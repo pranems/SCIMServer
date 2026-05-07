@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.42.0-beta.2 - **Updated:** May 6, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 4,996 tests (3,612 unit + 1,104 E2E + 280 web vitest)
+> **Version:** 0.42.0-beta.3 - **Updated:** May 6, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,009 tests (3,612 unit + 1,104 E2E + 293 web vitest)
 
 ---
 
@@ -47,6 +47,7 @@
 | [PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md](PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md) | **Phase A1 - TanStack Router Foundation** (v0.42.0-alpha.1) - additive scaffolding (10 route files + zod search schemas + test helper), +28 web tests, no production code wired in yet (A2 = cutover) |
 | [PHASE_A2_TANSTACK_ROUTER_CUTOVER.md](PHASE_A2_TANSTACK_ROUTER_CUTOVER.md) | **Phase A2 - TanStack Router Cutover** (v0.42.0-beta.1) - URL is now the single source of truth: RouterProvider wired, AppRouter regex matcher removed, currentPath/navigate stripped from Zustand, sidebar uses Link + useRouterState, EndpointDetailPage is layout-only with Outlet for tabs. +6 web tests (274 total), 1.03s build |
 | [PHASE_A3_PER_PAGE_URL_STATE.md](PHASE_A3_PER_PAGE_URL_STATE.md) | **Phase A3 - Per-Page URL State** (v0.42.0-beta.2) - pagination + filter inputs hoisted into URL via useSearch + useNavigate. UsersTab/GroupsTab/LogsTab/LogsPage/EndpointsPage all URL-driven. +6 web tests (280 total) |
+| [PHASE_A4_ROUTE_LOADERS.md](PHASE_A4_ROUTE_LOADERS.md) | **Phase A4 - Route Loaders + Hover-Prefetch** (v0.42.0-beta.3) - per-route loaders pre-fetch data via queryClient.ensureQueryData; combined with `<Link>` + defaultPreload:'intent', hovering warms cache before click. Shared `xxxQueryOptions()` helpers as single source of truth. +13 web tests (293 total) |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **Active 6-week delivery plan** - reconciles UI redesign + Tier-0 security + CI/CD upgrades into one operating model with named defects, TDD process, blue/green to prod, progress log |
 | [adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md) | ADR-004 - keep `enableImplicitConversion: true` (S-5 closure with regression-locked decision) |
 

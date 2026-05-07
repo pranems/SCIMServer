@@ -20,13 +20,14 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
 import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
+import { queryClient } from '../api/query-client';
 
 const useStyles = makeStyles({
   root: {
@@ -47,16 +48,11 @@ const useStyles = makeStyles({
   },
 });
 
-/** Shared QueryClient - configured with sensible defaults */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,          // 30s before refetch
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+/**
+ * Shared QueryClient is now a module-level singleton in api/query-client
+ * so route loaders (web/src/router.ts) can pre-fetch into the same
+ * cache instance the components read via useQuery.
+ */
 
 interface AppShellProps {
   children?: React.ReactNode;

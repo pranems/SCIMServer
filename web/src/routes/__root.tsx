@@ -13,11 +13,26 @@
  * <RouterProvider router={router} />. The legacy AppRouter regex matcher
  * has been removed from AppShell.
  *
- * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
+ * Phase A4 (loaders): the root route is created with
+ * `createRootRouteWithContext<{ queryClient }>()` so per-route `loader`
+ * functions can call `context.queryClient.ensureQueryData(...)` to
+ * pre-fetch data while the next route renders.
+ *
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2/A4
  */
 import React from 'react';
-import { createRootRoute, Outlet } from '@tanstack/react-router';
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import type { QueryClient } from '@tanstack/react-query';
 import { AppShell } from '../layout/AppShell';
+
+/**
+ * Type of the router context. Loaders receive an object of this shape
+ * via `loader: ({ context }) => ...` so they can call
+ * `context.queryClient.ensureQueryData(opts)`.
+ */
+export interface RouterContext {
+  queryClient: QueryClient;
+}
 
 /**
  * Lazy-load the devtools so they are tree-shaken from production bundles.
@@ -42,6 +57,6 @@ function RootLayout(): React.JSX.Element {
   );
 }
 
-export const rootRoute = createRootRoute({
+export const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
 });

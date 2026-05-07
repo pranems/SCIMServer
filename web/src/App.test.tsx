@@ -50,6 +50,18 @@ describe('App', () => {
       value: { ...window.location, search: '?ui=legacy' },
       writable: true,
     });
+    // Phase A4: route loaders (web/src/router.ts) call fetch via
+    // queryClient.ensureQueryData on initial mount. Without a global
+    // fetch stub the loaders hang and TanStack Router doesn't show the
+    // route's children, so the app-shell testid never appears. Stub
+    // fetch with a permissive empty-success response - individual
+    // tests can still override per-call.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+    }) as unknown as typeof fetch;
   });
 
   // ── Token Modal ────────────────────────────────────────────────────

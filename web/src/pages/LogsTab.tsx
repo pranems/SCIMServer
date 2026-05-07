@@ -18,8 +18,8 @@ import {
   Subtitle2,
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { fetchWithAuth } from '../api/queries';
 import { useQuery } from '@tanstack/react-query';
+import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -52,22 +52,16 @@ interface LogsTabProps {
   endpointId: string;
 }
 
-/** Hook to fetch logs for an endpoint */
+/** Hook to fetch logs for an endpoint - delegates to the shared queryOptions. */
 export function useEndpointLogs(endpointId: string, page: number, search: string, pageSize: number = DEFAULT_PAGE_SIZE) {
-  return useQuery<{ items: any[]; total: number; page: number; pageSize: number; hasNext: boolean; hasPrev: boolean }>({
-    queryKey: ['endpoint-logs', endpointId, page, pageSize, search],
-    queryFn: () => {
-      const params = new URLSearchParams({
-        endpointId,
-        pageSize: String(pageSize),
-        page: String(page),
-      });
-      if (search) params.set('urlContains', search);
-      return fetchWithAuth(`/scim/admin/logs?${params.toString()}`);
-    },
-    enabled: !!endpointId,
-    staleTime: 10_000,
-  });
+  return useQuery(
+    endpointLogsQueryOptions({
+      endpointId,
+      page,
+      pageSize,
+      urlContains: search || undefined,
+    }),
+  );
 }
 
 export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {

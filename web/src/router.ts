@@ -36,6 +36,7 @@ import { logsTabRoute } from './routes/endpoints.$endpointId.logs';
 import { settingsTabRoute } from './routes/endpoints.$endpointId.settings';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
+import { queryClient } from './api/query-client';
 
 /** Endpoint detail layout with its 5 nested tab routes (overview + 4 explicit). */
 const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
@@ -61,11 +62,16 @@ export const routeTree = rootRoute.addChildren([
  *   navigation feel instant.
  * - defaultPreloadStaleTime mirrors the TanStack Query default so we
  *   don't double-fetch.
+ * - context: { queryClient } is consumed by per-route loaders that call
+ *   context.queryClient.ensureQueryData(...) to pre-fetch data before
+ *   the matched component renders. Phase A4 wires this for every route
+ *   with a meaningful initial fetch.
  */
 export const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 30_000,
+  context: { queryClient },
 });
 
 /**

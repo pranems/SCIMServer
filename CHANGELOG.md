@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta.3] - 2026-05-06
+
+### UI Redesign - Phase A4: Route Loaders + Hover-Prefetch
+
+**Every route now pre-fetches its data via `queryClient.ensureQueryData(...)` so hovering a navigation link warms the TanStack Query cache before the user clicks. By the time the route mounts, data is in cache and the component renders synchronously - no spinner.**
+
+#### New module: `web/src/api/query-client.ts`
+
+Hoisted the `QueryClient` out of `AppShell.tsx` into a module-level singleton. Both the `<QueryClientProvider>` (mounted by AppShell) and the TanStack Router `context` consume the same instance, so loader writes are immediately readable by component hooks.
+
+#### `queries.ts` refactor: extracted `xxxQueryOptions(...)` helpers
+
+Each `useQuery` hook is now a thin wrapper around a matching `xxxQueryOptions(...)` helper. Loaders pass the same options object to `queryClient.ensureQueryData(...)`. Single source of truth for queryKey + queryFn + staleTime per resource - prevents loader/hook drift.
+
+New exports (10 helpers):
+- `dashboardQueryOptions()`, `healthQueryOptions()`, `versionQueryOptions()`
+- `endpointsQueryOptions()`, `endpointDetailQueryOptions(id)`, `endpointStatsQueryOptions(id)`
+- `endpointUsersQueryOptions(id, params)`, `endpointGroupsQueryOptions(id, params)`
+- `endpointLogsQueryOptions({...})`, `globalLogsQueryOptions({...})`
+
+LogsTab + LogsPage refactored to use the shared options instead of inline `useQuery` + `fetchWithAuth` calls.
+
+#### `__root.tsx`: `createRootRouteWithContext<{ queryClient }>()`
+
+Makes the router context typed so every `loader: ({ context }) => ...` gets a typed `context.queryClient`.
+
+#### `router.ts`: passes `context: { queryClient }` to `createRouter`
+
+No runtime cost - just hands the singleton to loaders.
+
+#### Per-route loaders
+
+10 loaders wired (one per production route):
+- `/` -> `dashboardQueryOptions()`
+- `/endpoints` -> `endpointsQueryOptions()`
+- `/endpoints/$endpointId` (layout) -> `endpointDetailQueryOptions(id)` (shared by all child tabs)
+- `/endpoints/$endpointId/` (overview index) -> `endpointStatsQueryOptions(id)`
+- `/endpoints/$endpointId/users` -> `endpointUsersQueryOptions(id, { startIndex, count, filter })` with `loaderDeps` extracting `page/pageSize/filter` from URL search
+- `/endpoints/$endpointId/groups` -> `endpointGroupsQueryOptions(id, ...)` (same pattern)
+- `/endpoints/$endpointId/logs` -> `endpointLogsQueryOptions({ endpointId, page, pageSize, urlContains })`
+- `/endpoints/$endpointId/settings` -> `endpointStatsQueryOptions(id)`
+- `/logs` -> `globalLogsQueryOptions({ urlContains })`
+- `/settings` -> parallel `Promise.all([versionQueryOptions(), healthQueryOptions()])`
+
+`loaderDeps` on URL-search-driven routes ensures TanStack Router only re-runs the loader when the relevant search params change - changing an unrelated param doesn't force a refetch.
+
+#### Tests +13 (web vitest 280 -> 293)
+
+- **[router-loaders.test.ts](web/src/router-loaders.test.ts) (NEW, 12 tests)**: structural - asserts every production route has `options.loader: function` (one test per route via `it.each`). Plus router context exposes queryClient, plus default preload options preserved.
+- **[router-loaders.integration.test.tsx](web/src/router-loaders.integration.test.tsx) (NEW, 1 test)**: end-to-end - mounts an in-memory router whose home route uses `dashboardQueryOptions()` as both loader and component query. Stubs fetch with sentinel payload, asserts (a) component renders sentinel data on first paint (no "cold" intermediate state), (b) `globalThis.fetch` was called exactly once - the loader's call - because `useQuery` hit warm cache.
+- **[App.test.tsx](web/src/App.test.tsx) (modified)**: "renders new Fluent UI by default" cutover test now sees a real `<RouterProvider>` whose loaders call fetch. Added permissive `globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => ({}) })` in `beforeEach` so loaders resolve and the AppShell stub appears.
+
+#### Test counts
+- Web: 280 -> **293** vitest tests (+13)
+- API: 3,612 unit + 1,104 E2E (unchanged - frontend-only phase)
+- Production build: clean (`vite build` 10.02s)
+- TypeScript: 0 errors in touched files
+
+#### Why this matters
+- **Perceived performance**: hovering a sidebar link warms the next page's data. Server roundtrip happens during user mouse travel, not after click.
+- **Single source of truth**: `xxxQueryOptions()` helpers force loader + hook to agree on URL/key/staleTime
+- **Sets up Phase A5**: Playwright tests can assert initial paint shows data (not spinner) when warm
+- **Sets up Phase E (mutations)**: invalidations after mutation cause matching `ensureQueryData` to refetch on next route visit
+- New feature doc: [docs/PHASE_A4_ROUTE_LOADERS.md](docs/PHASE_A4_ROUTE_LOADERS.md) (8 sections, 1 Mermaid diagram - hover-prefetch flow, route/loader matrix, risk register)
+
 ## [0.42.0-beta.2] - 2026-05-06
 
 ### UI Redesign - Phase A3: Per-Page URL-Driven State

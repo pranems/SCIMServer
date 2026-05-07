@@ -20,7 +20,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { fetchWithAuth } from '../api/queries';
+import { globalLogsQueryOptions } from '../api/queries';
 import type { GlobalLogsSearch } from '../routes/search-schemas';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
@@ -63,11 +63,9 @@ export const LogsPage: React.FC = () => {
     });
   };
 
-  const { data, isLoading, error } = useQuery<{ items: any[]; total: number }>({
-    queryKey: ['global-logs', urlContains],
-    queryFn: () => fetchWithAuth(`/scim/admin/logs?pageSize=50${urlContains ? `&urlContains=${encodeURIComponent(urlContains)}` : ''}`),
-    staleTime: 10_000,
-  });
+  const { data, isLoading, error } = useQuery(
+    globalLogsQueryOptions({ urlContains: urlContains || undefined }),
+  );
 
   if (isLoading) {
     return (
