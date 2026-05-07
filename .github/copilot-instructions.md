@@ -135,6 +135,34 @@ When working on development projects:
 - NEVER rewrite history on commits that have been pushed
 - Always use `git add -A; git commit -m "<descriptive message>"` for saving progress
 
+## Schema-Characteristic Test Rule (CRITICAL - RFC 7643 §2.2 + §7)
+
+When writing tests against `/Schemas` attribute definitions (unit, E2E, or live), the test MUST:
+
+1. **Check for the presence** of the attribute characteristic in the published schema.
+2. **If present:** enforce the published value as authoritative (validate it is a valid SCIM keyword, or use it as the expected value).
+3. **If absent:** substitute the RFC 7643 §2.2 default for that characteristic before asserting.
+
+NEVER hardcode an expected characteristic value (e.g. `expect(attr.uniqueness).toBe('none')`) without going through the present/default branch. Doing so creates churn every time a preset legitimately tightens or relaxes a characteristic and produces silent regressions like the May 2026 Group.displayName uniqueness flip.
+
+**RFC 7643 §2.2 defaults when a characteristic is omitted:**
+
+| Characteristic | Default |
+|---|---|
+| `required` | `false` |
+| `caseExact` | `false` |
+| `mutability` | `readWrite` |
+| `returned` | `default` |
+| `uniqueness` | `none` |
+| `multiValued` | `false` |
+| `type` | `"string"` |
+
+**TypeScript helper:** `api/test/e2e/helpers/schema-characteristics.helper.ts` exports `effectiveCharacteristic()`, `expectEffectiveCharacteristic()`, and `expectCharacteristicIn()`. Always use these in `*.e2e-spec.ts` instead of raw `attr.<key>` access.
+
+**PowerShell helper (live-test.ps1):** Use `Get-EffectiveUniqueness` (and add a similar function for any other characteristic before asserting it). Never write `Test-Result -Success ($attr.<characteristic> -eq "<value>")` without going through the effective-value computation.
+
+**Tightening allowance:** Per RFC 7643 §7 a server MAY enforce uniqueness/mutability stricter than what it advertises (e.g. advertise `uniqueness:none` while enforcing `server`). Tests that verify "the server publishes a valid keyword and the runtime enforcement is consistent" must use `expectCharacteristicIn(attr, key, VALID_<KEYWORD>)`, not a single-value `toBe()`.
+
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 
 Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:

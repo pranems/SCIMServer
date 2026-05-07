@@ -9,6 +9,13 @@ import {
   scimBasePath,
 } from './helpers/request.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
+import {
+  findAttribute,
+  findSubAttribute,
+  expectEffectiveCharacteristic,
+  expectCharacteristicIn,
+  VALID_UNIQUENESS,
+} from './helpers/schema-characteristics.helper';
 
 describe('Discovery Endpoints (E2E)', () => {
   let app: INestApplication;
@@ -94,61 +101,73 @@ describe('Discovery Endpoints (E2E)', () => {
     });
 
     // ─── P1: Schema attribute characteristics compliance ─────────────
+    //
+    // Standing rule (RFC 7643 §2.2 + §7):
+    //   Tests MUST check whether a characteristic is published; enforce the
+    //   published value if present, otherwise substitute the RFC default.
+    //   See test/e2e/helpers/schema-characteristics.helper.ts.
 
     it('should include caseExact:false on all User name sub-attributes (R-SUB-1)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User`, token).expect(200);
-      const nameAttr = res.body.attributes.find((a: any) => a.name === 'name');
+      const nameAttr = findAttribute(res.body, 'name');
       expect(nameAttr).toBeDefined();
       const expectedSubs = ['formatted', 'familyName', 'givenName', 'middleName', 'honorificPrefix', 'honorificSuffix'];
       for (const subName of expectedSubs) {
-        const sub = nameAttr.subAttributes.find((s: any) => s.name === subName);
+        const sub = findSubAttribute(nameAttr, subName);
         expect(sub).toBeDefined();
-        expect(sub.caseExact).toBe(false);
+        // Effective caseExact MUST resolve to false (RFC default, may be absent or explicit false)
+        expectEffectiveCharacteristic(sub, 'caseExact', false);
       }
     });
 
     it('should include caseExact:false on all User addresses sub-attributes (R-SUB-3)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User`, token).expect(200);
-      const addrAttr = res.body.attributes.find((a: any) => a.name === 'addresses');
+      const addrAttr = findAttribute(res.body, 'addresses');
       expect(addrAttr).toBeDefined();
       const expectedSubs = ['formatted', 'streetAddress', 'locality', 'region', 'postalCode', 'country'];
       for (const subName of expectedSubs) {
-        const sub = addrAttr.subAttributes.find((s: any) => s.name === subName);
+        const sub = findSubAttribute(addrAttr, subName);
         expect(sub).toBeDefined();
-        expect(sub.caseExact).toBe(false);
+        expectEffectiveCharacteristic(sub, 'caseExact', false);
       }
     });
 
-    it('should include uniqueness:none on User externalId (R-UNIQ-1)', async () => {
+    it('should publish a valid uniqueness keyword on User externalId (RFC 7643 §8.7.1 baseline=none, server may tighten)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User`, token).expect(200);
-      const extId = res.body.attributes.find((a: any) => a.name === 'externalId');
+      const extId = findAttribute(res.body, 'externalId');
       expect(extId).toBeDefined();
-      expect(extId.uniqueness).toBe('none');
+      // Effective uniqueness must be one of the RFC keywords. Absent => RFC
+      // default 'none'. Server is allowed to tighten to 'server' or 'global'.
+      expectCharacteristicIn(extId, 'uniqueness', VALID_UNIQUENESS);
     });
 
     it('should include $ref sub-attribute on Group members with referenceTypes (R-REF-1)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
-      const membersAttr = res.body.attributes.find((a: any) => a.name === 'members');
+      const membersAttr = findAttribute(res.body, 'members');
       expect(membersAttr).toBeDefined();
-      const refSub = membersAttr.subAttributes.find((s: any) => s.name === '$ref');
+      const refSub = findSubAttribute(membersAttr, '$ref');
       expect(refSub).toBeDefined();
-      expect(refSub.type).toBe('reference');
-      expect(refSub.mutability).toBe('immutable');
-      expect(refSub.referenceTypes).toEqual(['User', 'Group']);
+      expect(refSub!.type).toBe('reference');
+      // mutability for $ref is fixed by RFC 7643 §4.2 to 'immutable'
+      expectEffectiveCharacteristic(refSub, 'mutability', 'immutable');
+      expect(refSub!.referenceTypes).toEqual(['User', 'Group']);
     });
 
-    it('should include uniqueness:none on Group displayName (RFC 7643 §8.7.1 baseline)', async () => {
+    it('should publish a valid uniqueness keyword on Group displayName (RFC 7643 §8.7.1 baseline=none, server may tighten)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
-      const displayName = res.body.attributes.find((a: any) => a.name === 'displayName');
+      const displayName = findAttribute(res.body, 'displayName');
       expect(displayName).toBeDefined();
-      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 - presets may tighten to 'server'
+      // RFC 7643 §8.7.1 publishes 'none' for Group.displayName; servers MAY
+      // tighten to 'server' or 'global' per §7. The test enforces presence
+      // of a valid keyword, not a specific policy choice.
+      expectCharacteristicIn(displayName, 'uniqueness', VALID_UNIQUENESS);
     });
 
-    it('should include uniqueness:none on Group externalId (R-UNIQ-1)', async () => {
+    it('should publish a valid uniqueness keyword on Group externalId (RFC 7643 §8.7.1 baseline=none, server may tighten)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
-      const extId = res.body.attributes.find((a: any) => a.name === 'externalId');
+      const extId = findAttribute(res.body, 'externalId');
       expect(extId).toBeDefined();
-      expect(extId.uniqueness).toBe('none');
+      expectCharacteristicIn(extId, 'uniqueness', VALID_UNIQUENESS);
     });
   });
 

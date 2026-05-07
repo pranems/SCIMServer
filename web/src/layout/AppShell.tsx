@@ -1,10 +1,18 @@
 /**
  * AppShell - main layout container for the redesigned UI.
  *
- * Composes: Header (top) + Sidebar (left) + Content (right).
- * Wrapped in FluentProvider with light/dark theme.
+ * Composes: Header (top) + Sidebar (left) + Content (right). Wrapped in
+ * FluentProvider with light/dark theme, TanStack QueryClientProvider, and
+ * TokenGate. Content area renders whatever children the caller passes -
+ * in production this is the TanStack Router <Outlet /> from __root.tsx.
+ *
+ * Phase A2 (cutover): the legacy AppRouter regex matcher has been removed.
+ * URL is the single source of truth for view state, driven by the
+ * <RouterProvider /> mounted in App.tsx and rendered into this shell via
+ * the root route's <AppShell><Outlet /></AppShell> composition.
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D1
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
 import React from 'react';
 import {
@@ -12,17 +20,14 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
+import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
-import { DashboardPage } from '../pages/DashboardPage';
-import { EndpointsPage } from '../pages/EndpointsPage';
-import { EndpointDetailPage } from '../pages/EndpointDetailPage';
-import { LogsPage } from '../pages/LogsPage';
-import { SettingsPage } from '../pages/SettingsPage';
+import { queryClient } from '../api/query-client';
 
 const useStyles = makeStyles({
   root: {
@@ -43,16 +48,11 @@ const useStyles = makeStyles({
   },
 });
 
-/** Shared QueryClient - configured with sensible defaults */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,          // 30s before refetch
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+/**
+ * Shared QueryClient is now a module-level singleton in api/query-client
+ * so route loaders (web/src/router.ts) can pre-fetch into the same
+ * cache instance the components read via useQuery.
+ */
 
 interface AppShellProps {
   children?: React.ReactNode;
@@ -73,45 +73,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   return (
     <FluentProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
-        <SSEProvider />
-        <div className={classes.root} data-testid="app-shell">
-          <AppHeader />
-          <div className={classes.body}>
-            <AppSidebar />
-            <main className={classes.content} data-testid="app-content">
-              {children ?? <PlaceholderDashboard />}
-            </main>
+        <TokenGate>
+          <SSEProvider />
+          <div className={classes.root} data-testid="app-shell">
+            <AppHeader />
+            <div className={classes.body}>
+              <AppSidebar />
+              <main className={classes.content} data-testid="app-content">
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
+        </TokenGate>
       </QueryClientProvider>
     </FluentProvider>
   );
-};
-
-/** Placeholder until Phase 2 dashboard page is built */
-const PlaceholderDashboard: React.FC = () => {
-  // Simple pathname-based routing until TanStack Router is wired with real pages
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
-
-  // /endpoints/:id -> EndpointDetailPage
-  const endpointDetailMatch = pathname.match(/^\/endpoints\/([^/]+)/);
-  if (endpointDetailMatch) {
-    return <EndpointDetailPage endpointId={endpointDetailMatch[1]} />;
-  }
-
-  if (pathname === '/endpoints') {
-    return <EndpointsPage />;
-  }
-
-  if (pathname === '/logs') {
-    return <LogsPage />;
-  }
-
-  if (pathname === '/settings') {
-    return <SettingsPage />;
-  }
-
-  return <DashboardPage />;
 };
 
 /** SSE connection provider - invalidates TanStack Query cache on SCIM events */

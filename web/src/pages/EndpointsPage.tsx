@@ -1,9 +1,14 @@
 /**
  * EndpointsPage - card grid showing all endpoints with live stats.
  *
+ * Phase A3: free-text filter `q` lives in the URL via
+ * endpointsSearchSchema. Empty input normalizes to undefined so URLs
+ * stay clean.
+ *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.2
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   makeStyles,
   tokens,
@@ -14,15 +19,16 @@ import {
   Spinner,
   SearchBox,
   Subtitle1,
-  Body1,
   Caption1,
 } from '@fluentui/react-components';
 import {
   Server24Regular,
-  People20Regular,
-  PeopleTeam20Regular,
 } from '@fluentui/react-icons';
 import { useEndpoints } from '../api/queries';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import type { EndpointsSearch } from '../routes/search-schemas';
+
+const ENDPOINTS_ROUTE_PATH = '/endpoints' as const;
 
 const useStyles = makeStyles({
   page: {
@@ -70,7 +76,18 @@ const useStyles = makeStyles({
 export const EndpointsPage: React.FC = () => {
   const classes = useStyles();
   const { data, isLoading, error } = useEndpoints();
-  const [search, setSearch] = useState('');
+  const search = useSearch({ strict: false }) as Partial<EndpointsSearch>;
+  const q = search.q ?? '';
+  const navigate = useNavigate();
+
+  const setQ = (value: string): void => {
+    navigate({
+      to: ENDPOINTS_ROUTE_PATH,
+      search: () => ({
+        q: value.trim() === '' ? undefined : value,
+      }),
+    });
+  };
 
   if (isLoading) {
     return (
@@ -89,11 +106,11 @@ export const EndpointsPage: React.FC = () => {
   }
 
   const endpoints = data?.endpoints ?? [];
-  const filtered = search
+  const filtered = q
     ? endpoints.filter(
         (ep) =>
-          ep.name.toLowerCase().includes(search.toLowerCase()) ||
-          ep.displayName?.toLowerCase().includes(search.toLowerCase()),
+          ep.name.toLowerCase().includes(q.toLowerCase()) ||
+          ep.displayName?.toLowerCase().includes(q.toLowerCase()),
       )
     : endpoints;
 
@@ -103,8 +120,8 @@ export const EndpointsPage: React.FC = () => {
         <Subtitle1>Endpoints ({endpoints.length})</Subtitle1>
         <SearchBox
           placeholder="Filter endpoints..."
-          value={search}
-          onChange={(_, d) => setSearch(d.value)}
+          value={q}
+          onChange={(_, d) => setQ(d.value)}
           data-testid="endpoints-search"
         />
       </div>
@@ -115,6 +132,7 @@ export const EndpointsPage: React.FC = () => {
             key={ep.id}
             className={classes.card}
             data-testid={`endpoint-${ep.id}`}
+            onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: ep.id } })}
           >
             <CardHeader
               image={<Server24Regular />}
@@ -134,14 +152,7 @@ export const EndpointsPage: React.FC = () => {
               }
             />
             <div className={classes.cardBody}>
-              <div className={classes.stat}>
-                <People20Regular />
-                <Body1>users</Body1>
-              </div>
-              <div className={classes.stat}>
-                <PeopleTeam20Regular />
-                <Body1>groups</Body1>
-              </div>
+              <Caption1 style={{ fontFamily: 'monospace' }}>{ep.scimBasePath}</Caption1>
             </div>
           </Card>
         ))}
@@ -149,7 +160,7 @@ export const EndpointsPage: React.FC = () => {
 
       {filtered.length === 0 && (
         <div className={classes.center}>
-          <Text>{search ? 'No matching endpoints.' : 'No endpoints configured.'}</Text>
+          <Text>{q ? 'No matching endpoints.' : 'No endpoints configured.'}</Text>
         </div>
       )}
     </div>

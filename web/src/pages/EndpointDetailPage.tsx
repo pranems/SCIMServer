@@ -1,38 +1,40 @@
 /**
- * EndpointDetailPage - tabbed detail view for a single SCIM endpoint.
+ * EndpointDetailPage - tabbed detail layout for a single SCIM endpoint.
  *
  * Tabs: Overview | Users | Groups | Logs | Settings
- * Each tab is a separate content panel; data from TanStack Query.
+ *
+ * Phase A2 (cutover): this component is now a pure LAYOUT. The active tab
+ * is read from the URL via TanStack Router (useRouterState) and the tab
+ * content is rendered through <Outlet /> from the nested route tree:
+ *
+ *   /endpoints/$endpointId/         -> OverviewTab  (index route)
+ *   /endpoints/$endpointId/users    -> UsersTab
+ *   /endpoints/$endpointId/groups   -> GroupsTab
+ *   /endpoints/$endpointId/logs     -> LogsTab
+ *   /endpoints/$endpointId/settings -> SettingsTab
+ *
+ * Tab clicks call useNavigate() to push the new URL; the back button uses
+ * <Link to="/endpoints">. The legacy useState<TabValue> + Zustand navigate
+ * have been removed.
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.3
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   makeStyles,
   tokens,
-  Card,
   Text,
   Badge,
+  Button,
   Spinner,
   Tab,
   TabList,
   Subtitle1,
-  Subtitle2,
-  Body1,
   Caption1,
 } from '@fluentui/react-components';
-import {
-  People24Regular,
-  PeopleTeam24Regular,
-  PeopleCommunity24Regular,
-  DocumentText24Regular,
-} from '@fluentui/react-icons';
-import { useEndpoint, useEndpointStats } from '../api/queries';
-import type { EndpointStatsResponse } from '@scim/types/dashboard.types';
-import { UsersTab } from './UsersTab';
-import { GroupsTab } from './GroupsTab';
-import { LogsTab } from './LogsTab';
-import { SettingsTab } from './SettingsTab';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { useEndpoint } from '../api/queries';
 
 const useStyles = makeStyles({
   page: {
@@ -53,31 +55,6 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
     color: tokens.colorNeutralForeground3,
   },
-  kpiRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '12px',
-  },
-  kpiCard: {
-    padding: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  kpiIcon: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorBrandBackground2,
-    color: tokens.colorBrandForeground2,
-  },
-  kpiValues: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
   tabContent: {
     marginTop: '8px',
   },
@@ -87,11 +64,6 @@ const useStyles = makeStyles({
     alignItems: 'center',
     minHeight: '200px',
   },
-  placeholder: {
-    padding: '24px',
-    textAlign: 'center' as const,
-    color: tokens.colorNeutralForeground3,
-  },
 });
 
 type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings';
@@ -100,12 +72,24 @@ interface EndpointDetailPageProps {
   endpointId: string;
 }
 
+/** Derive the active tab from the current pathname. */
+function pathToTab(pathname: string, endpointId: string): TabValue {
+  const base = `/endpoints/${endpointId}`;
+  if (pathname === base || pathname === `${base}/`) return 'overview';
+  if (pathname.startsWith(`${base}/users`)) return 'users';
+  if (pathname.startsWith(`${base}/groups`)) return 'groups';
+  if (pathname.startsWith(`${base}/logs`)) return 'logs';
+  if (pathname.startsWith(`${base}/settings`)) return 'settings';
+  return 'overview';
+}
+
 export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const [activeTab, setActiveTab] = useState<TabValue>('overview');
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const activeTab = pathToTab(pathname, endpointId);
 
   const { data: endpoint, isLoading: loadingEndpoint, error: endpointError } = useEndpoint(endpointId);
-  const { data: stats, isLoading: loadingStats } = useEndpointStats(endpointId);
 
   if (loadingEndpoint) {
     return (
@@ -123,8 +107,39 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
     );
   }
 
+  const handleTabSelect = (next: TabValue): void => {
+    if (next === 'overview') {
+      navigate({ to: '/endpoints/$endpointId', params: { endpointId } });
+      return;
+    }
+    if (next === 'users') {
+      navigate({ to: '/endpoints/$endpointId/users', params: { endpointId } });
+      return;
+    }
+    if (next === 'groups') {
+      navigate({ to: '/endpoints/$endpointId/groups', params: { endpointId } });
+      return;
+    }
+    if (next === 'logs') {
+      navigate({ to: '/endpoints/$endpointId/logs', params: { endpointId } });
+      return;
+    }
+    if (next === 'settings') {
+      navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } });
+    }
+  };
+
   return (
     <div className={classes.page} data-testid="endpoint-detail-page">
+      {/* Back button - real <Link> so middle-click / right-click work */}
+      <Link
+        to="/endpoints"
+        style={{ alignSelf: 'flex-start', marginBottom: '8px', textDecoration: 'none' }}
+        data-testid="back-to-endpoints"
+      >
+        <Button appearance="subtle">← Back to Endpoints</Button>
+      </Link>
+
       {/* Header: Name + Status */}
       <div className={classes.header}>
         <Subtitle1>{endpoint.displayName ?? endpoint.name}</Subtitle1>
@@ -143,10 +158,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Caption1>Created: {new Date(endpoint.createdAt).toLocaleDateString()}</Caption1>
       </div>
 
-      {/* Tab bar */}
+      {/* Tab bar - selectedValue comes from URL */}
       <TabList
         selectedValue={activeTab}
-        onTabSelect={(_, d) => setActiveTab(d.value as TabValue)}
+        onTabSelect={(_, d) => handleTabSelect(d.value as TabValue)}
       >
         <Tab value="overview">Overview</Tab>
         <Tab value="users">Users</Tab>
@@ -155,92 +170,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="settings">Settings</Tab>
       </TabList>
 
-      {/* Tab content */}
+      {/* Tab content - rendered by the matched child route via <Outlet /> */}
       <div className={classes.tabContent}>
-        {activeTab === 'overview' && (
-          <OverviewTab stats={stats} loading={loadingStats} />
-        )}
-        {activeTab === 'users' && (
-          <div data-testid="tab-users"><UsersTab endpointId={endpointId} /></div>
-        )}
-        {activeTab === 'groups' && (
-          <div data-testid="tab-groups"><GroupsTab endpointId={endpointId} /></div>
-        )}
-        {activeTab === 'logs' && (
-          <div data-testid="tab-logs"><LogsTab endpointId={endpointId} /></div>
-        )}
-        {activeTab === 'settings' && (
-          <div data-testid="tab-settings"><SettingsTab endpointId={endpointId} /></div>
-        )}
+        <Outlet />
       </div>
-    </div>
-  );
-};
-
-// ─── Overview tab ────────────────────────────────────────────────────
-
-interface OverviewTabProps {
-  stats?: EndpointStatsResponse;
-  loading: boolean;
-}
-
-const OverviewTab: React.FC<OverviewTabProps> = ({ stats, loading }) => {
-  const classes = useStyles();
-
-  if (loading || !stats) {
-    return (
-      <div className={classes.center} data-testid="tab-overview">
-        <Spinner label="Loading stats..." />
-      </div>
-    );
-  }
-
-  return (
-    <div data-testid="tab-overview">
-      <Subtitle2 style={{ marginBottom: '12px' }}>Resource Statistics</Subtitle2>
-      <div className={classes.kpiRow}>
-        <KpiCard icon={<People24Regular />} label="Users" value={stats.users.total} subtitle={`${stats.users.active} active`} />
-        <KpiCard icon={<PeopleTeam24Regular />} label="Groups" value={stats.groups.total} subtitle={`${stats.groups.active} active`} />
-        <KpiCard icon={<PeopleCommunity24Regular />} label="Members" value={stats.groupMembers.total} />
-        <KpiCard icon={<DocumentText24Regular />} label="Requests" value={stats.requestLogs.total} />
-      </div>
-    </div>
-  );
-};
-
-// ─── Shared sub-components ───────────────────────────────────────────
-
-interface KpiCardProps {
-  icon: React.ReactElement;
-  label: string;
-  value: number;
-  subtitle?: string;
-}
-
-const KpiCard: React.FC<KpiCardProps> = ({ icon, label, value, subtitle }) => {
-  const classes = useStyles();
-  return (
-    <Card className={classes.kpiCard}>
-      <div className={classes.kpiIcon}>{icon}</div>
-      <div className={classes.kpiValues}>
-        <Text size={500} weight="semibold">{value}</Text>
-        <Caption1>{label}</Caption1>
-        {subtitle && <Caption1>{subtitle}</Caption1>}
-      </div>
-    </Card>
-  );
-};
-
-interface PlaceholderTabProps {
-  name: string;
-  testId: string;
-}
-
-const PlaceholderTab: React.FC<PlaceholderTabProps> = ({ name, testId }) => {
-  const classes = useStyles();
-  return (
-    <div className={classes.placeholder} data-testid={testId}>
-      <Body1>{name} tab - coming in Phase 2.4+</Body1>
     </div>
   );
 };

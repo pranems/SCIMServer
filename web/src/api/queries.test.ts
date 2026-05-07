@@ -98,3 +98,47 @@ describe('fetchWithAuth', () => {
     expect(result).toEqual({ version: '0.41.0' });
   });
 });
+
+describe('URL contract validation', () => {
+  // These tests verify the URLs constructed by query hooks match the
+  // backend route patterns. Catches /v2/ vs no-/v2/ mismatches.
+
+  const savedFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ totalResults: 0, Resources: [] }),
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = savedFetch;
+  });
+
+  it('Users endpoint URL has no /v2/ segment', async () => {
+    await fetchWithAuth('/scim/endpoints/ep-1/Users');
+    const calledUrl = (globalThis.fetch as any).mock.calls[0][0];
+    expect(calledUrl).toBe('/scim/endpoints/ep-1/Users');
+    expect(calledUrl).not.toContain('/v2/');
+  });
+
+  it('Groups endpoint URL has no /v2/ segment', async () => {
+    await fetchWithAuth('/scim/endpoints/ep-1/Groups');
+    const calledUrl = (globalThis.fetch as any).mock.calls[0][0];
+    expect(calledUrl).toBe('/scim/endpoints/ep-1/Groups');
+    expect(calledUrl).not.toContain('/v2/');
+  });
+
+  it('dashboard URL is /scim/admin/dashboard', async () => {
+    await fetchWithAuth('/scim/admin/dashboard');
+    const calledUrl = (globalThis.fetch as any).mock.calls[0][0];
+    expect(calledUrl).toBe('/scim/admin/dashboard');
+  });
+
+  it('endpoint stats URL is /scim/admin/endpoints/:id/stats', async () => {
+    await fetchWithAuth('/scim/admin/endpoints/ep-1/stats');
+    const calledUrl = (globalThis.fetch as any).mock.calls[0][0];
+    expect(calledUrl).toBe('/scim/admin/endpoints/ep-1/stats');
+  });
+});

@@ -1,5 +1,8 @@
 /**
  * GroupsTab - SCIM group list table for an endpoint.
+ *
+ * Phase A3: pagination lives in the URL (`?page=N&pageSize=N`) via
+ * TanStack Router. State is derived from groupsSearchSchema.
  */
 import React from 'react';
 import {
@@ -7,11 +10,16 @@ import {
   tokens,
   Text,
   Badge,
+  Button,
   Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
+import type { GroupsSearch } from '../routes/search-schemas';
+
+const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -22,6 +30,7 @@ const useStyles = makeStyles({
   tr: { ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   center: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' },
   empty: { textAlign: 'center' as const, padding: '32px', color: tokens.colorNeutralForeground3 },
+  pagination: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '12px 0' },
 });
 
 interface GroupsTabProps {
@@ -30,7 +39,21 @@ interface GroupsTabProps {
 
 export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const { data, isLoading, error } = useEndpointGroups(endpointId);
+  const search = useSearch({ strict: false }) as Partial<GroupsSearch>;
+  const page = search.page ?? 1;
+  const pageSize = search.pageSize ?? 20;
+  const navigate = useNavigate();
+  const startIndex = (page - 1) * pageSize + 1;
+
+  const goToPage = (nextPage: number): void => {
+    navigate({
+      to: GROUPS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as GroupsSearch), page: nextPage }),
+    });
+  };
+
+  const { data, isLoading, error } = useEndpointGroups(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
     return (
@@ -92,6 +115,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
           ))}
         </tbody>
       </table>
+
+      {total > pageSize && (
+        <div className={classes.pagination} data-testid="groups-pagination">
+          <Button appearance="subtle" disabled={page <= 1} onClick={() => goToPage(Math.max(1, page - 1))}>Previous</Button>
+          <Text>Page {page}</Text>
+          <Button appearance="subtle" disabled={startIndex + pageSize > total} onClick={() => goToPage(page + 1)}>Next</Button>
+        </div>
+      )}
     </div>
   );
 };

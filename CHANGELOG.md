@@ -7,6 +7,220 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta.3] - 2026-05-06
+
+### UI Redesign - Phase A4: Route Loaders + Hover-Prefetch
+
+**Every route now pre-fetches its data via `queryClient.ensureQueryData(...)` so hovering a navigation link warms the TanStack Query cache before the user clicks. By the time the route mounts, data is in cache and the component renders synchronously - no spinner.**
+
+#### New module: `web/src/api/query-client.ts`
+
+Hoisted the `QueryClient` out of `AppShell.tsx` into a module-level singleton. Both the `<QueryClientProvider>` (mounted by AppShell) and the TanStack Router `context` consume the same instance, so loader writes are immediately readable by component hooks.
+
+#### `queries.ts` refactor: extracted `xxxQueryOptions(...)` helpers
+
+Each `useQuery` hook is now a thin wrapper around a matching `xxxQueryOptions(...)` helper. Loaders pass the same options object to `queryClient.ensureQueryData(...)`. Single source of truth for queryKey + queryFn + staleTime per resource - prevents loader/hook drift.
+
+New exports (10 helpers):
+- `dashboardQueryOptions()`, `healthQueryOptions()`, `versionQueryOptions()`
+- `endpointsQueryOptions()`, `endpointDetailQueryOptions(id)`, `endpointStatsQueryOptions(id)`
+- `endpointUsersQueryOptions(id, params)`, `endpointGroupsQueryOptions(id, params)`
+- `endpointLogsQueryOptions({...})`, `globalLogsQueryOptions({...})`
+
+LogsTab + LogsPage refactored to use the shared options instead of inline `useQuery` + `fetchWithAuth` calls.
+
+#### `__root.tsx`: `createRootRouteWithContext<{ queryClient }>()`
+
+Makes the router context typed so every `loader: ({ context }) => ...` gets a typed `context.queryClient`.
+
+#### `router.ts`: passes `context: { queryClient }` to `createRouter`
+
+No runtime cost - just hands the singleton to loaders.
+
+#### Per-route loaders
+
+10 loaders wired (one per production route):
+- `/` -> `dashboardQueryOptions()`
+- `/endpoints` -> `endpointsQueryOptions()`
+- `/endpoints/$endpointId` (layout) -> `endpointDetailQueryOptions(id)` (shared by all child tabs)
+- `/endpoints/$endpointId/` (overview index) -> `endpointStatsQueryOptions(id)`
+- `/endpoints/$endpointId/users` -> `endpointUsersQueryOptions(id, { startIndex, count, filter })` with `loaderDeps` extracting `page/pageSize/filter` from URL search
+- `/endpoints/$endpointId/groups` -> `endpointGroupsQueryOptions(id, ...)` (same pattern)
+- `/endpoints/$endpointId/logs` -> `endpointLogsQueryOptions({ endpointId, page, pageSize, urlContains })`
+- `/endpoints/$endpointId/settings` -> `endpointStatsQueryOptions(id)`
+- `/logs` -> `globalLogsQueryOptions({ urlContains })`
+- `/settings` -> parallel `Promise.all([versionQueryOptions(), healthQueryOptions()])`
+
+`loaderDeps` on URL-search-driven routes ensures TanStack Router only re-runs the loader when the relevant search params change - changing an unrelated param doesn't force a refetch.
+
+#### Tests +13 (web vitest 280 -> 293)
+
+- **[router-loaders.test.ts](web/src/router-loaders.test.ts) (NEW, 12 tests)**: structural - asserts every production route has `options.loader: function` (one test per route via `it.each`). Plus router context exposes queryClient, plus default preload options preserved.
+- **[router-loaders.integration.test.tsx](web/src/router-loaders.integration.test.tsx) (NEW, 1 test)**: end-to-end - mounts an in-memory router whose home route uses `dashboardQueryOptions()` as both loader and component query. Stubs fetch with sentinel payload, asserts (a) component renders sentinel data on first paint (no "cold" intermediate state), (b) `globalThis.fetch` was called exactly once - the loader's call - because `useQuery` hit warm cache.
+- **[App.test.tsx](web/src/App.test.tsx) (modified)**: "renders new Fluent UI by default" cutover test now sees a real `<RouterProvider>` whose loaders call fetch. Added permissive `globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => ({}) })` in `beforeEach` so loaders resolve and the AppShell stub appears.
+
+#### Test counts
+- Web: 280 -> **293** vitest tests (+13)
+- API: 3,612 unit + 1,104 E2E (unchanged - frontend-only phase)
+- Production build: clean (`vite build` 10.02s)
+- TypeScript: 0 errors in touched files
+
+#### Why this matters
+- **Perceived performance**: hovering a sidebar link warms the next page's data. Server roundtrip happens during user mouse travel, not after click.
+- **Single source of truth**: `xxxQueryOptions()` helpers force loader + hook to agree on URL/key/staleTime
+- **Sets up Phase A5**: Playwright tests can assert initial paint shows data (not spinner) when warm
+- **Sets up Phase E (mutations)**: invalidations after mutation cause matching `ensureQueryData` to refetch on next route visit
+- New feature doc: [docs/PHASE_A4_ROUTE_LOADERS.md](docs/PHASE_A4_ROUTE_LOADERS.md) (8 sections, 1 Mermaid diagram - hover-prefetch flow, route/loader matrix, risk register)
+
+## [0.42.0-beta.2] - 2026-05-06
+
+### UI Redesign - Phase A3: Per-Page URL-Driven State
+
+**Pagination + filter inputs now live in the URL via TanStack Router's `useSearch` + `useNavigate`. Five list/filter views migrated from `useState` to URL-driven state, parsed by zod schemas defined in [search-schemas.ts](web/src/routes/search-schemas.ts) (Phase A1).**
+
+#### Components migrated
+- **[UsersTab.tsx](web/src/pages/UsersTab.tsx)**: `useState(startIndex)` removed; reads `page`/`pageSize` from `useSearch({ strict: false })`; Prev/Next buttons call `useNavigate({ to: '/endpoints/$endpointId/users', params, search: prev => ({...prev, page: N}) })`.
+- **[GroupsTab.tsx](web/src/pages/GroupsTab.tsx)**: same pattern with `groupsSearchSchema`.
+- **[LogsTab.tsx](web/src/pages/LogsTab.tsx)**: `useState(page)` + `useState(search)` removed; URL holds both `page` and `urlContains`. SearchBox typing dispatches navigate that resets to page 1 (typical filter-input UX). `useEndpointLogs` hook now accepts pageSize as a parameter so URL `?pageSize=50` flows through to the queryKey.
+- **[LogsPage.tsx](web/src/pages/LogsPage.tsx)**: `useState(search)` removed; reads `urlContains` from URL (globalLogsSearchSchema). Empty input normalizes to `undefined` before navigate so URLs stay clean (`?urlContains=` collapses to `/logs`).
+- **[EndpointsPage.tsx](web/src/pages/EndpointsPage.tsx)**: free-text filter `q` lives in the URL; SearchBox typing updates URL on every keystroke; client-side filter list derives from URL value.
+
+#### Test helper enhancement
+- **[router-test-utils.tsx](web/src/test/router-test-utils.tsx)** gained a `validateSearch?: (raw) => unknown` option so tests can mount a route with the same zod schema production uses. Prior to A3 the test route had no `validateSearch`, so `useSearch` returned raw URLSearchParams strings; now tests get the same parsed/coerced shape (numbers as numbers, defaults applied) as the live router.
+
+#### Test changes (+6)
+- **[router-test-utils.test.tsx](web/src/test/router-test-utils.test.tsx) +1**: "runs validateSearch when supplied so URL strings are coerced"
+- **[UsersTab.test.tsx](web/src/pages/UsersTab.test.tsx) +1**: "reads page from URL search params (?page=2 -> startIndex=21)"; existing "next button" test rewritten to assert hook re-invocation after navigate.
+- **[GroupsTab.test.tsx](web/src/pages/GroupsTab.test.tsx) +1**: same URL-driven page test as Users.
+- **[LogsTab.test.tsx](web/src/pages/LogsTab.test.tsx) +1**: "reads urlContains and page from URL search params" - asserts the queryKey passed to mockUseQuery includes the URL-derived page (3) and filter (`'Users'`).
+- **[LogsPage.test.tsx](web/src/pages/LogsPage.test.tsx) +1**: "reads urlContains from URL search params (queryKey changes)".
+- **[EndpointsPage.test.tsx](web/src/pages/EndpointsPage.test.tsx) +1**: "reads q filter from URL search params" - mounted at `/endpoints?q=dev` shows only the dev endpoint card, prod card filtered out.
+- All existing tests rewritten to use `renderWithRouter` instead of plain `render` + `QueryClientProvider` + `FluentProvider` since `useSearch`/`useNavigate` now require router context.
+
+#### Test counts
+- Web: 274 -> **280** vitest tests (+6)
+- API: 3,612 unit + 1,104 E2E (unchanged - frontend-only phase)
+- Production build: clean (`vite build` 10.36s)
+- TypeScript: 0 errors in touched files
+
+#### Why this matters
+- Views are now bookmarkable / shareable via URL (`/endpoints/abc/users?page=3` works on refresh + back-button navigation)
+- Browser back/forward navigates filter and pagination history, not just route changes
+- Removes ad-hoc `useState` + popstate juggling - URL is the single source of truth
+- Sets up Phase A4 loaders to prefetch data based on URL search params
+- New feature doc: [docs/PHASE_A3_PER_PAGE_URL_STATE.md](docs/PHASE_A3_PER_PAGE_URL_STATE.md) (9 sections, 1 Mermaid diagram, URL contract table, risk register)
+
+## [0.42.0-beta.1] - 2026-05-06
+
+### UI Redesign - Phase A2: TanStack Router Cutover
+
+**Cutover commit. The legacy `currentPath` Zustand field, `navigate(path)` action, popstate listener, and the `AppRouter` regex matcher inside [AppShell.tsx](web/src/layout/AppShell.tsx) are all gone. URL is now the single source of truth for view state, owned by TanStack Router via `<RouterProvider />`.**
+
+#### What changed
+- **App.tsx**: default branch returns `<RouterProvider router={router} />`; `?ui=legacy` escape hatch retained one more release for operator rollback.
+- **AppShell.tsx**: stripped 5 page imports + the `AppRouter` regex matcher component. Now pure layout chrome (FluentProvider + QueryClientProvider + TokenGate + Header + Sidebar + `<main>{children}</main>`). The `__root` route renders `<AppShell><Outlet /></AppShell>`.
+- **AppSidebar.tsx**: `<a onClick={preventDefault + navigate}>` replaced with TanStack `<Link to={item.href}>`. Active-route highlight now reads pathname from `useRouterState({ select: s => s.location.pathname })` instead of `useUIStore.currentPath`. New `data-testid={\`nav-${item.key}\`}` attribute exposes link href for tests.
+- **ui-store.ts**: removed `currentPath` field, `navigate(path)` action, and the popstate listener. Zustand now holds 3 values only: `sidebarCollapsed`, `commandPaletteOpen`, `colorScheme`.
+- **DashboardPage.tsx, EndpointsPage.tsx**: card click handlers switched from `useUIStore.navigate(\`/endpoints/${id}\`)` to `useNavigate()({ to: '/endpoints/$endpointId', params: { endpointId } })`.
+- **EndpointDetailPage.tsx**: rewritten as a pure layout component. Removed `useState<TabValue>('overview')`, inline `OverviewTab`/`KpiCard`/`PlaceholderTab` sub-components, and the `{ activeTab === '...' && ... }` content switch. Active tab now derived from URL via `useRouterState`; tab content rendered through `<Outlet />`. Back button is a real `<Link to="/endpoints">` so middle-click and right-click work.
+- **OverviewTab.tsx (new)**: extracted from EndpointDetailPage as a standalone component bound to its own route (the `/` index child of `/endpoints/$endpointId`). Calls `useEndpointStats(endpointId)` directly.
+- **endpoints.$endpointId.index.tsx (new)**: new TanStack Router index child of the endpoint detail layout. Mounts `OverviewTab` at the bare `/endpoints/$endpointId` URL so the overview surface still appears when no other tab is active.
+- **__root.tsx**: now composes `<AppShell><Outlet /></AppShell>` (was bare `<Outlet />`). AppShell still owns the FluentProvider/QueryClientProvider/TokenGate stack so route content renders inside the same chrome as before.
+
+#### Test changes
+- **OverviewTab.test.tsx (new, +3 tests)**: loading state, KPI rendering, active-user subtitle.
+- **AppShell.test.tsx (+1 test, all wrapped in `renderWithRouter`)**: AppSidebar's `useRouterState` requires router context; new test asserts each nav item is a `<Link>` with the correct `href`. State-mutation assertions wrapped in `waitFor`.
+- **EndpointDetailPage.test.tsx (+2 tests, reshaped)**: rewritten as layout-only assertions wrapped in `renderWithRouter`. KPI assertions moved to OverviewTab.test.tsx. New tests assert URL-driven `aria-selected` per tab and that the back button renders an `<Link>` with `href="/endpoints"`.
+- **App.test.tsx (1 test made async)**: "renders new Fluent UI by default" now uses `await screen.findByTestId('app-shell')` because `RouterProvider` resolves the initial route asynchronously.
+- **router.test.ts (assertion updated)**: now expects 5 nested children under `endpointDetailRoute` (was 4) - the new index child for OverviewTab.
+
+#### Test counts
+- Web: 268 -> **274** vitest tests (+6: 3 OverviewTab + 1 AppShell nav-link + 2 EndpointDetailPage URL-driven)
+- API: 3,612 unit + 1,104 E2E (unchanged - frontend-only phase)
+- Production build: clean (`vite build` 1.03s)
+- Bundle size: 725.15 kB -> 873.94 kB (gzip 200.49 -> 243.95 kB). The +148 kB unminified is the runtime cost of TanStack Router being actually invoked instead of just imported. Phase H6 will introduce `size-limit` budgets.
+- TypeScript: 0 errors in touched files
+
+#### Quality gates
+- TDD discipline maintained throughout (tests updated before implementation in each affected file).
+- New feature doc [docs/PHASE_A2_TANSTACK_ROUTER_CUTOVER.md](docs/PHASE_A2_TANSTACK_ROUTER_CUTOVER.md) (10 sections, 2 Mermaid diagrams, risk register, behavior verification matrix, definition-of-done).
+- Live tests + dev deploy run as part of A2 closure (next step in this phase).
+
+#### What did not ship in A2 (deferred to A3+)
+- `useState(PAGE_SIZE)` in UsersTab/GroupsTab/LogsTab still owns pagination state -> Phase A3 will hoist into URL via `validateSearch`
+- `urlContains` filter on logs still local state -> A3
+- `preload="intent"` on Links not yet wired to actual loader functions -> A4
+- `?ui=legacy` switch + ~3,000 lines of legacy AppContent code retained -> Phase I1
+
+## [0.42.0-alpha.1] - 2026-05-06
+
+### UI Redesign - Phase A1: TanStack Router Foundation (Additive)
+
+**First step of [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md). Pure scaffolding - no production code path uses the new router yet. Cutover happens in Phase A2 (`0.42.0-beta.1`).**
+
+- **feat(ui-router) A1.1** (commit `5a2a911`): Installed `zod` (runtime, for URL search-param schemas) and `@tanstack/router-devtools` (devDependency, lazy-loaded only in `import.meta.env.DEV`). Caught and corrected an initial install that placed devtools in `dependencies`.
+- **feat(ui-router) A1.2** (commit `dbdc0ef`): TDD-first creation of [web/src/routes/search-schemas.ts](web/src/routes/search-schemas.ts) with six zod schemas (`paginationSchema`, `usersSearchSchema`, `groupsSearchSchema`, `logsSearchSchema`, `globalLogsSearchSchema`, `endpointsSearchSchema`) and `TIME_RANGE_VALUES` constant. Conventions: `page` 1-indexed, `pageSize` capped at 100, `z.coerce.number()` for URL strings, empty-string filter normalized to `undefined`. **+20 unit tests.**
+- **feat(ui-router) A1.3-A1.5** (commit `c06ebcf`): TanStack Router route tree shipped as one coherent commit (route files cross-reference each other; splitting creates non-compiling intermediate states). New files: [web/src/routes/__root.tsx](web/src/routes/__root.tsx) (RootLayout = `<Outlet />` + dev-only `TanStackRouterDevtools` via `React.lazy`), [web/src/routes/index.tsx](web/src/routes/index.tsx), [web/src/routes/endpoints.tsx](web/src/routes/endpoints.tsx) with `endpointsSearchSchema` validateSearch, [web/src/routes/endpoints.$endpointId.tsx](web/src/routes/endpoints.$endpointId.tsx) layout route with typed `$endpointId` param, four nested tab routes (`endpoints.$endpointId.users.tsx`, `.groups.tsx`, `.logs.tsx`, `.settings.tsx`) each with their own search schema, [web/src/routes/logs.tsx](web/src/routes/logs.tsx) with `globalLogsSearchSchema`, [web/src/routes/settings.tsx](web/src/routes/settings.tsx). Assembly file [web/src/router.ts](web/src/router.ts) builds the tree (`endpointDetailRoute.addChildren([usersTab, groupsTab, logsTab, settingsTab])`, `rootRoute.addChildren([...])`), exports configured `router` with `defaultPreload: 'intent'` + `defaultPreloadStaleTime: 30_000`, and registers TypeScript module augmentation so `useParams`/`useSearch` infer the correct types in consumer components. **+4 unit tests** ([web/src/router.test.ts](web/src/router.test.ts)).
+- **feat(ui-router) A1.6** (commit `de8133a`): Created [web/src/test/router-test-utils.tsx](web/src/test/router-test-utils.tsx) - `renderWithRouter(ui, { initialUrl, routePath, ...renderOptions })` mounts UI inside fresh in-memory router so `useParams`, `useSearch`, and `<Link>` work in tests. Fresh `QueryClient` per call (retry: false, staleTime: Infinity); catch-all default `routePath: '/$'` with opt-in typed params via `routePath: '/endpoints/$endpointId/users'`. Tests use async `findByTestId` because `RouterProvider` resolves the initial route asynchronously (documented in helper JSDoc). **+4 unit tests** ([web/src/test/router-test-utils.test.tsx](web/src/test/router-test-utils.test.tsx)).
+- **chore(ui-router) A1.9-A1.10**: Version bumped to `0.42.0-alpha.1` in both [api/package.json](api/package.json) and [web/package.json](web/package.json) (lockstep). New feature doc [docs/PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md](docs/PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md) with 9 sections, 2 Mermaid diagrams (route tree, test helper sequence), risk register, and definition-of-done checklist. Updated [docs/INDEX.md](docs/INDEX.md) and [Session_starter.md](Session_starter.md).
+
+#### What did NOT ship in A1 (deferred to A2 cutover)
+- [web/src/App.tsx](web/src/App.tsx) still uses old structure (no `<RouterProvider />`)
+- [web/src/layout/AppShell.tsx](web/src/layout/AppShell.tsx) still uses `AppRouter` regex matcher
+- [web/src/store/ui-store.ts](web/src/store/ui-store.ts) still has `currentPath`, `navigate()`, popstate listener
+- Sidebar/Dashboard/Endpoints pages still use Zustand `navigate` (will become `<Link>` in A2)
+
+#### Test Counts (web only - API unchanged)
+- Web: 240 -> 268 vitest tests (+28: 20 schemas, 4 router config, 4 test helper). All passing.
+- API: 3,612 unit + 1,104 E2E (unchanged - A1 is frontend-only)
+- Production build: `vite build` clean (9.51s)
+- TypeScript: 0 errors in new files
+
+#### Quality Gates
+- **TDD discipline**: every step Red -> Green (test file created first, confirmed failing, then implementation)
+- **Live tests + dev deploy**: deferred to A2 cutover (A1 is additive, zero runtime impact - no behavior to live-test)
+- **Per-phase gates** (`addMissingTests`, `apiContractVerification`, etc.): run as block at A2 cutover when behavior changes
+
+### Tooling
+- **feat(dev-tooling)**: Prod -> dev mirror + synthetic shape-coverage seeder. New scripts [api/src/scripts/mirror-prod-to-dev.ts](api/src/scripts/mirror-prod-to-dev.ts) (two `PrismaClient` instances, upsert-by-PK with PII verbatim, orphan filtering, capped `RequestLog` window) and [api/src/scripts/seed-shape-coverage.ts](api/src/scripts/seed-shape-coverage.ts) (6 deterministic-UUID `shape-*` endpoints covering RFC strict / Entra lenient / custom extension / soft-delete-only / per-endpoint creds / custom resource type, with 3 users + 2 groups each = ~30 SCIM resources for full combinatorial coverage). PowerShell orchestrator [scripts/mirror-prod-to-dev.ps1](scripts/mirror-prod-to-dev.ps1) auto-resolves DB URLs from Container App secrets, opens/removes temporary PG firewall rules, scrubs env on exit. New npm aliases `mirror:prod-to-dev` and `seed:shape-coverage`. New doc [docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md](docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md). Updated [docs/INDEX.md](docs/INDEX.md).
+
+### Planning
+- **docs(ui-redesign)**: Created [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md) - dependency-ordered Phases A-I to reach 100% UI redesign compliance with [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md). Verified 38% complete; identifies all gaps (BFF Overview endpoint, mutation layer, Activity/Schemas/Credentials tabs, Cmd+K, MSW, axe-core, visual regression, coverage gates, legacy cleanup). Includes 4 Mermaid diagrams (dependency graph, mutation sequence, cutover state diagram, deploy state machine), risk register, test coverage targets (~120 new tests), TDD/quality-gates discipline. 12-16 day estimate. Updated [docs/INDEX.md](docs/INDEX.md). Phase A (TanStack Router migration) starts next.
+
+## [0.41.0] - 2026-05-04
+
+### UI Redesign - Full Fluent UI v9 Frontend
+
+**Complete UI redesign from legacy tab-based app to modern Fluent UI v9 admin dashboard.**
+
+#### Backend BFF (UI-B1 through UI-B6)
+- **feat(ui-b1)**: Shared TypeScript type contracts (`dashboard.types.ts`) + `@scim/types` Vite alias for compile-time API/UI contract enforcement
+- **feat(ui-b2)**: `StatsProjectionService` - materialized in-memory counter cache with EventEmitter2 `@OnEvent` decorators, 60s periodic reconciliation, per-endpoint error isolation. Zero DB queries for dashboard stats. 39 unit tests.
+- **feat(ui-b3)**: Event emission from all 3 SCIM services (Users/Groups/Generic) - `USER_CREATED`, `USER_DELETED`, `USER_STATUS_CHANGED`, `GROUP_CREATED`, `GROUP_DELETED`, `RESOURCE_CREATED`, `RESOURCE_DELETED` events emitted after successful DB commit
+- **feat(ui-b4)**: `NameResolverService` - LRU cache (1000 entries, 5-min TTL) with batch `resolveUserNames()` for N+1 elimination in activity feed. 13 unit tests.
+- **perf(ui-b5)**: Cache version/container info at `AdminController` construction - eliminates per-request `package.json` + `/proc/self/cgroup` reads
+- **feat(ui-b6)**: `DashboardController` BFF - `GET /admin/dashboard` aggregates health, stats, endpoints, activity in single response with 0 DB queries. 9 unit tests.
+
+#### Frontend (Phases 1-5)
+- **Phase 1**: Fluent UI v9 design system (light/dark themes), TanStack Query v5, Zustand store, AppShell layout (collapsible sidebar + header), `fetchWithAuth` API wrapper, `?ui=next` feature flag. 16 tests.
+- **Phase 2**: DashboardPage (4 KPI cards, endpoint grid, activity feed), EndpointsPage (card grid with search), EndpointDetailPage (tabbed layout: Overview|Users|Groups|Logs|Settings), UsersTab (data table with active badges), GroupsTab (member counts), LogsTab (method/status badges), SettingsTab (config flags). 40 tests.
+- **Phase 3**: LogsPage (global logs with URL search), SettingsPage (version/health/storage info cards). 5 tests.
+- **Phase 4**: SSE real-time cache invalidation via `useSSE` hook - EventSource with exponential backoff reconnect, TanStack Query cache invalidation on SCIM mutation events. 6 tests.
+- **Phase 5**: Cutover - new Fluent UI is now the default, `?ui=legacy` preserved for rollback.
+
+#### Dependencies Added
+- `@fluentui/react-components`, `@fluentui/react-icons` (design system)
+- `@tanstack/react-query`, `@tanstack/react-router` (server state + routing)
+- `zustand` (client state - 3 values: sidebar, theme, command palette)
+- `recharts` (charts), `msw` (dev - API mocking)
+- `@nestjs/event-emitter` (backend EventEmitter2)
+
+#### Test Counts
+- API: 3,612 unit tests (95 suites) - ALL PASSING
+- Web: 233 vitest tests (29 files) - ALL PASSING
+- Total: 3,845 tests
+- Production build: succeeds
+
 ### Ops - OPS-2: Digest Pinning in promote-to-prod
 
 - **fix(scripts)**: `scripts/promote-to-prod.ps1` now resolves the dev image's immutable SHA-256 digest BEFORE updating production. Production is pinned with `image@sha256:<digest>` instead of the previous mutable `image:<tag>` form. A re-pushed tag can no longer silently change prod after promotion.

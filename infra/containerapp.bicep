@@ -59,6 +59,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: env.id
     // workloadProfileName omitted - uses default consumption model
     configuration: {
+      // OPS-5: Multiple revisions mode enables blue/green deployment with
+      // traffic splitting. New revisions deploy at 0% traffic, get smoke-tested,
+      // then traffic is flipped. Old revision stays running for instant rollback.
+      activeRevisionsMode: 'Multiple'
       ingress: {
         external: true
         targetPort: targetPort
@@ -142,7 +146,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               // Allow up to (10 + 5*30) = 160s for prisma migrate deploy + boot
               type: 'Startup'
               httpGet: {
-                path: '/health'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -155,7 +159,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Liveness'
               httpGet: {
-                path: '/health'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -166,7 +170,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Readiness'
               httpGet: {
-                path: '/health'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }

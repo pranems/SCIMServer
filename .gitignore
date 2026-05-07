@@ -46,11 +46,17 @@ test-results/
 # Test artifacts (historical JSON snapshots — never commit)
 api/test-artifacts/
 
-# Test output files (generated per run — never commit)
+# Test output files (generated per run - never commit)
 *-live-output*.txt
 *-live-pipeline*.txt
 *-live-test-output*.txt
 live-test-output.txt
+az-*.txt
+azure-*.txt
+docker-live-*.txt
+himanshu-*.json
+log-level-*.txt
+standalone-live-*.txt
 api/e2e-*.txt
 api/e2e-*.json
 api/test-out*.txt
@@ -102,3 +108,5 @@ workflows.json
 # Stale API collection exports (superseded by versioned copies)
 docs/insomnia/SCIMServer_v031_*.json
 docs/postman/SCIMServer_v031_*.json
+
+api/.dev-db.tmp

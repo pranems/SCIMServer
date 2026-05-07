@@ -50,6 +50,18 @@ describe('App', () => {
       value: { ...window.location, search: '?ui=legacy' },
       writable: true,
     });
+    // Phase A4: route loaders (web/src/router.ts) call fetch via
+    // queryClient.ensureQueryData on initial mount. Without a global
+    // fetch stub the loaders hang and TanStack Router doesn't show the
+    // route's children, so the app-shell testid never appears. Stub
+    // fetch with a permissive empty-success response - individual
+    // tests can still override per-call.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+    }) as unknown as typeof fetch;
   });
 
   // ── Token Modal ────────────────────────────────────────────────────
@@ -173,15 +185,17 @@ describe('App', () => {
   // ── UI Cutover ─────────────────────────────────────────────────────
 
   describe('UI cutover (Phase 5)', () => {
-    it('renders new Fluent UI by default', () => {
+    it('renders new Fluent UI by default', async () => {
       // Override to no query param (default)
       Object.defineProperty(window, 'location', {
         value: { ...window.location, search: '' },
         writable: true,
       });
       render(<App />);
-      // Default is now the new AppShell
-      expect(screen.getByTestId('app-shell')).toBeInTheDocument();
+      // Default is now the TanStack Router-driven AppShell. RouterProvider
+      // resolves the initial route asynchronously, so the AppShell chrome
+      // shows up via findByTestId rather than the synchronous getByTestId.
+      expect(await screen.findByTestId('app-shell')).toBeInTheDocument();
     });
 
     it('renders legacy UI with ?ui=legacy', () => {

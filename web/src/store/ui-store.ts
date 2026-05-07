@@ -1,10 +1,13 @@
 /**
  * Zustand store for client-only UI state.
  *
- * Only 3 values - everything else is server state managed by TanStack Query.
- * D4: Zustand chosen for 1KB size, zero boilerplate.
+ * Only 3 values - everything else is server state managed by TanStack
+ * Query. Routing is now owned by TanStack Router (see web/src/router.ts);
+ * the previous `currentPath`, `navigate`, and popstate listener have been
+ * removed in Phase A2 cutover.
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D4
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
 import { create } from 'zustand';
 

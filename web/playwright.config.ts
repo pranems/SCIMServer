@@ -12,9 +12,10 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:4000',
     headless: true,
-    screenshot: 'only-on-failure',
+    screenshot: 'on',
     trace: 'retain-on-failure',
     actionTimeout: 5_000,
+    viewport: { width: 1440, height: 900 },
   },
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },

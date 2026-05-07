@@ -10,6 +10,7 @@
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { StatsProjectionService } from './stats-projection.service';
+import { EndpointService } from '../endpoint/services/endpoint.service';
 import {
   SCIM_EVENTS,
   type EndpointStatsSnapshot,
@@ -144,7 +145,7 @@ describe('StatsProjectionService', () => {
         { provide: USER_REPOSITORY, useValue: userRepo },
         { provide: GROUP_REPOSITORY, useValue: groupRepo },
         { provide: GENERIC_RESOURCE_REPOSITORY, useValue: genericRepo },
-        { provide: 'EndpointService', useValue: mockEndpointService },
+        { provide: EndpointService, useValue: mockEndpointService },
       ],
     }).compile();
 

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RouterProvider } from '@tanstack/react-router';
+import { router } from './router';
 import { fetchLogs, clearLogs, fetchLog, RequestLogItem, LogQuery, LogListResponse, fetchLocalVersion, VersionInfo, DeploymentInfo } from './api/client';
 import { TOKEN_INVALID_EVENT } from './auth/token';
 import { LogList } from './components/LogList';
@@ -10,7 +12,6 @@ import { ActivityFeed } from './components/activity/ActivityFeed';
 import { ManualProvision } from './components/manual/ManualProvision';
 import { ThemeProvider } from './hooks/useTheme';
 import { useAuth, AuthProvider } from './hooks/useAuth';
-import { AppShell } from './layout/AppShell';
 import './theme.css';
 import styles from './app.module.css';
 import { isKeepaliveLog } from './utils/keepalive';
@@ -682,24 +683,27 @@ const AppWithTheme: React.FC = () => {
 /**
  * Root App component with UI toggle.
  *
- * Phase 5 Cutover:
- * - Default: renders new Fluent UI redesigned shell (AppShell)
- * - ?ui=legacy: renders old tab-based UI (AppWithTheme)
- * - ?ui=next: also renders new UI (kept for backwards compat)
+ * Phase A2 cutover (v0.42.0-beta.1):
+ * - Default: renders <RouterProvider /> with the TanStack Router instance
+ *   from web/src/router.ts. The router's __root route mounts the AppShell
+ *   layout (FluentProvider + QueryClientProvider + TokenGate + chrome) and
+ *   the active route renders into <Outlet />.
+ * - ?ui=legacy: renders the original tab-based AppContent for one release
+ *   cycle as an emergency rollback escape hatch.
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D9
- * @see docs/DELIVERY_PLAN.md Phase 5
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
 export const App: React.FC = () => {
   const params = new URLSearchParams(window.location.search);
   const uiFlag = params.get('ui');
 
   if (uiFlag === 'legacy') {
-    // Opt-in to legacy UI for one release cycle
+    // Opt-in to legacy UI for one release cycle.
     return <AppWithTheme />;
   }
 
-  // Default: new Fluent UI shell
-  return <AppShell />;
+  // Default: TanStack Router-driven Fluent UI shell.
+  return <RouterProvider router={router} />;
 };
 

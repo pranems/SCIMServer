@@ -38,7 +38,8 @@ COPY --from=web-build /web/dist ./public
 # by docker-entrypoint.sh.
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate && \
-    npx tsc -p tsconfig.build.json
+    rm -rf dist && \
+    npx tsc -p tsconfig.build.json --incremental false
 
 #############################
 # Stage 3: Production-only dependencies

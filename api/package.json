@@ -1,6 +1,6 @@
 {
   "name": "scimserver-api",
-  "version": "0.40.0",
+  "version": "0.42.0-beta.3",
   "description": "SCIMServer backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",
@@ -30,7 +30,9 @@
     "build:standalone:full": "pwsh ../scripts/build-standalone.ps1 -IncludeNode -Zip",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
-    "check:trivyignore": "ts-node --transpile-only src/scripts/check-trivyignore.ts"
+    "check:trivyignore": "ts-node --transpile-only src/scripts/check-trivyignore.ts",
+    "mirror:prod-to-dev": "ts-node --transpile-only src/scripts/mirror-prod-to-dev.ts",
+    "seed:shape-coverage": "ts-node --transpile-only src/scripts/seed-shape-coverage.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.19",
