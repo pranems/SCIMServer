@@ -9,6 +9,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './modules/app/app.module';
 import { parseCorsOrigin } from './security/cors-origin';
+import { applySpaFallback } from './bootstrap/spa-fallback';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -69,12 +70,14 @@ async function bootstrap(): Promise<void> {
     index: false, // Don't serve index.html automatically
   });
 
-  // Serve the SPA index.html for all /admin* routes (client-side routing).
-  // Express middleware runs before NestJS routing, bypassing global prefix, guards, and filters.
-  const indexHtmlPath = join(__dirname, '..', 'public', 'index.html');
-  app.use('/admin', (_req: Request, res: Response) => {
-    res.sendFile(indexHtmlPath);
-  });
+  // Serve the SPA index.html for every URL prefix the TanStack Router
+  // owns (/admin legacy, /endpoints, /logs, /settings). Express middleware
+  // runs before NestJS routing, bypassing the global prefix, guards, and
+  // filters - so a deep link or hard refresh on /endpoints/abc/users
+  // returns the SPA shell instead of a NestJS 404. The list lives in
+  // src/bootstrap/spa-fallback.ts and is locked in by
+  // api/test/e2e/spa-fallback.e2e-spec.ts (Phase A5).
+  applySpaFallback(app);
 
   const globalPrefix = process.env.API_PREFIX ?? 'scim'; // still mounting at /scim internally
   app.setGlobalPrefix(globalPrefix, {

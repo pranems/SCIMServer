@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta.4] - 2026-05-06
+
+### UI Redesign - Phase A5: Playwright E2E + SPA Fallback Fix
+
+**Closes Phase A. Real-browser Playwright tests lock in every router contract A1-A4 proved in unit tests, AND surface a critical production bug: deep links to /endpoints, /logs, /settings returned a NestJS JSON 404 because only /admin had a SPA fallback. Fixed.**
+
+#### Critical bug surfaced & fixed
+- **Symptom**: Playwright "deep link to /endpoints loads endpoints page directly" returned `{"message":"Cannot GET /endpoints","error":"Not Found","statusCode":404}` instead of the SPA shell.
+- **Root cause**: pre-A5 [main.ts](api/src/main.ts) had a single inline `app.use('/admin', ...)` SPA fallback. Phase A1+ added `/endpoints`, `/logs`, `/settings` as URL-driven SPA routes with no NestJS controllers. In-app `<Link>` clicks worked (TanStack Router uses `history.pushState`, browser-side only), but a hard refresh, deep link, or share-a-link hit the server, NestJS routed through its global `/scim` prefix, found nothing, returned 404.
+- **Fix**: New module [api/src/bootstrap/spa-fallback.ts](api/src/bootstrap/spa-fallback.ts) exports `SPA_PATH_PREFIXES = ['/admin', '/endpoints', '/logs', '/settings']` and `applySpaFallback(app)`. The middleware reads index.html once at boot (cached body), serves it as `text/html` 200 for any GET under those prefixes. If the bundle is missing (test env without `vite build`), serves a placeholder HTML so deep-link refresh still produces a 200 instead of a 500. Mounted in [main.ts](api/src/main.ts) after `useStaticAssets` and before the global prefix is set. Legacy inline `/admin` block removed. Test app helper [api/test/e2e/helpers/app.helper.ts](api/test/e2e/helpers/app.helper.ts) updated to mirror this so E2E tests see the same middleware stack as production.
+
+#### Phase A5 tests added
+- **[web/e2e/router-behavior.spec.ts](web/e2e/router-behavior.spec.ts) (NEW, 7 Playwright cases)**: clicking sidebar Link uses pushState (no reload) | browser back/forward navigates between visited routes | deep link to /endpoints loads directly | typing in endpoints search box updates URL ?q= | deep-link with ?q= preserves filter on refresh | logs page refresh preserves urlContains filter | hovering Endpoints sidebar link triggers /scim/admin/endpoints fetch before click (locks in A4 prefetch contract). Pre-authenticates via `addInitScript` to set `localStorage[scimserver.authToken]` BEFORE the app boots (TokenGate's `useState(!getStoredToken())` short-circuits to dialog when key is missing).
+- **[api/test/e2e/spa-fallback.e2e-spec.ts](api/test/e2e/spa-fallback.e2e-spec.ts) (NEW, 15 cases)**: every SPA path returns 200 text/html (root, /admin, /admin/anything, /endpoints, /endpoints/abc-123, /endpoints/abc-123/users, /endpoints/abc-123/users?page=2, /endpoints/abc-123/groups, /endpoints/abc-123/logs?urlContains=Users, /endpoints/abc-123/settings, /logs, /logs?endpointId=ep-1, /settings) plus 2 sanity cases that prove /scim/admin/version and /scim/health still return JSON (not html - the SPA fallback didn't shadow the API).
+- **[api/src/bootstrap/spa-fallback.spec.ts](api/src/bootstrap/spa-fallback.spec.ts) (NEW, 8 cases)**: SPA_PATH_PREFIXES contains the four current prefixes | every prefix is single-segment URL starting with / | resolveSpaIndexPath returns a path ending in public/index.html | resolveSpaIndexPath points at bundled SPA, not source tree | applySpaFallback calls app.use() once per prefix with a function handler | handler returns text/html with status 200 and a non-empty body | uses readFileSync once at startup, not per request | parent directory of resolved path exists in repo layout.
+
+#### Test counts
+- API unit: 3,612 -> **3,632** (+20: 8 new spa-fallback unit tests + 12 from churn since A4)
+- API E2E: 1,104 -> **1,119** (+15 spa-fallback)
+- Web vitest: **293** unchanged (frontend tests of router were already in A4)
+- Browser E2E (Playwright): **+7 cases** in router-behavior.spec.ts run against deployed dev (not part of CI vitest count)
+- Live SCIM tests: **869** unchanged - confirms zero backend regression
+
+#### Why this matters
+- Phase A complete - URL is the single source of truth across in-app navigation, browser back/forward, deep-link refresh, AND server-side SPA fallback. Every router contract is locked in by both unit (isolated) and Playwright (real browser) tests.
+- Bug that would have shipped to prod is caught and fixed BEFORE the v0.42.0 promotion. Without Phase A5 Playwright, deep links would 404 in production.
+- Sets up Phase B (BFF Overview endpoint + mutations layer): the test infrastructure for hover-prefetch and URL-driven state is mature enough to validate mutation invalidation flows.
+- New feature doc: [docs/PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md](docs/PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md) (8 sections, 1 Mermaid diagram - request flow showing SPA fallback vs API split, risk register, definition-of-done).
+
 ## [0.42.0-beta.3] - 2026-05-06
 
 ### UI Redesign - Phase A4: Route Loaders + Hover-Prefetch
