@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-05-06 - Phase B (BFF Overview + SSE Audit)
+
+### UI Redesign - Phase B (B1 + B2 + B3)
+
+**Closes plan step 0.7 (per-endpoint Overview BFF) and audits SSE wiring so the new TanStack Query keys introduced in Phase A actually get invalidated when SCIM mutations occur.**
+
+#### B1 - `GET /admin/endpoints/:endpointId/overview`
+
+New BFF method on [DashboardController](api/src/modules/dashboard/dashboard.controller.ts). Aggregates endpoint summary, stats, credentials, recent activity (last 10), and config flags into a single round trip with zero DB queries on warm cache. Reads from in-memory `StatsProjectionService`, `EndpointService` cache, and `EndpointCredentialRepository`.
+
+Response shape (locked in by tests at all 3 levels):
+```jsonc
+{
+  "endpoint": { "id", "name", "displayName", "preset" | null, "active", "scimBasePath", "createdAt" },
+  "stats": { "userCount", "activeUserCount", "groupCount", "activeGroupCount", "genericResourceCount" },
+  "credentials": [{ "id", "credentialType", "label", "active", "createdAt", "expiresAt" }],
+  "recentActivity": [{ "id", "timestamp", "method", "path", "statusCode", "durationMs" }],
+  "configFlags": { /* whatever is in profile.settings */ }
+}
+```
+
+**Critical: credential hash NEVER returned.** Asserted at unit (`expect(cred.credentialHash).toBeUndefined()`), E2E (walks every string field, fails if any contains the bcrypt `$2` prefix), and live (`9z-V.15` and `9z-V.16` both check the projection).
+
+New types in [api/src/shared/types/dashboard.types.ts](api/src/shared/types/dashboard.types.ts): `EndpointOverviewResponse`, `EndpointOverviewSummary`, `EndpointOverviewStats`, `EndpointOverviewCredential`, `EndpointOverviewActivity`. [DashboardModule](api/src/modules/dashboard/dashboard.module.ts) now imports `RepositoryModule.register()` so the credential repo is injectable.
+
+Tests: 7 unit + 3 E2E + 17 live (section 9z-V).
+
+#### B2 - `useEndpointOverview` frontend hook
+
+Replaces two separate hook calls (`useEndpoint` + `useEndpointStats`) in `OverviewTab` with one BFF call. Removes the waterfall on cold cache and adds a Credentials KPI card that previously couldn't render without a third request.
+
+Files: [web/src/api/queries.ts](web/src/api/queries.ts) (new `endpointOverviewQueryOptions` + `useEndpointOverview` + `queryKeys.endpoints.overview(id)`), [web/src/pages/OverviewTab.tsx](web/src/pages/OverviewTab.tsx) (new shape, error path, credentials KPI), [web/src/routes/endpoints.$endpointId.index.tsx](web/src/routes/endpoints.$endpointId.index.tsx) (loader switched from stats to overview).
+
+Tests: 5 unit (replaces 3 prior `useEndpointStats` tests; +2 new for credentials subtitle and error path).
+
+#### B3 - `useSSE` channel-aware invalidation
+
+Pre-B3 the hook always invalidated `dashboard` + `endpoints.all` + (when an endpointId was on the SSE payload) `endpoints.detail(id)` + `endpoints.stats(id)`. The new query keys introduced in Phase A1+ were NOT in the set:
+- `endpoints.overview(id)` - the Overview tab showed stale data after a SCIM mutation
+- `users.byEndpoint(id, ...)` and `groups.byEndpoint(id, ...)` - tab tables didn't refetch after row CRUD; user saw old list until the 30s staleTime kicked in
+
+B3 makes invalidation channel-aware: every supported event type is mapped to a `Channel` (users / groups / resources / credentials / endpoints) and the channel determines which keys to invalidate. Exported `computeInvalidations(type, endpointId)` so unit tests can lock in the mapping without spinning up an EventSource.
+
+New event types the hook now reacts to (emit-side wiring lands in Phase E):
+- `scim.credential.created` / `scim.credential.revoked`
+- `scim.endpoint.created` / `scim.endpoint.updated` / `scim.endpoint.deleted`
+
+Tests: 8 new in [web/src/hooks/useSSE.test.ts](web/src/hooks/useSSE.test.ts).
+
+#### Test counts
+- API unit: 3,632 -> **3,641** (+9: 7 B1 + 2 churn)
+- API E2E: 1,119 -> **1,122** (+3 B1)
+- Web vitest: 293 -> **303** (+10: 2 B2 + 8 B3)
+- Live SCIM tests: 869 -> **886** (+17 section 9z-V)
+- Browser E2E (Playwright): 7 unchanged (router contracts still hold)
+
+#### Why this matters
+- One round trip for the per-endpoint Overview tab (was three; cold cache went from 3 sequential RTTs to 1)
+- Credentials surface immediately on Overview - no extra fetch when the user opens the Credentials tab in Phase E
+- SSE-triggered cache invalidation now reaches every TanStack Query key the new UI uses; user sees fresh data within ~50 ms of the mutation event without polling
+- New feature doc: [docs/PHASE_B_BFF_OVERVIEW_AND_SSE.md](docs/PHASE_B_BFF_OVERVIEW_AND_SSE.md) (8 sections, 1 Mermaid diagram - SSE event -> invalidation channel mapping, risk register, definition-of-done)
+
 ## [0.42.0] - 2026-05-06 - Phase A complete (TanStack Router migration)
 
 ### UI Redesign - Phase A complete (A1+A2+A3+A4+A5)

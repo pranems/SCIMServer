@@ -22,6 +22,7 @@ import type {
   EndpointListResponse,
   EndpointResponse,
   EndpointStatsResponse,
+  EndpointOverviewResponse,
   VersionInfo,
   HealthResponse,
 } from '@scim/types/dashboard.types';
@@ -66,6 +67,7 @@ export const queryKeys = {
     all: ['endpoints'] as const,
     detail: (id: string) => ['endpoints', id] as const,
     stats: (id: string) => ['endpoints', id, 'stats'] as const,
+    overview: (id: string) => ['endpoints', id, 'overview'] as const,
   },
   logs: {
     all: (params?: Record<string, unknown>) => ['logs', params] as const,
@@ -122,6 +124,24 @@ export const endpointDetailQueryOptions = (id: string) => ({
 export const endpointStatsQueryOptions = (id: string) => ({
   queryKey: queryKeys.endpoints.stats(id),
   queryFn: () => fetchWithAuth<EndpointStatsResponse>(`/scim/admin/endpoints/${id}/stats`),
+  staleTime: 30_000,
+});
+
+/**
+ * Phase B1 BFF query options. Aggregates endpoint summary, stats,
+ * credentials, recent activity, and config flags into a single round
+ * trip with zero DB queries on warm cache. The OverviewTab uses this
+ * instead of stitching three separate hooks (useEndpoint +
+ * useEndpointStats + useEndpointCredentials), eliminating waterfall
+ * latency and duplicate network requests.
+ *
+ * @see api/src/modules/dashboard/dashboard.controller.ts
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase B1
+ */
+export const endpointOverviewQueryOptions = (id: string) => ({
+  queryKey: queryKeys.endpoints.overview(id),
+  queryFn: () =>
+    fetchWithAuth<EndpointOverviewResponse>(`/scim/admin/endpoints/${id}/overview`),
   staleTime: 30_000,
 });
 
@@ -255,6 +275,17 @@ export function useEndpoint(id: string) {
 export function useEndpointStats(id: string) {
   return useQuery<EndpointStatsResponse>({
     ...endpointStatsQueryOptions(id),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Fetch the per-endpoint Overview BFF response (Phase B1).
+ * One round trip; warm cache means zero spinner.
+ */
+export function useEndpointOverview(id: string) {
+  return useQuery<EndpointOverviewResponse>({
+    ...endpointOverviewQueryOptions(id),
     enabled: !!id,
   });
 }

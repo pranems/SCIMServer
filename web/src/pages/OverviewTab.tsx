@@ -4,6 +4,11 @@
  * Phase A2 (cutover): extracted from EndpointDetailPage so it can render
  * as the index child route of `/endpoints/$endpointId` via TanStack Router's
  * <Outlet /> mechanism instead of being switched in by component-local state.
+ *
+ * Phase B2: replaced two separate hooks (useEndpoint + useEndpointStats)
+ * with a single useEndpointOverview that hits the BFF endpoint added in
+ * Phase B1. One round trip, no waterfall, room to grow into the
+ * Activity / Credentials sub-sections without adding more hooks.
  */
 import React from 'react';
 import {
@@ -19,9 +24,9 @@ import {
   People24Regular,
   PeopleTeam24Regular,
   PeopleCommunity24Regular,
-  DocumentText24Regular,
+  Key24Regular,
 } from '@fluentui/react-icons';
-import { useEndpointStats } from '../api/queries';
+import { useEndpointOverview } from '../api/queries';
 
 const useStyles = makeStyles({
   kpiRow: {
@@ -55,6 +60,10 @@ const useStyles = makeStyles({
     alignItems: 'center',
     minHeight: '200px',
   },
+  errorBlock: {
+    padding: '16px',
+    color: tokens.colorPaletteRedForeground1,
+  },
 });
 
 interface OverviewTabProps {
@@ -63,24 +72,56 @@ interface OverviewTabProps {
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const { data: stats, isLoading } = useEndpointStats(endpointId);
+  const { data, isLoading, error } = useEndpointOverview(endpointId);
 
-  if (isLoading || !stats) {
+  if (isLoading || !data) {
     return (
       <div className={classes.center} data-testid="tab-overview">
-        <Spinner label="Loading stats..." />
+        <Spinner label="Loading overview..." />
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className={classes.errorBlock} data-testid="tab-overview-error">
+        <Text>Failed to load overview: {(error as Error).message}</Text>
+      </div>
+    );
+  }
+
+  const { stats, credentials } = data;
+  // Active credential count for the KPI card. The Credentials tab will
+  // render the full list and detail (Phase E2).
+  const activeCredentialCount = credentials.filter((c) => c.active).length;
 
   return (
     <div data-testid="tab-overview">
       <Subtitle2 style={{ marginBottom: '12px' }}>Resource Statistics</Subtitle2>
       <div className={classes.kpiRow}>
-        <KpiCard icon={<People24Regular />} label="Users" value={stats.users.total} subtitle={`${stats.users.active} active`} />
-        <KpiCard icon={<PeopleTeam24Regular />} label="Groups" value={stats.groups.total} subtitle={`${stats.groups.active} active`} />
-        <KpiCard icon={<PeopleCommunity24Regular />} label="Members" value={stats.groupMembers.total} />
-        <KpiCard icon={<DocumentText24Regular />} label="Requests" value={stats.requestLogs.total} />
+        <KpiCard
+          icon={<People24Regular />}
+          label="Users"
+          value={stats.userCount}
+          subtitle={`${stats.activeUserCount} active`}
+        />
+        <KpiCard
+          icon={<PeopleTeam24Regular />}
+          label="Groups"
+          value={stats.groupCount}
+          subtitle={`${stats.activeGroupCount} active`}
+        />
+        <KpiCard
+          icon={<PeopleCommunity24Regular />}
+          label="Generic Resources"
+          value={stats.genericResourceCount}
+        />
+        <KpiCard
+          icon={<Key24Regular />}
+          label="Credentials"
+          value={credentials.length}
+          subtitle={`${activeCredentialCount} active`}
+        />
       </div>
     </div>
   );

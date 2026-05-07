@@ -9221,6 +9221,93 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logToggleEpId" -Met
 Write-Host "`n--- 9z-U: Test Gaps Audit #6 Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-V: ENDPOINT OVERVIEW BFF (Phase B1)
+# Validates GET /admin/endpoints/:id/overview - one round trip, zero
+# DB queries on warm cache, returns endpoint summary + stats +
+# credentials + recent activity + config flags. Locks in the response
+# key allowlist and the credential-hash-never-leaks contract.
+# ============================================
+$script:currentSection = "9z-V: Endpoint Overview BFF (B1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-V: ENDPOINT OVERVIEW BFF (Phase B1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# ─── Setup: dedicated endpoint ──────────────────────────────────────
+$ovEndpointBody = @{
+    name            = "live-9z-V-overview-$([DateTime]::Now.Ticks)"
+    profilePreset   = "rfc-standard"
+    profile         = @{ settings = @{ StrictSchemaValidation = "False"; PerEndpointCredentialsEnabled = "True" } }
+} | ConvertTo-Json -Depth 6
+$ovEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ovEndpointBody -ContentType "application/json"
+$ovEpId = $ovEndpoint.id
+Test-Result -Success ($null -ne $ovEpId) -Message "9z-V.setup: created endpoint for overview tests (id=$ovEpId)"
+
+# ─── 9z-V.1: Empty-state overview (no creds, no users) ─────────────
+$overview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
+$overviewKeys = ($overview.PSObject.Properties.Name | Sort-Object) -join ','
+Test-Result -Success ($overviewKeys -eq 'configFlags,credentials,endpoint,recentActivity,stats') `
+    -Message "9z-V.1: top-level keys are exactly {configFlags, credentials, endpoint, recentActivity, stats} (got: $overviewKeys)"
+Test-Result -Success ($overview.endpoint.id -eq $ovEpId) -Message "9z-V.2: endpoint.id matches the URL parameter"
+Test-Result -Success ($overview.endpoint.preset -eq 'rfc-standard') -Message "9z-V.3: endpoint.preset extracted from profile"
+Test-Result -Success ($overview.endpoint.active -eq $true) -Message "9z-V.4: endpoint.active is boolean true"
+Test-Result -Success ($overview.stats.userCount -eq 0) -Message "9z-V.5: stats.userCount is 0 for fresh endpoint"
+Test-Result -Success (@($overview.credentials).Count -eq 0) -Message "9z-V.6: credentials is empty array on fresh endpoint"
+Test-Result -Success ($null -ne $overview.configFlags) -Message "9z-V.7: configFlags object is present"
+
+# ─── 9z-V.8: 404 on unknown endpoint id ──────────────────────────────
+$ovBogusId = "00000000-0000-0000-0000-000000000000"
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovBogusId/overview" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "9z-V.8: unknown endpoint should return 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9z-V.8: unknown endpoint returns 404 (got $statusCode)"
+}
+
+# ─── 9z-V.9: Stats reflect real user/group counts ────────────────────
+# Create one user + one group to confirm stats projection is wired.
+$ovUserBody = @{
+    schemas  = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "live-9z-V-user-$([DateTime]::Now.Ticks)"
+} | ConvertTo-Json
+Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ovEpId/Users" -Method POST -Headers $headers -Body $ovUserBody -ContentType "application/scim+json" | Out-Null
+$ovGroupBody = @{
+    schemas     = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "live-9z-V-grp-$([DateTime]::Now.Ticks)"
+} | ConvertTo-Json
+Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ovEpId/Groups" -Method POST -Headers $headers -Body $ovGroupBody -ContentType "application/scim+json" | Out-Null
+
+$overview2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
+Test-Result -Success ($overview2.stats.userCount -ge 1) -Message "9z-V.9: stats.userCount reflects created user (got $($overview2.stats.userCount))"
+Test-Result -Success ($overview2.stats.groupCount -ge 1) -Message "9z-V.10: stats.groupCount reflects created group (got $($overview2.stats.groupCount))"
+
+# ─── 9z-V.11: Credential creation surfaces in overview WITHOUT hash ─
+$credBody = @{ label = "B1 live test cred" } | ConvertTo-Json
+$cred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/credentials" -Method POST -Headers $headers -Body $credBody -ContentType "application/json"
+Test-Result -Success ($null -ne $cred.id) -Message "9z-V.11.setup: credential created (id=$($cred.id))"
+
+$overview3 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
+$ovCred = @($overview3.credentials) | Where-Object { $_.id -eq $cred.id } | Select-Object -First 1
+Test-Result -Success ($null -ne $ovCred) -Message "9z-V.11: created credential appears in overview.credentials"
+Test-Result -Success ($ovCred.label -eq 'B1 live test cred') -Message "9z-V.12: credential.label preserved"
+Test-Result -Success ($ovCred.active -eq $true) -Message "9z-V.13: credential.active is true"
+Test-Result -Success ($ovCred.credentialType -eq 'bearer') -Message "9z-V.14: credentialType is 'bearer'"
+$ovCredKeys = $ovCred.PSObject.Properties.Name
+Test-Result -Success ($ovCredKeys -notcontains 'credentialHash') -Message "9z-V.15: credentialHash NOT exposed in overview projection"
+$hasBcryptInValues = $false
+foreach ($prop in $ovCred.PSObject.Properties) {
+    if ($prop.Value -is [string] -and $prop.Value -like '*$2*') { $hasBcryptInValues = $true }
+}
+Test-Result -Success (-not $hasBcryptInValues) -Message "9z-V.16: no bcrypt-prefix string ('$2') leaked in any credential value"
+
+# ─── 9z-V.17: Recent activity capped at 10 entries ───────────────────
+Test-Result -Success (@($overview3.recentActivity).Count -le 10) -Message "9z-V.17: recentActivity length capped at 10 (got $(@($overview3.recentActivity).Count))"
+
+# ─── Cleanup ─────────────────────────────────────────────────────────
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+Write-Host "`n--- 9z-V: Endpoint Overview BFF (B1) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

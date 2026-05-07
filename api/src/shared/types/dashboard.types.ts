@@ -225,6 +225,66 @@ export interface DashboardResponse {
   };
 }
 
+// ─── Endpoint Overview BFF (Phase B1) ────────────────────────────────────
+//
+// One round trip for the per-endpoint Overview tab. Reads from in-memory
+// caches (StatsProjectionService, EndpointService cache, NameResolverService
+// LRU) so the response carries zero database queries on warm cache.
+//
+// Response shape is locked in by api/test/e2e/dashboard-overview.e2e-spec.ts
+// (key allowlist) and api/src/modules/dashboard/dashboard.controller.spec.ts
+// (unit-level shape).
+
+/** Endpoint summary embedded in the overview response. */
+export interface EndpointOverviewSummary {
+  id: string;
+  name: string;
+  displayName?: string;
+  /** Preset name from profile.preset, or null when the endpoint has no preset. */
+  preset: string | null;
+  active: boolean;
+  scimBasePath: string;
+  createdAt: string;
+}
+
+/** Aggregated per-endpoint stats (matches StatsProjectionService snapshot). */
+export interface EndpointOverviewStats {
+  userCount: number;
+  activeUserCount: number;
+  groupCount: number;
+  activeGroupCount: number;
+  genericResourceCount: number;
+}
+
+/** Credential summary embedded in the overview response. Hash NEVER returned. */
+export interface EndpointOverviewCredential {
+  id: string;
+  credentialType: string;
+  label?: string | null;
+  active: boolean;
+  createdAt: string;
+  expiresAt?: string | null;
+}
+
+/** Recent activity row with display-name resolution. */
+export interface EndpointOverviewActivity {
+  id: string;
+  timestamp: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+}
+
+/** Full BFF response for GET /admin/endpoints/:id/overview (Phase B1). */
+export interface EndpointOverviewResponse {
+  endpoint: EndpointOverviewSummary;
+  stats: EndpointOverviewStats;
+  credentials: EndpointOverviewCredential[];
+  recentActivity: EndpointOverviewActivity[];
+  configFlags: Record<string, unknown>;
+}
+
 // ─── Presets ─────────────────────────────────────────────────────────────
 
 /** Preset summary in list response */
