@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-05-08 - Phase E Stable Rollup (Write Operations)
+
+### UI Redesign - Phase E (Write Operations) STABLE ROLLUP
+
+Phase E - Write Operations - is **COMPLETE**. Drops the `-alpha.N` suffix after every sub-phase shipped, deployed, and passed its live gate. Pure version cut + lockfile sync; no new features beyond the 4 already-released alphas.
+
+**Cumulative test counts at v0.46.0:**
+- Web vitest: 396 -> **443** (+47 across all four E sub-phases)
+- Live SCIM: 919 -> **933** (+14 in section 9z-Z from E2; E1/E3/E4 added zero new live sections)
+- API unit: 3,675 unchanged (E was frontend-only)
+- API E2E: 1,178 unchanged
+
+**Sub-phase recap:**
+- **E1 (alpha.1)** Credentials Manager - new per-endpoint Credentials tab; plaintext token shown ONCE; flag-disabled banner; +13 web vitest
+- **E2 (alpha.2)** Config Flag Toggles - SettingsTab interactive (13 boolean Switches); useUpdateEndpointConfig optimistic deep-merge into both detail.profile.settings + overview.configFlags; inline MessageBar feedback; boolean coercion handles native + Entra-style 'True'/'False'; +15 web + +12 live (`9z-Z`)
+- **E3 (alpha.3)** Manual Provisioning Redesigned - new top-level `/manual-provision` page; endpoint Combobox + User/Group TabList; ProvisionResult panel; +9 web + +1 router test
+- **E4 (alpha.4)** User/Group Detail Drawer + PATCH/DELETE - clickable rows open ResourceDetailDrawer; SCIM PATCH Operations envelope; inline confirm Delete; +10 web vitest
+
+All sub-phase gates green. Per-phase final quality gate next: deploy v0.46.0 to dev + 933+ live SCIM tests must all pass before Phase F starts.
+
 ## [0.46.0-alpha.4] - 2026-05-08 - Phase E4 (User/Group Detail Drawer + PATCH/DELETE)
 
 ### UI Redesign - Phase E4 (sub-phase 4 of 4 in Phase E - Write Operations)
