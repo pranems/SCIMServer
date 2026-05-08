@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0-alpha.1] - 2026-05-08 - Phase E1 (Credentials Manager)
+
+### UI Redesign - Phase E1 (sub-phase 1 of 4 in Phase E - Write Operations)
+
+**First Phase E sub-phase. New per-endpoint Credentials tab with create / list / revoke flows. Frontend-only - backend CRUD already shipped in Phase 11 (G11) and Phase C5 already shipped the mutation hooks. E1 wires those together into a complete UX with the standout 'plaintext token shown exactly once' interaction.**
+
+#### Frontend
+- **NEW** Credentials tab at `/endpoints/$endpointId/credentials` (8th nested child of endpoint detail layout)
+- **NEW** [CredentialsTab.tsx](web/src/pages/CredentialsTab.tsx) (~395 LoC):
+  - Lists credentials from `useEndpointOverview` (Phase B BFF, zero extra round trip)
+  - LoadingSkeleton (4 rows, 56px) mirrors final card layout (G1 pattern, CLS=0)
+  - EmptyState with Key icon + Add CTA when zero credentials
+  - Each row: label, monospace id+type, created timestamp, Active/Revoked badge, delete icon
+  - Add button opens FormDialog (Phase C2) with optional label input
+  - On create success: dialog flips to 'Save this token now' view with plaintext + Copy button + warning
+  - Plaintext token rendered EXACTLY ONCE (server stores only bcrypt hash, unrecoverable)
+  - Delete row -> FormDialog confirm -> useDeleteCredential (optimistic remove from cached overview, rollback on error)
+- **PerEndpointCredentialsEnabled** flag handling:
+  - Read from `data.configFlags.PerEndpointCredentialsEnabled` (in BFF response)
+  - When false / missing: MessageBar warning + disabled Add button + link to Settings tab
+  - Server 403 also surfaced via FormDialog errorMessage (defense in depth)
+- **NEW** [endpoints.$endpointId.credentials.tsx](web/src/routes/endpoints.$endpointId.credentials.tsx) - TanStack Router child route with loader pre-fetching the endpoint overview
+- **Updated** [router.ts](web/src/router.ts) - registers credentialsTabRoute as 8th nested child
+- **Updated** [EndpointDetailPage.tsx](web/src/pages/EndpointDetailPage.tsx) - TabValue type extended; pathToTab returns 'credentials'; nav handler; Tab in TabList between Schemas and Logs
+
+#### Tests (+13)
+- **NEW** [CredentialsTab.test.tsx](web/src/pages/CredentialsTab.test.tsx) - 13 vitest unit tests:
+  - Loading skeleton on isLoading
+  - Error block on fetch error
+  - EmptyState when flag enabled but zero credentials
+  - Warning banner + disabled Add button when flag is off (explicit false)
+  - Warning banner when flag is missing entirely (treated as off)
+  - Renders one card per credential (with Active vs Revoked badges)
+  - Opens create dialog on Add click
+  - Passes label to mutation on Create submit
+  - Empty label normalized to undefined
+  - Plaintext token + Copy button rendered after successful create
+  - Surfaces mutation error in dialog (no silent failure)
+  - Opens delete confirmation when delete icon clicked
+  - Calls useDeleteCredential mutate on Revoke confirm
+- **Updated** [router.test.ts](web/src/router.test.ts) - new assertions covering /credentials, /activity, /schemas as nested children
+
+#### Test Counts
+- Web vitest: 396 -> **409** (+13)
+- API unit: 3,675 (unchanged - frontend-only)
+- API E2E: 1,178 (unchanged)
+- Live SCIM: 919 (unchanged)
+
+#### Files Modified
+- NEW: [web/src/pages/CredentialsTab.tsx](web/src/pages/CredentialsTab.tsx), [web/src/pages/CredentialsTab.test.tsx](web/src/pages/CredentialsTab.test.tsx), [web/src/routes/endpoints.$endpointId.credentials.tsx](web/src/routes/endpoints.$endpointId.credentials.tsx), [docs/PHASE_E1_CREDENTIALS_MANAGER.md](docs/PHASE_E1_CREDENTIALS_MANAGER.md)
+- [web/src/router.ts](web/src/router.ts), [web/src/pages/EndpointDetailPage.tsx](web/src/pages/EndpointDetailPage.tsx), [web/src/router.test.ts](web/src/router.test.ts)
+
+**Per-sub-phase quality gate next: deploy v0.46.0-alpha.1 to dev + 919+ live SCIM tests must all pass before E2 starts (config flag toggles).**
+
 ## [0.45.0] - 2026-05-08 - Phase D Stable Rollup (Read-Only Completeness)
 
 ### UI Redesign - Phase D rollup (D1 + D2 + D3 + D4 + D5 stable cut)
