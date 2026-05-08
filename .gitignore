@@ -86,6 +86,9 @@ Dockerfile.dockerignore
 # Misc docs (local-only / may contain credentials)
 admin.md
 wiki.md
+# Strategic / research thought-exercise docs (kept local, not for commit)
+docs/STRATEGIC_FORWARD_LOOK_2026.md
+docs/STRATEGIC_LATERAL_AND_VISIONARY_2026.md
 api/combo-results.json
 api/ep-spec-results.json
 api/ep-spec2.json
