@@ -180,10 +180,16 @@ jobs:
       # build-and-push.yml so test images can never become "well, it scanned
       # clean once when we ran it manually" snowflakes.
       # Documented exceptions live in repo-root .trivyignore.
+      #
+      # NOTE: Trivy + OCI registries require lowercase image names. The
+      # github.repository env var preserves the repo's casing
+      # (`pranems/SCIMServer`) so we use the lowercase package name
+      # explicitly here. Without this, Trivy fails with "could not parse
+      # reference" before scanning.
       - name: Trivy image scan (HIGH+CRITICAL gating)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/scimserver@${{ steps.build.outputs.digest }}
           format: table
           exit-code: '1'
           severity: HIGH,CRITICAL

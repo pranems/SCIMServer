@@ -131,6 +131,13 @@ try {
 Write-Host "[3/7] Generating Prisma client & compiling TypeScript..." -ForegroundColor Yellow
 Push-Location $ApiDir
 try {
+    # Clear any stale tsc incremental buildinfo + dist before recompiling.
+    # Without this, tsc may skip emitting most files when the buildinfo
+    # cache thinks they are up to date but the dist/ has been wiped or
+    # is in an inconsistent state, producing a partial bundle that
+    # crashes at runtime with "Cannot find module './modules/app/app.module'".
+    Remove-Item -Force -ErrorAction SilentlyContinue 'tsconfig.build.tsbuildinfo'
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue 'dist'
     npx prisma generate 2>&1 | Out-Null
     npx tsc -p tsconfig.build.json 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "TypeScript compilation failed" }
