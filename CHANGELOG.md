@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.2] - 2026-05-08 - Phase F2 (Keyboard Shortcuts)
+
+### UI Redesign - Phase F2 (sub-phase 2 of 3 in Phase F - Power User & Real-Time)
+
+**Global GitHub/Linear-style keyboard shortcuts. New `useKeyboardShortcuts` hook + `KeyboardShortcutsHelp` modal both mounted in AppShell. Sequence shortcuts (g d/e/m/l/s) navigate without touching the mouse; `/` opens the F1 command palette; `?` opens the help modal. Hook bails out cleanly when typing in editable fields or when modifier keys are held. Frontend-only.**
+
+#### Frontend Changes
+
+- **useKeyboardShortcuts.ts (new):** ~80 LoC hook with sequence buffer + suppression. `g` opens a 1000ms window; pressing a recognised second key (d/e/m/l/s) navigates. Unrecognised second key clears the buffer. Editable target check covers input/textarea/select/contenteditable (with attribute fallback for jsdom). Modifier-key check skips when Cmd/Ctrl/Alt/Meta is held.
+- **KeyboardShortcutsHelp.tsx (new):** Modal grouping all shortcuts by intent (Navigation / Search & help) with monospace kbd badges. Opened by pressing `?`.
+- **AppShell.tsx:** wires the hook (g/x sequences -> navigate; `/` -> opens existing F1 palette which doubles as global search; `?` -> opens help modal). Mounts the help modal once at chrome level.
+
+#### Tests
+
+- **+15 hook vitest:** g d/e/l/s/m navigations; sequence reset on timeout; sequence reset on unrecognised second key; / fires onFocusSearch; ? fires onShowHelp; suppressed in input/textarea/contenteditable; suppressed under Ctrl/Cmd modifier; cleanup on unmount.
+- **+4 help modal vitest:** open=false renders nothing; lists every navigation shortcut; lists every search/help shortcut; Close button fires onOpenChange(false).
+- Web vitest: 454 -> 473 (+19)
+- API + Live SCIM unchanged (frontend-only)
+
+#### Documentation
+
+- New: [docs/PHASE_F2_KEYBOARD_SHORTCUTS.md](docs/PHASE_F2_KEYBOARD_SHORTCUTS.md)
+- Updated: [docs/INDEX.md](docs/INDEX.md), [Session_starter.md](Session_starter.md)
+- Versions: lockstep `0.46.1-alpha.1` -> `0.46.1-alpha.2` (api + web)
+
 ## [0.46.1-alpha.1] - 2026-05-08 - Phase F1 (Command Palette)
 
 ### UI Redesign - Phase F1 (sub-phase 1 of 3 in Phase F - Power User & Real-Time)
