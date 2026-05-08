@@ -218,6 +218,22 @@ export interface DashboardResponse {
   };
   endpoints: DashboardEndpoint[];
   recentActivity: DashboardActivity[];
+  /**
+   * Phase D4 - Dashboard charts.
+   *
+   * Hourly request counts for the last 24 hours, oldest first. Length is
+   * always exactly 24. `requestsLast24hSeries[0]` is the oldest hour
+   * (i.e. ~24h ago), `requestsLast24hSeries[23]` is the current hour.
+   * Excludes admin/health/keepalive traffic - matches the same default
+   * filter LoggingService.listLogs applies (i.e. `includeAdmin: false`).
+   *
+   * Computed by LoggingService.getRequestSeries({ hours: 24 }) on each
+   * dashboard load - cheap on warm cache (one indexed range scan), no
+   * materialization needed at this scale.
+   *
+   * @see docs/PHASE_D4_DASHBOARD_CHARTS.md
+   */
+  requestsLast24hSeries: number[];
   version: {
     version: string;
     node: string;

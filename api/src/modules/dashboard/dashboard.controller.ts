@@ -73,10 +73,11 @@ export class DashboardController {
   async getDashboard(): Promise<DashboardResponse> {
     const persistenceBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase();
 
-    // Parallel: endpoints + recent activity (stats are in-memory, no await needed)
-    const [endpointList, recentLogs] = await Promise.all([
+    // Parallel: endpoints + recent activity + 24h series. Stats are in-memory (sync).
+    const [endpointList, recentLogs, requestsLast24hSeries] = await Promise.all([
       this.endpointService.listEndpoints(),
       this.loggingService.listLogs({ pageSize: 20, page: 1 }),
+      this.loggingService.getRequestSeries({ hours: 24 }),
     ]);
 
     // Global stats from in-memory projection (0 DB queries)
@@ -129,6 +130,7 @@ export class DashboardController {
       },
       endpoints,
       recentActivity,
+      requestsLast24hSeries,
       version: {
         version: getVersion(),
         node: process.version,

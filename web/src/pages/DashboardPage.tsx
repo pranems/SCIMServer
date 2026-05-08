@@ -1,10 +1,18 @@
 /**
- * DashboardPage - main dashboard with KPI cards, endpoint cards, recent activity.
+ * DashboardPage - main dashboard with KPI cards, 24h request chart,
+ * endpoint cards, and recent activity.
  *
  * Reads from BFF /admin/dashboard endpoint (0 DB queries for stats via
  * StatsProjectionService). All data comes from TanStack Query cache.
  *
+ * Phase D4 additions:
+ *   - 24-hour request volume chart wired to `requestsLast24hSeries`
+ *     (via the Phase C4 KpiChart sparkline primitive)
+ *   - Loading state migrated from Spinner to LoadingSkeleton (R2)
+ *   - Empty states migrated from plain Text to EmptyState (R3)
+ *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.1
+ * @see docs/PHASE_D4_DASHBOARD_CHARTS.md
  */
 import React from 'react';
 import {
@@ -14,7 +22,6 @@ import {
   CardHeader,
   Text,
   Badge,
-  Spinner,
   Subtitle1,
   Body1,
   Caption1,
@@ -24,10 +31,13 @@ import {
   PeopleTeam24Regular,
   Server24Regular,
   CheckmarkCircle24Regular,
+  History24Regular,
+  ChartMultiple24Regular,
 } from '@fluentui/react-icons';
 import { useDashboard } from '../api/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { DashboardResponse, DashboardEndpoint } from '@scim/types/dashboard.types';
+import { EmptyState, KpiChart, LoadingSkeleton } from '../components/primitives';
 
 const useStyles = makeStyles({
   page: {
@@ -106,11 +116,32 @@ const useStyles = makeStyles({
   errorItem: {
     color: tokens.colorPaletteRedForeground1,
   },
-  center: {
+  // Phase D4 - chart card. Fixed height keeps the layout stable while
+  // recharts measures its own width via ResponsiveContainer.
+  chartCard: {
+    padding: '16px',
     display: 'flex',
-    justifyContent: 'center',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  chartArea: {
+    height: '120px',
+    width: '100%',
+  },
+  chartHeader: {
+    display: 'flex',
     alignItems: 'center',
-    minHeight: '200px',
+    gap: '8px',
+  },
+  chartHeaderText: {
+    flex: 1,
+  },
+  errorBlock: {
+    padding: '24px',
+    color: tokens.colorPaletteRedForeground1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
   },
 });
 
@@ -131,20 +162,34 @@ export const DashboardPage: React.FC = () => {
   const { data, isLoading, error } = useDashboard();
 
   if (isLoading) {
+    // R2 - replaced Spinner with LoadingSkeleton mirroring the final
+    // layout (4 KPI cards row + chart + endpoints grid + activity rows).
+    // Same Phase G1 pattern D1 introduced for OverviewTab. Zero CLS
+    // because the skeleton heights match the rendered cards.
     return (
-      <div className={classes.center} data-testid="dashboard-loading">
-        <Spinner label="Loading dashboard..." />
+      <div className={classes.page} data-testid="dashboard-loading">
+        <div className={classes.kpiRow} aria-hidden>
+          <LoadingSkeleton count={4} height="80px" />
+        </div>
+        <LoadingSkeleton count={1} height="160px" data-testid="dashboard-chart-skeleton" />
+        <LoadingSkeleton count={3} height="120px" />
+        <LoadingSkeleton count={5} height="36px" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className={classes.center} data-testid="dashboard-error">
+      <div className={classes.errorBlock} data-testid="dashboard-error">
         <Text>Failed to load dashboard: {error?.message ?? 'Unknown error'}</Text>
       </div>
     );
   }
+
+  // Phase D4 - chart series + headline current-hour value.
+  const series = data.requestsLast24hSeries ?? [];
+  const currentHourCount = series.length > 0 ? series[series.length - 1] : 0;
+  const sumLast24h = series.reduce((a, b) => a + b, 0);
 
   return (
     <div className={classes.page} data-testid="dashboard-page">
@@ -172,6 +217,27 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
+      {/* Phase D4 - 24h request volume chart */}
+      <Card className={classes.chartCard} data-testid="dashboard-chart-card">
+        <div className={classes.chartHeader}>
+          <ChartMultiple24Regular />
+          <div className={classes.chartHeaderText}>
+            <Subtitle1>Requests (last 24h)</Subtitle1>
+            <Caption1>
+              {sumLast24h} total / {currentHourCount} this hour
+            </Caption1>
+          </div>
+        </div>
+        <div className={classes.chartArea}>
+          <KpiChart
+            data={series}
+            label="Hourly request volume for the last 24 hours"
+            colorScheme="accent"
+            data-testid="dashboard-chart"
+          />
+        </div>
+      </Card>
+
       {/* Endpoint Cards */}
       <div className={classes.section}>
         <Subtitle1>Endpoints</Subtitle1>
@@ -180,7 +246,13 @@ export const DashboardPage: React.FC = () => {
             <EndpointCard key={ep.id} endpoint={ep} />
           ))}
           {data.endpoints.length === 0 && (
-            <Text>No endpoints configured.</Text>
+            // R3 - replaced plain Text with EmptyState. Phase G2 inventory.
+            <EmptyState
+              icon={<Server24Regular />}
+              title="No endpoints configured"
+              body="Create an endpoint to start provisioning users via SCIM."
+              data-testid="dashboard-empty-endpoints"
+            />
           )}
         </div>
       </div>
@@ -188,35 +260,43 @@ export const DashboardPage: React.FC = () => {
       {/* Recent Activity */}
       <div className={classes.section}>
         <Subtitle1>Recent Activity</Subtitle1>
-        <div className={classes.activityList} data-testid="activity-list">
-          {data.recentActivity.slice(0, 10).map((activity) => (
-            <div
-              key={activity.id}
-              className={`${classes.activityItem} ${activity.statusCode >= 400 ? classes.errorItem : ''}`}
-            >
-              <Badge
-                appearance="filled"
-                color={methodColor(activity.method)}
-                className={classes.methodBadge}
+        {data.recentActivity.length === 0 ? (
+          // R3 - replaced plain Text with EmptyState (matches the same
+          // pattern used in OverviewTab for per-endpoint activity).
+          <EmptyState
+            icon={<History24Regular />}
+            title="No recent activity"
+            body="SCIM operations across your endpoints will appear here in real time."
+            data-testid="dashboard-empty-activity"
+          />
+        ) : (
+          <div className={classes.activityList} data-testid="activity-list">
+            {data.recentActivity.slice(0, 10).map((activity) => (
+              <div
+                key={activity.id}
+                className={`${classes.activityItem} ${activity.statusCode >= 400 ? classes.errorItem : ''}`}
               >
-                {activity.method}
-              </Badge>
-              <Caption1 style={{ fontFamily: 'monospace', flex: 1 }}>
-                {activity.path}
-              </Caption1>
-              <Badge
-                appearance="outline"
-                color={activity.statusCode >= 400 ? 'danger' : 'success'}
-              >
-                {activity.statusCode}
-              </Badge>
-              <Caption1>{activity.durationMs}ms</Caption1>
-            </div>
-          ))}
-          {data.recentActivity.length === 0 && (
-            <Text>No recent activity.</Text>
-          )}
-        </div>
+                <Badge
+                  appearance="filled"
+                  color={methodColor(activity.method)}
+                  className={classes.methodBadge}
+                >
+                  {activity.method}
+                </Badge>
+                <Caption1 style={{ fontFamily: 'monospace', flex: 1 }}>
+                  {activity.path}
+                </Caption1>
+                <Badge
+                  appearance="outline"
+                  color={activity.statusCode >= 400 ? 'danger' : 'success'}
+                >
+                  {activity.statusCode}
+                </Badge>
+                <Caption1>{activity.durationMs}ms</Caption1>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

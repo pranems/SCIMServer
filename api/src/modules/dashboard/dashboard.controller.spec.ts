@@ -97,6 +97,9 @@ const mockLoggingService = {
     hasNext: false,
     hasPrev: false,
   }),
+  // Phase D4 - dashboard chart series. Default: 24-element zero array
+  // (no traffic). Specific tests override per-case.
+  getRequestSeries: jest.fn().mockResolvedValue(new Array(24).fill(0)),
 };
 
 const mockCredentialRepo: jest.Mocked<Pick<IEndpointCredentialRepository, 'findByEndpoint'>> = {
@@ -218,6 +221,48 @@ describe('DashboardController', () => {
 
       expect(result.endpoints).toHaveLength(0);
       expect(result.stats.totalEndpoints).toBe(0);
+    });
+
+    // ─── Phase D4: Dashboard charts ────────────────────────────────
+
+    describe('requestsLast24hSeries (Phase D4)', () => {
+      it('returns a 24-element series from LoggingService.getRequestSeries', async () => {
+        const result = await controller.getDashboard();
+
+        expect(result.requestsLast24hSeries).toHaveLength(24);
+        expect(mockLoggingService.getRequestSeries).toHaveBeenCalledWith({ hours: 24 });
+      });
+
+      it('passes through the array values verbatim (no client-side transform)', async () => {
+        const series = [
+          0, 0, 0, 1, 5, 10, 12, 8,
+          15, 20, 22, 18, 25, 30, 28, 24,
+          19, 14, 9, 5, 3, 2, 1, 0,
+        ];
+        mockLoggingService.getRequestSeries.mockResolvedValueOnce(series);
+
+        const result = await controller.getDashboard();
+
+        expect(result.requestsLast24hSeries).toEqual(series);
+        expect(result.requestsLast24hSeries[0]).toBe(0);
+        expect(result.requestsLast24hSeries[13]).toBe(30);
+        expect(result.requestsLast24hSeries[23]).toBe(0);
+      });
+
+      it('is part of the response shape contract (key allowlist)', async () => {
+        const result = await controller.getDashboard();
+
+        expect(Object.keys(result).sort()).toEqual(
+          [
+            'endpoints',
+            'health',
+            'recentActivity',
+            'requestsLast24hSeries',
+            'stats',
+            'version',
+          ].sort(),
+        );
+      });
     });
   });
 

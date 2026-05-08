@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0-alpha.4] - 2026-05-08 - Phase D4 (Dashboard Charts)
+
+### UI Redesign - Phase D4 (sub-phase 4 of 5 in Phase D)
+
+**24-hour request volume sparkline lands on the dashboard. Backend ships a new in-memory hourly aggregator on LoggingService; frontend wires the Phase C4 KpiChart primitive. R2/R3 polish migrates Spinner -> LoadingSkeleton and plain text -> EmptyState. Bonus: pre-existing in-memory `listLogs` filter parity gap closed.**
+
+#### Backend
+- **NEW** `LoggingService.getRequestSeries({ hours })` - returns fixed-length number[] of hourly request counts. Length always equals `hours` (default 24, clamped 1..168). `result[0]` = oldest hour, `result[hours-1]` = current hour. Bucket alignment via `floor(now / hourMs) * hourMs - (hours - 1) * hourMs` so current hour always lands at index `hours-1` regardless of minute-of-hour. Filters mirror `listLogs(includeAdmin: false)`: excludes `/scim/admin/*`, `/`, `/health`. Indexed range scan with `select { createdAt: true }`. Both Prisma and in-memory branches; identical filter set. On Prisma error returns zero array + logs (graceful, no 500).
+- **NEW** `requestsLast24hSeries: number[]` field on `DashboardResponse`. Wired into `DashboardController.getDashboard` via `Promise.all` so round trip is unchanged.
+- **FIX** `LoggingService.listLogs` in-memory branch was honoring only `endpointId` and silently ignoring `method`, `status`, `hasError`, `urlContains`, `since`, `until`, `search`, `includeAdmin`, `hideKeepalive`, `minDurationMs`. Now mirrors Prisma where-clause 1:1. Fixes 2 pre-existing E2E test failures.
+
+#### Frontend
+- **NEW** Chart card on `/` dashboard: `<KpiChart>` sparkline with title "Requests (last 24h)" + caption "{sum} total / {current} this hour". 120px height, ResponsiveContainer width.
+- **R2** Loading state: `<Spinner>` -> `<LoadingSkeleton>` mirroring final layout (4 KPI cards + chart + 3 endpoint cards + 5 activity rows). CLS = 0 when data swaps in.
+- **R3** Empty states: plain `<Text>` -> `<EmptyState>` for "No endpoints configured" and "No recent activity".
+
+#### Tests (+33)
+- API unit `LoggingService.getRequestSeries` (NEW spec): 13 tests covering shape contract, bucketing, exclusion, error handling, in-memory parity
+- API unit `DashboardController` (extended): +3 tests for the new field (presence, value passthrough, key allowlist)
+- API E2E `dashboard-charts` (NEW): 3 tests covering shape contract, monotonicity after SCIM call, admin exclusion
+- Web vitest `DashboardPage` (extended): +4 tests covering chart rendering, empty fallback, oldest-first contract, R2 skeleton
+- Live SCIM section `9z-X` (NEW): 9 assertions covering wire shape, length=24, numeric/non-negative, key allowlist, monotonicity, admin exclusion
+
+#### Test Counts
+- API unit: 3,643 -> **3,659** (+16: 13 new + 3 controller + 0 churn)
+- API E2E: 1,172 -> **1,175** (+3 D4)
+- Web vitest: 385 -> **389** (+4 D4)
+- Live SCIM: 898 -> **907** (+9 section 9z-X)
+
+#### Files Modified
+- [api/src/shared/types/dashboard.types.ts](api/src/shared/types/dashboard.types.ts), [api/src/modules/logging/logging.service.ts](api/src/modules/logging/logging.service.ts), [api/src/modules/dashboard/dashboard.controller.ts](api/src/modules/dashboard/dashboard.controller.ts), [api/src/modules/dashboard/dashboard.controller.spec.ts](api/src/modules/dashboard/dashboard.controller.spec.ts), [api/src/shared/types/shared-types.spec.ts](api/src/shared/types/shared-types.spec.ts)
+- NEW: [api/src/modules/logging/logging-request-series.spec.ts](api/src/modules/logging/logging-request-series.spec.ts), [api/test/e2e/dashboard-charts.e2e-spec.ts](api/test/e2e/dashboard-charts.e2e-spec.ts), [docs/PHASE_D4_DASHBOARD_CHARTS.md](docs/PHASE_D4_DASHBOARD_CHARTS.md)
+- [web/src/pages/DashboardPage.tsx](web/src/pages/DashboardPage.tsx), [web/src/pages/DashboardPage.test.tsx](web/src/pages/DashboardPage.test.tsx)
+- [scripts/live-test.ps1](scripts/live-test.ps1) - section `9z-X` added before TEST SECTION 10
+
+**Per-sub-phase quality gate next: deploy v0.45.0-alpha.4 to dev + 907+ live SCIM tests + 7 Playwright must all pass before D5 starts.**
+
 ## [0.45.0-alpha.3] - 2026-05-08 - Phase D3 (Schemas Tab)
 
 ### UI Redesign - Phase D3 (sub-phase 3 of 5 in Phase D)

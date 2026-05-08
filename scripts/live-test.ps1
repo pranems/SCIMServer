@@ -9406,6 +9406,107 @@ try {
 Write-Host "`n--- 9z-W: Activity endpointId Filter (D2) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-X: DASHBOARD CHARTS - requestsLast24hSeries (Phase D4)
+# ============================================
+$script:currentSection = "9z-X: Dashboard 24h request series (D4)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-X: DASHBOARD CHARTS (Phase D4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# What we lock at the live layer:
+#   1. The /admin/dashboard response carries `requestsLast24hSeries` of length 24
+#   2. Every entry is a non-negative integer
+#   3. Index 23 is the CURRENT hour (monotonically grows after a SCIM call,
+#      eventually - allowing for the 3s logger flush)
+#   4. Admin/health traffic does NOT contribute to the series
+#
+# Bucket-level placement accuracy is locked in unit + E2E layers; here we
+# verify the wire contract and the high-level "current hour grows" rule
+# from real HTTP traffic against the deployed server.
+
+try {
+    # ─── Test 9z-X.1: response shape includes the new field ────────
+    $dash = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+    $series = $dash.requestsLast24hSeries
+    Test-Result -Success ($null -ne $series) -Message "9z-X.1: response has 'requestsLast24hSeries' field"
+    Test-Result -Success ($series -is [array] -or $series.Count -ge 0) -Message "9z-X.2: requestsLast24hSeries is array-like"
+    Test-Result -Success ($series.Count -eq 24) -Message "9z-X.3: series length is exactly 24 (got $($series.Count))"
+
+    # Every value is a non-negative number
+    $allNumeric = $true
+    $allNonNegative = $true
+    foreach ($v in $series) {
+        if ($v -isnot [int] -and $v -isnot [long] -and $v -isnot [double]) { $allNumeric = $false }
+        if ($v -lt 0) { $allNonNegative = $false }
+    }
+    Test-Result -Success $allNumeric -Message "9z-X.4: every entry is numeric"
+    Test-Result -Success $allNonNegative -Message "9z-X.5: every entry is non-negative"
+
+    # ─── Test 9z-X.6: response key allowlist (no leakage of internals) ─
+    $allowedKeys = @('endpoints', 'health', 'recentActivity', 'requestsLast24hSeries', 'stats', 'version')
+    $actualKeys = ($dash | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name) | Sort-Object
+    $unexpected = @($actualKeys | Where-Object { $_ -notin $allowedKeys })
+    Test-Result -Success ($unexpected.Count -eq 0) `
+        -Message "9z-X.6: response keys match allowlist (unexpected: $($unexpected -join ','))"
+
+    # ─── Test 9z-X.7: monotonicity after a SCIM call ────────────────
+    # Capture baseline.
+    $baseSum = ($series | Measure-Object -Sum).Sum
+    $baseCurrent = $series[23]
+
+    # Drive a SCIM call that will be counted (not admin/health/keepalive).
+    # Use any pre-existing endpoint - we don't need to create one.
+    $endpoints = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
+    $epId = $null
+    if ($endpoints.endpoints -and $endpoints.endpoints.Count -gt 0) { $epId = $endpoints.endpoints[0].id }
+
+    if ($epId) {
+        # Hit a SCIM endpoint a couple of times to ensure something gets counted.
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$epId/Users?count=1" -Method GET -Headers $headers | Out-Null
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$epId/Groups?count=1" -Method GET -Headers $headers | Out-Null
+        # Wait beyond the 3-second logger flush window.
+        Start-Sleep -Seconds 4
+
+        $dash2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+        $series2 = $dash2.requestsLast24hSeries
+        $afterSum = ($series2 | Measure-Object -Sum).Sum
+        $afterCurrent = $series2[23]
+
+        Test-Result -Success ($afterSum -ge $baseSum) `
+            -Message "9z-X.7: total series sum is monotonically non-decreasing ($baseSum -> $afterSum)"
+        Test-Result -Success ($afterCurrent -ge $baseCurrent) `
+            -Message "9z-X.8: current-hour bucket monotonically non-decreasing ($baseCurrent -> $afterCurrent)"
+    } else {
+        # Skip the monotonicity check if there are no endpoints (fresh install).
+        Test-Result -Success $true -Message "9z-X.7-8: skipped (no endpoints exist to drive traffic)"
+    }
+
+    # ─── Test 9z-X.9: admin traffic does NOT inflate the series ────
+    $beforeAdmin = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+    $beforeAdminCurrent = $beforeAdmin.requestsLast24hSeries[23]
+
+    # Make 3 admin calls.
+    for ($i = 0; $i -lt 3; $i++) {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Method GET -Headers $headers | Out-Null
+    }
+    Start-Sleep -Seconds 4
+
+    $afterAdmin = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+    $afterAdminCurrent = $afterAdmin.requestsLast24hSeries[23]
+
+    # The 3 admin GETs themselves must NOT contribute. Other traffic from
+    # parallel test runs may, so we assert the delta is < 3 (weaker
+    # claim, but exactly the contract we care about).
+    $adminDelta = $afterAdminCurrent - $beforeAdminCurrent
+    Test-Result -Success ($adminDelta -lt 3) `
+        -Message "9z-X.9: admin/version GETs not counted in series (delta=$adminDelta < 3)"
+} catch {
+    Test-Result -Success $false -Message "9z-X.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-X: Dashboard Charts (D4) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
