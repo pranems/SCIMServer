@@ -99,10 +99,15 @@ export function computeInvalidations(
     case 'users':
     case 'groups':
     case 'resources':
-      // Stats + per-endpoint overview + per-endpoint resource list.
+      // Stats + per-endpoint overview + per-endpoint resource list +
+      // per-endpoint activity feed (Phase D2). Activity is shared
+      // across all three resource channels because the parsed
+      // ActivitySummary objects are derived from the underlying
+      // RequestLog rows, which all three channels mutate.
       if (endpointId) {
         keys.push(queryKeys.endpoints.stats(endpointId));
         keys.push(queryKeys.endpoints.overview(endpointId));
+        keys.push(queryKeys.activity.all(endpointId));
         // The byEndpoint key embeds the params object; passing only
         // [resource, endpointId] invalidates EVERY paginated variant
         // (TanStack Query treats the missing tail as a wildcard). Use

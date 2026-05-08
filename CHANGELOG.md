@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0-alpha.2] - 2026-05-08 - Phase D2 (Activity Tab)
+
+### UI Redesign - Phase D2 (sub-phase 2 of 5 in Phase D)
+
+**New per-endpoint Activity tab + backend `endpointId` filter on `GET /admin/activity`. Closes plan step 2.7. +6 web vitest + 2 API unit + 1 E2E + 10 live (`9z-W`).**
+
+#### What D2 delivers
+
+- **Backend** ([api/src/modules/activity-parser/activity.controller.ts](api/src/modules/activity-parser/activity.controller.ts)) accepts a new optional `?endpointId=<uuid>` query param on `GET /admin/activity`. The param is pushed into the existing AND clause that drives both `findMany` and `count` (so pagination math stays consistent), and into the inmemory branch via `LoggingService.listLogs({ endpointId })`. The `endpointId` column on `RequestLog` is already indexed (Phase 17), so no schema change.
+- **Frontend** ([web/src/pages/ActivityTab.tsx](web/src/pages/ActivityTab.tsx)) - new page consuming `useEndpointActivity(...)`. Composes `LoadingSkeleton` + `EmptyState` from Phase C. URL-driven filters: `type` (closed-set enum: `user` | `group` | `system`), `severity` (closed-set enum: `info` | `success` | `warning` | `error`), and free-text `search`. Empty-state shows a Reset CTA only when filters are active.
+- **Route** ([web/src/routes/endpoints.$endpointId.activity.tsx](web/src/routes/endpoints.$endpointId.activity.tsx)) - nested under `endpointDetailRoute` at path `activity`. Loader pre-fetches via Phase A4 pattern so click feels instant.
+- **EndpointDetailPage** - new `Activity` tab inserted between `Groups` and `Logs`.
+- **SSE invalidation** ([web/src/hooks/useSSE.ts](web/src/hooks/useSSE.ts)) - `users` / `groups` / `resources` channels now also invalidate `queryKeys.activity.all(endpointId)` so the open Activity tab refetches when SCIM mutations land.
+
+#### TDD evidence
+
+| Phase | Result |
+|-------|--------|
+| RED (backend) | Added `endpointId` param to test signature -> tsc compile error "Expected 0-6 arguments, but got 7". Strongest possible RED. |
+| GREEN (backend) | `@Query('endpointId') endpointId?: string` + `if (endpointId) whereConditions.push({ endpointId })` + plumbed through inmemory branch -> 17/17 spec tests pass + new E2E passes |
+| RED (frontend) | New ActivityTab tests imported a non-existent component -> module resolution error |
+| GREEN (frontend) | Created ActivityTab.tsx, hook, query options, route file, search schema, wired into route tree -> 6/6 ActivityTab tests pass + 378/378 full vitest pass |
+| REFACTOR | Extracted `severityColor` + `formatTime` helpers + `ActivityRow` sub-component for readability |
+
+#### Test counts
+
+- API unit: 3,641 -> **3,643** (+2)
+- API E2E: 1,171 -> **1,172** (+1)
+- Live SCIM: 888 -> **898** (+10 in section `9z-W`)
+- Web vitest: 372 -> **378** (+6)
+- Production build: clean (`vite build` 13.48s)
+
+#### URL-driven filter contract
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `page` | int >= 1 | 1 | UI-1-indexed |
+| `pageSize` | int 1-100 | 20 | Server `count` ceiling |
+| `type` | enum | absent | `user` \| `group` \| `system` (closed set) |
+| `severity` | enum | absent | `info` \| `success` \| `warning` \| `error` (closed set) |
+| `search` | string | absent | Free-text. Empty string normalised to absent so URL stays clean |
+
+#### Why D2 ships standalone
+
+Matches Phase A's beta-by-beta pattern. v0.45.0-alpha.2 is a single tag with the dev image getting D2 immediately after CI build + Trivy scan. The rollup to stable v0.45.0 happens after D5.
+
+#### Cross-references
+
+- [docs/PHASE_D2_ACTIVITY_TAB.md](docs/PHASE_D2_ACTIVITY_TAB.md) - feature doc with full architecture
+- [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md) S7.2 - parent spec
+- [docs/PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md](docs/PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md) - D1 predecessor
+
+#### Up next
+
+Phase D3 - new SchemasTab tree view consuming `/endpoints/:id/Schemas` (cache 5min - schemas rarely change), characteristics per leaf (required, mutability, returned, uniqueness, type, multiValued), copy-to-clipboard for URN. Will ship as v0.45.0-alpha.3.
+
 ## [0.45.0-alpha.1] - 2026-05-08 - Phase D1 (Overview Tab Data-Complete)
 
 ### UI Redesign - Phase D1 (start of Phase D rollout)

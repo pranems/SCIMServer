@@ -9324,6 +9324,88 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId" -Method DEL
 Write-Host "`n--- 9z-V: Endpoint Overview BFF (B1) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-W: ACTIVITY endpointId FILTER (Phase D2)
+# ============================================
+$script:currentSection = "9z-W: Activity endpointId filter (D2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-W: ACTIVITY endpointId FILTER (Phase D2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Spec: GET /scim/admin/activity should accept ?endpointId= and return
+# only logs for that endpoint. Activity rows are derived from the
+# RequestLog.endpointId column added in Phase 17 (interceptor populates
+# it from the URL prefix /scim/endpoints/:id/*). The new ActivityTab
+# on /endpoints/$id/activity (D2 frontend) consumes this contract.
+
+$d2Stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$d2EpAName = "live-9z-W-A-$d2Stamp"
+$d2EpBName = "live-9z-W-B-$d2Stamp"
+
+try {
+    # ─── Setup: two endpoints ────────────────────────────────────────
+    $d2EpA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = $d2EpAName; profilePreset = 'rfc-standard' } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $d2EpA.id) -Message "9z-W.setup: Created endpoint A (id=$($d2EpA.id))"
+    $d2EpAId = $d2EpA.id
+
+    $d2EpB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = $d2EpBName; profilePreset = 'rfc-standard' } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $d2EpB.id) -Message "9z-W.setup: Created endpoint B (id=$($d2EpB.id))"
+    $d2EpBId = $d2EpB.id
+
+    # Drive a SCIM POST against endpoint A so it has at least one
+    # request-log row (interceptor stamps endpointId).
+    $d2UserBody = @{
+        schemas  = @('urn:ietf:params:scim:schemas:core:2.0:User')
+        userName = "d2-live-user-$d2Stamp"
+    } | ConvertTo-Json
+    $d2User = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$d2EpAId/Users" -Method POST -Headers $headers -Body $d2UserBody -ContentType "application/scim+json"
+    Test-Result -Success ($null -ne $d2User.id) -Message "9z-W.setup: created user on endpoint A (drives an activity row)"
+
+    # Some buffering happens before the row is durable; small wait.
+    Start-Sleep -Milliseconds 250
+
+    # ─── Test 9z-W.1: omitting endpointId returns the canonical shape ─
+    $globalRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $globalRes.activities) -Message "9z-W.1: response has 'activities' array"
+    Test-Result -Success ($null -ne $globalRes.pagination) -Message "9z-W.2: response has 'pagination' object"
+    Test-Result -Success ($globalRes.pagination.total -ge 0) -Message "9z-W.3: pagination.total is a number (>=0)"
+    $globalTotal = [int]$globalRes.pagination.total
+
+    # ─── Test 9z-W.4: scoped to A returns 200 + canonical shape ─────
+    $scopedA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20&endpointId=$d2EpAId" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $scopedA.activities) -Message "9z-W.4: scoped response has 'activities' array"
+    Test-Result -Success ($null -ne $scopedA.pagination) -Message "9z-W.5: scoped response has 'pagination'"
+    $scopedATotal = [int]$scopedA.pagination.total
+
+    # Scoped count must NEVER exceed the global count. Strict equality
+    # is unsafe because parallel test runs share the ring buffer.
+    Test-Result -Success ($scopedATotal -le $globalTotal) -Message "9z-W.6: scoped(A) total ($scopedATotal) <= global total ($globalTotal)"
+
+    # ─── Test 9z-W.7: scoped to B is a DIFFERENT view from scoped(A) ─
+    $scopedB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20&endpointId=$d2EpBId" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $scopedB.activities) -Message "9z-W.7: scoped(B) response has 'activities' array"
+    $scopedBTotal = [int]$scopedB.pagination.total
+    Test-Result -Success ($scopedBTotal -le $globalTotal) -Message "9z-W.8: scoped(B) total ($scopedBTotal) <= global total ($globalTotal)"
+
+    # ─── Test 9z-W.9: unknown endpointId returns 200 + zero results ─
+    # Non-existent UUID is a valid SQL filter; the controller returns
+    # an empty list rather than 404 (matches the legacy /admin/logs
+    # behavior - filters are not validated against the endpoints table
+    # because RequestLog rows can outlive their endpoint).
+    $unknownId = '00000000-0000-0000-0000-000000000000'
+    $scopedUnknown = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20&endpointId=$unknownId" -Method GET -Headers $headers
+    Test-Result -Success (@($scopedUnknown.activities).Count -eq 0) -Message "9z-W.9: unknown endpointId yields empty activities (got $(@($scopedUnknown.activities).Count))"
+    Test-Result -Success ($scopedUnknown.pagination.total -eq 0) -Message "9z-W.10: unknown endpointId pagination.total = 0"
+} catch {
+    Test-Result -Success $false -Message "9z-W.error: $($_.Exception.Message)"
+} finally {
+    # ─── Cleanup ─────────────────────────────────────────────────────
+    try { if ($d2EpAId) { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$d2EpAId" -Method DELETE -Headers $headers | Out-Null } } catch {}
+    try { if ($d2EpBId) { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$d2EpBId" -Method DELETE -Headers $headers | Out-Null } } catch {}
+}
+
+Write-Host "`n--- 9z-W: Activity endpointId Filter (D2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

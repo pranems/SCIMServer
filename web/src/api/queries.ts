@@ -90,6 +90,16 @@ export const queryKeys = {
     byEndpoint: (endpointId: string, params?: Record<string, unknown>) =>
       ['groups', endpointId, params] as const,
   },
+  activity: {
+    /**
+     * Prefix key for every per-endpoint Activity list cache entry.
+     * Used by SSE invalidation so a SCIM write/log mutation refetches
+     * every cached page/filter combination for that endpoint.
+     */
+    all: (endpointId: string) => ['activity', endpointId] as const,
+    byEndpoint: (endpointId: string, params?: Record<string, unknown>) =>
+      ['activity', endpointId, params] as const,
+  },
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -247,6 +257,75 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
   };
 };
 
+// ─── Activity (Phase D2) ─────────────────────────────────────────────
+//
+// GET /admin/activity returns parsed SCIM operations. Phase D2 adds
+// optional endpointId scoping for the new ActivityTab on
+// /endpoints/$id/activity. Filters live in URL search params (zod
+// schema in routes/search-schemas.ts) so deep-links and refresh
+// preserve them.
+
+export interface ActivitySummaryItem {
+  id: string;
+  type: 'user' | 'group' | 'system';
+  severity: 'info' | 'success' | 'warning' | 'error';
+  timestamp: string | Date;
+  icon: string;
+  message: string;
+  details: string;
+  isKeepalive?: boolean;
+  // Activity parser may include extra fields per type; keep loose so
+  // future server additions don't break the type-check.
+  [key: string]: unknown;
+}
+
+export interface ActivityResponse {
+  activities: ActivitySummaryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  filters: {
+    types: string[];
+    severities: string[];
+  };
+}
+
+export interface EndpointActivityParams {
+  endpointId: string;
+  page: number;
+  limit: number;
+  type?: string;
+  severity?: string;
+  search?: string;
+}
+
+export const endpointActivityQueryOptions = (params: EndpointActivityParams) => {
+  const qs = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+    endpointId: params.endpointId,
+  });
+  if (params.type) qs.set('type', params.type);
+  if (params.severity) qs.set('severity', params.severity);
+  if (params.search) qs.set('search', params.search);
+  return {
+    queryKey: queryKeys.activity.byEndpoint(params.endpointId, {
+      page: params.page,
+      limit: params.limit,
+      type: params.type,
+      severity: params.severity,
+      search: params.search,
+    }),
+    queryFn: () => fetchWithAuth<ActivityResponse>(`/scim/admin/activity?${qs.toString()}`),
+    // Activity is "live-feel" data; 10s matches the logs queries so
+    // the perceived freshness is consistent across tabs.
+    staleTime: 10_000,
+  };
+};
+
 // ─── Query hooks ─────────────────────────────────────────────────────
 
 /** Fetch aggregated dashboard data (BFF endpoint - 0 DB queries for stats) */
@@ -312,6 +391,19 @@ export function useEndpointGroups(endpointId: string, params?: ScimListParams) {
   return useQuery<ScimListResponse>({
     ...endpointGroupsQueryOptions(endpointId, params),
     enabled: !!endpointId,
+  });
+}
+
+/**
+ * Fetch parsed SCIM activity scoped to one endpoint (Phase D2).
+ * Filters live in the URL via routes/search-schemas.ts so deep-links
+ * preserve them. Disabled when endpointId is empty (e.g. before the
+ * route param resolves).
+ */
+export function useEndpointActivity(params: EndpointActivityParams) {
+  return useQuery<ActivityResponse>({
+    ...endpointActivityQueryOptions(params),
+    enabled: !!params.endpointId,
   });
 }
 

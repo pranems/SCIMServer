@@ -486,4 +486,49 @@ describe('ActivityController', () => {
       expect(result.summary.operations).toEqual({ users: 0, groups: 0 });
     });
   });
+
+  // ─── Phase D2 - endpointId filter ─────────────────────────────────
+  // The Activity tab on `/endpoints/$id/activity` needs server-side
+  // scoping by endpointId. The Phase 17 RequestLog migration added an
+  // indexed `endpointId` column; this test pins the WHERE behavior so
+  // a future refactor can't silently regress to client-side filtering
+  // (which would defeat the purpose for endpoints with high traffic).
+  describe('getActivities - endpointId filter (Phase D2)', () => {
+    it('passes endpointId into the Prisma WHERE clause when provided', async () => {
+      jest.spyOn(prismaService.requestLog, 'findMany').mockResolvedValue([]);
+      jest.spyOn(prismaService.requestLog, 'count').mockResolvedValue(0);
+
+      await controller.getActivities(
+        '1', '50',
+        undefined, undefined, undefined,
+        undefined,
+        'ep-target-uuid',
+      );
+
+      const findManyCall = jest.mocked(prismaService.requestLog.findMany).mock.calls[0][0];
+      // Walk the AND tree to find the endpointId clause. We don't pin
+      // an exact path so future refactors can move the clause around
+      // as long as the predicate is still expressed.
+      const andClauses = (findManyCall as { where: { AND: unknown[] } }).where.AND;
+      const stringified = JSON.stringify(andClauses);
+      expect(stringified).toContain('"endpointId"');
+      expect(stringified).toContain('"ep-target-uuid"');
+
+      // Same predicate must hit the count() so pagination math matches.
+      const countCall = jest.mocked(prismaService.requestLog.count).mock.calls[0][0];
+      expect(JSON.stringify(countCall)).toContain('"ep-target-uuid"');
+    });
+
+    it('does not add endpointId clause when omitted (back-compat)', async () => {
+      jest.spyOn(prismaService.requestLog, 'findMany').mockResolvedValue([]);
+      jest.spyOn(prismaService.requestLog, 'count').mockResolvedValue(0);
+
+      await controller.getActivities('1', '50');
+
+      const findManyCall = jest.mocked(prismaService.requestLog.findMany).mock.calls[0][0];
+      const stringified = JSON.stringify(findManyCall);
+      // No endpointId predicate when caller passes nothing.
+      expect(stringified).not.toContain('endpointId');
+    });
+  });
 });

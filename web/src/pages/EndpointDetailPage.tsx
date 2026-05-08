@@ -66,7 +66,7 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings';
+type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity';
 
 interface EndpointDetailPageProps {
   endpointId: string;
@@ -78,6 +78,7 @@ function pathToTab(pathname: string, endpointId: string): TabValue {
   if (pathname === base || pathname === `${base}/`) return 'overview';
   if (pathname.startsWith(`${base}/users`)) return 'users';
   if (pathname.startsWith(`${base}/groups`)) return 'groups';
+  if (pathname.startsWith(`${base}/activity`)) return 'activity';
   if (pathname.startsWith(`${base}/logs`)) return 'logs';
   if (pathname.startsWith(`${base}/settings`)) return 'settings';
   return 'overview';
@@ -118,6 +119,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
     }
     if (next === 'groups') {
       navigate({ to: '/endpoints/$endpointId/groups', params: { endpointId } });
+      return;
+    }
+    if (next === 'activity') {
+      navigate({ to: '/endpoints/$endpointId/activity', params: { endpointId } });
       return;
     }
     if (next === 'logs') {
@@ -166,6 +171,7 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="overview">Overview</Tab>
         <Tab value="users">Users</Tab>
         <Tab value="groups">Groups</Tab>
+        <Tab value="activity">Activity</Tab>
         <Tab value="logs">Logs</Tab>
         <Tab value="settings">Settings</Tab>
       </TabList>

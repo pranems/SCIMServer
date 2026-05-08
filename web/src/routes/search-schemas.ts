@@ -87,3 +87,24 @@ export const endpointsSearchSchema = z.object({
   q: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type EndpointsSearch = z.infer<typeof endpointsSearchSchema>;
+
+/**
+ * Per-endpoint Activity tab (Phase D2): pagination + optional
+ * type/severity/search filters. The activity controller's `type` is
+ * limited to the ActivitySummary union (`user` | `group` | `system`)
+ * and `severity` to (`info` | `success` | `warning` | `error`); we
+ * preserve those server-side enums here as a closed set so the UI
+ * cannot construct a request the controller will silently filter to
+ * zero results.
+ */
+export const ACTIVITY_TYPE_VALUES = ['user', 'group', 'system'] as const;
+export type ActivityType = (typeof ACTIVITY_TYPE_VALUES)[number];
+export const ACTIVITY_SEVERITY_VALUES = ['info', 'success', 'warning', 'error'] as const;
+export type ActivitySeverity = (typeof ACTIVITY_SEVERITY_VALUES)[number];
+
+export const activitySearchSchema = paginationSchema.extend({
+  type: z.preprocess(emptyToUndef, z.enum(ACTIVITY_TYPE_VALUES).optional()),
+  severity: z.preprocess(emptyToUndef, z.enum(ACTIVITY_SEVERITY_VALUES).optional()),
+  search: z.preprocess(emptyToUndef, z.string().optional()),
+});
+export type ActivitySearch = z.infer<typeof activitySearchSchema>;
