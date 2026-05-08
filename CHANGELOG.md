@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-05-08 - Phase D Stable Rollup (Read-Only Completeness)
+
+### UI Redesign - Phase D rollup (D1 + D2 + D3 + D4 + D5 stable cut)
+
+**Phase D - Read-Only Completeness - is COMPLETE.** Drops the `-alpha.N` suffix after every sub-phase shipped, deployed, and passed its live gate. The UI now has a fully data-driven Overview tab, real-time Activity feed, schema explorer, dashboard charts, and global Logs page with filters + DetailDrawer. No new features beyond the 5 already-released alphas - this commit is purely the version cut + lockfile sync + Session_starter rollup.
+
+#### What Phase D delivered (consolidated)
+
+| Sub-phase | Version | Surface | Net new tests |
+|---|---|---|---|
+| **D1** Overview Data-Complete | 0.45.0-alpha.1 | OverviewTab uses Phase B BFF + 5 KPI cards + Recent Activity card with EmptyState + LoadingSkeleton (G1) | +4 web vitest |
+| **D2** Activity Tab | 0.45.0-alpha.2 | New `/endpoints/$id/activity` route, URL-driven type/severity/search filters, SSE invalidation extended for users/groups/resources channels, backend endpointId query param on `/admin/activity` | +2 unit, +1 E2E, +6 web, +10 live |
+| **D3** Schemas Tab | 0.45.0-alpha.3 | New `/endpoints/$id/schemas` route with characteristic-badge tree view, Copy URN, 5min cache | +7 web vitest |
+| **D4** Dashboard Charts | 0.45.0-alpha.4 | 24h request volume sparkline (KpiChart) + R2/R3 polish (Spinner -> LoadingSkeleton, plain text -> EmptyState) + bonus pre-existing in-memory listLogs filter parity fix | +13 logging-request-series unit, +3 controller, +3 E2E, +4 web, +9 live |
+| **D5** Global Logs Enhancement | 0.45.0-alpha.5 | Global Logs page redesigned with toolbar (URL contains + endpoint Combobox + status chips + time-range chips), DetailDrawer with full headers/bodies, R4/R6 polish | +2 unit, +3 E2E, +7 web, +9 live |
+| **Total** | | | **+33 unit, +6 E2E, +28 web vitest, +28 live (897 -> 919)** |
+
+#### Cumulative test counts at v0.45.0
+- API unit: 3,628 -> **3,661** (+33)
+- API E2E: 1,171 -> **1,178** (+7)
+- Web vitest: 368 -> **396** (+28)
+- Live SCIM: 891 -> **919** (+28)
+- All quality gates green at every sub-phase.
+
+#### Sub-phase quality gates passed
+- D4 alpha.4: deployed to dev, **910/910 live** pass
+- D5 alpha.5: deployed to dev, **919/919 live** pass
+- v0.45.0 stable: deploy + final live gate (next step)
+
+#### Sequencing rationale
+Each sub-phase shipped independently as an alpha tag with its own deploy + live gate. Following the Phase A beta-by-beta pattern. Stable rollup is purely a version cut once every sub-phase has paid for its own gate.
+
+**Per-phase final quality gate next: deploy v0.45.0 to dev + 919+ live SCIM tests + 7 Playwright must all pass before Phase E starts (Write Operations).**
+
 ## [0.45.0-alpha.5] - 2026-05-08 - Phase D5 (Global Logs Enhancement)
 
 ### UI Redesign - Phase D5 (sub-phase 5 of 5 in Phase D - LAST sub-phase before stable v0.45.0)
