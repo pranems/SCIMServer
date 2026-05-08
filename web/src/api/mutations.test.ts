@@ -247,6 +247,144 @@ describe('useUpdateEndpointConfig', () => {
       expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
     });
   });
+
+  // ─── Phase E2: profile.settings deep-merge ──────────────────────
+  // Without deep-merge, optimistically toggling one flag would clobber
+  // the entire profile (replacing it with `{ settings: { <flag>: x } }`)
+  // and lose schemas, resourceTypes, and every other flag. The hook
+  // must merge the new flag into the existing profile.settings.
+  it('E2 optimistic: deep-merges profile.settings into cached endpoint detail', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const seedDetail: EndpointResponse = {
+      id: EP_ID, name: 'x', active: true, scimBasePath: '',
+      createdAt: '', updatedAt: '',
+      profile: {
+        schemas: [{ id: 'urn:s' }],
+        resourceTypes: [{ name: 'User' }],
+        settings: {
+          StrictSchemaValidation: true,
+          PerEndpointCredentialsEnabled: false,
+          AllowAndCoerceBooleanStrings: true,
+        },
+      } as unknown as Record<string, unknown>,
+      _links: { self: '', stats: '', credentials: '', scim: '' },
+    };
+    queryClient.setQueryData(queryKeys.endpoints.detail(EP_ID), seedDetail);
+
+    const { result } = renderHook(() => useUpdateEndpointConfig(EP_ID), { wrapper });
+    // Don't await yet - check the cache mid-flight.
+    let resolveFetch: (v: unknown) => void = () => undefined;
+    fetchSpy.mockImplementationOnce(() => new Promise((r) => { resolveFetch = r; }));
+    let pending: Promise<unknown> | undefined;
+    act(() => {
+      pending = result.current.mutateAsync({
+        profile: { settings: { StrictSchemaValidation: false } },
+      });
+    });
+
+    // Optimistic snapshot: changed flag flipped, others preserved.
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<EndpointResponse>(
+        queryKeys.endpoints.detail(EP_ID),
+      );
+      const settings = (cached?.profile as Record<string, unknown> | undefined)?.settings as
+        | Record<string, unknown>
+        | undefined;
+      expect(settings?.StrictSchemaValidation).toBe(false);
+      expect(settings?.PerEndpointCredentialsEnabled).toBe(false);
+      expect(settings?.AllowAndCoerceBooleanStrings).toBe(true);
+    });
+
+    // Sibling profile fields preserved (schemas / resourceTypes).
+    const cachedAfter = queryClient.getQueryData<EndpointResponse>(
+      queryKeys.endpoints.detail(EP_ID),
+    );
+    const profile = cachedAfter?.profile as Record<string, unknown>;
+    expect(Array.isArray(profile.schemas)).toBe(true);
+    expect(Array.isArray(profile.resourceTypes)).toBe(true);
+
+    // Resolve the pending fetch so the test cleans up.
+    resolveFetch({ ok: true, status: 200, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
+    await act(async () => { await pending; });
+  });
+
+  it('E2 optimistic: deep-merges profile.settings into cached overview configFlags', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const seedOverview: EndpointOverviewResponse = {
+      endpoint: { id: EP_ID, name: 'x', preset: null, active: true, scimBasePath: '', createdAt: '' },
+      stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
+      credentials: [],
+      recentActivity: [],
+      configFlags: {
+        StrictSchemaValidation: true,
+        PerEndpointCredentialsEnabled: false,
+      },
+    };
+    queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);
+
+    const { result } = renderHook(() => useUpdateEndpointConfig(EP_ID), { wrapper });
+    let resolveFetch: (v: unknown) => void = () => undefined;
+    fetchSpy.mockImplementationOnce(() => new Promise((r) => { resolveFetch = r; }));
+    let pending: Promise<unknown> | undefined;
+    act(() => {
+      pending = result.current.mutateAsync({
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+      });
+    });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<EndpointOverviewResponse>(
+        queryKeys.endpoints.overview(EP_ID),
+      );
+      expect(cached?.configFlags.PerEndpointCredentialsEnabled).toBe(true);
+      expect(cached?.configFlags.StrictSchemaValidation).toBe(true);
+    });
+
+    resolveFetch({ ok: true, status: 200, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
+    await act(async () => { await pending; });
+  });
+
+  it('E2 rollback: restores both detail.profile.settings and overview.configFlags on server error', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const seedDetail: EndpointResponse = {
+      id: EP_ID, name: 'x', active: true, scimBasePath: '',
+      createdAt: '', updatedAt: '',
+      profile: { settings: { StrictSchemaValidation: true } } as unknown as Record<string, unknown>,
+      _links: { self: '', stats: '', credentials: '', scim: '' },
+    };
+    const seedOverview: EndpointOverviewResponse = {
+      endpoint: { id: EP_ID, name: 'x', preset: null, active: true, scimBasePath: '', createdAt: '' },
+      stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
+      credentials: [],
+      recentActivity: [],
+      configFlags: { StrictSchemaValidation: true },
+    };
+    queryClient.setQueryData(queryKeys.endpoints.detail(EP_ID), seedDetail);
+    queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);
+
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 500, text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useUpdateEndpointConfig(EP_ID), { wrapper });
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({
+          profile: { settings: { StrictSchemaValidation: false } },
+        });
+      });
+    } catch { /* expected */ }
+
+    const cachedDetail = queryClient.getQueryData<EndpointResponse>(
+      queryKeys.endpoints.detail(EP_ID),
+    );
+    const cachedOverview = queryClient.getQueryData<EndpointOverviewResponse>(
+      queryKeys.endpoints.overview(EP_ID),
+    );
+    const settings = (cachedDetail?.profile as Record<string, unknown> | undefined)?.settings as
+      | Record<string, unknown>
+      | undefined;
+    expect(settings?.StrictSchemaValidation).toBe(true);
+    expect(cachedOverview?.configFlags.StrictSchemaValidation).toBe(true);
+  });
 });
 
 // ─── useCreateUser ───────────────────────────────────────────────────

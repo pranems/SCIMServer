@@ -9592,6 +9592,109 @@ try {
 Write-Host "`n--- 9z-Y: Global Logs Filters (D5) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-Z: CONFIG FLAG TOGGLES (Phase E2)
+# ============================================
+$script:currentSection = "9z-Z: Config flag toggles (E2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-Z: CONFIG FLAG TOGGLES (Phase E2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# Locks the wire contract that the new SettingsTab interactive switches
+# depend on:
+#   1. PATCH /admin/endpoints/{id} with { profile: { settings: { <flag>: <bool> } } }
+#      flips a single flag and DEEP-MERGES into existing settings (other
+#      flags retained, schemas/resourceTypes retained).
+#   2. The new value is observable on a follow-up GET (full view) AND on
+#      the BFF /overview response under configFlags.
+#   3. Both native booleans and "True"/"False" string forms (Entra style)
+#      round-trip identically when AllowAndCoerceBooleanStrings is on
+#      (the default).
+
+try {
+    # Create a dedicated endpoint for E2 toggling so we don't pollute
+    # state of the long-lived test endpoints.
+    $e2Stamp = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
+    $e2EpName = "live-9z-Z-$e2Stamp"
+    $e2EpBody = @{
+        name = $e2EpName
+        displayName = "E2 toggle target"
+        active = $true
+        profile = @{
+            preset = "rfc-standard"
+            settings = @{
+                StrictSchemaValidation = $false
+                AllowAndCoerceBooleanStrings = $true
+                PerEndpointCredentialsEnabled = $false
+            }
+        }
+    } | ConvertTo-Json -Depth 10
+    $e2Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $e2EpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $e2Ep.id) -Message "9z-Z.setup: created endpoint $e2EpName (id=$($e2Ep.id))"
+
+    # ─── Test 9z-Z.1: PATCH single flag flips it on ───────────────
+    $patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $patchBody -ContentType 'application/json' | Out-Null
+    $afterOn = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $strict = $afterOn.profile.settings.StrictSchemaValidation
+    Test-Result -Success ($strict -eq $true -or $strict -eq 'True') -Message "9z-Z.1: StrictSchemaValidation flipped to true (got '$strict')"
+
+    # ─── Test 9z-Z.2: sibling settings preserved (deep merge) ─────
+    $allow = $afterOn.profile.settings.AllowAndCoerceBooleanStrings
+    Test-Result -Success ($allow -eq $true -or $allow -eq 'True') -Message "9z-Z.2: sibling AllowAndCoerceBooleanStrings preserved (got '$allow')"
+    $perEp = $afterOn.profile.settings.PerEndpointCredentialsEnabled
+    Test-Result -Success ($perEp -eq $false -or $perEp -eq 'False' -or $null -eq $perEp) -Message "9z-Z.3: sibling PerEndpointCredentialsEnabled preserved as false (got '$perEp')"
+
+    # ─── Test 9z-Z.4: PATCH flips it back off ─────────────────────
+    $patchOff = @{ profile = @{ settings = @{ StrictSchemaValidation = $false } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $patchOff -ContentType 'application/json' | Out-Null
+    $afterOff = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $strictOff = $afterOff.profile.settings.StrictSchemaValidation
+    Test-Result -Success ($strictOff -eq $false -or $strictOff -eq 'False' -or $null -eq $strictOff) -Message "9z-Z.4: StrictSchemaValidation flipped back to false (got '$strictOff')"
+
+    # ─── Test 9z-Z.5: Entra-style "True" string round-trips ───────
+    $patchStr = '{"profile":{"settings":{"RequireIfMatch":"True"}}}'
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $patchStr -ContentType 'application/json' | Out-Null
+    $afterStr = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $rim = $afterStr.profile.settings.RequireIfMatch
+    Test-Result -Success ($rim -eq $true -or $rim -eq 'True') -Message "9z-Z.5: 'True' string accepted; RequireIfMatch is truthy (got '$rim')"
+
+    # ─── Test 9z-Z.6: Overview BFF reflects the new value ─────────
+    $ov = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)/overview" -Method GET -Headers $headers
+    $ovRim = $ov.configFlags.RequireIfMatch
+    Test-Result -Success ($ovRim -eq $true -or $ovRim -eq 'True') -Message "9z-Z.6: BFF /overview configFlags.RequireIfMatch reflects PATCH (got '$ovRim')"
+
+    # ─── Test 9z-Z.7: PATCH preserves displayName when only settings change ─
+    $afterStrDisplay = $afterStr.displayName
+    Test-Result -Success ($afterStrDisplay -eq 'E2 toggle target') -Message "9z-Z.7: displayName preserved across settings-only PATCH (got '$afterStrDisplay')"
+
+    # ─── Test 9z-Z.8: PATCH multiple flags atomically ─────────────
+    $multi = @{ profile = @{ settings = @{ VerbosePatchSupported = $true; PatchOpAllowRemoveAllMembers = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $multi -ContentType 'application/json' | Out-Null
+    $afterMulti = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $vps = $afterMulti.profile.settings.VerbosePatchSupported
+    $par = $afterMulti.profile.settings.PatchOpAllowRemoveAllMembers
+    Test-Result -Success (($vps -eq $true -or $vps -eq 'True') -and ($par -eq $true -or $par -eq 'True')) -Message "9z-Z.8: multi-flag PATCH applied both (vps='$vps', par='$par')"
+
+    # ─── Test 9z-Z.9: previous PATCH (RequireIfMatch=True) still set ─
+    $stillRim = $afterMulti.profile.settings.RequireIfMatch
+    Test-Result -Success ($stillRim -eq $true -or $stillRim -eq 'True') -Message "9z-Z.9: RequireIfMatch still true after multi-flag PATCH (got '$stillRim')"
+
+    # ─── Test 9z-Z.10: schemas/resourceTypes retained across all PATCHes ─
+    $schemaCount = if ($afterMulti.profile.schemas) { @($afterMulti.profile.schemas).Count } else { 0 }
+    $rtCount = if ($afterMulti.profile.resourceTypes) { @($afterMulti.profile.resourceTypes).Count } else { 0 }
+    Test-Result -Success ($schemaCount -gt 0) -Message "9z-Z.10: profile.schemas retained ($schemaCount entries)"
+    Test-Result -Success ($rtCount -gt 0) -Message "9z-Z.11: profile.resourceTypes retained ($rtCount entries)"
+
+    # Cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "9z-Z.cleanup: deleted endpoint $e2EpName"
+} catch {
+    Test-Result -Success $false -Message "9z-Z.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-Z: Config Flag Toggles (E2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

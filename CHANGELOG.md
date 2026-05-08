@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0-alpha.2] - 2026-05-08 - Phase E2 (Config Flag Toggles)
+
+### UI Redesign - Phase E2 (sub-phase 2 of 4 in Phase E - Write Operations)
+
+**SettingsTab is now interactive. Every known boolean ProfileSetting flag (13 of them) is rendered as a Fluent UI Switch wired to `useUpdateEndpointConfig`. The hook gains an optimistic deep-merge so a single flag flip no longer clobbers `profile.schemas` / `resourceTypes` / sibling flags in cache. Frontend-only sub-phase - backend PATCH was already correct, just unused.**
+
+#### Frontend Changes
+
+- **SettingsTab.tsx (rewrite):** sources `configFlags` from `useEndpointOverview` (Phase B BFF, zero extra round trip). Renders 13 Switches grouped by concern (validation, concurrency, lifecycle, PATCH semantics, discovery / auth). Each row is `<Switch />` + monospace label + caption description. Coerces 'True' / 'False' string values (Entra style) and native booleans into a single boolean for display; sends boolean on PATCH. Inline MessageBar success / error feedback (auto-dismiss 4s). Currently mutating Switch is `disabled`. Non-boolean settings (`PrimaryEnforcement`, `logLevel`) render in a third "Read-only" card with API-edit hint.
+- **useUpdateEndpointConfig (queries.ts):** `onMutate` now snapshots BOTH detail and overview caches and applies a focused deep-merge: when body has `profile.settings`, merges into `prev.profile.settings` (detail) and `prev.configFlags` (overview). Sibling settings, schemas, resourceTypes are preserved. `onError` restores both caches; `onSettled` invalidates both. Non-settings PATCHes (displayName, description, active) keep the existing shallow merge.
+
+#### Tests
+
+- **+15 web vitest:**
+  - 12 new SettingsTab tests: loading / error / general info / render-all-13-Switches / boolean-true reflects checked / 'True' string coerces to checked / 'False' string coerces to unchecked / absent value falls back to documented defaults / toggle PATCH-shape (off->on and on->off) / success MessageBar / error MessageBar / pending Switch disabled / PrimaryEnforcement read-only render
+  - 3 new mutation tests: optimistic deep-merge into detail.profile.settings (siblings preserved) / optimistic deep-merge into overview.configFlags (other flags preserved) / dual-cache rollback on server error
+- **+12 live SCIM (`9z-Z`):** create test endpoint, single-flag flip on, sibling preservation x2, flip back off, Entra-style 'True' string round-trip, BFF /overview reflects PATCH, displayName preserved across settings-only PATCH, multi-flag PATCH applies both atomically, previous PATCH still set after multi, schemas + resourceTypes retained, cleanup
+- Web vitest: 409 -> 424 (+15)
+- Live SCIM: 919 -> 931 target (+12)
+- API unit / E2E: 3,675 / 1,178 unchanged (no API code change)
+
+#### Documentation
+
+- New: [docs/PHASE_E2_CONFIG_FLAG_TOGGLES.md](docs/PHASE_E2_CONFIG_FLAG_TOGGLES.md)
+- Updated: [docs/INDEX.md](docs/INDEX.md), [Session_starter.md](Session_starter.md)
+- Versions: lockstep `0.46.0-alpha.1` -> `0.46.0-alpha.2` (api + web)
+
 ## [0.46.0-alpha.1] - 2026-05-08 - Phase E1 (Credentials Manager)
 
 ### UI Redesign - Phase E1 (sub-phase 1 of 4 in Phase E - Write Operations)

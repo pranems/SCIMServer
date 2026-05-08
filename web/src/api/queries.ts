@@ -663,7 +663,22 @@ export function useDeleteCredential(endpointId: string) {
   });
 }
 
-/** Update endpoint profile / settings / displayName. Optimistic flag toggle. */
+/**
+ * Update endpoint profile / settings / displayName. Optimistic flag toggle.
+ *
+ * Phase E2: when the body carries `profile.settings` (the SettingsTab
+ * config-flag toggle case), we deep-merge into both the endpoint detail
+ * cache (`profile.settings`) AND the overview BFF cache (`configFlags`).
+ * Without the deep-merge a single flag flip would clobber `profile`
+ * entirely (losing schemas, resourceTypes, and every sibling flag) and
+ * the SettingsTab would visually "lose" every other switch until the
+ * background refetch landed. The overview cache mirror is what makes
+ * the toggle feel instant on the active tab.
+ *
+ * For non-settings PATCHes (`displayName`, `description`, `active`)
+ * we keep the shallow merge against the detail cache - that path was
+ * tested in v0.44.0 and we don't want to regress it.
+ */
 export function useUpdateEndpointConfig(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -674,21 +689,70 @@ export function useUpdateEndpointConfig(endpointId: string) {
       }),
     onMutate: async (body: Record<string, unknown>) => {
       await qc.cancelQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
-      const prev = qc.getQueryData<EndpointResponse>(
+      await qc.cancelQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+
+      const prevDetail = qc.getQueryData<EndpointResponse>(
         queryKeys.endpoints.detail(endpointId),
       );
-      if (prev) {
-        // Shallow merge - enough for flag toggles and displayName.
+      const prevOverview = qc.getQueryData<EndpointOverviewResponse>(
+        queryKeys.endpoints.overview(endpointId),
+      );
+
+      // Detect a profile.settings sub-update once; reuse for both caches.
+      const profilePatch = (body as { profile?: Record<string, unknown> }).profile;
+      const settingsPatch =
+        profilePatch && typeof profilePatch === 'object'
+          ? (profilePatch.settings as Record<string, unknown> | undefined)
+          : undefined;
+
+      // ─── endpoint detail cache (full profile, deep merge) ──────
+      if (prevDetail) {
+        const mergedProfile = profilePatch
+          ? {
+              ...((prevDetail.profile as Record<string, unknown> | undefined) ?? {}),
+              ...profilePatch,
+              ...(settingsPatch
+                ? {
+                    settings: {
+                      ...(((prevDetail.profile as Record<string, unknown> | undefined)?.settings as Record<string, unknown> | undefined) ?? {}),
+                      ...settingsPatch,
+                    },
+                  }
+                : {}),
+            }
+          : prevDetail.profile;
+
+        // Strip profile from the spread so we don't double-apply it.
+        const { profile: _profileFromBody, ...restBody } = body as { profile?: unknown } & Record<string, unknown>;
         qc.setQueryData<EndpointResponse>(
           queryKeys.endpoints.detail(endpointId),
-          { ...prev, ...(body as Partial<EndpointResponse>) },
+          {
+            ...prevDetail,
+            ...(restBody as Partial<EndpointResponse>),
+            ...(profilePatch ? { profile: mergedProfile as Record<string, unknown> } : {}),
+          },
         );
       }
-      return { prev };
+
+      // ─── overview cache (configFlags only) ─────────────────────
+      if (prevOverview && settingsPatch) {
+        qc.setQueryData<EndpointOverviewResponse>(
+          queryKeys.endpoints.overview(endpointId),
+          {
+            ...prevOverview,
+            configFlags: { ...prevOverview.configFlags, ...settingsPatch },
+          },
+        );
+      }
+
+      return { prevDetail, prevOverview };
     },
     onError: (_err, _vars, context) => {
-      if (context?.prev) {
-        qc.setQueryData(queryKeys.endpoints.detail(endpointId), context.prev);
+      if (context?.prevDetail) {
+        qc.setQueryData(queryKeys.endpoints.detail(endpointId), context.prevDetail);
+      }
+      if (context?.prevOverview) {
+        qc.setQueryData(queryKeys.endpoints.overview(endpointId), context.prevOverview);
       }
     },
     onSettled: () => {
