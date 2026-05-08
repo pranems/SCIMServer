@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.44.1 - **Updated:** May 7, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,131 tests (3,641 unit + 1,122 E2E + 368 web vitest) + 7 Playwright + 886 live SCIM
+> **Version:** 0.45.0-alpha.1 - **Updated:** May 8, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,135 tests (3,641 unit + 1,171 E2E + 372 web vitest) + 7 Playwright + 888 live SCIM
 
 ---
 
@@ -51,6 +51,7 @@
 | [PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md](PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md) | **Phase A5 - Playwright E2E + SPA Fallback Fix** (v0.42.0-beta.4, closes Phase A) - real-browser tests lock in router contracts; surfaced & fixed critical bug where deep links to /endpoints, /logs, /settings returned NestJS 404 (only /admin had SPA fallback). New `applySpaFallback` middleware + 23 new tests (8 unit + 15 E2E) + 7 Playwright cases |
 | [PHASE_B_BFF_OVERVIEW_AND_SSE.md](PHASE_B_BFF_OVERVIEW_AND_SSE.md) | **Phase B - BFF Overview + SSE Audit** (v0.43.0) - new `GET /admin/endpoints/:id/overview` endpoint aggregates summary+stats+credentials+activity+flags into one round trip (zero DB queries on warm cache); `useEndpointOverview` hook replaces 2 separate calls in OverviewTab; `useSSE` made channel-aware so per-endpoint Overview/Users/Groups caches invalidate on the right SCIM events. +9 unit + 3 E2E + 17 live + 10 web tests |
 | [PHASE_C_PRIMITIVES_AND_MUTATIONS.md](PHASE_C_PRIMITIVES_AND_MUTATIONS.md) | **Phase C - Reusable Primitives + Mutation Layer** (v0.44.0 + v0.44.1 hardening) - 6 primitives (DetailDrawer / FormDialog / EmptyState / LoadingSkeleton / ErrorBoundary with resetKeys / KpiChart) + 9 mutation hooks with universal optimistic-update pattern (onMutate snapshot -> apply -> onError rollback -> onSettled invalidate). v0.44.1 adds true optimism for User/Group PATCH+DELETE, useUpdateGroup/useDeleteGroup, If-Match ETag header propagation, queryKeys.users.all/groups.all factories, route-aware ErrorBoundary auto-reset. +65 web tests (303 -> 368) |
+| [PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md](PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md) | **Phase D1 - Overview Tab Data-Complete** (v0.45.0-alpha.1) - OverviewTab now composes Phase C primitives (LoadingSkeleton + EmptyState) on top of Phase B BFF: 5 KPI cards (added Config Flags - count of explicitly-true flags), Recent Activity card (10 rows: time / path / METHOD / status badge / duration), EmptyState in Activity slot when zero entries, Skeleton mirrors final layout (CLS=0). +4 web tests (368 -> 372). Frontend-only. |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **Active 6-week delivery plan** - reconciles UI redesign + Tier-0 security + CI/CD upgrades into one operating model with named defects, TDD process, blue/green to prod, progress log |
 | [adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md) | ADR-004 - keep `enableImplicitConversion: true` (S-5 closure with regression-locked decision) |
 

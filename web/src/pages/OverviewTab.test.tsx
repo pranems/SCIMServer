@@ -147,4 +147,98 @@ describe('OverviewTab', () => {
     // a transient error flash before retry.
     expect(screen.getByTestId('tab-overview')).toBeInTheDocument();
   });
+
+  // ── Phase D1 - data-completeness ──────────────────────────────────
+  // Spec ([UI_REDESIGN_REMAINING_GAPS_PLAN.md] §7.1):
+  //   - Render: stats cards + recent activity list + flag summary count
+  //     + credential count
+  //   - Skeleton on loading; EmptyState when no recent activity
+
+  it('renders LoadingSkeleton (not Spinner) while loading - Phase D1/G1', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    });
+
+    renderWithProviders(<OverviewTab endpointId="ep-1" />);
+    // The G1/D1 contract says we use LoadingSkeleton primitive, not the
+    // Fluent Spinner. Asserting on the primitive's data-testid keeps
+    // the test independent of internal Skeleton DOM details.
+    expect(screen.getByTestId('overview-skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('Loading overview...')).not.toBeInTheDocument();
+  });
+
+  it('renders the Recent Activity section with entries from the BFF', () => {
+    const overview: EndpointOverviewResponse = {
+      ...mockOverview,
+      recentActivity: [
+        {
+          id: 'l1',
+          timestamp: '2026-05-08T10:00:00Z',
+          method: 'POST',
+          path: '/scim/endpoints/ep-1/Users',
+          statusCode: 201,
+          durationMs: 42,
+        },
+        {
+          id: 'l2',
+          timestamp: '2026-05-08T10:01:00Z',
+          method: 'PATCH',
+          path: '/scim/endpoints/ep-1/Users/u1',
+          statusCode: 200,
+          durationMs: 18,
+        },
+      ],
+    };
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overview,
+      isLoading: false,
+      error: null,
+    });
+
+    renderWithProviders(<OverviewTab endpointId="ep-1" />);
+    expect(screen.getByTestId('overview-activity')).toBeInTheDocument();
+    // Each row exposes its id as a testid suffix so we can target them.
+    expect(screen.getByTestId('overview-activity-row-l1')).toBeInTheDocument();
+    expect(screen.getByTestId('overview-activity-row-l2')).toBeInTheDocument();
+    // The HTTP method + status code should be visible to a human.
+    expect(screen.getByText('POST')).toBeInTheDocument();
+    expect(screen.getByText('201')).toBeInTheDocument();
+  });
+
+  it('shows an EmptyState in the Recent Activity slot when none exist', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockOverview, // recentActivity is [] in the fixture
+      isLoading: false,
+      error: null,
+    });
+
+    renderWithProviders(<OverviewTab endpointId="ep-1" />);
+    expect(screen.getByTestId('overview-activity-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('overview-activity-row-l1')).not.toBeInTheDocument();
+  });
+
+  it('renders a Config Flags KPI card with the count of enabled flags', () => {
+    const overview: EndpointOverviewResponse = {
+      ...mockOverview,
+      configFlags: {
+        StrictSchemaValidation: true,
+        BulkOperationsEnabled: true,
+        UserSoftDeleteEnabled: false,
+        // Strings should NOT count toward the enabled tally.
+        logLevel: 'INFO',
+      },
+    };
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overview,
+      isLoading: false,
+      error: null,
+    });
+
+    renderWithProviders(<OverviewTab endpointId="ep-1" />);
+    // 2 flags are explicitly true; that is what the KPI surfaces.
+    expect(screen.getByTestId('overview-flags-card')).toBeInTheDocument();
+    expect(screen.getByText('2 enabled')).toBeInTheDocument();
+  });
 });

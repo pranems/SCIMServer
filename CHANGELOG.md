@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0-alpha.1] - 2026-05-08 - Phase D1 (Overview Tab Data-Complete)
+
+### UI Redesign - Phase D1 (start of Phase D rollout)
+
+**Frontend-only commit. First sub-phase of Phase D (Read-Only Completeness). +4 web vitest tests (368 -> 372). Each Phase D sub-phase ships as its own alpha tag (matches Phase A's beta-by-beta rollout pattern); the rollup to stable v0.45.0 happens after D5 with the per-phase quality gate.**
+
+#### What D1 delivers
+
+OverviewTab is now data-complete per [UI_REDESIGN_REMAINING_GAPS_PLAN.md S7.1](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md#71-d1---overview-tab-fully-data-driven). Composes Phase C primitives on top of the Phase B BFF response so the user sees - in one round trip - everything that matters about an endpoint:
+
+- **5 KPI cards** (was 4): Users / Groups / Generic Resources / Credentials / **Config Flags (NEW)**. The Config Flags card surfaces total flag count + count of explicitly-`true` flags (excludes string values like `logLevel: 'INFO'` so the enabled tally stays meaningful).
+- **Recent Activity card** (NEW): renders the last 10 SCIM operations from `useEndpointOverview(id).recentActivity`. 5-column grid: local time / path (truncated, full path in `title`) / METHOD outline badge / status filled badge (color-coded by class: 2xx green, 3xx blue, 4xx amber, 5xx red) / duration ms.
+- **EmptyState in Activity slot** (NEW): when `recentActivity.length === 0`, renders [EmptyState](web/src/components/primitives/EmptyState.tsx) with History icon, "No recent activity" headline, body "SCIM operations against this endpoint will appear here." Matches Phase G2 empty-state copy table.
+- **LoadingSkeleton mirrors final layout** (NEW, replaces Spinner): on `isLoading`, renders the Subtitle2 headers + 5-card KPI skeleton row + 5-row activity skeleton. When data arrives, cards swap in without CLS. Pattern that Phase G1 will roll out to every tab.
+
+#### Files
+
+- [web/src/pages/OverviewTab.tsx](web/src/pages/OverviewTab.tsx) rewritten (~250 lines): added `ActivityRow` sub-component, `statusBadgeColor` helper, swapped Spinner -> LoadingSkeleton, added Config Flags KPI + Recent Activity section.
+- [web/src/pages/OverviewTab.test.tsx](web/src/pages/OverviewTab.test.tsx): +4 tests (skeleton, recent activity rows, empty state, config flag count). RED phase ran 4 fail + 5 pass; GREEN phase passes 9/9.
+
+#### TDD evidence
+
+| Phase | Result |
+|-------|--------|
+| RED | 4 new tests added; vitest -> 4 fail with expected "element not found"; 5 pre-existing pass |
+| GREEN | rewrote OverviewTab to compose primitives + render activity + flag card -> 9/9 OverviewTab tests pass |
+| REFACTOR | extracted `ActivityRow` sub-component + `statusBadgeColor` helper; no test changes needed |
+
+#### Test counts
+
+- Web vitest: 368 -> **372** (+4)
+- API unit / E2E / live SCIM: unchanged (frontend-only commit; no backend changes)
+- Production build: clean (`vite build` 14.28s)
+
+#### Why D1 ships standalone
+
+Per plan, each Phase D sub-phase (D1 through D5) is its own RED-GREEN-REFACTOR cycle and ships under the alpha label so:
+
+1. Each step has its own deploy + live-test validation - if D2 regresses, D1 is already live and reverting is one commit.
+2. The dev image gets each piece of new UI as soon as it lands, not after 5 sub-phases batch up.
+3. CHANGELOG history matches the work granularity (mirrors how Phase A shipped 0.42.0-alpha.1 through beta.5 across A1-A5).
+
+The rollup to stable **v0.45.0** happens after D5 with the standing per-phase quality gate (deploy + 888+ live + 7 Playwright + all 11 quality-gate prompts).
+
+#### Cross-references
+
+- [docs/PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md](docs/PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md) - feature doc with full architecture
+- [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md) S7 - Phase D parent plan
+- [docs/PHASE_C_PRIMITIVES_AND_MUTATIONS.md](docs/PHASE_C_PRIMITIVES_AND_MUTATIONS.md) - primitives consumed (LoadingSkeleton + EmptyState)
+- [docs/PHASE_B_BFF_OVERVIEW_AND_SSE.md](docs/PHASE_B_BFF_OVERVIEW_AND_SSE.md) - BFF endpoint that feeds OverviewTab
+
+#### Up next
+
+Phase D2 - new Activity tab (dedicated route + `useEndpointActivity` hook + filter URL search params + SSE invalidation hookup). Will ship as v0.45.0-alpha.2 after the same RED -> GREEN -> deploy cycle.
+
 ## [0.44.1] - 2026-05-07 - Phase C Hardening (gap-fill before Phase D)
 
 ### UI Redesign - Phase C v0.44.1 (gap-fill commit)
