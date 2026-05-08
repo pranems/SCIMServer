@@ -26,6 +26,8 @@ describe('router route tree', () => {
     expect(childPaths).toContain('/endpoints');
     expect(childPaths).toContain('/logs');
     expect(childPaths).toContain('/settings');
+    // Phase E3: top-level Manual Provision page.
+    expect(childPaths).toContain('/manual-provision');
   });
 
   it('has the endpoint detail layout with nested tab routes (incl. overview index)', () => {

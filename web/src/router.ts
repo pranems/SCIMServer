@@ -39,6 +39,7 @@ import { schemasTabRoute } from './routes/endpoints.$endpointId.schemas';
 import { credentialsTabRoute } from './routes/endpoints.$endpointId.credentials';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
+import { manualProvisionRoute } from './routes/manual-provision';
 import { queryClient } from './api/query-client';
 
 /** Endpoint detail layout with its 8 nested tab routes (overview + 7 explicit). */
@@ -60,6 +61,7 @@ export const routeTree = rootRoute.addChildren([
   endpointDetailRouteWithChildren,
   logsRoute,
   settingsRoute,
+  manualProvisionRoute,
 ]);
 
 /**

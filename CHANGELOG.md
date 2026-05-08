@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0-alpha.3] - 2026-05-08 - Phase E3 (Manual Provisioning Redesigned)
+
+### UI Redesign - Phase E3 (sub-phase 3 of 4 in Phase E - Write Operations)
+
+**Frontend-only sub-phase. New top-level `/manual-provision` page with endpoint Combobox, User/Group TabList, sub-component forms, and a JSON-aware ProvisionResult panel. Replaces the legacy `components/manual/ManualProvision.tsx` (deleted in Phase I2). Wires Phase C5 mutation hooks (`useCreateUser` / `useCreateGroup`) so cache invalidation flows through the standard query keys (UsersTab / GroupsTab / Dashboard / Overview all refetch automatically).**
+
+#### Frontend Changes
+
+- **ManualProvisionPage.tsx (new):** top-level page composed of three sub-components (`CreateUserForm`, `CreateGroupForm`, `ProvisionResult`). Endpoint Combobox sourced from `useEndpoints`; TabList switches between User and Group resource types; the matching form gates submission until an endpoint is picked. Submit builds a proper SCIM body (`schemas: [...]` + required `userName` / `displayName` + optional fields) and fires `useCreateUser` or `useCreateGroup` with the picked endpoint id. Result panel renders id + raw JSON on success or a red MessageBar on error.
+- **manual-provision.tsx (route):** new TanStack Router top-level route at `/manual-provision`; loader pre-fetches the endpoints list so the picker has cached data on first paint.
+- **router.ts:** registered as a 5th top-level child of root.
+- **AppSidebar.tsx:** new nav item with `PersonAdd24Regular` icon between Endpoints and Logs.
+
+#### Tests
+
+- **+9 web vitest:** loading state; error state; Combobox renders all endpoints; submit disabled until endpoint picked; User submit body shape (schemas + active + optional fields); Group tab + Group submit body shape (schemas + members[]); success result panel shows returned id; error result panel shows server message; HTML5 required guard on empty userName.
+- **+1 router.test assertion** (still 4 `it` cases - extends the top-level paths assertion).
+- Web vitest: 424 -> 433 (+9)
+- API unit / E2E: 3,675 / 1,178 unchanged (no API code change)
+- Live SCIM: 933 unchanged (SCIM POST flows are already exhaustively locked at sections 2 / 3 / 9z-Q.1)
+
+#### Documentation
+
+- New: [docs/PHASE_E3_MANUAL_PROVISION.md](docs/PHASE_E3_MANUAL_PROVISION.md)
+- Updated: [docs/INDEX.md](docs/INDEX.md), [Session_starter.md](Session_starter.md)
+- Versions: lockstep `0.46.0-alpha.2` -> `0.46.0-alpha.3` (api + web)
+
 ## [0.46.0-alpha.2] - 2026-05-08 - Phase E2 (Config Flag Toggles)
 
 ### UI Redesign - Phase E2 (sub-phase 2 of 4 in Phase E - Write Operations)
