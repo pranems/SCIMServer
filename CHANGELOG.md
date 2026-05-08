@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.1] - 2026-05-08 - Phase F1 (Command Palette)
+
+### UI Redesign - Phase F1 (sub-phase 1 of 3 in Phase F - Power User & Real-Time)
+
+**Cmd+K / Ctrl+K command palette mounted globally in AppShell. Built on cmdk + Fluent UI Dialog. Three source groups (routes, endpoints, quick actions) with cmdk fuzzy-filter on typed query. Keyboard navigation (arrow keys + Enter), Esc closes. Frontend-only.**
+
+#### Frontend Changes
+
+- **CommandPalette.tsx (new):** ~210 LoC component plus `useCommandPaletteShortcut` hook. Renders inside Fluent UI Dialog overlay. Sources: 5 hard-coded routes, dynamic endpoints from `useEndpoints`, 2 quick actions (Create user / Create group both route to `/manual-provision`).
+- **AppShell.tsx:** mounts the palette once at chrome level with controlled open state.
+- **test/setup.ts:** added `Element.prototype.scrollIntoView` stub - jsdom doesn't implement it and cmdk's auto-scroll-to-highlighted-item crashes without it.
+- **package.json:** added `cmdk@^1.1.1` (~50KB minified, 4 new modules in dist).
+
+#### Tests
+
+- **+11 web vitest:** open=false renders nothing; open=true renders dialog + input; route group lists all 5; endpoint group lists each; quick actions visible; route select navigates + closes; endpoint select navigates with params + closes; typed query filters via cmdk; Esc closes; Cmd+K (mac) opens; Ctrl+K (others) opens.
+- Web vitest: 443 -> 454 (+11)
+- API + Live SCIM unchanged (frontend-only)
+
+#### Documentation
+
+- New: [docs/PHASE_F1_COMMAND_PALETTE.md](docs/PHASE_F1_COMMAND_PALETTE.md)
+- Updated: [docs/INDEX.md](docs/INDEX.md), [Session_starter.md](Session_starter.md)
+- Versions: lockstep `0.46.0` -> `0.46.1-alpha.1` (api + web)
+
 ## [0.46.0] - 2026-05-08 - Phase E Stable Rollup (Write Operations)
 
 ### UI Redesign - Phase E (Write Operations) STABLE ROLLUP

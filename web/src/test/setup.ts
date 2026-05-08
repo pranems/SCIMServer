@@ -40,3 +40,11 @@ if (typeof window !== 'undefined' && typeof window.matchMedia === 'undefined') {
     dispatchEvent: () => false,
   });
 }
+
+// jsdom does NOT implement Element.scrollIntoView. cmdk (Phase F1
+// command palette) calls it on each highlighted item to keep it in
+// view; tests crash with "scrollIntoView is not a function" without
+// this stub.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function () {};
+}

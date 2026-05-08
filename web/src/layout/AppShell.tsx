@@ -25,6 +25,7 @@ import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
+import { CommandPalette } from '../components/CommandPalette';
 import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
 import { queryClient } from '../api/query-client';
@@ -61,6 +62,7 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const classes = useStyles();
   const colorScheme = useUIStore((s) => s.colorScheme);
+  const [paletteOpen, setPaletteOpen] = React.useState(false);
 
   const isDark =
     colorScheme === 'dark' ||
@@ -75,6 +77,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       <QueryClientProvider client={queryClient}>
         <TokenGate>
           <SSEProvider />
+          <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
           <div className={classes.root} data-testid="app-shell">
             <AppHeader />
             <div className={classes.body}>
