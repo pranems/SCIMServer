@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0-alpha.4] - 2026-05-08 - Phase E4 (User/Group Detail Drawer + PATCH/DELETE)
+
+### UI Redesign - Phase E4 (sub-phase 4 of 4 in Phase E - Write Operations)
+
+**Final Phase E sub-phase. Closes the last write-operation gap: clicking a row in UsersTab or GroupsTab now opens a slide-in drawer with editable form, Save (real SCIM PATCH Operations envelope), and Delete (with inline confirm step). Frontend-only sub-phase - SCIM PATCH and DELETE on /Users/{id} and /Groups/{id} are already exhaustively locked at sections 9w / 9x / 9z-Q.10 / 9z-S / 9z-U.4 of the live suite.**
+
+#### Frontend Changes
+
+- **ResourceDetailDrawer.tsx (new):** shared component (~300 LoC) discriminated by `kind: 'user' | 'group'`. Wraps the Phase C1 `DetailDrawer` primitive. Renders read-only metadata (`id`, `meta.created`, `meta.lastModified`) plus an editable form (User: userName/displayName/active; Group: displayName/externalId/members count). Save builds a SCIM PATCH Operations envelope (`schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp']`, `Operations: [{ op: 'replace', path, value }, ...]`) containing only fields that actually changed (no-op skipped, drawer just closes). Save fires `useUpdateUser` / `useUpdateGroup` (Phase C5 - already optimistic against every cached list page). Delete shows an inline confirm card (no second modal); confirm fires `useDeleteUser` / `useDeleteGroup` then `onClose()` dismisses the drawer. Error MessageBar surfaces server failure messages.
+- **UsersTab.tsx / GroupsTab.tsx:** rows are now clickable; navigates with `?detail=<id>`. Drawer mounted when search.detail matches a row.
+- **search-schemas.ts:** added `detail` field (optional string, empty -> undefined) to both usersSearchSchema and groupsSearchSchema for URL-driven drawer state (consistent with the D5 LogsPage pattern).
+
+#### Tests
+
+- **+10 web vitest:** User mode (5) - read-only metadata render, form pre-fill, Save fires SCIM PATCH Operations envelope, active toggle replace op, Delete confirm gate then useDeleteUser, error MessageBar on Save reject. Group mode (5) - form pre-fill (displayName + externalId), member count badge, Save fires useUpdateGroup envelope, Delete confirm then useDeleteGroup.
+- Web vitest: 433 -> 443 (+10)
+- API unit / E2E / Live SCIM unchanged (no API code change)
+
+#### Documentation
+
+- New: [docs/PHASE_E4_DETAIL_DRAWER_PATCH_DELETE.md](docs/PHASE_E4_DETAIL_DRAWER_PATCH_DELETE.md)
+- Updated: [docs/INDEX.md](docs/INDEX.md), [Session_starter.md](Session_starter.md)
+- Versions: lockstep `0.46.0-alpha.3` -> `0.46.0-alpha.4` (api + web)
+
 ## [0.46.0-alpha.3] - 2026-05-08 - Phase E3 (Manual Provisioning Redesigned)
 
 ### UI Redesign - Phase E3 (sub-phase 3 of 4 in Phase E - Write Operations)

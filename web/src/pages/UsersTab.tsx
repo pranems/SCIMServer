@@ -24,6 +24,7 @@ import {
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
 import type { UsersSearch } from '../routes/search-schemas';
+import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
@@ -92,6 +93,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const search = useSearch({ strict: false }) as Partial<UsersSearch>;
   const page = search.page ?? 1;
   const pageSize = search.pageSize ?? 20;
+  const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;
 
@@ -100,6 +102,22 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
       to: USERS_ROUTE_PATH,
       params: (prev) => ({ ...prev, endpointId }),
       search: (prev) => ({ ...(prev as UsersSearch), page: nextPage }),
+    });
+  };
+
+  const openDetail = (userId: string): void => {
+    navigate({
+      to: USERS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as UsersSearch), detail: userId }),
+    });
+  };
+
+  const closeDetail = (): void => {
+    navigate({
+      to: USERS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as UsersSearch), detail: undefined }),
     });
   };
 
@@ -149,7 +167,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
         </thead>
         <tbody>
           {users.map((user: any) => (
-            <tr key={user.id} className={classes.tr}>
+            <tr
+              key={user.id}
+              className={classes.tr}
+              onClick={() => openDetail(user.id)}
+              style={{ cursor: 'pointer' }}
+              data-testid={`user-row-${user.id}`}
+            >
               <td className={classes.td}>
                 <Text weight="semibold">{user.userName}</Text>
               </td>
@@ -196,6 +220,16 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
             Next
           </Button>
         </div>
+      )}
+
+      {detailId && users.find((u: any) => u.id === detailId) && (
+        <ResourceDetailDrawer
+          kind="user"
+          endpointId={endpointId}
+          resource={users.find((u: any) => u.id === detailId)}
+          open
+          onClose={closeDetail}
+        />
       )}
     </div>
   );

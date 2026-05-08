@@ -40,15 +40,19 @@ export const paginationSchema = z.object({
 });
 export type PaginationSearch = z.infer<typeof paginationSchema>;
 
-/** Users tab inside an endpoint: pagination + optional SCIM filter. */
+/** Users tab inside an endpoint: pagination + optional SCIM filter + drawer detail id. */
 export const usersSearchSchema = paginationSchema.extend({
   filter: z.preprocess(emptyToUndef, z.string().optional()),
+  /** Phase E4: id of the user whose detail drawer is open. */
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type UsersSearch = z.infer<typeof usersSearchSchema>;
 
-/** Groups tab inside an endpoint: pagination + optional SCIM filter. */
+/** Groups tab inside an endpoint: pagination + optional SCIM filter + drawer detail id. */
 export const groupsSearchSchema = paginationSchema.extend({
   filter: z.preprocess(emptyToUndef, z.string().optional()),
+  /** Phase E4: id of the group whose detail drawer is open. */
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type GroupsSearch = z.infer<typeof groupsSearchSchema>;
 

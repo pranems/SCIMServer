@@ -18,6 +18,7 @@ import {
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
+import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
@@ -42,6 +43,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const search = useSearch({ strict: false }) as Partial<GroupsSearch>;
   const page = search.page ?? 1;
   const pageSize = search.pageSize ?? 20;
+  const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;
 
@@ -50,6 +52,22 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
       to: GROUPS_ROUTE_PATH,
       params: (prev) => ({ ...prev, endpointId }),
       search: (prev) => ({ ...(prev as GroupsSearch), page: nextPage }),
+    });
+  };
+
+  const openDetail = (groupId: string): void => {
+    navigate({
+      to: GROUPS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as GroupsSearch), detail: groupId }),
+    });
+  };
+
+  const closeDetail = (): void => {
+    navigate({
+      to: GROUPS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as GroupsSearch), detail: undefined }),
     });
   };
 
@@ -97,7 +115,13 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
         </thead>
         <tbody>
           {groups.map((group: any) => (
-            <tr key={group.id} className={classes.tr}>
+            <tr
+              key={group.id}
+              className={classes.tr}
+              onClick={() => openDetail(group.id)}
+              style={{ cursor: 'pointer' }}
+              data-testid={`group-row-${group.id}`}
+            >
               <td className={classes.td}>
                 <Text weight="semibold">{group.displayName}</Text>
               </td>
@@ -122,6 +146,16 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
           <Text>Page {page}</Text>
           <Button appearance="subtle" disabled={startIndex + pageSize > total} onClick={() => goToPage(page + 1)}>Next</Button>
         </div>
+      )}
+
+      {detailId && groups.find((g: any) => g.id === detailId) && (
+        <ResourceDetailDrawer
+          kind="group"
+          endpointId={endpointId}
+          resource={groups.find((g: any) => g.id === detailId)}
+          open
+          onClose={closeDetail}
+        />
       )}
     </div>
   );
