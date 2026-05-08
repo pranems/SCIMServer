@@ -111,21 +111,25 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
     });
 
     it('counts rows into the correct hourly bucket', async () => {
-      // Clock-relative offsets. With the alignment rule "current hour at
-      // index hours-1", a row at `now - kh` (k integer) lands in bucket
-      // index `hours - 1 - k` whenever (k <= hours-1). Half-hour offsets
-      // are kept inside the same bucket as the integer floor (e.g.,
-      // 0.5h ago is in current bucket if now is in second half of hour).
-      // For deterministic placement we test only OFFSETS that are at
-      // least 0.1h after the bucket boundary - and we verify totals,
-      // not exact placement, to remain immune to clock-second drift.
+      // Bucket-anchored offsets. Compute the same `currentBucketStart`
+      // the implementation uses, then place rows at deterministic
+      // positions inside specific buckets. Avoids clock-edge flakiness
+      // (a "now - 0.1h" offset can land in EITHER the current bucket OR
+      // the previous one depending on which minute of the hour we run).
       const now = Date.now();
       const hourMs = 60 * 60 * 1000;
+      const currentBucketStart = Math.floor(now / hourMs) * hourMs;
+      const halfHour = 30 * 60 * 1000;
       const rows = [
-        { createdAt: new Date(now - 0.1 * hourMs) },        // current bucket
-        { createdAt: new Date(now - 1.1 * hourMs) },        // 1 bucket back
-        { createdAt: new Date(now - 1.1 * hourMs) },        // 1 bucket back (2nd)
-        { createdAt: new Date(now - 22.1 * hourMs) },       // 22 buckets back (well within window)
+        // Inside current bucket (idx=23): use NOW itself - guaranteed
+        // to fall in [currentBucketStart, currentBucketStart + hourMs).
+        { createdAt: new Date(now) },
+        // Halfway through previous bucket (idx=22).
+        { createdAt: new Date(currentBucketStart - halfHour) },
+        // Halfway through previous bucket again (idx=22, 2nd row).
+        { createdAt: new Date(currentBucketStart - halfHour) },
+        // Halfway through bucket 22 hours back (idx=1).
+        { createdAt: new Date(currentBucketStart - 22 * hourMs + halfHour) },
       ];
       prisma.requestLog.findMany.mockResolvedValue(rows);
 
@@ -232,14 +236,18 @@ describe('LoggingService - getRequestSeries (in-memory backend)', () => {
   }
 
   it('counts in-memory rows into hourly buckets', async () => {
-    // Use offsets safely inside their target buckets (not on the
-    // bucket boundary) so the test is immune to clock-minute drift.
+    // Bucket-anchored offsets - identical pattern to the Prisma test
+    // for clock-edge robustness. The "halfway through bucket" choice
+    // guarantees the row falls in the intended bucket regardless of
+    // wall-clock minute when the test runs.
     const now = Date.now();
     const hourMs = 60 * 60 * 1000;
-    seedRow({ url: '/scim/endpoints/x/v2/Users', createdAt: new Date(now - 0.1 * hourMs) });
-    seedRow({ url: '/scim/endpoints/x/v2/Users', createdAt: new Date(now - 1.1 * hourMs) });
-    seedRow({ url: '/scim/endpoints/x/v2/Groups', createdAt: new Date(now - 1.1 * hourMs) });
-    seedRow({ url: '/scim/endpoints/x/v2/Users', createdAt: new Date(now - 22.1 * hourMs) });
+    const currentBucketStart = Math.floor(now / hourMs) * hourMs;
+    const halfHour = 30 * 60 * 1000;
+    seedRow({ url: '/scim/endpoints/x/v2/Users', createdAt: new Date(now) });
+    seedRow({ url: '/scim/endpoints/x/v2/Users', createdAt: new Date(currentBucketStart - halfHour) });
+    seedRow({ url: '/scim/endpoints/x/v2/Groups', createdAt: new Date(currentBucketStart - halfHour) });
+    seedRow({ url: '/scim/endpoints/x/v2/Users', createdAt: new Date(currentBucketStart - 22 * hourMs + halfHour) });
 
     const series = await service.getRequestSeries({ hours: 24 });
     expect(series).toHaveLength(24);
@@ -247,9 +255,8 @@ describe('LoggingService - getRequestSeries (in-memory backend)', () => {
   });
 
   it('excludes /scim/admin/, /, /health (matches Prisma branch)', async () => {
-    const now = Date.now();
-    const hourMs = 60 * 60 * 1000;
-    const t = new Date(now - 0.1 * hourMs);
+    // Anchor to NOW which is always in the current bucket (idx=23).
+    const t = new Date(Date.now());
     seedRow({ url: '/scim/admin/dashboard', createdAt: t });
     seedRow({ url: '/health', createdAt: t });
     seedRow({ url: '/', createdAt: t });
