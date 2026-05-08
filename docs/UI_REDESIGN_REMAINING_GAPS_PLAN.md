@@ -1,8 +1,8 @@
 # UI Redesign - Remaining Gaps Implementation Plan
 
-> **Version:** 0.41.0 (planning) - **Date:** May 6, 2026  
+> **Version:** 0.45.0 (Phase D complete) - **Date:** May 8, 2026  
 > **Scope:** All work remaining to reach 100% compliance with [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](UI_REDESIGN_ARCHITECTURE_AND_PLAN.md) (the original 42-step plan)  
-> **Status:** Planning approved - Phase A (TanStack Router) starts next  
+> **Status:** Phases A through D shipped + stable v0.45.0 deployed; D-phase live gate 919/919 pass. Phase E (Write Operations) starts next.  
 > **Predecessor docs:** [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](UI_REDESIGN_ARCHITECTURE_AND_PLAN.md), [DELIVERY_PLAN.md](DELIVERY_PLAN.md), [UI_GUIDE.md](UI_GUIDE.md)  
 > **Affects:** [web/src/](../web/src/), [api/src/modules/dashboard/](../api/src/modules/dashboard/), [scripts/](../scripts/), [docs/](../docs/)
 
@@ -91,7 +91,28 @@ This document collapses the remaining work into **9 dependency-ordered phases (A
 
 | Item | Phase | Status |
 |------|-------|--------|
-| TanStack Router migration | **A** | Plan delivered; user approved; implementation pending |
+| Phase A - TanStack Router migration | **A** | ✅ COMPLETE (v0.42.0) |
+| Phase B - BFF Overview + SSE audit | **B** | ✅ COMPLETE (v0.43.0) |
+| Phase C - Reusable Primitives + Mutations | **C** | ✅ COMPLETE (v0.44.0 + v0.44.1 hardening) |
+| Phase D - Read-Only Completeness | **D** | ✅ COMPLETE (v0.45.0 stable, 919/919 live pass) |
+| Phase E - Write Operations | **E** | NEXT - starts after Phase D rollup |
+| Phase F - Power User and Real-Time | **F** | After E |
+| Phase G - Visual Polish | **G** | Parallel with H |
+| Phase H - Test Infrastructure | **H** | Parallel with G |
+| Phase I - Cutover and Cleanup | **I** | After F, G, H |
+
+### 2.4 Phase D rollup snapshot (v0.45.0)
+
+| Sub-phase | Tag | Live gate | Net new tests |
+|---|---|---|---|
+| D1 Overview Data-Complete | 0.45.0-alpha.1 | rolled into D5 | +4 web vitest |
+| D2 Activity Tab | 0.45.0-alpha.2 | rolled into D5 | +2 unit, +1 E2E, +6 web, +10 live |
+| D3 Schemas Tab | 0.45.0-alpha.3 | rolled into D5 | +7 web vitest |
+| D4 Dashboard Charts | 0.45.0-alpha.4 | 910/910 | +13 unit (req-series), +3 unit (controller), +3 E2E, +4 web, +9 live |
+| D5 Global Logs Enhancement | 0.45.0-alpha.5 | 919/919 | +2 unit, +3 E2E, +7 web, +9 live |
+| **Stable rollup** | **v0.45.0** | **919/919 PASS** | +14 unit (in-memory parity gate-2 fix) |
+
+Cumulative: API unit 3,628 -> **3,675**, API E2E 1,171 -> **1,178**, Web vitest 368 -> **396**, Live SCIM 891 -> **919**.
 
 ---
 
