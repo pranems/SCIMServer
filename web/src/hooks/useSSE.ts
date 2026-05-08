@@ -73,17 +73,26 @@ const EVENT_CHANNEL: Record<SupportedEventType, Channel> = {
  * given event. Exported so unit tests can lock in the mapping without
  * spinning up an EventSource.
  *
+ * Phase F3 audit (completeness): every SCIM mutation creates a
+ * RequestLog row. The Global Logs page and the per-endpoint Logs tab
+ * therefore must refetch on every channel - not just user/group/resource.
+ * Activity invalidation is also broadened to credential and endpoint
+ * channels because the activity feed is derived from RequestLog and
+ * those events show up there too.
+ *
  * Rules:
  *   - Stats and dashboard counts are touched by every mutation.
- *   - User/group list pages for the affected endpoint must refetch.
- *   - Resource events touch the dashboard + endpoint stats but the new
- *     UI doesn't surface generic resources in a list yet, so we don't
- *     try to invalidate that here. When the Generic Resources tab
- *     lands (Phase D), add the invalidation alongside.
+ *   - Logs (`queryKeys.logs.all`, plus the legacy `globalLogs` and
+ *     `endpointLogs` prefixes) refetch on EVERY channel.
+ *   - Activity feeds (`activity.all(endpointId)`) refetch on EVERY
+ *     channel where an endpointId is present.
+ *   - User/group list pages for the affected endpoint refetch on
+ *     resource events for the matching channel.
  *   - Credential events touch the per-endpoint Overview BFF (which
- *     embeds the credential list) plus a future credentials list query.
+ *     embeds the credential list) plus logs / activity (admin actions
+ *     are logged as RequestLog rows).
  *   - Endpoint mutations touch the global endpoints list + per-endpoint
- *     overview if the payload identifies one.
+ *     overview if the payload identifies one + logs / activity.
  */
 export function computeInvalidations(
   type: SupportedEventType,
@@ -91,28 +100,37 @@ export function computeInvalidations(
 ): readonly (readonly unknown[])[] {
   const channel = EVENT_CHANNEL[type];
   const keys: (readonly unknown[])[] = [
-    // Always-invalidate keys.
+    // ─── Always-invalidate keys (every channel) ───────────────
     queryKeys.dashboard,
+    // Phase F3: log views must refetch on every mutation; the
+    // Global Logs and per-endpoint Logs pages use legacy prefix
+    // keys (global-logs / endpoint-logs) that pre-date the
+    // queryKeys.logs factory, so we hit all three to be safe.
+    queryKeys.logs.all,
+    queryKeys.globalLogs.all,
+    queryKeys.endpointLogs.all,
   ];
+
+  // Phase F3: activity feeds derive from RequestLog; refetch on
+  // every channel that carries an endpointId, not just the resource
+  // channels.
+  if (endpointId) {
+    keys.push(queryKeys.activity.all(endpointId));
+  }
 
   switch (channel) {
     case 'users':
     case 'groups':
     case 'resources':
-      // Stats + per-endpoint overview + per-endpoint resource list +
-      // per-endpoint activity feed (Phase D2). Activity is shared
-      // across all three resource channels because the parsed
-      // ActivitySummary objects are derived from the underlying
-      // RequestLog rows, which all three channels mutate.
+      // Stats + per-endpoint overview + per-endpoint resource list.
+      // The byEndpoint key embeds the params object; passing only
+      // [resource, endpointId] invalidates EVERY paginated variant
+      // (TanStack Query treats the missing tail as a wildcard). Use
+      // the same factory the mutation hooks use so changes stay in
+      // lock-step (Phase C5 v0.44.1).
       if (endpointId) {
         keys.push(queryKeys.endpoints.stats(endpointId));
         keys.push(queryKeys.endpoints.overview(endpointId));
-        keys.push(queryKeys.activity.all(endpointId));
-        // The byEndpoint key embeds the params object; passing only
-        // [resource, endpointId] invalidates EVERY paginated variant
-        // (TanStack Query treats the missing tail as a wildcard). Use
-        // the same factory the mutation hooks use so changes stay in
-        // lock-step (Phase C5 v0.44.1).
         if (channel === 'users') {
           keys.push(queryKeys.users.all(endpointId));
         } else if (channel === 'groups') {
@@ -122,7 +140,7 @@ export function computeInvalidations(
       break;
     case 'credentials':
       // Credentials are embedded in the Overview BFF; invalidate it so
-      // the credential KPI card and the future Credentials tab refetch.
+      // the credential KPI card and the Credentials tab refetch.
       if (endpointId) {
         keys.push(queryKeys.endpoints.overview(endpointId));
       }

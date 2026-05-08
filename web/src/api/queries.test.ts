@@ -26,10 +26,14 @@ describe('queryKeys', () => {
     ]);
   });
 
-  it('logs key includes filter params', () => {
-    expect(queryKeys.logs.all({ method: 'POST' })).toEqual([
+  it('logs.list key includes filter params', () => {
+    expect(queryKeys.logs.list({ method: 'POST' })).toEqual([
       'logs', { method: 'POST' },
     ]);
+  });
+
+  it('logs.all is a stable prefix used for SSE invalidation (Phase F3)', () => {
+    expect(queryKeys.logs.all).toEqual(['logs']);
   });
 });
 

@@ -70,9 +70,28 @@ export const queryKeys = {
     overview: (id: string) => ['endpoints', id, 'overview'] as const,
   },
   logs: {
-    all: (params?: Record<string, unknown>) => ['logs', params] as const,
+    /**
+     * Prefix key for every log list cache entry. Used by SSE
+     * invalidation (Phase F3) so every SCIM mutation refetches the
+     * Global Logs / per-endpoint Logs pages (each mutation creates a
+     * RequestLog row). Pass to `invalidateQueries({ queryKey:
+     * queryKeys.logs.all })` to match every paginated / filtered
+     * variant via prefix match.
+     */
+    all: ['logs'] as const,
+    list: (params?: Record<string, unknown>) => ['logs', params] as const,
     detail: (id: string) => ['logs', id] as const,
   },
+  /**
+   * Prefix keys for the legacy log-page caches that pre-date the
+   * `queryKeys.logs` factory. The Global Logs page (`globalLogsQueryOptions`)
+   * uses `['global-logs', ...]` and the per-endpoint Logs page
+   * (`endpointLogsQueryOptions`) uses `['endpoint-logs', ...]`. SSE
+   * invalidation must hit BOTH so a write in one tab refreshes the
+   * logs view in another.
+   */
+  globalLogs: { all: ['global-logs'] as const },
+  endpointLogs: { all: ['endpoint-logs'] as const },
   users: {
     /**
      * Prefix key for every per-endpoint Users list cache entry. Used by

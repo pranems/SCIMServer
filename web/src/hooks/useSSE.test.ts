@@ -177,6 +177,64 @@ describe('computeInvalidations (Phase B3)', () => {
   });
 });
 
+// ─── Phase F3: SSE invalidation completeness audit ───────────────
+//
+// F3 broadens the invalidation map so every channel hits log views and
+// activity feeds (every SCIM mutation creates a RequestLog row, and
+// admin actions land on the activity feed too).
+
+describe('computeInvalidations Phase F3 completeness audit', () => {
+  // Sanity check: every supported event still emits the dashboard key
+  // (regression guard if anyone trims `dashboard` from the always-set).
+  it('every event still invalidates the dashboard key', () => {
+    for (const t of SUPPORTED_EVENT_TYPES) {
+      const keys = computeInvalidations(t, 'ep-1').map(k);
+      expect(keys).toContain(k(queryKeys.dashboard));
+    }
+  });
+
+  // Logs invalidation: every channel should refresh the global logs
+  // page + the per-endpoint logs page + the future queryKeys.logs
+  // factory (no caller uses it yet but the prefix lock prevents a
+  // future query from drifting outside the SSE map).
+  it('every event invalidates all three log prefix keys (Phase F3)', () => {
+    for (const t of SUPPORTED_EVENT_TYPES) {
+      const keys = computeInvalidations(t, 'ep-1').map(k);
+      expect(keys).toContain(k(queryKeys.logs.all));
+      expect(keys).toContain(k(queryKeys.globalLogs.all));
+      expect(keys).toContain(k(queryKeys.endpointLogs.all));
+    }
+  });
+
+  // Logs invalidation must fire even when no endpointId is on the
+  // payload (e.g. system / endpoint-create events that don't carry
+  // a target endpoint scope).
+  it('logs prefix keys still invalidate when endpointId is missing', () => {
+    const keys = computeInvalidations('scim.endpoint.created', undefined).map(k);
+    expect(keys).toContain(k(queryKeys.logs.all));
+    expect(keys).toContain(k(queryKeys.globalLogs.all));
+    expect(keys).toContain(k(queryKeys.endpointLogs.all));
+  });
+
+  // Activity invalidation broadens to credential events.
+  it('credential events now invalidate the activity feed (Phase F3)', () => {
+    const keys = computeInvalidations('scim.credential.created', 'ep-1').map(k);
+    expect(keys).toContain(k(queryKeys.activity.all('ep-1')));
+  });
+
+  // Activity invalidation broadens to endpoint events.
+  it('endpoint events now invalidate the activity feed (Phase F3)', () => {
+    const keys = computeInvalidations('scim.endpoint.updated', 'ep-1').map(k);
+    expect(keys).toContain(k(queryKeys.activity.all('ep-1')));
+  });
+
+  // Activity invalidation skipped when no endpointId (it's per-endpoint).
+  it('activity invalidation skipped when endpointId is missing', () => {
+    const keys = computeInvalidations('scim.user.created', undefined).map(k);
+    expect(keys.every((s) => !s.includes('"activity"'))).toBe(true);
+  });
+});
+
 describe('useSSE channel dispatch (Phase B3)', () => {
   // Mirror the lifecycle from the outer describe block - those hooks
   // don't apply to sibling describes, so we re-install the EventSource

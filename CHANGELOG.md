@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.3] - 2026-05-08 - Phase F3 (SSE Invalidation Completeness Audit)
+
+### UI Redesign - Phase F3 (sub-phase 3 of 3 in Phase F - Power User & Real-Time)
+
+**Audit closes two real gaps in the Phase B3 SSE invalidation map vs the Phase D / E feature surface that landed afterward. (1) Logs invalidation: the Global Logs page (`['global-logs', ...]`) and per-endpoint Logs tab (`['endpoint-logs', ...]`) used cache key prefixes that pre-dated the `queryKeys.logs` factory and were never invalidated by SSE - now invalidated on every channel. (2) Activity invalidation: previously only fired on user/group/resource channels, now also fires on credential and endpoint events (admin actions land on the activity feed too). Pure additive change - no existing invalidation removed. Frontend-only.**
+
+#### Frontend Changes
+
+- **queries.ts:** new `queryKeys.logs.all = ['logs']` prefix lock; renamed prior `logs.all(params)` factory to `logs.list(params)`. New `queryKeys.globalLogs.all = ['global-logs']` and `queryKeys.endpointLogs.all = ['endpoint-logs']` for the legacy log caches.
+- **useSSE.ts:** `computeInvalidations` always-block now includes the three log prefixes; activity invalidation moved out of the channel switch to fire on every channel that carries an endpointId. Doc comment expanded to explain the F3 audit findings.
+
+#### Tests
+
+- **+1 queries.test:** `queryKeys.logs.all` is the stable `['logs']` prefix.
+- **+6 useSSE.test:** every event invalidates dashboard; every event invalidates all three log prefixes (with endpointId); log prefixes still fire when endpointId is missing; credential events invalidate activity; endpoint events invalidate activity; activity skipped when endpointId missing.
+- Web vitest: 473 -> 480 (+7)
+- API + Live SCIM unchanged (frontend-only)
+
+#### Documentation
+
+- New: [docs/PHASE_F3_SSE_INVALIDATION_AUDIT.md](docs/PHASE_F3_SSE_INVALIDATION_AUDIT.md)
+- Updated: [docs/INDEX.md](docs/INDEX.md), [Session_starter.md](Session_starter.md)
+- Versions: lockstep `0.46.1-alpha.2` -> `0.46.1-alpha.3` (api + web)
+
 ## [0.46.1-alpha.2] - 2026-05-08 - Phase F2 (Keyboard Shortcuts)
 
 ### UI Redesign - Phase F2 (sub-phase 2 of 3 in Phase F - Power User & Real-Time)
