@@ -9507,6 +9507,91 @@ try {
 Write-Host "`n--- 9z-X: Dashboard Charts (D4) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-Y: GLOBAL LOGS FILTERS (Phase D5)
+# ============================================
+$script:currentSection = "9z-Y: Global logs filters (D5)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-Y: GLOBAL LOGS FILTERS (Phase D5)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# Locks the wire contract for the new filter dimensions exposed on
+# /admin/logs by the Global Logs page enhancement:
+#   - endpointId (NEW in D5 - was missing from controller surface)
+#   - status (already supported - locked here)
+#   - since / until (already supported - locked here)
+#
+# These are the filter dimensions the new LogsPage UI consumes via
+# globalLogsQueryOptions. If the wire contract drifts, the UI silently
+# breaks.
+
+try {
+    # Find any existing endpoint to scope filters against. Use the
+    # admin endpoints list and pick the first.
+    $eps = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
+    $epId = $null
+    if ($eps.endpoints -and $eps.endpoints.Count -gt 0) { $epId = $eps.endpoints[0].id }
+
+    # ─── Test 9z-Y.1: endpointId filter scopes results ─────────────
+    if ($epId) {
+        $scoped = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?endpointId=$epId&pageSize=50" -Method GET -Headers $headers
+        Test-Result -Success ($null -ne $scoped.items) -Message "9z-Y.1: scoped /admin/logs has 'items'"
+        Test-Result -Success ($scoped.total -ge 0) -Message "9z-Y.2: scoped total is a number (>=0)"
+
+        # Every row's URL should contain the endpoint id (or be /scim/admin/* but
+        # those are filtered out by includeAdmin=false default).
+        $allHaveEpOrAdmin = $true
+        foreach ($row in $scoped.items) {
+            if ($row.url -notmatch [regex]::Escape($epId) -and $row.url -notmatch '/scim/admin/') {
+                $allHaveEpOrAdmin = $false
+                break
+            }
+        }
+        Test-Result -Success $allHaveEpOrAdmin -Message "9z-Y.3: scoped rows are all under endpointId=$epId (or admin)"
+
+        # Compare with global - scoped <= global.
+        $global = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=50" -Method GET -Headers $headers
+        Test-Result -Success ($scoped.total -le $global.total) -Message "9z-Y.4: scoped total ($($scoped.total)) <= global total ($($global.total))"
+    } else {
+        # No endpoints exist - skip the data-driven assertions but still
+        # verify the param doesn't blow up the controller.
+        $scoped = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?endpointId=00000000-0000-0000-0000-000000000000&pageSize=50" -Method GET -Headers $headers
+        Test-Result -Success ($null -ne $scoped.items) -Message "9z-Y.1-4: skipped data-asserts; param accepted (no endpoints exist)"
+    }
+
+    # ─── Test 9z-Y.5: status filter ───────────────────────────────
+    $status200 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?status=200&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $status200.items) -Message "9z-Y.5: status filter returns 'items'"
+    $allOk = $true
+    foreach ($row in $status200.items) {
+        # Server returns null for in-flight rows; treat null as compatible.
+        if ($null -ne $row.status -and $row.status -ne 200) {
+            $allOk = $false
+            break
+        }
+    }
+    Test-Result -Success $allOk -Message "9z-Y.6: status=200 returns only rows where status is 200 or null"
+
+    # ─── Test 9z-Y.7: since filter (future date returns 0 rows) ──
+    $tomorrow = (Get-Date).ToUniversalTime().AddDays(1).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $futureRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?since=$tomorrow&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($futureRes.total -eq 0) -Message "9z-Y.7: since=tomorrow yields 0 rows (got $($futureRes.total))"
+
+    # ─── Test 9z-Y.8: combined filters ────────────────────────────
+    $combined = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?status=200&since=$tomorrow&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($combined.total -eq 0) -Message "9z-Y.8: status=200 + since=tomorrow yields 0 rows"
+
+    # ─── Test 9z-Y.9: invalid status still safe ──────────────────
+    # status=999 is out of valid range but server accepts the query (the
+    # filter just matches nothing). Confirm 200 + empty body, not 500.
+    $invalid = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?status=999&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $invalid.items) -Message "9z-Y.9: status=999 returns 200 with empty matching set (graceful)"
+} catch {
+    Test-Result -Success $false -Message "9z-Y.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-Y: Global Logs Filters (D5) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

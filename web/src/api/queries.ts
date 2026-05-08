@@ -244,18 +244,89 @@ export const endpointLogsQueryOptions = (params: EndpointLogsParams) => {
 export interface GlobalLogsParams {
   urlContains?: string;
   pageSize?: number;
+  // Phase D5 - additional filter dimensions surfaced on the Global
+  // Logs page. All optional; the backend treats undefined as "no
+  // restriction" so partial filter states work transparently.
+  endpointId?: string;
+  status?: number;
+  /**
+   * ISO 8601 lower bound on createdAt. The Global Logs page derives
+   * this from a closed-set time-range picker (1h / 24h / 7d / 30d),
+   * computed at navigation time and persisted in the URL via the zod
+   * search-param schema.
+   */
+  since?: string;
+  /** ISO 8601 upper bound. Currently unused by the picker but accepted. */
+  until?: string;
 }
 
 export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
   const pageSize = params.pageSize ?? 50;
   const qs = new URLSearchParams({ pageSize: String(pageSize) });
   if (params.urlContains) qs.set('urlContains', params.urlContains);
+  if (params.endpointId) qs.set('endpointId', params.endpointId);
+  if (typeof params.status === 'number') qs.set('status', String(params.status));
+  if (params.since) qs.set('since', params.since);
+  if (params.until) qs.set('until', params.until);
   return {
-    queryKey: ['global-logs', params.urlContains ?? ''] as const,
+    // Cache key includes every filter dimension so changing one of
+    // them yields a distinct cache entry (no accidental stale-data
+    // bleed across filter combinations).
+    queryKey: [
+      'global-logs',
+      params.urlContains ?? '',
+      params.endpointId ?? '',
+      params.status ?? '',
+      params.since ?? '',
+      params.until ?? '',
+      pageSize,
+    ] as const,
     queryFn: () => fetchWithAuth<AdminLogsResponse>(`/scim/admin/logs?${qs.toString()}`),
     staleTime: 10_000,
   };
 };
+
+/**
+ * Phase D5 - hook wrapper around globalLogsQueryOptions for components
+ * that don't need to compose the options object (route loaders still
+ * use the options form for ensureQueryData).
+ */
+export const useGlobalLogs = (params: GlobalLogsParams = {}) =>
+  useQuery(globalLogsQueryOptions(params));
+
+/**
+ * Phase D5 - per-log detail hook. Powers the DetailDrawer slide-over
+ * on the Global Logs page when a row is clicked. The detail endpoint
+ * returns parsed request/response bodies + headers, so we fetch on
+ * demand rather than carrying every log body in the list response.
+ */
+export interface GlobalLogDetail {
+  id: string;
+  method: string;
+  url: string;
+  status?: number;
+  durationMs?: number;
+  createdAt: string | Date;
+  requestHeaders?: unknown;
+  requestBody?: unknown;
+  responseHeaders?: unknown;
+  responseBody?: unknown;
+  errorMessage?: string;
+  reportableIdentifier?: string;
+}
+
+export const globalLogDetailQueryOptions = (id: string | undefined) => ({
+  // When `id` is undefined the query is disabled (enabled: false) so
+  // we never request /admin/logs/undefined. The key still includes the
+  // (undefined) id for cache distinction.
+  queryKey: ['global-logs', 'detail', id] as const,
+  queryFn: () => fetchWithAuth<GlobalLogDetail>(`/scim/admin/logs/${id!}`),
+  enabled: Boolean(id),
+  staleTime: 60_000, // log bodies are immutable - long stale time is fine
+});
+
+export const useGlobalLog = (id: string | undefined) =>
+  useQuery(globalLogDetailQueryOptions(id));
 
 // ─── Activity (Phase D2) ─────────────────────────────────────────────
 //

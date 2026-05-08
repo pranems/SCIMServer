@@ -69,12 +69,17 @@ export type LogsSearch = z.infer<typeof logsSearchSchema>;
  * `status` is coerced to number because URL search params are strings.
  * `timeRange` is a closed enum to prevent typo-driven divergence between
  * the UI and the server's accepted set.
+ *
+ * Phase D5 adds `detail` (the id of a log row whose body/headers should
+ * be shown in the slide-over DetailDrawer). Empty / missing means no
+ * drawer is open.
  */
 export const globalLogsSearchSchema = paginationSchema.extend({
   endpointId: z.preprocess(emptyToUndef, z.string().optional()),
   status: z.preprocess(emptyToUndef, z.coerce.number().int().min(100).max(599).optional()),
   timeRange: z.preprocess(emptyToUndef, z.enum(TIME_RANGE_VALUES).optional()),
   urlContains: z.preprocess(emptyToUndef, z.string().optional()),
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type GlobalLogsSearch = z.infer<typeof globalLogsSearchSchema>;
 

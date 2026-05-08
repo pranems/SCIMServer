@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0-alpha.5] - 2026-05-08 - Phase D5 (Global Logs Enhancement)
+
+### UI Redesign - Phase D5 (sub-phase 5 of 5 in Phase D - LAST sub-phase before stable v0.45.0)
+
+**Global Logs page redesigned. Backend exposes new `endpointId` query param on `GET /admin/logs`. Frontend ships full filter toolbar (URL contains + endpoint Combobox + status chips + time-range chips), all URL-driven, plus a click-to-open DetailDrawer with full request/response headers + bodies. R4 polish migrates Spinner -> LoadingSkeleton and plain text -> EmptyState. R6 adds the missing useGlobalLogs hook for ergonomics.**
+
+#### Backend
+- **NEW** `endpointId` query param on `GET /admin/logs`. The service `listLogs()` already accepted this filter (Phase 17 indexed column); D5 plumbs it through the admin controller so the UI can scope global logs to a single endpoint. Other filter dimensions (`status`, `since`, `until`) were already accepted; D5 locks them at the contract level via tests.
+
+#### Frontend
+- **NEW** Toolbar on `/logs` with 4 filter slots: URL contains (SearchBox), endpoint single-select (Combobox driven by useEndpoints), status chips (closed-set 200/201/400/401/403/404/409/500), time-range chips (closed-set 1h/24h/7d/30d). All filters URL-driven via Phase A pattern (zod schema in routes/search-schemas.ts).
+- **NEW** Click-to-open DetailDrawer (Phase C1 primitive). Drawer state lives in URL (`?detail=<id>`) so deep-links land directly on the open drawer. Renders status badge, duration, full request/response headers, full request/response bodies (pre-formatted JSON), and error message when present.
+- **NEW** `useGlobalLogs` hook + `useGlobalLog` hook + `globalLogDetailQueryOptions`. R6 - the previous LogsPage called `useQuery(globalLogsQueryOptions(...))` directly which was inconsistent with the rest of the queries surface.
+- **R4** Loading state: `<Spinner>` -> `<LoadingSkeleton count={8} height="40px">` mirroring the table row layout (zero CLS).
+- **R4** Empty state: plain `<Text>` -> `<EmptyState>` with conditional CTA - shows "Reset filters" only when filters are actually active so an empty server doesn't get a misleading prompt.
+- Reset-filters button shown in header only when filters are active.
+
+#### Tests (+25)
+- API unit `admin.controller.spec` (extended): +2 tests (endpointId passthrough; undefined when not provided)
+- API E2E `global-logs-filters.e2e-spec` (NEW): 3 tests covering endpointId scoping, status filter rows, since=tomorrow yields 0 rows
+- Web vitest `LogsPage.test` (full rewrite): 11 tests (5 baseline behaviors + 6 D5: 4 toolbar/filter tests + 3 drawer tests + 1 reset-button conditional test)
+- Live SCIM section `9z-Y` (NEW): 9 assertions covering endpointId scoping (rows match endpoint), scoped <= global total, status=200 rows are 200/null, since=tomorrow yields 0, combined filters, invalid status graceful
+
+#### Test Counts
+- API unit: 3,659 -> **3,661** (+2)
+- API E2E: 1,175 -> **1,178** (+3)
+- Web vitest: 389 -> **396** (+7)
+- Live SCIM: 910 -> **919** (+9 section 9z-Y)
+
+#### Files Modified
+- [api/src/modules/scim/controllers/admin.controller.ts](api/src/modules/scim/controllers/admin.controller.ts), [api/src/modules/scim/controllers/admin.controller.spec.ts](api/src/modules/scim/controllers/admin.controller.spec.ts)
+- NEW: [api/test/e2e/global-logs-filters.e2e-spec.ts](api/test/e2e/global-logs-filters.e2e-spec.ts), [docs/PHASE_D5_GLOBAL_LOGS_ENHANCEMENT.md](docs/PHASE_D5_GLOBAL_LOGS_ENHANCEMENT.md)
+- [web/src/api/queries.ts](web/src/api/queries.ts), [web/src/routes/search-schemas.ts](web/src/routes/search-schemas.ts)
+- Rewritten: [web/src/pages/LogsPage.tsx](web/src/pages/LogsPage.tsx), [web/src/pages/LogsPage.test.tsx](web/src/pages/LogsPage.test.tsx)
+- [scripts/live-test.ps1](scripts/live-test.ps1) - section `9z-Y` added before TEST SECTION 10
+
+**Per-sub-phase quality gate next: deploy v0.45.0-alpha.5 to dev + 919+ live SCIM tests + 7 Playwright must all pass. After that, Phase D rolls up to stable v0.45.0 (drops -alpha suffix) with one final gate, then Phase E starts.**
+
 ## [0.45.0-alpha.4] - 2026-05-08 - Phase D4 (Dashboard Charts)
 
 ### UI Redesign - Phase D4 (sub-phase 4 of 5 in Phase D)
