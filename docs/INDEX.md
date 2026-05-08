@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.45.0-alpha.2 - **Updated:** May 8, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,162 tests (3,643 unit + 1,172 E2E + 378 web vitest) + 7 Playwright + 898 live SCIM
+> **Version:** 0.45.0-alpha.3 - **Updated:** May 8, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,169 tests (3,643 unit + 1,172 E2E + 385 web vitest) + 7 Playwright + 901 live SCIM
 
 ---
 
@@ -53,6 +53,7 @@
 | [PHASE_C_PRIMITIVES_AND_MUTATIONS.md](PHASE_C_PRIMITIVES_AND_MUTATIONS.md) | **Phase C - Reusable Primitives + Mutation Layer** (v0.44.0 + v0.44.1 hardening) - 6 primitives (DetailDrawer / FormDialog / EmptyState / LoadingSkeleton / ErrorBoundary with resetKeys / KpiChart) + 9 mutation hooks with universal optimistic-update pattern (onMutate snapshot -> apply -> onError rollback -> onSettled invalidate). v0.44.1 adds true optimism for User/Group PATCH+DELETE, useUpdateGroup/useDeleteGroup, If-Match ETag header propagation, queryKeys.users.all/groups.all factories, route-aware ErrorBoundary auto-reset. +65 web tests (303 -> 368) |
 | [PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md](PHASE_D1_OVERVIEW_TAB_DATA_COMPLETE.md) | **Phase D1 - Overview Tab Data-Complete** (v0.45.0-alpha.1) - OverviewTab now composes Phase C primitives (LoadingSkeleton + EmptyState) on top of Phase B BFF: 5 KPI cards (added Config Flags - count of explicitly-true flags), Recent Activity card (10 rows: time / path / METHOD / status badge / duration), EmptyState in Activity slot when zero entries, Skeleton mirrors final layout (CLS=0). +4 web tests (368 -> 372). Frontend-only. |
 | [PHASE_D2_ACTIVITY_TAB.md](PHASE_D2_ACTIVITY_TAB.md) | **Phase D2 - Activity Tab** (v0.45.0-alpha.2) - new ActivityTab at `/endpoints/$id/activity` with URL-driven type/severity/search filters (zod-validated closed-set enums). Backend adds optional `?endpointId=` param to `GET /admin/activity` (indexed WHERE, no schema change). SSE invalidation extended so user/group/resource events refetch the activity feed. +2 API unit + 1 E2E + 10 live (`9z-W`) + 6 web vitest. |
+| [PHASE_D3_SCHEMAS_TAB.md](PHASE_D3_SCHEMAS_TAB.md) | **Phase D3 - Schemas Tab** (v0.45.0-alpha.3) - new SchemasTab at `/endpoints/$id/schemas` - read-only tree view of every schema declared by the endpoint's profile. Per-attribute characteristic badges (type / required / mutability / returned / uniqueness / multiValued / caseExact). Per-schema Copy URN button. 5min cache (schemas rarely change). LoadingSkeleton + EmptyState (covers SchemaDiscovery=disabled). +7 web vitest. Frontend-only. |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **Active 6-week delivery plan** - reconciles UI redesign + Tier-0 security + CI/CD upgrades into one operating model with named defects, TDD process, blue/green to prod, progress log |
 | [adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md) | ADR-004 - keep `enableImplicitConversion: true` (S-5 closure with regression-locked decision) |
 

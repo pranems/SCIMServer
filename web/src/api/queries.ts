@@ -326,6 +326,52 @@ export const endpointActivityQueryOptions = (params: EndpointActivityParams) => 
   };
 };
 
+// ─── Schemas (Phase D3) ──────────────────────────────────────────────
+//
+// GET /scim/endpoints/:id/Schemas returns the full SCIM ListResponse of
+// schemas declared by the endpoint's profile. Schemas rarely change
+// per endpoint after configuration, so we cache for 5 minutes (matches
+// the plan section 7.2 "stale time" recommendation for schemas).
+
+export interface ScimAttributeCharacteristic {
+  name: string;
+  type: string;
+  required?: boolean;
+  multiValued?: boolean;
+  caseExact?: boolean;
+  mutability?: 'readOnly' | 'readWrite' | 'immutable' | 'writeOnly';
+  returned?: 'always' | 'default' | 'never' | 'request';
+  uniqueness?: 'none' | 'server' | 'global';
+  description?: string;
+  canonicalValues?: string[];
+  referenceTypes?: string[];
+  subAttributes?: ScimAttributeCharacteristic[];
+}
+
+export interface ScimSchemaResource {
+  id: string;
+  name?: string;
+  description?: string;
+  attributes: ScimAttributeCharacteristic[];
+  meta?: { resourceType?: string; location?: string };
+  schemas?: string[];
+}
+
+export interface ScimSchemasResponse {
+  schemas: string[];
+  totalResults: number;
+  startIndex: number;
+  itemsPerPage: number;
+  Resources: ScimSchemaResource[];
+}
+
+export const endpointSchemasQueryOptions = (endpointId: string) => ({
+  queryKey: ['endpoint-schemas', endpointId] as const,
+  queryFn: () =>
+    fetchWithAuth<ScimSchemasResponse>(`/scim/endpoints/${endpointId}/Schemas`),
+  staleTime: 5 * 60_000, // 5 minutes
+});
+
 // ─── Query hooks ─────────────────────────────────────────────────────
 
 /** Fetch aggregated dashboard data (BFF endpoint - 0 DB queries for stats) */
@@ -404,6 +450,18 @@ export function useEndpointActivity(params: EndpointActivityParams) {
   return useQuery<ActivityResponse>({
     ...endpointActivityQueryOptions(params),
     enabled: !!params.endpointId,
+  });
+}
+
+/**
+ * Fetch the full SCIM /Schemas list for one endpoint (Phase D3).
+ * Cached 5min - schemas rarely change after endpoint configuration.
+ * Used by SchemasTab for the read-only schema explorer tree.
+ */
+export function useEndpointSchemas(endpointId: string) {
+  return useQuery<ScimSchemasResponse>({
+    ...endpointSchemasQueryOptions(endpointId),
+    enabled: !!endpointId,
   });
 }
 

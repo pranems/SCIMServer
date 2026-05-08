@@ -35,11 +35,12 @@ import { groupsTabRoute } from './routes/endpoints.$endpointId.groups';
 import { logsTabRoute } from './routes/endpoints.$endpointId.logs';
 import { settingsTabRoute } from './routes/endpoints.$endpointId.settings';
 import { activityTabRoute } from './routes/endpoints.$endpointId.activity';
+import { schemasTabRoute } from './routes/endpoints.$endpointId.schemas';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
 import { queryClient } from './api/query-client';
 
-/** Endpoint detail layout with its 6 nested tab routes (overview + 5 explicit). */
+/** Endpoint detail layout with its 7 nested tab routes (overview + 6 explicit). */
 const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   overviewTabRoute,
   usersTabRoute,
@@ -47,6 +48,7 @@ const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   logsTabRoute,
   settingsTabRoute,
   activityTabRoute,
+  schemasTabRoute,
 ]);
 
 /** Full route tree exported for inspection in tests. */

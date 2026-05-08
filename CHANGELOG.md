@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0-alpha.3] - 2026-05-08 - Phase D3 (Schemas Tab)
+
+### UI Redesign - Phase D3 (sub-phase 3 of 5 in Phase D)
+
+**New per-endpoint Schemas tab. Frontend-only - consumes the existing `/scim/endpoints/:id/Schemas` endpoint (Phase 6). +7 web vitest tests (378 -> 385).**
+
+#### What D3 delivers
+
+- **New page** [web/src/pages/SchemasTab.tsx](web/src/pages/SchemasTab.tsx): read-only tree of every schema declared by the endpoint's profile. Each schema is a Card with name + URN + attribute count + Copy URN button. Expanding a schema reveals its attributes; expanding a complex attribute reveals its sub-attributes (2-level nesting matches RFC 7643 schema model).
+- **Characteristic badges** per attribute: `type` (always), `required` (when true, brand color), `mutability` (when not readWrite), `returned` (when not default, informative color), `uniqueness` (when not none, warning color), `multiValued` / `caseExact` (when true). Mirrors the spec table in S7.3.
+- **Copy URN** button per schema uses `navigator.clipboard.writeText` with copied/error transient feedback.
+- **New hook** `useEndpointSchemas(id)` + `endpointSchemasQueryOptions` + `ScimSchemasResponse` / `ScimSchemaResource` / `ScimAttributeCharacteristic` types in [queries.ts](web/src/api/queries.ts). 5min staleTime - schemas rarely change after endpoint configuration.
+- **New route** [endpoints.$endpointId.schemas.tsx](web/src/routes/endpoints.$endpointId.schemas.tsx) registered as nested child + tab inserted between Activity and Logs in EndpointDetailPage.
+- **LoadingSkeleton** count=5 height=56px mirrors the schema card row layout (G1 pattern, CLS=0).
+- **EmptyState** with DocumentBulletList icon - covers both SchemaDiscovery=disabled (404) and zero-schema endpoints.
+
+#### TDD evidence
+
+| Phase | Result |
+|-------|--------|
+| RED | SchemasTab.test.tsx imported a non-existent component -> module resolution failure |
+| GREEN | created SchemasTab.tsx + hook + queryOptions + route file + wired into router + tab list -> 7/7 SchemasTab tests pass + 385/385 full vitest |
+| REFACTOR | extracted `SchemaRow`, `AttributeLeaf`, `CharacteristicBadges` sub-components |
+
+#### Test counts
+
+- Web vitest: 378 -> **385** (+7)
+- API unit / E2E / live SCIM: unchanged (frontend-only)
+- Production build: clean (vite build 12.41s)
+
+#### Cross-references
+
+- [docs/PHASE_D3_SCHEMAS_TAB.md](docs/PHASE_D3_SCHEMAS_TAB.md)
+- [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md) S7.3
+
+#### Up next
+
+Phase D4 - wire `KpiChart` (already shipped in Phase C4) to the Dashboard's 24h request trend. Will ship as v0.45.0-alpha.4.
+
 ## [0.45.0-alpha.2] - 2026-05-08 - Phase D2 (Activity Tab)
 
 ### UI Redesign - Phase D2 (sub-phase 2 of 5 in Phase D)
