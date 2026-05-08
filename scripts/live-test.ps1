@@ -9619,17 +9619,15 @@ try {
         name = $e2EpName
         displayName = "E2 toggle target"
         active = $true
-        profile = @{
-            preset = "rfc-standard"
-            settings = @{
-                StrictSchemaValidation = $false
-                AllowAndCoerceBooleanStrings = $true
-                PerEndpointCredentialsEnabled = $false
-            }
-        }
-    } | ConvertTo-Json -Depth 10
+        profilePreset = "rfc-standard"
+    } | ConvertTo-Json -Depth 4
     $e2Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $e2EpBody -ContentType 'application/json'
     Test-Result -Success ($null -ne $e2Ep.id) -Message "9z-Z.setup: created endpoint $e2EpName (id=$($e2Ep.id))"
+
+    # Seed baseline settings via a PATCH so we know the starting state.
+    $seed = @{ profile = @{ settings = @{ StrictSchemaValidation = $false; AllowAndCoerceBooleanStrings = $true; PerEndpointCredentialsEnabled = $false } } } | ConvertTo-Json -Depth 5
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $seed -ContentType 'application/json' | Out-Null
+    Test-Result -Success $true -Message "9z-Z.setup: seeded baseline flags via PATCH"
 
     # ─── Test 9z-Z.1: PATCH single flag flips it on ───────────────
     $patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = $true } } } | ConvertTo-Json -Depth 10
