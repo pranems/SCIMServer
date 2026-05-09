@@ -27,7 +27,6 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   Tab,
   TabList,
   Subtitle1,
@@ -35,6 +34,7 @@ import {
 } from '@fluentui/react-components';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEndpoint } from '../api/queries';
+import { LoadingSkeleton } from '../components/primitives';
 
 const useStyles = makeStyles({
   page: {
@@ -95,9 +95,13 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
   const { data: endpoint, isLoading: loadingEndpoint, error: endpointError } = useEndpoint(endpointId);
 
   if (loadingEndpoint) {
+    // G1 - skeleton mirrors header (title row) + tablist row + an
+    // initial content block so the page does not jump on data arrival.
     return (
-      <div className={classes.center} data-testid="endpoint-detail-loading">
-        <Spinner label="Loading endpoint..." />
+      <div className={classes.page} data-testid="endpoint-detail-loading">
+        <LoadingSkeleton count={1} height="40px" data-testid="endpoint-detail-skeleton-header" />
+        <LoadingSkeleton count={1} height="36px" data-testid="endpoint-detail-skeleton-tabs" />
+        <LoadingSkeleton count={5} height="32px" data-testid="endpoint-detail-skeleton-content" />
       </div>
     );
   }

@@ -24,6 +24,7 @@ import React from 'react';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import type { QueryClient } from '@tanstack/react-query';
 import { AppShell } from '../layout/AppShell';
+import { RouteBoundary } from '../layout/RouteBoundary';
 
 /**
  * Type of the router context. Loaders receive an object of this shape
@@ -47,7 +48,9 @@ const TanStackRouterDevtools = import.meta.env.DEV
 function RootLayout(): React.JSX.Element {
   return (
     <AppShell>
-      <Outlet />
+      <RouteBoundary>
+        <Outlet />
+      </RouteBoundary>
       {import.meta.env.DEV ? (
         <React.Suspense fallback={null}>
           <TanStackRouterDevtools />

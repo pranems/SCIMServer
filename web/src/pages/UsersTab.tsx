@@ -7,8 +7,12 @@
  * `?page=N&pageSize=N` is now the single source of truth, parsed by
  * usersSearchSchema (`web/src/routes/search-schemas.ts`).
  *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (table-row shaped; 8 rows above the fold).
+ * Phase G2: empty state migrated from plain Text to EmptyState.
+ *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.4
- * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3 + S10 G1/G2
  */
 import React from 'react';
 import {
@@ -17,7 +21,6 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
@@ -25,6 +28,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
 import type { UsersSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
+import { EmptyState, LoadingSkeleton } from '../components/primitives';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
@@ -124,9 +128,14 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const { data, isLoading, error } = useEndpointUsers(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
+    // G1 - row-shaped skeleton mirrors the final table.
     return (
-      <div className={classes.center} data-testid="users-loading">
-        <Spinner label="Loading users..." />
+      <div className={classes.container} data-testid="users-loading">
+        <LoadingSkeleton
+          count={8}
+          height="40px"
+          data-testid="users-skeleton"
+        />
       </div>
     );
   }
@@ -143,10 +152,15 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const total = data?.totalResults ?? 0;
 
   if (total === 0) {
+    // G2 - EmptyState replaces ad-hoc Text. No CTA: user creation
+    // happens via SCIM POST from the IdP, but the manual provision
+    // page exists for manual onboarding.
     return (
-      <div className={classes.empty} data-testid="users-empty">
-        <Text>No users provisioned to this endpoint yet.</Text>
-      </div>
+      <EmptyState
+        data-testid="users-empty"
+        title="No users in this endpoint"
+        body="Users are provisioned to this endpoint via SCIM POST /Users from your identity provider, or manually from the Manual Provision page."
+      />
     );
   }
 

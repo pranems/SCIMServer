@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.4] - 2026-05-08 - Phase G (Visual Polish)
+
+### UI Redesign - Phase G (S10 closing audit)
+
+**Final audit + close of the S10 visual polish gates that were partially implemented during Phases D and E. G1 (skeletons), G2 (empty states), G3 (per-route error boundaries), G4 (route fade transitions) are now uniformly enforced across every primary surface. Frontend-only.**
+
+#### G1 - LoadingSkeleton replaces Spinner on 8 surfaces
+
+Each skeleton now mirrors the final layout instead of an indeterminate Spinner:
+
+- `EndpointsPage` - 6 card-shaped tiles in a 3-col grid
+- `EndpointDetailPage` - header band + tablist band + content rows
+- `UsersTab`, `GroupsTab`, `LogsTab` - 8 table-row bands
+- `SettingsTab` - 6 form-row bands (Spinner kept only for inline "Saving flag..." indicator per E2 design)
+- `SettingsPage` - 3 card-shaped tiles
+- `ManualProvisionPage` - header + endpoint picker + form rows
+
+#### G2 - EmptyState replaces ad-hoc Text on 4 new surfaces
+
+- `EndpointsPage` - "No endpoints yet" / "No matching endpoints" with Reset filter CTA
+- `UsersTab` - "No users in this endpoint"
+- `GroupsTab` - "No groups in this endpoint"
+- `LogsTab` - "No request logs yet" / "No logs match these filters" with Reset filter CTA
+
+(Already-migrated D4-E1 surfaces: DashboardPage, LogsPage, ActivityTab, CredentialsTab, OverviewTab, SchemasTab.)
+
+#### G3 + G4 - new `RouteBoundary` primitive
+
+Single mount in `__root.tsx` wraps `<Outlet />` and provides both gates:
+
+- **G3** - `ErrorBoundary` keyed on pathname; catches render errors that TanStack Router's per-route `errorComponent` cannot (the latter only catches loader errors). Auto-resets on navigation so a crash on `/endpoints/A` clears when the user moves to `/endpoints/B`. Tags every error with the route path before delegating to the fallback UI.
+- **G4** - 180 ms opacity-only ease-out fade via `<div key={pathname}>` force-remount. `@media (prefers-reduced-motion: reduce)` collapses duration to `0.01ms`.
+
+#### Tests
+
+- New: [web/src/layout/RouteBoundary.test.tsx](web/src/layout/RouteBoundary.test.tsx) - 5 tests (renders children, catches render error, auto-resets on navigation, key-based remount, custom data-testid)
+- New: [web/src/pages/__phase-g-polish.test.tsx](web/src/pages/__phase-g-polish.test.tsx) - 14 tests (8 G1 surfaces + 6 G2 surfaces including filtered variants)
+- Test counts: Web vitest 480 -> **499** (+19); API unit 3675, API E2E 1178, Live SCIM 933 unchanged.
+
+#### Files
+
+- New: `web/src/layout/RouteBoundary.tsx` (~110 LoC)
+- New: `web/src/layout/RouteBoundary.test.tsx`
+- New: `web/src/pages/__phase-g-polish.test.tsx`
+- New: `docs/PHASE_G_VISUAL_POLISH.md`
+- Edited: `web/src/routes/__root.tsx` (wire RouteBoundary)
+- Edited: 8 page files (Spinner -> LoadingSkeleton, Text -> EmptyState)
+- Updated: `docs/INDEX.md`, `CHANGELOG.md`, `Session_starter.md`
+- Versions: api+web `0.46.1-alpha.3` -> `0.46.1-alpha.4`
+
 ## [0.46.1-alpha.3] - 2026-05-08 - Phase F3 (SSE Invalidation Completeness Audit)
 
 ### UI Redesign - Phase F3 (sub-phase 3 of 3 in Phase F - Power User & Real-Time)

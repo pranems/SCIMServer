@@ -28,7 +28,6 @@ import {
   Switch,
   Button,
   Card,
-  Spinner,
   TabList,
   Tab,
   type TabValue,
@@ -42,6 +41,7 @@ import {
 } from '@fluentui/react-components';
 import { Add24Regular, Person24Regular, People24Regular } from '@fluentui/react-icons';
 import { useEndpoints, useCreateUser, useCreateGroup } from '../api/queries';
+import { LoadingSkeleton } from '../components/primitives';
 
 // ─── Styles ───────────────────────────────────────────────────────────
 
@@ -285,9 +285,13 @@ export const ManualProvisionPage: React.FC = () => {
   const createGroup = useCreateGroup(endpointId);
 
   if (isLoading) {
+    // G1 - skeleton mirrors the page (header + endpoint picker + tabs +
+    // form area) instead of an indeterminate Spinner.
     return (
-      <div className={classes.center} data-testid="manual-provision-loading">
-        <Spinner label="Loading endpoints..." />
+      <div data-testid="manual-provision-loading">
+        <LoadingSkeleton count={1} height="40px" data-testid="manual-provision-skeleton-header" />
+        <LoadingSkeleton count={1} height="56px" data-testid="manual-provision-skeleton-picker" />
+        <LoadingSkeleton count={5} height="40px" data-testid="manual-provision-skeleton-form" />
       </div>
     );
   }

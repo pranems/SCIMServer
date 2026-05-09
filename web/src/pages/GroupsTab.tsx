@@ -3,6 +3,10 @@
  *
  * Phase A3: pagination lives in the URL (`?page=N&pageSize=N`) via
  * TanStack Router. State is derived from groupsSearchSchema.
+ *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (table-row shaped; 8 rows above the fold).
+ * Phase G2: empty state migrated from plain Text to EmptyState.
  */
 import React from 'react';
 import {
@@ -11,7 +15,6 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
@@ -19,6 +22,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
+import { EmptyState, LoadingSkeleton } from '../components/primitives';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
@@ -74,9 +78,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const { data, isLoading, error } = useEndpointGroups(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
+    // G1 - row-shaped skeleton mirrors the final table.
     return (
-      <div className={classes.center} data-testid="groups-loading">
-        <Spinner label="Loading groups..." />
+      <div className={classes.container} data-testid="groups-loading">
+        <LoadingSkeleton
+          count={8}
+          height="40px"
+          data-testid="groups-skeleton"
+        />
       </div>
     );
   }
@@ -93,10 +102,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const total = data?.totalResults ?? 0;
 
   if (total === 0) {
+    // G2 - EmptyState replaces ad-hoc Text. No CTA: group creation
+    // happens via SCIM POST from the IdP, not from the UI.
     return (
-      <div className={classes.empty} data-testid="groups-empty">
-        <Text>No groups provisioned to this endpoint yet.</Text>
-      </div>
+      <EmptyState
+        data-testid="groups-empty"
+        title="No groups in this endpoint"
+        body="Groups are provisioned to this endpoint via SCIM POST /Groups from your identity provider."
+      />
     );
   }
 

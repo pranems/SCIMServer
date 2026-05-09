@@ -48,6 +48,7 @@ import {
   useUpdateEndpointConfig,
 } from '../api/queries';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
+import { LoadingSkeleton } from '../components/primitives';
 
 // ─── Curated boolean flag registry ────────────────────────────────────
 // Each entry is a known boolean ProfileSetting (api/src/modules/scim/
@@ -249,9 +250,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   }, [feedback]);
 
   if (isLoading) {
+    // G1 - settings is a stack of form rows; mirror with several
+    // shorter skeleton bands instead of an indeterminate Spinner.
     return (
-      <div className={classes.center} data-testid="settings-loading">
-        <Spinner label="Loading settings..." />
+      <div data-testid="settings-loading">
+        <LoadingSkeleton
+          count={6}
+          height="56px"
+          data-testid="settings-skeleton"
+        />
       </div>
     );
   }

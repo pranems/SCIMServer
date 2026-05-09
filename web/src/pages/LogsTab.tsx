@@ -4,6 +4,11 @@
  * Phase A3: page + urlContains filter are URL-driven via
  * logsSearchSchema. SearchBox typing dispatches a navigate that resets
  * page to 1 (typical filter-input UX).
+ *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (table-row shaped).
+ * Phase G2: empty state migrated from plain Text to EmptyState
+ * with a contextual "Reset filter" CTA when a filter is active.
  */
 import React from 'react';
 import {
@@ -12,7 +17,6 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   SearchBox,
   Caption1,
   Subtitle2,
@@ -21,6 +25,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
+import { EmptyState, LoadingSkeleton } from '../components/primitives';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -96,9 +101,14 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   };
 
   if (isLoading) {
+    // G1 - row-shaped skeleton mirrors the final table.
     return (
-      <div className={classes.center} data-testid="logs-loading">
-        <Spinner label="Loading logs..." />
+      <div className={classes.container} data-testid="logs-loading">
+        <LoadingSkeleton
+          count={8}
+          height="40px"
+          data-testid="logs-tab-skeleton"
+        />
       </div>
     );
   }
@@ -114,10 +124,23 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const logs = data?.items ?? [];
 
   if (logs.length === 0) {
-    return (
-      <div className={classes.empty} data-testid="logs-empty">
-        <Text>No request logs for this endpoint.</Text>
-      </div>
+    // G2 - EmptyState replaces plain Text. CTA appears only when a
+    // filter is active (so the user can recover from over-narrow
+    // input).
+    return urlContains ? (
+      <EmptyState
+        data-testid="logs-tab-empty-filtered"
+        title="No logs match these filters"
+        body={`No request logs contain "${urlContains}".`}
+        actionLabel="Reset filter"
+        onAction={() => updateSearch({ urlContains: '' })}
+      />
+    ) : (
+      <EmptyState
+        data-testid="logs-tab-empty"
+        title="No request logs yet"
+        body="This endpoint has not received any SCIM requests in the visible window."
+      />
     );
   }
 

@@ -1,6 +1,10 @@
 /**
  * SettingsPage - global app settings and version info.
  * Accessible via /settings sidebar link.
+ *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (3 card-shaped tiles mirroring the final grid of Server Info /
+ * Health / Storage cards).
  */
 import React from 'react';
 import {
@@ -8,12 +12,12 @@ import {
   tokens,
   Card,
   Text,
-  Spinner,
   Subtitle1,
   Subtitle2,
   Caption1,
 } from '@fluentui/react-components';
 import { useVersion, useHealth } from '../api/queries';
+import { LoadingSkeleton } from '../components/primitives';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px' },
@@ -29,9 +33,19 @@ export const SettingsPage: React.FC = () => {
   const { data: health, isLoading: hLoading } = useHealth();
 
   if (vLoading || hLoading) {
+    // G1 - card-shaped skeleton mirrors the final 3-card layout.
     return (
-      <div className={classes.center} data-testid="settings-page-loading">
-        <Spinner label="Loading..." />
+      <div className={classes.page} data-testid="settings-page-loading">
+        <div className={classes.grid} data-testid="settings-page-skeleton-grid">
+          {Array.from({ length: 3 }, (_, i) => (
+            <LoadingSkeleton
+              key={i}
+              count={1}
+              height="180px"
+              data-testid="settings-page-skeleton"
+            />
+          ))}
+        </div>
       </div>
     );
   }
