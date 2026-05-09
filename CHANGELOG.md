@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-05-09 - Phase G + Phase H Stable Rollup
+
+### UI Redesign - Phase G + Phase H complete
+
+**Phase G (Visual Polish) and Phase H (Test Infrastructure) are COMPLETE.** Drops the `-alpha.N` suffix after every sub-phase shipped, deployed to dev, and passed its 933+ live SCIM gate. Pure version cut + lockfile sync + Session_starter rollup; no new features beyond the 7 already-released alphas.
+
+**Cumulative test counts at v0.47.0 (vs v0.46.0 baseline):**
+
+- Web vitest: 443 -> **535** (+92 across G + H1-H6)
+- API unit: 3,675 (unchanged - all phases were frontend-only)
+- API E2E: 1,178 (unchanged)
+- Live SCIM: 933 (unchanged - SCIM contract locked since pre-G)
+- New PowerShell contract assertions: +14 (test-all-modes.contract.ps1)
+
+**All 7 sub-phase gates green:**
+
+- G alpha.4 - Visual Polish: +19 web (RouteBoundary primitive + 14 polish audit tests)
+- H1 alpha.5 - MSW Handlers: +8 web (msw infrastructure + 8 integration tests)
+- H2 alpha.6/7 - axe-core a11y gate: +10 web (axe-core helpers + 10 a11y tests; alpha.7 was hotfix re-tag for missing devDeps)
+- H3 alpha.8 - Visual Regression: +4 web (vitest snapshot tests; Playwright spec infrastructure committed; F3-deferred cross-tab SSE test committed)
+- H4 alpha.9 - vitest Coverage Gates: +6 web (V8 provider + ratchet-floor thresholds + 6 config contract tests)
+- H5 alpha.10 - test-all-modes.ps1 orchestrator: +14 PowerShell contract assertions (no vitest delta)
+- H6 alpha.11 - size-limit Bundle Budgets: +8 web (gzipped budgets + 8 config contract tests)
+
+**Per-phase final quality gate next:** deploy v0.47.0 to dev + 933+ live SCIM tests must all pass before Phase I starts (legacy cleanup).
+
 ## [0.46.1-alpha.11] - 2026-05-09 - Phase H6 (size-limit Bundle Budgets)
 
 ### UI Redesign - Phase H6 (sub-phase 6 of 6 in Phase H - Test Infrastructure - FINAL)
