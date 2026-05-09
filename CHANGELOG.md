@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.9] - 2026-05-09 - Phase H4 (vitest Coverage Gates)
+
+### UI Redesign - Phase H4 (sub-phase 4 of 6 in Phase H - Test Infrastructure)
+
+**Closes the plan §5.4 / S11.4 gap: redesigned UI shipped without a coverage gate so dead-code regressions and untested new features could land silently. Phase H4 wires `@vitest/coverage-v8` with scoped include + I2-aware exclude + ratchet-floor thresholds. Frontend-only.**
+
+#### Threshold rationale
+
+Measured baseline at v0.46.1-alpha.8: statements 77.87 / branches 72.72 / functions 67.02 / lines 80.63. Floor set 2-3 percentage points below baseline (lines:78 / branches:70 / functions:65 / statements:75) so jitter does not red-fail CI but regressions do. Aspirational targets per plan (lines:80 / branches:75 / functions:90 / statements:80) reachable via documented follow-up: 9 trivial route-wrapper tests + 6 mutation hook tests + 3 filter-combination tests + Phase I2 legacy deletion (which widens the include list).
+
+#### Files
+
+- New: `docs/PHASE_H4_COVERAGE_GATES.md`
+- New: `web/src/test/coverage-config.test.ts` - 6 config-contract tests asserting provider / reporters / thresholds / excludes / includes are present in `vite.config.ts`
+- Edited: `web/vite.config.ts` - +85 LoC coverage block with extensive docstrings explaining baseline / floor / trajectory / Phase I2 widening plan
+- Edited: `web/package.json` - new `test:coverage` script + `@vitest/coverage-v8` devDependency
+- Updated: `docs/INDEX.md`, `CHANGELOG.md`, `Session_starter.md`
+- Versions: api+web `0.46.1-alpha.8` -> `0.46.1-alpha.9`
+
+#### Tests
+
+Web vitest 521 -> **527** (+6). API + Live SCIM unchanged.
+
 ## [0.46.1-alpha.8] - 2026-05-08 - Phase H3 (Visual Regression)
 
 ### UI Redesign - Phase H3 (sub-phase 3 of 6 in Phase H - Test Infrastructure)
