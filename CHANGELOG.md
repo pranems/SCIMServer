@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.10] - 2026-05-09 - Phase H5 (test-all-modes Orchestrator)
+
+### UI Redesign - Phase H5 (sub-phase 5 of 6 in Phase H - Test Infrastructure)
+
+**Closes the plan §5.5 / S11.5 gap: redesigned UI shipped without a single command for the full test matrix across persistence backends. Phase H5 ships `scripts/test-all-modes.ps1` - one PowerShell entry point that runs 6 modes (api unit / e2e in both inmemory + prisma backends, web vitest + coverage gate). Frontend-only test infra.**
+
+#### Why backend matters
+
+The API has two repository implementations (InMemoryRepositoryModule + PrismaRepositoryModule) with different consistency guarantees, transaction semantics, and filter evaluation paths. **Real-world precedent:** Phase D4 found `LoggingService.listLogs` had 9 filter dimensions implemented in the prisma branch but missing in the in-memory branch - only caught because Phase D4 also ran the suite in-memory. Without a matrix orchestrator, the divergence is silent until production traffic surfaces it.
+
+**Why theme is single-pass:** Every Fluent UI test mounts its own `FluentProvider theme={webLightTheme}`. Running the suite twice with a global theme env var changes nothing. Theme regressions are caught by Phase H3's Playwright visual-regression spec.
+
+#### Modes
+
+6 modes: `api-unit-inmemory`, `api-unit-prisma`, `api-e2e-inmemory`, `api-e2e-prisma`, `web-vitest`, `web-coverage-gate`.
+
+Each mode runs in `try/finally` that stashes + restores env vars so `PERSISTENCE_BACKEND=prisma` from one mode does not leak into the next mode's `inmemory` run.
+
+#### Files
+
+- New: `scripts/test-all-modes.ps1` (~210 LoC orchestrator with auto-install for fresh-clone case)
+- New: `scripts/test/test-all-modes.contract.ps1` (14-assertion contract test)
+- New: `docs/PHASE_H5_TEST_ALL_MODES.md`
+- Versions: api+web `0.46.1-alpha.9` -> `0.46.1-alpha.10`
+
+#### Tests
+
+Web vitest unchanged. New 14 PowerShell contract assertions in `scripts/test/test-all-modes.contract.ps1`.
+
 ## [0.46.1-alpha.9] - 2026-05-09 - Phase H4 (vitest Coverage Gates)
 
 ### UI Redesign - Phase H4 (sub-phase 4 of 6 in Phase H - Test Infrastructure)
