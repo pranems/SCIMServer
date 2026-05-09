@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.6] - 2026-05-08 - Phase H2 (axe-core a11y gate)
+
+### UI Redesign - Phase H2 (sub-phase 2 of 6 in Phase H - Test Infrastructure)
+
+**Closes the plan §5.1 gap: redesigned UI shipped without an automated accessibility gate. Phase H2 installs axe-core (the W3C-aligned engine that powers Microsoft Accessibility Insights, Lighthouse a11y audits, and Deque) and wires it into both vitest and Playwright with one shared severity threshold. Frontend-only.**
+
+#### Two layers, one severity threshold
+
+FAIL bar: `serious` + `critical` violations fail the gate. `minor` and `moderate` are reported but do not block (matches WCAG 2.1 AA conformance bar).
+
+- **vitest** ([web/src/test/a11y-helper.ts](web/src/test/a11y-helper.ts)) - per-component / per-page checks in jsdom. Disables `color-contrast` / `region` / `landmark-one-main` (false positives in jsdom because `getComputedStyle` does not resolve Fluent UI's design-token-driven colors and component isolation tests do not include the `<main>` landmark wrapper).
+- **Playwright** ([web/e2e/a11y-playwright.ts](web/e2e/a11y-playwright.ts)) - assembled live page in Chromium. Keeps both rules enabled and only disables `color-contrast-enhanced` (WCAG AAA, above our AA target).
+
+Both share the `FAIL_IMPACTS=[serious,critical]` constant so a violation that fails vitest also fails the e2e run (and vice versa).
+
+#### Coverage
+
+10 vitest tests in [web/src/test/a11y.test.tsx](web/src/test/a11y.test.tsx):
+
+- 5 primitives: LoadingSkeleton, EmptyState (no-CTA + with-CTA), ErrorBoundary fallback, KpiChart (with `role-img-alt` per-test override - tracked as recharts a11y follow-up)
+- 3 pages: EndpointsPage, DashboardPage, SettingsPage (all data-loaded happy paths)
+- 2 helper contract tests: `runAxe` returns array, `assertNoA11yViolations` FAILS on `<button>` without accessible name (regression-lock)
+
+#### Tests
+
+Web vitest 507 -> **517** (+10). API + Live SCIM unchanged.
+
+#### Files
+
+- New: `web/src/test/a11y-helper.ts` (~110 LoC) - vitest helper exporting `runAxe`, `assertNoA11yViolations`, `FAIL_IMPACTS`, `DEFAULT_VITEST_RULE_OVERRIDES`
+- New: `web/e2e/a11y-playwright.ts` (~100 LoC) - Playwright helper exporting `assertNoA11yViolationsOnPage`
+- New: `web/src/test/a11y.test.tsx` - 10 vitest a11y tests
+- New: `docs/PHASE_H2_AXE_A11Y_GATE.md`
+- Edited: `web/package.json` - added `@axe-core/playwright@4.x` + `axe-core@4.x` devDependencies
+- Updated: `docs/INDEX.md`, `CHANGELOG.md`, `Session_starter.md`
+- Versions: api+web `0.46.1-alpha.5` -> `0.46.1-alpha.6`
+
 ## [0.46.1-alpha.5] - 2026-05-08 - Phase H1 (MSW Handlers)
 
 ### UI Redesign - Phase H1 (sub-phase 1 of 6 in Phase H - Test Infrastructure)
