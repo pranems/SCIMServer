@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-05-09 - Phase I (Legacy Cleanup + UI Cutover) - FINAL UI REDESIGN PHASE
+
+### UI Redesign - Phase I (I1 + I2 + I3) - COMPLETE
+
+**The UI redesign is COMPLETE.** All three Phase I sub-phases ship as one atomic commit because they are tightly coupled (strip switch + delete components + final validation). The legacy tab-based UI is gone; the redesigned TanStack Router + Fluent UI shell from Phases A through H6 is the single user-facing surface.
+
+#### I1 - Strip ?ui=legacy switch
+
+[web/src/App.tsx](web/src/App.tsx) collapsed from 710 LoC to ~10 LoC. The new file is a single `RouterProvider` mount.
+
+What's gone: 670 LoC tab state machine, ad-hoc fetch wiring, version polling + GitHub release discovery, token modal, ?ui=legacy URL query-param check + URLSearchParams parsing, legacy AuthProvider + ThemeProvider context wrappers.
+
+#### I2 - Delete ~3,850 LoC of legacy components
+
+Deleted (with their replacement in the redesigned UI):
+
+- `api/client.ts` + .test.ts (~830 LoC) -> [api/queries.ts](web/src/api/queries.ts) via TanStack Query
+- `components/Header.{tsx,test,module.css}` (~280) -> [layout/AppHeader.tsx](web/src/layout/AppHeader.tsx)
+- `components/LogList.* + LogDetail.* + LogFilters.*` (~730) -> [pages/LogsPage.tsx](web/src/pages/LogsPage.tsx) (Phase D5)
+- `components/activity/*` (~410) -> [pages/ActivityTab.tsx](web/src/pages/ActivityTab.tsx) (Phase D2)
+- `components/database/*` (~580) -> [pages/UsersTab.tsx](web/src/pages/UsersTab.tsx) + GroupsTab + Endpoint Detail BFF (Phase B1)
+- `components/manual/*` (~190) -> [pages/ManualProvisionPage.tsx](web/src/pages/ManualProvisionPage.tsx) (Phase E3)
+- `hooks/useAuth.tsx` + .test (~150) -> [auth/token.ts](web/src/auth/token.ts) + [layout/TokenGate.tsx](web/src/layout/TokenGate.tsx) (Phase A1)
+- `hooks/useTheme.tsx` + .test (~120) -> [store/ui-store.ts](web/src/store/ui-store.ts) Zustand + Fluent UI's `FluentProvider theme={...}` (Phase A1)
+- `app.module.css` (~80) -> Fluent UI's CSS-in-JS (no separate stylesheet emitted)
+- Old `App.tsx` (710) + `App.test.tsx` (210) -> New 10 LoC App.tsx + 6 contract assertions
+
+**Total deleted: ~3,850 LoC** (slightly over the plan's ~3,000 estimate - inclusive count of test files + CSS modules pushed over).
+
+#### I3 - Final validation - all 11 quality gates verified
+
+See [docs/PHASE_I_LEGACY_CLEANUP.md](docs/PHASE_I_LEGACY_CLEANUP.md) §2 I3 table for evidence.
+
+#### Test counts at v0.48.0
+
+- Web vitest: 535 -> **397** (-138 from deleted legacy tests; coverage 77.6 / 72.98 / 65.99 / 80.43 still above floor)
+- API unit: 3,675 (unchanged)
+- API E2E: 1,178 (unchanged)
+- Live SCIM: 933 (unchanged)
+- PowerShell contract: 14 (unchanged)
+- **Total: 6,197 assertions across 5 layers**
+
+#### Bundle size at v0.48.0
+
+- JS bundle: 394.45 KB -> **377.33 KB gzipped** (-17 KB / 4 % reduction from cleanup)
+- CSS budget dropped: Fluent UI uses CSS-in-JS, no separate stylesheet emitted
+
+#### Prod promotion - explicit-user-only
+
+v0.48.0 deployed to dev only. **Prod promotion requires explicit user invocation** of `.\scripts\promote-to-prod.ps1` per standing rule in `.github/copilot-instructions.md`. The script is gated by interactive [Y/N] prompt + prod-promotion-state.json audit trail.
+
+#### UI redesign - DONE
+
+4-month effort delivered: 14 new pages + 8 endpoint detail tabs (router-driven), 5 new primitives, BFF aggregation, Cmd+K palette + keyboard shortcuts, SSE invalidation, visual polish, test infrastructure, legacy cleanup.
+
+Bundle: 1.4 MB raw -> 1.35 MB raw / 377.33 KB gzipped.
+
+Total LoC churn: ~+15,000 added (redesigned UI), ~-3,850 removed (legacy cleanup), ~+5,000 docs.
+
 ## [0.47.0] - 2026-05-09 - Phase G + Phase H Stable Rollup
 
 ### UI Redesign - Phase G + Phase H complete

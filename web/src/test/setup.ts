@@ -1,23 +1,22 @@
 import '@testing-library/jest-dom/vitest';
 
-// Phase H1: MSW server lifecycle is opt-in per test file. The Node MSW
-// interceptor sits below `globalThis.fetch`, which means it overrides
-// `vi.stubGlobal('fetch', mockFetch)` patterns used by legacy tests
-// (api/client.test.ts, components/activity/ActivityFeed.test.tsx,
-// components/database/DatabaseBrowser.test.tsx - all slated for Phase
-// I2 deletion). Globally starting MSW here would change the call
-// signature legacy tests assert against (Request object instead of
-// `[url, init]` tuple) and break them in confusing ways.
+// Phase H1 - opt-in MSW server lifecycle.
 //
-// New tests that want network-level mocking import the server and
-// install the lifecycle themselves:
-//
+// MSW (Node) lifecycle is opted into per test file via:
 //   import { server } from '@/test/msw/server';
 //   beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 //   afterEach(() => server.resetHandlers());
 //   afterAll(() => server.close());
 //
-// See `web/src/test/msw.integration.test.tsx` for the pattern.
+// History: in Phase H1 we evaluated globally enabling MSW here, but
+// MSW v2 in Node intercepts BELOW `globalThis.fetch` and broke 24
+// legacy `vi.stubGlobal('fetch')` tests in the pre-redesign legacy
+// component tree. Phase I2 deleted that tree; the global default
+// could now be enabled here without breaking anything, but the
+// per-file pattern is still preferred because it makes the network-
+// mock dependency explicit at the spec level (no hidden global
+// behavior). See `web/src/test/msw.integration.test.tsx` for the
+// canonical pattern.
 
 // Minimal localStorage mock (jsdom provides one but ensure it's clean between tests)
 beforeEach(() => {

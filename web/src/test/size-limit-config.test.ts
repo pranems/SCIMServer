@@ -32,14 +32,12 @@ describe('Phase H6 - size-limit budget contract', () => {
 
   it('package.json declares a size-limit block', () => {
     expect(Array.isArray(entries)).toBe(true);
-    expect(entries.length).toBeGreaterThanOrEqual(2);
+    expect(entries.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('declares both JS bundle and CSS budgets (regression-lock so neither is dropped)', () => {
+  it('declares the JS bundle budget (Phase I2 dropped the separate CSS bundle - Fluent UI uses CSS-in-JS)', () => {
     const jsEntry = entries.find((e) => e.path.endsWith('.js'));
-    const cssEntry = entries.find((e) => e.path.endsWith('.css'));
     expect(jsEntry, 'missing JS bundle budget entry').toBeDefined();
-    expect(cssEntry, 'missing CSS bundle budget entry').toBeDefined();
   });
 
   it('JS budget is enforced gzipped (raw-byte budgets are misleading - users download gzip)', () => {
@@ -47,32 +45,16 @@ describe('Phase H6 - size-limit budget contract', () => {
     expect(jsEntry.gzip).toBe(true);
   });
 
-  it('CSS budget is enforced gzipped', () => {
-    const cssEntry = entries.find((e) => e.path.endsWith('.css'))!;
-    expect(cssEntry.gzip).toBe(true);
-  });
-
-  it('JS budget is at the ratchet floor (<= 420 KB) and not silently raised', () => {
-    // Floor measured at v0.46.1-alpha.10: 394.45 KB gzipped. Floor 420 KB
-    // gives ~6 % headroom for jitter from added Fluent UI components /
-    // route additions. Lowering this value is fine; raising it
-    // requires updating this test (a deliberate decision, not a
-    // silent regression).
+  it('JS budget is at the post-I2 ratchet floor (<= 400 KB) and not silently raised', () => {
+    // Floor measured at v0.48.0 (post legacy-cleanup): 377.33 KB gzipped.
+    // Floor 400 KB gives ~6 % headroom for jitter from added Fluent UI
+    // components / route additions. Lowering this value is fine; raising
+    // it requires updating this test (a deliberate decision).
     const jsEntry = entries.find((e) => e.path.endsWith('.js'))!;
     const matched = jsEntry.limit.match(/^(\d+(?:\.\d+)?)\s*KB$/);
     expect(matched, `expected limit to be in 'NNN KB' format, got '${jsEntry.limit}'`).not.toBeNull();
     const limitKb = Number(matched![1]);
-    expect(limitKb).toBeLessThanOrEqual(420);
-  });
-
-  it('CSS budget is at the ratchet floor (<= 12 KB) and not silently raised', () => {
-    // Floor measured at v0.46.1-alpha.10: 9.73 KB gzipped. Floor 12 KB
-    // gives ~23 % headroom for jitter from added pages / icons.
-    const cssEntry = entries.find((e) => e.path.endsWith('.css'))!;
-    const matched = cssEntry.limit.match(/^(\d+(?:\.\d+)?)\s*KB$/);
-    expect(matched).not.toBeNull();
-    const limitKb = Number(matched![1]);
-    expect(limitKb).toBeLessThanOrEqual(12);
+    expect(limitKb).toBeLessThanOrEqual(400);
   });
 
   it('paths target the built dist/assets/* output (not src)', () => {

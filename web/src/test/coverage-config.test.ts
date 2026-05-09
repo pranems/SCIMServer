@@ -58,21 +58,19 @@ describe('Phase H4 - coverage gate config contract', () => {
     expect(Number(statementsMatch![1])).toBeGreaterThanOrEqual(75);
   });
 
-  it('explicitly excludes legacy I2-deletion targets so the gate does not block on dead code', () => {
-    // Each path is one of the legacy components slated for Phase I2
-    // deletion. Excluding them keeps coverage focused on the redesigned
-    // UI surface; once they are deleted the include list widens.
+  it('explicitly excludes test infrastructure + bootstrap files (no-logic surface)', () => {
+    // After Phase I2 deleted the legacy component tree, the only
+    // exclusions left are bootstrap (main.tsx / App.tsx) + design
+    // tokens (no logic) + test infrastructure (test files exclude
+    // themselves; src/test/** is helpers).
     const expectedExcludes = [
-      'src/api/client.ts',
-      'src/components/activity/**',
-      'src/components/database/**',
-      'src/components/Header*',
-      'src/components/LogList*',
-      'src/components/LogDetail*',
-      'src/components/manual/**',
+      'src/main.tsx',
+      'src/App.tsx',
+      'src/env.d.ts',
+      'src/design/**',
+      'src/test/**',
     ];
     for (const pattern of expectedExcludes) {
-      // Quote-escape the wildcard so the regex is literal-match.
       const literal = pattern.replace(/\*/g, '\\*');
       expect(
         CONFIG_TEXT,
@@ -81,21 +79,11 @@ describe('Phase H4 - coverage gate config contract', () => {
     }
   });
 
-  it('scopes include to the redesigned-UI surface (api/queries + primitives + pages + routes + ...)', () => {
-    // Sanity-check a representative subset of include patterns.
-    const expectedIncludes = [
-      'src/api/queries.ts',
-      'src/components/primitives/**/*.{ts,tsx}',
-      'src/hooks/**/*.{ts,tsx}',
-      'src/pages/**/*.{ts,tsx}',
-      'src/routes/**/*.{ts,tsx}',
-    ];
-    for (const pattern of expectedIncludes) {
-      const literal = pattern.replace(/[.*{}/]/g, (c) => '\\' + c);
-      expect(
-        CONFIG_TEXT,
-        `expected include list to contain ${pattern}`,
-      ).toMatch(new RegExp(`['"]${literal}['"]`));
-    }
+  it('uses the wide src/**/*.{ts,tsx} include after Phase I2 legacy cleanup', () => {
+    // Pre-I2 the include was a per-folder allowlist (api/queries.ts,
+    // components/primitives/**, hooks/**, etc) because the legacy tree
+    // would otherwise drag coverage down. Phase I2 deleted the legacy
+    // tree, so the include can be the whole src/ tree.
+    expect(CONFIG_TEXT).toMatch(/['"]src\/\*\*\/\*\.\{ts,tsx\}['"]/);
   });
 });
