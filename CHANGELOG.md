@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.11] - 2026-05-09 - Phase H6 (size-limit Bundle Budgets)
+
+### UI Redesign - Phase H6 (sub-phase 6 of 6 in Phase H - Test Infrastructure - FINAL)
+
+**Closes the plan §5.6 / S11.6 gap: redesigned UI shipped without a bundle-size gate so adding a heavy dependency could silently bloat the initial JS payload. Phase H6 wires `size-limit@12` + `@size-limit/preset-app` with gzipped ratchet-floor budgets. Frontend-only.**
+
+#### Budgets
+
+- JS bundle (gzipped): 420 KB floor (current: 394.45 KB, ~6 % headroom)
+- CSS bundle (gzipped): 12 KB floor (current: 9.73 KB, ~23 % headroom)
+
+Why gzipped not raw: browsers download gzip-encoded payload over the wire. Raw-byte budgets give false-negative for highly-compressible Fluent UI (394 KB gzipped represents 1.4 MB raw).
+
+#### Per-route splits are aspirational
+
+Plan target was dashboard 90 KB / endpoint detail 110 KB. Current build emits a single combined bundle (no route-level code splitting). Per-route budgets reachable via deferred Phase J follow-up: convert route components to `React.lazy(() => import())` + `<Suspense>` boundaries (1-2 days work, not blocker for 0.47.0 stable).
+
+#### Files
+
+- New: `docs/PHASE_H6_SIZE_LIMIT_BUDGETS.md`
+- New: `web/src/test/size-limit-config.test.ts` - 8 config contract tests
+- Edited: `web/package.json` - +12 lines (`size` + `size:why` npm scripts + 3 size-limit devDeps + size-limit budget block with 2 entries)
+- Versions: api+web `0.46.1-alpha.10` -> `0.46.1-alpha.11`
+
+#### Tests
+
+Web vitest 527 -> **535** (+8 contract tests).
+
 ## [0.46.1-alpha.10] - 2026-05-09 - Phase H5 (test-all-modes Orchestrator)
 
 ### UI Redesign - Phase H5 (sub-phase 5 of 6 in Phase H - Test Infrastructure)
