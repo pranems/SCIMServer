@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.5] - 2026-05-08 - Phase H1 (MSW Handlers)
+
+### UI Redesign - Phase H1 (sub-phase 1 of 6 in Phase H - Test Infrastructure)
+
+**Closes the plan §5.3 gap: msw@2.14.3 was declared in package.json but had zero handlers and zero MSW-driven tests. Phase H1 adds the full MSW infrastructure (~600 LoC of fixtures + handlers + error variants + Node server + browser worker) and locks the contract through 8 integration tests that exercise the real `fetchWithAuth` + `useQuery` pipeline. Frontend-only.**
+
+#### Coverage
+
+15 handlers across all 12 admin BFF endpoints + SCIM `/Schemas`:
+
+- GET `/scim/admin/dashboard` (Phase B + D4 charts)
+- GET `/scim/admin/endpoints` (admin grid)
+- GET `/scim/admin/endpoints/:id` (full view)
+- GET `/scim/admin/endpoints/:id/overview` (Phase B1 BFF)
+- GET `/scim/admin/endpoints/:id/stats`
+- PATCH `/scim/admin/endpoints/:id` (Phase E2 toggles)
+- POST `/scim/admin/endpoints/:id/credentials` (Phase E1 - returns plaintext token ONCE)
+- DELETE `/scim/admin/endpoints/:id/credentials/:credentialId`
+- GET `/scim/admin/logs` + GET `/scim/admin/logs/:id`
+- GET `/scim/admin/activity` (Phase D2)
+- GET `/scim/admin/version` + GET `/scim/health`
+- GET `/scim/v2/*/Schemas` + GET `/scim/admin/endpoints/:id/Schemas`
+
+Per-status-code error factories: 401, 403, 404, 409, 500.
+
+#### Lifecycle is opt-in per file
+
+MSW v2 in Node intercepts BELOW `globalThis.fetch`, which would break 24 legacy `vi.stubGlobal('fetch')` tests in `api/client.test.ts`, `components/activity/ActivityFeed.test.tsx`, and `components/database/DatabaseBrowser.test.tsx` (all slated for Phase I2 deletion). Globally enabling MSW changes `mockFetch.mock.calls[0]` from `[url, init]` to `[Request]`. Trade-off: each MSW-driven file installs its own `beforeAll(() => server.listen()); afterEach(() => server.resetHandlers()); afterAll(() => server.close())`. Phase I2 will delete the legacy files and the next sub-phase can promote to a global default.
+
+#### Tests
+
+- New: [web/src/test/msw.integration.test.tsx](web/src/test/msw.integration.test.tsx) - 8 tests (5 happy-path: useDashboard / useEndpoints / useEndpointOverview / useVersion / useGlobalLogs; 3 error overrides: 500 / 401 with `clearStoredToken` flow / 404)
+- Test counts: Web vitest 499 -> **507** (+8); API unit 3675, API E2E 1178, Live SCIM 933 unchanged.
+
+#### Files
+
+- New: `web/src/test/msw/fixtures.ts` (~270 LoC, typed against `@scim/types/dashboard.types`)
+- New: `web/src/test/msw/handlers.ts` (~140 LoC, 15 happy-path handlers)
+- New: `web/src/test/msw/error-handlers.ts` (~85 LoC, per-status factories)
+- New: `web/src/test/msw/server.ts` (Node `setupServer` wrapper)
+- New: `web/src/test/msw/browser.ts` (`setupWorker` for Playwright dev-server)
+- New: `web/src/test/msw.integration.test.tsx`
+- New: `docs/PHASE_H1_MSW_HANDLERS.md`
+- Edited: `web/src/test/setup.ts` (opt-in lifecycle docs, no global start)
+- Updated: `docs/INDEX.md`, `CHANGELOG.md`, `Session_starter.md`
+- Versions: api+web `0.46.1-alpha.4` -> `0.46.1-alpha.5`
+
 ## [0.46.1-alpha.4] - 2026-05-08 - Phase G (Visual Polish)
 
 ### UI Redesign - Phase G (S10 closing audit)
