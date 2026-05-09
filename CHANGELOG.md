@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1-alpha.8] - 2026-05-08 - Phase H3 (Visual Regression)
+
+### UI Redesign - Phase H3 (sub-phase 3 of 6 in Phase H - Test Infrastructure)
+
+**Closes the plan §5.2 gap: redesigned UI shipped without a visual regression gate. Two-layer strategy plus the F3-deferred two-tab SSE invalidation test. Frontend-only.**
+
+#### Two-layer strategy
+
+- **Playwright** ([web/e2e/visual-regression.spec.ts](web/e2e/visual-regression.spec.ts)) - 12 baselines via `toHaveScreenshot()` pixel-diff. Covers Dashboard light+dark, Endpoints, Logs light+dark, Settings, Manual Provision, Endpoint Detail Overview/Users/Schemas, Command Palette open, Keyboard Help open. `animations:disabled` + documented `mask` selectors + `maxDiffPixelRatio:0.002` for stability.
+- **vitest** ([web/src/test/visual-snapshots.test.tsx](web/src/test/visual-snapshots.test.tsx)) - 4 structural baselines via `toMatchSnapshot()`. Covers LoadingSkeleton (default + circle) + EmptyState (no-CTA + with-CTA). `normalizeFluentHashes()` regex strips Fluent UI CSS-in-JS class hashes so minor Fluent upgrades do not invalidate snapshots; structural changes still do.
+
+#### F3-deferred cross-tab SSE test
+
+[web/e2e/sse-cross-tab.spec.ts](web/e2e/sse-cross-tab.spec.ts) - two BrowserContexts (independent localStorage/cookies/EventSource), Tab A creates a user via Manual Provision, asserts Tab B's UsersTab refetches WITHOUT manual reload within 5 s. Validates the F3 `useSSE` invalidation contract at the cross-tab boundary that vitest cannot model.
+
+#### Tests
+
+- New: 4 vitest snapshot tests with committed `.snap` baselines
+- New: 12 Playwright snapshot baselines (auto-generated on first CI run with web server)
+- New: 1 cross-tab Playwright SSE invalidation test
+- Test counts: Web vitest 517 -> **521** (+4 snapshot tests). API + Live SCIM unchanged.
+
+#### Files
+
+- New: `web/e2e/visual-regression.spec.ts` (~210 LoC, 12 Playwright baselines)
+- New: `web/e2e/sse-cross-tab.spec.ts` (~95 LoC, F3-deferred two-tab test)
+- New: `web/src/test/visual-snapshots.test.tsx` (~75 LoC, 4 vitest snapshot tests)
+- New: `web/src/test/__snapshots__/visual-snapshots.test.tsx.snap` (committed baselines)
+- New: `docs/PHASE_H3_VISUAL_REGRESSION.md`
+- Updated: `docs/INDEX.md`, `CHANGELOG.md`, `Session_starter.md`
+- Versions: api+web `0.46.1-alpha.7` -> `0.46.1-alpha.8`
+
+## [0.46.1-alpha.7] - 2026-05-08 - Phase H2 (re-tag, missing-deps hotfix)
+
+### UI Redesign - Phase H2 hotfix
+
+**Re-tag of v0.46.1-alpha.6 (which had broken CI build because the `@axe-core/playwright` + `axe-core` devDependencies were missing from `web/package.json` after a stale lockfile regen). alpha.7 adds the deps to package.json + regenerates the Linux lockfile so the build-and-push workflow succeeds.** Pure version bump to re-trigger CI - no code change beyond the dep manifest.
+
 ## [0.46.1-alpha.6] - 2026-05-08 - Phase H2 (axe-core a11y gate)
 
 ### UI Redesign - Phase H2 (sub-phase 2 of 6 in Phase H - Test Infrastructure)
