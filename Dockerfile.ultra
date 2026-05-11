@@ -7,7 +7,7 @@
 #############################
 # Stage 1: Dependencies and build tools
 #############################
-FROM node:25-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 
 # Install packages needed for building native addons (better-sqlite3)
@@ -51,7 +51,7 @@ RUN cp prisma.config.ts /tmp/prisma.config.ts && \
 #############################
 # Stage 4: Minimal runtime
 #############################
-FROM node:25-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 
 # openssl needed for Prisma migration engine at container startup

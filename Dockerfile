@@ -12,7 +12,7 @@
 #############################
 # Stage 1: Build web frontend (React + Vite)
 #############################
-FROM node:25-alpine AS web-build
+FROM node:26-alpine AS web-build
 WORKDIR /web
 COPY web/package*.json ./
 RUN npm ci --no-audit --no-fund
@@ -22,7 +22,7 @@ RUN npm run build && rm -rf node_modules
 #############################
 # Stage 2: Build API (NestJS + Prisma generate)
 #############################
-FROM node:25-alpine AS api-build
+FROM node:26-alpine AS api-build
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY api/package*.json ./
@@ -48,7 +48,7 @@ RUN npx prisma generate && \
 #   startup, so we copy it from the full-install stage instead of reinstalling
 #   (which would pull 100+ MB of transitive deps back in).
 #############################
-FROM node:25-alpine AS prod-deps
+FROM node:26-alpine AS prod-deps
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY api/package*.json ./
@@ -78,7 +78,7 @@ RUN find ./node_modules -name "*.md" -delete 2>/dev/null || true && \
 #############################
 # Stage 4: Minimal runtime
 #############################
-FROM node:25-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 
 # Install runtime essentials and create non-root user in single layer
