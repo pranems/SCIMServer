@@ -15,11 +15,11 @@
   },
   "dependencies": {
     "@fluentui/react-components": "^9.73.8",
-    "@fluentui/react-icons": "^2.0.325",
+    "@fluentui/react-icons": "^2.0.326",
     "@tanstack/react-query": "^5.100.9",
-    "@tanstack/react-router": "^1.169.1",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
+    "@tanstack/react-router": "^1.169.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "recharts": "^3.8.1",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
@@ -34,9 +34,9 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "jsdom": "^29.1.1",
-    "msw": "^2.14.3",
+    "msw": "^2.14.5",
     "typescript": "6.0.3",
-    "vite": "^8.0.10",
+    "vite": "^8.0.12",
     "vitest": "^4.1.5"
   }
 }
