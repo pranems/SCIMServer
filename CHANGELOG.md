@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.48.1] - 2026-05-11 - Phase J - SCIM Event SSE Bridge + MSW worker mount + DELIVERY_PLAN sweep
+
+### Added
+
+- **`ScimEventSseBridge` service** ([api/src/modules/stats/scim-event-sse-bridge.service.ts](api/src/modules/stats/scim-event-sse-bridge.service.ts)) - the missing seam between EventEmitter2 SCIM mutation events and the SSE wire `useSSE` listens to. One `@OnEvent` handler per `SCIM_EVENTS` constant forwards to a new `ScimLogger.emitScimEvent(type, payload)` channel. Pre-Phase-J root cause: `useSSE` reads `data?.type` from each SSE message but the SSE stream only forwarded `StructuredLogEntry` objects (no `type` field), so NO SCIM mutation events reached the client for ANY channel and cross-tab refresh ran on the 30 s `staleTime`. The bridge unlocks live cross-tab refresh for all 15 SCIM_EVENTS at once.
+- **7 new `SCIM_EVENTS` constants** ([api/src/modules/stats/scim-events.ts](api/src/modules/stats/scim-events.ts)): `USER_UPDATED`, `GROUP_UPDATED`, `CREDENTIAL_CREATED`, `CREDENTIAL_REVOKED`, `ENDPOINT_CREATED`, `ENDPOINT_UPDATED`, `ENDPOINT_DELETED`. Wire strings already listed in `web/src/hooks/useSSE.ts` `SUPPORTED_EVENT_TYPES` so the receive side needs no change.
+- **2 new payload interfaces** `ScimCredentialEventPayload` + `ScimEndpointEventPayload`. The credential payload deliberately omits the bcrypt hash AND the plaintext token (PII boundary - asserted at unit + E2E levels).
+- **Emit-after-commit at 8 controller / service sites**: 2 in [admin-credential.controller.ts](api/src/modules/scim/controllers/admin-credential.controller.ts) (create + revoke), 6 in [endpoint.service.ts](api/src/modules/endpoint/services/endpoint.service.ts) (create / update / delete x InMemory + Prisma branches), 2 in [endpoint-scim-users.service.ts](api/src/modules/scim/services/endpoint-scim-users.service.ts) (PATCH + PUT), 2 in [endpoint-scim-groups.service.ts](api/src/modules/scim/services/endpoint-scim-groups.service.ts) (PATCH + PUT).
+- **`ScimLogger` SCIM event channel** ([scim-logger.service.ts](api/src/modules/logging/scim-logger.service.ts)): separate `EventEmitter` from the existing log-entry channel so SCIM events bypass log-level gates and don't pollute the ring buffer or per-endpoint log files. Public methods `subscribeScimEvents(listener)` + `emitScimEvent(type, payload)`.
+- **SSE controller extension** ([log-config.controller.ts](api/src/modules/logging/log-config.controller.ts) `streamLogs`): subscribes to BOTH log entries and SCIM events on the same `/admin/log-config/stream` connection. SCIM events honor the `?endpointId=` filter but ignore `?level=` / `?category=` (admin signals, not diagnostic logs).
+- **MSW browser worker mount** ([web/src/main.tsx](web/src/main.tsx)): wraps `createRoot(...)` in an async `bootstrap()` that conditionally `await import('./test/msw/browser')` + `worker.start({onUnhandledRequest: 'bypass'})` when `import.meta.env.VITE_USE_MSW === 'true'`. Production builds tree-shake the entire branch. Unblocks the F3-deferred [web/e2e/sse-cross-tab.spec.ts](web/e2e/sse-cross-tab.spec.ts) Playwright spec.
+
+### Changed
+
+- [docs/DELIVERY_PLAN.md](docs/DELIVERY_PLAN.md) reconciled with code reality: §3.2 / §3.3 / §3.5 / §3.6 mark S-4, S-5, OPS-2, OPS-3, OPS-4, UI-B1..6, all UI Frontend phases A-I as closed (verified in code with file links). Test counts refreshed (3,422/1,100/172 -> 3,675/1,178/397 baseline). New 2026-05-11 progress entry summarizes the full UI redesign cutover (v0.41.0 .. v0.48.0) + Phase J. Header banner status updated.
+
+### Tests
+
+- API unit: 3,675 -> **3,720** (+45 across 5 specs)
+  - [scim-events.spec.ts](api/src/modules/stats/scim-events.spec.ts) - 13 tests (constant value lock + dot-namespaced format guard)
+  - [scim-event-sse-bridge.service.spec.ts](api/src/modules/stats/scim-event-sse-bridge.service.spec.ts) - 17 tests (15 per-event forwards + count guard + injectable check)
+  - [scim-logger.service.spec.ts](api/src/modules/logging/scim-logger.service.spec.ts) - +5 tests in new SCIM event stream block
+  - [admin-credential.controller.spec.ts](api/src/modules/scim/controllers/admin-credential.controller.spec.ts) - +6 tests (Phase J emit-after-commit + PII boundary)
+  - Plus 4 tests added at module init scope across the affected modules
+- API E2E: 1,178 -> **1,184** (+6 in new [scim-event-sse-bridge.e2e-spec.ts](api/test/e2e/scim-event-sse-bridge.e2e-spec.ts) covering endpoint CRUD, credential admin, SCIM resource regression guard)
+- Web vitest: 397 -> **403** (+6 in new [main-msw-mount.test.ts](web/src/test/main-msw-mount.test.ts))
+- Live SCIM: 933 / 933 unchanged (will rerun against dev v0.48.1 deploy)
+
+### Validation
+
+- TDD red-green: 6 failing main.tsx tests + 3 failing API spec suites BEFORE implementation; all GREEN after.
+- Lockstep version bump: api + web both 0.48.0 -> 0.48.1.
+- Linux-platform lockfile regen for both api/ and web/ (Docker step before tag push).
+- All 11 mandatory quality gates pass.
+- Prod promotion: NOT triggered. Dev-only deploy per standing rule.
+
+### Documentation
+
+- New [docs/PHASE_J_SSE_EVENT_BRIDGE.md](docs/PHASE_J_SSE_EVENT_BRIDGE.md) (architecture, before/after diagrams, implementation details, test coverage tables, rollout, deferred items).
+- [docs/INDEX.md](docs/INDEX.md) updated with PHASE_J row.
+- [Session_starter.md](Session_starter.md) updated with v0.48.1 metrics.
+
 ## [0.48.0] - 2026-05-09 - Phase I (Legacy Cleanup + UI Cutover) - FINAL UI REDESIGN PHASE
 
 ### UI Redesign - Phase I (I1 + I2 + I3) - COMPLETE

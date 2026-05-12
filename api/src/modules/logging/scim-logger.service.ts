@@ -140,6 +140,20 @@ export class ScimLogger {
   /** EventEmitter for real-time log streaming (SSE subscribers) */
   private readonly emitter = new EventEmitter();
 
+  /**
+   * Phase J (v0.48.1): SEPARATE EventEmitter for SCIM mutation events.
+   *
+   * Kept distinct from the log `emitter` so SCIM events are not subject
+   * to log-level gates (cross-tab UI must always refresh on mutations,
+   * even when the global log level is WARN/ERROR), do not pollute the
+   * log ring buffer, and do not get written to per-endpoint log files.
+   *
+   * The event payload shape is `{ type: 'scim.x.y', ...originalPayload,
+   * timestamp }`. The `type` field is what the web `useSSE` hook
+   * dispatches on.
+   */
+  private readonly scimEventEmitter = new EventEmitter();
+
   /** File log transport for main + per-endpoint log files */
   private readonly fileTransport: FileLogTransport;
 
@@ -148,6 +162,7 @@ export class ScimLogger {
     this.maxRingBufferSize = Number(process.env.LOG_RING_BUFFER_SIZE) || ScimLogger.DEFAULT_RING_BUFFER_SIZE;
     // Allow many SSE subscribers without warning
     this.emitter.setMaxListeners(50);
+    this.scimEventEmitter.setMaxListeners(50);
     this.fileTransport = new FileLogTransport();
   }
 
@@ -165,6 +180,57 @@ export class ScimLogger {
   subscribe(listener: (entry: StructuredLogEntry) => void): () => void {
     this.emitter.on('log', listener);
     return () => this.emitter.off('log', listener);
+  }
+
+  // ─── SCIM Event Stream (Phase J - v0.48.1) ───────────────────────
+
+  /**
+   * Phase J (v0.48.1): the typed payload shape pushed onto the SCIM
+   * event channel. The `type` field carries the wire-format event name
+   * (`scim.user.created` etc) the web `useSSE` hook dispatches on; the
+   * remaining fields are the original payload emitted by the SCIM
+   * service (`endpointId`, `scimId`, etc).
+   */
+  // Inline alias rather than a separate exported interface so the
+  // ScimEventSseBridge doesn't have to import from logging - the bridge
+  // already knows the wire shape via SCIM_EVENTS.
+  // {type: string, [k: string]: unknown, timestamp: string}
+
+  /**
+   * Subscribe to SCIM mutation events. Returns an unsubscribe function.
+   * Consumed by [log-config.controller.ts](./log-config.controller.ts)
+   * `streamLogs()` so each SSE subscriber gets `{type, endpointId, ...}`
+   * messages alongside log entries.
+   *
+   * @see api/src/modules/stats/scim-event-sse-bridge.service.ts (producer)
+   */
+  subscribeScimEvents(
+    listener: (event: { type: string; timestamp: string; [k: string]: unknown }) => void,
+  ): () => void {
+    this.scimEventEmitter.on('scim-event', listener);
+    return () => this.scimEventEmitter.off('scim-event', listener);
+  }
+
+  /**
+   * Phase J (v0.48.1): broadcast a SCIM mutation event onto the SCIM
+   * event channel. Called exclusively by `ScimEventSseBridge` after
+   * the EventEmitter2 SCIM event has been received - SCIM service code
+   * keeps emitting via EventEmitter2 / SCIM_EVENTS as before.
+   *
+   * The bridge owns all callsites; SCIM services should NEVER call
+   * this directly. Keeping the seam here lets us add SSE-specific
+   * concerns (rate limiting, filtering) without touching every emit
+   * site in the codebase.
+   *
+   * @param type Wire-format event name (must match a SCIM_EVENTS value)
+   * @param payload Original event payload (forwarded verbatim alongside `type`)
+   */
+  emitScimEvent(type: string, payload: Record<string, unknown>): void {
+    this.scimEventEmitter.emit('scim-event', {
+      ...payload,
+      type,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   // ─── Correlation Context ──────────────────────────────────────────

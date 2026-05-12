@@ -1,8 +1,8 @@
 # Delivery Plan - Production Hardening + UI Redesign
 
-> **Status:** Active | **Last Updated:** 2026-04-30 | **Branch:** `ci/validate-before-push` (active) - target merge to `feat/ui` then `master`  
-> **Version:** v0.40.0 (current) - target v0.42.0 at end of plan  
-> **Total scope:** ~30 engineering days across 6 calendar weeks for one engineer  
+> **Status:** Largely complete - tracking residual ops items only | **Last Updated:** 2026-05-11 | **Branch:** `feat/ui` (active) - prod still on pre-redesign image, manual promotion gated  
+> **Version:** v0.48.0 shipped to dev (UI redesign cutover complete); residual scope tracked here is ops-only (OPS-5 blue/green, OPS-6 restore drill, Phase 0.1 PROD_DEPENDENTS.md, Phase 0.6/0.7 synthetic-monitor.yml)  
+> **Total residual scope:** ~17 engineering hours across the 4 still-open items above  
 > **Approach:** TDD red-green-refactor for every behavioral change, named-defect-driven for ops/CI work
 
 ---
@@ -160,20 +160,26 @@ Each defect: ID, file path with line, severity, hours, "done when". No grouping 
 | **DTO-1** | [api/src/modules/scim/filters/scim-filter-parser.ts](../api/src/modules/scim/filters/scim-filter-parser.ts) | `96d9b74` | New exported `MAX_FILTER_LENGTH = 10000` enforced at parser entry point. Unit + E2E regression guards. |
 | **Tier-0 #5** | [api/prisma/schema.prisma](../api/prisma/schema.prisma) + new migration | (this commit) | `@@unique([groupResourceId, value])` (SCIM identifies a member by `value`, always populated; `memberResourceId` is nullable). Migration `20260430120000_resource_member_unique_value` deduplicates existing rows BEFORE applying constraint (additive-safe). Service-layer dedupe added in `resolveMemberInputs()` so the DB constraint never fires from API input - it is defense-in-depth against direct DB writes / repo bugs. New `required-schema-constraints.spec.ts` plus 2 E2E dedupe tests in `edge-cases.e2e-spec.ts`. |
 
-### 3.2 Open - Tier 0 (Week 1 Day 3-4)
+### 3.2 Tier 0 - all closed (Week 1)
 
-| ID | File | Severity | Hours | Done when |
-|---|---|---|---|---|
-| **S-4** | [api/src/main.ts#L48](../api/src/main.ts) | MEDIUM | 2 | `origin: process.env.CORS_ORIGIN?.split(',') ?? false`; E2E test rejects from disallowed origin |
-| **S-5** | [api/src/main.ts#L88](../api/src/main.ts) | MEDIUM | 1 | ADR-004 written documenting decision (recommend keep with mitigation) |
+All items previously listed here (S-4 CORS_ORIGIN, S-5 ADR-004) shipped on 2026-04-30 - see [Progress Log](#11-progress-log). Verified live in code:
+- **S-4:** [api/src/main.ts#L53-L62](../api/src/main.ts#L53) parses `CORS_ORIGIN` via `parseCorsOrigin`
+- **S-5:** [docs/adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md) exists
 
-### 3.3 Open - Operational (Week 1 Day 5 + Week 2)
+### 3.3 Operational - mostly closed; 2 still open
+
+**Closed on 2026-04-30** (verified in code):
+
+| ID | What | Closed in | Verification |
+|---|---|---|---|
+| **OPS-2** | Digest pinning in [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) | (this branch) | [scripts/promote-to-prod.ps1#L179-L211](../scripts/promote-to-prod.ps1#L179) resolves digest before `az containerapp update` |
+| **OPS-3** | Dependabot + CodeQL + Trivy | `2db07fb` | [.github/dependabot.yml](../.github/dependabot.yml), [.github/workflows/codeql.yml](../.github/workflows/codeql.yml), Trivy gating in [build-and-push.yml#L147-L156](../.github/workflows/build-and-push.yml#L147) and [build-test.yml#L189-L198](../.github/workflows/build-test.yml#L189) |
+| **OPS-4** | CODEOWNERS + PR template | `a7f9fa0` | [.github/CODEOWNERS](../.github/CODEOWNERS) + [.github/pull_request_template.md](../.github/pull_request_template.md) |
+
+**Still open:**
 
 | ID | What | Hours | Done when |
 |---|---|---|---|
-| **OPS-2** | Digest pinning in [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) | 2 | Prod uses `image@sha256:...` not mutable `:tag` |
-| **OPS-3** | `.github/dependabot.yml` + CodeQL workflow + Trivy on built image | 8 | First Dependabot PR appears, CodeQL runs, Trivy fails build on HIGH/CRITICAL CVE |
-| **OPS-4** | `.github/CODEOWNERS` + `.github/pull_request_template.md` with checklist | 1 | New PR shows checklist as template |
 | **OPS-5** | [infra/containerapp.bicep](../infra/containerapp.bicep) `revisionsMode: 'multiple'` + blue/green logic in [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) | 8 | New revision deployed at 0% traffic, smoke-tested on label-FQDN, flipped to 100%; rollback drill confirmed |
 | **OPS-6** | `.github/workflows/quarterly-restore-drill.yml` | 4 | Scheduled cron restores PITR snapshot into dev RG, runs live-test, deletes |
 
@@ -184,20 +190,20 @@ Each defect: ID, file path with line, severity, hours, "done when". No grouping 
 | **Phase 0.1** | Inventory dependents in `docs/PROD_DEPENDENTS.md` | 0.5 | Doc lists every external caller of current Azure URL |
 | **Phase 0.6/0.7** | `.github/workflows/synthetic-monitor.yml` every 15 min | 1 | GHA cron hits `/health`, `/scim/admin/version`, asserts known endpoint+user IDs return 200; failure auto-creates GitHub issue |
 
-### 3.5 Open - UI Backend BFF (Weeks 2-3)
+### 3.5 UI Backend BFF - all closed
 
-| ID | What | Hours | Done when |
-|---|---|---|---|
-| **UI-B1** | `api/src/shared/types/dashboard.types.ts` + Vite alias `@scim/types` | 4 | `tsc --noEmit` passes in `api` and `web` |
-| **UI-B2** | `api/src/modules/stats/stats-projection.service.ts` + `EventEmitter2` wiring + 15-20 unit tests | 12 | Counter increments observable in test; 60s reconciliation tested |
-| **UI-B3** | Event emission from existing 3 SCIM services (after-commit only) | 4 | Existing E2E remains green; new test verifies emit-after-commit |
-| **UI-B4** | `api/src/modules/stats/name-resolver.service.ts` (DataLoader-style + LRU 1000/5min) + 10 unit tests | 8 | Activity feed render with 50 logs makes ≤2 DB queries (verified via Prisma query log) |
-| **UI-B5** | Cache version info in [admin.controller.ts](../api/src/modules/scim/controllers/admin.controller.ts) at module init | 0.5 | Per-request FS read of `package.json` and `/proc/self/cgroup` removed |
-| **UI-B6** | `api/src/modules/dashboard/dashboard.controller.ts` BFF + spec + 8 E2E tests | 8 | `GET /admin/dashboard` returns aggregated response in p95 < 100ms with 0 DB queries |
+All UI-B1 through UI-B6 shipped during the UI redesign program. See [docs/PHASE_B_BFF_OVERVIEW_AND_SSE.md](PHASE_B_BFF_OVERVIEW_AND_SSE.md) for the per-endpoint Overview BFF and channel-aware SSE; see [api/src/modules/dashboard/dashboard.controller.ts](../api/src/modules/dashboard/dashboard.controller.ts) for the global dashboard BFF.
 
-### 3.6 Open - UI Frontend (Weeks 3-6)
+### 3.6 UI Frontend - all closed (v0.48.0 cutover)
 
-Per [docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md §13](UI_REDESIGN_ARCHITECTURE_AND_PLAN.md), executed verbatim. Phases 0-5, 42 steps, 9-14 days. Tracked in this doc as Weeks 3-6.
+The entire 9-phase UI redesign (Phase A foundation through Phase I legacy cleanup) shipped between 2026-04-30 and 2026-05-11 across cumulative versions v0.41.0 through v0.48.0. Per-phase docs:
+
+- [PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md](PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md) through [PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md](PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md)
+- [PHASE_B_BFF_OVERVIEW_AND_SSE.md](PHASE_B_BFF_OVERVIEW_AND_SSE.md)
+- [PHASE_G_VISUAL_POLISH.md](PHASE_G_VISUAL_POLISH.md), [PHASE_H1_MSW_HANDLERS.md](PHASE_H1_MSW_HANDLERS.md), [PHASE_H2_AXE_A11Y_GATE.md](PHASE_H2_AXE_A11Y_GATE.md), [PHASE_H3_VISUAL_REGRESSION.md](PHASE_H3_VISUAL_REGRESSION.md), [PHASE_H4_COVERAGE_GATES.md](PHASE_H4_COVERAGE_GATES.md), [PHASE_H5_TEST_ALL_MODES.md](PHASE_H5_TEST_ALL_MODES.md), [PHASE_H6_SIZE_LIMIT_BUDGETS.md](PHASE_H6_SIZE_LIMIT_BUDGETS.md)
+- [PHASE_I_LEGACY_CLEANUP.md](PHASE_I_LEGACY_CLEANUP.md) - v0.48.0 cutover, ~3,850 LoC legacy deleted
+
+Deferred sub-items (not blocking; tracked separately): per-route code splitting (`web/src/routes/*.tsx` static imports), aspirational coverage ratchet (78/70/65/75 floor vs 80/75/90/80 target).
 
 ### 3.7 Backlog - Tier 1-3 (post-cutover)
 
@@ -288,9 +294,9 @@ flowchart TB
         S1A[Checkout + Node 24 + cache]
         S1B[npm ci - lockfile audit]
         S1C[Lint API + Generate Prisma]
-        S1D[Unit: jest 3,422 - blocking]
-        S1E[E2E: jest 1,100 inmemory - blocking]
-        S1F[Web Vitest 172 + production build - blocking]
+        S1D[Unit: jest 3,675 - blocking]
+        S1E[E2E: jest 1,178 inmemory - blocking]
+        S1F[Web Vitest 397 + production build - blocking]
         S1A --> S1B --> S1C --> S1D --> S1E --> S1F
     end
 
@@ -667,6 +673,33 @@ These are intentionally **NOT** in this plan and represent decisions to remove f
 - Both dev and prod running `ghcr.io/pranems/scimserver:0.40.2`
 
 **Next up**: UI-B1 through UI-B6 (UI Backend BFF, Weeks 2-3)
+
+---
+
+### Session: 2026-05-11 (UI Redesign cutover complete)
+
+| Date | Item | Version | Status |
+|---|---|---|---|
+| 2026-04-30 .. 2026-05-11 | Full 9-phase UI redesign (Phase A foundation -> Phase I legacy cleanup) shipped through dev with own alpha + stable cycles per phase | v0.41.0 .. v0.48.0 | Shipped to dev; prod still on pre-redesign sha256 image (manual promotion gated) |
+| 2026-05-11 | DELIVERY_PLAN.md sweep: §3.2 / §3.3 / §3.5 / §3.6 reconciled with reality (S-4, S-5, OPS-2, OPS-3, OPS-4, UI-B1..6, UI Frontend Phases A-I all marked closed); test counts refreshed (3,675 unit / 1,178 E2E / 933 live) | (this commit) | Stale-doc sweep |
+
+**Validation as of 2026-05-11 (v0.48.0 dev)**:
+- Web vitest: 397 / 397 pass
+- API unit: 3,675 / 3,675 pass
+- API E2E (inmemory): 1,178 / 1,178 pass
+- Live (dev Azure, scimserver-dev v0.48.0): 933 / 933 pass
+- PowerShell contract assertions (test-all-modes): 14
+- Total assertions: 6,197 across all gates
+- Web bundle size: 377.33 KB JS gzipped (under 400 KB budget)
+- Web coverage: floor 78/70/65/75 (target aspirational 80/75/90/80 - deferred)
+
+**Residual open scope** (not UI-redesign work):
+- OPS-5: Container Apps blue/green deploy (8h)
+- OPS-6: Quarterly PITR restore drill workflow (4h)
+- Phase 0.1: `docs/PROD_DEPENDENTS.md` inventory (0.5h)
+- Phase 0.6/0.7: `.github/workflows/synthetic-monitor.yml` (1h)
+
+**Prod promotion**: Prod (`scimserver2`) is still on pre-redesign image `ghcr.io/pranems/scimserver@sha256:22bc611c...` and will only be advanced on explicit user request via [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) or the `deployAndPromote` prompt - per standing rule, prod promotion is never automatic.
 
 ---
 

@@ -265,6 +265,10 @@ export class EndpointScimUsersService {
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'User patched', { scimId, endpointId });
+    // Phase J (v0.48.1): broadcast generic update event for cross-tab
+    // refresh. The status-changed event below is preserved for the
+    // StatsProjectionService active/inactive counters.
+    this.eventEmitter.emit(SCIM_EVENTS.USER_UPDATED, { endpointId, scimId });
     if (user.active !== updatedUser.active) {
       this.eventEmitter.emit(SCIM_EVENTS.USER_STATUS_CHANGED, {
         endpointId, scimId, previousActive: user.active, newActive: updatedUser.active,
@@ -350,6 +354,8 @@ export class EndpointScimUsersService {
     }
 
     this.logger.info(LogCategory.SCIM_USER, 'User replaced', { scimId, userName: dto.userName, endpointId });
+    // Phase J (v0.48.1): broadcast generic update event for cross-tab refresh.
+    this.eventEmitter.emit(SCIM_EVENTS.USER_UPDATED, { endpointId, scimId });
     if (user.active !== updatedUser.active) {
       this.eventEmitter.emit(SCIM_EVENTS.USER_STATUS_CHANGED, {
         endpointId, scimId, previousActive: user.active, newActive: updatedUser.active,

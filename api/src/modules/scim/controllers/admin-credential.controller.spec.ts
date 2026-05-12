@@ -1,9 +1,19 @@
 /**
  * Unit tests for AdminCredentialController (Phase 11).
+ *
+ * Phase J (v0.48.1) additions:
+ *   - The controller now emits SCIM_EVENTS.CREDENTIAL_CREATED /
+ *     CREDENTIAL_REVOKED via EventEmitter2 on the success path so the
+ *     ScimEventSseBridge can forward them onto the SSE wire for
+ *     cross-tab CredentialsTab refresh. The controller test verifies
+ *     emit-after-commit (call ordering relative to the persisted
+ *     write).
  */
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AdminCredentialController } from './admin-credential.controller';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { SCIM_EVENTS } from '../../stats/scim-events';
 
 // Mock bcrypt
 jest.mock('bcrypt', () => ({
@@ -14,6 +24,7 @@ describe('AdminCredentialController', () => {
   let controller: AdminCredentialController;
   let mockCredentialRepo: Record<string, jest.Mock>;
   let mockEndpointService: Record<string, jest.Mock>;
+  let mockEventEmitter: { emit: jest.Mock };
 
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
@@ -77,6 +88,7 @@ describe('AdminCredentialController', () => {
       mockCredentialRepo as any,
       mockEndpointService as any,
       mockScimLogger,
+      (mockEventEmitter = { emit: jest.fn() }) as unknown as EventEmitter2,
     );
   });
 
@@ -217,6 +229,85 @@ describe('AdminCredentialController', () => {
       await expect(
         controller.revokeCredential(mockEndpoint.id, mockCredential.id),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ─── Phase J (v0.48.1) - SSE event emission ────────────────────────
+  describe('Phase J - SCIM event emission for SSE bridge', () => {
+    it('emits SCIM_EVENTS.CREDENTIAL_CREATED after a successful create', async () => {
+      await controller.createCredential(mockEndpoint.id, { label: 'Phase J' });
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        SCIM_EVENTS.CREDENTIAL_CREATED,
+        expect.objectContaining({
+          endpointId: mockEndpoint.id,
+          credentialId: mockCredential.id,
+          credentialType: mockCredential.credentialType,
+        }),
+      );
+    });
+
+    it('emits CREDENTIAL_CREATED AFTER the persisted write (event payload uses repo-returned id)', async () => {
+      await controller.createCredential(mockEndpoint.id, {});
+
+      // Order check: the create call must come first; if the emit
+      // happened before the repo resolved, the payload would not have
+      // the persisted id.
+      const createCallOrder = mockCredentialRepo.create.mock.invocationCallOrder[0];
+      const emitCallOrder = mockEventEmitter.emit.mock.invocationCallOrder[0];
+      expect(createCallOrder).toBeLessThan(emitCallOrder);
+    });
+
+    it('does NOT emit CREDENTIAL_CREATED when the endpoint config rejects the operation', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { PerEndpointCredentialsEnabled: false } },
+      });
+
+      await expect(
+        controller.createCredential(mockEndpoint.id, {}),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
+        SCIM_EVENTS.CREDENTIAL_CREATED,
+        expect.anything(),
+      );
+    });
+
+    it('emits SCIM_EVENTS.CREDENTIAL_REVOKED after a successful revoke', async () => {
+      await controller.revokeCredential(mockEndpoint.id, mockCredential.id);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        SCIM_EVENTS.CREDENTIAL_REVOKED,
+        expect.objectContaining({
+          endpointId: mockEndpoint.id,
+          credentialId: mockCredential.id,
+        }),
+      );
+    });
+
+    it('does NOT emit CREDENTIAL_REVOKED when the credential is not found', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(null);
+
+      await expect(
+        controller.revokeCredential(mockEndpoint.id, 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
+        SCIM_EVENTS.CREDENTIAL_REVOKED,
+        expect.anything(),
+      );
+    });
+
+    it('NEVER includes the credential hash or plaintext token in the emitted payload (PII boundary)', async () => {
+      await controller.createCredential(mockEndpoint.id, { label: 'PII test' });
+
+      const [, payload] = mockEventEmitter.emit.mock.calls.find(
+        (c) => c[0] === SCIM_EVENTS.CREDENTIAL_CREATED,
+      ) as [string, Record<string, unknown>];
+      expect(payload).not.toHaveProperty('credentialHash');
+      expect(payload).not.toHaveProperty('token');
+      expect(payload).not.toHaveProperty('hash');
     });
   });
 });
