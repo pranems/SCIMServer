@@ -27,6 +27,7 @@ import type {
   HealthResponse,
 } from '@scim/types/dashboard.types';
 import { getStoredToken, notifyTokenInvalid, clearStoredToken } from '../auth/token';
+import { ScimApiError } from './scim-error';
 
 // ─── Base fetch wrapper ──────────────────────────────────────────────
 
@@ -46,15 +47,57 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
   if (res.status === 401) {
     clearStoredToken();
     notifyTokenInvalid();
-    throw new Error('Authentication required');
+    throw new ScimApiError({
+      status: 401,
+      detail: 'Authentication required',
+      requestId: extractRequestId(res),
+    });
   }
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}: ${body}`);
+    // Phase K3 - throw a structured ScimApiError instead of a plain
+    // Error so the redesigned UI's <ScimErrorMessage /> primitive can
+    // map status + scimType -> plain-English copy. Backward-compatible:
+    // ScimApiError extends Error, so legacy `err instanceof Error`
+    // guards still match and `err.message` still carries the detail.
+    const text = await res.text().catch(() => '');
+    const contentType = res.headers?.get?.('content-type') ?? '';
+    let parsedBody: unknown;
+    let scimType: string | undefined;
+    let detail: string | undefined;
+    if (contentType.includes('json') && text.length > 0) {
+      try {
+        parsedBody = JSON.parse(text);
+        if (parsedBody && typeof parsedBody === 'object') {
+          const body = parsedBody as Record<string, unknown>;
+          if (typeof body.scimType === 'string') scimType = body.scimType;
+          if (typeof body.detail === 'string') detail = body.detail;
+        }
+      } catch {
+        // Server claimed JSON but body did not parse - fall through to text fallback.
+      }
+    }
+    if (!detail) {
+      // Strip common HTML wrappers so the popped-up text is readable.
+      detail = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!detail) detail = `HTTP ${res.status}`;
+    }
+    throw new ScimApiError({
+      status: res.status,
+      scimType,
+      detail,
+      rawBody: parsedBody ?? (text.length > 0 ? text : undefined),
+      requestId: extractRequestId(res),
+    });
   }
 
   return res.json() as Promise<T>;
+}
+
+/** Pull X-Request-Id off the response if the server set one. */
+function extractRequestId(res: Response): string | undefined {
+  const id = res.headers?.get?.('x-request-id') ?? res.headers?.get?.('X-Request-Id');
+  return id ?? undefined;
 }
 
 // ─── Query key factory ───────────────────────────────────────────────

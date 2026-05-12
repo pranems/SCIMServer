@@ -36,15 +36,13 @@ import {
   Subtitle2,
   Text,
   Badge,
-  MessageBar,
-  MessageBarBody,
-  MessageBarTitle,
 } from '@fluentui/react-components';
 import {
   Save24Regular,
   Delete24Regular,
 } from '@fluentui/react-icons';
 import { DetailDrawer } from '../primitives/DetailDrawer';
+import { ScimErrorMessage } from '../primitives/ScimErrorMessage';
 import {
   useUpdateUser,
   useDeleteUser,
@@ -150,7 +148,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   const [externalId, setExternalId] = React.useState(resource.externalId ?? '');
   const [active, setActive] = React.useState(resource.active ?? true);
   const [confirming, setConfirming] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<unknown>(null);
 
   // Reset form whenever a different resource is loaded into the drawer.
   React.useEffect(() => {
@@ -194,7 +192,10 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed.');
+      // K3 - keep the raw error so ScimErrorMessage can map scimType
+      // to a plain-English explanation; legacy `err.message` is still
+      // available since ScimApiError extends Error.
+      setError(err);
     }
   }
 
@@ -208,7 +209,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed.');
+      setError(err);
     }
   }
 
@@ -325,14 +326,9 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           </>
         )}
 
-        {error && (
-          <MessageBar intent="error" data-testid="drawer-error">
-            <MessageBarBody>
-              <MessageBarTitle>Operation failed</MessageBarTitle>
-              {error}
-            </MessageBarBody>
-          </MessageBar>
-        )}
+        {error !== null && error !== undefined ? (
+          <ScimErrorMessage error={error} data-testid="drawer-error" />
+        ) : null}
       </div>
     </DetailDrawer>
   );

@@ -405,6 +405,8 @@ Lists today have no export. Operator who wants "all users on endpoint X" has to 
 
 ### 5.7 Smart Error Explainer
 
+> ✅ **CLOSED in v0.49.0-alpha.3 as Phase K3.** See [docs/PHASE_K3_SMART_ERROR_EXPLAINER.md](PHASE_K3_SMART_ERROR_EXPLAINER.md). 3-layer architecture (ScimApiError + parseScimError + ScimErrorMessage primitive), catalog covers every RFC 7644 Table 9 keyword + 5 HTTP-status fallbacks, +39 web vitest tests, 3 consumer surfaces wired.
+
 SCIM error responses today render as a red MessageBar with raw `detail`. The error catalog already exists ([LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md)). Wire it.
 
 **Shape:**

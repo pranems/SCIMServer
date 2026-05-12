@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0-alpha.3] - 2026-05-12 - Phase K3 - Smart Error Explainer
+
+### Added
+- **`ScimApiError` class** in [web/src/api/scim-error.ts](web/src/api/scim-error.ts). Subclass of `Error` thrown by `fetchWithAuth` for every non-OK response. Carries `status`, optional `scimType`, server `detail`, raw response body, and `requestId` (from `X-Request-Id`). Backward-compatible (extends `Error`, sets `message = detail || "HTTP <status>"` so legacy `err instanceof Error` and `err.message` access keeps working).
+- **`SCIM_ERROR_CATALOG`** mapping every RFC 7644 Table 9 keyword (`uniqueness`, `invalidFilter`, `invalidSyntax`, `invalidPath`, `noTarget`, `invalidValue`, `mutability`, `invalidVers`, `sensitive`, `tooMany`) + project extensions (`versionMismatch`, `tooLarge`) + 5 HTTP-status fallbacks (401/403/404/412/415/428/5xx/generic) to a `{ title, explanation, docsUrl? }` entry. Test [scim-error.test.ts](web/src/api/scim-error.test.ts) `it.each(KNOWN_KEYWORDS)` block fails until any new keyword has both a non-empty title and a >20-char explanation.
+- **`parseScimError(unknown)`** pure normalizer in [web/src/api/scim-error.ts](web/src/api/scim-error.ts). Converts `ScimApiError` / `Error` / `string` / `null` / `undefined` into a uniform `ParsedScimError` with the matching catalog entry attached. Exported so it can be reused outside the React component.
+- **`<ScimErrorMessage />` primitive** in [web/src/components/primitives/ScimErrorMessage.tsx](web/src/components/primitives/ScimErrorMessage.tsx). Renders nothing for `null`/`undefined` (safe to mount unconditionally). For real errors: catalog title + plain-English explanation + monospace server `detail` line + monospace `requestId` + optional "Read the spec" RFC link (`target=_blank rel=noopener noreferrer`) + collapsible "View details" expander showing pretty-printed `rawBody` JSON. Added to barrel export.
+- **`fetchWithAuth` upgrade** in [web/src/api/queries.ts](web/src/api/queries.ts) - throws `ScimApiError` instead of plain `Error`. Detects `application/scim+json`, parses body, extracts `scimType`/`detail`/`rawBody`/`requestId`. Falls back to `text` body with HTML-tag stripping when response is not JSON.
+- **`FormDialog.error?: unknown` prop** in [web/src/components/primitives/FormDialog.tsx](web/src/components/primitives/FormDialog.tsx). When set, renders `<ScimErrorMessage />` instead of the legacy red-banner `errorMessage` (which is retained for backward compat).
+- **3 consumer surfaces wired** to the new primitive: [ResourceDetailDrawer.tsx](web/src/components/detail/ResourceDetailDrawer.tsx) (error state `string|null` -> `unknown`), [ManualProvisionPage.tsx](web/src/pages/ManualProvisionPage.tsx) (result error `message: string` -> `error: unknown`), [CredentialsTab.tsx](web/src/pages/CredentialsTab.tsx) (createError + deleteError -> `unknown`, passed via FormDialog `error` prop).
+- **+39 web vitest tests** across 4 files: new [scim-error.test.ts](web/src/api/scim-error.test.ts) (28 - 12 catalog completeness + 4 ScimApiError shape + 12 parser scenarios), new [ScimErrorMessage.test.tsx](web/src/components/primitives/ScimErrorMessage.test.tsx) (9 - render/null/title/explanation/detail/expander/docs-link/fallback), extended [queries.test.ts](web/src/api/queries.test.ts) +2 (structured throw on JSON SCIM error + 5xx text body).
+- New feature doc [docs/PHASE_K3_SMART_ERROR_EXPLAINER.md](docs/PHASE_K3_SMART_ERROR_EXPLAINER.md) covering 3-layer architecture (structured throw + pure parser + presentational primitive), full catalog table, before/after UX comparison, bundle impact.
+
+### Changed
+- Bundle: main entry 151.10 -> **150.34 KB gzipped** (-0.76 KB; some MessageBar usage migrated into shared chunk). Shared primitives 173.04 -> **180.69 KB** (+7.65 KB for catalog + parser + component; still 18 % under the 220 KB K1 budget). All 16 size-limit budgets pass.
+- `fetchWithAuth` 401 path now throws `ScimApiError({ status: 401 })` instead of plain `Error('Authentication required')`. The `clearStoredToken() + notifyTokenInvalid()` side effects are unchanged.
+
+### Test counts (net new)
+
+| Layer | Pre-K3 | Post-K3 | Delta |
+|-------|--------|---------|-------|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,184 | 1,184 | 0 |
+| Web vitest | 484 | **523** | **+39** |
+| Live SCIM | 933 | 933 | 0 (deferred to dev gate) |
+| **Total** | 6,335 | **6,374** | **+39** |
+
+### Notes
+- Frontend-only commit. No API change, no live SCIM behavior change.
+- Per-sub-phase quality gate next: deploy v0.49.0-alpha.3 to dev + 933+ live SCIM tests must all pass before Phase K4 starts (live SSE log stream viewer).
+
 ## [0.49.0-alpha.2] - 2026-05-12 - Phase K2 - Service Health Rollup Widget
 
 ### Added

@@ -41,7 +41,7 @@ import {
 } from '@fluentui/react-components';
 import { Add24Regular, Person24Regular, People24Regular } from '@fluentui/react-icons';
 import { useEndpoints, useCreateUser, useCreateGroup } from '../api/queries';
-import { LoadingSkeleton } from '../components/primitives';
+import { LoadingSkeleton, ScimErrorMessage } from '../components/primitives';
 
 // ─── Styles ───────────────────────────────────────────────────────────
 
@@ -226,7 +226,7 @@ const CreateGroupForm: React.FC<CreateGroupFormProps> = ({ endpointId, isPending
 };
 
 interface ProvisionResultProps {
-  result: { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; message: string } | null;
+  result: { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; error: unknown } | null;
 }
 
 const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
@@ -242,12 +242,7 @@ const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
   if (result.kind === 'error') {
     return (
       <Card className={classes.resultCard} data-testid="provision-result-error">
-        <MessageBar intent="error">
-          <MessageBarBody>
-            <MessageBarTitle>Create failed</MessageBarTitle>
-            {result.message}
-          </MessageBarBody>
-        </MessageBar>
+        <ScimErrorMessage error={result.error} />
       </Card>
     );
   }
@@ -276,7 +271,7 @@ export const ManualProvisionPage: React.FC = () => {
   const [endpointId, setEndpointId] = React.useState('');
   const [tab, setTab] = React.useState<Tab>('user');
   const [result, setResult] = React.useState<
-    { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; message: string } | null
+    { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; error: unknown } | null
   >(null);
 
   // Mutations - always create the hooks (React rule of hooks); they
@@ -320,7 +315,9 @@ export const ManualProvisionPage: React.FC = () => {
       const resource = (await createUser.mutateAsync(body)) as Record<string, unknown>;
       setResult({ kind: 'success', resource });
     } catch (err) {
-      setResult({ kind: 'error', message: err instanceof Error ? err.message : 'Create failed.' });
+      // Pass the raw error so <ScimErrorMessage /> can map scimType +
+      // status to a plain-English explanation (Phase K3).
+      setResult({ kind: 'error', error: err });
     }
   }
 
@@ -330,7 +327,7 @@ export const ManualProvisionPage: React.FC = () => {
       const resource = (await createGroup.mutateAsync(body)) as Record<string, unknown>;
       setResult({ kind: 'success', resource });
     } catch (err) {
-      setResult({ kind: 'error', message: err instanceof Error ? err.message : 'Create failed.' });
+      setResult({ kind: 'error', error: err });
     }
   }
 

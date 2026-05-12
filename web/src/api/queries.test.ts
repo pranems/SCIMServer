@@ -71,10 +71,71 @@ describe('fetchWithAuth', () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 500,
+      // Phase K3: shape mirrors a plain-text fetch Response (no
+      // headers.get() defined) - parser must still produce a
+      // ScimApiError carrying the status + the text as detail.
       text: () => Promise.resolve('Internal Server Error'),
     });
 
-    await expect(fetchWithAuth('/scim/health')).rejects.toThrow('HTTP 500');
+    // Phase K3 - assert the structured class + detail substring.
+    const { ScimApiError } = await import('./scim-error');
+    try {
+      await fetchWithAuth('/scim/health');
+      throw new Error('expected fetchWithAuth to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ScimApiError);
+      expect((err as InstanceType<typeof ScimApiError>).status).toBe(500);
+      expect((err as Error).message).toContain('Internal Server Error');
+    }
+  });
+
+  // ─── Phase K3 - structured ScimApiError ─────────────────────────
+  it('throws a ScimApiError carrying status + parsed body on a JSON SCIM error response', async () => {
+    const body = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+      status: '409',
+      scimType: 'uniqueness',
+      detail: 'userName already taken',
+    };
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 409,
+      headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/scim+json' : null) },
+      text: () => Promise.resolve(JSON.stringify(body)),
+    });
+    const { ScimApiError } = await import('./scim-error');
+    try {
+      await fetchWithAuth('/scim/endpoints/ep-1/Users');
+      throw new Error('expected fetchWithAuth to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ScimApiError);
+      const e = err as InstanceType<typeof ScimApiError>;
+      expect(e.status).toBe(409);
+      expect(e.scimType).toBe('uniqueness');
+      expect(e.detail).toBe('userName already taken');
+      expect(e.rawBody).toEqual(body);
+    }
+  });
+
+  it('throws a ScimApiError on 5xx with body=null when response is not JSON (graceful degrade)', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 502,
+      headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'text/html' : null) },
+      text: () => Promise.resolve('<html>Bad Gateway</html>'),
+    });
+    const { ScimApiError } = await import('./scim-error');
+    try {
+      await fetchWithAuth('/scim/health');
+      throw new Error('expected fetchWithAuth to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ScimApiError);
+      const e = err as InstanceType<typeof ScimApiError>;
+      expect(e.status).toBe(502);
+      // Detail must include the raw text so the operator can read it.
+      expect(e.detail).toContain('Bad Gateway');
+      expect(e.scimType).toBeUndefined();
+    }
   });
 
   it('clears token and notifies on 401', async () => {

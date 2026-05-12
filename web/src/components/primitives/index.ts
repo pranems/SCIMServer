@@ -20,3 +20,6 @@ export type { ErrorBoundaryProps } from './ErrorBoundary';
 
 export { KpiChart } from './KpiChart';
 export type { KpiChartProps } from './KpiChart';
+
+export { ScimErrorMessage } from './ScimErrorMessage';
+export type { ScimErrorMessageProps } from './ScimErrorMessage';

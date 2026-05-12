@@ -22,6 +22,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { ScimErrorMessage } from './ScimErrorMessage';
 
 const useStyles = makeStyles({
   errorBanner: {
@@ -61,8 +62,18 @@ export interface FormDialogProps {
   cancelLabel?: string;
   /** When true, disables both buttons and shows a spinner. */
   busy?: boolean;
-  /** When set, renders a red error banner above the fields. */
+  /**
+   * Legacy string error banner. Prefer `error` (Phase K3) when the
+   * caller has the raw `unknown` from a try/catch - the structured
+   * path renders the SCIM error catalog with plain-English copy.
+   */
   errorMessage?: string | null;
+  /**
+   * Phase K3 - structured error from a caught throw. When set, the
+   * dialog renders <ScimErrorMessage /> instead of the legacy red
+   * banner; falls back to `errorMessage` when this is null/undefined.
+   */
+  error?: unknown;
   /** When true, the submit button is disabled (e.g. invalid form). */
   disabled?: boolean;
   /** Override the default test id. */
@@ -79,6 +90,7 @@ export const FormDialog: React.FC<FormDialogProps> = ({
   cancelLabel = 'Cancel',
   busy = false,
   errorMessage,
+  error,
   disabled = false,
   ...rest
 }) => {
@@ -110,7 +122,9 @@ export const FormDialog: React.FC<FormDialogProps> = ({
           <DialogBody>
             <DialogTitle data-testid={`${testId}-title`}>{title}</DialogTitle>
             <DialogContent>
-              {errorMessage && (
+              {error !== undefined && error !== null ? (
+                <ScimErrorMessage error={error} data-testid={`${testId}-error`} />
+              ) : errorMessage ? (
                 <div
                   className={classes.errorBanner}
                   role="alert"
@@ -118,7 +132,7 @@ export const FormDialog: React.FC<FormDialogProps> = ({
                 >
                   {errorMessage}
                 </div>
-              )}
+              ) : null}
               <div className={classes.fields} data-testid={`${testId}-fields`}>
                 {children}
               </div>

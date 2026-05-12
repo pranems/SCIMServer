@@ -134,13 +134,13 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // Local UI state
   const [createOpen, setCreateOpen] = React.useState(false);
   const [labelInput, setLabelInput] = React.useState('');
-  const [createError, setCreateError] = React.useState<string | null>(null);
+  const [createError, setCreateError] = React.useState<unknown>(null);
   // Plaintext token returned ONCE on create - keep around so the user
   // can copy it. Cleared when the modal closes after acknowledgement.
   const [createdCred, setCreatedCred] = React.useState<CreatedCredential | null>(null);
 
   const [deleteTarget, setDeleteTarget] = React.useState<EndpointOverviewCredential | null>(null);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [deleteError, setDeleteError] = React.useState<unknown>(null);
 
   const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -181,7 +181,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           });
         },
         onError: (err) => {
-          setCreateError((err as Error).message || 'Failed to create credential');
+          setCreateError(err);
         },
       },
     );
@@ -195,7 +195,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         setDeleteTarget(null);
       },
       onError: (err) => {
-        setDeleteError((err as Error).message || 'Failed to revoke credential');
+        setDeleteError(err);
       },
     });
   };
@@ -321,7 +321,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         submitLabel={createdCred ? 'Done' : 'Create'}
         cancelLabel="Cancel"
         busy={createMutation.isPending}
-        errorMessage={createError}
+        error={createError}
         data-testid="credentials-create-dialog"
       >
         {!createdCred && (
@@ -382,7 +382,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         submitLabel="Revoke"
         cancelLabel="Keep"
         busy={deleteMutation.isPending}
-        errorMessage={deleteError}
+        error={deleteError}
         data-testid="credentials-delete-dialog"
       >
         <Body1>
