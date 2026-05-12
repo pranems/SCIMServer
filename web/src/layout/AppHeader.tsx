@@ -17,6 +17,7 @@ import {
 import { HEADER_HEIGHT } from '../design/tokens';
 import { useUIStore } from '../store/ui-store';
 import { clearStoredToken, notifyTokenInvalid } from '../auth/token';
+import { HealthRollup } from './HealthRollup';
 
 const useStyles = makeStyles({
   header: {
@@ -58,6 +59,7 @@ export const AppHeader: React.FC = () => {
       </div>
 
       <div className={classes.actions}>
+        <HealthRollup />
         <Tooltip content="Change token" relationship="label">
           <Button
             appearance="subtle"

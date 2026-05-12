@@ -558,6 +558,8 @@ Expose the dashboard / endpoints / schemas / recent-activity / workbench-history
 
 ### 6.10 Service Health Rollup Widget
 
+> ✅ **CLOSED in v0.49.0-alpha.2 as Phase K2.** See [docs/PHASE_K2_SERVICE_HEALTH_ROLLUP.md](PHASE_K2_SERVICE_HEALTH_ROLLUP.md). 5 substatuses (API, Database, Auth, Realtime, Recent errors), strictest-substatus-wins reducer, +32 web vitest tests, +6 KB main bundle (24 % headroom under K1 200 KB budget). Frontend-only.
+
 Top-right traffic-light: green/yellow/red rolling status of DB, SCIM, Auth, Logging, Cache. Click for drill-down. Powered by `/health` (already in API). Auto-refresh on SSE.
 
 **Effort:** 2 days.

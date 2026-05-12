@@ -120,6 +120,59 @@ describe('useSSE', () => {
   });
 });
 
+// ─── Phase K2 - SSE connection state mirrored into ui-store ─────────
+//
+// useHealthRollup reads the SSE connection state from ui-store to
+// surface the Realtime substatus. These tests lock in that useSSE
+// keeps that state in sync across the lifecycle (connecting -> open
+// -> reconnecting on error -> closed on unmount). Without this lock
+// the Realtime traffic-light would lie about reality whenever the
+// EventSource state machine changes.
+import { useUIStore } from '../store/ui-store';
+
+describe('useSSE - K2 ui-store connection state', () => {
+  beforeEach(() => {
+    MockEventSource.instances = [];
+    (globalThis as any).EventSource = MockEventSource;
+    useUIStore.setState({ sseConnectionState: 'closed' });
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).EventSource;
+  });
+
+  it('writes "connecting" the moment the EventSource is constructed', () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE({ enabled: true }), { wrapper });
+    // Constructor ran synchronously; onopen is a microtask away.
+    // Snapshot must already be 'connecting' before the microtask fires.
+    expect(useUIStore.getState().sseConnectionState).toBe('connecting');
+  });
+
+  it('writes "open" once the EventSource onopen fires', async () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE({ enabled: true }), { wrapper });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(useUIStore.getState().sseConnectionState).toBe('open');
+  });
+
+  it('writes "reconnecting" when onerror fires (before the next connect attempt)', async () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE({ enabled: true }), { wrapper });
+    await new Promise((r) => setTimeout(r, 10));
+    // Trigger an error - the hook closes the ES, schedules reconnect.
+    MockEventSource.instances[0].onerror?.(new Event('error'));
+    expect(useUIStore.getState().sseConnectionState).toBe('reconnecting');
+  });
+
+  it('writes "closed" on unmount cleanup', () => {
+    const { wrapper } = createWrapper();
+    const { unmount } = renderHook(() => useSSE({ enabled: true }), { wrapper });
+    unmount();
+    expect(useUIStore.getState().sseConnectionState).toBe('closed');
+  });
+});
+
 // ─── Phase B3 - granular per-channel invalidation contract ──────────
 
 import { computeInvalidations, SUPPORTED_EVENT_TYPES } from './useSSE';

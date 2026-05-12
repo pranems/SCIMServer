@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0-alpha.2] - 2026-05-12 - Phase K2 - Service Health Rollup Widget
+
+### Added
+- **Service health rollup widget** in the AppHeader. Top-right traffic-light icon (green/yellow/red/grey) with on-click popover listing 5 substatuses (API, Database, Auth, Realtime, Recent errors). Frontend-only - aggregates signals already produced by `/scim/health`, `/scim/admin/version`, `/scim/admin/dashboard`, plus the SSE EventSource lifecycle mirrored into `ui-store.sseConnectionState`. No new API surface.
+- **`useHealthRollup` hook** in [web/src/hooks/useHealthRollup.ts](web/src/hooks/useHealthRollup.ts) with pure `rollupOverallStatus` reducer (strictest substatus wins: down > degraded > healthy > unknown).
+- **`<HealthRollup />` component** in [web/src/layout/HealthRollup.tsx](web/src/layout/HealthRollup.tsx). Fluent UI Popover; per-row status badge + detail line. Trigger always carries `aria-label="System status: <X>"` for screen-reader disambiguation; per-row literal status string sits beside each colored icon for colorblind / screen-reader parity.
+- **`sseConnectionState` slice** in [web/src/store/ui-store.ts](web/src/store/ui-store.ts) with new `SseConnectionState` type and `setSseConnectionState` setter. `useSSE` writes the lifecycle (`connecting`/`open`/`reconnecting`/`closed`) so `useHealthRollup` can surface the Realtime substatus without bolting another React context onto AppShell.
+- **+32 web vitest tests**: new [web/src/hooks/useHealthRollup.test.ts](web/src/hooks/useHealthRollup.test.ts) (17 - reducer + per-substatus rules + overall-status precedence), [web/src/layout/HealthRollup.test.tsx](web/src/layout/HealthRollup.test.tsx) (5 - traffic-light render + popover open + per-row testids), [web/src/store/ui-store.test.ts](web/src/store/ui-store.test.ts) (6 - new slice contract), extended [web/src/hooks/useSSE.test.ts](web/src/hooks/useSSE.test.ts) +4 (lifecycle ui-store writes).
+- New feature doc [docs/PHASE_K2_SERVICE_HEALTH_ROLLUP.md](docs/PHASE_K2_SERVICE_HEALTH_ROLLUP.md) covering architecture, substatus rules, lifecycle Mermaid, bundle impact, A11y notes.
+
+### Changed
+- Main entry bundle 144.74 KB -> **151.10 KB gzipped** (+6 KB for the rollup widget; still 24 % under the 200 KB K1 budget). All 16 size-limit budgets pass.
+- `useSSE` writes `sseConnectionState` at every transition: pre-construct -> `connecting`, on `open` -> `open`, on `error` -> `reconnecting`, on cleanup -> `closed`.
+
+### Test counts (net new)
+
+| Layer | Pre-K2 | Post-K2 | Delta |
+|-------|--------|---------|-------|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,184 | 1,184 | 0 |
+| Web vitest | 452 | **484** | **+32** |
+| Live SCIM | 933 | 933 | 0 (deferred to dev gate) |
+| **Total** | 6,303 | **6,335** | **+32** |
+
+### Notes
+- Frontend-only commit. No API change, no live SCIM behavior change.
+- A deeper backend health probe (DB connectivity test, log writability, OAuth secret validity) is a future Phase L item; the K2 widget contract will absorb that without changes to the substatus list.
+- Per-sub-phase quality gate next: deploy v0.49.0-alpha.2 to dev + 933+ live SCIM tests must all pass before Phase K3 starts (smart error explainer).
+
 ## [0.49.0-alpha.1] - 2026-05-12 - Phase K1 - Route-Level Code Splitting
 
 ### Added

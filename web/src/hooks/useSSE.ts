@@ -28,6 +28,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { getStoredToken } from '../auth/token';
 import { queryKeys } from '../api/queries';
+import { useUIStore } from '../store/ui-store';
 
 /** Names of every SCIM mutation event we react to. */
 export const SUPPORTED_EVENT_TYPES = [
@@ -186,11 +187,16 @@ export function useSSE(options: UseSSEOptions = {}) {
     const fullUrl = token ? `${url}&token=${encodeURIComponent(token)}` : url;
 
     const connect = () => {
+      // K2 - mark connecting BEFORE constructing the EventSource so the
+      // <HealthRollup /> Realtime substatus reflects the in-flight
+      // attempt, not the previous lifecycle state.
+      useUIStore.getState().setSseConnectionState('connecting');
       const es = new EventSource(fullUrl);
       eventSourceRef.current = es;
 
       es.onopen = () => {
         retryCount.current = 0;
+        useUIStore.getState().setSseConnectionState('open');
       };
 
       es.onmessage = (event) => {
@@ -207,6 +213,10 @@ export function useSSE(options: UseSSEOptions = {}) {
       es.onerror = () => {
         es.close();
         eventSourceRef.current = null;
+        // K2 - signal "reconnecting" so the rollup shows degraded
+        // (yellow) instead of jumping straight to down (red) - the
+        // hook is about to schedule the next attempt.
+        useUIStore.getState().setSseConnectionState('reconnecting');
 
         // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
         const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
@@ -220,6 +230,9 @@ export function useSSE(options: UseSSEOptions = {}) {
     return () => {
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
+      // K2 - mark closed on unmount so the rollup correctly reflects
+      // that no realtime channel is active.
+      useUIStore.getState().setSseConnectionState('closed');
     };
   }, [enabled, url, queryClient]);
 }
