@@ -5,10 +5,15 @@
  * value on first render (zero spinner when navigating from any page
  * that already warmed `useEndpoints`).
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
-import { ManualProvisionPage } from '../pages/ManualProvisionPage';
 import { endpointsQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load ManualProvisionPage into its own chunk.
+const ManualProvisionPage = React.lazy(() =>
+  import('../pages/ManualProvisionPage').then((m) => ({ default: m.ManualProvisionPage })),
+);
 
 export const manualProvisionRoute = createRoute({
   getParentRoute: () => rootRoute,

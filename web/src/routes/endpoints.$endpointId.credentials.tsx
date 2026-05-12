@@ -9,10 +9,15 @@
  * (the parent loader still runs, but explicit ensureQueryData makes
  * the dependency obvious).
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
-import { CredentialsTab } from '../pages/CredentialsTab';
 import { endpointOverviewQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load CredentialsTab into its own chunk.
+const CredentialsTab = React.lazy(() =>
+  import('../pages/CredentialsTab').then((m) => ({ default: m.CredentialsTab })),
+);
 
 function CredentialsTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();

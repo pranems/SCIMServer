@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0-alpha.1] - 2026-05-12 - Phase K1 - Route-Level Code Splitting
+
+### Added
+- **Route-level code splitting**: every TanStack Router route file under [web/src/routes/](web/src/routes/) now uses `React.lazy(() => import('../pages/X').then(m => ({ default: m.X })))` instead of static imports. Vite emits one chunk per page (14 page chunks + 1 entry + 1 shared `primitives-*.js` + ~25 vendor chunks).
+- **Root Suspense boundary** in [web/src/routes/__root.tsx](web/src/routes/__root.tsx) wraps `<Outlet />` with a `RouteLoadingFallback` (`LoadingSkeleton count={6} height="40px"`) so cold-cache route loads have a single shared loading surface.
+- **size-limit budget restructuring**: 1 budget -> 16 budgets in [web/package.json](web/package.json). Main entry tightened from 400 KB -> **200 KB** (measured 144.74 KB, 28% headroom). New shared primitives chunk budget (220 KB, measured 173.04 KB). 14 per-route budgets at 110 KB each (largest route ActivityTab 10.54 KB - 90% headroom).
+- **+49 web vitest tests**: new [web/src/routes/lazy-routes.test.ts](web/src/routes/lazy-routes.test.ts) (29 source-pattern contract tests, one per route file, asserting React.lazy + dynamic import AND no static `import { X } from '../pages/X'`); new [web/src/routes/route-suspense.test.ts](web/src/routes/route-suspense.test.ts) (3 tests asserting __root.tsx wraps Outlet in Suspense with non-null fallback). Extended [web/src/test/size-limit-config.test.ts](web/src/test/size-limit-config.test.ts) with 17 new assertions (per-route budget existence, gzipped flag, path glob convention, <=110 KB ceiling).
+- New feature doc [docs/PHASE_K1_ROUTE_CODE_SPLITTING.md](docs/PHASE_K1_ROUTE_CODE_SPLITTING.md) covering before/after architecture, lazy-load + Suspense lifecycle Mermaid sequence, performance impact, RED-to-GREEN test summary.
+
+### Changed
+- Main JS entry bundle reduced **62%** gzipped: 381.49 KB -> **144.74 KB**. Per-page chunks 1-11 KB gzipped each. First-paint download surface (entry + primitives + matched route): ~325 KB vs prior 381 KB; subsequent navigations download only the new route chunk (~2-11 KB).
+- size-limit-config.test.ts main-entry assertion now matches by exact path (`dist/assets/index-*.js`) instead of `.js` suffix to avoid false-matching per-route entries.
+
+### Test counts (net new)
+
+| Layer | Pre-K1 | Post-K1 | Delta |
+|-------|--------|---------|-------|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,184 | 1,184 | 0 |
+| Web vitest | 403 | **452** | **+49** |
+| Live SCIM | 933 | 933 | 0 (deferred to dev gate) |
+| **Total** | 6,254 | **6,303** | **+49** |
+
+### Notes
+- Frontend-only commit. No API change, no live SCIM behavior change.
+- All 16 size-limit budgets pass (`npm run size`): main 144.74 / 200 KB, primitives 173.04 / 220 KB, every route page < 11 / 110 KB.
+- Per-phase quality gate next: deploy v0.49.0-alpha.1 to dev + 933+ live SCIM tests must pass before Phase K2 starts (service health rollup widget).
+
 ## [0.48.1] - 2026-05-11 - Phase J - SCIM Event SSE Bridge + MSW worker mount + DELIVERY_PLAN sweep
 
 ### Added

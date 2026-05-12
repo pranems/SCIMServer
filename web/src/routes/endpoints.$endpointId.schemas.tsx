@@ -10,8 +10,12 @@
 import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
-import { SchemasTab } from '../pages/SchemasTab';
 import { endpointSchemasQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load SchemasTab into its own chunk.
+const SchemasTab = React.lazy(() =>
+  import('../pages/SchemasTab').then((m) => ({ default: m.SchemasTab })),
+);
 
 function SchemasTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();

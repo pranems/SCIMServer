@@ -10,9 +10,13 @@
 import React from 'react';
 import { createRoute, useSearch, useNavigate } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
-import { ActivityTab } from '../pages/ActivityTab';
 import { activitySearchSchema, type ActivitySearch } from './search-schemas';
 import { endpointActivityQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load ActivityTab into its own chunk.
+const ActivityTab = React.lazy(() =>
+  import('../pages/ActivityTab').then((m) => ({ default: m.ActivityTab })),
+);
 
 function ActivityTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();

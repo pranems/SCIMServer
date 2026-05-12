@@ -10,10 +10,15 @@
  * KPI cards skip the spinner state. Replaces the older endpoint-stats
  * pre-fetch which only warmed half the data the tab needs.
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
-import { OverviewTab } from '../pages/OverviewTab';
 import { endpointOverviewQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load OverviewTab into its own chunk.
+const OverviewTab = React.lazy(() =>
+  import('../pages/OverviewTab').then((m) => ({ default: m.OverviewTab })),
+);
 
 function OverviewTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();

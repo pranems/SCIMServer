@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.48.1",
+  "version": "0.49.0-alpha.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -51,9 +51,99 @@
   },
   "size-limit": [
     {
-      "name": "Total app bundle (gzipped)",
+      "name": "Main entry bundle (gzipped)",
       "path": "dist/assets/index-*.js",
-      "limit": "400 KB",
+      "limit": "200 KB",
+      "gzip": true
+    },
+    {
+      "name": "Shared primitives chunk (gzipped)",
+      "path": "dist/assets/primitives-*.js",
+      "limit": "220 KB",
+      "gzip": true
+    },
+    {
+      "name": "DashboardPage",
+      "path": "dist/assets/DashboardPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "EndpointsPage",
+      "path": "dist/assets/EndpointsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "EndpointDetailPage",
+      "path": "dist/assets/EndpointDetailPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "OverviewTab",
+      "path": "dist/assets/OverviewTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "UsersTab",
+      "path": "dist/assets/UsersTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "GroupsTab",
+      "path": "dist/assets/GroupsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "ActivityTab",
+      "path": "dist/assets/ActivityTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "SchemasTab",
+      "path": "dist/assets/SchemasTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "CredentialsTab",
+      "path": "dist/assets/CredentialsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "LogsTab",
+      "path": "dist/assets/LogsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "SettingsTab",
+      "path": "dist/assets/SettingsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "LogsPage",
+      "path": "dist/assets/LogsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "ManualProvisionPage",
+      "path": "dist/assets/ManualProvisionPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "SettingsPage",
+      "path": "dist/assets/SettingsPage-*.js",
+      "limit": "110 KB",
       "gzip": true
     }
   ]
