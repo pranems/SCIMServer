@@ -43,6 +43,14 @@ import {
 } from '@fluentui/react-icons';
 import { DetailDrawer } from '../primitives/DetailDrawer';
 import { ScimErrorMessage } from '../primitives/ScimErrorMessage';
+import { EtagBadge } from '../primitives/EtagBadge';
+import { ConflictDialog } from '../primitives/ConflictDialog';
+import {
+  formatIfMatchValue,
+  parseResourceEtag,
+  FORCE_OVERWRITE_IF_MATCH,
+} from '../../api/etag';
+import { ScimApiError } from '../../api/scim-error';
 import {
   useUpdateUser,
   useDeleteUser,
@@ -149,6 +157,11 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   const [active, setActive] = React.useState(resource.active ?? true);
   const [confirming, setConfirming] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
+  // K5 - separate state for the 412/428 conflict dialog. We surface
+  // those via <ConflictDialog /> instead of the generic
+  // <ScimErrorMessage /> because the operator's recovery path is
+  // different (refresh-and-reapply vs. force-overwrite vs. cancel).
+  const [conflict, setConflict] = React.useState<{ pending: Record<string, unknown> } | null>(null);
 
   // Reset form whenever a different resource is loaded into the drawer.
   React.useEffect(() => {
@@ -158,6 +171,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     setActive(resource.active ?? true);
     setConfirming(false);
     setError(null);
+    setConflict(null);
   }, [resource.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function buildDiff(): Record<string, unknown> {
@@ -173,7 +187,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     return diff;
   }
 
-  async function handleSave() {
+  async function handleSave(overrideIfMatch?: string) {
     setError(null);
     const diff = buildDiff();
     if (Object.keys(diff).length === 0) {
@@ -184,14 +198,27 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       schemas: [SCIM_PATCH_OP_SCHEMA],
       Operations: buildOperations(diff),
     };
+    // K5 - send the resource's current ETag as If-Match. Server uses
+    // it to detect mid-air collisions (412 Precondition Failed when
+    // the server already moved on, 428 Precondition Required when
+    // RequireIfMatch=true and we have no ETag to send).
+    const ifMatch = overrideIfMatch ?? formatIfMatchValue(parseResourceEtag(resource));
     try {
       if (kind === 'user') {
-        await userUpdate.mutateAsync({ userId: resource.id, body });
+        await userUpdate.mutateAsync({ userId: resource.id, body, ifMatch });
       } else {
-        await groupUpdate.mutateAsync({ groupId: resource.id, body });
+        await groupUpdate.mutateAsync({ groupId: resource.id, body, ifMatch });
       }
+      setConflict(null);
       onClose();
     } catch (err) {
+      // K5 - 412 / 428 = collision. Surface ConflictDialog instead of
+      // the generic error banner. Everything else falls through to
+      // <ScimErrorMessage /> via setError.
+      if (err instanceof ScimApiError && (err.status === 412 || err.status === 428)) {
+        setConflict({ pending: diff });
+        return;
+      }
       // K3 - keep the raw error so ScimErrorMessage can map scimType
       // to a plain-English explanation; legacy `err.message` is still
       // available since ScimApiError extends Error.
@@ -257,7 +284,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
         <Button
           appearance="primary"
           icon={<Save24Regular />}
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           disabled={saving || deleting}
         >
           Save
@@ -289,6 +316,12 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>Last modified</Caption1>
           <Caption1>{resource.meta?.lastModified ?? '-'}</Caption1>
+        </div>
+        {/* K5 - ETag badge in the metadata card. Renders nothing
+            when the server never sent meta.version. */}
+        <div className={classes.metaRow}>
+          <Caption1 className={classes.metaLabel}>Version</Caption1>
+          <EtagBadge resource={resource} />
         </div>
 
         {/* ── Editable fields ──────────────────────────────────── */}
@@ -330,6 +363,29 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           <ScimErrorMessage error={error} data-testid="drawer-error" />
         ) : null}
       </div>
+      {/* K5 - mid-air collision dialog. Mounted as sibling so its
+          backdrop sits above the drawer's body. */}
+      <ConflictDialog
+        open={conflict !== null}
+        pendingDiff={conflict?.pending ?? {}}
+        serverResource={resource}
+        onCancel={() => setConflict(null)}
+        onRefreshAndReapply={() => {
+          // Re-seed the form with the current resource snapshot so
+          // the operator can review server values then re-Save. We
+          // do NOT auto-fire the mutation - the user picks which
+          // edits to keep.
+          setUserName(resource.userName ?? '');
+          setDisplayName(resource.displayName ?? '');
+          setExternalId(resource.externalId ?? '');
+          setActive(resource.active ?? true);
+          setConflict(null);
+        }}
+        onForceOverwrite={() => {
+          setConflict(null);
+          void handleSave(FORCE_OVERWRITE_IF_MATCH);
+        }}
+      />
     </DetailDrawer>
   );
 };

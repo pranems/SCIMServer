@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0-alpha.5] - 2026-05-13 - Phase K5 - ETag / Version Surface + RequireIfMatch UX
+
+### Added
+- **Mid-air collision UX** - the redesigned UI now surfaces RFC 7644 §3.14 ETags + `RequireIfMatch` instead of leaving them in the network tab. ResourceDetailDrawer reads `meta.version` from the loaded resource and forwards it as `If-Match` on every Save; on `412 Precondition Failed` (versionMismatch) or `428 Precondition Required` (RequireIfMatch=true + no ETag), a new `<ConflictDialog />` opens with side-by-side diff (your pending edits vs server's current state) + 3 actions: **Refresh and reapply** (reseeds form with server snapshot, keeps the diff visible for re-Save), **Force overwrite** (re-fires the same mutation with `If-Match: *`), **Cancel**.
+- **`<EtagBadge />` primitive** in [web/src/components/primitives/EtagBadge.tsx](web/src/components/primitives/EtagBadge.tsx). Small monospace Badge that renders the resource's version (`v3`) or legacy ETag string with a tooltip. Renders nothing when `meta.version` is absent.
+- **`<ConflictDialog />` primitive** in [web/src/components/primitives/ConflictDialog.tsx](web/src/components/primitives/ConflictDialog.tsx). Fluent UI Dialog with side-by-side pending-vs-server columns + server ETag display. Force-overwrite button is hidden when `isForceOverwriteSafe` returns false (no `meta.version` to reason about).
+- **`parseResourceEtag` + `formatIfMatchValue` + `isForceOverwriteSafe` + `FORCE_OVERWRITE_IF_MATCH`** pure helpers in [web/src/api/etag.ts](web/src/api/etag.ts). Discriminated union return type (`kind: 'version' | 'legacy' | 'missing'`) so the UI can render the right surface for each case. Tolerant of legacy timestamp ETags (`W/"<ISO>"`) for backward compat with pre-v0.16.0 deployments.
+- **+30 web vitest tests** across 4 files: new [etag.test.ts](web/src/api/etag.test.ts) (13 - parser cases for version/legacy/missing + force-overwrite policy), new [EtagBadge.test.tsx](web/src/components/primitives/EtagBadge.test.tsx) (4 - render cases + aria-label), new [ConflictDialog.test.tsx](web/src/components/primitives/ConflictDialog.test.tsx) (7 - open/close, both columns, server ETag visible, all 3 buttons fire callbacks, force-overwrite hidden when unsafe), extended [ResourceDetailDrawer.test.tsx](web/src/components/detail/ResourceDetailDrawer.test.tsx) +5 (badge rendering, If-Match forwarded on Save, 412 -> ConflictDialog, 428 -> ConflictDialog, force-overwrite re-fires with `If-Match: *`).
+- New feature doc [docs/PHASE_K5_ETAG_AND_REQUIREIFMATCH.md](docs/PHASE_K5_ETAG_AND_REQUIREIFMATCH.md) covering architecture, save lifecycle Mermaid sequence, force-overwrite safety policy, before/after UX comparison.
+
+### Changed
+- ResourceDetailDrawer `handleSave()` is now `handleSave(overrideIfMatch?)` and parses the resource's ETag on every call. The Save button click is wired to `() => void handleSave()`; the ConflictDialog's force-overwrite button calls `handleSave(FORCE_OVERWRITE_IF_MATCH)`.
+- Bundle: main entry 152.40 -> **147.22 KB gzipped** (-5.18 KB; Tooltip/Dialog usage hoisted into shared chunk via vite chunking heuristics). Shared primitives 180.70 -> **198.81 KB** (+18.11 KB for ConflictDialog + EtagBadge + their Fluent dependencies; still 9 % under 220 KB K1 budget). All 16 size-limit budgets pass.
+
+### Test counts (net new)
+
+| Layer | Pre-K5 | Post-K5 | Delta |
+|-------|--------|---------|-------|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,184 | 1,184 | 0 |
+| Web vitest | 560 | **590** | **+30** |
+| Live SCIM | 933 | 933 | 0 (deferred to dev gate) |
+| **Total** | 6,411 | **6,441** | **+30** |
+
+### Notes
+- Frontend-only commit. No API change, no live SCIM behavior change.
+- Force-overwrite is gated by `isForceOverwriteSafe` policy: button only appears when the server returned a `meta.version` we can reason about. The 428 path (RequireIfMatch=true + no ETag) hits this branch by definition.
+- Per-sub-phase quality gate next: deploy v0.49.0-alpha.5 to dev + 933+ live SCIM tests must all pass before the v0.49.0 stable rollup (drops -alpha.N suffix and closes Phase K).
+
 ## [0.49.0-alpha.4] - 2026-05-12 - Phase K4 - Live SSE Log Stream Viewer
 
 ### Added

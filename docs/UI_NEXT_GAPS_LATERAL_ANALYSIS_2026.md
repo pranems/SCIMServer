@@ -315,6 +315,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.10 ETag / Version Surface + RequireIfMatch Pre-Flight
 
+> ✅ **CLOSED in v0.49.0-alpha.5 as Phase K5.** See [docs/PHASE_K5_ETAG_AND_REQUIREIFMATCH.md](PHASE_K5_ETAG_AND_REQUIREIFMATCH.md). EtagBadge in metadata, If-Match forwarded on Save, 412/428 open ConflictDialog with side-by-side diff + Refresh-and-reapply + Force-overwrite (gated by isForceOverwriteSafe policy). +30 web vitest tests.
+
 **Why:** [Phase 7](../docs/phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md) replaced timestamp ETags with monotonic `W/"v{N}"` and the `RequireIfMatch` config flag exists. Today **the UI never displays the ETag**. If a user opens a row, walks away, comes back, edits, and saves while another tab modified the row, the optimistic update path fails with 412 and the user sees a generic error.
 
 **Shape:**

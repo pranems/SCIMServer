@@ -200,6 +200,128 @@ describe('ResourceDetailDrawer (User)', () => {
       expect(screen.getByTestId('drawer-error')).toBeInTheDocument();
     });
   });
+
+  // ─── Phase K5 - ETag surface + 412 conflict + force overwrite ─────
+
+  it('K5 - renders the ETag badge in the metadata section', () => {
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={{ ...USER, meta: { ...USER.meta, version: 'W/"v3"' } }}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    const badge = screen.getByTestId('etag-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent).toContain('v3');
+  });
+
+  it('K5 - forwards the parsed ETag as If-Match on Save', async () => {
+    const user = userEvent.setup();
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={{ ...USER, meta: { ...USER.meta, version: 'W/"v7"' } }}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    const display = screen.getByLabelText(/displayName/i) as HTMLInputElement;
+    fireEvent.change(display, { target: { value: 'New' } });
+    await user.click(screen.getByRole('button', { name: /Save/i }));
+    expect(updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ ifMatch: 'W/"v7"' }),
+    );
+  });
+
+  it('K5 - on 412 the ConflictDialog opens (not the generic ScimErrorMessage)', async () => {
+    const user = userEvent.setup();
+    const { ScimApiError } = await import('../../api/scim-error');
+    updateUser.mockRejectedValueOnce(new ScimApiError({
+      status: 412,
+      scimType: 'versionMismatch',
+      detail: 'If-Match did not match',
+      rawBody: { schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'], status: '412' },
+    }));
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={{ ...USER, meta: { ...USER.meta, version: 'W/"v7"' } }}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    const display = screen.getByLabelText(/displayName/i) as HTMLInputElement;
+    fireEvent.change(display, { target: { value: 'New' } });
+    await user.click(screen.getByRole('button', { name: /Save/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('drawer-error')).toBeNull();
+  });
+
+  it('K5 - Force overwrite from the conflict dialog re-fires the mutation with If-Match=*', async () => {
+    const user = userEvent.setup();
+    const { ScimApiError } = await import('../../api/scim-error');
+    updateUser
+      .mockRejectedValueOnce(new ScimApiError({
+        status: 412, scimType: 'versionMismatch', detail: 'collision',
+        rawBody: { status: '412' },
+      }))
+      .mockResolvedValueOnce({});
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={{ ...USER, meta: { ...USER.meta, version: 'W/"v7"' } }}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    const display = screen.getByLabelText(/displayName/i) as HTMLInputElement;
+    fireEvent.change(display, { target: { value: 'New' } });
+    await user.click(screen.getByRole('button', { name: /Save/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument();
+    });
+    await user.click(screen.getByTestId('conflict-force-overwrite'));
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledTimes(2);
+    });
+    expect(updateUser.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ ifMatch: '*' }),
+    );
+  });
+
+  it('K5 - on 428 (RequireIfMatch missing) the ConflictDialog also opens (server signals the operator must reload)', async () => {
+    const user = userEvent.setup();
+    const { ScimApiError } = await import('../../api/scim-error');
+    updateUser.mockRejectedValueOnce(new ScimApiError({
+      status: 428,
+      detail: 'If-Match required',
+    }));
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        // Resource lacks meta.version on purpose - the drawer cannot
+        // synthesise an If-Match, server returns 428.
+        resource={USER}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    const display = screen.getByLabelText(/displayName/i) as HTMLInputElement;
+    fireEvent.change(display, { target: { value: 'New' } });
+    await user.click(screen.getByRole('button', { name: /Save/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument();
+    });
+  });
 });
 
 describe('ResourceDetailDrawer (Group)', () => {
