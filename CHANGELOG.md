@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-05-13 - Phase K Foundation Hardening - Stable Rollup
+
+### Summary
+
+Phase K (Foundation Hardening) is **COMPLETE**. This release drops the `-alpha.N` suffix after every sub-phase shipped, deployed to dev, and passed its 933+ live SCIM gate. Pure version cut + lockfile sync; no new features beyond the 5 already-released alphas.
+
+### Sub-phases shipped (5 of 5)
+
+| Sub-phase | Version | Web vitest delta | Bundle main entry (gz) | Doc |
+|-----------|---------|-----------------:|-----------------------:|-----|
+| K1 Route code splitting | 0.49.0-alpha.1 | +49 -> 452 | 381 -> 145 KB (-62 %) | [docs/PHASE_K1_ROUTE_CODE_SPLITTING.md](docs/PHASE_K1_ROUTE_CODE_SPLITTING.md) |
+| K2 Service health rollup | 0.49.0-alpha.2 | +32 -> 484 | 145 -> 151 KB | [docs/PHASE_K2_SERVICE_HEALTH_ROLLUP.md](docs/PHASE_K2_SERVICE_HEALTH_ROLLUP.md) |
+| K3 Smart error explainer | 0.49.0-alpha.3 | +39 -> 523 | 151 -> 150 KB | [docs/PHASE_K3_SMART_ERROR_EXPLAINER.md](docs/PHASE_K3_SMART_ERROR_EXPLAINER.md) |
+| K4 Live log stream viewer | 0.49.0-alpha.4 | +37 -> 560 | 150 -> 152 KB | [docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md](docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md) |
+| K5 ETag / RequireIfMatch | 0.49.0-alpha.5 | +30 -> 590 | 152 -> 147 KB | [docs/PHASE_K5_ETAG_AND_REQUIREIFMATCH.md](docs/PHASE_K5_ETAG_AND_REQUIREIFMATCH.md) |
+
+### Cumulative test counts at v0.49.0 stable
+
+| Layer | Pre-Phase-K (v0.48.1) | Post-Phase-K (v0.49.0) | Delta |
+|-------|----------------------:|-----------------------:|------:|
+| API unit (Jest) | 3,720 | 3,720 | 0 |
+| API E2E (Jest) | 1,184 | 1,184 | 0 |
+| Web vitest | 403 | **590** | **+187** |
+| Live SCIM (PowerShell) | 933 | 933 | 0 |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total assertions across 5 layers** | 6,254 | **6,441** | **+187** |
+
+All 16 size-limit budgets green at v0.49.0: main entry 147 KB gzipped (27 % under K1's 200 KB budget), shared primitives 199 KB gzipped (10 % under 220 KB budget), and 14 per-route chunks all under 11 KB gzipped (10 % of the 110 KB per-route ceiling).
+
+### Notes
+
+- Pure version cut + lockfile regen in node:25-alpine. No code changes beyond the 4 version-string lines (api/package.json, web/package.json, api/package-lock.json, web/package-lock.json).
+- Frontend-only across all 5 sub-phases. No API behavior change. No live SCIM behavior change.
+- Per-phase final quality gate next: deploy v0.49.0 to dev + 933+ live SCIM tests must all pass before Phase L1 starts (Endpoint CRUD UI + Preset Picker per [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.1).
+- Prod promotion: NOT triggered. Prod still on v0.48.0 (Phase J SSE bridge). Standing rule - prod promotion only on explicit user invocation of [scripts/promote-to-prod.ps1](scripts/promote-to-prod.ps1).
+
 ## [0.49.0-alpha.5] - 2026-05-13 - Phase K5 - ETag / Version Surface + RequireIfMatch UX
 
 ### Added
