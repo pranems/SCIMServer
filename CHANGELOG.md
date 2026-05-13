@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0-alpha.2] - 2026-05-13 - Phase L2 - /Me Self-Service UI
+
+### Added
+- **/Me self-service page at /me** - operator can pick an endpoint, see what the server thinks they are (RFC 7644 S3.11), edit displayName + active via SCIM PatchOp, and delete their own /Me with type-userName-to-confirm safety. Endpoint picker is a single-select Card grid sourced from `useEndpoints()`. Wires the already-shipped `/scim/endpoints/:id/Me` HTTP surface (v0.20.0) into the redesigned UI. Closes [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.7.
+- **OAuth-required fallback UX** - when `useMe` returns 404 with `scimType=noTarget` (the case when the K3 TokenGate's shared-secret bearer is in use, since /Me requires OAuth JWT with `sub` claim matching a User's `userName`), the page renders K3 `<ScimErrorMessage />` PLUS a dedicated `<MessageBar intent="info">` hint pointing operators at per-endpoint OAuth credentials. Without this branch, operators would blame the UI for a server-enforced auth-model constraint.
+- **`useMe(endpointId)` + `usePatchMe(endpointId)` + `useDeleteMe(endpointId)` hooks** in [web/src/api/queries.ts](web/src/api/queries.ts) plus new `MeResource` type, `meQueryOptions(endpointId)` helper, `queryKeys.me(endpointId)` factory entry. `useMe` is `retry: false` (404 is the normal case for shared-secret tokens; do not hammer the server). `useDeleteMe` evicts the per-endpoint `me` cache + invalidates dashboard + endpoints.overview on settle so user counts refresh.
+- **+17 web vitest tests** across 2 files: extended [mutations.test.ts](web/src/api/mutations.test.ts) +7 (queryKeys.me + 3 useMe + 1 usePatchMe + 2 useDeleteMe), new [MeProfilePage.test.tsx](web/src/pages/MeProfilePage.test.tsx) (7 - endpoint picker + empty state + happy profile + 404 OAuth-hint fallback + Save fires PatchOp body + delete confirm gate + delete confirm fires mutation), 3 implicit (lazy-routes contract for `me.tsx` + size-limit contract entry for `MeProfilePage` + new per-route size-limit budget).
+- **+6 live SCIM** in new section [9z-AB in scripts/live-test.ps1](scripts/live-test.ps1) covering: GET /Me with shared-secret bearer returns 404, error body carries `scimType=noTarget`, error detail mentions OAuth, error envelope includes the SCIM Error schema URN, PATCH /Me also returns 404, DELETE /Me also returns 404. Inserted before TEST SECTION 10 per live-test conventions.
+- New TanStack route at `/me` ([web/src/routes/me.tsx](web/src/routes/me.tsx)) with endpoints loader pre-fetch. New `My profile` sidebar nav entry between Manual Provision and Logs.
+- New comprehensive feature doc [docs/PHASE_L2_ME_SELF_SERVICE.md](docs/PHASE_L2_ME_SELF_SERVICE.md) (7 sections + 2 Mermaid: architecture + happy/404 lifecycle, file inventory, risk register with 5 entries, per-step quality gate sequence with 16 checkpoints).
+
+### Changed
+- Bundle: main entry 147.39 -> **147.50 KB gzipped** (+0.11 KB). Shared primitives 199.01 -> **199.06 KB gzipped** (+0.05 KB). 16 existing per-route chunks unchanged + 1 new per-route chunk: MeProfilePage 2.33 KB gzipped (97.9 % under the 110 KB ceiling). All **19 size-limit budgets pass** (was 18 at v0.50.0-alpha.1; +1 for the MeProfilePage budget).
+
+### Test counts (net new)
+
+| Layer | Pre-L2 (v0.50.0-alpha.1) | Post-L2 (v0.50.0-alpha.2) | Delta |
+|-------|-------------------------:|--------------------------:|------:|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 620 | **637** | **+17** |
+| Live SCIM | 940 | **946** | **+6** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,480 | **6,503** | **+23** |
+
+### Notes
+- Backend `/Me` HTTP surface unchanged (shipped v0.20.0). All mutations are pre-existing; L2 is pure UI plumbing + the new live-test section.
+- The /Me happy path is exercised at the unit layer with mocked OAuth-token responses. Live verification covers the 404 noTarget contract because the dev cluster does not yet have an OAuth client-credentials flow wired into TokenGate; that is a separate Phase N polish item.
+- Per-sub-phase quality gate next: deploy v0.50.0-alpha.2 to dev + 946+ live SCIM tests must all pass before Phase L3 starts (Activity Analytics dashboard per analysis-doc S4.6).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.50.0-alpha.1] - 2026-05-13 - Phase L1 - Endpoint CRUD UI + Preset Picker
 
 ### Added

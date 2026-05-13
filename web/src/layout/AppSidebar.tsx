@@ -24,6 +24,7 @@ import {
   PanelLeft24Regular,
   PanelLeftContract24Regular,
   PersonAdd24Regular,
+  Person24Regular,
 } from '@fluentui/react-icons';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED, HEADER_HEIGHT } from '../design/tokens';
@@ -85,6 +86,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: <Home24Regular />, href: '/' },
   { key: 'endpoints', label: 'Endpoints', icon: <Server24Regular />, href: '/endpoints' },
   { key: 'manual-provision', label: 'Manual Provision', icon: <PersonAdd24Regular />, href: '/manual-provision' },
+  // Phase L2 - per-endpoint /Me self-service
+  { key: 'me', label: 'My profile', icon: <Person24Regular />, href: '/me' },
   { key: 'logs', label: 'Logs', icon: <DocumentText24Regular />, href: '/logs' },
   { key: 'settings', label: 'Settings', icon: <Settings24Regular />, href: '/settings' },
 ];

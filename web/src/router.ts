@@ -42,6 +42,7 @@ import { settingsRoute } from './routes/settings';
 import { manualProvisionRoute } from './routes/manual-provision';
 import { createEndpointRoute } from './routes/endpoints.new';
 import { editEndpointRoute } from './routes/endpoints.$endpointId.edit';
+import { meRoute } from './routes/me';
 import { queryClient } from './api/query-client';
 
 /** Endpoint detail layout with its 8 nested tab routes (overview + 7 explicit). */
@@ -69,6 +70,8 @@ export const routeTree = rootRoute.addChildren([
   logsRoute,
   settingsRoute,
   manualProvisionRoute,
+  // Phase L2 - /Me self-service
+  meRoute,
 ]);
 
 /**

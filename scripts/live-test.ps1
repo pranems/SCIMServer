@@ -9761,6 +9761,79 @@ try {
 Write-Host "`n--- 9z-AA: Endpoint CRUD Wizard Contract (L1) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AB: /Me SELF-SERVICE CONTRACT (Phase L2)
+# ============================================
+$script:currentSection = "9z-AB: /Me self-service (L2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AB: /Me SELF-SERVICE CONTRACT (Phase L2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Setup: create an endpoint we can call /Me against (cleanup at end of section)
+    $abStamp = [int](Get-Date -UFormat %s)
+    $abName = "live-9z-AB-$abStamp"
+    $abCreateBody = @{ name = $abName; profilePreset = "rfc-standard"; displayName = "L2 /Me target" } | ConvertTo-Json -Compress
+    $abEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Body $abCreateBody -ContentType "application/json" -Headers $headers
+    Test-Result -Success ($null -ne $abEp.id) -Message "9z-AB.setup: created endpoint $abName (id=$($abEp.id))"
+
+    # 9z-AB.1: GET /Me with the global shared-secret token returns 404 noTarget (auth-model branch
+    # the MeProfilePage UI must handle gracefully)
+    $resp = $null
+    $errBody = $null
+    try {
+        $resp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Headers $headers -SkipHttpErrorCheck
+    } catch {
+        $resp = $_.Exception.Response
+    }
+    $code = if ($resp -and $resp.StatusCode) { [int]$resp.StatusCode } else { 0 }
+    Test-Result -Success ($code -eq 404) -Message "9z-AB.1: GET /Me with shared-secret bearer returns 404 (got $code)"
+
+    if ($resp -and $resp.Content) {
+        try { $errBody = $resp.Content | ConvertFrom-Json } catch { $errBody = $null }
+    }
+
+    # 9z-AB.2: error body carries scimType=noTarget so the UI can branch on it
+    Test-Result -Success ($null -ne $errBody -and $errBody.scimType -eq 'noTarget') -Message "9z-AB.2: error body scimType=noTarget (got '$($errBody.scimType)')"
+
+    # 9z-AB.3: error detail mentions OAuth so the UI hint copy is grounded in server text
+    $detail = if ($errBody) { $errBody.detail } else { '' }
+    Test-Result -Success ($detail -like '*OAuth*' -or $detail -like '*oauth*') -Message "9z-AB.3: error detail mentions OAuth"
+
+    # 9z-AB.4: response carries the SCIM Error schema URN (RFC 7644 S3.12 envelope shape)
+    $hasSchema = ($null -ne $errBody -and $errBody.schemas -contains 'urn:ietf:params:scim:api:messages:2.0:Error')
+    Test-Result -Success $hasSchema -Message "9z-AB.4: error envelope includes SCIM Error schema URN"
+
+    # 9z-AB.5: PATCH /Me with shared-secret bearer also returns 404 (same auth-model branch)
+    $patchBody = @{ schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp'); Operations = @(@{ op='replace'; path='displayName'; value='will-not-apply' }) } | ConvertTo-Json -Depth 6 -Compress
+    $patchCode = 0
+    try {
+        $patchResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method PATCH -Body $patchBody -ContentType "application/scim+json" -Headers $headers -SkipHttpErrorCheck
+        $patchCode = [int]$patchResp.StatusCode
+    } catch {
+        if ($_.Exception.Response) { $patchCode = [int]$_.Exception.Response.StatusCode }
+    }
+    Test-Result -Success ($patchCode -eq 404) -Message "9z-AB.5: PATCH /Me with shared-secret bearer returns 404 (got $patchCode)"
+
+    # 9z-AB.6: DELETE /Me with shared-secret bearer also returns 404 (same auth-model branch)
+    $delCode = 0
+    try {
+        $delResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method DELETE -Headers $headers -SkipHttpErrorCheck
+        $delCode = [int]$delResp.StatusCode
+    } catch {
+        if ($_.Exception.Response) { $delCode = [int]$_.Exception.Response.StatusCode }
+    }
+    Test-Result -Success ($delCode -eq 404) -Message "9z-AB.6: DELETE /Me with shared-secret bearer returns 404 (got $delCode)"
+
+    # Cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($abEp.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "9z-AB.cleanup: deleted endpoint $abName"
+} catch {
+    Test-Result -Success $false -Message "9z-AB.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AB: /Me Self-Service Contract (L2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -173,6 +173,13 @@ export const queryKeys = {
     all: ['presets'] as const,
     detail: (name: string) => ['presets', name] as const,
   },
+  /**
+   * Phase L2: per-endpoint /Me self-service alias (RFC 7644 S3.11).
+   * The /Me endpoint resolves the authenticated subject's User
+   * resource for the picked endpoint. Cached per endpointId so
+   * switching endpoints re-fetches without bleed.
+   */
+  me: (endpointId: string) => ['me', endpointId] as const,
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -269,6 +276,31 @@ export const presetDetailQueryOptions = (name: string) => ({
   queryFn: () =>
     fetchWithAuth<PresetDetailResponse>(`/scim/admin/endpoints/presets/${encodeURIComponent(name)}`),
   staleTime: 5 * 60_000,
+});
+
+/**
+ * Phase L2: /Me query options. GET /scim/endpoints/:id/Me returns
+ * the User resource for the authenticated subject (RFC 7644 S3.11).
+ * Server requires OAuth JWT auth with a `sub` claim matching a User's
+ * `userName`; with the K3 TokenGate's shared-secret bearer this
+ * always returns 404 noTarget. The MeProfilePage component renders
+ * a fallback in that case.
+ */
+export interface MeResource {
+  schemas: string[];
+  id: string;
+  userName: string;
+  displayName?: string;
+  active?: boolean;
+  meta?: { resourceType?: string; created?: string; lastModified?: string; version?: string };
+  [key: string]: unknown;
+}
+
+export const meQueryOptions = (endpointId: string) => ({
+  queryKey: queryKeys.me(endpointId),
+  queryFn: () =>
+    fetchWithAuth<MeResource>(`/scim/endpoints/${endpointId}/Me`),
+  staleTime: 30_000,
 });
 
 /**
@@ -681,6 +713,21 @@ export function usePresetDetail(name: string | undefined) {
   return useQuery<PresetDetailResponse>({
     ...presetDetailQueryOptions(name ?? ''),
     enabled: !!name,
+  });
+}
+
+/**
+ * Phase L2: thin useQuery wrapper for /Me on a picked endpoint.
+ * Disabled when endpointId is empty so the picker can mount before
+ * the operator chooses an endpoint (no eager fetch on N endpoints).
+ */
+export function useMe(endpointId: string) {
+  return useQuery<MeResource>({
+    ...meQueryOptions(endpointId),
+    enabled: !!endpointId,
+    // /Me failures are common (shared-secret tokens always 404). Don't
+    // hammer the server with retries - one shot, render the fallback.
+    retry: false,
   });
 }
 
@@ -1216,6 +1263,64 @@ export function useDeleteEndpoint() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.all });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+}
+
+// ─── Phase L2: /Me self-service mutations ────────────────────────────
+//
+// `/scim/endpoints/:id/Me` (RFC 7644 S3.11) is per-endpoint and
+// requires OAuth JWT auth with a `sub` claim matching a User's
+// `userName`. With the K3 TokenGate's shared-secret bearer the
+// queries always 404 (covered by the page's fallback UX). When a
+// real OAuth token is in use, these mutations let the operator
+// patch or delete their own SCIM record.
+
+/**
+ * PATCH /scim/endpoints/:id/Me with a SCIM PatchOp envelope.
+ * Returns the updated User. Invalidates the `me(endpointId)` cache
+ * on settle so the form re-seeds from the server's view of truth.
+ *
+ * No optimistic write: self-service is a low-rate path and consistency
+ * with the server's mutability/uniqueness/strict-schema rules matters
+ * more than felt latency for this surface.
+ */
+export function usePatchMe(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, Record<string, unknown>>({
+    mutationFn: (body) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Me`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.me(endpointId) });
+    },
+  });
+}
+
+/**
+ * DELETE /scim/endpoints/:id/Me. Returns 204. Removes the cached
+ * `me(endpointId)` entry on success and invalidates dashboard +
+ * endpoints.overview so user counts refresh.
+ *
+ * The MeProfilePage gates this behind a type-name-to-confirm modal
+ * (mirrors L1 DeleteEndpointDialog) because deleting your own /Me
+ * is the largest data-loss footgun on the page.
+ */
+export function useDeleteMe(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, void>({
+    mutationFn: () =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Me`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: queryKeys.me(endpointId) });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
   });
 }

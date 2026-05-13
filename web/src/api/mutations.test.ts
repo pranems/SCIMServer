@@ -878,3 +878,163 @@ describe('presets query options (Phase L1)', () => {
     expect(qk.presets.detail('entra-id')).toEqual(['presets', 'entra-id']);
   });
 });
+
+// ─── Phase L2: /Me self-service hooks ────────────────────────────────
+//
+// Backend `/scim/endpoints/:id/Me` shipped in v0.20.0 (RFC 7644 S3.11).
+// The redesigned UI never wired it. L2 adds:
+//   useMe(endpointId)       - GET /Me  (thin useQuery wrapper)
+//   usePatchMe(endpointId)  - PATCH /Me (returns updated User; invalidates queryKeys.me)
+//   useDeleteMe(endpointId) - DELETE /Me (204; removes from cache; invalidates dashboard + endpoint overview)
+
+describe('queryKeys.me (Phase L2)', () => {
+  it('queryKeys.me(id) is a stable per-endpoint key', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.me('ep-1')).toEqual(['me', 'ep-1']);
+  });
+});
+
+describe('useMe (Phase L2)', () => {
+  it('GETs /scim/endpoints/:id/Me and returns the User resource on 200', async () => {
+    const { useMe } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const meResource = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      id: 'me-user-123',
+      userName: 'admin@example.com',
+      active: true,
+      meta: { resourceType: 'User', version: 'W/"v3"' },
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(meResource),
+    });
+
+    const { result } = renderHook(() => useMe(EP_ID), { wrapper });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toBe(`/scim/endpoints/${EP_ID}/Me`);
+    expect(result.current.data).toEqual(meResource);
+  });
+
+  it('disabled when endpointId is empty so picker can mount before user picks', async () => {
+    const { useMe } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useMe(''), { wrapper });
+    // Disabled query never fires fetch.
+    await act(async () => { await Promise.resolve(); });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.current.data).toBeUndefined();
+  });
+
+  it('propagates ScimApiError(404, scimType=noTarget) when shared-secret token is used', async () => {
+    const { useMe } = await import('./queries');
+    const { ScimApiError } = await import('./scim-error');
+    const { wrapper } = createWrapper();
+
+    const errBody = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+      status: '404',
+      scimType: 'noTarget',
+      detail: 'The /Me endpoint requires OAuth authentication with a JWT token whose "sub" claim matches a SCIM User\'s userName.',
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/scim+json' : null) },
+      text: () => Promise.resolve(JSON.stringify(errBody)),
+    });
+
+    const { result } = renderHook(() => useMe(EP_ID), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(ScimApiError);
+    expect((result.current.error as InstanceType<typeof ScimApiError>).status).toBe(404);
+    expect((result.current.error as InstanceType<typeof ScimApiError>).scimType).toBe('noTarget');
+  });
+});
+
+describe('usePatchMe (Phase L2)', () => {
+  it('PATCHes /scim/endpoints/:id/Me with the SCIM PatchOp body and invalidates queryKeys.me', async () => {
+    const { usePatchMe, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: 'me-1', displayName: 'Updated' }),
+    });
+
+    const patchBody = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: 'displayName', value: 'Updated' }],
+    };
+
+    const { result } = renderHook(() => usePatchMe(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(patchBody);
+    });
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toBe(`/scim/endpoints/${EP_ID}/Me`);
+    const calledOpts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(calledOpts.method).toBe('PATCH');
+    expect(JSON.parse(calledOpts.body as string)).toEqual(patchBody);
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(qk.me(EP_ID)));
+    });
+  });
+});
+
+describe('useDeleteMe (Phase L2)', () => {
+  it('DELETEs /scim/endpoints/:id/Me and removes the cached entry', async () => {
+    const { useDeleteMe, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(qk.me(EP_ID), { id: 'me-1' });
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+    });
+
+    const { result } = renderHook(() => useDeleteMe(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toBe(`/scim/endpoints/${EP_ID}/Me`);
+    const calledOpts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(calledOpts.method).toBe('DELETE');
+
+    // Cache entry evicted on success.
+    expect(queryClient.getQueryData(qk.me(EP_ID))).toBeUndefined();
+  });
+
+  it('also invalidates the dashboard + endpoints.overview on settle so counts refresh', async () => {
+    const { useDeleteMe, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fetchSpy.mockResolvedValueOnce({ ok: true, status: 204, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useDeleteMe(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(qk.dashboard));
+      expect(keys).toContain(JSON.stringify(qk.endpoints.overview(EP_ID)));
+    });
+  });
+});

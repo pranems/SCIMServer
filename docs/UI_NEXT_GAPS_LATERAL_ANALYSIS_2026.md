@@ -275,6 +275,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.7 /Me Self-Service UI
 
+> **Status: CLOSED in v0.50.0-alpha.2 (Phase L2, 2026-05-13).** See [docs/PHASE_L2_ME_SELF_SERVICE.md](PHASE_L2_ME_SELF_SERVICE.md) for the shipped architecture, mutation lifecycle Mermaid, and the OAuth-required fallback design that handles the K3 TokenGate's shared-secret bearer case as first-class UX.
+
 **Why:** [scim-me.controller.ts](../api/src/modules/scim/controllers/scim-me.controller.ts) ships at v0.20.0. The token holder can never see "what does the server think I am."
 
 **Shape:**

@@ -60,6 +60,8 @@ const ROUTE_FILES: ReadonlyArray<RouteFile> = [
   // Phase L1
   { file: 'endpoints.new.tsx', pageComponents: ['CreateEndpointWizard'] },
   { file: 'endpoints.$endpointId.edit.tsx', pageComponents: ['EditEndpointPage'] },
+  // Phase L2
+  { file: 'me.tsx', pageComponents: ['MeProfilePage'] },
 ];
 
 function readRoute(file: string): string {
