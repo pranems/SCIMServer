@@ -9864,6 +9864,42 @@ try {
 Write-Host "`n--- 9z-AB: /Me Self-Service Contract (L2) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AC: ACTIVITY SUMMARY CONTRACT (Phase L3)
+# ============================================
+$script:currentSection = "9z-AC: Activity summary (L3)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AC: ACTIVITY SUMMARY CONTRACT (Phase L3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # 9z-AC.1: GET /admin/activity/summary returns the documented envelope
+    $sum = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity/summary" -Headers $headers
+    Test-Result -Success ($null -ne $sum.summary) -Message "9z-AC.1: response has 'summary' object"
+
+    # 9z-AC.2: response has the 4 documented fields the UI consumes
+    $hasFields = ($null -ne $sum.summary.last24Hours) -and ($null -ne $sum.summary.lastWeek) -and ($null -ne $sum.summary.operations)
+    Test-Result -Success $hasFields -Message "9z-AC.2: summary has last24Hours + lastWeek + operations"
+
+    # 9z-AC.3: operations carries users + groups counts (the ops-split bar inputs)
+    $hasOps = ($null -ne $sum.summary.operations.users) -and ($null -ne $sum.summary.operations.groups)
+    Test-Result -Success $hasOps -Message "9z-AC.3: operations has users (got '$($sum.summary.operations.users)') + groups (got '$($sum.summary.operations.groups)')"
+
+    # 9z-AC.4: top-level response key allowlist - the UI's response shape
+    # depends on a single `summary` key. A future leak (e.g. raw _internal
+    # fields, PII, or unknown keys) would silently break the type contract.
+    $allowed = @('summary')
+    $extras = @()
+    foreach ($key in $sum.PSObject.Properties.Name) {
+        if ($allowed -notcontains $key) { $extras += $key }
+    }
+    Test-Result -Success ($extras.Count -eq 0) -Message "9z-AC.4: top-level response keys match allowlist (extras: $($extras -join ','))"
+} catch {
+    Test-Result -Success $false -Message "9z-AC.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AC: Activity Summary Contract (L3) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

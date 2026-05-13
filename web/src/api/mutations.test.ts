@@ -1038,3 +1038,60 @@ describe('useDeleteMe (Phase L2)', () => {
     });
   });
 });
+
+// ─── Phase L3: useActivitySummary ────────────────────────────────────
+//
+// Backend `/scim/admin/activity/summary` ships aggregations:
+//   { summary: { last24Hours, lastWeek, operations: { users, groups } } }
+// L3 wires it into the redesigned UI via a thin useQuery wrapper feeding
+// the new ActivityAnalyticsSection on DashboardPage.
+
+describe('queryKeys.activitySummary (Phase L3)', () => {
+  it('queryKeys.activitySummary is a stable prefix', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.activitySummary).toEqual(['activity-summary']);
+  });
+});
+
+describe('useActivitySummary (Phase L3)', () => {
+  it('GETs /scim/admin/activity/summary and returns the summary payload', async () => {
+    const { useActivitySummary } = await import('./queries');
+    const { wrapper } = createWrapper();
+    const payload = {
+      summary: {
+        last24Hours: 42,
+        lastWeek: 318,
+        operations: { users: 142, groups: 18 },
+      },
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(payload),
+    });
+
+    const { result } = renderHook(() => useActivitySummary(), { wrapper });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    expect(fetchSpy.mock.calls[0][0]).toBe('/scim/admin/activity/summary');
+    expect(result.current.data).toEqual(payload);
+  });
+
+  it('propagates ScimApiError on 500', async () => {
+    const { useActivitySummary } = await import('./queries');
+    const { ScimApiError } = await import('./scim-error');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      headers: { get: () => null },
+      text: () => Promise.resolve('Internal Server Error'),
+    });
+
+    const { result } = renderHook(() => useActivitySummary(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(ScimApiError);
+    expect((result.current.error as InstanceType<typeof ScimApiError>).status).toBe(500);
+  });
+});

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0-alpha.3] - 2026-05-13 - Phase L3 - Activity Analytics Dashboard
+
+### Added
+- **Activity analytics section on DashboardPage** - new `<ActivityAnalyticsSection />` rendered between the existing 24h-sparkline card and the endpoints grid. 4 KPI tiles (Operations 24h / Operations 7d / User ops 30d / Group ops 30d) sourced from the already-shipped `GET /scim/admin/activity/summary` (v0.18.0+) plus a horizontal users-vs-groups operations split bar with proportional fills + accessible aria-label + numeric legend. Closes [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.6.
+- **`useActivitySummary` hook** + `ActivitySummaryResponse` type + `activitySummaryQueryOptions` + `queryKeys.activitySummary` factory entry in [web/src/api/queries.ts](web/src/api/queries.ts). Cached 60 seconds (the underlying SQL counts are bounded but still touch the RequestLog table; refetching on every focus would be wasteful).
+- **+7 web vitest tests** across 2 files: extended [mutations.test.ts](web/src/api/mutations.test.ts) +3 (queryKeys.activitySummary stable prefix + GET URL contract + 500 -> ScimApiError), extended [DashboardPage.test.tsx](web/src/pages/DashboardPage.test.tsx) +4 (analytics section renders + 4 KPI tile values + ops-split bar with users/groups labels + zeroed in-memory backend handled).
+- **+4 live SCIM** in new section [9z-AC in scripts/live-test.ps1](scripts/live-test.ps1) covering: GET /admin/activity/summary returns the documented envelope, summary has last24Hours + lastWeek + operations, operations has users + groups counts, top-level response key allowlist (only 'summary' allowed; future leaks like raw _internal fields would fail). Inserted before TEST SECTION 10 per live-test conventions.
+- New comprehensive feature doc [docs/PHASE_L3_ACTIVITY_ANALYTICS.md](docs/PHASE_L3_ACTIVITY_ANALYTICS.md).
+
+### Changed
+- Bundle: main entry 147.50 -> **147.48 KB gzipped** (-0.02 KB; vite chunking adjustment). Shared primitives 199.06 -> **199.09 KB gzipped** (+0.03 KB). DashboardPage chunk 2.06 -> **2.82 KB gzipped** (+0.76 for the new analytics section; still 97.4 % under the 110 KB ceiling). All **19 size-limit budgets pass** (unchanged from L2; no new per-route entry needed since DashboardPage already has its budget).
+
+### Test counts (net new)
+
+| Layer | Pre-L3 (v0.50.0-alpha.2) | Post-L3 (v0.50.0-alpha.3) | Delta |
+|-------|-------------------------:|--------------------------:|------:|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 637 | **644** | **+7** |
+| Live SCIM | 948 | **952** | **+4** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,505 | **6,516** | **+11** |
+
+### Notes
+- Backend `/admin/activity/summary` shipped in v0.18.0+; L3 is pure UI plumbing + the live-test contract section.
+- Aspirational pieces (p50/p95/p99 latency lines, drill-down navigation from chart slice to filtered LogsPage, time-range picker beyond the hardcoded 24h/7d/30d windows) are deferred to Phase N polish - they require a different aggregator strategy than the current bounded SQL counts.
+- In-memory backend returns a zeroed summary; the analytics section handles 0 ops gracefully (split bar shows 0%/0% but stays visible with explanatory caption).
+- Per-sub-phase quality gate next: deploy v0.50.0-alpha.3 to dev + 952+ live SCIM tests must all pass before Phase L4 starts (Log Config admin per analysis-doc S4.5).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.50.0-alpha.2] - 2026-05-13 - Phase L2 - /Me Self-Service UI
 
 ### Added

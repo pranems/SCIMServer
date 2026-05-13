@@ -1,7 +1,7 @@
 /**
  * DashboardPage tests.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
@@ -68,10 +68,14 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useDashboard: vi.fn(),
+    // Phase L3 - new analytics hook. Default mock returns no data so the
+    // pre-L3 tests below see an empty/loading analytics section without
+    // having to set the return value themselves.
+    useActivitySummary: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
   };
 });
 
-import { useDashboard } from '../api/queries';
+import { useDashboard, useActivitySummary } from '../api/queries';
 
 // Phase A2 note: DashboardPage's EndpointCard sub-component now calls
 // useNavigate() from TanStack Router. Without a RouterProvider in this
@@ -277,5 +281,85 @@ describe('DashboardPage', () => {
     // the legacy Spinner removal is verified by the absence of the
     // text "Loading dashboard..." (the Spinner's label).
     expect(screen.queryByText('Loading dashboard...')).not.toBeInTheDocument();
+  });
+});
+
+// ─── Phase L3: ActivityAnalyticsSection ──────────────────────────────
+
+describe('DashboardPage activity analytics (Phase L3)', () => {
+  const sampleSummary = {
+    summary: {
+      last24Hours: 42,
+      lastWeek: 318,
+      operations: { users: 142, groups: 18 },
+    },
+  };
+
+  beforeEach(() => {
+    (useDashboard as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockDashboardData,
+      isLoading: false,
+      error: null,
+    });
+  });
+
+  it('renders the analytics section when summary loads', () => {
+    (useActivitySummary as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: sampleSummary,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<DashboardPage />);
+    expect(screen.getByTestId('dashboard-analytics-section')).toBeInTheDocument();
+  });
+
+  it('renders 4 KPI tiles with the summary values', () => {
+    (useActivitySummary as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: sampleSummary,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<DashboardPage />);
+    const tile24h = screen.getByTestId('analytics-kpi-last24h');
+    const tile7d = screen.getByTestId('analytics-kpi-last7d');
+    const tileUsers = screen.getByTestId('analytics-kpi-users-30d');
+    const tileGroups = screen.getByTestId('analytics-kpi-groups-30d');
+    expect(tile24h.textContent).toContain('42');
+    expect(tile7d.textContent).toContain('318');
+    expect(tileUsers.textContent).toContain('142');
+    expect(tileGroups.textContent).toContain('18');
+  });
+
+  it('renders the users-vs-groups operations split bar', () => {
+    (useActivitySummary as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: sampleSummary,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<DashboardPage />);
+    const split = screen.getByTestId('analytics-ops-split');
+    expect(split).toBeInTheDocument();
+    // Caption mentions both surface names so the operator can read
+    // the bar without external context.
+    expect(split.textContent).toMatch(/users/i);
+    expect(split.textContent).toMatch(/groups/i);
+  });
+
+  it('handles a zeroed summary (in-memory backend) without crashing', () => {
+    (useActivitySummary as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { summary: { last24Hours: 0, lastWeek: 0, operations: { users: 0, groups: 0 } } },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<DashboardPage />);
+    const tile24h = screen.getByTestId('analytics-kpi-last24h');
+    expect(tile24h.textContent).toContain('0');
+    // Split bar still renders even when both ops counts are 0 (shows
+    // a neutral empty bar with the explanatory caption).
+    expect(screen.getByTestId('analytics-ops-split')).toBeInTheDocument();
   });
 });

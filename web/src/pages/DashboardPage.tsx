@@ -33,8 +33,9 @@ import {
   CheckmarkCircle24Regular,
   History24Regular,
   ChartMultiple24Regular,
+  DataPie24Regular,
 } from '@fluentui/react-icons';
-import { useDashboard } from '../api/queries';
+import { useDashboard, useActivitySummary } from '../api/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { DashboardResponse, DashboardEndpoint } from '@scim/types/dashboard.types';
 import { EmptyState, KpiChart, LoadingSkeleton } from '../components/primitives';
@@ -143,6 +144,42 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '8px',
   },
+  // Phase L3 - activity analytics section. Sits between the sparkline
+  // chart and the endpoint grid. The 4 KPI tiles reuse the kpiRow grid
+  // layout. The ops-split bar uses a flex pair of colored fills with
+  // proportional widths.
+  analyticsCard: {
+    padding: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  analyticsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  opsSplitBar: {
+    display: 'flex',
+    width: '100%',
+    height: '24px',
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  opsSplitUsers: {
+    backgroundColor: tokens.colorBrandBackground,
+    height: '100%',
+  },
+  opsSplitGroups: {
+    backgroundColor: tokens.colorPaletteGreenBackground2,
+    height: '100%',
+  },
+  opsSplitLegend: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    color: tokens.colorNeutralForeground3,
+  },
 });
 
 /** Returns color for HTTP method badge */
@@ -238,6 +275,9 @@ export const DashboardPage: React.FC = () => {
         </div>
       </Card>
 
+      {/* Phase L3 - Activity Analytics aggregations */}
+      <ActivityAnalyticsSection />
+
       {/* Endpoint Cards */}
       <div className={classes.section}>
         <Subtitle1>Endpoints</Subtitle1>
@@ -326,6 +366,106 @@ const KpiCard: React.FC<KpiCardProps> = ({ icon, label, value }) => {
 interface EndpointCardProps {
   endpoint: DashboardEndpoint;
 }
+
+// ─── Phase L3: ActivityAnalyticsSection ──────────────────────────
+//
+// Renders the rolled-up counts from `/scim/admin/activity/summary`:
+//   - 4 KPI tiles in the same kpiRow grid as the top of the page
+//     (last 24h, last 7d, user ops 30d, group ops 30d)
+//   - one ops-split horizontal bar showing users vs groups share
+//
+// In-memory backend returns a zeroed summary; section still renders
+// (caption text explains the empty state).
+
+const ActivityAnalyticsSection: React.FC = () => {
+  const classes = useStyles();
+  const { data, isLoading, isError } = useActivitySummary();
+
+  if (isLoading) {
+    return (
+      <Card className={classes.analyticsCard} data-testid="dashboard-analytics-section">
+        <LoadingSkeleton count={1} height="40px" />
+        <LoadingSkeleton count={1} height="24px" />
+      </Card>
+    );
+  }
+
+  // On error, render nothing extra - the rest of the dashboard already
+  // shows its own error block from useDashboard. Activity analytics is
+  // a soft addition; missing data should not break the page.
+  if (isError || !data) return null;
+
+  const s = data.summary;
+  const userOps = s.operations.users;
+  const groupOps = s.operations.groups;
+  const opsTotal = userOps + groupOps;
+  const usersPct = opsTotal > 0 ? Math.round((userOps / opsTotal) * 100) : 0;
+  const groupsPct = opsTotal > 0 ? 100 - usersPct : 0;
+
+  return (
+    <Card className={classes.analyticsCard} data-testid="dashboard-analytics-section">
+      <div className={classes.analyticsHeader}>
+        <DataPie24Regular />
+        <Subtitle1>Activity analytics</Subtitle1>
+      </div>
+
+      <div className={classes.kpiRow}>
+        <Card className={classes.kpiCard} data-testid="analytics-kpi-last24h">
+          <div className={classes.kpiIcon}><History24Regular /></div>
+          <div className={classes.kpiValues}>
+            <Text size={600} weight="semibold">{s.last24Hours}</Text>
+            <Caption1>Operations (24h)</Caption1>
+          </div>
+        </Card>
+        <Card className={classes.kpiCard} data-testid="analytics-kpi-last7d">
+          <div className={classes.kpiIcon}><History24Regular /></div>
+          <div className={classes.kpiValues}>
+            <Text size={600} weight="semibold">{s.lastWeek}</Text>
+            <Caption1>Operations (7d)</Caption1>
+          </div>
+        </Card>
+        <Card className={classes.kpiCard} data-testid="analytics-kpi-users-30d">
+          <div className={classes.kpiIcon}><People24Regular /></div>
+          <div className={classes.kpiValues}>
+            <Text size={600} weight="semibold">{userOps}</Text>
+            <Caption1>User ops (30d)</Caption1>
+          </div>
+        </Card>
+        <Card className={classes.kpiCard} data-testid="analytics-kpi-groups-30d">
+          <div className={classes.kpiIcon}><PeopleTeam24Regular /></div>
+          <div className={classes.kpiValues}>
+            <Text size={600} weight="semibold">{groupOps}</Text>
+            <Caption1>Group ops (30d)</Caption1>
+          </div>
+        </Card>
+      </div>
+
+      <div data-testid="analytics-ops-split">
+        <Caption1>Operations split (last 30 days)</Caption1>
+        <div
+          className={classes.opsSplitBar}
+          role="img"
+          aria-label={`Users ${usersPct}%, Groups ${groupsPct}%`}
+        >
+          <div
+            className={classes.opsSplitUsers}
+            style={{ width: `${usersPct}%` }}
+            data-testid="analytics-ops-split-users"
+          />
+          <div
+            className={classes.opsSplitGroups}
+            style={{ width: `${groupsPct}%` }}
+            data-testid="analytics-ops-split-groups"
+          />
+        </div>
+        <div className={classes.opsSplitLegend}>
+          <Caption1>Users {usersPct}% ({userOps})</Caption1>
+          <Caption1>Groups {groupsPct}% ({groupOps})</Caption1>
+        </div>
+      </div>
+    </Card>
+  );
+};
 
 const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
   const classes = useStyles();

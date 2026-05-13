@@ -180,6 +180,13 @@ export const queryKeys = {
    * switching endpoints re-fetches without bleed.
    */
   me: (endpointId: string) => ['me', endpointId] as const,
+  /**
+   * Phase L3: aggregated activity counts (24h / 7d / user-ops 30d /
+   * group-ops 30d) sourced from `GET /scim/admin/activity/summary`.
+   * Cached 60s - the underlying SQL counts are bounded but still
+   * touch the RequestLog table, so don't refetch on every focus.
+   */
+  activitySummary: ['activity-summary'] as const,
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -301,6 +308,31 @@ export const meQueryOptions = (endpointId: string) => ({
   queryFn: () =>
     fetchWithAuth<MeResource>(`/scim/endpoints/${endpointId}/Me`),
   staleTime: 30_000,
+});
+
+/**
+ * Phase L3: activity summary aggregations. Backend response shape
+ * (locked at live layer 9z-AC):
+ *   { summary: { last24Hours, lastWeek, operations: { users, groups } } }
+ * Both 24h/7d windows count non-admin + non-Entra-keepalive RequestLog
+ * rows; users/groups counts are bounded to 30 days. InMemory backend
+ * returns a zeroed summary - the UI handles 0 gracefully.
+ */
+export interface ActivitySummaryResponse {
+  summary: {
+    last24Hours: number;
+    lastWeek: number;
+    operations: {
+      users: number;
+      groups: number;
+    };
+  };
+}
+
+export const activitySummaryQueryOptions = () => ({
+  queryKey: queryKeys.activitySummary,
+  queryFn: () => fetchWithAuth<ActivitySummaryResponse>('/scim/admin/activity/summary'),
+  staleTime: 60_000,
 });
 
 /**
@@ -728,6 +760,16 @@ export function useMe(endpointId: string) {
     // /Me failures are common (shared-secret tokens always 404). Don't
     // hammer the server with retries - one shot, render the fallback.
     retry: false,
+  });
+}
+
+/**
+ * Phase L3: thin useQuery wrapper for /admin/activity/summary.
+ * Drives the new ActivityAnalyticsSection on DashboardPage.
+ */
+export function useActivitySummary() {
+  return useQuery<ActivitySummaryResponse>({
+    ...activitySummaryQueryOptions(),
   });
 }
 

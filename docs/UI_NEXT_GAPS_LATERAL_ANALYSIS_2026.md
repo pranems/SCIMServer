@@ -256,7 +256,7 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 **Effort:** 4 days. **Test counts:** +6 mutation hooks, +18 web vitest, +1 Playwright (SSE drawer).
 
 ### 4.6 Activity Summary / Analytics Dashboard
-
+> **Status: CLOSED in v0.50.0-alpha.3 (Phase L3, 2026-05-13).** See [docs/PHASE_L3_ACTIVITY_ANALYTICS.md](PHASE_L3_ACTIVITY_ANALYTICS.md) for the shipped architecture. New `<ActivityAnalyticsSection />` on DashboardPage with 4 KPI tiles (24h/7d/users-30d/groups-30d) + horizontal users-vs-groups ops split bar. p50/p95/p99 latency lines, drill-down, and flexible time-range picker are explicitly deferred to Phase N polish (require a different aggregator than the current bounded SQL counts).
 **Why:** [activity.controller.ts:175](../api/src/modules/activity-parser/activity.controller.ts) ships `GET /admin/activity/summary` with aggregations (operation counts, error rates, top endpoints by volume, top users by activity). DashboardPage shows raw activity rows but never the aggregations.
 
 **Shape:**
