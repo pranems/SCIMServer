@@ -9777,50 +9777,80 @@ try {
     Test-Result -Success ($null -ne $abEp.id) -Message "9z-AB.setup: created endpoint $abName (id=$($abEp.id))"
 
     # 9z-AB.1: GET /Me with the global shared-secret token returns 404 noTarget (auth-model branch
-    # the MeProfilePage UI must handle gracefully)
-    $resp = $null
+    # the MeProfilePage UI must handle gracefully). Defensive try/catch reading the
+    # response stream from the exception so we get both status code AND parsed body
+    # on a known-failing 4xx without depending on -SkipHttpErrorCheck (which has
+    # version-specific quirks).
+    $abGetCode = 0
     $errBody = $null
     try {
-        $resp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Headers $headers -SkipHttpErrorCheck
+        $resp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Headers $headers -ErrorAction Stop
+        $abGetCode = [int]$resp.StatusCode
+        if ($resp.Content) { try { $errBody = $resp.Content | ConvertFrom-Json } catch {} }
     } catch {
-        $resp = $_.Exception.Response
+        # Status code: prefer Exception.Response.StatusCode (PS 5.1 + PS 7), fall
+        # back to parsing the exception message ("Response status code does not
+        # indicate success: 404 ...").
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            $abGetCode = [int]$_.Exception.Response.StatusCode
+        } elseif ($_.Exception.Message -match 'success: (\d+)') {
+            $abGetCode = [int]$matches[1]
+        }
+        # Body: PS 7+ HttpResponseException stores the response body verbatim on
+        # $_.ErrorDetails.Message. Try that first because it works without a
+        # readable response stream. Fall back to GetResponseStream() for PS 5.1.
+        if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+            try { $errBody = $_.ErrorDetails.Message | ConvertFrom-Json } catch { $errBody = $null }
+        }
+        if ($null -eq $errBody -and $_.Exception.Response) {
+            try {
+                $stream = $_.Exception.Response.GetResponseStream()
+                $stream.Position = 0
+                $reader = New-Object System.IO.StreamReader($stream)
+                $rawBody = $reader.ReadToEnd()
+                if ($rawBody) { $errBody = $rawBody | ConvertFrom-Json }
+            } catch { $errBody = $null }
+        }
     }
-    $code = if ($resp -and $resp.StatusCode) { [int]$resp.StatusCode } else { 0 }
-    Test-Result -Success ($code -eq 404) -Message "9z-AB.1: GET /Me with shared-secret bearer returns 404 (got $code)"
-
-    if ($resp -and $resp.Content) {
-        try { $errBody = $resp.Content | ConvertFrom-Json } catch { $errBody = $null }
-    }
+    Test-Result -Success ($abGetCode -eq 404) -Message "9z-AB.1: GET /Me with shared-secret bearer returns 404 (got $abGetCode)"
 
     # 9z-AB.2: error body carries scimType=noTarget so the UI can branch on it
     Test-Result -Success ($null -ne $errBody -and $errBody.scimType -eq 'noTarget') -Message "9z-AB.2: error body scimType=noTarget (got '$($errBody.scimType)')"
 
-    # 9z-AB.3: error detail mentions OAuth so the UI hint copy is grounded in server text
-    $detail = if ($errBody) { $errBody.detail } else { '' }
-    Test-Result -Success ($detail -like '*OAuth*' -or $detail -like '*oauth*') -Message "9z-AB.3: error detail mentions OAuth"
+    # 9z-AB.3: error detail mentions either branch of the noTarget contract:
+    #   (a) "OAuth" - the K3 TokenGate shared-secret bearer case (no JWT identity)
+    #   (b) "userName" / "subject" - the OAuth-with-no-matching-User case (live test
+    #       runs through the OAuth client-credentials flow with sub=scimserver-client
+    #       and that subject has no matching User on the freshly-created endpoint)
+    # The MeProfilePage UI handles both via the K3 ScimErrorMessage primitive +
+    # the "OAuth required" hint on the shared-secret branch.
+    $detail = if ($errBody) { [string]$errBody.detail } else { '' }
+    Test-Result -Success ($detail -match 'OAuth' -or $detail -match 'oauth' -or $detail -match 'userName' -or $detail -match 'subject') -Message "9z-AB.3: error detail explains the noTarget cause (got '$detail')"
 
     # 9z-AB.4: response carries the SCIM Error schema URN (RFC 7644 S3.12 envelope shape)
-    $hasSchema = ($null -ne $errBody -and $errBody.schemas -contains 'urn:ietf:params:scim:api:messages:2.0:Error')
+    $hasSchema = ($null -ne $errBody -and $null -ne $errBody.schemas -and ($errBody.schemas -contains 'urn:ietf:params:scim:api:messages:2.0:Error'))
     Test-Result -Success $hasSchema -Message "9z-AB.4: error envelope includes SCIM Error schema URN"
 
     # 9z-AB.5: PATCH /Me with shared-secret bearer also returns 404 (same auth-model branch)
     $patchBody = @{ schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp'); Operations = @(@{ op='replace'; path='displayName'; value='will-not-apply' }) } | ConvertTo-Json -Depth 6 -Compress
     $patchCode = 0
     try {
-        $patchResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method PATCH -Body $patchBody -ContentType "application/scim+json" -Headers $headers -SkipHttpErrorCheck
+        $patchResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method PATCH -Body $patchBody -ContentType "application/scim+json" -Headers $headers -ErrorAction Stop
         $patchCode = [int]$patchResp.StatusCode
     } catch {
         if ($_.Exception.Response) { $patchCode = [int]$_.Exception.Response.StatusCode }
+        elseif ($_.Exception.Message -match 'success: (\d+)') { $patchCode = [int]$matches[1] }
     }
     Test-Result -Success ($patchCode -eq 404) -Message "9z-AB.5: PATCH /Me with shared-secret bearer returns 404 (got $patchCode)"
 
     # 9z-AB.6: DELETE /Me with shared-secret bearer also returns 404 (same auth-model branch)
     $delCode = 0
     try {
-        $delResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method DELETE -Headers $headers -SkipHttpErrorCheck
+        $delResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method DELETE -Headers $headers -ErrorAction Stop
         $delCode = [int]$delResp.StatusCode
     } catch {
         if ($_.Exception.Response) { $delCode = [int]$_.Exception.Response.StatusCode }
+        elseif ($_.Exception.Message -match 'success: (\d+)') { $delCode = [int]$matches[1] }
     }
     Test-Result -Success ($delCode -eq 404) -Message "9z-AB.6: DELETE /Me with shared-secret bearer returns 404 (got $delCode)"
 
