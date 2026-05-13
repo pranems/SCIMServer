@@ -6,7 +6,7 @@
  * (3 card-shaped tiles mirroring the final grid of Server Info /
  * Health / Storage cards).
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   makeStyles,
   tokens,
@@ -15,9 +15,17 @@ import {
   Subtitle1,
   Subtitle2,
   Caption1,
+  Dropdown,
+  Option,
+  Switch,
+  Input,
+  Field,
+  Divider,
 } from '@fluentui/react-components';
-import { useVersion, useHealth } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
+import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton } from '../components/primitives';
+import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px' },
@@ -25,6 +33,27 @@ const useStyles = makeStyles({
   card: { padding: '20px' },
   row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   center: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' },
+  // Phase L4 - log config section
+  logConfigCard: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' },
+  logConfigHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' },
+  logConfigGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
+  },
+  categoryGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: '8px',
+  },
+  categoryRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '6px 8px',
+    borderRadius: tokens.borderRadiusSmall,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
 });
 
 export const SettingsPage: React.FC = () => {
@@ -107,6 +136,190 @@ export const SettingsPage: React.FC = () => {
           </Card>
         )}
       </div>
+
+      {/* Phase L4 - log config admin */}
+      <LogConfigSection />
     </div>
+  );
+};
+
+// ─── Phase L4: LogConfigSection ─────────────────────────────────
+//
+// Wires GET + PUT /admin/log-config into SettingsPage. Optimistic
+// merge via useUpdateLogConfig (rollback on error). Closed-set
+// pickers seeded from response.availableLevels + availableCategories.
+
+const LogConfigSection: React.FC = () => {
+  const classes = useStyles();
+  const { data, isLoading, isError, error } = useLogConfig();
+  const update = useUpdateLogConfig();
+  const [submitError, setSubmitError] = useState<unknown>(null);
+
+  const apply = async (body: Parameters<typeof update.mutateAsync>[0]): Promise<void> => {
+    setSubmitError(null);
+    try {
+      await update.mutateAsync(body);
+    } catch (err) {
+      setSubmitError(err);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className={classes.logConfigCard} data-testid="log-config-section">
+        <LoadingSkeleton count={1} height="40px" />
+        <LoadingSkeleton count={3} height="32px" />
+      </Card>
+    );
+  }
+  if (isError || !data) {
+    return (
+      <Card className={classes.logConfigCard} data-testid="log-config-section">
+        <Subtitle2>Log configuration</Subtitle2>
+        <ScimErrorMessage error={error ?? new Error('Failed to load log config')} />
+      </Card>
+    );
+  }
+
+  const cfg: LogConfigResponse = data;
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="log-config-section">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>Log configuration</Subtitle1>
+        <Caption1>
+          Audit trail for changes flows into <code>/scim/admin/logs</code> and the LogStreamDrawer (Pulse icon in the header).
+        </Caption1>
+      </div>
+
+      <div className={classes.logConfigGrid}>
+        <Field label="Global level">
+          <Dropdown
+            value={cfg.globalLevel}
+            selectedOptions={[cfg.globalLevel]}
+            onOptionSelect={(_, d) => {
+              const v = d.optionValue ?? '';
+              if (v && v !== cfg.globalLevel) void apply({ globalLevel: v });
+            }}
+            disabled={update.isPending}
+            data-testid="log-config-global-level"
+          >
+            {cfg.availableLevels.map((lvl) => (
+              <Option key={lvl} value={lvl}>{lvl}</Option>
+            ))}
+          </Dropdown>
+        </Field>
+
+        <Field label="Format">
+          <Dropdown
+            value={cfg.format}
+            selectedOptions={[cfg.format]}
+            onOptionSelect={(_, d) => {
+              const v = d.optionValue;
+              if ((v === 'pretty' || v === 'json') && v !== cfg.format) {
+                void apply({ format: v });
+              }
+            }}
+            disabled={update.isPending}
+            data-testid="log-config-format"
+          >
+            <Option value="pretty">pretty</Option>
+            <Option value="json">json</Option>
+          </Dropdown>
+        </Field>
+
+        <Field label="Include payloads">
+          <Switch
+            checked={cfg.includePayloads}
+            onChange={(_, d) => void apply({ includePayloads: d.checked })}
+            disabled={update.isPending}
+            data-testid="log-config-include-payloads"
+          />
+        </Field>
+
+        <Field label="Include stack traces">
+          <Switch
+            checked={cfg.includeStackTraces}
+            onChange={(_, d) => void apply({ includeStackTraces: d.checked })}
+            disabled={update.isPending}
+            data-testid="log-config-include-stacks"
+          />
+        </Field>
+      </div>
+
+      <Divider />
+
+      <div>
+        <Subtitle2>Per-category levels ({cfg.availableCategories.length})</Subtitle2>
+        <Caption1>
+          Empty cells inherit the global level. Pick a per-category override to scope verbosity.
+        </Caption1>
+        <div className={classes.categoryGrid} style={{ marginTop: '8px' }}>
+          {cfg.availableCategories.map((cat) => {
+            const current = cfg.categoryLevels[cat] ?? cfg.globalLevel;
+            return (
+              <div
+                key={cat}
+                className={classes.categoryRow}
+                data-testid={`log-config-category-${cat}`}
+              >
+                <Text style={{ fontFamily: tokens.fontFamilyMonospace }}>{cat}</Text>
+                <Dropdown
+                  value={current}
+                  selectedOptions={[current]}
+                  onOptionSelect={(_, d) => {
+                    const v = d.optionValue ?? '';
+                    if (v && v !== current) void apply({ categoryLevels: { [cat]: v } });
+                  }}
+                  disabled={update.isPending}
+                  data-testid={`log-config-category-${cat}-dropdown`}
+                  style={{ minWidth: '110px' }}
+                >
+                  {cfg.availableLevels.map((lvl) => (
+                    <Option key={lvl} value={lvl}>{lvl}</Option>
+                  ))}
+                </Dropdown>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <Divider />
+
+      <div className={classes.logConfigGrid}>
+        <Field label="Max payload size (bytes)">
+          <Input
+            type="number"
+            value={String(cfg.maxPayloadSizeBytes)}
+            onChange={(_e, d) => {
+              const n = Number(d.value);
+              if (Number.isFinite(n) && n >= 0 && n !== cfg.maxPayloadSizeBytes) {
+                void apply({ maxPayloadSizeBytes: n });
+              }
+            }}
+            disabled={update.isPending}
+            data-testid="log-config-max-payload"
+          />
+        </Field>
+
+        <Field label="Slow request threshold (ms)">
+          <Input
+            type="number"
+            value={String(cfg.slowRequestThresholdMs ?? 1000)}
+            onChange={(_e, d) => {
+              const n = Number(d.value);
+              if (Number.isFinite(n) && n > 0 && n !== cfg.slowRequestThresholdMs) {
+                void apply({ slowRequestThresholdMs: n });
+              }
+            }}
+            disabled={update.isPending}
+            data-testid="log-config-slow-threshold"
+          />
+        </Field>
+      </div>
+
+      <ScimErrorMessage error={submitError} />
+    </Card>
   );
 };

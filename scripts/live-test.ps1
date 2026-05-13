@@ -9900,6 +9900,39 @@ try {
 Write-Host "`n--- 9z-AC: Activity Summary Contract (L3) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AD: LOG CONFIG UI-SHAPE CONTRACT (Phase L4)
+# ============================================
+$script:currentSection = "9z-AD: Log config UI shape (L4)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AD: LOG CONFIG UI-SHAPE CONTRACT (Phase L4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend behavior is exhaustively locked at section 9j (~80 assertions).
+    # 9z-AD adds the small UI-consumed shape contract: confirm the closed-set
+    # picker arrays (availableLevels + availableCategories) AND the scalar
+    # fields the SettingsPage LogConfigSection binds to are all present.
+
+    $cfg = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Headers $headers
+
+    # 9z-AD.1: availableLevels is a non-empty array (Combobox would render empty without it)
+    Test-Result -Success ($null -ne $cfg.availableLevels -and $cfg.availableLevels.Count -ge 5) -Message "9z-AD.1: availableLevels has >=5 entries (got $($cfg.availableLevels.Count))"
+
+    # 9z-AD.2: availableCategories is a non-empty array (per-category grid sourced from this)
+    Test-Result -Success ($null -ne $cfg.availableCategories -and $cfg.availableCategories.Count -ge 5) -Message "9z-AD.2: availableCategories has >=5 entries (got $($cfg.availableCategories.Count))"
+
+    # 9z-AD.3: all UI-bound scalar fields present (4 toggles + 2 numeric inputs + 2 dropdowns)
+    $hasAll = ($null -ne $cfg.globalLevel) -and ($null -ne $cfg.format) -and `
+              ($null -ne $cfg.includePayloads) -and ($null -ne $cfg.includeStackTraces) -and `
+              ($null -ne $cfg.maxPayloadSizeBytes) -and ($null -ne $cfg.categoryLevels)
+    Test-Result -Success $hasAll -Message "9z-AD.3: globalLevel + format + includePayloads + includeStackTraces + maxPayloadSizeBytes + categoryLevels all present"
+} catch {
+    Test-Result -Success $false -Message "9z-AD.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AD: Log Config UI-Shape Contract (L4) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -1095,3 +1095,154 @@ describe('useActivitySummary (Phase L3)', () => {
     expect((result.current.error as InstanceType<typeof ScimApiError>).status).toBe(500);
   });
 });
+
+// ─── Phase L4: useLogConfig + useUpdateLogConfig ─────────────────────
+//
+// Backend `/scim/admin/log-config` ships a complete admin surface
+// (locked at live layer 9j with ~80 assertions). L4 wires the GET +
+// PUT pair into a real settings page via:
+//   useLogConfig()              - thin useQuery wrapper
+//   useUpdateLogConfig()        - optimistic merge + rollback (mirrors L1
+//                                 useUpdateEndpointConfig pattern)
+
+const sampleLogConfig = {
+  globalLevel: 'DEBUG',
+  categoryLevels: { auth: 'WARN', 'scim.patch': 'TRACE' },
+  endpointLevels: {},
+  includePayloads: true,
+  includeStackTraces: true,
+  maxPayloadSizeBytes: 65536,
+  slowRequestThresholdMs: 1000,
+  format: 'pretty',
+  availableLevels: ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'OFF'],
+  availableCategories: ['http', 'scim', 'scim.bulk', 'auth', 'config'],
+};
+
+describe('queryKeys.logConfig (Phase L4)', () => {
+  it('queryKeys.logConfig is a stable prefix', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.logConfig).toEqual(['log-config']);
+  });
+});
+
+describe('useLogConfig (Phase L4)', () => {
+  it('GETs /scim/admin/log-config and returns the config payload', async () => {
+    const { useLogConfig } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(sampleLogConfig),
+    });
+
+    const { result } = renderHook(() => useLogConfig(), { wrapper });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    expect(fetchSpy.mock.calls[0][0]).toBe('/scim/admin/log-config');
+    expect(result.current.data).toEqual(sampleLogConfig);
+  });
+});
+
+describe('useUpdateLogConfig (Phase L4)', () => {
+  it('PUTs /scim/admin/log-config with the partial body and invalidates queryKeys.logConfig', async () => {
+    const { useUpdateLogConfig, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ message: 'ok', config: sampleLogConfig }),
+    });
+
+    const { result } = renderHook(() => useUpdateLogConfig(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ globalLevel: 'WARN' });
+    });
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toBe('/scim/admin/log-config');
+    const opts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(opts.method).toBe('PUT');
+    expect(JSON.parse(opts.body as string)).toEqual({ globalLevel: 'WARN' });
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(qk.logConfig));
+    });
+  });
+
+  it('optimistic: deep-merges the partial body into the cached config', async () => {
+    const { useUpdateLogConfig, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(qk.logConfig, sampleLogConfig);
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ message: 'ok', config: sampleLogConfig }),
+    });
+
+    const { result } = renderHook(() => useUpdateLogConfig(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ globalLevel: 'WARN', categoryLevels: { http: 'TRACE' } });
+    });
+
+    // Optimistic merge: existing scim.patch:TRACE preserved, http:TRACE added,
+    // globalLevel flipped to WARN.
+    const cached = queryClient.getQueryData(qk.logConfig) as typeof sampleLogConfig;
+    expect(cached.globalLevel).toBe('WARN');
+    expect(cached.categoryLevels['scim.patch']).toBe('TRACE');
+    expect(cached.categoryLevels.http).toBe('TRACE');
+    // Sibling fields untouched.
+    expect(cached.includePayloads).toBe(true);
+    expect(cached.format).toBe('pretty');
+  });
+
+  it('rollback: restores the previous cached config on server error', async () => {
+    const { useUpdateLogConfig, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(qk.logConfig, sampleLogConfig);
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      headers: { get: () => null },
+      text: () => Promise.resolve('Bad Request'),
+    });
+
+    const { result } = renderHook(() => useUpdateLogConfig(), { wrapper });
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({ globalLevel: 'WARN' });
+      });
+    } catch { /* expected */ }
+
+    // Rollback restores the original.
+    const cached = queryClient.getQueryData(qk.logConfig) as typeof sampleLogConfig;
+    expect(cached.globalLevel).toBe('DEBUG');
+  });
+
+  it('cold cache: PUT still fires + invalidates without an optimistic snapshot', async () => {
+    const { useUpdateLogConfig, queryKeys: qk } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ message: 'ok', config: sampleLogConfig }),
+    });
+
+    const { result } = renderHook(() => useUpdateLogConfig(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ format: 'json' });
+    });
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(qk.logConfig));
+    });
+  });
+});

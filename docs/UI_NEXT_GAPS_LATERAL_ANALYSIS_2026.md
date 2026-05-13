@@ -238,6 +238,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.5 Log Config Admin UI
 
+> **Status: CLOSED in v0.50.0-alpha.4 (Phase L4, 2026-05-13).** See [docs/PHASE_L4_LOG_CONFIG_ADMIN.md](PHASE_L4_LOG_CONFIG_ADMIN.md). New `<LogConfigSection />` on SettingsPage with global level + format + payload toggles + per-category grid sourced from server's `availableLevels` / `availableCategories`. Optimistic deep-merge mutation + rollback. Per-endpoint level grid + audit trail panel + stream viewer + download button explicitly out of scope (already covered by other surfaces).
+
 **Why:** [log-config.controller.ts](../api/src/modules/logging/log-config.controller.ts) ships GET/PUT for global level, per-category level (`auth`, `scim`, `database`, etc.), per-endpoint level, audit trail, download, stream, prune. None of it is exposed.
 
 **Shape:**

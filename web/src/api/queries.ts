@@ -187,6 +187,13 @@ export const queryKeys = {
    * touch the RequestLog table, so don't refetch on every focus.
    */
   activitySummary: ['activity-summary'] as const,
+  /**
+   * Phase L4: runtime log configuration sourced from `GET /scim/admin/log-config`.
+   * Single global resource (no per-id parameter); SettingsPage's
+   * LogConfigSection consumes it. Mutations via `useUpdateLogConfig`
+   * deep-merge into this cache optimistically and roll back on error.
+   */
+  logConfig: ['log-config'] as const,
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -332,6 +339,31 @@ export interface ActivitySummaryResponse {
 export const activitySummaryQueryOptions = () => ({
   queryKey: queryKeys.activitySummary,
   queryFn: () => fetchWithAuth<ActivitySummaryResponse>('/scim/admin/activity/summary'),
+  staleTime: 60_000,
+});
+
+/**
+ * Phase L4: runtime log configuration shape returned by
+ * `GET /scim/admin/log-config`. The UI's LogConfigSection consumes
+ * `availableLevels` + `availableCategories` to build closed-set
+ * pickers; PUT bodies use the same level strings.
+ */
+export interface LogConfigResponse {
+  globalLevel: string;
+  categoryLevels: Record<string, string>;
+  endpointLevels: Record<string, string>;
+  includePayloads: boolean;
+  includeStackTraces: boolean;
+  maxPayloadSizeBytes: number;
+  slowRequestThresholdMs?: number;
+  format: 'pretty' | 'json';
+  availableLevels: string[];
+  availableCategories: string[];
+}
+
+export const logConfigQueryOptions = () => ({
+  queryKey: queryKeys.logConfig,
+  queryFn: () => fetchWithAuth<LogConfigResponse>('/scim/admin/log-config'),
   staleTime: 60_000,
 });
 
@@ -770,6 +802,16 @@ export function useMe(endpointId: string) {
 export function useActivitySummary() {
   return useQuery<ActivitySummaryResponse>({
     ...activitySummaryQueryOptions(),
+  });
+}
+
+/**
+ * Phase L4: thin useQuery wrapper for /admin/log-config.
+ * Drives the new LogConfigSection on SettingsPage.
+ */
+export function useLogConfig() {
+  return useQuery<LogConfigResponse>({
+    ...logConfigQueryOptions(),
   });
 }
 
@@ -1363,6 +1405,66 @@ export function useDeleteMe(endpointId: string) {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+// ─── Phase L4: useUpdateLogConfig ────────────────────────────────────
+//
+// Wires `PUT /admin/log-config` into the redesigned UI. Optimistic
+// merge: the SettingsPage's LogConfigSection flips the toggle/select
+// immediately; on server error the cache rolls back and the K3
+// ScimErrorMessage primitive renders the structured failure.
+//
+// Body shape mirrors the controller's accepted partial: any subset of
+// { globalLevel, includePayloads, includeStackTraces, maxPayloadSizeBytes,
+//   slowRequestThresholdMs, format, categoryLevels: { <cat>: <level> } }.
+
+export interface LogConfigUpdateBody {
+  globalLevel?: string;
+  includePayloads?: boolean;
+  includeStackTraces?: boolean;
+  maxPayloadSizeBytes?: number;
+  slowRequestThresholdMs?: number;
+  format?: 'pretty' | 'json';
+  categoryLevels?: Record<string, string>;
+}
+
+export function useUpdateLogConfig() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, LogConfigUpdateBody, { prev?: LogConfigResponse }>({
+    mutationFn: (body) =>
+      fetchWithAuth('/scim/admin/log-config', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onMutate: async (body) => {
+      await qc.cancelQueries({ queryKey: queryKeys.logConfig });
+      const prev = qc.getQueryData<LogConfigResponse>(queryKeys.logConfig);
+
+      // Optimistic deep-merge: scalars overwrite, categoryLevels merges
+      // (so flipping `http` to TRACE preserves any existing
+      // `scim.patch` override).
+      if (prev) {
+        const merged: LogConfigResponse = {
+          ...prev,
+          ...(body as Partial<LogConfigResponse>),
+          categoryLevels: body.categoryLevels
+            ? { ...prev.categoryLevels, ...body.categoryLevels }
+            : prev.categoryLevels,
+        };
+        qc.setQueryData<LogConfigResponse>(queryKeys.logConfig, merged);
+      }
+
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        qc.setQueryData(queryKeys.logConfig, context.prev);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.logConfig });
     },
   });
 }

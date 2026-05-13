@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0-alpha.4] - 2026-05-13 - Phase L4 - Log Config Admin UI
+
+### Added
+- **Log Config admin section on SettingsPage** - new `<LogConfigSection />` rendered after the existing version/health/storage cards. Wires `GET / PUT /scim/admin/log-config` (backend exhaustively locked at live layer 9j with ~80 assertions). Surfaces: global level Dropdown, format Dropdown (pretty/json), includePayloads Switch, includeStackTraces Switch, max payload size + slow request threshold numeric Inputs, per-category level grid (one row per `availableCategories` entry x closed-set Dropdown of `availableLevels`). Empty per-category cells inherit the global level (caption explains). Closes [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.5.
+- **`useLogConfig` + `useUpdateLogConfig` hooks** in [web/src/api/queries.ts](web/src/api/queries.ts) plus `LogConfigResponse` + `LogConfigUpdateBody` types, `logConfigQueryOptions` helper, and `queryKeys.logConfig` factory entry. `useUpdateLogConfig` is optimistic (mirrors L1 `useUpdateEndpointConfig` pattern): onMutate snapshots + deep-merges the partial body into the cache (scalars overwrite, categoryLevels merges so flipping http preserves any existing scim.patch override), onError rolls back, onSettled invalidates.
+- **+11 web vitest tests** across 2 files: extended [mutations.test.ts](web/src/api/mutations.test.ts) +6 (queryKeys.logConfig stable prefix + GET URL contract + PUT body + invalidation + optimistic deep-merge + rollback on error + cold-cache PUT), extended [SettingsPage.test.tsx](web/src/pages/SettingsPage.test.tsx) +5 (section renders + global level Dropdown seeded from availableLevels + format Dropdown + includePayloads Switch + per-category grid with override values).
+- **+3 live SCIM** in new section [9z-AD in scripts/live-test.ps1](scripts/live-test.ps1) covering UI-consumed shape contract (availableLevels >= 5 entries, availableCategories >= 5 entries, all 6 UI-bound scalar fields present). Backend behavior unchanged - 9j retains the full ~80-assertion suite.
+- New comprehensive feature doc [docs/PHASE_L4_LOG_CONFIG_ADMIN.md](docs/PHASE_L4_LOG_CONFIG_ADMIN.md).
+
+### Changed
+- Bundle: main entry 147.48 -> **147.50 KB gzipped** (+0.02 KB). Shared primitives 199.09 -> **199.25 KB gzipped** (+0.16 KB; Dropdown + Option + Divider + Field hoisted from shared chunk). SettingsPage chunk 0.95 -> **2.22 KB gzipped** (+1.27 KB for log config admin section; still 98 % under the 110 KB ceiling). All **19 size-limit budgets pass**.
+
+### Test counts (net new)
+
+| Layer | Pre-L4 (v0.50.0-alpha.3) | Post-L4 (v0.50.0-alpha.4) | Delta |
+|-------|-------------------------:|--------------------------:|------:|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 644 | **655** | **+11** |
+| Live SCIM | 952 | **955** | **+3** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,516 | **6,530** | **+14** |
+
+### Notes
+- Backend `/admin/log-config` shipped pre-v0.20.0; L4 is pure UI plumbing + the small UI-shape contract section.
+- Pragmatic scope cut per the doc: in-scope = global config knobs the operator changes daily (level / format / includePayloads / includeStackTraces / payload size / slow threshold / per-category levels). Out of scope = per-endpoint level grid (already lives in each endpoint's SettingsTab via profile.settings.logLevel - duplicating it cross-endpoint adds clutter without value), audit trail panel (audit rows already flow into /admin/logs and operators filter there), stream viewer (Phase K4 LogStreamDrawer already ships this), download button (deferred to Phase N export).
+- Per-sub-phase quality gate next: deploy v0.50.0-alpha.4 to dev + 955+ live SCIM tests must all pass before Phase L5 starts (Discovery Explorer per analysis-doc S4.8).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.50.0-alpha.3] - 2026-05-13 - Phase L3 - Activity Analytics Dashboard
 
 ### Added
