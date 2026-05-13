@@ -536,6 +536,8 @@ Drag attributes; UI shows in real time which characteristics tighten (red), rela
 
 ### 6.6 Live SSE Log Stream (the operator's dream)
 
+> ✅ **CLOSED in v0.49.0-alpha.4 as Phase K4.** See [docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md](PHASE_K4_LIVE_LOG_STREAM_VIEWER.md). Floating right-side OverlayDrawer with independent EventSource (DEBUG-level), 5,000-entry ring buffer, level + search filter, pause/resume/clear, auto-scroll-to-bottom. +37 web vitest tests.
+
 Floating right-side panel that tails [/admin/log-config/stream](../api/src/modules/logging/log-config.controller.ts#L260) in real time. Color-coded by level. Searchable. Pausable. Persists last 5,000 lines. The grafana-loki-tail experience inside the admin UI.
 
 **Effort:** 2 days (Phase 4.5 covered the API, this is the UI viewer). **Test counts:** +6 web vitest.

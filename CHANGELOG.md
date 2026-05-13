@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0-alpha.4] - 2026-05-12 - Phase K4 - Live SSE Log Stream Viewer
+
+### Added
+- **Live log stream drawer** - new floating right-side OverlayDrawer giving operators a tail-f experience over the structured log stream (`/scim/admin/log-config/stream`). Toggled from a new Pulse icon button in AppHeader (aria-pressed + tooltip). Connection-state badge (green=open, yellow=reconnecting), level filter (DEBUG/INFO/WARN/ERROR), free-text search across message/path/category/requestId/endpointId/method, Pause/Resume button (drops messages while paused), Clear button (empties buffer without disconnecting), auto-scroll-to-bottom only when within 50 px of the bottom (standard tail-f UX).
+- **`useLogStream` hook** in [web/src/hooks/useLogStream.ts](web/src/hooks/useLogStream.ts). Opens an INDEPENDENT EventSource at `/scim/admin/log-config/stream?level=DEBUG` (separate from useSSE which tails at INFO for cache invalidation only - decoupling means filter changes do not require reconnect, closed drawer does not consume a connection). Ring buffer capped at 5,000 entries (oldest dropped first). Exposes `entries / connectionState / paused / setPaused / clear`. Type-guards against payload shape (SCIM mutation events vs StructuredLogEntry) so a single SSE channel can carry both. Exponential-backoff reconnect (1s/2s/4s/8s/.../30s).
+- **Pure `filterEntries(entries, { level, search })` reducer** exported from the same hook so the drawer can apply ui-store filter state without baking the filters into the transport layer.
+- **`<LogStreamDrawer />` component** in [web/src/layout/LogStreamDrawer.tsx](web/src/layout/LogStreamDrawer.tsx). Mounted once at chrome level in AppShell. Conditional render via `ui-store.logStreamDrawerOpen` so a closed drawer renders nothing AND does not open an EventSource.
+- **ui-store slice extension** - new `logStreamDrawerOpen` (default false) + `logStreamLevel` (default DEBUG) + `logStreamSearch` (default '') fields with `setLogStreamDrawerOpen` / `toggleLogStreamDrawer` / `setLogStreamLevel` / `setLogStreamSearch` setters.
+- **+37 web vitest tests** across 3 files: new [useLogStream.test.ts](web/src/hooks/useLogStream.test.ts) (17 - 6 pure filter + 11 hook integration covering ring-buffer cap, paused-drop semantics, exponential backoff, non-JSON message tolerance, SCIM-event-type-guard), new [LogStreamDrawer.test.tsx](web/src/layout/LogStreamDrawer.test.tsx) (11 - render/list/connection-badge/pause/clear/close/empty/level-filter/search-filter/cap-banner), extended [ui-store.test.ts](web/src/store/ui-store.test.ts) +9 (new slice contract: defaults, setters, toggle, every legal level value).
+- New feature doc [docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md](docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md) covering 2-EventSource architecture, why decoupled from useSSE, drawer UX layout, lifecycle Mermaid, bundle impact.
+
+### Changed
+- AppShell now mounts `<LogStreamDrawer />` at chrome level (sibling to CommandPalette + KeyboardShortcutsHelp).
+- AppHeader gained a `Pulse24Regular` toggle button between HealthRollup and the token/theme buttons.
+- Bundle: main entry 150.34 -> **152.40 KB gzipped** (+2.06 KB; still 24 % under K1 200 KB budget). Shared primitives 180.69 -> **180.70 KB** (+0.01 KB; OverlayDrawer/Combobox/SearchBox already in chunk via DetailDrawer / Manual Provision usage; only the K4 wrapper code is new). All 16 size-limit budgets pass.
+
+### Test counts (net new)
+
+| Layer | Pre-K4 | Post-K4 | Delta |
+|-------|--------|---------|-------|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,184 | 1,184 | 0 |
+| Web vitest | 523 | **560** | **+37** |
+| Live SCIM | 933 | 933 | 0 (deferred to dev gate) |
+| **Total** | 6,374 | **6,411** | **+37** |
+
+### Notes
+- Frontend-only commit. No API change, no live SCIM behavior change.
+- The drawer's EventSource is opt-in: only opens while the operator has the drawer visible. Closing the drawer unmounts the hook, which closes the connection.
+- Per-sub-phase quality gate next: deploy v0.49.0-alpha.4 to dev + 933+ live SCIM tests must all pass before Phase K5 starts (ETag / version surface).
+
 ## [0.49.0-alpha.3] - 2026-05-12 - Phase K3 - Smart Error Explainer
 
 ### Added

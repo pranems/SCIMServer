@@ -35,3 +35,57 @@ describe('ui-store - K2 sseConnectionState slice', () => {
     expect(useUIStore.getState().sseConnectionState).toBe(state);
   });
 });
+
+// ─── Phase K4 - log stream drawer slice ─────────────────────────────
+
+import type { LogStreamLevel } from '../hooks/useLogStream';
+
+describe('ui-store - K4 log stream drawer slice', () => {
+  beforeEach(() => {
+    useUIStore.setState({
+      logStreamDrawerOpen: false,
+      logStreamLevel: 'DEBUG',
+      logStreamSearch: '',
+    });
+  });
+
+  it('exposes logStreamDrawerOpen with default false', () => {
+    expect(useUIStore.getState().logStreamDrawerOpen).toBe(false);
+  });
+
+  it('exposes setLogStreamDrawerOpen setter', () => {
+    const { setLogStreamDrawerOpen } = useUIStore.getState();
+    expect(typeof setLogStreamDrawerOpen).toBe('function');
+    setLogStreamDrawerOpen(true);
+    expect(useUIStore.getState().logStreamDrawerOpen).toBe(true);
+  });
+
+  it('exposes toggleLogStreamDrawer', () => {
+    const { toggleLogStreamDrawer } = useUIStore.getState();
+    expect(typeof toggleLogStreamDrawer).toBe('function');
+    toggleLogStreamDrawer();
+    expect(useUIStore.getState().logStreamDrawerOpen).toBe(true);
+    toggleLogStreamDrawer();
+    expect(useUIStore.getState().logStreamDrawerOpen).toBe(false);
+  });
+
+  it('exposes logStreamLevel default DEBUG with setter', () => {
+    expect(useUIStore.getState().logStreamLevel).toBe<LogStreamLevel>('DEBUG');
+    useUIStore.getState().setLogStreamLevel('ERROR');
+    expect(useUIStore.getState().logStreamLevel).toBe<LogStreamLevel>('ERROR');
+  });
+
+  it.each<LogStreamLevel>(['DEBUG', 'INFO', 'WARN', 'ERROR'])(
+    'accepts every legal log stream level: %s',
+    (lvl) => {
+      useUIStore.getState().setLogStreamLevel(lvl);
+      expect(useUIStore.getState().logStreamLevel).toBe(lvl);
+    },
+  );
+
+  it('exposes logStreamSearch default empty string with setter', () => {
+    expect(useUIStore.getState().logStreamSearch).toBe('');
+    useUIStore.getState().setLogStreamSearch('foo');
+    expect(useUIStore.getState().logStreamSearch).toBe('foo');
+  });
+});

@@ -31,6 +31,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useNavigate } from '@tanstack/react-router';
 import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
+import { LogStreamDrawer } from './LogStreamDrawer';
 import { queryClient } from '../api/query-client';
 
 const useStyles = makeStyles({
@@ -93,6 +94,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           <SSEProvider />
           <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
           <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
+          <LogStreamDrawer />
           <div className={classes.root} data-testid="app-shell">
             <AppHeader />
             <div className={classes.body}>

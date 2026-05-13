@@ -24,6 +24,13 @@ export type SseConnectionState =
   | 'reconnecting'
   | 'closed';
 
+/**
+ * Phase K4 - log stream level keywords. Mirrors the server's
+ * `LogLevel` enum vocabulary but as a string union so it serializes
+ * cleanly into URLs / localStorage.
+ */
+export type LogStreamLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+
 interface UIState {
   /** Whether the sidebar is collapsed */
   sidebarCollapsed: boolean;
@@ -38,12 +45,27 @@ interface UIState {
    * actually opens.
    */
   sseConnectionState: SseConnectionState;
+  /**
+   * Phase K4 - whether the live SSE log stream drawer is open. Toggled
+   * from AppHeader; read by LogStreamDrawer. Default closed so the
+   * drawer's EventSource is never opened until the operator asks for
+   * it (the drawer's hook is gated on this flag).
+   */
+  logStreamDrawerOpen: boolean;
+  /** Phase K4 - minimum log level filter applied to the buffered entries. */
+  logStreamLevel: LogStreamLevel;
+  /** Phase K4 - free-text search filter applied across message/path/category/requestId. */
+  logStreamSearch: string;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleCommandPalette: () => void;
   setColorScheme: (scheme: 'light' | 'dark' | 'system') => void;
   setSseConnectionState: (state: SseConnectionState) => void;
+  setLogStreamDrawerOpen: (open: boolean) => void;
+  toggleLogStreamDrawer: () => void;
+  setLogStreamLevel: (level: LogStreamLevel) => void;
+  setLogStreamSearch: (search: string) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -51,6 +73,9 @@ export const useUIStore = create<UIState>((set) => ({
   commandPaletteOpen: false,
   colorScheme: (localStorage.getItem('scim-color-scheme') as 'light' | 'dark' | 'system') ?? 'system',
   sseConnectionState: 'closed',
+  logStreamDrawerOpen: false,
+  logStreamLevel: 'DEBUG',
+  logStreamSearch: '',
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
@@ -60,4 +85,8 @@ export const useUIStore = create<UIState>((set) => ({
     set({ colorScheme: scheme });
   },
   setSseConnectionState: (state) => set({ sseConnectionState: state }),
+  setLogStreamDrawerOpen: (open) => set({ logStreamDrawerOpen: open }),
+  toggleLogStreamDrawer: () => set((s) => ({ logStreamDrawerOpen: !s.logStreamDrawerOpen })),
+  setLogStreamLevel: (level) => set({ logStreamLevel: level }),
+  setLogStreamSearch: (search) => set({ logStreamSearch: search }),
 }));
