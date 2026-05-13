@@ -9693,6 +9693,74 @@ try {
 Write-Host "`n--- 9z-Z: Config Flag Toggles (E2) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AA: ENDPOINT CRUD WIZARD CONTRACT (Phase L1)
+# ============================================
+$script:currentSection = "9z-AA: Endpoint CRUD wizard (L1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AA: ENDPOINT CRUD WIZARD CONTRACT (Phase L1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # 9z-AA.1: GET /admin/endpoints/presets returns the list the wizard Step 1 Combobox sources from
+    $presetsRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/presets" -Headers $headers
+    Test-Result -Success ($null -ne $presetsRes.presets -and $presetsRes.presets.Count -ge 3) -Message "9z-AA.1: GET /admin/endpoints/presets returns >=3 presets (got $($presetsRes.presets.Count))"
+
+    # 9z-AA.2: every preset has the Combobox-required schemaCount + resourceTypeCount fields nested under summary.*
+    $hasShape = ($presetsRes.presets | Where-Object { $null -ne $_.summary -and $null -ne $_.summary.schemaCount -and $null -ne $_.summary.resourceTypeCount }).Count
+    Test-Result -Success ($hasShape -eq $presetsRes.presets.Count) -Message "9z-AA.2: every preset summary has summary.schemaCount + summary.resourceTypeCount (matched=$hasShape of $($presetsRes.presets.Count))"
+
+    # 9z-AA.3: POST /admin/endpoints with profilePreset succeeds (the wizard Step 4 commit happy path)
+    $aaStamp = [int](Get-Date -UFormat %s)
+    $aaName = "live-9z-AA-$aaStamp"
+    $createBody = @{ name = $aaName; profilePreset = "rfc-standard"; displayName = "L1 wizard target" } | ConvertTo-Json -Compress
+    $created = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Body $createBody -ContentType "application/json" -Headers $headers
+    Test-Result -Success ($null -ne $created.id) -Message "9z-AA.3: POST /admin/endpoints with profilePreset returned id=$($created.id)"
+
+    # 9z-AA.4: POST response carries the wizard's required fields { id, name, active, scimBasePath }
+    $hasRequired = ($null -ne $created.id) -and ($created.name -eq $aaName) -and ($created.active -is [bool] -or $created.active -eq $true) -and ($null -ne $created.scimBasePath)
+    Test-Result -Success $hasRequired -Message "9z-AA.4: POST response has wizard-required fields (id+name+active+scimBasePath)"
+
+    # 9z-AA.5: POST /admin/endpoints with duplicate name is rejected with 400 (or 409 future-aligned)
+    $dupRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Body $createBody -ContentType "application/json" -Headers $headers | Out-Null
+        $dupRejected = $false
+    } catch {
+        # Live shell - exception status code lives on Exception.Response.StatusCode
+        $code = 0
+        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+        $dupRejected = ($code -eq 400 -or $code -eq 409)
+    }
+    Test-Result -Success $dupRejected -Message "9z-AA.5: duplicate-name POST is rejected (400 or 409)"
+
+    # 9z-AA.6: DELETE /admin/endpoints/:id returns 204 (the wizard's delete-confirm path)
+    $deleted204 = $false
+    try {
+        $delResp = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($created.id)" -Method DELETE -Headers $headers -SkipHttpErrorCheck
+        $deleted204 = ($delResp.StatusCode -eq 204)
+    } catch {
+        $deleted204 = $false
+    }
+    Test-Result -Success $deleted204 -Message "9z-AA.6: DELETE returns 204 No Content (got status above)"
+
+    # 9z-AA.7: GET on the deleted endpoint returns 404 (cascade delete + cache eviction)
+    $gone = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($created.id)" -Headers $headers | Out-Null
+        $gone = $false
+    } catch {
+        $code = 0
+        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+        $gone = ($code -eq 404)
+    }
+    Test-Result -Success $gone -Message "9z-AA.7: GET on deleted endpoint returns 404"
+} catch {
+    Test-Result -Success $false -Message "9z-AA.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AA: Endpoint CRUD Wizard Contract (L1) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

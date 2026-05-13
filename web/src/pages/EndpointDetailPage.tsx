@@ -32,9 +32,11 @@ import {
   Subtitle1,
   Caption1,
 } from '@fluentui/react-components';
+import { Edit24Regular, Delete24Regular } from '@fluentui/react-icons';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEndpoint } from '../api/queries';
 import { LoadingSkeleton } from '../components/primitives';
+import { DeleteEndpointDialog } from '../components/endpoint/DeleteEndpointDialog';
 
 const useStyles = makeStyles({
   page: {
@@ -93,6 +95,8 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
   const activeTab = pathToTab(pathname, endpointId);
 
   const { data: endpoint, isLoading: loadingEndpoint, error: endpointError } = useEndpoint(endpointId);
+  // Phase L1 - delete confirmation modal mounted in the header.
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   if (loadingEndpoint) {
     // G1 - skeleton mirrors header (title row) + tablist row + an
@@ -168,7 +172,39 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         >
           {endpoint.active ? 'Active' : 'Inactive'}
         </Badge>
+        {/* Phase L1 - Edit + Delete buttons sit at the right edge of the header. */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+          <Button
+            appearance="subtle"
+            icon={<Edit24Regular />}
+            data-testid="endpoint-edit-button"
+            onClick={() =>
+              navigate({ to: '/endpoints/$endpointId/edit', params: { endpointId } })
+            }
+          >
+            Edit
+          </Button>
+          <Button
+            appearance="subtle"
+            icon={<Delete24Regular />}
+            data-testid="endpoint-delete-button"
+            onClick={() => setDeleteOpen(true)}
+          >
+            Delete
+          </Button>
+        </div>
       </div>
+
+      <DeleteEndpointDialog
+        open={deleteOpen}
+        endpointId={endpoint.id}
+        endpointName={endpoint.name}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirmed={() => {
+          setDeleteOpen(false);
+          void navigate({ to: '/endpoints' });
+        }}
+      />
 
       {/* Metadata row */}
       <div className={classes.meta}>

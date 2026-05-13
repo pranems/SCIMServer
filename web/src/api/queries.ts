@@ -162,6 +162,17 @@ export const queryKeys = {
     byEndpoint: (endpointId: string, params?: Record<string, unknown>) =>
       ['activity', endpointId, params] as const,
   },
+  /**
+   * Phase L1: built-in profile presets exposed under
+   * `/scim/admin/endpoints/presets`. The list is small (~5 entries)
+   * and changes only on a server upgrade, so a long staleTime is
+   * appropriate. The wizard's Step 1 Combobox sources its options
+   * from `presets.all` and Step 2's preview reads `presets.detail(name)`.
+   */
+  presets: {
+    all: ['presets'] as const,
+    detail: (name: string) => ['presets', name] as const,
+  },
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -206,6 +217,58 @@ export const endpointStatsQueryOptions = (id: string) => ({
   queryKey: queryKeys.endpoints.stats(id),
   queryFn: () => fetchWithAuth<EndpointStatsResponse>(`/scim/admin/endpoints/${id}/stats`),
   staleTime: 30_000,
+});
+
+/**
+ * Phase L1: presets list. Sourced from `GET /scim/admin/endpoints/presets`
+ * which returns `{ totalResults, presets: PresetSummary[] }`. Used by
+ * the CreateEndpointWizard Step 1 Combobox. Cached 5 min - the preset
+ * library only changes on server upgrade.
+ */
+export interface PresetSummary {
+  name: string;
+  default?: boolean;
+  description?: string;
+  /**
+   * Nested digest produced by `EndpointService.listPresets()`. Real
+   * shape (from `/admin/endpoints/presets`) keeps counts + SPC +
+   * activeSettings under `summary.*` rather than at the top level.
+   */
+  summary?: {
+    schemaCount?: number;
+    resourceTypeCount?: number;
+    schemas?: Array<{ id: string; name?: string; attributeCount?: number }>;
+    resourceTypes?: Array<{ name: string; schema?: string; extensions?: string[] }>;
+    serviceProviderConfig?: Record<string, unknown>;
+    activeSettings?: Record<string, unknown>;
+  };
+  [key: string]: unknown;
+}
+
+export interface PresetListResponse {
+  totalResults: number;
+  presets: PresetSummary[];
+}
+
+export interface PresetDetailResponse {
+  name: string;
+  default?: boolean;
+  description?: string;
+  profile: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export const presetsQueryOptions = () => ({
+  queryKey: queryKeys.presets.all,
+  queryFn: () => fetchWithAuth<PresetListResponse>('/scim/admin/endpoints/presets'),
+  staleTime: 5 * 60_000,
+});
+
+export const presetDetailQueryOptions = (name: string) => ({
+  queryKey: queryKeys.presets.detail(name),
+  queryFn: () =>
+    fetchWithAuth<PresetDetailResponse>(`/scim/admin/endpoints/presets/${encodeURIComponent(name)}`),
+  staleTime: 5 * 60_000,
 });
 
 /**
@@ -595,6 +658,29 @@ export function useEndpointSchemas(endpointId: string) {
   return useQuery<ScimSchemasResponse>({
     ...endpointSchemasQueryOptions(endpointId),
     enabled: !!endpointId,
+  });
+}
+
+/**
+ * Phase L1: thin useQuery wrapper for the presets list. Drives the
+ * CreateEndpointWizard Step 1 preset Combobox.
+ */
+export function usePresets() {
+  return useQuery<PresetListResponse>({
+    ...presetsQueryOptions(),
+  });
+}
+
+/**
+ * Phase L1: thin useQuery wrapper for one preset's full profile.
+ * Drives the CreateEndpointWizard Step 2 preview pane. Disabled
+ * until a preset name is picked so opening the wizard does not
+ * fire N concurrent detail fetches.
+ */
+export function usePresetDetail(name: string | undefined) {
+  return useQuery<PresetDetailResponse>({
+    ...presetDetailQueryOptions(name ?? ''),
+    enabled: !!name,
   });
 }
 
@@ -1039,3 +1125,98 @@ export function useDeleteGroup(endpointId: string) {
     },
   });
 }
+
+// ─── Phase L1: Endpoint admin CRUD mutations ─────────────────────────
+//
+// The CRUD HTTP surface (POST / PATCH / DELETE /admin/endpoints +
+// GET /admin/endpoints/presets) shipped in v0.30.0; until L1 the
+// redesigned UI never wired it. PATCH was wired earlier as
+// `useUpdateEndpointConfig` (used by SettingsTab); L1 adds CREATE
+// and DELETE so the new CreateEndpointWizard and the EndpointDetail
+// header Delete dialog can drive the full lifecycle.
+//
+// Both mutations invalidate `endpoints.all` (so the EndpointsPage
+// list refetches without a manual reload) AND `dashboard` (so the
+// dashboard endpoint count + recent activity reflect the change).
+// useDeleteEndpoint additionally evicts the per-endpoint detail and
+// overview cache entries so a stale RouteLoader cannot resurrect a
+// deleted endpoint's data after navigation.
+
+/**
+ * Phase L1: create a new endpoint.
+ *
+ * Request body matches the backend `CreateEndpointDto`:
+ *   - `name` (required, `[a-zA-Z0-9_-]+`)
+ *   - `displayName` (optional)
+ *   - `description` (optional)
+ *   - `profilePreset` (optional) - load a built-in preset by name
+ *   - `profile` (optional) - inline profile (mutually exclusive with profilePreset)
+ *
+ * Returns the full `EndpointResponse` so the wizard can navigate
+ * straight to `/endpoints/{newId}` on success.
+ *
+ * On 400 duplicate name (the current backend behavior; see
+ * endpoint.service.spec.ts) the hook re-throws as `ScimApiError(400)`
+ * so the wizard can render `<ScimErrorMessage />` (Phase K3) with the
+ * server's `detail` text inline. A future RFC-aligned tightening to
+ * 409 would still flow through the same path.
+ */
+export interface CreateEndpointBody {
+  name: string;
+  displayName?: string;
+  description?: string;
+  profilePreset?: string;
+  profile?: Record<string, unknown>;
+}
+
+export function useCreateEndpoint() {
+  const qc = useQueryClient();
+  return useMutation<EndpointResponse, Error, CreateEndpointBody>({
+    mutationFn: (body) =>
+      fetchWithAuth<EndpointResponse>('/scim/admin/endpoints', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+}
+
+/**
+ * Phase L1: delete an endpoint and cascade-delete every user, group,
+ * group member, credential, and request log that belongs to it.
+ *
+ * Server returns 204 No Content on success. On 404 (already deleted
+ * by another operator / TTL) the hook re-throws as `ScimApiError(404)`
+ * so the DeleteEndpointDialog can show the `<ScimErrorMessage />`
+ * Smart Error explainer.
+ *
+ * Cache cleanup: removes both the per-endpoint `detail` and `overview`
+ * entries so a stale RouteLoader cannot resurrect deleted data on
+ * navigation. Mirrors the pattern used by useDeleteCredential but at
+ * the endpoint level.
+ */
+export function useDeleteEndpoint() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, string>({
+    mutationFn: (endpointId) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: (_data, endpointId) => {
+      // Evict the per-endpoint caches so RouteLoader re-fetch will
+      // get a 404 (and react-router can surface a not-found page)
+      // rather than re-rendering the deleted endpoint's detail.
+      qc.removeQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
+      qc.removeQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      qc.removeQueries({ queryKey: queryKeys.endpoints.stats(endpointId) });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+}
+

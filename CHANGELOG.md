@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0-alpha.1] - 2026-05-13 - Phase L1 - Endpoint CRUD UI + Preset Picker
+
+### Added
+- **Endpoint CRUD wizard at /endpoints/new** - new 4-step Wizard mounted at `/endpoints/new` (Identity & Preset / Preview / Override / Confirm). Step 1 takes name + display name + description + preset (Combobox sourced from `usePresets()` rendering one Card per preset with schemaCount + resourceTypeCount + default badge). Step 2 shows the picked preset's schemas / resourceTypes / serviceProviderConfig / settings via `usePresetDetail()`. Step 3 placeholder for per-flag overrides (will be wired in a follow-up once the BOOLEAN_FLAGS registry is extracted from SettingsTab into its own module). Step 4 read-only summary + Create button fires `useCreateEndpoint()` and navigates to `/endpoints/{newId}` on success. On 400 duplicate name (or future 409 tightening) renders K3 `<ScimErrorMessage />` inline. Closes [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.1.
+- **Endpoint edit form at /endpoints/$id/edit** - new `EditEndpointPage` for displayName + description + active. Fires `useUpdateEndpointConfig()` (existing hook) and navigates back to detail on success. Loader pre-fetches the endpoint detail so the form is pre-filled on first render.
+- **Type-name-to-confirm delete modal** - new [DeleteEndpointDialog.tsx](web/src/components/endpoint/DeleteEndpointDialog.tsx) mounts in the EndpointDetail header. Echoes the endpoint name in monospace, requires the operator to type it case-sensitively into a free-text Input before the Delete button enables (mirrors GitHub repo-delete UX). Composes the `<FormDialog />` primitive so cancel / busy / structured-error chrome is reused.
+- **`useCreateEndpoint()` + `useDeleteEndpoint()` mutation hooks** in [web/src/api/queries.ts](web/src/api/queries.ts). Both invalidate `queryKeys.endpoints.all` + `queryKeys.dashboard` on settle so the EndpointsPage list and dashboard counts refresh without a manual reload. `useDeleteEndpoint` additionally evicts the per-endpoint detail / overview / stats caches so a stale RouteLoader cannot resurrect deleted data on navigation.
+- **`usePresets()` + `usePresetDetail()` query hooks + `presetsQueryOptions` + `presetDetailQueryOptions`** for the preset library at `/admin/endpoints/presets` + `/admin/endpoints/presets/:name`. Cached 5 minutes (preset library only changes on server upgrade). New `queryKeys.presets.all` + `queryKeys.presets.detail(name)` factory entries.
+- **EndpointsPage `+ Create endpoint` primary button** in the page header navigating to `/endpoints/new`.
+- **EndpointDetailPage Edit + Delete buttons** in the header. Edit navigates to `/endpoints/$id/edit`; Delete opens the `<DeleteEndpointDialog />` with the endpoint name + id.
+- **+30 web vitest tests**: 8 new in [mutations.test.ts](web/src/api/mutations.test.ts) (3 useCreateEndpoint + 3 useDeleteEndpoint + 2 presets queryKeys), 5 in new [DeleteEndpointDialog.test.tsx](web/src/components/endpoint/DeleteEndpointDialog.test.tsx) (renders endpoint name in warning + button disabled by default + mismatch keeps disabled + exact match enables + submit fires mutation + onConfirmed), 8 in new [CreateEndpointWizard.test.tsx](web/src/pages/CreateEndpointWizard.test.tsx) (Step 1 renders + Next gate + advance to Step 2 + preview shows counts + Step 4 commit body + navigate on success + Back preserves state + 400 -> ScimErrorMessage), 3 in new [EditEndpointPage.test.tsx](web/src/pages/EditEndpointPage.test.tsx) (form pre-filled + Save body + navigate on success), 6 implicit additions (lazy-routes contract for the 2 new route files + size-limit contract for 2 new per-route budgets + new entries in size-limit-config.test.ts).
+- **+2 API E2E tests** in new [admin-endpoints-create.e2e-spec.ts](api/test/e2e/admin-endpoints-create.e2e-spec.ts): response key allowlist on POST /admin/endpoints (the wizard navigates straight to `/endpoints/{id}` so `id` + `name` + `active` + `scimBasePath` MUST be in the response; allowlist also covers `displayName`, `description`, `profile`, `profileSummary`, `_links`, `createdAt`, `updatedAt` and rejects any unknown leak like `credentialHash`); duplicate-name rejection asserting `[400, 409]` so future RFC-aligned tightening flows through the same UI surface.
+- **+6 live SCIM tests** in new section [9z-AA in scripts/live-test.ps1](scripts/live-test.ps1) covering: GET /admin/endpoints/presets returns >=3 presets, every preset has `summary.schemaCount` + `summary.resourceTypeCount` (the wizard Combobox display fields), POST /admin/endpoints with profilePreset returns the wizard-required fields, duplicate-name POST rejected (400 or 409), DELETE returns 204 No Content, GET on deleted endpoint returns 404 (cascade delete + cache eviction proof). Inserted before TEST SECTION 10 per live-test conventions.
+- New comprehensive feature doc [docs/PHASE_L1_ENDPOINT_CRUD.md](docs/PHASE_L1_ENDPOINT_CRUD.md) (7 sections + 2 Mermaid: architecture flow + commit lifecycle sequence; 4-step layout table; file inventory; risk register with 5 entries; per-step quality gate sequence with 21 checkpoints).
+
+### Changed
+- `PresetSummary` type updated to reflect actual server response shape: counts + SPC + activeSettings live nested under `summary.{schemaCount, resourceTypeCount, schemas, resourceTypes, serviceProviderConfig, activeSettings}` rather than at the top level. Discovered while running section 9z-AA against dev (live test 9z-AA.2 caught the type drift before merge).
+- Bundle: main entry 147.22 -> **147.39 KB gzipped** (+0.17 KB; 26.3 % under 200 KB K1 budget). Shared primitives 198.81 -> **199.01 KB gzipped** (+0.20 KB; 9.5 % under 220 KB budget). 14 existing per-route chunks unchanged plus 2 new per-route chunks: CreateEndpointWizard 2.64 KB gzipped + EditEndpointPage 0.98 KB gzipped (both 97 % + under the 110 KB ceiling). All 18 size-limit budgets pass.
+
+### Test counts (net new)
+
+| Layer | Pre-L1 (v0.49.0) | Post-L1 (v0.50.0-alpha.1) | Delta |
+|-------|-----------------:|--------------------------:|------:|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,184 | **1,186** | **+2** |
+| Web vitest | 590 | **620** | **+30** |
+| Live SCIM | 933 | **939** | **+6** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,441 | **6,479** | **+38** |
+
+### Notes
+- The CRUD HTTP surface (POST / PATCH / DELETE /admin/endpoints + GET /admin/endpoints/presets) shipped in v0.30.0; until L1 the UI never wired POST or DELETE, only PATCH (via `useUpdateEndpointConfig` for the SettingsTab). All backend behavior was already exhaustively locked at the unit + E2E + 9z-D + 9z + 9z-Q layers; L1 adds wizard-shape regression locks at the E2E + live layers without re-asserting the long-locked CRUD contracts.
+- Per-sub-phase quality gate next: deploy v0.50.0-alpha.1 to dev + 939+ live SCIM tests must all pass before Phase L2 starts (/Me endpoint per analysis-doc S4.4).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.49.0] - 2026-05-13 - Phase K Foundation Hardening - Stable Rollup
 
 ### Summary

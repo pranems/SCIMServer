@@ -120,6 +120,9 @@ describe('Phase H6 - size-limit budget contract', () => {
       'LogsPage',
       'ManualProvisionPage',
       'SettingsPage',
+      // Phase L1
+      'CreateEndpointWizard',
+      'EditEndpointPage',
     ] as const;
 
     it.each(ROUTE_CHUNK_NAMES)(

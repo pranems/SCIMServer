@@ -40,6 +40,8 @@ import { credentialsTabRoute } from './routes/endpoints.$endpointId.credentials'
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
 import { manualProvisionRoute } from './routes/manual-provision';
+import { createEndpointRoute } from './routes/endpoints.new';
+import { editEndpointRoute } from './routes/endpoints.$endpointId.edit';
 import { queryClient } from './api/query-client';
 
 /** Endpoint detail layout with its 8 nested tab routes (overview + 7 explicit). */
@@ -57,6 +59,11 @@ const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
 /** Full route tree exported for inspection in tests. */
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  // Phase L1: createEndpointRoute MUST come before endpointsRoute /
+  // endpointDetailRouteWithChildren so TanStack matches the literal
+  // "/endpoints/new" before the wildcard "/endpoints/$endpointId".
+  createEndpointRoute,
+  editEndpointRoute,
   endpointsRoute,
   endpointDetailRouteWithChildren,
   logsRoute,

@@ -711,3 +711,170 @@ describe('useDeleteGroup', () => {
     });
   });
 });
+
+// ─── Phase L1: useCreateEndpoint ─────────────────────────────────────
+//
+// L1 wires the already-shipped POST /admin/endpoints surface (v0.30.0)
+// into the redesigned UI. Until L1 there was no FE entry point for
+// creating an endpoint; every onboarding required a curl command.
+
+describe('useCreateEndpoint (Phase L1)', () => {
+  it('success: POSTs to /scim/admin/endpoints with name + preset', async () => {
+    const { useCreateEndpoint } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ id: 'new-ep', name: 'l1-test', active: true, scimBasePath: '/scim/endpoints/new-ep' }),
+    });
+
+    const { result } = renderHook(() => useCreateEndpoint(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ name: 'l1-test', profilePreset: 'rfc-standard' });
+    });
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('/scim/admin/endpoints');
+    const calledOpts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(calledOpts.method).toBe('POST');
+    expect(JSON.parse(calledOpts.body as string)).toEqual({ name: 'l1-test', profilePreset: 'rfc-standard' });
+
+    // L1 invalidation: the endpoints list cache must refetch so the
+    // new endpoint appears on /endpoints without a manual reload.
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.all));
+      expect(keys).toContain(JSON.stringify(queryKeys.dashboard));
+    });
+  });
+
+  it('returns the created EndpointResponse so the caller can navigate to its detail page', async () => {
+    const { useCreateEndpoint } = await import('./queries');
+    const { wrapper } = createWrapper();
+    const created = { id: 'new-ep-2', name: 'l1-test-2', active: true, scimBasePath: '/scim/endpoints/new-ep-2' };
+    fetchSpy.mockResolvedValueOnce({ ok: true, status: 201, json: () => Promise.resolve(created) });
+
+    const { result } = renderHook(() => useCreateEndpoint(), { wrapper });
+    let returned: unknown;
+    await act(async () => {
+      returned = await result.current.mutateAsync({ name: 'l1-test-2', profilePreset: 'minimal' });
+    });
+
+    expect(returned).toEqual(created);
+  });
+
+  it('propagates ScimApiError on duplicate name (400)', async () => {
+    const { useCreateEndpoint } = await import('./queries');
+    const { ScimApiError } = await import('./scim-error');
+    const { wrapper } = createWrapper();
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+      text: () => Promise.resolve(JSON.stringify({ statusCode: 400, message: 'Endpoint name already exists' })),
+    });
+
+    const { result } = renderHook(() => useCreateEndpoint(), { wrapper });
+    let err: unknown;
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({ name: 'duplicate', profilePreset: 'minimal' });
+      });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(ScimApiError);
+    expect((err as InstanceType<typeof ScimApiError>).status).toBe(400);
+  });
+});
+
+// ─── Phase L1: useDeleteEndpoint ─────────────────────────────────────
+
+describe('useDeleteEndpoint (Phase L1)', () => {
+  it('success: DELETEs the endpoint and invalidates endpoints.all + dashboard', async () => {
+    const { useDeleteEndpoint } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    // 204 No Content - body is empty.
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+    });
+
+    const { result } = renderHook(() => useDeleteEndpoint(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync('ep-to-delete');
+    });
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('/scim/admin/endpoints/ep-to-delete');
+    const calledOpts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(calledOpts.method).toBe('DELETE');
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.all));
+      expect(keys).toContain(JSON.stringify(queryKeys.dashboard));
+    });
+  });
+
+  it('removes the endpoint detail + overview from the cache on success', async () => {
+    const { useDeleteEndpoint } = await import('./queries');
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(queryKeys.endpoints.detail('ep-x'), { id: 'ep-x' });
+    queryClient.setQueryData(queryKeys.endpoints.overview('ep-x'), { endpoint: { id: 'ep-x' } });
+
+    fetchSpy.mockResolvedValueOnce({ ok: true, status: 204, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useDeleteEndpoint(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync('ep-x');
+    });
+
+    expect(queryClient.getQueryData(queryKeys.endpoints.detail('ep-x'))).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.endpoints.overview('ep-x'))).toBeUndefined();
+  });
+
+  it('propagates ScimApiError on 404 (already deleted)', async () => {
+    const { useDeleteEndpoint } = await import('./queries');
+    const { ScimApiError } = await import('./scim-error');
+    const { wrapper } = createWrapper();
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      headers: { get: () => null },
+      text: () => Promise.resolve('Not Found'),
+    });
+
+    const { result } = renderHook(() => useDeleteEndpoint(), { wrapper });
+    let err: unknown;
+    try {
+      await act(async () => {
+        await result.current.mutateAsync('missing-ep');
+      });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(ScimApiError);
+    expect((err as InstanceType<typeof ScimApiError>).status).toBe(404);
+  });
+});
+
+// ─── Phase L1: presets query options ─────────────────────────────────
+
+describe('presets query options (Phase L1)', () => {
+  it('queryKeys.presets.all is a stable prefix', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.presets.all).toEqual(['presets']);
+  });
+
+  it('queryKeys.presets.detail includes the preset name', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.presets.detail('entra-id')).toEqual(['presets', 'entra-id']);
+  });
+});

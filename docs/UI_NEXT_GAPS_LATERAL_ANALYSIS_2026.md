@@ -147,6 +147,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.1 Endpoint CRUD UI with Preset Picker
 
+> **Status: CLOSED in v0.50.0-alpha.1 (Phase L1, 2026-05-13).** See [docs/PHASE_L1_ENDPOINT_CRUD.md](PHASE_L1_ENDPOINT_CRUD.md) for the shipped architecture, mutation lifecycle Mermaid, and DoD evidence. The 4-step wizard ships at `/endpoints/new`, the edit form at `/endpoints/$id/edit`, and the type-name-to-confirm delete modal mounts in the EndpointDetail header.
+
 **Why critical:** Today an operator cannot create a new endpoint from the UI. Every onboarding still requires shell access + a hand-crafted POST body. This single gap defeats the "self-service admin tool" framing of the redesign.
 
 **Shape:**

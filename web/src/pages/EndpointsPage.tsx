@@ -22,12 +22,14 @@ import {
   CardHeader,
   Text,
   Badge,
+  Button,
   SearchBox,
   Subtitle1,
   Caption1,
 } from '@fluentui/react-components';
 import {
   Server24Regular,
+  Add24Regular,
 } from '@fluentui/react-icons';
 import { useEndpoints } from '../api/queries';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -136,12 +138,23 @@ export const EndpointsPage: React.FC = () => {
     <div className={classes.page} data-testid="endpoints-page">
       <div className={classes.header}>
         <Subtitle1>Endpoints ({endpoints.length})</Subtitle1>
-        <SearchBox
-          placeholder="Filter endpoints..."
-          value={q}
-          onChange={(_, d) => setQ(d.value)}
-          data-testid="endpoints-search"
-        />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <SearchBox
+            placeholder="Filter endpoints..."
+            value={q}
+            onChange={(_, d) => setQ(d.value)}
+            data-testid="endpoints-search"
+          />
+          {/* Phase L1 - Create endpoint button. */}
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            data-testid="endpoints-create-button"
+            onClick={() => navigate({ to: '/endpoints/new' })}
+          >
+            Create endpoint
+          </Button>
+        </div>
       </div>
 
       <div className={classes.grid} data-testid="endpoints-grid">
