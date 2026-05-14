@@ -194,6 +194,21 @@ export const queryKeys = {
    * deep-merge into this cache optimistically and roll back on error.
    */
   logConfig: ['log-config'] as const,
+  /**
+   * Phase L5: per-endpoint Discovery surfaces (Schemas already lives
+   * under the legacy `['endpoint-schemas', id]` key from D3 -
+   * intentionally NOT migrated to keep cache continuity). The two
+   * surfaces L5 adds (ResourceTypes + ServiceProviderConfig) live
+   * under a fresh `discovery` namespace so the prefix is greppable
+   * and SSE invalidation can target them collectively if a future
+   * profile-edit feature dirties them.
+   */
+  discovery: {
+    resourceTypes: (endpointId: string) =>
+      ['discovery', endpointId, 'resourceTypes'] as const,
+    serviceProviderConfig: (endpointId: string) =>
+      ['discovery', endpointId, 'serviceProviderConfig'] as const,
+  },
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -664,6 +679,93 @@ export const endpointSchemasQueryOptions = (endpointId: string) => ({
   staleTime: 5 * 60_000, // 5 minutes
 });
 
+// ─── Discovery: ResourceTypes + ServiceProviderConfig (Phase L5) ─────
+//
+// GET /scim/endpoints/:id/ResourceTypes returns a SCIM ListResponse
+// of resource-type definitions (one entry per type registered on the
+// endpoint's profile, with schema + schemaExtensions).
+//
+// GET /scim/endpoints/:id/ServiceProviderConfig returns the SCIM
+// service-provider config object (patch / filter / etag / bulk /
+// changePassword / sort / authenticationSchemes blocks).
+//
+// Both are exhaustively locked at the API layer (live-test sections 8
+// and 9z-Q.11) and rarely change after endpoint configuration, so
+// 5-minute staleTime mirrors `endpointSchemasQueryOptions` for cache
+// continuity across the three Discovery sub-tabs.
+
+export interface ScimResourceType {
+  id: string;
+  name: string;
+  endpoint: string;
+  schema: string;
+  description?: string;
+  schemaExtensions?: Array<{ schema: string; required?: boolean }>;
+  meta?: { resourceType?: string; location?: string };
+  schemas?: string[];
+}
+
+export interface ScimResourceTypesResponse {
+  schemas: string[];
+  totalResults: number;
+  startIndex: number;
+  itemsPerPage: number;
+  Resources: ScimResourceType[];
+}
+
+export interface ScimSpcSupportedFlag {
+  supported: boolean;
+}
+export interface ScimSpcFilterFlag {
+  supported: boolean;
+  maxResults?: number;
+}
+export interface ScimSpcBulkFlag {
+  supported: boolean;
+  maxOperations?: number;
+  maxPayloadSize?: number;
+}
+export interface ScimSpcAuthScheme {
+  type: string;
+  name?: string;
+  description?: string;
+  primary?: boolean;
+  documentationUri?: string;
+  specUri?: string;
+}
+
+export interface ScimServiceProviderConfig {
+  schemas: string[];
+  documentationUri?: string;
+  patch: ScimSpcSupportedFlag;
+  filter: ScimSpcFilterFlag;
+  etag: ScimSpcSupportedFlag;
+  bulk: ScimSpcBulkFlag;
+  changePassword: ScimSpcSupportedFlag;
+  sort?: ScimSpcSupportedFlag;
+  authenticationSchemes: ScimSpcAuthScheme[];
+  meta?: { resourceType?: string; location?: string };
+  [key: string]: unknown;
+}
+
+export const endpointResourceTypesQueryOptions = (endpointId: string) => ({
+  queryKey: queryKeys.discovery.resourceTypes(endpointId),
+  queryFn: () =>
+    fetchWithAuth<ScimResourceTypesResponse>(
+      `/scim/endpoints/${endpointId}/ResourceTypes`,
+    ),
+  staleTime: 5 * 60_000,
+});
+
+export const endpointServiceProviderConfigQueryOptions = (endpointId: string) => ({
+  queryKey: queryKeys.discovery.serviceProviderConfig(endpointId),
+  queryFn: () =>
+    fetchWithAuth<ScimServiceProviderConfig>(
+      `/scim/endpoints/${endpointId}/ServiceProviderConfig`,
+    ),
+  staleTime: 5 * 60_000,
+});
+
 // ─── Query hooks ─────────────────────────────────────────────────────
 
 /** Fetch aggregated dashboard data (BFF endpoint - 0 DB queries for stats) */
@@ -753,6 +855,31 @@ export function useEndpointActivity(params: EndpointActivityParams) {
 export function useEndpointSchemas(endpointId: string) {
   return useQuery<ScimSchemasResponse>({
     ...endpointSchemasQueryOptions(endpointId),
+    enabled: !!endpointId,
+  });
+}
+
+/**
+ * Phase L5: per-endpoint /ResourceTypes. Drives the Discovery
+ * Explorer's ResourceTypes sub-tab (and the diff view when two
+ * endpoints are picked). Disabled when endpointId is empty so the
+ * scope picker can mount before the operator picks an endpoint.
+ */
+export function useEndpointResourceTypes(endpointId: string) {
+  return useQuery<ScimResourceTypesResponse>({
+    ...endpointResourceTypesQueryOptions(endpointId),
+    enabled: !!endpointId,
+  });
+}
+
+/**
+ * Phase L5: per-endpoint /ServiceProviderConfig. Drives the
+ * Discovery Explorer's ServiceProviderConfig sub-tab. Same disabled-
+ * when-empty pattern as `useEndpointResourceTypes`.
+ */
+export function useEndpointServiceProviderConfig(endpointId: string) {
+  return useQuery<ScimServiceProviderConfig>({
+    ...endpointServiceProviderConfigQueryOptions(endpointId),
     enabled: !!endpointId,
   });
 }

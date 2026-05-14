@@ -293,6 +293,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.8 Discovery Explorer
 
+> ✅ **CLOSED in v0.50.0-alpha.5 (Phase L5, 2026-05-13).** See [docs/PHASE_L5_DISCOVERY_EXPLORER.md](PHASE_L5_DISCOVERY_EXPLORER.md). New top-level `/discovery` route (5th sidebar nav entry) with three sub-tabs (ServiceProviderConfig | ResourceTypes | Schemas), endpoint scope picker (1 or 2 endpoints), and side-by-side Schemas diff view colored by a new pure diff reducer that mirrors the API tighten-only-validator algebra (`MUTABILITY_RANK` / `UNIQUENESS_RANK` / coarse 2-rank `RETURNED_RANK`). Cells expose `data-status` = tighten/relax/unchanged/incomparable/only-a/only-b. RFC 7643 §2.2 default substitution applied BEFORE classification per the project's Schema-Characteristic Test Rule. Action toolbar: Copy as JSON / Copy as URN (both work) + Open in Workbench (disabled stub - wired in Phase M1). +42 web vitest (22 reducer + 6 hook + 11 page + 3 size-limit ratchet) + 5 live SCIM in new section 9z-AE. Out of scope (deferred): real Workbench wiring (M1), schema-property edit history (M1), RFC compliance score chart (Phase N), sub-attribute drill-down (L6/M).
+
 **Why:** SchemasTab is per-endpoint and read-only. There is no place to see ServiceProviderConfig, ResourceTypes, or to compare two endpoints' discovery surfaces. With the [tighten-only validator algebra](../api/src/modules/scim/endpoint-profile/tighten-only-validator.ts) in place, **two-endpoint diff is a 1-day feature** that no commercial SCIM tool ships.
 
 **Shape:**

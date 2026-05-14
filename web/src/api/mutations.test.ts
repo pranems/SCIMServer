@@ -1246,3 +1246,119 @@ describe('useUpdateLogConfig (Phase L4)', () => {
     });
   });
 });
+
+// ─── Phase L5: Discovery Explorer hooks ──────────────────────────────
+//
+// Backend `/scim/endpoints/:id/{Schemas,ResourceTypes,ServiceProviderConfig}`
+// is exhaustively locked at the live layer (sections 8 + 9z-Q.11 +
+// per-section probes throughout). L5 wires the two surfaces the UI
+// did not yet call (ResourceTypes + ServiceProviderConfig) into:
+//   useEndpointResourceTypes(id)             - GET /ResourceTypes
+//   useEndpointServiceProviderConfig(id)     - GET /ServiceProviderConfig
+//
+// Both are pure useQuery wrappers (no mutations) with a 5-min
+// staleTime - discovery rarely changes after endpoint configuration.
+
+const sampleResourceTypes = {
+  schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+  totalResults: 2,
+  startIndex: 1,
+  itemsPerPage: 2,
+  Resources: [
+    { id: 'User', name: 'User', endpoint: '/Users', schema: 'urn:ietf:params:scim:schemas:core:2.0:User' },
+    { id: 'Group', name: 'Group', endpoint: '/Groups', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group' },
+  ],
+};
+
+const sampleServiceProviderConfig = {
+  schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
+  patch: { supported: true },
+  filter: { supported: true, maxResults: 200 },
+  etag: { supported: true },
+  bulk: { supported: true, maxOperations: 1000, maxPayloadSize: 1048576 },
+  changePassword: { supported: false },
+  sort: { supported: true },
+  authenticationSchemes: [{ type: 'oauthbearertoken', primary: true }],
+};
+
+describe('queryKeys.discovery (Phase L5)', () => {
+  it('queryKeys.discovery.resourceTypes(id) is a stable per-endpoint key', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.discovery.resourceTypes('ep-1')).toEqual(['discovery', 'ep-1', 'resourceTypes']);
+  });
+
+  it('queryKeys.discovery.serviceProviderConfig(id) is a stable per-endpoint key', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.discovery.serviceProviderConfig('ep-1')).toEqual([
+      'discovery',
+      'ep-1',
+      'serviceProviderConfig',
+    ]);
+  });
+});
+
+describe('useEndpointResourceTypes (Phase L5)', () => {
+  it('GETs /scim/endpoints/:id/ResourceTypes and returns the ListResponse', async () => {
+    const { useEndpointResourceTypes } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(sampleResourceTypes),
+    });
+
+    const { result } = renderHook(() => useEndpointResourceTypes(EP_ID), { wrapper });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(`/scim/endpoints/${EP_ID}/ResourceTypes`);
+    expect(result.current.data).toEqual(sampleResourceTypes);
+  });
+
+  it('disabled when endpointId is empty (picker mounts before endpoint chosen)', async () => {
+    const { useEndpointResourceTypes } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useEndpointResourceTypes(''), { wrapper });
+    await act(async () => { await Promise.resolve(); });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.current.data).toBeUndefined();
+  });
+});
+
+describe('useEndpointServiceProviderConfig (Phase L5)', () => {
+  it('GETs /scim/endpoints/:id/ServiceProviderConfig and returns the SPC payload', async () => {
+    const { useEndpointServiceProviderConfig } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(sampleServiceProviderConfig),
+    });
+
+    const { result } = renderHook(
+      () => useEndpointServiceProviderConfig(EP_ID),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      `/scim/endpoints/${EP_ID}/ServiceProviderConfig`,
+    );
+    expect(result.current.data).toEqual(sampleServiceProviderConfig);
+  });
+
+  it('disabled when endpointId is empty', async () => {
+    const { useEndpointServiceProviderConfig } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(
+      () => useEndpointServiceProviderConfig(''),
+      { wrapper },
+    );
+    await act(async () => { await Promise.resolve(); });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.current.data).toBeUndefined();
+  });
+});

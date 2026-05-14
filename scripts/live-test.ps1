@@ -9933,6 +9933,76 @@ try {
 Write-Host "`n--- 9z-AD: Log Config UI-Shape Contract (L4) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AE: DISCOVERY EXPLORER UI-SHAPE CONTRACT (Phase L5)
+# ============================================
+$script:currentSection = "9z-AE: Discovery Explorer (L5)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AE: DISCOVERY EXPLORER UI-SHAPE CONTRACT (Phase L5)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend behavior for the three Discovery surfaces
+    # (/Schemas, /ResourceTypes, /ServiceProviderConfig) is exhaustively
+    # locked elsewhere (sections 8 + 9z-Q.11 + per-section probes).
+    # 9z-AE adds the small UI-consumed shape contract the new
+    # DiscoveryExplorerPage binds to (Phase L5):
+    #   - 3 surfaces all have the documented top-level keys
+    #   - characteristic keywords on a known attribute belong to the RFC valid set
+    #   - the diff reducer's classification keys (mutability / uniqueness /
+    #     returned) carry valid keywords on the published User schema
+
+    # 9z-AE.1: GET /ServiceProviderConfig has all 6 capability flag blocks the UI rows bind to
+    $spc = Invoke-RestMethod -Uri "$scimBase/ServiceProviderConfig" -Method GET -Headers $headers
+    $spcHasFlags = ($null -ne $spc.patch) -and ($null -ne $spc.filter) -and `
+                   ($null -ne $spc.etag) -and ($null -ne $spc.bulk) -and `
+                   ($null -ne $spc.changePassword) -and ($null -ne $spc.sort)
+    Test-Result -Success $spcHasFlags -Message "9z-AE.1: SPC has patch+filter+etag+bulk+changePassword+sort capability blocks"
+
+    # 9z-AE.2: each capability block has a `supported` boolean (the UI's row text reads it)
+    $allHaveSupported = ($null -ne $spc.patch.supported) -and ($null -ne $spc.filter.supported) -and `
+                       ($null -ne $spc.etag.supported) -and ($null -ne $spc.bulk.supported) -and `
+                       ($null -ne $spc.changePassword.supported) -and ($null -ne $spc.sort.supported)
+    Test-Result -Success $allHaveSupported -Message "9z-AE.2: every SPC capability block exposes a 'supported' boolean"
+
+    # 9z-AE.3: GET /ResourceTypes returns >=2 resources (User+Group baseline)
+    $rt = Invoke-RestMethod -Uri "$scimBase/ResourceTypes" -Method GET -Headers $headers
+    Test-Result -Success ($rt.totalResults -ge 2 -and $rt.Resources.Count -ge 2) -Message "9z-AE.3: ResourceTypes returns >=2 resources (got $($rt.totalResults))"
+
+    # 9z-AE.4: each ResourceType row has the 4 fields the single-endpoint view renders (id+name+endpoint+schema)
+    $rtRowsValid = $true
+    foreach ($r in $rt.Resources) {
+        if (-not ($r.id -and $r.name -and $r.endpoint -and $r.schema)) { $rtRowsValid = $false; break }
+    }
+    Test-Result -Success $rtRowsValid -Message "9z-AE.4: every ResourceType row has id+name+endpoint+schema"
+
+    # 9z-AE.5: GET /Schemas exposes the User schema with characteristic keywords inside the
+    # RFC 7643 valid sets. This is the same data the diff reducer classifies, so verifying
+    # the keywords are valid is the live-layer twin of the diff reducer's RFC-defaults rule.
+    $schemas = Invoke-RestMethod -Uri "$scimBase/Schemas" -Method GET -Headers $headers
+    $userSchema = $schemas.Resources | Where-Object { $_.id -eq "urn:ietf:params:scim:schemas:core:2.0:User" } | Select-Object -First 1
+    $userNameAttr = $null
+    if ($userSchema -and $userSchema.attributes) {
+        $userNameAttr = $userSchema.attributes | Where-Object { $_.name -eq "userName" } | Select-Object -First 1
+    }
+    $validMutability = @("readOnly", "readWrite", "immutable", "writeOnly")
+    $validUniqueness = @("none", "server", "global")
+    $validReturned = @("always", "default", "request", "never")
+    $charsValid = $false
+    if ($userNameAttr) {
+        # Per project Schema-Characteristic Test Rule: only assert when the characteristic is published.
+        $mutOk = (-not $userNameAttr.PSObject.Properties.Match('mutability') -or ($userNameAttr.mutability -in $validMutability))
+        $uniqOk = (-not $userNameAttr.PSObject.Properties.Match('uniqueness') -or ($userNameAttr.uniqueness -in $validUniqueness))
+        $retOk = (-not $userNameAttr.PSObject.Properties.Match('returned') -or ($userNameAttr.returned -in $validReturned))
+        $charsValid = $mutOk -and $uniqOk -and $retOk
+    }
+    Test-Result -Success $charsValid -Message "9z-AE.5: User.userName mutability/uniqueness/returned keywords are RFC-valid (mut=$($userNameAttr.mutability) uniq=$($userNameAttr.uniqueness) ret=$($userNameAttr.returned))"
+} catch {
+    Test-Result -Success $false -Message "9z-AE.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AE: Discovery Explorer UI-Shape Contract (L5) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

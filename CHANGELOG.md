@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0-alpha.5] - 2026-05-13 - Phase L5 - Discovery Explorer + Two-Endpoint Diff
+
+### Added
+- **Top-level Discovery Explorer at `/discovery`** (5th sidebar nav entry, between My profile and Logs). Three sub-tabs (ServiceProviderConfig | ResourceTypes | Schemas) each render the picked endpoint's read-only Discovery surface. Endpoint scope picker exposes a primary slot plus an optional secondary "Compare with another" slot; when two endpoints are picked the Schemas tab swaps to a side-by-side diff view that colors each attribute characteristic green (tighten), red (relax), grey (unchanged), or orange (incomparable / structural change). Cell colors are driven by a `data-status` attribute that mirrors the API's [tighten-only validator algebra](api/src/modules/scim/endpoint-profile/tighten-only-validator.ts) (`MUTABILITY_RANK`, `UNIQUENESS_RANK`, plus a coarse 2-rank `RETURNED_RANK` for the never-vs-visible split). Action toolbar: Copy as JSON (works), Copy as URN (works), Open in Workbench (disabled stub - wired in Phase M1), Refresh (manual refetch escape hatch). Closes [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.8.
+- **Pure diff reducer** in new [web/src/utils/discovery-diff.ts](web/src/utils/discovery-diff.ts) (~280 LoC). Re-encodes the API partial-order tables, applies RFC 7643 §2.2 default substitution BEFORE classifying (per the project's Schema-Characteristic Test Rule), and exposes `classifyCharacteristic(key, a, b) -> DiffStatus` plus `compareSchemas(a, b) -> SchemaDiffResult` with a per-cell tighten/relax/unchanged/incomparable/only-a/only-b classification.
+- **`useEndpointResourceTypes` + `useEndpointServiceProviderConfig` hooks** + `ScimResourceType` / `ScimResourceTypesResponse` / `ScimServiceProviderConfig` types + `endpointResourceTypesQueryOptions(id)` / `endpointServiceProviderConfigQueryOptions(id)` helpers + `queryKeys.discovery` factory in [web/src/api/queries.ts](web/src/api/queries.ts). Both cached 5min (Discovery rarely changes after endpoint configuration; matches `endpointSchemasQueryOptions` for cache-tier consistency across the three sub-tabs). Disabled when `endpointId` is empty so the picker can mount before the operator picks an endpoint.
+- **+42 web vitest tests** across 4 files: new [discovery-diff.test.ts](web/src/utils/discovery-diff.test.ts) +22 (equality on each char + tighten + relax + RFC default substitution + incomparable + cross-attribute walker + summary counts), extended [mutations.test.ts](web/src/api/mutations.test.ts) +6 (queryKeys.discovery stable per-endpoint keys + GET URL contracts for both surfaces + disabled-when-empty), new [DiscoveryExplorerPage.test.tsx](web/src/pages/DiscoveryExplorerPage.test.tsx) +11 (sub-tabs render + scope picker + secondary picker toggle + single-endpoint mode for each surface + two-endpoint diff render + cell `data-status` mirrors reducer + Copy as JSON wires clipboard + Open in Workbench disabled), plus +3 size-limit ratchet for the new chunk name.
+- **+5 live SCIM** in new section [9z-AE in scripts/live-test.ps1](scripts/live-test.ps1) covering UI-consumed shape contract: SPC has all 6 capability flag blocks (patch/filter/etag/bulk/changePassword/sort), every block exposes a `supported` boolean, ResourceTypes returns >=2 resources with id+name+endpoint+schema, User.userName characteristic keywords (mutability/uniqueness/returned) belong to the RFC valid sets (Schema-Characteristic Test Rule live-layer twin). Inserted before TEST SECTION 10 per live-test conventions.
+- New comprehensive feature doc [docs/PHASE_L5_DISCOVERY_EXPLORER.md](docs/PHASE_L5_DISCOVERY_EXPLORER.md).
+
+### Changed
+- Bundle: main entry 147.50 -> **149.33 KB gzipped** (+1.83 KB; new TabList + Tooltip primitives hoisted into the entry chunk for the sub-tab UI). Shared primitives 199.25 -> **201.17 KB gzipped** (+1.92 KB; same hoisting). New DiscoveryExplorerPage chunk: **4.35 KB gzipped** (96 % under the 110 KB ceiling). All **20 size-limit budgets pass** (size-limit-config test extended to lock the new `DiscoveryExplorerPage` chunk name + per-route 110 KB cap).
+- Sidebar nav grew from 6 to 7 entries (Dashboard, Endpoints, Manual Provision, My profile, **Discovery**, Logs, Settings).
+
+### Test counts (net new)
+
+| Layer | Pre-L5 (v0.50.0-alpha.4) | Post-L5 (v0.50.0-alpha.5) | Delta |
+|-------|-------------------------:|--------------------------:|------:|
+| API unit | 3,720 | 3,720 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 655 | **697** | **+42** |
+| Live SCIM | 955 | **960** | **+5** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,530 | **6,577** | **+47** |
+
+### Notes
+- Backend `/Schemas` + `/ResourceTypes` + `/ServiceProviderConfig` shipped pre-v0.20.0 and are exhaustively locked at the live layer (sections 8 + 9z-Q.11 + per-section probes throughout). L5 is pure UI plumbing + the small UI-shape contract section.
+- Pragmatic scope cut per the analysis doc: in-scope = the 3 read-only viewers + scope picker + 2-endpoint Schemas diff + the 3 action buttons. Out of scope (deferred to Phase M1 Workbench): wiring "Open in Workbench" to a real workbench (renders a disabled tooltip "Coming in Phase M1" today), schema-property edit history, RFC compliance score chart (deferred to Phase N analytics polish - requires an aggregator the backend doesn't have yet), sub-attribute diff drill-down.
+- Schema-Characteristic Test Rule (RFC 7643 §2.2 + §7) compliance: both the diff reducer (`RFC_DEFAULTS` table + `effective()` substitution) and the live test (`-not $attr.PSObject.Properties.Match('mutability') -or ...` defensive presence check) go through the present/default branch. No hardcoded `expect(attr.uniqueness).toBe('none')` anywhere.
+- Per-sub-phase quality gate next: deploy v0.50.0-alpha.5 to dev + 960+ live SCIM tests must all pass before Phase L6 starts (Operations cross-endpoint view).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.50.0-alpha.4] - 2026-05-13 - Phase L4 - Log Config Admin UI
 
 ### Added
