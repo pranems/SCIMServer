@@ -209,6 +209,22 @@ export const queryKeys = {
     serviceProviderConfig: (endpointId: string) =>
       ['discovery', endpointId, 'serviceProviderConfig'] as const,
   },
+  /**
+   * Phase L6: cross-endpoint operations surface. The legacy "Database
+   * Browser" tab covered this in the pre-redesign UI; the redesigned
+   * UI never restored it. L6 mounts `/operations` with 3 sub-tabs
+   * sourced from `GET /admin/database/{users,groups,statistics}`.
+   * Cached 30s - the data is operator-grade aggregation, not the
+   * SCIM-canonical per-endpoint resource list, so a short staleTime
+   * keeps it fresh without hammering the cross-endpoint query.
+   */
+  operations: {
+    users: (params: Record<string, unknown>) =>
+      ['operations', 'users', params] as const,
+    groups: (params: Record<string, unknown>) =>
+      ['operations', 'groups', params] as const,
+    statistics: ['operations', 'statistics'] as const,
+  },
 } as const;
 
 // ─── Query options helpers (Phase A4) ────────────────────────────────
@@ -881,6 +897,159 @@ export function useEndpointServiceProviderConfig(endpointId: string) {
   return useQuery<ScimServiceProviderConfig>({
     ...endpointServiceProviderConfigQueryOptions(endpointId),
     enabled: !!endpointId,
+  });
+}
+
+// ─── Phase L6: Cross-Endpoint Operations hooks ───────────────────────
+//
+// Backend /admin/database/{users,groups,statistics} ships an operator-
+// grade cross-endpoint view (one row per User / Group across every
+// endpoint registered on the server, plus a coarse statistics
+// envelope). The legacy "Database Browser" tab covered this in the
+// pre-redesign UI; the redesigned UI never restored it. L6 wires the
+// 3 surfaces into a new `/operations` route.
+
+export interface DatabaseUserRow {
+  id: string;
+  userName?: string;
+  scimId?: string;
+  externalId?: string | null;
+  active?: boolean;
+  endpointId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  groups?: Array<{ id: string; displayName?: string }>;
+  // Pass-through for any SCIM payload fields the backend echoes (the
+  // service spreads `...payload` into the row).
+  [key: string]: unknown;
+}
+
+export interface DatabaseGroupRow {
+  id: string;
+  displayName?: string;
+  memberCount?: number;
+  endpointId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
+}
+
+export interface DatabaseUsersResponse {
+  users: DatabaseUserRow[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface DatabaseGroupsResponse {
+  groups: DatabaseGroupRow[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface DatabaseStatisticsResponse {
+  users: { total: number; active: number; inactive: number };
+  groups: { total: number };
+  activity: { totalRequests: number; last24Hours: number };
+  database: {
+    type: string;
+    persistenceBackend: 'prisma' | 'inmemory';
+  };
+}
+
+export interface DatabaseUsersParams {
+  page: number;
+  limit: number;
+  search?: string;
+  active?: boolean;
+}
+
+export interface DatabaseGroupsParams {
+  page: number;
+  limit: number;
+  search?: string;
+}
+
+function buildDatabaseUsersUrl(params: DatabaseUsersParams): string {
+  const qs = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  if (params.search !== undefined && params.search !== '') {
+    qs.set('search', params.search);
+  }
+  if (params.active !== undefined) {
+    qs.set('active', String(params.active));
+  }
+  return `/scim/admin/database/users?${qs.toString()}`;
+}
+
+function buildDatabaseGroupsUrl(params: DatabaseGroupsParams): string {
+  const qs = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  if (params.search !== undefined && params.search !== '') {
+    qs.set('search', params.search);
+  }
+  return `/scim/admin/database/groups?${qs.toString()}`;
+}
+
+export const databaseUsersQueryOptions = (params: DatabaseUsersParams) => ({
+  queryKey: queryKeys.operations.users(params as unknown as Record<string, unknown>),
+  queryFn: () => fetchWithAuth<DatabaseUsersResponse>(buildDatabaseUsersUrl(params)),
+  staleTime: 30_000,
+});
+
+export const databaseGroupsQueryOptions = (params: DatabaseGroupsParams) => ({
+  queryKey: queryKeys.operations.groups(params as unknown as Record<string, unknown>),
+  queryFn: () => fetchWithAuth<DatabaseGroupsResponse>(buildDatabaseGroupsUrl(params)),
+  staleTime: 30_000,
+});
+
+export const databaseStatisticsQueryOptions = () => ({
+  queryKey: queryKeys.operations.statistics,
+  queryFn: () => fetchWithAuth<DatabaseStatisticsResponse>('/scim/admin/database/statistics'),
+  staleTime: 30_000,
+});
+
+/**
+ * Phase L6: paginated cross-endpoint users feed. Powers the All Users
+ * sub-tab of `/operations`. Disabled when limit is 0 so the consumer
+ * can render the toolbar before pagination is computed.
+ */
+export function useDatabaseUsers(params: DatabaseUsersParams) {
+  return useQuery<DatabaseUsersResponse>({
+    ...databaseUsersQueryOptions(params),
+    enabled: params.limit > 0,
+  });
+}
+
+/**
+ * Phase L6: paginated cross-endpoint groups feed. Powers the All
+ * Groups sub-tab of `/operations`.
+ */
+export function useDatabaseGroups(params: DatabaseGroupsParams) {
+  return useQuery<DatabaseGroupsResponse>({
+    ...databaseGroupsQueryOptions(params),
+    enabled: params.limit > 0,
+  });
+}
+
+/**
+ * Phase L6: aggregate cross-endpoint statistics. Powers the
+ * Statistics sub-tab of `/operations`.
+ */
+export function useDatabaseStatistics() {
+  return useQuery<DatabaseStatisticsResponse>({
+    ...databaseStatisticsQueryOptions(),
   });
 }
 

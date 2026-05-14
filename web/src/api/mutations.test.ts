@@ -1362,3 +1362,136 @@ describe('useEndpointServiceProviderConfig (Phase L5)', () => {
     expect(result.current.data).toBeUndefined();
   });
 });
+
+// ─── Phase L6: Cross-Endpoint Operations hooks ───────────────────────
+//
+// Backend /admin/database/{users,groups,statistics} ships an operator-
+// grade cross-endpoint view. The legacy "Database Browser" tab covered
+// this; the redesigned UI never restored it. L6 wires:
+//   useDatabaseUsers({ page, limit, search, active })   - GET /admin/database/users
+//   useDatabaseGroups({ page, limit, search })          - GET /admin/database/groups
+//   useDatabaseStatistics()                              - GET /admin/database/statistics
+
+describe('queryKeys.operations (Phase L6)', () => {
+  it('queryKeys.operations.users(params) is stable and serializes params', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.operations.users({ page: 1, limit: 50 })).toEqual([
+      'operations',
+      'users',
+      { page: 1, limit: 50 },
+    ]);
+  });
+
+  it('queryKeys.operations.groups(params) is stable and serializes params', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.operations.groups({ page: 2, limit: 25, search: 'eng' })).toEqual([
+      'operations',
+      'groups',
+      { page: 2, limit: 25, search: 'eng' },
+    ]);
+  });
+
+  it('queryKeys.operations.statistics is a stable prefix', async () => {
+    const { queryKeys: qk } = await import('./queries');
+    expect(qk.operations.statistics).toEqual(['operations', 'statistics']);
+  });
+});
+
+describe('useDatabaseUsers (Phase L6)', () => {
+  it('GETs /scim/admin/database/users with paged + searchable query string', async () => {
+    const { useDatabaseUsers } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const payload = {
+      users: [{ id: 'u1', userName: 'alice@x.com', active: true, endpointId: 'ep-1' }],
+      pagination: { page: 1, limit: 50, total: 1, pages: 1 },
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(payload),
+    });
+
+    const { result } = renderHook(
+      () => useDatabaseUsers({ page: 1, limit: 50, search: 'al' }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('/scim/admin/database/users');
+    expect(url).toContain('page=1');
+    expect(url).toContain('limit=50');
+    expect(url).toContain('search=al');
+    expect(result.current.data).toEqual(payload);
+  });
+
+  it('includes active=true|false in query string only when set', async () => {
+    const { useDatabaseUsers } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ users: [], pagination: { page: 1, limit: 50, total: 0, pages: 0 } }),
+    });
+
+    const { result } = renderHook(
+      () => useDatabaseUsers({ page: 1, limit: 50, active: false }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('active=false');
+  });
+});
+
+describe('useDatabaseGroups (Phase L6)', () => {
+  it('GETs /scim/admin/database/groups with paged query string', async () => {
+    const { useDatabaseGroups } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        groups: [{ id: 'g1', displayName: 'Eng', memberCount: 3, endpointId: 'ep-1' }],
+        pagination: { page: 2, limit: 25, total: 1, pages: 1 },
+      }),
+    });
+
+    const { result } = renderHook(
+      () => useDatabaseGroups({ page: 2, limit: 25 }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('/scim/admin/database/groups');
+    expect(url).toContain('page=2');
+    expect(url).toContain('limit=25');
+  });
+});
+
+describe('useDatabaseStatistics (Phase L6)', () => {
+  it('GETs /scim/admin/database/statistics and returns the aggregate payload', async () => {
+    const { useDatabaseStatistics } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const payload = {
+      users: { total: 12, active: 10, inactive: 2 },
+      groups: { total: 4 },
+      activity: { totalRequests: 1500, last24Hours: 42 },
+      database: { type: 'PostgreSQL', persistenceBackend: 'prisma' },
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(payload),
+    });
+
+    const { result } = renderHook(() => useDatabaseStatistics(), { wrapper });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    expect(fetchSpy.mock.calls[0][0]).toBe('/scim/admin/database/statistics');
+    expect(result.current.data).toEqual(payload);
+  });
+});

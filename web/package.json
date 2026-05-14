@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.50.0-alpha.5",
+  "version": "0.50.0-alpha.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -167,6 +167,12 @@
     {
       "name": "DiscoveryExplorerPage",
       "path": "dist/assets/DiscoveryExplorerPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "OperationsPage",
+      "path": "dist/assets/OperationsPage-*.js",
       "limit": "110 KB",
       "gzip": true
     }

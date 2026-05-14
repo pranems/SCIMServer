@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0-alpha.6] - 2026-05-14 - Phase L6 - Operations / Cross-Endpoint Operator View
+
+### Added
+- **Top-level Operations page at `/operations`** (6th sidebar nav entry, between Discovery and Logs). Three sub-tabs (All Users | All Groups | Statistics) wire the already-shipped `database.controller.ts` cross-endpoint surface that the redesigned UI never restored from the legacy "Database Browser" tab (analysis-doc S4.9). The 2 list tabs render paginated tables with Search + (users-only) Active-Only Switch + per-row endpoint Badge that deep-links to that endpoint`s Users/Groups tab via `useNavigate()`. The Statistics tab renders 4 KPI tiles (Users total / Users active / Groups total / Requests 24h) + a database type/backend caption. Each tab carries a Download CSV button that exports ONLY the visible (filtered + paginated) page via a new pure RFC 4180 serializer.
+- **Pure CSV serializer** in new [web/src/utils/csv-export.ts](web/src/utils/csv-export.ts) (~110 LoC). Two exports: `toCsv(rows, options?)` (RFC 4180 quote-if-needed + double-quote-doubling + columns-override-pins-order-and-filters + opt-in CRLF) and `triggerCsvDownload(filename, csv)` (Blob + synthetic anchor + Object URL revocation pattern mirroring SchemasTab Copy URN). No new dependency added (csv-stringify is ~6 KB gz but ships node-only APIs; papaparse is ~45 KB gz; the SCIM admin row sets are small enough that a hand-rolled tiny implementation is the right cut).
+- **`useDatabaseUsers` + `useDatabaseGroups` + `useDatabaseStatistics` hooks** + `DatabaseUserRow` / `DatabaseGroupRow` / `DatabaseUsersResponse` / `DatabaseGroupsResponse` / `DatabaseStatisticsResponse` types + `databaseUsersQueryOptions(params)` / `databaseGroupsQueryOptions(params)` / `databaseStatisticsQueryOptions()` helpers + `queryKeys.operations` factory in [web/src/api/queries.ts](web/src/api/queries.ts). 30s staleTime - the data is operator-grade aggregation, not SCIM-canonical, so short staleTime keeps freshness without hammering the cross-endpoint query.
+- **+34 web vitest tests** across 4 files: new [csv-export.test.ts](web/src/utils/csv-export.test.ts) +15 (empty input / column inference / row-order preservation / boolean+number+null+undefined / comma quoting / double-quote escape / newline quoting / nested values via JSON.stringify / CRLF / column override + Blob + triggerCsvDownload + cleanup), extended [mutations.test.ts](web/src/api/mutations.test.ts) +7 (queryKeys.operations stable factories + URL contracts for the 3 hooks + active=false serialization edge case), new [OperationsPage.test.tsx](web/src/pages/OperationsPage.test.tsx) +9 (3 sub-tabs render + endpoint picker badge + Statistics tiles + search resets page + empty state + 2 CSV download triggers + Link href contract), plus 3 size-limit ratchet (OperationsPage added to ROUTE_CHUNK_NAMES so the per-route 110 KB cap is locked).
+- **+5 live SCIM** in new section 9z-AF before TEST SECTION 10 per live-test conventions: users response envelope shape + every user row has endpointId key + groups response envelope shape + every group row has endpointId key + statistics envelope shape (users.total / users.active / groups.total / activity.last24Hours / database.{type,persistenceBackend}). Uses `PSObject.Properties.Match` defensive presence check per Schema-Characteristic Test Rule.
+- **+4 API unit tests** in [database.service.spec.ts](api/src/modules/database/database.service.spec.ts) under "Phase L6 - cross-endpoint endpointId projection" - locks `endpointId: true` in both prisma selects + asserts every response row carries endpointId.
+- New comprehensive feature doc [docs/PHASE_L6_OPERATIONS_VIEW.md](docs/PHASE_L6_OPERATIONS_VIEW.md).
+
+### Changed
+- **Backend additive projection:** [api/src/modules/database/database.service.ts](api/src/modules/database/database.service.ts) `getUsers` and `getGroups` prisma `select` blocks now include `endpointId: true`. In-memory branches map endpointId onto each row at the spread point. No schema change (the column was indexed since Phase 17); fully backward-compatible with the existing `toHaveProperty` assertions in admin-api-coverage e2e spec.
+- Bundle: main entry 149.33 -> **149.86 KB gzipped** (+0.53 KB; TabList already in entry chunk from L5, just SearchBox + Switch added). Shared primitives 201.17 -> **201.52 KB gzipped** (+0.35 KB). New OperationsPage chunk: **3.71 KB gzipped** (96 % under the 110 KB ceiling). All **21 size-limit budgets pass** (was 20; +1 for OperationsPage).
+- Sidebar nav grew from 7 to 8 entries (Dashboard, Endpoints, Manual Provision, My profile, Discovery, **Operations**, Logs, Settings).
+
+### Test counts (net new)
+
+| Layer | Pre-L6 (v0.50.0-alpha.5) | Post-L6 (v0.50.0-alpha.6) | Delta |
+|-------|--------------------------:|---------------------------:|------:|
+| API unit | 3,720 | **3,724** | **+4** |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 697 | **731** | **+34** |
+| Live SCIM | 960 | **965** | **+5** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,577 | **6,620** | **+43** |
+
+### Notes
+- Backend `database.controller.ts` shipped pre-v0.18.0 with full operator-grade aggregation (5 routes, paginated, searchable, in-memory + prisma branches). L6 is pure UI wire-up + a tiny additive backend projection (endpointId column).
+- Pragmatic scope cut per the analysis doc: in-scope = the 3 read-only views + per-row endpoint badge link + CSV export of the visible page. Out of scope (deferred): CSV column customization (deferred to Phase N3 export polish - requires column-picker UX), multi-page "export ALL" (deferred to N3 - requires server-side streaming + ETag pagination cursor), per-endpoint filter on the cross-endpoint view (the badge link is the inverse - clicking it pivots to one endpoint).
+- Schema-Characteristic Test Rule compliance: the live test uses `$g.PSObject.Properties.Match('endpointId')` defensive presence check rather than asserting a specific endpointId value, so the test passes regardless of whether rows are seeded under specific endpoints. The API unit + e2e tests lock the projection + response shape.
+- TanStack Router `<Link>` swallowed all 9 page tests synchronously when the target route wasn't registered in the in-memory test router. Replaced with a thin `EndpointBadgeLink` component (plain `<a href>` + `useNavigate` onClick) that renders cleanly in isolation AND still drives SPA navigation at runtime - this is the recommended pattern for cross-route badges that need testability.
+- **Phase L Capability Completeness is now COMPLETE (6 of 6 sub-phases)**. Per-sub-phase quality gate next: deploy v0.50.0-alpha.6 to dev + 965+ live SCIM tests must all pass on dev. After that gate passes, the v0.50.0 stable rollup drops the -alpha.N suffix and closes Phase L.
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.50.0-alpha.5] - 2026-05-13 - Phase L5 - Discovery Explorer + Two-Endpoint Diff
 
 ### Added

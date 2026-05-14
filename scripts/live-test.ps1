@@ -10003,6 +10003,73 @@ try {
 Write-Host "`n--- 9z-AE: Discovery Explorer UI-Shape Contract (L5) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AF: OPERATIONS / CROSS-ENDPOINT UI-SHAPE CONTRACT (Phase L6)
+# ============================================
+$script:currentSection = "9z-AF: Operations cross-endpoint (L6)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AF: OPERATIONS / CROSS-ENDPOINT UI-SHAPE CONTRACT (Phase L6)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend /admin/database/{users,groups,statistics} exhaustively covered
+    # by admin-api-coverage.e2e-spec.ts + database.service.spec.ts. 9z-AF
+    # adds the small UI-consumed shape contract the new OperationsPage
+    # binds to (Phase L6):
+    #   - users response has { users[], pagination } and rows carry endpointId
+    #   - groups response has { groups[], pagination } and rows carry endpointId
+    #   - statistics response has the documented envelope
+
+    # 9z-AF.1: GET /admin/database/users returns the documented envelope shape
+    $usersRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/users?page=1&limit=10" -Headers $headers
+    $usersOk = ($null -ne $usersRes.users) -and ($null -ne $usersRes.pagination) -and `
+               ($null -ne $usersRes.pagination.page) -and ($null -ne $usersRes.pagination.total)
+    Test-Result -Success $usersOk -Message "9z-AF.1: /admin/database/users has users[] + pagination(page+total)"
+
+    # 9z-AF.2: every user row carries an endpointId (or is null) - the column the UI Badge binds to.
+    # Per Schema-Characteristic-Test-Rule semantics, accept either explicit endpointId or
+    # endpointId:null when the row exists.
+    $usersHaveEndpointKey = $true
+    if ($usersRes.users.Count -gt 0) {
+        foreach ($u in $usersRes.users) {
+            if (-not $u.PSObject.Properties.Match('endpointId')) {
+                $usersHaveEndpointKey = $false
+                break
+            }
+        }
+    }
+    Test-Result -Success $usersHaveEndpointKey -Message "9z-AF.2: every user row has an endpointId key (rows=$($usersRes.users.Count))"
+
+    # 9z-AF.3: GET /admin/database/groups returns the documented envelope shape
+    $groupsRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/groups?page=1&limit=10" -Headers $headers
+    $groupsOk = ($null -ne $groupsRes.groups) -and ($null -ne $groupsRes.pagination) -and `
+                ($null -ne $groupsRes.pagination.page) -and ($null -ne $groupsRes.pagination.total)
+    Test-Result -Success $groupsOk -Message "9z-AF.3: /admin/database/groups has groups[] + pagination(page+total)"
+
+    # 9z-AF.4: every group row carries an endpointId key
+    $groupsHaveEndpointKey = $true
+    if ($groupsRes.groups.Count -gt 0) {
+        foreach ($g in $groupsRes.groups) {
+            if (-not $g.PSObject.Properties.Match('endpointId')) {
+                $groupsHaveEndpointKey = $false
+                break
+            }
+        }
+    }
+    Test-Result -Success $groupsHaveEndpointKey -Message "9z-AF.4: every group row has an endpointId key (rows=$($groupsRes.groups.Count))"
+
+    # 9z-AF.5: GET /admin/database/statistics returns the documented envelope
+    $stats = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/statistics" -Headers $headers
+    $statsOk = ($null -ne $stats.users.total) -and ($null -ne $stats.users.active) -and `
+               ($null -ne $stats.groups.total) -and ($null -ne $stats.activity.last24Hours) -and `
+               ($null -ne $stats.database.type) -and ($null -ne $stats.database.persistenceBackend)
+    Test-Result -Success $statsOk -Message "9z-AF.5: /admin/database/statistics has users.total + users.active + groups.total + activity.last24Hours + database.{type,persistenceBackend}"
+} catch {
+    Test-Result -Success $false -Message "9z-AF.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AF: Operations Cross-Endpoint UI-Shape Contract (L6) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

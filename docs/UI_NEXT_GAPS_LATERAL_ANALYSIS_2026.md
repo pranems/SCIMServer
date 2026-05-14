@@ -310,6 +310,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.9 Database / Cross-Endpoint Operator View
 
+> ✅ **CLOSED in v0.50.0-alpha.6 (Phase L6, 2026-05-14).** See [docs/PHASE_L6_OPERATIONS_VIEW.md](PHASE_L6_OPERATIONS_VIEW.md). New top-level `/operations` route (6th sidebar nav entry, between Discovery and Logs) wires the already-shipped `database.controller.ts` surface that the redesigned UI never restored. Three sub-tabs (All Users | All Groups | Statistics) - the 2 list tabs render paginated tables with Search + Active-Only Switch + per-row endpoint Badge deep-linking to the per-endpoint Users/Groups tab via `useNavigate()`. Statistics tab renders 4 KPI tiles + database type/backend caption. Each tab carries a Download CSV button driven by a new pure RFC 4180 serializer in [web/src/utils/csv-export.ts](../web/src/utils/csv-export.ts) (no new dependency added). New `useDatabaseUsers` + `useDatabaseGroups` + `useDatabaseStatistics` hooks + `queryKeys.operations` factory. Backend additive change: `endpointId: true` added to both `getUsers` and `getGroups` prisma selects + in-memory branches map endpointId per row. +34 web vitest (15 csv + 7 hooks + 9 page + 3 size-limit ratchet) + 4 API unit (endpointId projection lock) + 5 live SCIM in new section 9z-AF. **Closes Phase L Capability Completeness (6 of 6 sub-phases).**
+
 **Why:** [database.controller.ts](../api/src/modules/database/database.controller.ts) ships an operator-grade cross-endpoint view (all users, all groups, statistics). The legacy "Database Browser" tab covered this; the redesigned UI never restored it.
 
 **Shape:**

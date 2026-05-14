@@ -64,6 +64,8 @@ const ROUTE_FILES: ReadonlyArray<RouteFile> = [
   { file: 'me.tsx', pageComponents: ['MeProfilePage'] },
   // Phase L5
   { file: 'discovery.tsx', pageComponents: ['DiscoveryExplorerPage'] },
+  // Phase L6
+  { file: 'operations.tsx', pageComponents: ['OperationsPage'] },
 ];
 
 function readRoute(file: string): string {
