@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-05-14 - Phase L Capability Completeness - COMPLETE (6 of 6 sub-phases)
+
+Stable rollup of Phase L Capability Completeness. Drops the `-alpha.N` suffix after every Phase L sub-phase shipped, deployed to dev, and passed its 939+ -> 965+ live SCIM gate. Pure version cut + lockfile sync; no new features beyond the 6 already-released alphas.
+
+### Phase L sub-phases shipped (chronological)
+
+| Sub-phase | Version | Doc | Web vitest delta | Live SCIM delta |
+|---|---|---|--:|--:|
+| L1 - Endpoint CRUD UI + Preset Picker | 0.50.0-alpha.1 | [PHASE_L1_ENDPOINT_CRUD.md](docs/PHASE_L1_ENDPOINT_CRUD.md) | +30 (590 -> 620) | +6 (933 -> 939) |
+| L2 - /Me Self-Service UI | 0.50.0-alpha.2 | [PHASE_L2_ME_SELF_SERVICE.md](docs/PHASE_L2_ME_SELF_SERVICE.md) | +17 (620 -> 637) | +9 (939 -> 948) |
+| L3 - Activity Analytics Dashboard | 0.50.0-alpha.3 | [PHASE_L3_ACTIVITY_ANALYTICS.md](docs/PHASE_L3_ACTIVITY_ANALYTICS.md) | +7 (637 -> 644) | +4 (948 -> 952) |
+| L4 - Log Config Admin UI | 0.50.0-alpha.4 | [PHASE_L4_LOG_CONFIG_ADMIN.md](docs/PHASE_L4_LOG_CONFIG_ADMIN.md) | +11 (644 -> 655) | +3 (952 -> 955) |
+| L5 - Discovery Explorer + Two-Endpoint Diff | 0.50.0-alpha.5 | [PHASE_L5_DISCOVERY_EXPLORER.md](docs/PHASE_L5_DISCOVERY_EXPLORER.md) | +42 (655 -> 697) | +5 (955 -> 960) |
+| L6 - Operations / Cross-Endpoint Operator View | 0.50.0-alpha.6 | [PHASE_L6_OPERATIONS_VIEW.md](docs/PHASE_L6_OPERATIONS_VIEW.md) | +34 (697 -> 731) | +5 (960 -> 965) |
+
+### Cumulative test counts at v0.50.0 stable
+
+| Layer | Pre-Phase-L (v0.49.0) | Post-Phase-L (v0.50.0) | Delta |
+|-------|---------------------:|------------------------:|------:|
+| API unit | 3,720 | **3,724** | **+4** (L6 endpointId projection lock) |
+| API E2E | 1,184 | **1,186** | **+2** (L1 admin-endpoints-create spec) |
+| Web vitest | 590 | **731** | **+141** across L1-L6 |
+| Live SCIM | 933 | **965** | **+32** across L1-L6 (6 new sections 9z-AA -> 9z-AF) |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total assertions across 5 layers** | **6,441** | **6,620** | **+179** |
+
+### What Phase L closes
+
+After Phase L, an operator can do **everything with a mouse** that previously required curl + shell access:
+
+- Create / edit / delete endpoints with a 4-step wizard + preset picker (L1)
+- View their own /Me identity per endpoint with PATCH/Delete + OAuth-required hint (L2)
+- See cross-endpoint activity analytics on the dashboard (L3)
+- Change log levels + format + payload toggles + per-category overrides (L4)
+- Explore Schemas / ResourceTypes / ServiceProviderConfig per endpoint AND diff two endpoints side-by-side with red/green/grey cell coloring driven by the API tighten-only-validator algebra (L5)
+- See the cross-endpoint operator view (All Users / All Groups / Statistics) with per-row endpoint badge deep-link + CSV export (L6)
+
+### Bundle final at v0.50.0
+
+| Chunk | Pre-L (v0.49.0) | Post-L (v0.50.0) | Budget |
+|---|--:|--:|--:|
+| Main entry | 147 KB gz | **149.86 KB gz** | 200 KB |
+| Shared primitives | 199 KB gz | **201.52 KB gz** | 220 KB |
+| Per-route chunks | 14 chunks | **20 chunks** (added CreateEndpointWizard, EditEndpointPage, MeProfilePage, DiscoveryExplorerPage, OperationsPage; preset chunk via wizard sourcing) | 110 KB each |
+| Total size budgets | 16 | **21** (was 16; +2 L1 + 1 L2 + 1 L5 + 1 L6) | all passing |
+
+### Next phase: Phase M (The Workbench, ~18 days)
+
+Per [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S9:
+
+- **M1 SCIM Workbench** (filter+PATCH+history) - the killer feature, wires the existing tighten-only-validator algebra + endpoint/auth/schema awareness into a request-builder UX that round-trips into the regression test suite
+- **M2 Bulk Operations UI** - wires the already-shipped /Bulk surface
+- **M3 Custom Resource Type UI** - wires the existing custom-RT registration surface
+
+### Notes
+
+- Per-phase final quality gate next: deploy v0.50.0 to dev + 965+ live SCIM tests must all pass on dev.
+- **Prod promotion: NOT triggered** - prod still on v0.48.0 (Phase J SSE bridge). Standing rule: prod promotion is NEVER automatic; only triggered when user explicitly invokes `promote-to-prod.ps1` or the `deployAndPromote` prompt.
+
 ## [0.50.0-alpha.6] - 2026-05-14 - Phase L6 - Operations / Cross-Endpoint Operator View
 
 ### Added
