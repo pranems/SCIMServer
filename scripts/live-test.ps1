@@ -10156,14 +10156,20 @@ try {
 
     $ahStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $ahName = "live-test-9z-AH-$ahStamp"
+    # Create from preset, then PATCH BulkOperationsEnabled (the API
+    # rejects setting both profilePreset and profile in the same POST).
     $ahEpBody = @{
         name = $ahName
         profilePreset = "rfc-standard"
-        profile = @{ settings = @{ BulkOperationsEnabled = $true } }
     } | ConvertTo-Json -Depth 10
     $ahEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ahEpBody -ContentType 'application/json'
-    Test-Result -Success ($null -ne $ahEp.id) -Message "9z-AH.setup: created endpoint id=$($ahEp.id) with BulkOperationsEnabled"
+    Test-Result -Success ($null -ne $ahEp.id) -Message "9z-AH.setup: created endpoint id=$($ahEp.id) (rfc-standard preset)"
     $ahSBase = "$baseUrl/scim/endpoints/$($ahEp.id)"
+
+    # Enable BulkOperations via PATCH (rfc-standard preset has it on by default,
+    # but be explicit so the test does not depend on preset internals).
+    $ahPatchFlag = @{ profile = @{ settings = @{ BulkOperationsEnabled = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ahEp.id)" -Method PATCH -Headers $headers -Body $ahPatchFlag -ContentType 'application/json' | Out-Null
 
     # 9z-AH.1: assembled BulkRequest with 2 POST ops round-trips
     $ahBulkBody = @{
