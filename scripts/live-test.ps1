@@ -10314,7 +10314,7 @@ try {
     # 9z-AI.4: GET /Devices wildcard endpoint is now addressable
     # (returns ListResponse rather than 404 / 403)
     try {
-        $aiDevices = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/Devices" -Headers $headers -TimeoutSec 30
+        $aiDevices = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/Devices" -Headers $headers
         $listOk = ($null -ne $aiDevices.schemas -and $aiDevices.schemas[0] -eq "urn:ietf:params:scim:api:messages:2.0:ListResponse")
         Test-Result -Success $listOk -Message "9z-AI.4: GET /Devices wildcard endpoint returns ListResponse (CustomResourceTypesEnabled)"
     } catch {
