@@ -45,6 +45,7 @@ import { editEndpointRoute } from './routes/endpoints.$endpointId.edit';
 import { meRoute } from './routes/me';
 import { discoveryRoute } from './routes/discovery';
 import { operationsRoute } from './routes/operations';
+import { workbenchRoute } from './routes/workbench';
 import { queryClient } from './api/query-client';
 
 /** Endpoint detail layout with its 8 nested tab routes (overview + 7 explicit). */
@@ -78,6 +79,8 @@ export const routeTree = rootRoute.addChildren([
   discoveryRoute,
   // Phase L6 - Cross-endpoint Operations view
   operationsRoute,
+  // Phase M1 - SCIM Workbench
+  workbenchRoute,
 ]);
 
 /**

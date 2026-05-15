@@ -1495,3 +1495,129 @@ describe('useDatabaseStatistics (Phase L6)', () => {
     expect(result.current.data).toEqual(payload);
   });
 });
+
+// ─── Phase M1: useScimRequest free-form workbench mutation ──────────
+//
+// The Workbench needs to send arbitrary HTTP requests (any method,
+// any path under /scim/*, any body) and surface the structured
+// response (status + duration + headers + body) without any
+// invalidation or optimistic side-effects on the rest of the cache.
+
+describe('useScimRequest (Phase M1)', () => {
+  it('sends the request through the standard auth-aware fetch and returns status + duration + body', async () => {
+    const { useScimRequest } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const respPayload = { schemas: ['urn:...:ListResponse'], totalResults: 0, Resources: [] };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: (h: string) => (h.toLowerCase() === 'x-request-id' ? 'req-xyz' : null) },
+      json: () => Promise.resolve(respPayload),
+      text: () => Promise.resolve(JSON.stringify(respPayload)),
+    });
+
+    const { result } = renderHook(() => useScimRequest(), { wrapper });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.mutateAsync({
+        method: 'GET',
+        path: '/scim/endpoints/ep-1/Users',
+      });
+    });
+
+    const o = outcome as { status: number; durationMs: number; body: unknown; requestId?: string };
+    expect(o.status).toBe(200);
+    expect(o.body).toEqual(respPayload);
+    expect(typeof o.durationMs).toBe('number');
+    expect(o.durationMs).toBeGreaterThanOrEqual(0);
+    expect(o.requestId).toBe('req-xyz');
+    // Sent the right URL via fetch.
+    expect(fetchSpy.mock.calls[0][0]).toBe('/scim/endpoints/ep-1/Users');
+  });
+
+  it('forwards the body and Content-Type for POST', async () => {
+    const { useScimRequest } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: { get: () => null },
+      json: () => Promise.resolve({ id: 'new-1' }),
+      text: () => Promise.resolve('{"id":"new-1"}'),
+    });
+
+    const { result } = renderHook(() => useScimRequest(), { wrapper });
+    const body = { schemas: ['urn:...:User'], userName: 'new@x.com' };
+    await act(async () => {
+      await result.current.mutateAsync({
+        method: 'POST',
+        path: '/scim/endpoints/ep-1/Users',
+        body,
+      });
+    });
+
+    const opts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body as string)).toEqual(body);
+  });
+
+  it('captures non-2xx responses as a successful mutation outcome (does NOT throw)', async () => {
+    // Workbench needs to surface 4xx/5xx errors as part of the response
+    // viewer rather than the mutation-error path; otherwise the operator
+    // can`t see what the server returned.
+    const { useScimRequest } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const errBody = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+      status: '404',
+      scimType: 'noTarget',
+      detail: 'User not found',
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/scim+json' : null) },
+      text: () => Promise.resolve(JSON.stringify(errBody)),
+    });
+
+    const { result } = renderHook(() => useScimRequest(), { wrapper });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.mutateAsync({
+        method: 'GET',
+        path: '/scim/endpoints/ep-1/Users/missing',
+      });
+    });
+    const o = outcome as { status: number; body: unknown };
+    expect(o.status).toBe(404);
+    // Body is the parsed SCIM error envelope, not undefined.
+    expect((o.body as Record<string, unknown>)?.scimType).toBe('noTarget');
+  });
+
+  it('handles 204 No Content gracefully (body is undefined; status preserved)', async () => {
+    const { useScimRequest } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      headers: { get: () => null },
+      text: () => Promise.resolve(''),
+    });
+
+    const { result } = renderHook(() => useScimRequest(), { wrapper });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.mutateAsync({
+        method: 'DELETE',
+        path: '/scim/endpoints/ep-1/Users/u1',
+      });
+    });
+    const o = outcome as { status: number; body: unknown };
+    expect(o.status).toBe(204);
+    expect(o.body).toBeUndefined();
+  });
+});

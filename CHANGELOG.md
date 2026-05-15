@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.0-alpha.1] - 2026-05-15 - Phase M1 - SCIM Workbench (the killer feature)
+
+### Added
+- **Top-level Workbench page at `/workbench`** (7th sidebar nav entry, between Operations and Logs, `Beaker24Regular` icon). Free-form SCIM HTTP request builder per [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.2 (THE highest-leverage gap). Top toolbar: Method picker (GET/POST/PUT/PATCH/DELETE) + Path input (under `/scim/*`) + Endpoint convenience picker (selecting one pre-fills the path with `/scim/endpoints/<id>/Users`) + Send button. Body editor (monospace textarea) visible only for POST/PUT/PATCH; surfaces JSON parse errors inline. Response viewer: status badge color-coded (green 2xx / yellow 3xx / red 4xx-5xx) + duration ms + X-Request-Id (cross-references `/admin/logs`) + pretty-printed body. History list: ring buffer of last 50 requests persisted to `localStorage`, newest-first; clicking any row re-seeds the toolbar from it. Action row: Copy as curl + Copy as TypeScript snippets.
+- **3 new pure modules:**
+  - [web/src/utils/workbench-history.ts](web/src/utils/workbench-history.ts) - `localStorage` ring buffer (key `scimserver.workbench.history.v1`, cap 50, newest-first, corrupt-storage-safe)
+  - [web/src/utils/filter-builder.ts](web/src/utils/filter-builder.ts) - RFC 7644 §3.4.2.2 emitter + parser for the 10 standard operators (eq/ne/co/sw/ew/pr/gt/ge/lt/le); compound (and/or) emit supported; single-atom inverse parse
+  - [web/src/utils/patch-builder.ts](web/src/utils/patch-builder.ts) - RFC 7644 §3.5.2 PatchOp envelope assembly + per-op validation (rejects unknown op names, missing path on remove, missing value on add/replace)
+- **`useScimRequest` mutation hook** in [web/src/api/queries.ts](web/src/api/queries.ts) + `ScimRequestArgs` / `ScimRequestOutcome` types. Critically, does NOT throw on 4xx/5xx (the operator NEEDS to see the response body in the viewer; throwing would route those into the K3 ScimErrorMessage chrome and bury the body). 401 still triggers `clearStoredToken` + `notifyTokenInvalid` so a stale bearer doesn't get stuck in the workbench. Returns `{ status, durationMs, requestId, body }` for any status.
+- **+65 web vitest tests** across 5 files: new [workbench-history.test.ts](web/src/utils/workbench-history.test.ts) +9 (round-trip + ordering + cap + clear + corrupt-storage recovery), new [filter-builder.test.ts](web/src/utils/filter-builder.test.ts) +18 (all 10 RFC operators + value coercion + quote escape + AND/OR + parser inverse for every operator), new [patch-builder.test.ts](web/src/utils/patch-builder.test.ts) +18 (3 op names + envelope + validation + parseCurlPatchBody round-trip), extended [mutations.test.ts](web/src/api/mutations.test.ts) +4 (URL contract + body forwarding + 4xx-as-outcome + 204 graceful), new [WorkbenchPage.test.tsx](web/src/pages/WorkbenchPage.test.tsx) +13 (toolbar + body editor visibility + Send gate + Send fires hook + response viewer + history append + Copy as curl/TS + endpoint picker convenience + URL `?prefill` deep-link), plus 3 size-limit ratchet (WorkbenchPage added to ROUTE_CHUNK_NAMES).
+- **+5 live SCIM** in new section 9z-AG before TEST SECTION 10 per live-test conventions: setup creates rfc-standard endpoint, GET /ServiceProviderConfig returns 200 + X-Request-Id (the L5 deep-link target), POST /Users round-trips, PATCH /Users PatchOp envelope round-trips, DELETE /Users returns 204; cleanup removes the endpoint.
+- **L5 "Open in Workbench" stub WIRED to the real route** in [web/src/pages/DiscoveryExplorerPage.tsx](web/src/pages/DiscoveryExplorerPage.tsx). Was a disabled stub with "coming in Phase M1" tooltip; now navigates to `/workbench?prefill=<urlencoded-JSON>` packing the active sub-tab's surface URL as a GET request. Existing 11 L5 tests re-asserted - the disabled-stub test was rewritten to lock the new wired behavior (button enables once endpoint picked + navigates with correct path for SPC sub-tab). All 11 still pass.
+- New comprehensive feature doc [docs/PHASE_M1_SCIM_WORKBENCH.md](docs/PHASE_M1_SCIM_WORKBENCH.md).
+
+### Changed
+- Bundle: main entry 149.86 -> **150.13 KB gzipped** (+0.27 KB; minimal change since the workbench textarea + select are native HTML, not Fluent components). Shared primitives 201.52 -> **132.00 KB gzipped** (-69.52 KB; vite re-chunked when the WorkbenchPage's small surface area changed the dependency graph - several Fluent components moved out of the shared chunk into their per-route chunks where they're actually consumed). New WorkbenchPage chunk: **7.03 KB gzipped** (94 % under the 110 KB ceiling). All **22 size-limit budgets pass** (was 21; +1 for WorkbenchPage). Net total bundle is ~70 KB gzipped smaller.
+- Sidebar nav grew from 8 to 9 entries (Dashboard, Endpoints, Manual Provision, My profile, Discovery, Operations, **Workbench**, Logs, Settings).
+
+### Test counts (net new)
+
+| Layer | Pre-M1 (v0.50.0) | Post-M1 (v0.51.0-alpha.1) | Delta |
+|-------|----------------:|---------------------------:|------:|
+| API unit | 3,724 | 3,724 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 731 | **796** | **+65** |
+| Live SCIM | 965 | **970** | **+5** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,620 | **6,690** | **+70** |
+
+### Notes
+- M1 ships the minimal viable Workbench. Out of scope (deferred): visual filter builder UI (the reducer ships in M1; the click-to-build form is N6), visual PATCH builder UI (M2 / N6), `Save as snippet` (N4), `Save as live-test step` PowerShell-snippet emit (the killer differentiator; deferred to M2 alongside Bulk UI), diff tab on response viewer (M2), Monaco code editor (deferred indefinitely - textarea + JSON.parse error surface is sufficient and Monaco would add ~150 KB).
+- The minor version bump `0.50.0 -> 0.51.0-alpha.1` follows the established Phase-K and Phase-L pattern: each new phase opens with `0.NEXT.0-alpha.1`. Phase M will roll up to `0.51.0` stable after M1 + M2 + M3 ship and pass their dev gates.
+- Per-sub-phase quality gate next: deploy v0.51.0-alpha.1 to dev + 970+ live SCIM tests must all pass on dev before Phase M2 starts (Bulk Operations UI per analysis-doc S4.3).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.50.0] - 2026-05-14 - Phase L Capability Completeness - COMPLETE (6 of 6 sub-phases)
 
 Stable rollup of Phase L Capability Completeness. Drops the `-alpha.N` suffix after every Phase L sub-phase shipped, deployed to dev, and passed its 939+ -> 965+ live SCIM gate. Pure version cut + lockfile sync; no new features beyond the 6 already-released alphas.

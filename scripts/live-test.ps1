@@ -10070,6 +10070,74 @@ try {
 Write-Host "`n--- 9z-AF: Operations Cross-Endpoint UI-Shape Contract (L6) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AG: WORKBENCH ROUND-TRIP CONTRACT (Phase M1)
+# ============================================
+$script:currentSection = "9z-AG: Workbench round-trip (M1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AG: WORKBENCH ROUND-TRIP CONTRACT (Phase M1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # The Workbench is a free-form HTTP request builder against /scim/*.
+    # Backend semantics for every method + path it can target are
+    # exhaustively locked elsewhere (sections 1-9z-AF + admin-api-coverage
+    # e2e). 9z-AG adds the small UI-consumed contract the operator
+    # depends on:
+    #   - GET on the canonical Discovery surface returns the documented envelope (the
+    #     L5 'Open in Workbench' button deep-links to this exact path)
+    #   - POST /Users via free-form path round-trips and returns id + meta
+    #   - PATCH /Users via SCIM PatchOp envelope round-trips
+    #   - DELETE /Users returns 204 (Workbench shows status badge correctly)
+    #   - Server X-Request-Id header is set (Workbench history persists it)
+
+    # 9z-AG.setup: create endpoint with rfc-standard preset for round-trip
+    $agStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $agName = "live-test-9z-AG-$agStamp"
+    $agEpBody = @{ name = $agName; profilePreset = "rfc-standard" } | ConvertTo-Json
+    $agEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $agEpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $agEp.id) -Message "9z-AG.setup: created endpoint id=$($agEp.id)"
+    $agSBase = "$baseUrl/scim/endpoints/$($agEp.id)"
+
+    # 9z-AG.1: GET /ServiceProviderConfig returns envelope (the L5 'Open in Workbench' default deep-link)
+    $agSpcResp = Invoke-WebRequest -Uri "$agSBase/ServiceProviderConfig" -Method GET -Headers $headers -ErrorAction Stop
+    $agSpcRequestId = $agSpcResp.Headers['X-Request-Id']
+    if (-not $agSpcRequestId) { $agSpcRequestId = $agSpcResp.Headers['x-request-id'] }
+    Test-Result -Success (200 -eq [int]$agSpcResp.StatusCode) -Message "9z-AG.1: GET /ServiceProviderConfig returns 200 (Workbench deep-link target)"
+    Test-Result -Success ($null -ne $agSpcRequestId -and $agSpcRequestId.Length -gt 0) -Message "9z-AG.2: response carries X-Request-Id (Workbench history persists it)"
+
+    # 9z-AG.3: POST /Users via free-form path round-trips
+    $agUserName = "agworkbench-$agStamp@example.com"
+    $agPostBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $agUserName
+        active = $true
+    } | ConvertTo-Json -Depth 5
+    $agPostResp = Invoke-RestMethod -Uri "$agSBase/Users" -Method POST -Headers $headers -Body $agPostBody -ContentType 'application/scim+json'
+    Test-Result -Success ($null -ne $agPostResp.id) -Message "9z-AG.3: POST /Users round-trips (id=$($agPostResp.id))"
+
+    $agUserId = $agPostResp.id
+
+    # 9z-AG.4: PATCH /Users with SCIM PatchOp envelope round-trips
+    $agPatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{ op = "replace"; path = "displayName"; value = "AG Test User" })
+    } | ConvertTo-Json -Depth 5
+    $agPatchResp = Invoke-RestMethod -Uri "$agSBase/Users/$agUserId" -Method PATCH -Headers $headers -Body $agPatchBody -ContentType 'application/scim+json'
+    Test-Result -Success ($agPatchResp.displayName -eq "AG Test User") -Message "9z-AG.4: PATCH /Users PatchOp round-trips (displayName=$($agPatchResp.displayName))"
+
+    # 9z-AG.5: DELETE /Users returns 204 (Workbench shows green status badge)
+    $agDelResp = Invoke-WebRequest -Uri "$agSBase/Users/$agUserId" -Method DELETE -Headers $headers -ErrorAction Stop
+    Test-Result -Success (204 -eq [int]$agDelResp.StatusCode) -Message "9z-AG.5: DELETE /Users returns 204"
+
+    # 9z-AG cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($agEp.id)" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-AG.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AG: Workbench Round-Trip Contract (M1) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

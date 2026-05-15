@@ -1053,6 +1053,105 @@ export function useDatabaseStatistics() {
   });
 }
 
+// ─── Phase M1: useScimRequest free-form workbench mutation ───────────
+//
+// The Workbench (M1) sends arbitrary HTTP requests (any method, any
+// path under /scim/*, any body) and surfaces the structured response
+// (status + duration + headers + body) to the operator. Distinct from
+// `fetchWithAuth` in two ways:
+//
+//   1. Does NOT throw on non-2xx. The operator NEEDS to see the
+//      4xx/5xx response body in the response viewer; throwing would
+//      route those into the mutation's error path where the body is
+//      buried under the K3 ScimErrorMessage chrome.
+//   2. Returns a structured `ScimRequestOutcome` carrying status +
+//      durationMs + parsed body + requestId so the History ring
+//      buffer can persist them.
+//
+// All the auth header / 401-token-clearing semantics ARE shared with
+// fetchWithAuth (this hook reuses the same getStoredToken +
+// notifyTokenInvalid surface).
+
+export interface ScimRequestArgs {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  /**
+   * Absolute (`/scim/...`) path. Workbench passes a path that begins
+   * with `/scim/` so the operator can target any backend route.
+   */
+  path: string;
+  /** Optional request body. JSON-stringified when present. */
+  body?: unknown;
+  /** Optional If-Match header value (for ETag-aware operations). */
+  ifMatch?: string;
+}
+
+export interface ScimRequestOutcome {
+  status: number;
+  durationMs: number;
+  /** Server X-Request-Id, when present. */
+  requestId?: string;
+  /** Parsed JSON body. Undefined for 204 / empty body. */
+  body?: unknown;
+}
+
+export function useScimRequest() {
+  return useMutation<ScimRequestOutcome, Error, ScimRequestArgs>({
+    mutationFn: async (args) => {
+      const token = getStoredToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/scim+json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (args.ifMatch) {
+        headers['If-Match'] = args.ifMatch;
+      }
+      const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      let res: Response;
+      try {
+        res = await fetch(`${API_BASE}${args.path}`, {
+          method: args.method,
+          headers,
+          body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
+        });
+      } catch (e) {
+        // Network-level failure (DNS, CORS, offline). Propagate so the
+        // mutation surface shows a clear error.
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+      const end = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+      // 401 still triggers the standard token-clear flow so a stale
+      // bearer doesn't get stuck in the workbench.
+      if (res.status === 401) {
+        clearStoredToken();
+        notifyTokenInvalid();
+      }
+
+      const requestId = extractRequestId(res);
+      let body: unknown;
+      if (res.status !== 204) {
+        const text = await res.text().catch(() => '');
+        if (text.length > 0) {
+          try {
+            body = JSON.parse(text);
+          } catch {
+            // Non-JSON body (HTML error page, plain text, etc.) -
+            // surface the raw text so the operator can still see it.
+            body = text;
+          }
+        }
+      }
+
+      return {
+        status: res.status,
+        durationMs: Math.max(0, Math.round(end - start)),
+        requestId,
+        body,
+      };
+    },
+  });
+}
+
 /**
  * Phase L1: thin useQuery wrapper for the presets list. Drives the
  * CreateEndpointWizard Step 1 preset Combobox.

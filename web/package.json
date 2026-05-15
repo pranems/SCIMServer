@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.50.0",
+  "version": "0.51.0-alpha.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -173,6 +173,12 @@
     {
       "name": "OperationsPage",
       "path": "dist/assets/OperationsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "WorkbenchPage",
+      "path": "dist/assets/WorkbenchPage-*.js",
       "limit": "110 KB",
       "gzip": true
     }

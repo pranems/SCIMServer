@@ -129,6 +129,8 @@ describe('Phase H6 - size-limit budget contract', () => {
       'DiscoveryExplorerPage',
       // Phase L6
       'OperationsPage',
+      // Phase M1
+      'WorkbenchPage',
     ] as const;
 
     it.each(ROUTE_CHUNK_NAMES)(

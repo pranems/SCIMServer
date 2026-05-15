@@ -27,6 +27,7 @@ import {
   Person24Regular,
   Search24Regular,
   DataUsage24Regular,
+  Beaker24Regular,
 } from '@fluentui/react-icons';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED, HEADER_HEIGHT } from '../design/tokens';
@@ -94,6 +95,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'discovery', label: 'Discovery', icon: <Search24Regular />, href: '/discovery' },
   // Phase L6 - Cross-endpoint Operations view
   { key: 'operations', label: 'Operations', icon: <DataUsage24Regular />, href: '/operations' },
+  // Phase M1 - SCIM Workbench (the killer feature)
+  { key: 'workbench', label: 'Workbench', icon: <Beaker24Regular />, href: '/workbench' },
   { key: 'logs', label: 'Logs', icon: <DocumentText24Regular />, href: '/logs' },
   { key: 'settings', label: 'Settings', icon: <Settings24Regular />, href: '/settings' },
 ];

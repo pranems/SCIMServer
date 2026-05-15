@@ -23,6 +23,7 @@ const mockUseEndpoints = vi.fn();
 const mockUseEndpointSchemas = vi.fn();
 const mockUseEndpointResourceTypes = vi.fn();
 const mockUseEndpointServiceProviderConfig = vi.fn();
+const mockNavigate = vi.fn();
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -33,6 +34,18 @@ vi.mock('../api/queries', async () => {
     useEndpointResourceTypes: (id: string) => mockUseEndpointResourceTypes(id),
     useEndpointServiceProviderConfig: (id: string) =>
       mockUseEndpointServiceProviderConfig(id),
+  };
+});
+
+// Stub useNavigate so the M1-wired "Open in Workbench" button can be
+// observed without mounting the full router tree.
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
+    '@tanstack/react-router',
+  );
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
   };
 });
 
@@ -286,10 +299,23 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
     expect(parsed.patch?.supported).toBe(true);
   });
 
-  it('Open in Workbench button is disabled with a "coming in M1" tooltip stub', () => {
+  it('Open in Workbench button is enabled once an endpoint is picked AND navigates to /workbench with prefill (Phase M1)', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
+    // Disabled before any endpoint is picked.
+    const btnPre = screen.getByTestId('discovery-open-in-workbench');
+    expect(btnPre).toBeDisabled();
+    // Pick endpoint -> button enables.
     fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
     const btn = screen.getByTestId('discovery-open-in-workbench');
-    expect(btn).toBeDisabled();
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    // Default tab is ServiceProviderConfig -> path uses that surface.
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    const navArg = mockNavigate.mock.calls[0][0] as { to: string; search?: { prefill?: string } };
+    expect(navArg.to).toBe('/workbench');
+    const prefillRaw = decodeURIComponent(navArg.search?.prefill ?? '');
+    const parsed = JSON.parse(prefillRaw);
+    expect(parsed.method).toBe('GET');
+    expect(parsed.path).toBe('/scim/endpoints/ep-1/ServiceProviderConfig');
   });
 });

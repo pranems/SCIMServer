@@ -49,6 +49,7 @@ import {
   Open24Regular,
   ArrowSync20Regular,
 } from '@fluentui/react-icons';
+import { useNavigate } from '@tanstack/react-router';
 import {
   useEndpoints,
   useEndpointSchemas,
@@ -177,6 +178,7 @@ const useStyles = makeStyles({
 
 export const DiscoveryExplorerPage: React.FC = () => {
   const classes = useStyles();
+  const navigate = useNavigate();
 
   const endpoints = useEndpoints();
 
@@ -377,12 +379,27 @@ export const DiscoveryExplorerPage: React.FC = () => {
         </Button>
         <Tooltip
           relationship="label"
-          content="Open in Workbench - coming in Phase M1"
+          content="Open the active surface as a prefilled GET in the Workbench"
         >
           <Button
             appearance="subtle"
             icon={<Open24Regular />}
-            disabled
+            disabled={!primaryId}
+            onClick={() => {
+              // Build the canonical Discovery URL for the active sub-tab
+              // and deep-link the Workbench with method=GET prefilled.
+              const surface =
+                activeTab === 'serviceProviderConfig'
+                  ? 'ServiceProviderConfig'
+                  : activeTab === 'resourceTypes'
+                    ? 'ResourceTypes'
+                    : 'Schemas';
+              const path = `/scim/endpoints/${primaryId}/${surface}`;
+              const prefill = encodeURIComponent(
+                JSON.stringify({ method: 'GET', path }),
+              );
+              navigate({ to: '/workbench', search: { prefill } as Record<string, string> });
+            }}
             data-testid="discovery-open-in-workbench"
           >
             Open in Workbench
