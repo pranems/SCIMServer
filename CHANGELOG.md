@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-05-15 - Phase M (The Workbench) - COMPLETE (3 of 3 sub-phases)
+
+Stable rollup of Phase M (The Workbench). Drops the `-alpha.N` suffix after every Phase M sub-phase shipped, deployed to dev, and passed its 970+ -> 984 live SCIM gate. Pure version cut + lockfile sync; no new features beyond the 3 already-released alphas.
+
+### Phase M sub-phases shipped (chronological)
+
+| Sub-phase | Version | Doc | Web vitest delta | Live SCIM delta |
+|---|---|---|--:|--:|
+| M1 - SCIM Workbench (the killer feature) | 0.51.0-alpha.1 | [PHASE_M1_SCIM_WORKBENCH.md](docs/PHASE_M1_SCIM_WORKBENCH.md) | +65 (731 -> 796) | +5 (965 -> 970) |
+| M2 - Bulk Operations UI + Save-as-live-test killer | 0.51.0-alpha.2 | [PHASE_M2_BULK_OPERATIONS.md](docs/PHASE_M2_BULK_OPERATIONS.md) | +52 (796 -> 848) | +6 (970 -> 976) |
+| M3 - Custom Resource Type UI | 0.51.0-alpha.3 | [PHASE_M3_CUSTOM_RESOURCE_TYPES.md](docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md) | +12 (848 -> 860) | +6 (976 -> 982) |
+
+### Cumulative test counts at v0.51.0 stable
+
+| Layer | Pre-Phase-M (v0.50.0) | Post-Phase-M (v0.51.0) | Delta |
+|-------|----------------------:|------------------------:|------:|
+| API unit | 3,724 | 3,724 | 0 (frontend-only phase) |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 731 | **860** | **+129** across M1-M3 |
+| Live SCIM | 965 | **984** | **+19** across M1-M3 (3 new sections 9z-AG -> 9z-AI; live gate also picked up implicit assertions in pre-existing sections) |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total assertions across 5 layers** | **6,620** | **6,768** | **+148** |
+
+### What Phase M closes
+
+After Phase M, SCIMServer is the **only SCIM tool** with:
+- A built-in API workbench that round-trips into the regression test suite (M1 + M2 Save-as-live-test emitter; the killer differentiator from analysis-doc S4.2)
+- A bulk operations UI with CSV upload + per-op failure CSV download (M2)
+- A custom resource type registration UI gated by the same flag the backend honors (M3)
+
+The Workbench Save-as-live-test wiring is THE differentiator that "no other admin UI does". Every Workbench exploration becomes a regression test in two clicks - paste the snippet into a new section in `scripts/live-test.ps1` and the round-trip is locked into the 984-test suite.
+
+### Bundle final at v0.51.0
+
+| Chunk | Pre-M (v0.50.0) | Post-M (v0.51.0) | Budget |
+|---|--:|--:|--:|
+| Main entry | 149.86 KB gz | **150.55 KB gz** | 200 KB |
+| Shared primitives | 201.52 KB gz | **126.80 KB gz** (-74.72; vite re-chunked many Fluent surfaces into per-route chunks across M1-M3) | 220 KB |
+| Per-route chunks | 21 chunks | **24 chunks** (added WorkbenchPage / BulkTab / ResourceTypesTab) | 110 KB each |
+| Total size budgets | 21 | **24** (was 21; +3 across M1+M2+M3) | all passing |
+
+### Next phase: Phase N (UX & Polish, ~17 days)
+
+Per [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S9:
+
+- **N1 Notifications inbox** (3 days) - in-app surface for SCIM mutation events + admin audit + failed jobs
+- **N2 Onboarding wizard** (3 days) - first-run flow that walks the operator through endpoint create + token issue + verify
+- **N3 Export everywhere** (CSV / JSON, 2 days) - extends the M2 csv-export to every list page
+- **N4 Settings persistence** (3 days) - per-user preferences + Workbench saved snippets (M1-deferred)
+- **N5 Frontend telemetry sink** (3 days) - error / perf events to /admin/logs
+- **N6 Keyboard ergonomics** (3 days) - j/k row navigation, "/" focus toolbar search, gh-style shortcuts; conversational filter builder
+
+### Notes
+
+- Per-phase final quality gate next: deploy v0.51.0 to dev + 984+ live SCIM tests must all pass on dev.
+- **Prod promotion: NOT triggered** - prod still on v0.48.0 (Phase J SSE bridge). Standing rule: prod promotion is NEVER automatic; only triggered when user explicitly invokes `promote-to-prod.ps1` or the `deployAndPromote` prompt.
+
 ## [0.51.0-alpha.3] - 2026-05-15 - Phase M3 - Custom Resource Type UI
 
 ### Added
