@@ -52,6 +52,8 @@ const ROUTE_FILES: ReadonlyArray<RouteFile> = [
   { file: 'endpoints.$endpointId.activity.tsx', pageComponents: ['ActivityTab'] },
   { file: 'endpoints.$endpointId.schemas.tsx', pageComponents: ['SchemasTab'] },
   { file: 'endpoints.$endpointId.credentials.tsx', pageComponents: ['CredentialsTab'] },
+  // Phase M2
+  { file: 'endpoints.$endpointId.bulk.tsx', pageComponents: ['BulkTab'] },
   { file: 'endpoints.$endpointId.logs.tsx', pageComponents: ['LogsTab'] },
   { file: 'endpoints.$endpointId.settings.tsx', pageComponents: ['SettingsTab'] },
   { file: 'logs.tsx', pageComponents: ['LogsPage'] },

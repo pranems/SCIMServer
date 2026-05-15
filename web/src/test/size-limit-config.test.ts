@@ -115,6 +115,8 @@ describe('Phase H6 - size-limit budget contract', () => {
       'ActivityTab',
       'SchemasTab',
       'CredentialsTab',
+      // Phase M2
+      'BulkTab',
       'LogsTab',
       'SettingsTab',
       'LogsPage',

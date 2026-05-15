@@ -68,7 +68,7 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials';
+type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'bulk';
 
 interface EndpointDetailPageProps {
   endpointId: string;
@@ -81,6 +81,7 @@ function pathToTab(pathname: string, endpointId: string): TabValue {
   if (pathname.startsWith(`${base}/users`)) return 'users';
   if (pathname.startsWith(`${base}/groups`)) return 'groups';
   if (pathname.startsWith(`${base}/activity`)) return 'activity';
+  if (pathname.startsWith(`${base}/bulk`)) return 'bulk';
   if (pathname.startsWith(`${base}/schemas`)) return 'schemas';
   if (pathname.startsWith(`${base}/credentials`)) return 'credentials';
   if (pathname.startsWith(`${base}/logs`)) return 'logs';
@@ -133,6 +134,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
     }
     if (next === 'activity') {
       navigate({ to: '/endpoints/$endpointId/activity', params: { endpointId } });
+      return;
+    }
+    if (next === 'bulk') {
+      navigate({ to: '/endpoints/$endpointId/bulk', params: { endpointId } });
       return;
     }
     if (next === 'schemas') {
@@ -222,6 +227,7 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="users">Users</Tab>
         <Tab value="groups">Groups</Tab>
         <Tab value="activity">Activity</Tab>
+        <Tab value="bulk">Bulk</Tab>
         <Tab value="schemas">Schemas</Tab>
         <Tab value="credentials">Credentials</Tab>
         <Tab value="logs">Logs</Tab>

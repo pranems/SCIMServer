@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.0-alpha.2] - 2026-05-15 - Phase M2 - Bulk Operations UI
+
+### Added
+- **Per-endpoint Bulk tab at `/endpoints/$id/bulk`** (9th nested tab between Activity and Schemas, `Stack24Regular` icon). Per [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.3, wires the already-shipped `POST /scim/endpoints/:id/Bulk` surface (RFC 7644 §3.7, 1000-op cap, 1 MB payload) into a friendly UX. Pre-M2 the only consumer was scripts/live-test.ps1. **Shape:** Mode picker (POST/PATCH/DELETE) + Resource picker (Users/Groups) + CSV file input (drop-zone style, max 1 MB per server limit) + Mapping panel (one row per parsed CSV header, each mapping to a SCIM target attribute pre-populated with the column name; operator can override with extension-style URN keys) + Preview pane (assembled BulkRequest envelope, first 10 ops) + failOnErrors numeric input + Submit button. Result viewer: success/failure totals + color-coded per-op badges + Download failures CSV button (failure rows exported with `bulkId / method / status / scimType / detail` columns for retry triage).
+- **3 new pure modules:**
+  - [web/src/utils/csv-parse.ts](web/src/utils/csv-parse.ts) - RFC 4180 reverse of csv-export. State-machine reader: quoted vs unquoted, doubled quote escape, embedded newlines, CRLF + LF line terminators, malformed-quote returns error string + null rows. Round-trips perfectly with the M1 csv-export.
+  - [web/src/utils/bulk-builder.ts](web/src/utils/bulk-builder.ts) - RFC 7644 §3.7 BulkRequest assembler. POST mode: each row -> POST op with auto-assigned `bulkId='row-N'` + data carrying mapped attribute key/values + resource core schema URN. PATCH mode: id-injected path + data is a SCIM PatchOp envelope of replace ops; rows missing the id column are skipped defensively. DELETE mode: id-injected path with no data. Empty-string values are omitted (not serialized as data); extension-style dotted/URN target keys are preserved verbatim. Throws when row count exceeds `BULK_MAX_OPERATIONS=1000` (mirrors API constant).
+  - [web/src/utils/live-test-snippet.ts](web/src/utils/live-test-snippet.ts) - **THE killer differentiator** per analysis-doc S4.2 (M1-deferred to M2). Turns a Workbench history entry into a paste-ready PowerShell snippet for `scripts/live-test.ps1`. Output matches the existing 9z-* section idiom: `# 9z-XX.N: <label>` banner + `Invoke-WebRequest -Uri "$baseUrl<path>" -Method <X> -Headers $headers` + body via `ConvertFrom-Json | ConvertTo-Json -Depth 10` round-trip + `Test-Result -Success ([int]$response.StatusCode -eq <expected>)`. Embedded single-quotes in JSON are escaped per PowerShell here-string semantics. Wired to a new "Save as live-test" button on every Workbench history row.
+- **`useScimBulk(endpointId)` mutation hook** in [web/src/api/queries.ts](web/src/api/queries.ts) + `ScimBulkOutcome` type. Same no-throw-on-non-2xx semantics as M1 `useScimRequest` - the BulkPage NEEDS to surface partial failures (e.g. 2 of 100 rows rejected with their per-op error.scimType) in the result viewer + downloadable failure-rows CSV. 401 still triggers `clearStoredToken`. Returns `{ status, durationMs, requestId, body }`.
+- **+52 web vitest tests** across 5 files: new [csv-parse.test.ts](web/src/utils/csv-parse.test.ts) +14 (round-trip with toCsv + quote escape + multi-line cells + CRLF + missing-cells default + extra-cells dropped + malformed-quote error), new [bulk-builder.test.ts](web/src/utils/bulk-builder.test.ts) +16 (3 modes + bulkId auto-assignment + missing source -> omitted + empty-string -> omitted + idColumn injection + PATCH-without-id skipped + failOnErrors threshold + 1000-op cap throws + dotted-key preservation), new [live-test-snippet.test.ts](web/src/utils/live-test-snippet.test.ts) +11 (GET / POST / PATCH / DELETE + banner format + section/step defaults + $baseUrl wrapping + Test-Result assertion + single-quote escape + ConvertTo-Json pipe + label echo), extended [mutations.test.ts](web/src/api/mutations.test.ts) +2 (URL contract + 413 tooLarge as outcome not throw), new [BulkTab.test.tsx](web/src/pages/BulkTab.test.tsx) +9 (toolbar + CSV upload + mapping panel + preview + Submit fires hook + result viewer + Download failures CSV + failOnErrors + malformed CSV error). Plus +1 new test in [WorkbenchPage.test.tsx](web/src/pages/WorkbenchPage.test.tsx) asserting the new "Save as live-test" button shape.
+- **+6 live SCIM** in new section 9z-AH before TEST SECTION 10: setup creates rfc-standard endpoint with `BulkOperationsEnabled=true`, BulkResponse envelope schemas URN matches, Operations[] has 2 entries, every op carries bulkId+status, success ops carry location header, duplicate userName op returns 409 with `response.scimType='uniqueness'` (the BulkPage failure-CSV reads this); cleanup removes the endpoint.
+- **"Save as live-test" button column on Workbench history rows** - the M1-deferred killer differentiator now ships. Click any history row's button, the canonical PowerShell snippet (matching `scripts/live-test.ps1` style) lands in the clipboard. Existing 13 M1 Workbench tests pass unchanged + 1 new test locks the wiring.
+- New comprehensive feature doc [docs/PHASE_M2_BULK_OPERATIONS.md](docs/PHASE_M2_BULK_OPERATIONS.md).
+
+### Changed
+- Bundle: main entry 150.13 -> **150.47 KB gzipped** (+0.34 KB; minimal change since the BulkTab page uses native HTML inputs). Shared primitives 132.00 -> **126.80 KB gzipped** (-5.20 KB; vite re-chunked some Fluent components into a new `ScimErrorMessage-*.js` chunk consumed by both BulkTab and other error-handling surfaces). New BulkTab chunk: **3.47 KB gzipped** (97 % under the 110 KB ceiling). All **23 size-limit budgets pass** (was 22; +1 for BulkTab).
+- EndpointDetailPage tab list grew from 8 to 9 entries (Overview, Users, Groups, Activity, **Bulk**, Schemas, Credentials, Logs, Settings).
+
+### Test counts (net new)
+
+| Layer | Pre-M2 (v0.51.0-alpha.1) | Post-M2 (v0.51.0-alpha.2) | Delta |
+|-------|-------------------------:|---------------------------:|------:|
+| API unit | 3,724 | 3,724 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 796 | **848** | **+52** |
+| Live SCIM | 970 | **976** | **+6** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,690 | **6,748** | **+58** |
+
+### Notes
+- M2 closes both S4.3 (Bulk UI) AND the M1-deferred S4.2 "Save as live-test step" emitter. The "no other admin UI does this" claim from the analysis doc now ships in production form: any Workbench exploration becomes a `live-test.ps1` regression in two clicks.
+- Out of scope (deferred): schema-aware mapping autocomplete (N6 needs the schema-attribute introspection it brings), async bulk via `?async=true` (IETF draft not finalized), bulkId cross-reference DAG viewer (nice-to-have, not critical), multi-resource bulk (95 % of real workflows are single-resource).
+- Per-sub-phase quality gate next: deploy v0.51.0-alpha.2 to dev + 976+ live SCIM tests must all pass on dev before Phase M3 starts (Custom Resource Type UI per analysis-doc S4.4).
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.51.0-alpha.1] - 2026-05-15 - Phase M1 - SCIM Workbench (the killer feature)
 
 ### Added

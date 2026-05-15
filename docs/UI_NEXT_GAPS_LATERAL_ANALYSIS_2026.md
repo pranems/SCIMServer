@@ -208,6 +208,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.3 Bulk Operations UI
 
+> ✅ **CLOSED in v0.51.0-alpha.2 (Phase M2, 2026-05-15).** See [docs/PHASE_M2_BULK_OPERATIONS.md](PHASE_M2_BULK_OPERATIONS.md). New per-endpoint Bulk tab at `/endpoints/$id/bulk` (9th nested tab between Activity and Schemas, `Stack24Regular` icon). Wires `POST /scim/endpoints/:id/Bulk` (1000-op cap + 1 MB payload). Mode picker (POST/PATCH/DELETE) + Resource picker (Users/Groups) + CSV file input + Mapping panel + Preview pane (first 10 ops) + failOnErrors threshold input + Submit. Result viewer with success/failure totals + per-op badges + Download failures CSV (`bulkId / method / status / scimType / detail`). 3 new pure modules: [csv-parse.ts](../web/src/utils/csv-parse.ts) (RFC 4180 reader inverse of M1 csv-export), [bulk-builder.ts](../web/src/utils/bulk-builder.ts) (RFC 7644 §3.7 BulkRequest assembler), [live-test-snippet.ts](../web/src/utils/live-test-snippet.ts) (the M1-deferred killer differentiator - turns Workbench history entries into paste-ready PowerShell snippets matching the existing 9z-* section idiom). New `useScimBulk` hook + "Save as live-test" button column wired on Workbench history rows. +52 web vitest + 6 live SCIM in new section 9z-AH.
+
 **Why:** [endpoint-scim-bulk.controller.ts:72](../api/src/modules/scim/controllers/endpoint-scim-bulk.controller.ts) supports 1000-op batches with `bulkId` cross-references. Today the only consumer is [scripts/live-test.ps1](../scripts/live-test.ps1).
 
 **Shape:**

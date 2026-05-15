@@ -191,6 +191,24 @@ describe('WorkbenchPage (Phase M1)', () => {
     expect(rows.length).toBe(1);
   });
 
+  it('Save as live-test button on a history row copies a paste-ready PowerShell snippet (Phase M2)', async () => {
+    renderWithProviders(<WorkbenchPage />);
+    fireEvent.change(screen.getByTestId('workbench-path'), {
+      target: { value: '/scim/endpoints/ep-1/Users' },
+    });
+    fireEvent.click(screen.getByTestId('workbench-send'));
+    await waitFor(() => expect(screen.getByTestId('workbench-history')).toBeInTheDocument());
+    const saveBtn = screen.getAllByTestId(/^workbench-save-as-live-test-/)[0];
+    fireEvent.click(saveBtn);
+    expect((navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
+    const last = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[
+      (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls.length - 1
+    ][0] as string;
+    expect(last).toMatch(/Invoke-WebRequest/);
+    expect(last).toContain('/scim/endpoints/ep-1/Users');
+    expect(last).toMatch(/Test-Result\s+-Success/);
+  });
+
   // ─── 7-8. Copy as curl + Copy as TypeScript ────────────────────────
 
   it('Copy as curl writes a curl line containing the method + path', async () => {

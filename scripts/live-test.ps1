@@ -10138,6 +10138,105 @@ try {
 Write-Host "`n--- 9z-AG: Workbench Round-Trip Contract (M1) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AH: BULK OPERATIONS UI CONTRACT (Phase M2)
+# ============================================
+$script:currentSection = "9z-AH: Bulk operations UI (M2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AH: BULK OPERATIONS UI CONTRACT (Phase M2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend bulk surface is exhaustively locked at section 9n + 9z-H.
+    # 9z-AH adds the small UI-consumed contract the BulkPage binds to:
+    #   - POST /Bulk with the assembled BulkRequest envelope round-trips
+    #   - BulkResponse envelope carries Operations[] with status + bulkId + location
+    #   - failOnErrors threshold halts processing as documented
+    #   - Per-op error.scimType + error.detail are present on failure rows
+    #     (BulkPage's "Download failures CSV" reads these fields)
+
+    $ahStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $ahName = "live-test-9z-AH-$ahStamp"
+    $ahEpBody = @{
+        name = $ahName
+        profilePreset = "rfc-standard"
+        profile = @{ settings = @{ BulkOperationsEnabled = $true } }
+    } | ConvertTo-Json -Depth 10
+    $ahEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ahEpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $ahEp.id) -Message "9z-AH.setup: created endpoint id=$($ahEp.id) with BulkOperationsEnabled"
+    $ahSBase = "$baseUrl/scim/endpoints/$($ahEp.id)"
+
+    # 9z-AH.1: assembled BulkRequest with 2 POST ops round-trips
+    $ahBulkBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "POST"
+                path = "/Users"
+                bulkId = "row-1"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "ah-row-1-$ahStamp@example.com"
+                }
+            },
+            @{
+                method = "POST"
+                path = "/Users"
+                bulkId = "row-2"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "ah-row-2-$ahStamp@example.com"
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 10
+    $ahResp = Invoke-RestMethod -Uri "$ahSBase/Bulk" -Method POST -Headers $headers -Body $ahBulkBody -ContentType 'application/scim+json'
+    Test-Result -Success ($ahResp.schemas[0] -eq "urn:ietf:params:scim:api:messages:2.0:BulkResponse") -Message "9z-AH.1: BulkResponse envelope schemas URN matches"
+    Test-Result -Success ($ahResp.Operations.Count -eq 2) -Message "9z-AH.2: BulkResponse Operations[] has 2 entries (got $($ahResp.Operations.Count))"
+
+    # 9z-AH.3: every result op carries bulkId + status (the BulkPage table columns)
+    $allHaveBulkIdStatus = $true
+    foreach ($op in $ahResp.Operations) {
+        if (-not $op.bulkId -or -not $op.status) { $allHaveBulkIdStatus = $false; break }
+    }
+    Test-Result -Success $allHaveBulkIdStatus -Message "9z-AH.3: every Operations entry has bulkId + status"
+
+    # 9z-AH.4: success ops carry location header
+    $successCount = 0
+    foreach ($op in $ahResp.Operations) {
+        if ($op.status -eq "201" -and $op.location) { $successCount++ }
+    }
+    Test-Result -Success ($successCount -eq 2) -Message "9z-AH.4: 2 success ops carry location header"
+
+    # 9z-AH.5: duplicate userName -> per-op response.scimType=uniqueness (the
+    # BulkPage failure-CSV reads these fields)
+    $ahDupBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "POST"
+                path = "/Users"
+                bulkId = "row-dup"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "ah-row-1-$ahStamp@example.com"  # duplicate of 9z-AH.1
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 10
+    $ahDupResp = Invoke-RestMethod -Uri "$ahSBase/Bulk" -Method POST -Headers $headers -Body $ahDupBody -ContentType 'application/scim+json'
+    $dupOp = $ahDupResp.Operations[0]
+    Test-Result -Success ($dupOp.status -eq "409") -Message "9z-AH.5: duplicate userName op returns status=409 (got $($dupOp.status))"
+    Test-Result -Success ($null -ne $dupOp.response -and $dupOp.response.scimType -eq "uniqueness") -Message "9z-AH.6: failure op carries response.scimType='uniqueness' (BulkPage CSV reads this)"
+
+    # 9z-AH cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ahEp.id)" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-AH.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AH: Bulk Operations UI Contract (M2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

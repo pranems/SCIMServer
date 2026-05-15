@@ -1152,6 +1152,66 @@ export function useScimRequest() {
   });
 }
 
+// ─── Phase M2: useScimBulk - Bulk Operations submit hook ─────────────
+//
+// Wires `POST /scim/endpoints/:id/Bulk` (RFC 7644 §3.7) for the
+// BulkPage. Same no-throw-on-non-2xx semantics as `useScimRequest` -
+// the page needs to surface partial bulk failures (e.g. 2 of 100
+// rows rejected with their per-op error.scimType) in the result
+// viewer + downloadable failure-rows CSV.
+//
+// Reuses the same auth + 401-token-clear surface as fetchWithAuth.
+
+export interface ScimBulkOutcome {
+  status: number;
+  durationMs: number;
+  requestId?: string;
+  body?: unknown;
+}
+
+export function useScimBulk(endpointId: string) {
+  return useMutation<ScimBulkOutcome, Error, Record<string, unknown>>({
+    mutationFn: async (envelope) => {
+      const token = getStoredToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/scim+json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const res = await fetch(`${API_BASE}/scim/endpoints/${endpointId}/Bulk`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(envelope),
+      });
+      const end = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+      if (res.status === 401) {
+        clearStoredToken();
+        notifyTokenInvalid();
+      }
+
+      const requestId = extractRequestId(res);
+      let body: unknown;
+      const text = await res.text().catch(() => '');
+      if (text.length > 0) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = text;
+        }
+      }
+
+      return {
+        status: res.status,
+        durationMs: Math.max(0, Math.round(end - start)),
+        requestId,
+        body,
+      };
+    },
+  });
+}
+
+
 /**
  * Phase L1: thin useQuery wrapper for the presets list. Drives the
  * CreateEndpointWizard Step 1 preset Combobox.

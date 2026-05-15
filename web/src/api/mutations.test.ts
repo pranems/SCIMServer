@@ -1621,3 +1621,89 @@ describe('useScimRequest (Phase M1)', () => {
     expect(o.body).toBeUndefined();
   });
 });
+
+// ─── Phase M2: useScimBulk - Bulk Operations submit hook ─────────────
+//
+// Wires `POST /scim/endpoints/:id/Bulk` for the BulkPage. Distinct
+// from useScimRequest: the bulk surface ALWAYS POSTs (no method
+// picker), takes a typed BulkRequest envelope, and the response
+// shape is the canonical { schemas, Operations[] } from RFC 7644 §3.7.
+// Like useScimRequest, does NOT throw on 4xx/5xx so the page can
+// surface partial failures in the result viewer.
+
+describe('useScimBulk (Phase M2)', () => {
+  it('POSTs the BulkRequest envelope to /scim/endpoints/:id/Bulk and returns the BulkResponse', async () => {
+    const { useScimBulk } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    const respPayload = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkResponse'],
+      Operations: [
+        { method: 'POST', bulkId: 'row-1', status: '201', location: '/Users/u1' },
+        { method: 'POST', bulkId: 'row-2', status: '201', location: '/Users/u2' },
+      ],
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: (h: string) => (h.toLowerCase() === 'x-request-id' ? 'req-bulk' : null) },
+      json: () => Promise.resolve(respPayload),
+      text: () => Promise.resolve(JSON.stringify(respPayload)),
+    });
+
+    const envelope = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+      Operations: [
+        { method: 'POST', path: '/Users', bulkId: 'row-1', data: { userName: 'a@x.com' } },
+        { method: 'POST', path: '/Users', bulkId: 'row-2', data: { userName: 'b@x.com' } },
+      ],
+    };
+
+    const { result } = renderHook(() => useScimBulk(EP_ID), { wrapper });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.mutateAsync(envelope);
+    });
+
+    const o = outcome as { status: number; body: { Operations?: Array<{ status: string }> }; requestId?: string };
+    expect(o.status).toBe(200);
+    expect(o.body.Operations).toHaveLength(2);
+    expect(o.body.Operations?.[0].status).toBe('201');
+    expect(o.requestId).toBe('req-bulk');
+
+    // URL is /scim/endpoints/:id/Bulk; method POST; body is the envelope.
+    expect(fetchSpy.mock.calls[0][0]).toBe(`/scim/endpoints/${EP_ID}/Bulk`);
+    const opts = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body as string)).toEqual(envelope);
+  });
+
+  it('captures non-2xx outcomes (e.g. 413 too-large) without throwing', async () => {
+    const { useScimBulk } = await import('./queries');
+    const { wrapper } = createWrapper();
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 413,
+      headers: { get: () => null },
+      text: () => Promise.resolve(JSON.stringify({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+        status: '413',
+        scimType: 'tooLarge',
+        detail: 'Bulk payload exceeds 1 MB',
+      })),
+    });
+
+    const { result } = renderHook(() => useScimBulk(EP_ID), { wrapper });
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.mutateAsync({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+        Operations: [],
+      });
+    });
+    const o = outcome as { status: number; body: { scimType?: string } };
+    expect(o.status).toBe(413);
+    expect(o.body.scimType).toBe('tooLarge');
+  });
+});

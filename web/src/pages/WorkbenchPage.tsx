@@ -48,6 +48,7 @@ import {
   Delete24Regular,
   History24Regular,
   Beaker24Regular,
+  Save24Regular,
 } from '@fluentui/react-icons';
 import { useSearch } from '@tanstack/react-router';
 import { useEndpoints, useScimRequest, type ScimRequestOutcome } from '../api/queries';
@@ -57,6 +58,7 @@ import {
   clearHistory,
   type WorkbenchHistoryEntry,
 } from '../utils/workbench-history';
+import { emitLiveTestSnippet } from '../utils/live-test-snippet';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -467,6 +469,7 @@ export const WorkbenchPage: React.FC = () => {
                 <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>path</th>
                 <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>status</th>
                 <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>ms</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>save</th>
               </tr>
             </thead>
             <tbody>
@@ -495,6 +498,28 @@ export const WorkbenchPage: React.FC = () => {
                   </td>
                   <td className={classes.historyCell}>
                     <Caption1>{entry.durationMs}</Caption1>
+                  </td>
+                  <td className={classes.historyCell}>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      icon={<Save24Regular />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const snippet = emitLiveTestSnippet({
+                          method: entry.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+                          path: entry.path,
+                          body: entry.requestBody,
+                          expectedStatus: entry.status,
+                          label: `${entry.method} ${entry.path}`,
+                        });
+                        void navigator.clipboard.writeText(snippet);
+                      }}
+                      data-testid={`workbench-save-as-live-test-${entry.id}`}
+                      title="Copy as live-test.ps1 snippet"
+                    >
+                      Save as live-test
+                    </Button>
                   </td>
                 </tr>
               ))}
