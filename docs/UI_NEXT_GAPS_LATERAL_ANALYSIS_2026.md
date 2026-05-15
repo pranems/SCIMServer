@@ -228,6 +228,8 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.4 Custom Resource Type Registration UI
 
+> ✅ **CLOSED in v0.51.0-alpha.3 (Phase M3, 2026-05-15).** See [docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md](PHASE_M3_CUSTOM_RESOURCE_TYPES.md). New per-endpoint Resource Types tab at `/endpoints/$id/resource-types` (10th nested tab between Bulk and Schemas, `CubeTree24Regular` icon). Gated by `CustomResourceTypesEnabled` flag; shows feature-disabled MessageBar pointing at Settings when off. Lists existing custom RTs (filters out built-in User/Group). Create dialog with inline validation rejecting reserved names + reserved endpoints + duplicates. Delete confirm uses the L1 type-name-to-confirm pattern. As of v0.28.0 the dedicated admin RT API was REMOVED; custom RTs live in `endpoint.profile.resourceTypes[]` and M3 reuses L1 `useUpdateEndpointConfig` to PATCH the merged profile (single optimistic-update path). +12 web vitest + 6 live SCIM in new section 9z-AI. Closes Phase M (3 of 3 sub-phases shipped).
+
 **Why:** [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) shipped in v0.18.0. The feature is invisible in the UI. Customers paying for "extensible SCIM" cannot extend it without curl.
 
 **Shape:**

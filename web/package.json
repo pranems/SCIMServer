@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.51.0-alpha.2",
+  "version": "0.51.0-alpha.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -119,6 +119,12 @@
     {
       "name": "BulkTab",
       "path": "dist/assets/BulkTab-*.js",
+      "limit": "110 KB",
+      "gzip": true
+    },
+    {
+      "name": "ResourceTypesTab",
+      "path": "dist/assets/ResourceTypesTab-*.js",
       "limit": "110 KB",
       "gzip": true
     },

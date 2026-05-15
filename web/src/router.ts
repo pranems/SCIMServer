@@ -38,6 +38,7 @@ import { activityTabRoute } from './routes/endpoints.$endpointId.activity';
 import { schemasTabRoute } from './routes/endpoints.$endpointId.schemas';
 import { credentialsTabRoute } from './routes/endpoints.$endpointId.credentials';
 import { bulkTabRoute } from './routes/endpoints.$endpointId.bulk';
+import { resourceTypesTabRoute } from './routes/endpoints.$endpointId.resource-types';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
 import { manualProvisionRoute } from './routes/manual-provision';
@@ -49,7 +50,7 @@ import { operationsRoute } from './routes/operations';
 import { workbenchRoute } from './routes/workbench';
 import { queryClient } from './api/query-client';
 
-/** Endpoint detail layout with its 9 nested tab routes (overview + 8 explicit). */
+/** Endpoint detail layout with its 10 nested tab routes (overview + 9 explicit). */
 const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   overviewTabRoute,
   usersTabRoute,
@@ -61,6 +62,8 @@ const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   credentialsTabRoute,
   // Phase M2 - Bulk Operations UI
   bulkTabRoute,
+  // Phase M3 - Custom Resource Types UI
+  resourceTypesTabRoute,
 ]);
 
 /** Full route tree exported for inspection in tests. */

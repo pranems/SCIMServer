@@ -10243,6 +10243,108 @@ try {
 Write-Host "`n--- 9z-AH: Bulk Operations UI Contract (M2) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AI: CUSTOM RESOURCE TYPES UI CONTRACT (Phase M3)
+# ============================================
+$script:currentSection = "9z-AI: Custom Resource Types UI (M3)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AI: CUSTOM RESOURCE TYPES UI CONTRACT (Phase M3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend custom-resource-type registration semantics are exhaustively
+    # locked at section 9m-B and 9m-C. As of v0.28.0 the dedicated admin
+    # RT API was REMOVED; custom RTs now live in
+    # endpoint.profile.resourceTypes[] and are added/removed via PATCH
+    # /admin/endpoints/:id with the merged profile.
+    #
+    # 9z-AI adds the small UI-consumed contract the M3
+    # ResourceTypesTab binds to:
+    #   - PATCH /admin/endpoints with merged profile.resourceTypes +
+    #     profile.schemas[] registers a custom RT
+    #   - The new RT appears in /Schemas + /ResourceTypes discovery
+    #   - The wildcard /:resourceType endpoint becomes addressable
+    #     (CustomResourceTypesEnabled flag on)
+    #   - PATCH with the filtered resourceTypes[] removes the RT
+    #     (built-in User + Group remain)
+
+    $aiStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $aiName = "live-test-9z-AI-$aiStamp"
+
+    # 9z-AI.setup: create endpoint with rfc-standard preset
+    $aiEpBody = @{ name = $aiName; profilePreset = "rfc-standard" } | ConvertTo-Json
+    $aiEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $aiEpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $aiEp.id) -Message "9z-AI.setup: created endpoint id=$($aiEp.id) (rfc-standard preset)"
+
+    # Enable CustomResourceTypesEnabled via PATCH (the M3 UI gates the
+    # Create button on this flag; the API gates the wildcard route too).
+    $aiPatchFlag = @{ profile = @{ settings = @{ CustomResourceTypesEnabled = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method PATCH -Headers $headers -Body $aiPatchFlag -ContentType 'application/json' | Out-Null
+
+    # 9z-AI.1: PATCH endpoint with merged profile.resourceTypes + profile.schemas
+    # registers a custom Device RT (this is what the M3 ResourceTypesTab
+    # Create dialog Submit handler does).
+    $deviceSchemaUrn = "urn:ietf:params:scim:schemas:custom:Device-$aiStamp"
+    $aiCreateBody = @{
+        profile = @{
+            resourceTypes = @(
+                @{ id = "User"; name = "User"; endpoint = "/Users"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() },
+                @{ id = "Group"; name = "Group"; endpoint = "/Groups"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() },
+                @{ id = "Device"; name = "Device"; endpoint = "/Devices"; description = "Custom Device RT"; schema = $deviceSchemaUrn; schemaExtensions = @() }
+            )
+            schemas = @(
+                @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = @() },
+                @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = @() },
+                @{ id = $deviceSchemaUrn; name = "Device"; description = "Custom Device schema"; attributes = @() }
+            )
+        }
+    } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method PATCH -Headers $headers -Body $aiCreateBody -ContentType 'application/json' | Out-Null
+    Test-Result -Success $true -Message "9z-AI.1: PATCH with merged profile.resourceTypes + profile.schemas registers Device RT"
+
+    # 9z-AI.2: GET /Schemas reflects the new Device schema
+    $aiSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/Schemas" -Headers $headers
+    $deviceSchemaPresent = $aiSchemas.Resources | Where-Object { $_.id -eq $deviceSchemaUrn } | Select-Object -First 1
+    Test-Result -Success ($null -ne $deviceSchemaPresent) -Message "9z-AI.2: GET /Schemas reflects the new Device schema URN"
+
+    # 9z-AI.3: GET /ResourceTypes reflects the new Device RT
+    $aiRTs = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/ResourceTypes" -Headers $headers
+    $deviceRTPresent = $aiRTs.Resources | Where-Object { $_.id -eq "Device" } | Select-Object -First 1
+    Test-Result -Success ($null -ne $deviceRTPresent -and $deviceRTPresent.endpoint -eq "/Devices") -Message "9z-AI.3: GET /ResourceTypes reflects the new Device RT (endpoint=/Devices)"
+
+    # 9z-AI.4: GET /Devices wildcard endpoint is now addressable
+    # (returns ListResponse rather than 404 / 403)
+    try {
+        $aiDevices = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/Devices" -Headers $headers -TimeoutSec 30
+        $listOk = ($null -ne $aiDevices.schemas -and $aiDevices.schemas[0] -eq "urn:ietf:params:scim:api:messages:2.0:ListResponse")
+        Test-Result -Success $listOk -Message "9z-AI.4: GET /Devices wildcard endpoint returns ListResponse (CustomResourceTypesEnabled)"
+    } catch {
+        Test-Result -Success $false -Message "9z-AI.4: GET /Devices wildcard endpoint failed: $($_.Exception.Message)"
+    }
+
+    # 9z-AI.5: PATCH with filtered resourceTypes[] removes Device
+    # (this is what the M3 Delete-confirm dialog Submit handler does).
+    $aiDeleteBody = @{
+        profile = @{
+            resourceTypes = @(
+                @{ id = "User"; name = "User"; endpoint = "/Users"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() },
+                @{ id = "Group"; name = "Group"; endpoint = "/Groups"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+            )
+        }
+    } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method PATCH -Headers $headers -Body $aiDeleteBody -ContentType 'application/json' | Out-Null
+    $aiRTsAfter = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/ResourceTypes" -Headers $headers
+    $deviceStillPresent = $aiRTsAfter.Resources | Where-Object { $_.id -eq "Device" }
+    Test-Result -Success ($null -eq $deviceStillPresent) -Message "9z-AI.5: PATCH with filtered resourceTypes[] removes Device (User + Group remain)"
+
+    # 9z-AI cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-AI.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AI: Custom Resource Types UI Contract (M3) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

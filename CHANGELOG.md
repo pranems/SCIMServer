@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.0-alpha.3] - 2026-05-15 - Phase M3 - Custom Resource Type UI
+
+### Added
+- **Per-endpoint Resource Types tab at `/endpoints/$id/resource-types`** (10th nested tab between Bulk and Schemas, `CubeTree24Regular` icon). Per [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.4, wires the already-shipped custom-resource-type machinery (G8b, v0.18.0) into a friendly UX. Pre-M3 the feature was invisible from the UI; customers paying for "extensible SCIM" could not extend it without curl. **Shape:** Title + Create button (gated by `CustomResourceTypesEnabled` flag - shows feature-disabled MessageBar with link to Settings when off) + list of existing custom RTs (filters out built-in User and Group; each row shows name + endpoint + schema URN + Delete icon button). Create dialog: name + endpoint + schema URN + optional description fields with inline validation (`<Field validationState=...>`) rejecting reserved names (`User`, `Group`), reserved endpoints (`/Users`, `/Groups`, `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`, `/Bulk`, `/Me`), regex violations, and per-endpoint duplicates. Submit disabled until all 3 required fields validate. Delete confirm: type-name-to-confirm modal (mirrors L1 DeleteEndpointDialog pattern); Submit disabled until exact name match. **No new HTTP hook** - as of v0.28.0 the dedicated admin RT API was REMOVED, so M3 reuses the L1 `useUpdateEndpointConfig` mutation hook (the same hook that powers SettingsTab toggle flips) to PATCH the endpoint with merged `profile.resourceTypes[]` + `profile.schemas[]` arrays. Two benefits: (1) single optimistic-update path - the L1 deep-merge logic handles RT operations for free, (2) no new live test of the hook surface - the existing 9z-Z (config flag toggles) locks the same PATCH.
+- **+12 web vitest tests** across 4 files: new [ResourceTypesTab.test.tsx](web/src/pages/ResourceTypesTab.test.tsx) +9 (flag gating + EmptyState + list filtering + Create dialog renders + submit PATCHes merged profile + name validation + endpoint validation + Delete confirm + filtered PATCH on Delete), plus +3 wiring contract churn (lazy-routes test + size-limit-config test + EndpointDetailPage tab branch).
+- **+6 live SCIM** in new section 9z-AI before TEST SECTION 10: setup creates rfc-standard endpoint, PATCH with merged profile registers Device RT, GET /Schemas reflects the new schema URN, GET /ResourceTypes reflects the new Device RT, GET /Devices wildcard endpoint returns ListResponse (CustomResourceTypesEnabled gate), PATCH with filtered resourceTypes[] removes Device. Cleanup removes the endpoint.
+- New comprehensive feature doc [docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md](docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md).
+
+### Changed
+- Bundle: main entry 150.47 -> **150.55 KB gzipped** (+0.08 KB; minimal change since the page reuses existing FormDialog primitive). Shared primitives unchanged at **126.80 KB gzipped**. New ResourceTypesTab chunk: **2.93 KB gzipped** (97 % under the 110 KB ceiling). All **24 size-limit budgets pass** (was 23; +1 for ResourceTypesTab).
+- EndpointDetailPage tab list grew from 9 to 10 entries (Overview, Users, Groups, Activity, Bulk, **Resource types**, Schemas, Credentials, Logs, Settings).
+
+### Test counts (net new)
+
+| Layer | Pre-M3 (v0.51.0-alpha.2) | Post-M3 (v0.51.0-alpha.3) | Delta |
+|-------|--------------------------:|---------------------------:|------:|
+| API unit | 3,724 | 3,724 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 848 | **860** | **+12** |
+| Live SCIM | 976 | **982** | **+6** |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,748 | **6,766** | **+18** |
+
+### Notes
+- M3 is the THIRD and FINAL sub-phase in Phase M (The Workbench). M1 + M2 + M3 all shipped; the v0.51.0 stable rollup follows after the dev gate passes.
+- Out of scope (deferred): schema URN autocomplete from cached /Schemas (N6), per-resource-type CRUD detail list (Workbench M1 already round-trips arbitrary /:resourceType requests), cascade-confirm with affected-resource-count preview (future), schema definition editor (O4 Profile editor).
+- Per-sub-phase quality gate next: deploy v0.51.0-alpha.3 to dev + 982+ live SCIM tests must all pass on dev before the v0.51.0 stable rollup.
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.51.0-alpha.2] - 2026-05-15 - Phase M2 - Bulk Operations UI
 
 ### Added
