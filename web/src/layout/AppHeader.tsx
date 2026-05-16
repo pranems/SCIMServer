@@ -19,6 +19,7 @@ import { HEADER_HEIGHT } from '../design/tokens';
 import { useUIStore } from '../store/ui-store';
 import { clearStoredToken, notifyTokenInvalid } from '../auth/token';
 import { HealthRollup } from './HealthRollup';
+import { NotificationsButton } from './NotificationsButton';
 
 const useStyles = makeStyles({
   header: {
@@ -63,6 +64,7 @@ export const AppHeader: React.FC = () => {
 
       <div className={classes.actions}>
         <HealthRollup />
+        <NotificationsButton />
         <Tooltip
           content={logStreamOpen ? 'Hide live log stream' : 'Show live log stream'}
           relationship="label"

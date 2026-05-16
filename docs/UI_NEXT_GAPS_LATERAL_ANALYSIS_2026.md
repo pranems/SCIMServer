@@ -166,8 +166,6 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.2 SCIM Workbench (the killer feature)
 
-> ✅ **CLOSED in v0.51.0-alpha.1 (Phase M1, 2026-05-15).** See [docs/PHASE_M1_SCIM_WORKBENCH.md](PHASE_M1_SCIM_WORKBENCH.md). New top-level `/workbench` route (7th sidebar nav entry, `Beaker24Regular` icon). Free-form HTTP request builder against `/scim/*`: Method picker + Path input + endpoint convenience picker + Send button + Body editor (visible for POST/PUT/PATCH; surfaces JSON parse errors inline) + Response viewer (status badge color-coded + duration ms + X-Request-Id + pretty-printed body) + History list (newest-first ring buffer of 50, persisted to `localStorage`, click any row to re-seed) + Copy as curl + Copy as TypeScript actions. New `useScimRequest` mutation hook that does NOT throw on 4xx/5xx (the operator NEEDS to see the response body in the viewer; throwing would route through the K3 error chrome and bury it). 3 new pure modules ship the RFC algebra: [workbench-history.ts](../web/src/utils/workbench-history.ts), [filter-builder.ts](../web/src/utils/filter-builder.ts) (RFC 7644 §3.4.2.2 emitter + parser for the 10 standard operators), [patch-builder.ts](../web/src/utils/patch-builder.ts) (RFC 7644 §3.5.2 PatchOp envelope + per-op validation). The L5 "Open in Workbench" stub is wired to navigate to `/workbench?prefill=<urlencoded-JSON>`. +65 web vitest + 5 live SCIM in new section 9z-AG. Out of scope (deferred): visual filter / PATCH builder UIs (the reducers ship in M1; visual click-to-build forms are deferred to M2 / N6), `Save as snippet` (N4), `Save as live-test step` PowerShell-snippet emit (the killer differentiator; deferred to M2), diff tab on response viewer (M2).
-
 **Why this is the highest-leverage move:** It collapses 4 separate Tier-1 gaps (PATCH builder, filter builder, Bulk submitter, Discovery explorer) into one composable workbench. The cmdk palette opens it; it pre-fills auth + endpoint + schemas from the active route.
 
 **Shape:**
@@ -208,8 +206,6 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.3 Bulk Operations UI
 
-> ✅ **CLOSED in v0.51.0-alpha.2 (Phase M2, 2026-05-15).** See [docs/PHASE_M2_BULK_OPERATIONS.md](PHASE_M2_BULK_OPERATIONS.md). New per-endpoint Bulk tab at `/endpoints/$id/bulk` (9th nested tab between Activity and Schemas, `Stack24Regular` icon). Wires `POST /scim/endpoints/:id/Bulk` (1000-op cap + 1 MB payload). Mode picker (POST/PATCH/DELETE) + Resource picker (Users/Groups) + CSV file input + Mapping panel + Preview pane (first 10 ops) + failOnErrors threshold input + Submit. Result viewer with success/failure totals + per-op badges + Download failures CSV (`bulkId / method / status / scimType / detail`). 3 new pure modules: [csv-parse.ts](../web/src/utils/csv-parse.ts) (RFC 4180 reader inverse of M1 csv-export), [bulk-builder.ts](../web/src/utils/bulk-builder.ts) (RFC 7644 §3.7 BulkRequest assembler), [live-test-snippet.ts](../web/src/utils/live-test-snippet.ts) (the M1-deferred killer differentiator - turns Workbench history entries into paste-ready PowerShell snippets matching the existing 9z-* section idiom). New `useScimBulk` hook + "Save as live-test" button column wired on Workbench history rows. +52 web vitest + 6 live SCIM in new section 9z-AH.
-
 **Why:** [endpoint-scim-bulk.controller.ts:72](../api/src/modules/scim/controllers/endpoint-scim-bulk.controller.ts) supports 1000-op batches with `bulkId` cross-references. Today the only consumer is [scripts/live-test.ps1](../scripts/live-test.ps1).
 
 **Shape:**
@@ -227,8 +223,6 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 **Effort:** 5-6 days. **Test counts:** +15 web vitest (CSV parser, mapping, preview), +3 E2E.
 
 ### 4.4 Custom Resource Type Registration UI
-
-> ✅ **CLOSED in v0.51.0-alpha.3 (Phase M3, 2026-05-15).** See [docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md](PHASE_M3_CUSTOM_RESOURCE_TYPES.md). New per-endpoint Resource Types tab at `/endpoints/$id/resource-types` (10th nested tab between Bulk and Schemas, `CubeTree24Regular` icon). Gated by `CustomResourceTypesEnabled` flag; shows feature-disabled MessageBar pointing at Settings when off. Lists existing custom RTs (filters out built-in User/Group). Create dialog with inline validation rejecting reserved names + reserved endpoints + duplicates. Delete confirm uses the L1 type-name-to-confirm pattern. As of v0.28.0 the dedicated admin RT API was REMOVED; custom RTs live in `endpoint.profile.resourceTypes[]` and M3 reuses L1 `useUpdateEndpointConfig` to PATCH the merged profile (single optimistic-update path). +12 web vitest + 6 live SCIM in new section 9z-AI. Closes Phase M (3 of 3 sub-phases shipped).
 
 **Why:** [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) shipped in v0.18.0. The feature is invisible in the UI. Customers paying for "extensible SCIM" cannot extend it without curl.
 
@@ -316,8 +310,6 @@ These are gaps where the API is shipped, tested at all 5 layers, and used in pro
 
 ### 4.9 Database / Cross-Endpoint Operator View
 
-> ✅ **CLOSED in v0.50.0-alpha.6 (Phase L6, 2026-05-14).** See [docs/PHASE_L6_OPERATIONS_VIEW.md](PHASE_L6_OPERATIONS_VIEW.md). New top-level `/operations` route (6th sidebar nav entry, between Discovery and Logs) wires the already-shipped `database.controller.ts` surface that the redesigned UI never restored. Three sub-tabs (All Users | All Groups | Statistics) - the 2 list tabs render paginated tables with Search + Active-Only Switch + per-row endpoint Badge deep-linking to the per-endpoint Users/Groups tab via `useNavigate()`. Statistics tab renders 4 KPI tiles + database type/backend caption. Each tab carries a Download CSV button driven by a new pure RFC 4180 serializer in [web/src/utils/csv-export.ts](../web/src/utils/csv-export.ts) (no new dependency added). New `useDatabaseUsers` + `useDatabaseGroups` + `useDatabaseStatistics` hooks + `queryKeys.operations` factory. Backend additive change: `endpointId: true` added to both `getUsers` and `getGroups` prisma selects + in-memory branches map endpointId per row. +34 web vitest (15 csv + 7 hooks + 9 page + 3 size-limit ratchet) + 4 API unit (endpointId projection lock) + 5 live SCIM in new section 9z-AF. **Closes Phase L Capability Completeness (6 of 6 sub-phases).**
-
 **Why:** [database.controller.ts](../api/src/modules/database/database.controller.ts) ships an operator-grade cross-endpoint view (all users, all groups, statistics). The legacy "Database Browser" tab covered this; the redesigned UI never restored it.
 
 **Shape:**
@@ -401,6 +393,8 @@ Today only the color scheme persists. Table column visibility, page size, dense 
 **Effort:** 2-3 days. **Test counts:** +10 web vitest (preference reducers, migrations, reset).
 
 ### 5.5 Notifications Inbox
+
+> ✅ **CLOSED in v0.52.0-alpha.1 (Phase N1, 2026-05-15).** See [docs/PHASE_N1_NOTIFICATIONS_INBOX.md](PHASE_N1_NOTIFICATIONS_INBOX.md). Bell icon + unread-count badge (caps at 99+) in AppHeader + right-side OverlayDrawer with severity-coded list + Mark-all-read + Clear + Take-me-there link to per-endpoint Activity. New notifications-store (Zustand) with localStorage persistence (key `scimserver.notifications.v1`) + 7-day TTL pruning + 50-entry ring buffer + id-based dedupe (the SSE bridge generates ids from `bucketKey(type, endpointId, second)` so bursts collapse). New severity classifier: `*.error` -> error, `endpoint.updated`/`endpoint.deleted`/`credential.revoked` -> warning, routine CRUD -> info. useSSE extended to push every supported SCIM event into the store alongside the existing cache-invalidation path. +33 web vitest. No new live SCIM section - underlying SSE surface already locked at 9z-H + 9z-I + 9z-V. Out of scope (deferred): toast for high-severity events, Web Push API (needs service worker we don't ship), per-row dismiss, server-side persistence.
 
 SSE-driven events fire today but have no human-visible surface beyond cache invalidation. Operator misses the signal "endpoint X just went red" unless they happen to be on the dashboard.
 

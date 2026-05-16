@@ -88,4 +88,21 @@ describe('ui-store - K4 log stream drawer slice', () => {
     useUIStore.getState().setLogStreamSearch('foo');
     expect(useUIStore.getState().logStreamSearch).toBe('foo');
   });
+
+  // ─── Phase N1 - notifications drawer slice ───────────────────
+
+  it('exposes notificationsDrawerOpen with default false (Phase N1)', () => {
+    expect(useUIStore.getState().notificationsDrawerOpen).toBe(false);
+  });
+
+  it('exposes setNotificationsDrawerOpen + toggleNotificationsDrawer (Phase N1)', () => {
+    const { setNotificationsDrawerOpen, toggleNotificationsDrawer } = useUIStore.getState();
+    setNotificationsDrawerOpen(true);
+    expect(useUIStore.getState().notificationsDrawerOpen).toBe(true);
+    toggleNotificationsDrawer();
+    expect(useUIStore.getState().notificationsDrawerOpen).toBe(false);
+    toggleNotificationsDrawer();
+    expect(useUIStore.getState().notificationsDrawerOpen).toBe(true);
+  });
 });
+

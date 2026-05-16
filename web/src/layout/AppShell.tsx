@@ -32,6 +32,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
 import { LogStreamDrawer } from './LogStreamDrawer';
+import { NotificationsDrawer } from './NotificationsDrawer';
 import { queryClient } from '../api/query-client';
 
 const useStyles = makeStyles({
@@ -95,6 +96,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
           <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
           <LogStreamDrawer />
+          <NotificationsDrawer />
           <div className={classes.root} data-testid="app-shell">
             <AppHeader />
             <div className={classes.body}>

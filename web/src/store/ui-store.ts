@@ -57,6 +57,14 @@ interface UIState {
   /** Phase K4 - free-text search filter applied across message/path/category/requestId. */
   logStreamSearch: string;
 
+  /**
+   * Phase N1 - notifications drawer (right-side, separate from log
+   * stream). Toggled from the AppHeader Bell button; read by
+   * NotificationsDrawer. Default closed so the drawer's content is
+   * not rendered until the operator opens it.
+   */
+  notificationsDrawerOpen: boolean;
+
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleCommandPalette: () => void;
@@ -66,6 +74,10 @@ interface UIState {
   toggleLogStreamDrawer: () => void;
   setLogStreamLevel: (level: LogStreamLevel) => void;
   setLogStreamSearch: (search: string) => void;
+
+  // Phase N1
+  setNotificationsDrawerOpen: (open: boolean) => void;
+  toggleNotificationsDrawer: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -76,6 +88,9 @@ export const useUIStore = create<UIState>((set) => ({
   logStreamDrawerOpen: false,
   logStreamLevel: 'DEBUG',
   logStreamSearch: '',
+
+  // Phase N1 - notifications drawer slice
+  notificationsDrawerOpen: false,
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
@@ -89,4 +104,8 @@ export const useUIStore = create<UIState>((set) => ({
   toggleLogStreamDrawer: () => set((s) => ({ logStreamDrawerOpen: !s.logStreamDrawerOpen })),
   setLogStreamLevel: (level) => set({ logStreamLevel: level }),
   setLogStreamSearch: (search) => set({ logStreamSearch: search }),
+
+  // Phase N1
+  setNotificationsDrawerOpen: (open) => set({ notificationsDrawerOpen: open }),
+  toggleNotificationsDrawer: () => set((s) => ({ notificationsDrawerOpen: !s.notificationsDrawerOpen })),
 }));

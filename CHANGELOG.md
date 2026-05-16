@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.0-alpha.1] - 2026-05-15 - Phase N1 - Notifications Inbox
+
+See [docs/PHASE_N1_NOTIFICATIONS_INBOX.md](docs/PHASE_N1_NOTIFICATIONS_INBOX.md) for the full feature doc.
+
+### Added
+- Bell icon in AppHeader with unread-count badge (caps at 99+) + right-side OverlayDrawer with severity-coded list + Mark-all-read + Clear + Take-me-there link to the per-endpoint Activity tab. Per analysis-doc S5.5.
+- New notifications-store (Zustand) with localStorage persistence (key 'scimserver.notifications.v1') + 7-day TTL pruning + 50-entry ring buffer + id-based dedupe. SSE bridge generates ids deterministically from bucketKey(type, endpointId, second) so 100 events with the same (type, endpointId, second) collapse to one entry naturally.
+- useSSE bridge: every supported SCIM event now ALSO produces a notification entry with severity classified per type pattern (*.error -> error, scim.endpoint.updated/*.deleted/scim.credential.revoked -> warning, routine CRUD -> info), human-readable title, and endpointId carried through.
+- ui-store slice: notificationsDrawerOpen + setNotificationsDrawerOpen + toggleNotificationsDrawer (mirrors the K4 logStream pattern).
+- +33 web vitest across 5 files: 13 notifications-store + 2 ui-store slice + 4 useSSE bridge + 6 NotificationsButton + 8 NotificationsDrawer.
+
+### Changed
+- Bundle: main entry 150.55 -> 152.99 KB gzipped (+2.44 KB; Notifications surface lives in the entry chunk via AppShell mount). Shared primitives 126.80 -> 126.83 KB gzipped (+0.03 KB). No new size-limit budget. All 24 existing budgets still pass.
+
+### Test counts (net new)
+
+| Layer | Pre-N1 (v0.51.0) | Post-N1 (v0.52.0-alpha.1) | Delta |
+|-------|-----------------:|---------------------------:|------:|
+| API unit | 3,724 | 3,724 | 0 |
+| API E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 860 | **893** | **+33** |
+| Live SCIM | 984 | 984 | 0 (SSE surface locked by 9z-H + 9z-I + 9z-V) |
+| PowerShell contract | 14 | 14 | 0 |
+| **Total** | 6,768 | **6,801** | **+33** |
+
+### Notes
+- N1 is the FIRST of 6 sub-phases in Phase N (UX & Polish). Remaining: N2 Onboarding wizard, N3 Export everywhere, N4 Settings persistence, N5 Frontend telemetry, N6 Keyboard ergonomics.
+- Out of scope (deferred): toast for high-severity events (N1 follow-up), Web Push API (deferred - needs service worker we do not ship), per-row dismiss (clear-all covers the case), server-side persistence (N4).
+- Per-sub-phase quality gate next: deploy v0.52.0-alpha.1 to dev + 984+ live SCIM tests must all pass on dev before Phase N2 starts.
+- Prod promotion: NOT triggered. Prod still on v0.48.0. Standing rule.
+
 ## [0.51.0] - 2026-05-15 - Phase M (The Workbench) - COMPLETE (3 of 3 sub-phases)
 
 Stable rollup of Phase M (The Workbench). Drops the `-alpha.N` suffix after every Phase M sub-phase shipped, deployed to dev, and passed its 970+ -> 984 live SCIM gate. Pure version cut + lockfile sync; no new features beyond the 3 already-released alphas.

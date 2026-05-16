@@ -342,3 +342,83 @@ describe('useSSE channel dispatch (Phase B3)', () => {
     expect(calls).toContain(JSON.stringify(['users', 'ep-9']));
   });
 });
+
+// ─── Phase N1 - notifications-store SSE bridge ─────────────────────
+//
+// useSSE pushes every supported SCIM event into the notifications
+// store so the operator's Bell icon + drawer can show what just
+// happened. Distinct from the cache invalidation path (which is
+// silent + non-visual) - this is the human-visible surface.
+
+import {
+  useNotificationsStore,
+  bucketKey,
+  clearNotifications,
+} from '../store/notifications-store';
+
+describe('useSSE - N1 notifications-store bridge', () => {
+  beforeEach(() => {
+    MockEventSource.instances = [];
+    (globalThis as any).EventSource = MockEventSource;
+    // Reset notifications store between tests.
+    clearNotifications();
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).EventSource;
+  });
+
+  it('appends a notification on every supported SCIM event', async () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE(), { wrapper });
+    await new Promise((r) => setTimeout(r, 10));
+    MockEventSource.instances[0].simulateMessage(
+      JSON.stringify({
+        type: 'scim.user.created',
+        endpointId: 'ep-1',
+        timestamp: '2026-05-15T10:00:00.500Z',
+      }),
+    );
+    const s = useNotificationsStore.getState();
+    expect(s.entries).toHaveLength(1);
+    expect(s.entries[0].type).toBe('scim.user.created');
+    expect(s.entries[0].endpointId).toBe('ep-1');
+    expect(s.unreadCount).toBe(1);
+  });
+
+  it('uses bucketKey-derived id so SSE bursts collapse via store dedupe', async () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE(), { wrapper });
+    await new Promise((r) => setTimeout(r, 10));
+    // Same type + endpointId + second-bucket -> same id -> dedupe.
+    MockEventSource.instances[0].simulateMessage(
+      JSON.stringify({ type: 'scim.user.created', endpointId: 'ep-1', timestamp: '2026-05-15T10:00:00.100Z' }),
+    );
+    MockEventSource.instances[0].simulateMessage(
+      JSON.stringify({ type: 'scim.user.created', endpointId: 'ep-1', timestamp: '2026-05-15T10:00:00.800Z' }),
+    );
+    expect(useNotificationsStore.getState().entries).toHaveLength(1);
+    // The id matches the documented bucketKey output for parity.
+    const expectedId = bucketKey('scim.user.created', 'ep-1', '2026-05-15T10:00:00.100Z');
+    expect(useNotificationsStore.getState().entries[0].id).toBe(expectedId);
+  });
+
+  it('classifies severity per the store contract (endpoint.updated -> warning)', async () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE(), { wrapper });
+    await new Promise((r) => setTimeout(r, 10));
+    MockEventSource.instances[0].simulateMessage(
+      JSON.stringify({ type: 'scim.endpoint.updated', endpointId: 'ep-1', timestamp: '2026-05-15T10:00:00.500Z' }),
+    );
+    expect(useNotificationsStore.getState().entries[0].severity).toBe('warning');
+  });
+
+  it('does NOT push notifications for unsupported / keepalive events', async () => {
+    const { wrapper } = createWrapper();
+    renderHook(() => useSSE(), { wrapper });
+    await new Promise((r) => setTimeout(r, 10));
+    MockEventSource.instances[0].simulateMessage(JSON.stringify({ type: 'keepalive' }));
+    expect(useNotificationsStore.getState().entries).toHaveLength(0);
+  });
+});
+

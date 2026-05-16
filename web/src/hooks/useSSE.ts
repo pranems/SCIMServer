@@ -29,6 +29,12 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { getStoredToken } from '../auth/token';
 import { queryKeys } from '../api/queries';
 import { useUIStore } from '../store/ui-store';
+import {
+  appendNotification,
+  bucketKey,
+  classifySeverity,
+  type NotificationEntry,
+} from '../store/notifications-store';
 
 /** Names of every SCIM mutation event we react to. */
 export const SUPPORTED_EVENT_TYPES = [
@@ -205,6 +211,10 @@ export function useSSE(options: UseSSEOptions = {}) {
           const eventType = data?.type ?? data?.event;
           if (!isSupportedEvent(eventType)) return;
           dispatchInvalidations(queryClient, eventType, data?.endpointId);
+          // Phase N1 - push every supported SCIM event into the
+          // notifications store so the Bell icon + drawer can render
+          // a human-visible feed alongside the cache invalidation.
+          pushNotification(eventType, data?.endpointId, data?.timestamp);
         } catch {
           // Non-JSON SSE message (keepalive, etc.) - ignore
         }
@@ -251,4 +261,48 @@ function dispatchInvalidations(
   for (const queryKey of keys) {
     qc.invalidateQueries({ queryKey });
   }
+}
+
+// ─── Phase N1 - SCIM event -> human notification ─────────────────────
+//
+// Coarse human-readable titles per event type. The drawer surfaces
+// these alongside an optional endpointId so the operator can scan
+// the feed without needing to know the SCIM event-type vocabulary.
+
+const EVENT_TITLE: Record<SupportedEventType, string> = {
+  'scim.user.created': 'User created',
+  'scim.user.updated': 'User updated',
+  'scim.user.deleted': 'User deleted',
+  'scim.group.created': 'Group created',
+  'scim.group.updated': 'Group updated',
+  'scim.group.deleted': 'Group deleted',
+  'scim.resource.created': 'Resource created',
+  'scim.resource.deleted': 'Resource deleted',
+  'scim.credential.created': 'Credential issued',
+  'scim.credential.revoked': 'Credential revoked',
+  'scim.endpoint.created': 'Endpoint created',
+  'scim.endpoint.updated': 'Endpoint updated',
+  'scim.endpoint.deleted': 'Endpoint deleted',
+};
+
+function pushNotification(
+  type: SupportedEventType,
+  endpointId: unknown,
+  timestamp: unknown,
+): void {
+  const id = typeof endpointId === 'string' && endpointId.length > 0 ? endpointId : undefined;
+  const ts = typeof timestamp === 'string' && timestamp.length > 0 ? timestamp : new Date().toISOString();
+  // Use bucketKey-derived id so SSE bursts (same type+endpoint+second)
+  // collapse to one entry via the store's id-based dedupe.
+  const entryId = bucketKey(type, id, ts);
+  const entry: NotificationEntry = {
+    id: entryId,
+    type,
+    timestamp: ts,
+    endpointId: id,
+    severity: classifySeverity(type),
+    title: EVENT_TITLE[type],
+    read: false,
+  };
+  appendNotification(entry);
 }
