@@ -245,14 +245,14 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 6.4. **`generateCommitMessage` prompt** - Use it to compose the commit message; ensures the standing rule about per-sub-phase gate naming is honored.
 6.5. **No `--amend` on pushed commits, no `--force` push, no `--no-verify`** - All three are disallowed by the standing operational-safety rules.
 
-### Stage M - Meta / Strategy Evolution (not per-commit)
-Stage M does NOT gate any single commit. It runs on inflection points to evolve the gate strategy itself. The other 6 stages are the floor; Stage M is what raises the floor over time.
+### Stage X - Meta / Strategy Evolution (not per-commit)
+Stage X does NOT gate any single commit. It runs on inflection points to evolve the gate strategy itself. The other 6 stages are the floor; Stage X is what raises the floor over time.
 
-M.1. **`gateStrategySelfAudit` prompt** - Meta-prompt that introspects: (a) **internal drift** - baseline rot, prompt rot, coverage rot, complexity rot, doc rot, escape patterns; (b) **external standards intake** - SCIM RFC errata, framework upgrades, ecosystem changes (with URL citations REQUIRED); (c) **incident learnings** - auto-pull every `fix:` commit since last run; (d) **recommended additions, retirements, ratchets** - actionable findings with confidence + owner assignment.
+X.1. **`gateStrategySelfAudit` prompt** - Meta-prompt that introspects: (a) **internal drift** - baseline rot, prompt rot, coverage rot, complexity rot, doc rot, escape patterns; (b) **external standards intake** - SCIM RFC errata, framework upgrades, ecosystem changes (with URL citations REQUIRED); (c) **incident learnings** - auto-pull every `fix:` commit since last run; (d) **recommended additions, retirements, ratchets** - actionable findings with confidence + owner assignment.
 
-M.2. **`securityBestPracticesIntake` prompt** - Sibling to M.1, scoped exclusively to security best-practices intake across 10 categories: (1) Standards bodies (OWASP, CWE, NIST, CIS); (2) Protocol-level (OAuth 2.1, OIDC FAPI, DPoP, TLS); (3) Supply chain (SLSA, npm provenance, Sigstore, GHA pinning); (4) Cryptographic deprecations (NIST SP 800-131A); (5) Container/runtime (distroless, rootless, trivy, syft, cosign); (6) CI/CD security (OIDC, branch protection, signed commits, Dependabot); (7) Web/UI security (CSP, HSTS, COOP/COEP, Trusted Types); (8) Privacy/PII (GDPR, CCPA, PIPL); (9) Cloud-specific (Azure Security Baselines, Managed Identity, WAF); (10) AI/LLM-specific (OWASP LLM Top 10, prompt injection, model supply chain). Each finding requires URL citation, confidence level, and concrete owner action. Output: structured Markdown report under `docs/strategy/SECURITY_INTAKE_<YYYY-MM-DD>.md` with proposed deltas to this file.
+X.2. **`securityBestPracticesIntake` prompt** - Sibling to X.1, scoped exclusively to security best-practices intake across 10 categories: (1) Standards bodies (OWASP, CWE, NIST, CIS); (2) Protocol-level (OAuth 2.1, OIDC FAPI, DPoP, TLS); (3) Supply chain (SLSA, npm provenance, Sigstore, GHA pinning); (4) Cryptographic deprecations (NIST SP 800-131A); (5) Container/runtime (distroless, rootless, trivy, syft, cosign); (6) CI/CD security (OIDC, branch protection, signed commits, Dependabot); (7) Web/UI security (CSP, HSTS, COOP/COEP, Trusted Types); (8) Privacy/PII (GDPR, CCPA, PIPL); (9) Cloud-specific (Azure Security Baselines, Managed Identity, WAF); (10) AI/LLM-specific (OWASP LLM Top 10, prompt injection, model supply chain). Each finding requires URL citation, confidence level, and concrete owner action. Output: structured Markdown report under `docs/strategy/SECURITY_INTAKE_<YYYY-MM-DD>.md` with proposed deltas to this file.
 
-**M.1 + M.2 trigger conditions (shared, 4 types):**
+**X.1 + X.2 trigger conditions (shared, 4 types):**
 | Trigger | Cadence | Scope | Why |
 |---|---|---|---|
 | Release cuts | Every `v0.X.0` stable rollup | last release cycle | Natural reflection point |
@@ -260,18 +260,18 @@ M.2. **`securityBestPracticesIntake` prompt** - Sibling to M.1, scoped exclusive
 | On-demand | User invokes | operator-specified | Bug-hunt / planning / threat-hunt mode |
 | Incident-driven | After ANY bug/security-incident escapes Stages 1-5 to live/dev | focused on the escape path | Auto-captures Finding-B / Finding-C / supply-chain class events |
 
-**Hard constraints (apply to both M.1 and M.2):**
+**Hard constraints (apply to both X.1 and X.2):**
 - External claims require URL citations (no URL = "speculative — verify before action").
-- Confidence levels required (`Critical` / `High` / `Medium` / `Speculative` for M.2; `High` / `Medium` / `Speculative` for M.1).
+- Confidence levels required (`Critical` / `High` / `Medium` / `Speculative` for X.2; `High` / `Medium` / `Speculative` for X.1).
 - Owner action required on every finding.
 - New prompt recommendations require >=2 escape-pattern matches (single-escape patterns go into an EXISTING prompt as a new check).
 - Prompt retirement requires 30+ days of no-fire evidence.
 - Baseline ratchets require a measured snapshot supporting the new value.
 - Tool-dependent recommendations flagged DEFERRED if the tool isn't installed; do not recommend a gate the runner can't execute today.
 
-**M.1 + M.2 output convention:** structured Markdown reports under `docs/strategy/`:
-- `docs/strategy/SELF_AUDIT_<YYYY-MM-DD>.md` from M.1
-- `docs/strategy/SECURITY_INTAKE_<YYYY-MM-DD>.md` from M.2
+**X.1 + X.2 output convention:** structured Markdown reports under `docs/strategy/`:
+- `docs/strategy/SELF_AUDIT_<YYYY-MM-DD>.md` from X.1
+- `docs/strategy/SECURITY_INTAKE_<YYYY-MM-DD>.md` from X.2
 - Both end with "Proposed deltas to copilot-instructions.md" for operator review.
 
 ### Cross-Cutting Security Gate Map
@@ -289,16 +289,16 @@ Security checks are intentionally threaded through every stage. This map makes t
 | SCIM error envelope (no PII in error detail) | 3a.3 | `error-handling-verification` |
 | PII redaction + structured-log hygiene | 3b.1 | `logging-verification` |
 | Live SCIM contract on the wire (auth headers, OAuth flow, ETag flow) | 4.2 / 4.3 / 4.4 | `scripts/live-test.ps1` |
-| **External security-landscape changes (proactive)** | **M.2** | **`securityBestPracticesIntake`** |
+| **External security-landscape changes (proactive)** | **X.2** | **`securityBestPracticesIntake`** |
 | Container image CVEs (OS-level base image) | DEFERRED | (Standing Backlog: trivy gate at Stage 4) |
 | Web security headers (CSP/HSTS/etc.) | DEFERRED | (Standing Backlog: Playwright spec at Stage 5) |
 | SBOM generation + signing | DEFERRED | (Standing Backlog: syft + cosign at Stage 6) |
 | SAST (semgrep / CodeQL) | DEFERRED | (Standing Backlog: Stage 1 extension) |
 | GHA action pinning + branch protection + OIDC | DEFERRED | (Standing Backlog: repo policy) |
-| Cryptographic deprecation watch | M.2 Category 4 | `securityBestPracticesIntake` |
-| AI/LLM security (when Phase N+ adds LLM features) | M.2 Category 10 | `securityBestPracticesIntake` |
+| Cryptographic deprecation watch | X.2 Category 4 | `securityBestPracticesIntake` |
+| AI/LLM security (when Phase N+ adds LLM features) | X.2 Category 10 | `securityBestPracticesIntake` |
 
-When `securityBestPracticesIntake` (M.2) recommends moving any DEFERRED item to an active gate, this map MUST be updated in the same commit.
+When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to an active gate, this map MUST be updated in the same commit.
 
 ### Prod Promotion (separate, on-demand only)
 - **NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
@@ -319,7 +319,7 @@ When `securityBestPracticesIntake` (M.2) recommends moving any DEFERRED item to 
 - Follow existing patterns: `Test-Result -Success <bool> -Message <string>`, `Invoke-RestMethod`, `$scimBase`, `$headers`
 
 ### Gate-Strategy Self-Improvement Loop
-After every commit that exposes a new bug class (parity gap, prompt-injection vector, RFC ambiguity, test-rot pattern, etc.), update THIS section to add the corresponding gate. The formal engine for this loop is `gateStrategySelfAudit` (Stage M.1) for general drift and `securityBestPracticesIntake` (Stage M.2) for security-landscape changes. Manual updates here are still valid for fast-turn cases; both prompts aggregate them on their periodic runs.
+After every commit that exposes a new bug class (parity gap, prompt-injection vector, RFC ambiguity, test-rot pattern, etc.), update THIS section to add the corresponding gate. The formal engine for this loop is `gateStrategySelfAudit` (Stage X.1) for general drift and `securityBestPracticesIntake` (Stage X.2) for security-landscape changes. Manual updates here are still valid for fast-turn cases; both prompts aggregate them on their periodic runs.
 
 Examples of standing rules that originated from real failures:
 - **Schema-Characteristic Test Rule** (May 2026 Group.displayName uniqueness flip) - added a helper module + standing rule about always going through `expectCharacteristicIn` / `Get-EffectiveUniqueness`.
@@ -330,17 +330,17 @@ Examples of standing rules that originated from real failures:
 - **Stage 3b.3 endpointConfigFlagAudit** (codebase-specific 14-flag architectural element) - the 10-cell completeness matrix prevents the "added a flag but forgot the doc / UI / live test" bug class.
 - **Stage 3b.5 dependencyCveSweep** (CVE freshness discipline separate from feature-driven `securityAudit`) - triggered by `package.json` changes + weekly schedule; Critical/High blocks commits.
 - **Stage 3c.1 codeReviewSelfAudit** (May 2026 Design Deep Analysis precedent: SchemaValidator god class 1,467 lines, service-helpers Swiss army 1,230 lines) - scoped to CHANGED files only; output is suggestions not blocks; catches god-class growth, helper-bloat, naming drift.
-- **Stage M.1 gateStrategySelfAudit** (May 2026 meta-audit need) - formal proactive engine for THIS loop. 4 trigger types (release / monthly / on-demand / incident-driven). Replaces ad-hoc reactive updates with structured introspection.
-- **Stage M.2 securityBestPracticesIntake** (May 2026 security-intake gap) - dedicated security-landscape scan across 10 categories with URL-citation enforcement. Separated from M.1 so security depth is not diluted by general drift. Pairs with the Cross-Cutting Security Gate Map to make threading visible.
+- **Stage X.1 gateStrategySelfAudit** (May 2026 meta-audit need) - formal proactive engine for THIS loop. 4 trigger types (release / monthly / on-demand / incident-driven). Replaces ad-hoc reactive updates with structured introspection.
+- **Stage X.2 securityBestPracticesIntake** (May 2026 security-intake gap) - dedicated security-landscape scan across 10 categories with URL-citation enforcement. Separated from X.1 so security depth is not diluted by general drift. Pairs with the Cross-Cutting Security Gate Map to make threading visible.
 
 ### Standing Backlog (recommendations for future evolution; not blockers)
 
 **Strategy / process:**
 - **`backwardCompatAudit` prompt** - "does this change break a previously-published contract?" Currently partially covered by `apiContractVerification`. Would specialize on public-contract diffing between commits. Worth scoping after the next public-contract-breaking incident provides design constraints.
-- **CI-time runner for Stage M.1 + M.2** - both prompts are currently operator-invoked. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar) for both.
-- **Auto-creation of `docs/strategy/*_<date>.md`** - M.1 and M.2 outputs are structured Markdown; a small script could open a PR with the report attached, surfacing findings to reviewers without requiring an operator to run the prompt.
+- **CI-time runner for Stage X.1 + X.2** - both prompts are currently operator-invoked. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar) for both.
+- **Auto-creation of `docs/strategy/*_<date>.md`** - X.1 and X.2 outputs are structured Markdown; a small script could open a PR with the report attached, surfacing findings to reviewers without requiring an operator to run the prompt.
 
-**Security tool gates (surfaced by M.2; defer until tool installed):**
+**Security tool gates (surfaced by X.2; defer until tool installed):**
 - **Stage 1 SAST gate** - install [semgrep](https://semgrep.dev/) or use [GitHub CodeQL](https://codeql.github.com/) with a tuned ruleset; +30s per commit; ~20% false positive rate before tuning.
 - **Stage 4 container CVE scan** - install [trivy](https://github.com/aquasecurity/trivy) (FOSS gold-standard) or grype; scan the API image after build, fail on Critical/High OS-level CVEs in the base image; +60s per Docker build.
 - **Stage 4 SBOM generation** - [syft](https://github.com/anchore/syft) generates an SPDX SBOM at build time; enables post-deploy CVE lookup; near-zero overhead.

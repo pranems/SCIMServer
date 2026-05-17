@@ -16,7 +16,7 @@
 4. [The 7-Stage Sequence](#4-the-7-stage-sequence)
 5. [10 New Self-Improving Prompts](#5-10-new-self-improving-prompts)
 6. [Cross-Cutting Security Gate Map](#6-cross-cutting-security-gate-map)
-7. [Stage M: Meta / Strategy Evolution](#7-stage-m-meta--strategy-evolution)
+7. [Stage X: Meta / Strategy Evolution](#7-stage-m-meta--strategy-evolution)
 8. [Hard Constraints on Meta Prompts](#8-hard-constraints-on-meta-prompts)
 9. [Standing Backlog](#9-standing-backlog)
 10. [Real Precedents That Drove Each Addition](#10-real-precedents-that-drove-each-addition)
@@ -30,13 +30,13 @@
 
 The Mandatory Quality Gates section in [.github/copilot-instructions.md](../.github/copilot-instructions.md) used to be a **flat 11-item list** with no ordering, no cost-vs-value rationale, and no formal incident-learning loop. Two bug classes escaped to production-adjacent environments in May 2026 (Finding-B and Finding-C - see Section 2). Each escape made it obvious which gate would have caught it, but adding gates reactively guarantees we keep paying for the next escape pattern we haven't seen yet.
 
-This strategy reorganizes gates into a **7-stage sequence** (Stage 0 -> 6 + Stage M) where:
+This strategy reorganizes gates into a **7-stage sequence** (Stage 0 -> 6 + Stage X) where:
 
 - Each stage has explicit ordering, cost, and trigger conditions.
 - Each gate has a precedent traceable to a real failure or a documented standard.
 - Cheap gates run first (left-shift bug catch).
 - Security is threaded through every stage and made visible via a dedicated **Cross-Cutting Security Gate Map**.
-- A **Stage M (Meta)** layer formalizes proactive strategy evolution via two periodic prompts: `gateStrategySelfAudit` (internal drift + external standards) and `securityBestPracticesIntake` (10-category security-landscape scan).
+- A **Stage X (Meta)** layer formalizes proactive strategy evolution via two periodic prompts: `gateStrategySelfAudit` (internal drift + external standards) and `securityBestPracticesIntake` (10-category security-landscape scan).
 - A **Standing Backlog** captures concrete deferred items (mostly security tools) with cost + value, so they can be promoted in order.
 
 The prompt library grew from 22 to 32 files (+10 new self-improving prompts).
@@ -79,7 +79,7 @@ The new strategy is built on six principles. Each principle traces to a real pre
 |---|---|---|---|
 | 1 | **Left-shift bug catch** | A bug caught in Stage 1 costs seconds. The same bug caught in Stage 4 costs minutes. The same bug shipped to prod costs days. Gates are ordered cheapest-fastest first. | Finding-B was a 2-second unit-test gap that took ~10 min to surface at the live layer. |
 | 2 | **No gate replaces another** | Static gates don't replace unit tests. Unit tests don't replace E2E. E2E doesn't replace live. Coverage is by layer, not by substitution. | Phase D4 listLogs gap was missed by unit tests AND E2E; only the in-memory live run found it. |
-| 3 | **Self-improvement is mandatory** | Every escape pattern that surfaces gets a new gate. The standing-rules file has a `Gate-Strategy Self-Improvement Loop` section that records every gate's precedent. Stage M.1 formalizes the loop into a periodic prompt. | The 7-stage list itself was triggered by Finding-B + Finding-C. |
+| 3 | **Self-improvement is mandatory** | Every escape pattern that surfaces gets a new gate. The standing-rules file has a `Gate-Strategy Self-Improvement Loop` section that records every gate's precedent. Stage X.1 formalizes the loop into a periodic prompt. | The 7-stage list itself was triggered by Finding-B + Finding-C. |
 | 4 | **Stage 3 split by SCOPE** | A 9-prompt Stage 3 with no sub-grouping invites skipping. Splitting into 3a (test completeness) -> 3b (cross-cutting impl) -> 3c (hygiene + docs) makes the dependency order obvious and the cost of skipping any sub-stage visible. | The flat list put `securityAudit` next to `auditAndUpdateDocs` - prompts that have nothing in common except being prompts. |
 | 5 | **Cost ordering matches risk** | Slow gates (Playwright, Azure deploy) come last so we never pay their cost for code that would fail Stage 1. | Pre-strategy, operators sometimes ran Playwright before Stage 1 and wasted 8 minutes per fail. |
 | 6 | **Baselines ratchet, never raise** | Test counts, lint warning ceiling, web tsc error count, web bundle size - all are ceilings that can only ratchet down (`raise without explicit justification = blocked`). | API lint baseline of 465 warnings has been stable for 3 weeks; bundle gz floor of 153 KB has held since Phase K1. |
@@ -117,7 +117,7 @@ flowchart TD
     Prod -->|no| Done([Done])
     ProdGate --> Done
 
-    StageM[Stage M - Meta / Strategy Evolution<br/>NOT per-commit<br/>4 trigger types<br/>M.1 gateStrategySelfAudit<br/>M.2 securityBestPracticesIntake]
+    StageM[Stage X - Meta / Strategy Evolution<br/>NOT per-commit<br/>4 trigger types<br/>X.1 gateStrategySelfAudit<br/>X.2 securityBestPracticesIntake]
     StageM -.runs on cadence.-> S0
 
     style S0 fill:#ffe1c4
@@ -172,9 +172,9 @@ graph LR
     subgraph S5["Stage 5 - UI"]
         P8[playwrightSpecHygieneAudit<br/>Stage 5.2]
     end
-    subgraph SM["Stage M - Meta"]
-        P9[gateStrategySelfAudit<br/>Stage M.1]
-        P10[securityBestPracticesIntake<br/>Stage M.2]
+    subgraph SM["Stage X - Meta"]
+        P9[gateStrategySelfAudit<br/>Stage X.1]
+        P10[securityBestPracticesIntake<br/>Stage X.2]
     end
 
     P9 -.intake/precedents.-> S1
@@ -200,8 +200,8 @@ graph LR
 | 6 | [`dependencyCveSweep`](../.github/prompts/dependencyCveSweep.prompt.md) | 3b.5 | Critical/High CVE in transitive deps | Continuous CVE DB updates need cadence-based scan separate from per-commit `securityAudit` |
 | 7 | [`codeReviewSelfAudit`](../.github/prompts/codeReviewSelfAudit.prompt.md) | 3c.1 | God-class growth, helper-bloat, naming drift | May 2026 Design Deep Analysis: SchemaValidator 1,467 lines + service-helpers 1,230 lines |
 | 8 | [`playwrightSpecHygieneAudit`](../.github/prompts/playwrightSpecHygieneAudit.prompt.md) | 5.2 | Stale specs vs deleted UI inflating failure noise | Finding-C (2026-05-16): 121 false fails for 7 weeks |
-| 9 | [`gateStrategySelfAudit`](../.github/prompts/gateStrategySelfAudit.prompt.md) | M.1 | Drift in baselines/prompts/coverage/docs; missed RFC errata; recurring escape patterns | Meta - formalizes the previously-ad-hoc self-improvement loop |
-| 10 | [`securityBestPracticesIntake`](../.github/prompts/securityBestPracticesIntake.prompt.md) | M.2 | Missed security-landscape changes (OAuth 2.1, SLSA, npm provenance, OWASP LLM Top 10) | xz-utils precedent + OAuth 2.0 BCP (RFC 9700) shipped Apr 2025; no existing prompt would have intaken either |
+| 9 | [`gateStrategySelfAudit`](../.github/prompts/gateStrategySelfAudit.prompt.md) | X.1 | Drift in baselines/prompts/coverage/docs; missed RFC errata; recurring escape patterns | Meta - formalizes the previously-ad-hoc self-improvement loop |
+| 10 | [`securityBestPracticesIntake`](../.github/prompts/securityBestPracticesIntake.prompt.md) | X.2 | Missed security-landscape changes (OAuth 2.1, SLSA, npm provenance, OWASP LLM Top 10) | xz-utils precedent + OAuth 2.0 BCP (RFC 9700) shipped Apr 2025; no existing prompt would have intaken either |
 
 ---
 
@@ -229,10 +229,10 @@ flowchart TD
     subgraph Stage4[Stage 4 - Deploy]
         LiveAuth[Live SCIM contract on the wire - auth headers / OAuth / ETag<br/>4.2 / 4.3 / 4.4 scripts/live-test.ps1]
     end
-    subgraph StageM[Stage M - Meta]
-        SecIntake[External security-landscape changes - proactive scan<br/>M.2 securityBestPracticesIntake]
-        Crypto[Cryptographic deprecation watch<br/>M.2 Category 4]
-        LLM[AI/LLM security when Phase N+ adds LLM features<br/>M.2 Category 10]
+    subgraph StageM[Stage X - Meta]
+        SecIntake[External security-landscape changes - proactive scan<br/>X.2 securityBestPracticesIntake]
+        Crypto[Cryptographic deprecation watch<br/>X.2 Category 4]
+        LLM[AI/LLM security when Phase N+ adds LLM features<br/>X.2 Category 10]
     end
     subgraph Deferred[DEFERRED - Standing Backlog]
         Trivy[Container image CVEs - trivy at Stage 4]
@@ -248,15 +248,15 @@ flowchart TD
     style StageM fill:#ffe1ff
 ```
 
-When `securityBestPracticesIntake` (M.2) recommends moving any DEFERRED item to an active gate, the Cross-Cutting Security Gate Map in [.github/copilot-instructions.md](../.github/copilot-instructions.md) MUST be updated in the same commit.
+When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to an active gate, the Cross-Cutting Security Gate Map in [.github/copilot-instructions.md](../.github/copilot-instructions.md) MUST be updated in the same commit.
 
 ---
 
-## 7. Stage M: Meta / Strategy Evolution
+## 7. Stage X: Meta / Strategy Evolution
 
-Stage M is structurally different from the other 6 stages. It does NOT gate any single commit. It runs on **inflection points** to evolve the gate strategy itself.
+Stage X is structurally different from the other 6 stages. It does NOT gate any single commit. It runs on **inflection points** to evolve the gate strategy itself.
 
-The 6 per-commit stages are the FLOOR. Stage M is what RAISES the floor over time.
+The 6 per-commit stages are the FLOOR. Stage X is what RAISES the floor over time.
 
 ```mermaid
 stateDiagram-v2
@@ -276,7 +276,7 @@ stateDiagram-v2
     NewFloor --> [*]
 ```
 
-### 4-trigger cadence (shared by M.1 + M.2)
+### 4-trigger cadence (shared by X.1 + X.2)
 
 | Trigger | Cadence | Recommended scope | Why exactly this trigger |
 |---|---|---|---|
@@ -285,13 +285,13 @@ stateDiagram-v2
 | **C. On-demand** | User invokes | operator-specified | Bug-hunt / planning / threat-hunt mode |
 | **D. Incident-driven** | After ANY bug or security incident escapes Stages 1-5 to live/dev | focused on the escape path | Auto-captures Finding-B / Finding-C / supply-chain-class events into the loop in real-time, not at next monthly |
 
-### Why separate M.1 from M.2
+### Why separate X.1 from X.2
 
 Security best practices change faster than RFC errata or framework upgrades (OAuth 2.1 deprecated implicit flow Q1 2024; OWASP Top 10 reshuffled 2021; xz-utils supply-chain attack 2024; SLSA + provenance became table-stakes 2023). A single missed advisory can cascade to full RCE (supply chain) or full data exposure (auth bypass). The cost of NOT intaking is asymmetric: bug-class costs scale linearly, security-class costs scale exponentially.
 
-If security intake stayed as one of four sub-sections inside `gateStrategySelfAudit`, it would be diluted. Splitting it into M.2 keeps the depth dedicated; M.1 stays focused on internal drift + general external standards.
+If security intake stayed as one of four sub-sections inside `gateStrategySelfAudit`, it would be diluted. Splitting it into X.2 keeps the depth dedicated; X.1 stays focused on internal drift + general external standards.
 
-### M.2 covers 10 categories
+### X.2 covers 10 categories
 
 1. Standards bodies (OWASP, CWE, NIST, CIS)
 2. Protocol-level (OAuth 2.1, OIDC FAPI, DPoP, TLS)
@@ -310,37 +310,37 @@ Findings tagged `[LLM]` have different action paths from traditional security fi
 
 ## 8. Hard Constraints on Meta Prompts
 
-Both M.1 and M.2 enforce six constraints. These exist to prevent the LLM-running-the-prompt from inventing advisories or proposing prompt-library bloat.
+Both X.1 and X.2 enforce six constraints. These exist to prevent the LLM-running-the-prompt from inventing advisories or proposing prompt-library bloat.
 
 | # | Constraint | What it prevents |
 |---|---|---|
 | 1 | **URL citation MANDATORY for every external claim.** No URL = tagged `"SPECULATIVE - verify before action"`. | LLM hallucinating CVEs / RFCs / advisories that don't exist. The strongest anti-hallucination defense. |
-| 2 | **Confidence level mandatory.** `Critical / High / Medium / Speculative` for M.2; `High / Medium / Speculative` for M.1. | Bare assertions that look authoritative but aren't. |
+| 2 | **Confidence level mandatory.** `Critical / High / Medium / Speculative` for X.2; `High / Medium / Speculative` for X.1. | Bare assertions that look authoritative but aren't. |
 | 3 | **Owner action mandatory per finding.** | "This seems off" findings that no human knows what to do with. |
 | 4 | **2-escape threshold for new prompts.** A new prompt is only proposed when >=2 historical bug-escape patterns match it. Single-escape patterns extend an existing prompt. | Prompt-library bloat. |
 | 5 | **30-day no-fire evidence for retirement.** A silent prompt may be having deterrent effect; we don't retire on first absence. | Premature deletion of gates that are doing prophylactic work. |
 | 6 | **Baseline ratchets require measured snapshot.** "Tighten the warning ceiling from 465 to 442" requires today's `npm run lint` output AND 442 must be supported by the measurement. | Aspirational ratchets that immediately get bypassed. |
 
-Plus two M.2-specific:
+Plus two X.2-specific:
 
-- **CVE-overlap rule** - pure-CVE findings defer to `dependencyCveSweep`. M.2 only handles structural/behavioral security best practices, not per-CVE triage.
+- **CVE-overlap rule** - pure-CVE findings defer to `dependencyCveSweep`. X.2 only handles structural/behavioral security best practices, not per-CVE triage.
 - **Tool-dependent recommendations flagged DEFERRED** if the tool isn't installed; do not recommend a gate the runner can't execute today.
 
 ---
 
 ## 9. Standing Backlog
 
-Items recorded with cost + value but NOT yet promoted to active gates. Each can be evaluated for promotion at the next M.1 or M.2 run.
+Items recorded with cost + value but NOT yet promoted to active gates. Each can be evaluated for promotion at the next X.1 or X.2 run.
 
 ### Strategy / process
 
 | Item | Notes | Estimated cost |
 |---|---|---|
 | `backwardCompatAudit` prompt | "Does this change break a previously-published contract?" Partially covered by `apiContractVerification`. Specialize after next public-contract-breaking incident. | 1 day to scope |
-| CI-time runner for Stage M.1 + M.2 | Both prompts are operator-invoked today. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar). | 1-2 days |
-| Auto-creation of `docs/strategy/*_<date>.md` | M.1 and M.2 outputs are structured Markdown; a small script could open a PR with the report attached. | 0.5 day |
+| CI-time runner for Stage X.1 + X.2 | Both prompts are operator-invoked today. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar). | 1-2 days |
+| Auto-creation of `docs/strategy/*_<date>.md` | X.1 and X.2 outputs are structured Markdown; a small script could open a PR with the report attached. | 0.5 day |
 
-### Security tool gates (surfaced by M.2 / `securityBestPracticesIntake`)
+### Security tool gates (surfaced by X.2 / `securityBestPracticesIntake`)
 
 | Item | Tool | Cost | Value | Where it would slot |
 |---|---|---|---|---|
@@ -372,8 +372,8 @@ The Gate-Strategy Self-Improvement Loop section in `copilot-instructions.md` rec
 | **Stage 3b.3 endpointConfigFlagAudit** | 14-flag ProfileSettings architecture; the "added a flag but forgot the UI Switch / live test / doc" pattern | New flag ships incomplete; users can't actually use it | `endpointConfigFlagAudit` prompt with 10-cell completeness matrix per flag |
 | **Stage 3b.5 dependencyCveSweep** | CVE freshness discipline separate from feature-driven `securityAudit` (continuous DB updates) | Transitive CVEs lurk for weeks/months | `dependencyCveSweep`; ~30s per package.json change + weekly schedule |
 | **Stage 3c.1 codeReviewSelfAudit** | May 2026 Design Deep Analysis: SchemaValidator god class 1,467 lines + service-helpers Swiss army 1,230 lines | God-class growth compounds; refactor cost grows quadratically | `codeReviewSelfAudit` prompt scoped to CHANGED files only; suggestions not blocks |
-| **Stage M.1 gateStrategySelfAudit** | May 2026 meta-audit need; the standing rules said "update this section after a bug escapes" but had no formal engine for proactive review | Reactive-only loop; every new escape pattern costs ~10 min real-time detection + the underlying bug | M.1 prompt; 20-60 min per run on cadence triggers |
-| **Stage M.2 securityBestPracticesIntake** | May 2026 security-intake gap; external advisories (xz-utils Mar 2024, OAuth BCP RFC 9700 Apr 2025, OWASP LLM Top 10 2024) had no intake mechanism | Missed mitigations for known-attack-classes; potential supply-chain / auth-bypass / RCE | M.2 prompt; 30-90 min per run on cadence triggers; URL-citation + tool-deferred discipline |
+| **Stage X.1 gateStrategySelfAudit** | May 2026 meta-audit need; the standing rules said "update this section after a bug escapes" but had no formal engine for proactive review | Reactive-only loop; every new escape pattern costs ~10 min real-time detection + the underlying bug | X.1 prompt; 20-60 min per run on cadence triggers |
+| **Stage X.2 securityBestPracticesIntake** | May 2026 security-intake gap; external advisories (xz-utils Mar 2024, OAuth BCP RFC 9700 Apr 2025, OWASP LLM Top 10 2024) had no intake mechanism | Missed mitigations for known-attack-classes; potential supply-chain / auth-bypass / RCE | X.2 prompt; 30-90 min per run on cadence triggers; URL-citation + tool-deferred discipline |
 
 ---
 
@@ -384,29 +384,29 @@ Risks introduced by the new strategy itself (not by the bugs it prevents):
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | **Strategy over-engineering** - 7 stages + 32 prompts looks complex; smaller projects may copy-paste then drop most of it | Medium | Medium | Each stage explicitly has its own trigger condition (e.g. Stage 5 only when `web/` touched). The cost-vs-value table at Section 4 makes the per-stage budget visible. |
-| **Prompt-library bloat** | Medium | Low | 2-escape threshold for new prompts (Section 8); 30-day retirement evidence rule. M.1 specifically reports on prompt-rot. |
-| **LLM hallucinating security advisories in M.2** | High (without mitigation) | Critical | URL-citation requirement + `SPECULATIVE` tag (Section 8 Constraint 1). |
+| **Prompt-library bloat** | Medium | Low | 2-escape threshold for new prompts (Section 8); 30-day retirement evidence rule. X.1 specifically reports on prompt-rot. |
+| **LLM hallucinating security advisories in X.2** | High (without mitigation) | Critical | URL-citation requirement + `SPECULATIVE` tag (Section 8 Constraint 1). |
 | **Operators skipping Stage 3 when prompted** | Medium | High | Stage 3 split into 3a/3b/3c by SCOPE means each sub-stage is a meaningful unit. Per-commit gate sequence is explicit in standing rules. |
 | **Baseline ratchets becoming aspirational, then bypassed** | Medium | Medium | Constraint 6: ratchet requires measured snapshot. Today's baselines are written in the standing rules with measurement date. |
-| **Meta prompts triggering churn on every run** | Low | Medium | M.1/M.2 produce structured reports; operator reviews and accepts deltas. Reports go under `docs/strategy/` for review trail. |
-| **CI-runner debt** - M.1/M.2 are operator-invoked today; Trigger B (calendar) not actually triggered | Medium | Medium | Documented in Standing Backlog; first M.2 run will recommend the GHA workflow. |
+| **Meta prompts triggering churn on every run** | Low | Medium | X.1/X.2 produce structured reports; operator reviews and accepts deltas. Reports go under `docs/strategy/` for review trail. |
+| **CI-runner debt** - X.1/X.2 are operator-invoked today; Trigger B (calendar) not actually triggered | Medium | Medium | Documented in Standing Backlog; first X.2 run will recommend the GHA workflow. |
 | **Cross-Cutting Security Gate Map drift** | Low | Medium | Map must be updated in the same commit when any DEFERRED item is promoted to active gate (explicit rule in standing rules). |
 
 ---
 
 ## 12. Future Evolution Path
 
-The strategy is designed to compound. Each Stage M run produces a structured `docs/strategy/SELF_AUDIT_<date>.md` (M.1) or `SECURITY_INTAKE_<date>.md` (M.2) with proposed deltas to standing rules. Over time:
+The strategy is designed to compound. Each Stage X run produces a structured `docs/strategy/SELF_AUDIT_<date>.md` (X.1) or `SECURITY_INTAKE_<date>.md` (X.2) with proposed deltas to standing rules. Over time:
 
 ```mermaid
 gantt
-    title Stage M run cadence + expected deliverables
+    title Stage X run cadence + expected deliverables
     dateFormat YYYY-MM-DD
-    section M.1 General Drift
-    First M.1 run :m1_1, 2026-06-01, 1d
+    section X.1 General Drift
+    First X.1 run :m1_1, 2026-06-01, 1d
     Quarterly retrospective :m1_2, 2026-08-01, 1d
-    section M.2 Security Intake
-    First M.2 run :m2_1, 2026-06-01, 1d
+    section X.2 Security Intake
+    First X.2 run :m2_1, 2026-06-01, 1d
     Trivy gate promoted to Stage 4 :m2_2, after m2_1, 14d
     SBOM gate promoted to Stage 6 :m2_3, after m2_2, 14d
     Web security headers gate promoted to Stage 5 :m2_4, after m2_2, 7d
@@ -417,7 +417,7 @@ gantt
     SAST gate (semgrep) :sb_4, after m2_4, 14d
     section Prompt library
     backwardCompatAudit (after first contract-break incident) :prompt_1, 2026-09-01, 14d
-    CI-time M.1/M.2 runner :prompt_2, 2026-09-15, 7d
+    CI-time X.1/X.2 runner :prompt_2, 2026-09-15, 7d
 ```
 
 The expectation is that 6-12 months from now:
@@ -428,7 +428,7 @@ The expectation is that 6-12 months from now:
 - Baselines will have ratcheted down 3-5% on average (lint warnings, web tsc, coverage thresholds).
 - The Cross-Cutting Security Gate Map will have fewer DEFERRED rows.
 
-If after 12 months none of this happens, the strategy itself is the bug - run M.1 to identify why.
+If after 12 months none of this happens, the strategy itself is the bug - run X.1 to identify why.
 
 ---
 
@@ -460,7 +460,7 @@ Stages 1, 2, 3a, 3b, 4, 5 all empty. Stage 3c.2 (`auditAndUpdateDocs`) is the wh
 
 Stages 1, 2, 3a all run. Stage 3c.1 (`codeReviewSelfAudit`) is where the refactor's quality gets graded. Stage 4 confirms behavior unchanged.
 
-### When to invoke Stage M (Meta)
+### When to invoke Stage X (Meta)
 
 - After every release cut (v0.X.0 stable rollup).
 - 1st of every month.

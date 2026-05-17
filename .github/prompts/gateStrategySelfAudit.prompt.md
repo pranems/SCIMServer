@@ -1,6 +1,6 @@
 ---
 name: gateStrategySelfAudit
-description: Meta-prompt - introspect the gate strategy itself plus external best-practice intake. Looks for missing gates BEFORE bugs escape, retires dead prompts, ratchets baselines, intakes RFC/framework/security advisory updates. Lives in Stage M (Meta).
+description: Meta-prompt - introspect the gate strategy itself plus external best-practice intake. Looks for missing gates BEFORE bugs escape, retires dead prompts, ratchets baselines, intakes RFC/framework/security advisory updates. Lives in Stage X (Meta).
 argument-hint: Optional - "--scope=lastNcommits=N" (introspect last N commits), "--scope=currentRelease" (last alpha/stable cycle), "--scope=fullSweep" (entire repo + prompt library), "--scope=incident" (focused on a recent bug escape; specify --commit=<sha>).
 ---
 

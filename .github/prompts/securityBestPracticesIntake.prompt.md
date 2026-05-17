@@ -1,14 +1,14 @@
 ---
 name: securityBestPracticesIntake
-description: Meta prompt - intake the latest security best-practices changes from standards bodies, frameworks, supply-chain registries, cloud platforms, and AI/LLM security communities. Sibling to gateStrategySelfAudit; lives in Stage M.2 and runs on the same 4-trigger cadence.
+description: Meta prompt - intake the latest security best-practices changes from standards bodies, frameworks, supply-chain registries, cloud platforms, and AI/LLM security communities. Sibling to gateStrategySelfAudit; lives in Stage X.2 and runs on the same 4-trigger cadence.
 argument-hint: Optional - "--scope=quick" (top-3 categories only), "--scope=full" (all 10), "--scope=category:<name>" (one of: standards|protocol|supplyChain|crypto|container|cicd|web|privacy|cloud|llm). Default is "--scope=full".
 ---
 
-This is a META prompt. It does not gate any commit. It does not run per-feature. It runs on inflection points (Stage M) to intake security best-practices changes from outside the repo, identify gaps in our gate suite, and propose concrete additions.
+This is a META prompt. It does not gate any commit. It does not run per-feature. It runs on inflection points (Stage X) to intake security best-practices changes from outside the repo, identify gaps in our gate suite, and propose concrete additions.
 
-Sibling to `gateStrategySelfAudit` (M.1): both run on the same 4-trigger cadence; both produce structured reports under `docs/strategy/`. They differ in subject:
-- **M.1 `gateStrategySelfAudit`** — internal drift + general external standards + incident learnings.
-- **M.2 `securityBestPracticesIntake`** (this prompt) — security-specific external intake across 10 categories, with explicit cross-reference to our existing security gates.
+Sibling to `gateStrategySelfAudit` (X.1): both run on the same 4-trigger cadence; both produce structured reports under `docs/strategy/`. They differ in subject:
+- **X.1 `gateStrategySelfAudit`** — internal drift + general external standards + incident learnings.
+- **X.2 `securityBestPracticesIntake`** (this prompt) — security-specific external intake across 10 categories, with explicit cross-reference to our existing security gates.
 
 The strict separation lets each prompt go deeper in its lane without bloating the other.
 
@@ -38,7 +38,7 @@ This prompt is that proactive scan. Cost: 30-90 minutes per run. ROI breaks even
 
 ---
 
-## Trigger conditions (same as M.1)
+## Trigger conditions (same as X.1)
 
 | Trigger | Cadence | Recommended scope |
 |---|---|---|
