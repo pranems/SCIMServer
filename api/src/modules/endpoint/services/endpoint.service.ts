@@ -398,6 +398,17 @@ export class EndpointService implements OnModuleInit {
 
     // Persist + cache
     if (this.isInMemoryBackend) {
+      // Cross-backend parity (Finding-B, May 2026): the Prisma branch below
+      // checks `findUnique({ where: { name } })` and throws BadRequestException
+      // on duplicate. The inmemory branch must mirror that exact behavior so
+      // POST /admin/endpoints with a duplicate name returns 400 regardless of
+      // PERSISTENCE_BACKEND. Cache lookup is sufficient because inmemory
+      // backend is single-process and the name->endpoint Map is the source of
+      // truth (no DB to race against). See crossBackendParityAudit prompt.
+      if (this.cacheByName.has(dto.name)) {
+        throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
+      }
+
       // Normalize any deprecated settings keys before caching
       this.normalizeStaleSettingsKeys(resolvedProfile);
       const now = new Date();
