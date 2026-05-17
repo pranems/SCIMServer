@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.0-alpha.2] - 2026-05-16 - Phase N2 - First-Run Onboarding Wizard
+
+See [docs/PHASE_N2_ONBOARDING_WIZARD.md](docs/PHASE_N2_ONBOARDING_WIZARD.md) for the full feature doc.
+
+### Added
+
+- **First-run Onboarding Wizard** (closes [UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S5.8). New OnboardingWizard mounted at chrome level in [AppShell](web/src/layout/AppShell.tsx). Trigger contract: shows when (a) `scimserver.onboarding.completedAt` is absent in localStorage AND (b) `useEndpoints().totalResults === 0`; force-open hatch via `scimserver.onboarding.forceOpen=1` for tests / demos / SettingsPage reset. 4 steps: Welcome -> Pick a preset (entra-id preselected, Phase L1 4-step CreateEndpointWizard template reused) -> Issue first credential (plaintext token surfaced once via Phase E1 UX pattern) -> Send a SCIM request from Workbench (Phase M1 prefill via urlencoded GET). Skip / X close / I-will-do-this-later all dismiss with `markOnboardingComplete()`.
+- **`useOnboarding.ts` hook + helpers** ([web/src/hooks/useOnboarding.ts](web/src/hooks/useOnboarding.ts), ~100 LoC): exports `useShowOnboarding()`, `markOnboardingComplete()`, `resetOnboarding()`, plus three constants.
+- **Settings re-open card** ([SettingsPage](web/src/pages/SettingsPage.tsx) +32 LoC): new `OnboardingResetCard` with `Show onboarding` button calling `resetOnboarding()`.
+
+### Tests
+
+- **+14 web vitest** in new [OnboardingWizard.test.tsx](web/src/layout/OnboardingWizard.test.tsx) covering trigger logic (4 cases) + step transitions (10 cases).
+- **+2 web vitest** in [SettingsPage.test.tsx](web/src/pages/SettingsPage.test.tsx) for the OnboardingResetCard.
+- No new API test - N2 consumes already-shipped backend endpoints.
+- No new live-test section - all consumed endpoints exhaustively covered at 9z-AA / 9z-V / core SCIM CRUD.
+- No new Playwright spec - vitest coverage is sufficient.
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- Stage 0 TDD: 14 wizard tests + 2 settings tests written alongside implementation
+- Stage 1.4 web tsc: 96/96 baseline maintained (fixed 2 new Fluent UI v9 `borderColor`-only override errors by switching to `border` shorthand)
+- Stage 1.6 / 1.7: vite build 12.7s, 24/24 size budgets pass
+- Stage 2.1 API jest: 3728/3728 unchanged (frontend-only commit)
+- Stage 2.3 web vitest: 909/909 (was 893; +16)
+- Stage 3a apiContractVerification: no new API contract introduced
+- Stage 3b securityAudit: plaintext token in React state only, never logged; localStorage flags non-sensitive
+- Stage 3c.2 auditAndUpdateDocs: new PHASE_N2_ONBOARDING_WIZARD.md + INDEX.md entry + Session_starter row
+- Stage 4.4: deploy v0.52.0-alpha.2 to dev + 984+ live SCIM tests pass
+
+### Bundle delta
+
+| Chunk | Pre-N2 (v0.52.0-alpha.1) | Post-N2 (v0.52.0-alpha.2) | Delta | Budget | Headroom |
+|---|---|---|---|---|---|
+| Main entry (gzipped) | 152.99 KB | 160.48 KB | +7.49 KB | 200 KB | 19.8 % |
+| Shared primitives (gzipped) | 126.83 KB | 125.66 KB | -1.17 KB | 220 KB | 42.9 % |
+| Per-route chunks (24) | unchanged | unchanged | 0 | 110 KB each | varies |
+
+Main entry growth justification: wizard is mounted chrome-level (not lazy-loaded) because operators on first-run need it without a route change. +7.49 KB is the cost of that immediacy; 20 % headroom remains.
+
+### Test counts
+
+| Layer | Pre-N2 | Post-N2 | Delta |
+|---|---|---|---|
+| API jest unit | 3,728 | 3,728 | 0 |
+| API jest E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 893 | **909** | +16 |
+| Live SCIM (dev) | 984 | 984 | 0 |
+| Playwright | 25 (post-Finding-C cleanup) | 25 | 0 |
+
+**Total assertions across 5 layers: 6,817 -> 6,833 (+16).**
+
+### Prod promotion
+
+NOT triggered - dev-only deploy per standing rule. Prod still on v0.48.0 (Phase J).
+
 ## [0.52.0-alpha.1] - 2026-05-15 - Phase N1 - Notifications Inbox
 
 See [docs/PHASE_N1_NOTIFICATIONS_INBOX.md](docs/PHASE_N1_NOTIFICATIONS_INBOX.md) for the full feature doc.

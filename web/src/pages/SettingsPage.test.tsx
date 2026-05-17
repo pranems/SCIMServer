@@ -126,3 +126,31 @@ describe('SettingsPage log config (Phase L4)', () => {
     expect(screen.getByTestId('log-config-category-scim.patch').textContent).toContain('TRACE');
   });
 });
+
+// ─── Phase N2: OnboardingResetCard ──────────────────────────────────
+
+describe('SettingsPage onboarding reset (Phase N2)', () => {
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.52.0', runtime: { node: 'v25', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    localStorage.clear();
+  });
+
+  it('renders the onboarding reset card with a button', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('settings-onboarding-reset-card')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-onboarding-reset-button')).toBeInTheDocument();
+  });
+
+  it('clicking the reset button sets the force-open flag and clears completedAt', () => {
+    localStorage.setItem('scimserver.onboarding.completedAt', new Date().toISOString());
+    wrap(<SettingsPage />);
+    const btn = screen.getByTestId('settings-onboarding-reset-button');
+    btn.click();
+    expect(localStorage.getItem('scimserver.onboarding.completedAt')).toBeNull();
+    expect(localStorage.getItem('scimserver.onboarding.forceOpen')).toBe('1');
+  });
+});

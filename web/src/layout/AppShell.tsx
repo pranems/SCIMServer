@@ -33,6 +33,7 @@ import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
 import { LogStreamDrawer } from './LogStreamDrawer';
 import { NotificationsDrawer } from './NotificationsDrawer';
+import { OnboardingWizard } from './OnboardingWizard';
 import { queryClient } from '../api/query-client';
 
 const useStyles = makeStyles({
@@ -97,6 +98,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
           <LogStreamDrawer />
           <NotificationsDrawer />
+          <OnboardingWizard />
           <div className={classes.root} data-testid="app-shell">
             <AppHeader />
             <div className={classes.body}>

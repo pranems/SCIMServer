@@ -190,7 +190,7 @@ After implementation AND before considering work complete, ALL of the following 
 ### Stage 1 - Local Static Gates (fast, before any test run)
 1.1. **`lintAndStaticAnalysis` prompt** - Runner for all the gates below; parses output, prioritizes fixes, blocks on regression in baseline counts.
 1.2. **API TypeScript build** - `cd api; npm run build` -> exit 0, zero errors.
-1.3. **API ESLint** - `cd api; npm run lint` -> 0 errors. Warning count is a ratchet ceiling; the current baseline at v0.52.0-alpha.1 is 0 errors / 465 warnings. New code must not increase that ceiling without a CHANGELOG note.
+1.3. **API ESLint** - `cd api; npm run lint` -> 0 errors. Warning count is a ratchet ceiling; the current baseline at v0.52.0-alpha.2 is 0 errors / 465 warnings. New code must not increase that ceiling without a CHANGELOG note.
 1.4. **Web TypeScript check** - `cd web; npx tsc --noEmit` -> the prod-file error baseline at the start of work must not increase. Test-file errors are tolerated only when they are pre-existing on HEAD; any new test file you add must compile clean. Today's baseline: 96 errors (87 test / 9 prod). Aspirational target: 0 prod-file errors; ratchet down over time, never up.
 1.5. **Web ESLint** - if `web/eslint.config.{mjs,cjs,js}` exists, run `cd web; npx eslint src` -> 0 errors. If no config exists yet, this gate is N/A until Option-4 work adds one.
 1.6. **Web production build** - `cd web; npm run build` -> 0 errors. Confirms vite + esbuild can ship the bundle.

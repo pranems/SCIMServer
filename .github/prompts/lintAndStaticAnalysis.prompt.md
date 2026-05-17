@@ -29,7 +29,7 @@ npm run build
 # 1.2 ESLint
 npm run lint
 # Expected: 0 errors. Warnings allowed but should not increase commit-over-commit.
-# Today's baseline (v0.52.0-alpha.1): 0 errors / 465 warnings.
+# Today's baseline (v0.52.0-alpha.2): 0 errors / 465 warnings.
 
 # 1.3 Verify no .ts files were forgotten in /dist or /node_modules linting
 $lintLog = npm run lint 2>&1

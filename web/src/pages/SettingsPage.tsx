@@ -21,11 +21,13 @@ import {
   Input,
   Field,
   Divider,
+  Button,
 } from '@fluentui/react-components';
 import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
+import { resetOnboarding } from '../hooks/useOnboarding';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px' },
@@ -139,7 +141,37 @@ export const SettingsPage: React.FC = () => {
 
       {/* Phase L4 - log config admin */}
       <LogConfigSection />
+
+      {/* Phase N2 - re-open onboarding wizard */}
+      <OnboardingResetCard />
     </div>
+  );
+};
+
+// ─── Phase N2: OnboardingResetCard ───────────────────────────────
+//
+// Escape hatch for operators who want to re-watch the first-run
+// wizard (demos, training). Clicking the link clears the
+// `scimserver.onboarding.completedAt` flag and sets the
+// `scimserver.onboarding.forceOpen` flag so the wizard appears even
+// on tenants that already have endpoints.
+
+const OnboardingResetCard: React.FC = () => {
+  const classes = useStyles();
+  return (
+    <Card className={classes.card} data-testid="settings-onboarding-reset-card">
+      <Subtitle2>Onboarding</Subtitle2>
+      <div className={classes.row}>
+        <Text>Show the first-run onboarding wizard again</Text>
+        <Button
+          appearance="subtle"
+          onClick={() => resetOnboarding()}
+          data-testid="settings-onboarding-reset-button"
+        >
+          Show onboarding
+        </Button>
+      </div>
+    </Card>
   );
 };
 
