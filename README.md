@@ -2,7 +2,7 @@
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
-[![Version](https://img.shields.io/badge/version-0.38.0-blue)]()
+[![Version](https://img.shields.io/badge/version-0.52.0--alpha.2-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
@@ -62,7 +62,7 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 | **Observability** | Structured JSON logging, SSE live stream, ring buffer, per-endpoint log isolation, file rotation, auto-prune |
 | **Deployment** | Docker Compose (1 command), Azure Container Apps (1 script), local dev, pre-built GHCR image |
 | **Web UI** | React + Vite admin dashboard - log viewer, database browser, activity feed, manual provisioning |
-| **Testing** | 3,378 unit + 1,074 E2E + ~789 live + 112 ISV = ~5,274 total tests |
+| **Testing** | 3,728 unit + 1,186 E2E + 984 live + 909 web vitest + 14 PowerShell = 6,821 total tests |
 
 ---
 
@@ -1273,13 +1273,13 @@ Access at `http://localhost:8080/admin` (no separate build step needed - pre-bui
                     |   112 ISV Tests   |  Lexmark SCIM Validator
                     +-------------------+
                  +-------------------------+
-                 |   ~789 Live Tests       |  PowerShell, real HTTP
+                 |   984 Live Tests       |  PowerShell, real HTTP
                  +-------------------------+
               +-------------------------------+
-              |   1,074 E2E Tests (51 suites) |  Supertest, in-process
+              |   1,186 E2E Tests (61 suites) |  Supertest, in-process
               +-------------------------------+
            +-------------------------------------+
-           |   3,378 Unit Tests (84 suites)      |  Jest, mocked deps
+           |   3,728 Unit Tests (102 suites)      |  Jest, mocked deps
            +-------------------------------------+
 ```
 
@@ -1389,7 +1389,7 @@ SCIMServer/
 |   |   +-- components/           # Log viewer, DB browser, activity feed
 |   +-- e2e/                      # Playwright E2E tests
 +-- scripts/                      # DevOps tooling
-|   +-- live-test.ps1             # ~8,700 lines, ~789 live tests
+|   +-- live-test.ps1             # ~8,700 lines, 984 Live Tests
 |   +-- lexmark-live-test.ps1     # ISV validator tests
 |   +-- deploy-azure.ps1          # Azure deployment script
 |   +-- full-validation-pipeline.ps1

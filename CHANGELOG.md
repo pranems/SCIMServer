@@ -57,7 +57,7 @@ Main entry growth justification: wizard is mounted chrome-level (not lazy-loaded
 | Live SCIM (dev) | 984 | 984 | 0 |
 | Playwright | 25 (post-Finding-C cleanup) | 25 | 0 |
 
-**Total assertions across 5 layers: 6,817 -> 6,833 (+16).**
+**Total assertions across 5 layers: 6,805 -> 6,821 (+16).**
 
 ### Prod promotion
 
