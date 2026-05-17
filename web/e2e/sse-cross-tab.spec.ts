@@ -40,6 +40,13 @@ const TEST_USER = {
 
 async function authenticatedPage(context: BrowserContext, path: string): Promise<Page> {
   const page = await context.newPage();
+  // Inject token before navigation so TokenGate accepts it on first paint.
+  await page.addInitScript(
+    ({ key, value }) => {
+      try { window.localStorage.setItem(key, value); } catch {}
+    },
+    { key: 'scimserver.authToken', value: 'msw-test-bearer' },
+  );
   await page.goto('/');
   await page.evaluate((t) => localStorage.setItem('scim_token', t), 'msw-test-bearer');
   await page.goto(path);
@@ -48,6 +55,17 @@ async function authenticatedPage(context: BrowserContext, path: string): Promise
 }
 
 test.describe('Phase H3 - F3-deferred cross-tab SSE invalidation', () => {
+  // This test depends on MSW running in the page (VITE_USE_MSW=true on a local
+  // vite dev server). Against a deployed Azure dev URL there is no MSW worker
+  // and the mock endpoint `ep-msw-1` does not exist - so skip in that case.
+  // Replacement coverage for the F3 SSE contract against real backends is
+  // already provided by the live-test 9z-V section (PII boundary + SSE event
+  // emission) plus the api/test/e2e/scim-event-sse-bridge.e2e-spec.ts E2E.
+  test.skip(
+    !!process.env.E2E_BASE_URL && !process.env.E2E_BASE_URL.startsWith('http://localhost'),
+    'MSW-only test; requires local vite dev server with VITE_USE_MSW=true. F3 contract is also locked by api/test/e2e/scim-event-sse-bridge.e2e-spec.ts + live-test 9z-V.',
+  );
+
   test('Tab A creates user, Tab B refetches WITHOUT manual reload', async ({ browser }) => {
     // Two independent BrowserContexts so each tab gets its own
     // localStorage / cookies / EventSource - same as a real
