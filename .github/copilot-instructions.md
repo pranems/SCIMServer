@@ -179,26 +179,130 @@ Every feature or significant change commit MUST include ALL of the following bef
 
 ## Mandatory Quality Gates (Standing Rule)
 
-After implementation AND before considering work complete, ALL of the following quality gates MUST be executed. Use TDD (Red-Green-Refactor) for all implementation.
+After implementation AND before considering work complete, ALL of the following quality gates MUST be executed. Use TDD (Red-Green-Refactor) for ALL implementation - including the smallest spot-fix. The gates are organized into 6 stages (Stage 0 -> Stage 5). NEVER skip a stage. NEVER reorder. Higher-numbered stages depend on lower-numbered stages.
 
-### Always Required (every change)
-1. **TDD** - Write failing test first, implement minimal code, refactor. No exceptions.
-2. **addMissingTests** prompt - Close any remaining test gaps (unit/E2E/live)
-3. **apiContractVerification** prompt - Verify response shapes match contracts
-4. **error-handling-verification** prompt - Audit all error paths
-5. **logging-verification** prompt - Verify logging completeness
-6. **auditAgainstRFC** prompt - RFC 7643/7644 compliance check
-7. **securityAudit** prompt - Auth, secrets, input validation, PII, headers
-8. **performanceBenchmark** prompt - p95 latency, DB query counts, memory
-9. **auditAndUpdateDocs** prompt - Documentation freshness across all docs
-10. **fullValidationPipeline** prompt - Local + Docker build & test
-11. **Deploy to dev + live tests** - Publish image, deploy to dev Azure Container App, run `live-test.ps1` (867+ assertions must pass)
+### Stage 0 - TDD Discipline (every commit, every step)
+0.1. **RED first** - Write the failing unit/E2E/live test for the new behavior BEFORE touching production code. Confirm RED in the test output (assertion message, not just "Tests Failed: N").
+0.2. **GREEN minimal** - Implement the smallest change that makes the failing test pass. Do NOT add extra features.
+0.3. **REFACTOR safe** - Clean up only with the GREEN suite still green after every edit.
+0.4. **No exceptions** - even for "one-line fixes" or "obvious bugs." The Finding-B inmemory parity gap (May 2026) was a one-line missing guard that escaped review for months because it had no unit-level lock. RED-first prevents the next one.
 
-### Additional for UI changes
-12. **uiTestAndValidation** prompt - React/Vitest test suite
+### Stage 1 - Local Static Gates (fast, before any test run)
+1.1. **`lintAndStaticAnalysis` prompt** - Runner for all the gates below; parses output, prioritizes fixes, blocks on regression in baseline counts.
+1.2. **API TypeScript build** - `cd api; npm run build` -> exit 0, zero errors.
+1.3. **API ESLint** - `cd api; npm run lint` -> 0 errors. Warning count is a ratchet ceiling; the current baseline at v0.52.0-alpha.1 is 0 errors / 465 warnings. New code must not increase that ceiling without a CHANGELOG note.
+1.4. **Web TypeScript check** - `cd web; npx tsc --noEmit` -> the prod-file error baseline at the start of work must not increase. Test-file errors are tolerated only when they are pre-existing on HEAD; any new test file you add must compile clean. Today's baseline: 96 errors (87 test / 9 prod). Aspirational target: 0 prod-file errors; ratchet down over time, never up.
+1.5. **Web ESLint** - if `web/eslint.config.{mjs,cjs,js}` exists, run `cd web; npx eslint src` -> 0 errors. If no config exists yet, this gate is N/A until Option-4 work adds one.
+1.6. **Web production build** - `cd web; npm run build` -> 0 errors. Confirms vite + esbuild can ship the bundle.
+1.7. **Web size-limit budgets** - `cd web; npm run size` -> all budgets pass. Reports 24+ per-route + entry + shared-primitives budgets that lock first-paint download.
+1.8. **`bundleBudgetAudit` prompt** - Enforces that every NEW lazy route added under `web/src/routes/` has a corresponding entry in `web/package.json` `"size-limit"` array. Catches the "ship a route with no ceiling" bug class.
+1.9. **`prismaMigrationAudit` prompt** - Verifies `api/prisma/schema.prisma`, `api/prisma/migrations/*`, and the runtime DB stay in lockstep. Run whenever `api/prisma/` is touched. Catches the "schema edited but migration not generated" CD blocker.
 
-### Prod promotion
-- **NEVER automatic** - Only triggered when user explicitly requests it via `deployAndPromote` prompt or manual `promote-to-prod.ps1`
+### Stage 2 - Local Test Gates (run after Stage 1 is green)
+2.1. **API unit jest** - `cd api; npm test` -> all suites pass. Capture suite + test counts; record in CHANGELOG.
+2.2. **API E2E jest** - `cd api; npm run test:e2e` -> all suites pass. Capture counts.
+2.3. **Web vitest** - `cd web; npm test` -> all suites pass. Capture counts.
+2.4. **Web vitest coverage gate** - `cd web; npm run test:coverage` -> meets Phase H4 ratchet thresholds (lines:78 / branches:70 / functions:65 / statements:75 floor; raise as repo improves, never lower).
+2.5. **`crossBackendParityAudit` prompt** - For ANY change that touches a file with an `isInMemoryBackend` branch, walk through the parity matrix (Q1-Q4) and confirm both backends behave identically. This is the Finding-B preventer (May 2026 - InMemory endpoint-create was missing the duplicate-name guard Prisma had).
+2.6. **API + Web tests across persistence backends** - `pwsh scripts/test-all-modes.ps1` (Phase H5 orchestrator) covers 6 modes including api-unit-prisma + api-unit-inmemory + api-e2e-prisma + api-e2e-inmemory. Companion runner to 2.5; the prompt does the thinking, the orchestrator does the execution.
+
+### Stage 3 - Self-Improving Audit Prompts (every feature/bug-fix commit)
+Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. Run them in this order; later sub-stages depend on earlier ones being green.
+
+#### Stage 3a - Test-Completeness Audits (gap-fill BEFORE confirming correctness)
+3a.1. **`addMissingTests` prompt** - Inventory current test coverage vs the change. Close every gap at the unit + E2E + live layer BEFORE moving on. The May 2026 Group.displayName uniqueness flip would have been caught a release earlier had this gate run.
+3a.2. **`apiContractVerification` prompt** - Confirm every response shape matches the documented contract. Use key-allowlist assertions (`expect(ALLOWED_KEYS).toContain(key)`), never `toHaveProperty`. Internal runtime fields prefixed with `_` MUST be invisible at every public response.
+3a.3. **`error-handling-verification` prompt** - Audit every error path: HTTP status, SCIM `scimType` keyword (RFC 7644 Table 9), structured diagnostics envelope (`attributePaths[]`, `activeConfig`, `filterExpression`), and the smart-error-explainer client surface.
+
+#### Stage 3b - Cross-Cutting Audits (verify the IMPL against external standards)
+3b.1. **`logging-verification` prompt** - Verify the new code path produces correctly-categorized + correctly-leveled log entries, with PII redacted, requestId propagated, and slow-request thresholds honored.
+3b.2. **`auditAgainstRFC` prompt** - RFC 7643 (Schema) + RFC 7644 (Protocol) compliance review for any change that touches Schemas/ResourceTypes/ServiceProviderConfig/Users/Groups/Bulk/PatchOp/.search/discovery.
+3b.3. **`endpointConfigFlagAudit` prompt** - Verifies the 14-boolean-flag + logLevel system stays architecturally complete (registry + default + validator + enforcement + tests at every layer + doc + UI Switch + UI test = 10 cells per flag). Run when adding/modifying any flag.
+3b.4. **`securityAudit` prompt** - Auth, secrets, input validation, output PII, security headers, rate limits, OWASP Top 10 coverage. Re-run after every dependency bump.
+3b.5. **`dependencyCveSweep` prompt** - NPM-audit / CVE scan against api/ + web/ with Critical/High severity blocking commits. Companion to `securityAudit` but triggered by `package.json`/`package-lock.json` changes AND on a weekly schedule. Both prompts must be green for Stage 3b to pass.
+3b.6. **`performanceBenchmark` prompt** - p50/p95/p99 latency, DB query count per request, memory headroom, no N+1 patterns. Compare against the prior commit's baseline; regression > 10% requires explicit justification in the commit message.
+
+#### Stage 3c - Code Hygiene + Documentation Sweep (after all impl + tests are GREEN)
+3c.1. **`codeReviewSelfAudit` prompt** - SOLID / DRY / readability / complexity audit of CHANGED files only. Suggestions, not blocks. Catches god-class growth, helper-bloat, and naming drift that the RFC/security/perf prompts don't see. Reference: the May 2026 Design Deep Analysis found 5 SOLID violations (SchemaValidator god class 1,467 lines, service-helpers 1,230 lines, etc.) - this prompt is the standing engine for catching the next one.
+3c.2. **`auditAndUpdateDocs` prompt** - Sweep `docs/INDEX.md`, `Session_starter.md`, `docs/CONTEXT_INSTRUCTIONS.md`, `CHANGELOG.md`, `README.md`, plus every feature doc that references test counts / version / commit SHA / behavior the change touches. Use sub-agent for thoroughness on large changes.
+
+### Stage 4 - Pipeline + Multi-Mode Deployment Validation
+4.1. **`fullValidationPipeline` prompt** - End-to-end local build + Docker build + container smoke. Must pass cleanly before any deployment.
+4.2. **Docker compose live tests** - `docker compose up -d api`, then `pwsh scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). Confirms the Prisma backend behaves identically to the inmemory mode AND identical to dev.
+4.3. **Local node live tests** - `node api/dist/main.js` (inmemory backend, port 6000), then `pwsh scripts/live-test.ps1` -> all current-baseline tests pass. Confirms inmemory parity. **A live-test failure on local that passes on Docker/dev is a parity bug; fix it at the source (usually `api/src/infrastructure/repositories/inmemory/` or in the service-layer `isInMemoryBackend` branch), don't suppress.**
+4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). **This is the sub-phase gate the commit message names.**
+
+### Stage 5 - UI-Specific Gates (when the change touches `web/`)
+5.1. **`uiTestAndValidation` prompt** - Full React/vitest test suite + a11y + visual regression sanity check.
+5.2. **`playwrightSpecHygieneAudit` prompt** - Audit `web/e2e/*.spec.ts` files against the currently-shipped UI surface. Delete stale specs (specs testing components deleted in Phase I v0.48.0: `raw-logs`, `manual-provision`, `database-browser`, `app-shell`, `activity-feed`, `live-data-verification`, `new-ui`). Run this BEFORE 5.3 so the next run produces a trustworthy signal.
+5.3. **Playwright E2E vs dev** - `cd web; $env:E2E_BASE_URL='<dev FQDN>'; npx playwright test --reporter=line` -> all currently-live specs pass. Visual-regression baseline drift is acceptable only when accompanied by a CHANGELOG entry justifying the UI evolution AND fresh baselines committed in the same change.
+5.4. **Browser binary sync** - If `npx playwright install` is required (binary version drift), run it as a one-shot setup step before 5.3. Not a per-commit gate, but a per-branch / per-clean-clone gate.
+
+### Stage 6 - Commit Hygiene + Release Documentation
+6.1. **Version bump** - `api/package.json` + `web/package.json` + lockfiles regenerated **inside node:25-alpine** for cross-platform reproducibility.
+6.2. **CHANGELOG.md** - One entry per minor/patch with explicit before/after test counts at every layer (API unit, API E2E, Web vitest, Live SCIM, Playwright, PowerShell contract), version delta, files changed summary, and per-phase quality gate result.
+6.3. **Session_starter.md** + **docs/CONTEXT_INSTRUCTIONS.md** updates - Latest test counts, version, recent achievements row.
+6.4. **`generateCommitMessage` prompt** - Use it to compose the commit message; ensures the standing rule about per-sub-phase gate naming is honored.
+6.5. **No `--amend` on pushed commits, no `--force` push, no `--no-verify`** - All three are disallowed by the standing operational-safety rules.
+
+### Stage M - Meta / Strategy Evolution (not per-commit)
+Stage M does NOT gate any single commit. It runs on inflection points to evolve the gate strategy itself. The other 6 stages are the floor; Stage M is what raises the floor over time.
+
+M.1. **`gateStrategySelfAudit` prompt** - Meta-prompt that introspects: (a) **internal drift** - baseline rot, prompt rot, coverage rot, complexity rot, doc rot, escape patterns; (b) **external standards intake** - SCIM RFC errata, framework upgrades, ecosystem changes (with URL citations REQUIRED); (c) **incident learnings** - auto-pull every `fix:` commit since last run; (d) **recommended additions, retirements, ratchets** - actionable findings with confidence + owner assignment.
+
+M.2. **`securityBestPracticesIntake` prompt** - Sibling to M.1, scoped exclusively to security best-practices intake across 10 categories: (1) Standards bodies (OWASP, CWE, NIST, CIS); (2) Protocol-level (OAuth 2.1, OIDC FAPI, DPoP, TLS); (3) Supply chain (SLSA, npm provenance, Sigstore, GHA pinning); (4) Cryptographic deprecations (NIST SP 800-131A); (5) Container/runtime (distroless, rootless, trivy, syft, cosign); (6) CI/CD security (OIDC, branch protection, signed commits, Dependabot); (7) Web/UI security (CSP, HSTS, COOP/COEP, Trusted Types); (8) Privacy/PII (GDPR, CCPA, PIPL); (9) Cloud-specific (Azure Security Baselines, Managed Identity, WAF); (10) AI/LLM-specific (OWASP LLM Top 10, prompt injection, model supply chain). Each finding requires URL citation, confidence level, and concrete owner action. Output: structured Markdown report under `docs/strategy/SECURITY_INTAKE_<YYYY-MM-DD>.md` with proposed deltas to this file.
+
+**M.1 + M.2 trigger conditions (shared, 4 types):**
+| Trigger | Cadence | Scope | Why |
+|---|---|---|---|
+| Release cuts | Every `v0.X.0` stable rollup | last release cycle | Natural reflection point |
+| Calendar | Monthly (1st of month) | full sweep | Catches drift in periods without release |
+| On-demand | User invokes | operator-specified | Bug-hunt / planning / threat-hunt mode |
+| Incident-driven | After ANY bug/security-incident escapes Stages 1-5 to live/dev | focused on the escape path | Auto-captures Finding-B / Finding-C / supply-chain class events |
+
+**Hard constraints (apply to both M.1 and M.2):**
+- External claims require URL citations (no URL = "speculative — verify before action").
+- Confidence levels required (`Critical` / `High` / `Medium` / `Speculative` for M.2; `High` / `Medium` / `Speculative` for M.1).
+- Owner action required on every finding.
+- New prompt recommendations require >=2 escape-pattern matches (single-escape patterns go into an EXISTING prompt as a new check).
+- Prompt retirement requires 30+ days of no-fire evidence.
+- Baseline ratchets require a measured snapshot supporting the new value.
+- Tool-dependent recommendations flagged DEFERRED if the tool isn't installed; do not recommend a gate the runner can't execute today.
+
+**M.1 + M.2 output convention:** structured Markdown reports under `docs/strategy/`:
+- `docs/strategy/SELF_AUDIT_<YYYY-MM-DD>.md` from M.1
+- `docs/strategy/SECURITY_INTAKE_<YYYY-MM-DD>.md` from M.2
+- Both end with "Proposed deltas to copilot-instructions.md" for operator review.
+
+### Cross-Cutting Security Gate Map
+Security checks are intentionally threaded through every stage. This map makes the threading visible so the next reviewer knows where each security concern is enforced.
+
+| Concern | Stage(s) where checked | Prompt / gate |
+|---|---|---|
+| Hardcoded secrets in staged diff | 1.1 | `lintAndStaticAnalysis` Step 3.2 |
+| em-dash (style proxy for un-reviewed bot output) | 1.1 | `lintAndStaticAnalysis` Step 3.1 |
+| `console.log` leakage to prod | 1.1 | `lintAndStaticAnalysis` Step 3.3 |
+| Dependency CVE (Critical/High blocks; Moderate tracked) | 3b.5 | `dependencyCveSweep` |
+| Auth / authz / input validation / output PII / OWASP Top 10 (per-commit) | 3b.4 | `securityAudit` |
+| Schema characteristics that imply security (uniqueness/mutability tightening) | 3b.2 | `auditAgainstRFC` + Schema-Characteristic Test Rule |
+| Response key allowlist (no internal `_` fields leak) | 3a.2 | `apiContractVerification` |
+| SCIM error envelope (no PII in error detail) | 3a.3 | `error-handling-verification` |
+| PII redaction + structured-log hygiene | 3b.1 | `logging-verification` |
+| Live SCIM contract on the wire (auth headers, OAuth flow, ETag flow) | 4.2 / 4.3 / 4.4 | `scripts/live-test.ps1` |
+| **External security-landscape changes (proactive)** | **M.2** | **`securityBestPracticesIntake`** |
+| Container image CVEs (OS-level base image) | DEFERRED | (Standing Backlog: trivy gate at Stage 4) |
+| Web security headers (CSP/HSTS/etc.) | DEFERRED | (Standing Backlog: Playwright spec at Stage 5) |
+| SBOM generation + signing | DEFERRED | (Standing Backlog: syft + cosign at Stage 6) |
+| SAST (semgrep / CodeQL) | DEFERRED | (Standing Backlog: Stage 1 extension) |
+| GHA action pinning + branch protection + OIDC | DEFERRED | (Standing Backlog: repo policy) |
+| Cryptographic deprecation watch | M.2 Category 4 | `securityBestPracticesIntake` |
+| AI/LLM security (when Phase N+ adds LLM features) | M.2 Category 10 | `securityBestPracticesIntake` |
+
+When `securityBestPracticesIntake` (M.2) recommends moving any DEFERRED item to an active gate, this map MUST be updated in the same commit.
+
+### Prod Promotion (separate, on-demand only)
+- **NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
+- Prod promotion requires Stage 4.4 (dev live tests) green on the exact image SHA being promoted, not the "latest" tag.
 
 ### Deployment Topology
 | Environment | App Name | OAuth Secret | FQDN |
@@ -213,5 +317,40 @@ After implementation AND before considering work complete, ALL of the following 
 - Create dedicated test resources, verify behavior, then clean up at end of section
 - Test all CRUD operations plus edge cases (e.g., `?attributes=` override attempts for returned:never)
 - Follow existing patterns: `Test-Result -Success <bool> -Message <string>`, `Invoke-RestMethod`, `$scimBase`, `$headers`
+
+### Gate-Strategy Self-Improvement Loop
+After every commit that exposes a new bug class (parity gap, prompt-injection vector, RFC ambiguity, test-rot pattern, etc.), update THIS section to add the corresponding gate. The formal engine for this loop is `gateStrategySelfAudit` (Stage M.1) for general drift and `securityBestPracticesIntake` (Stage M.2) for security-landscape changes. Manual updates here are still valid for fast-turn cases; both prompts aggregate them on their periodic runs.
+
+Examples of standing rules that originated from real failures:
+- **Schema-Characteristic Test Rule** (May 2026 Group.displayName uniqueness flip) - added a helper module + standing rule about always going through `expectCharacteristicIn` / `Get-EffectiveUniqueness`.
+- **Stage 2.5 + Stage 2.6 cross-backend parity** (May 2026 Finding-B inmemory parity) - elevated `test-all-modes.ps1` from optional to mandatory AND added the `crossBackendParityAudit` prompt as the thinking discipline that complements the orchestrator.
+- **Stage 5.2 Playwright spec hygiene** (May 2026 Finding-C 121-fail false signal) - added the `playwrightSpecHygieneAudit` prompt; explicit guidance that legacy-UI spec failures are tests-to-delete, not gates-to-lower.
+- **Stage 1.8 bundleBudgetAudit** (Phase K1/L1/M1 manual budget-add discipline) - codified the "every new lazy route = new size-limit entry" workflow that was manual until v0.52.x.
+- **Stage 1.9 prismaMigrationAudit** (cross-cutting CD concern) - codified the pre-commit check that `schema.prisma` + `migrations/` + InMemory repos stay in lockstep.
+- **Stage 3b.3 endpointConfigFlagAudit** (codebase-specific 14-flag architectural element) - the 10-cell completeness matrix prevents the "added a flag but forgot the doc / UI / live test" bug class.
+- **Stage 3b.5 dependencyCveSweep** (CVE freshness discipline separate from feature-driven `securityAudit`) - triggered by `package.json` changes + weekly schedule; Critical/High blocks commits.
+- **Stage 3c.1 codeReviewSelfAudit** (May 2026 Design Deep Analysis precedent: SchemaValidator god class 1,467 lines, service-helpers Swiss army 1,230 lines) - scoped to CHANGED files only; output is suggestions not blocks; catches god-class growth, helper-bloat, naming drift.
+- **Stage M.1 gateStrategySelfAudit** (May 2026 meta-audit need) - formal proactive engine for THIS loop. 4 trigger types (release / monthly / on-demand / incident-driven). Replaces ad-hoc reactive updates with structured introspection.
+- **Stage M.2 securityBestPracticesIntake** (May 2026 security-intake gap) - dedicated security-landscape scan across 10 categories with URL-citation enforcement. Separated from M.1 so security depth is not diluted by general drift. Pairs with the Cross-Cutting Security Gate Map to make threading visible.
+
+### Standing Backlog (recommendations for future evolution; not blockers)
+
+**Strategy / process:**
+- **`backwardCompatAudit` prompt** - "does this change break a previously-published contract?" Currently partially covered by `apiContractVerification`. Would specialize on public-contract diffing between commits. Worth scoping after the next public-contract-breaking incident provides design constraints.
+- **CI-time runner for Stage M.1 + M.2** - both prompts are currently operator-invoked. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar) for both.
+- **Auto-creation of `docs/strategy/*_<date>.md`** - M.1 and M.2 outputs are structured Markdown; a small script could open a PR with the report attached, surfacing findings to reviewers without requiring an operator to run the prompt.
+
+**Security tool gates (surfaced by M.2; defer until tool installed):**
+- **Stage 1 SAST gate** - install [semgrep](https://semgrep.dev/) or use [GitHub CodeQL](https://codeql.github.com/) with a tuned ruleset; +30s per commit; ~20% false positive rate before tuning.
+- **Stage 4 container CVE scan** - install [trivy](https://github.com/aquasecurity/trivy) (FOSS gold-standard) or grype; scan the API image after build, fail on Critical/High OS-level CVEs in the base image; +60s per Docker build.
+- **Stage 4 SBOM generation** - [syft](https://github.com/anchore/syft) generates an SPDX SBOM at build time; enables post-deploy CVE lookup; near-zero overhead.
+- **Stage 5 web security headers gate** - new Playwright spec asserts presence + value of `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options` (or CSP `frame-ancestors`), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` on every public response; locks CSP/HSTS as code.
+- **Stage 6 image signing** - [cosign](https://github.com/sigstore/cosign) keyless OIDC signs the image after build; verifies image came from our CI.
+- **Stage 6 GHA action SHA pinning** - audit all workflows via [stepsecurity.io](https://app.stepsecurity.io/) and pin every `uses:` line to a SHA; prevents tag-rewrite supply-chain attacks (precedent: tj-actions/changed-files Mar 2025).
+- **Repo policy: Dependabot weekly** - GitHub-native, $0 cost, surfaces dep upgrades automatically; complements `dependencyCveSweep` per-commit checks.
+- **Repo policy: signed commits + branch protection require SHA pinning** - GPG-signed commits, required PR review, no force-push to `main` / `feat/*`.
+- **Migration to distroless or rootless base image** - currently node:25-alpine; evaluate distroless Node image as a security hardening step (smaller attack surface, no shell).
+- **CORS hardening on API** - current CORS is permissive (noted in May 2026 design analysis); tighten to explicit origin list.
+- **Rotate long-lived secrets quarterly** - `SCIM_SHARED_SECRET`, `JWT_SECRET`, `OAUTH_CLIENT_SECRET`; track rotation dates in a runbook.
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**
