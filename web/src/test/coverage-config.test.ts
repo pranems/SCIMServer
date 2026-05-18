@@ -37,11 +37,14 @@ describe('Phase H4 - coverage gate config contract', () => {
     expect(CONFIG_TEXT).toMatch(/'json-summary'/);
   });
 
-  it('declares ratchet-floor thresholds (lines>=78, branches>=70, functions>=65, statements>=75)', () => {
+  it('declares ratchet-floor thresholds (lines>=82, branches>=70, functions>=69, statements>=78)', () => {
     // Match each threshold individually so a partial edit is caught.
-    // The values intentionally encode the Phase H4 baseline measurement
-    // documented in vite.config.ts. Raising thresholds is OK; lowering
-    // is not (a coverage gate that only ratchets up).
+    // The values intentionally encode the post-Stage-X.1 F.1 ratchet
+    // (2026-05-17) measured at v0.52.0-alpha.2:
+    //   lines:83.55 / branches:72.32 / functions:71.3 / statements:80.32
+    // Floor was raised lines:78->82, functions:65->69, statements:75->78.
+    // Branches kept at 70 (only 2.3% headroom). Raising thresholds is
+    // OK; lowering is not (a coverage gate that only ratchets up).
     const linesMatch = CONFIG_TEXT.match(/lines:\s*(\d+)/);
     const branchesMatch = CONFIG_TEXT.match(/branches:\s*(\d+)/);
     const functionsMatch = CONFIG_TEXT.match(/functions:\s*(\d+)/);
@@ -52,10 +55,10 @@ describe('Phase H4 - coverage gate config contract', () => {
     expect(functionsMatch).not.toBeNull();
     expect(statementsMatch).not.toBeNull();
 
-    expect(Number(linesMatch![1])).toBeGreaterThanOrEqual(78);
+    expect(Number(linesMatch![1])).toBeGreaterThanOrEqual(82);
     expect(Number(branchesMatch![1])).toBeGreaterThanOrEqual(70);
-    expect(Number(functionsMatch![1])).toBeGreaterThanOrEqual(65);
-    expect(Number(statementsMatch![1])).toBeGreaterThanOrEqual(75);
+    expect(Number(functionsMatch![1])).toBeGreaterThanOrEqual(69);
+    expect(Number(statementsMatch![1])).toBeGreaterThanOrEqual(78);
   });
 
   it('explicitly excludes test infrastructure + bootstrap files (no-logic surface)', () => {

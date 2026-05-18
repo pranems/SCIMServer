@@ -95,10 +95,16 @@ export default defineConfig({
         // Once the legacy components are deleted in Phase I2, the
         // include list widens to all of `src/**` and the floor can
         // be raised to the aspirational targets.
-        lines: 78,
+        //
+        // F.1 RATCHET (2026-05-17, Stage X.1 first audit closure):
+        // measured at v0.52.0-alpha.2 was lines:83.55 / branches:72.32 /
+        // functions:71.3 / statements:80.32. Floor raised lines:78->82,
+        // functions:65->69, statements:75->78. Branches kept at 70 (only
+        // 2.3% headroom; needs new tests before next ratchet).
+        lines: 82,
         branches: 70,
-        functions: 65,
-        statements: 75,
+        functions: 69,
+        statements: 78,
       },
     },
   }

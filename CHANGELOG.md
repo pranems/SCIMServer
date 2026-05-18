@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Web vitest coverage thresholds ratcheted up** ([docs/strategy/SELF_AUDIT_2026-05-16.md](docs/strategy/SELF_AUDIT_2026-05-16.md) F.1 closure). Floor raised in [web/vite.config.ts](web/vite.config.ts) and contract-locked in [web/src/test/coverage-config.test.ts](web/src/test/coverage-config.test.ts):
+  - lines: 78 -> **82** (measured 83.55; 1.55 % headroom)
+  - branches: 70 -> **70** (unchanged; measured 72.32 has only 2.32 % headroom, needs new tests before next ratchet)
+  - functions: 65 -> **69** (measured 71.3; 2.3 % headroom)
+  - statements: 75 -> **78** (measured 80.32; 2.32 % headroom)
+
+  Locks in earned coverage so future drift gets caught by the gate, not by a human review. Per the Mandatory Quality Gates standing rule "the gate can only ratchet UP from here." No version bump - pure threshold tighten.
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- Stage 0 TDD: test (`coverage-config.test.ts`) updated FIRST to assert the new floor, then `vite.config.ts` thresholds bumped to make it pass.
+- Stage 1.4 web tsc: 96/96 baseline maintained (no new errors in changed files).
+- Stage 1.5 web ESLint: 0 errors on changed files.
+- Stage 2.3 web vitest: 909/909 unchanged.
+- Stage 2.4 web vitest coverage: **passes at new floor** (lines 83.55 / branches 72.32 / functions 71.3 / statements 80.32; all above the new gate).
+- Stages 2.1 / 2.2 / 4 / 5: N/A (this commit only edits one config file + one test file).
+
+### Test counts (unchanged - this is a threshold tighten, not a feature)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,728 | 3,728 | 0 |
+| API jest E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM (dev) | 984 | 984 | 0 |
+| PowerShell contract | 14 | 14 | 0 |
+
+**Total assertions across 5 layers: 6,821 (unchanged).**
+
 ## [0.52.0-alpha.2] - 2026-05-16 - Phase N2 - First-Run Onboarding Wizard
 
 See [docs/PHASE_N2_ONBOARDING_WIZARD.md](docs/PHASE_N2_ONBOARDING_WIZARD.md) for the full feature doc.
