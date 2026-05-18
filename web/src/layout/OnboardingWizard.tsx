@@ -14,10 +14,9 @@
  *
  * Architecture choices:
  *
- *   - One component handles all 4 steps with a local `step` state.
- *     The L1 CreateEndpointWizard uses the same pattern; the
- *     wizard is short enough that splitting into 4 components would
- *     just shuffle props around.
+ *   - Thin step-dispatcher (this file). Per-step UI lives in
+ *     `web/src/layout/onboarding/Step*.tsx` (extracted 2026-05-17,
+ *     Stage X.1 A.4 closure - was a single 478-line monolith).
  *   - Reuses L1's `useCreateEndpoint` and E1's `useCreateCredential`
  *     mutation hooks - no new HTTP surface. The endpoint is created
  *     on the Step 2 -> Step 3 transition; the credential is issued
@@ -48,22 +47,9 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Card,
-  Subtitle1,
-  Subtitle2,
-  Text,
-  Caption1,
-  Badge,
-  MessageBar,
-  MessageBarBody,
-  MessageBarTitle,
-  Spinner,
-  makeStyles,
-  tokens,
 } from '@fluentui/react-components';
 import {
   Dismiss20Regular,
-  Copy16Regular,
   Rocket24Regular,
 } from '@fluentui/react-icons';
 import { useNavigate } from '@tanstack/react-router';
@@ -72,88 +58,21 @@ import {
   useCreateEndpoint,
   useCreateCredential,
 } from '../api/queries';
-import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import {
   useShowOnboarding,
   markOnboardingComplete,
 } from '../hooks/useOnboarding';
-
-type Step = 1 | 2 | 3 | 4;
-
-const STEP_TITLES: Record<Step, string> = {
-  1: 'Welcome to SCIMServer',
-  2: 'Pick a preset',
-  3: 'Issue your first credential',
-  4: 'Send your first request',
-};
-
-const useStyles = makeStyles({
-  surface: {
-    maxWidth: '720px',
-    width: '100%',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '8px',
-  },
-  stepDots: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '12px',
-  },
-  stepDot: {
-    minWidth: '28px',
-    minHeight: '28px',
-    borderRadius: '50%',
-    border: `1px solid ${tokens.colorNeutralStroke1}`,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: tokens.fontSizeBase200,
-    fontFamily: tokens.fontFamilyMonospace,
-  },
-  stepDotActive: {
-    backgroundColor: tokens.colorBrandBackground,
-    color: tokens.colorNeutralForegroundOnBrand,
-    border: `1px solid ${tokens.colorBrandBackground}`,
-  },
-  body: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  },
-  presetGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '12px',
-  },
-  presetCard: {
-    cursor: 'pointer',
-    padding: '12px',
-    border: `1px solid transparent`,
-  },
-  presetCardSelected: {
-    border: `1px solid ${tokens.colorBrandStroke1}`,
-    boxShadow: tokens.shadow4Brand,
-  },
-  tokenBox: {
-    fontFamily: tokens.fontFamilyMonospace,
-    fontSize: tokens.fontSizeBase300,
-    padding: '12px',
-    backgroundColor: tokens.colorNeutralBackground3,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-    wordBreak: 'break-all',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '12px',
-  },
-});
-
-const DEFAULT_PRESET = 'entra-id';
+import {
+  Step,
+  STEP_TITLES,
+  DEFAULT_PRESET,
+  useOnboardingStyles,
+} from './onboarding/onboarding-styles';
+import { StepDots } from './onboarding/StepDots';
+import { StepWelcome } from './onboarding/StepWelcome';
+import { StepPickPreset } from './onboarding/StepPickPreset';
+import { StepIssueCredential } from './onboarding/StepIssueCredential';
+import { StepSendRequest } from './onboarding/StepSendRequest';
 
 export const OnboardingWizard: React.FC = () => {
   const show = useShowOnboarding();
@@ -163,7 +82,7 @@ export const OnboardingWizard: React.FC = () => {
 };
 
 const OnboardingWizardInner: React.FC = () => {
-  const classes = useStyles();
+  const classes = useOnboardingStyles();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(1);
@@ -282,130 +201,40 @@ const OnboardingWizardInner: React.FC = () => {
             {STEP_TITLES[step]}
           </DialogTitle>
           <DialogContent>
-            <div
-              className={classes.stepDots}
-              aria-label={`Step ${step} of 4`}
-            >
-              {[1, 2, 3, 4].map((n) => (
-                <span
-                  key={n}
-                  className={`${classes.stepDot} ${n === step ? classes.stepDotActive : ''}`}
-                  data-testid={`onboarding-step-dot-${n}`}
-                >
-                  {n}
-                </span>
-              ))}
-            </div>
+            <StepDots step={step} />
 
-            {step === 1 && (
-              <div className={classes.body} data-testid="onboarding-step-1">
-                <Subtitle2>Set up your first SCIM endpoint in 3 quick steps.</Subtitle2>
-                <Text>
-                  SCIMServer hosts SCIM 2.0 endpoints for testing identity-provider
-                  integrations. This wizard walks you through creating an endpoint,
-                  issuing a bearer credential, and sending your first request -
-                  all without leaving the UI.
-                </Text>
-                <Caption1>
-                  You can dismiss this at any time and re-open it later from Settings.
-                </Caption1>
-              </div>
-            )}
+            {step === 1 && <StepWelcome />}
 
             {step === 2 && (
-              <div className={classes.body} data-testid="onboarding-step-2">
-                <Subtitle2>Pick the schema profile that matches your IdP.</Subtitle2>
-                {presets.isLoading ? (
-                  <Spinner />
-                ) : presets.error ? (
-                  <Text>Failed to load presets: {(presets.error as Error).message}</Text>
-                ) : (
-                  <div className={classes.presetGrid}>
-                    {presets.data?.presets.map((p) => {
-                      const selected = p.name === picked;
-                      return (
-                        <Card
-                          key={p.name}
-                          className={`${classes.presetCard} ${selected ? classes.presetCardSelected : ''}`}
-                          onClick={() => handlePickPreset(p.name)}
-                          data-testid={`onboarding-preset-card-${p.name}`}
-                          data-selected={selected ? 'true' : 'false'}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Subtitle2>{p.name}</Subtitle2>
-                            {p.default ? <Badge appearance="filled" size="small">Default</Badge> : null}
-                          </div>
-                          <Caption1>
-                            {p.summary?.schemaCount ?? 0} schemas /{' '}
-                            {p.summary?.resourceTypeCount ?? 0} resource types
-                          </Caption1>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-                <ScimErrorMessage error={advanceError} />
-              </div>
+              <StepPickPreset
+                presets={{
+                  isLoading: presets.isLoading,
+                  error: presets.error as Error | null,
+                  data: presets.data,
+                }}
+                picked={picked}
+                onPick={handlePickPreset}
+                advanceError={advanceError}
+              />
             )}
 
             {step === 3 && (
-              <div className={classes.body} data-testid="onboarding-step-3">
-                <Subtitle2>Issue a bearer credential for your new endpoint.</Subtitle2>
-                <Text>
-                  Your SCIM client (Entra ID, Okta, curl) needs a bearer token to
-                  call the endpoint. Click below to issue one - the plaintext value
-                  is shown exactly once and cannot be recovered later.
-                </Text>
-                {!plaintextToken ? (
-                  <Button
-                    appearance="primary"
-                    onClick={() => {
-                      void handleIssueCredential();
-                    }}
-                    disabled={createCredential.isPending || !createdEndpointId}
-                    data-testid="onboarding-issue-credential"
-                  >
-                    {createCredential.isPending ? 'Issuing...' : 'Issue first credential'}
-                  </Button>
-                ) : (
-                  <>
-                    <MessageBar intent="warning">
-                      <MessageBarBody>
-                        <MessageBarTitle>Save this token now</MessageBarTitle>
-                        The plaintext value is shown ONCE. The server only stores a
-                        bcrypt hash - we cannot recover the original.
-                      </MessageBarBody>
-                    </MessageBar>
-                    <div className={classes.tokenBox} data-testid="onboarding-plaintext-token">
-                      <span>{plaintextToken}</span>
-                      <Button
-                        appearance="subtle"
-                        icon={<Copy16Regular />}
-                        onClick={() => {
-                          void handleCopyToken();
-                        }}
-                        data-testid="onboarding-copy-token"
-                      >
-                        {copyState === 'copied' ? 'Copied!' : copyState === 'error' ? 'Copy failed' : 'Copy'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-                <ScimErrorMessage error={advanceError} />
-              </div>
+              <StepIssueCredential
+                plaintextToken={plaintextToken}
+                copyState={copyState}
+                isPending={createCredential.isPending}
+                hasEndpointId={Boolean(createdEndpointId)}
+                onIssue={() => {
+                  void handleIssueCredential();
+                }}
+                onCopy={() => {
+                  void handleCopyToken();
+                }}
+                advanceError={advanceError}
+              />
             )}
 
-            {step === 4 && (
-              <div className={classes.body} data-testid="onboarding-step-4">
-                <Subtitle2>Try a SCIM request in the Workbench.</Subtitle2>
-                <Text>
-                  We will pre-fill a <code>GET /scim/endpoints/{createdEndpointId ?? '...'}/Users</code>{' '}
-                  request so you can verify everything works end-to-end. The
-                  Workbench supports every SCIM verb and copies-as-curl/PowerShell
-                  for hand-off to your IdP team.
-                </Text>
-              </div>
-            )}
+            {step === 4 && <StepSendRequest endpointId={createdEndpointId} />}
           </DialogContent>
           <DialogActions>
             {step === 1 && (

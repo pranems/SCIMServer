@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OnboardingWizard refactor (Stage X.1 A.4 closure)** - extracted the 478-line `web/src/layout/OnboardingWizard.tsx` monolith into a thin ~245-line step-dispatcher + 6 sibling files under `web/src/layout/onboarding/`: `onboarding-styles.ts` (88 LoC shared `makeStyles` hook + `Step` type + `STEP_TITLES` + `DEFAULT_PRESET`), `StepDots.tsx` (32 LoC), `StepWelcome.tsx` (30 LoC), `StepPickPreset.tsx` (84 LoC), `StepIssueCredential.tsx` (87 LoC), `StepSendRequest.tsx` (28 LoC). Wizard owns all state (step / picked / createdEndpointId / plaintextToken / advanceError / copyState) + footer DialogActions; children are presentation-only and props-driven. **Zero behavior change** - all 14 existing `OnboardingWizard.test.tsx` tests pass without modification (every `data-testid` selector preserved exactly). Eliminates the Stage 3c.1 "concerning" >450 LoC threshold flag from the May 2026 Design Deep Analysis precedent. **Pre-existing baseline preserved exactly**: web tsc 96/96 errors (no change), main entry bundle 368.24 kB gzipped (no change - identical pre vs post refactor; the 168.24 kB main-entry breach pre-dates this commit and is tracked separately in the Standing Backlog).
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- Stage 0 TDD: existing 14 OnboardingWizard tests held GREEN throughout the file split (red-on-refactor would have surfaced any selector / state / handler regression).
+- Stage 1.4 web tsc: 96 errors, exact baseline preserved (pre-existing baseline; refactor adds 0).
+- Stage 1.6 web vite build: PASS in 14.42s, no warnings introduced by refactor.
+- Stage 1.7 size-limit: main entry breach is pre-existing (verified by stash-and-rebuild); refactor adds 0 bytes to any bundle.
+- Stage 2.3 web vitest: 909/909 PASS (78 test files, 91.47s).
+- Stage 3a.2 apiContractVerification: N/A (no API surface).
+- Stage 3c.1 codeReviewSelfAudit: this commit IS the resolution of the previously-flagged SOLID/SRP concern.
+- Stage 3c.2 auditAndUpdateDocs: CHANGELOG + Session_starter updated.
+- Stage 4 / 5: N/A (no runtime / no deploy in this commit; visual rendering unchanged by construction).
+- Stage 6: this commit message names per-stage results.
+
+### Test counts (unchanged - pure refactor)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,728 | 3,728 | 0 |
+| API jest E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM (dev) | 984 | 984 | 0 |
+| PowerShell contract | 15 | 15 | 0 |
+
+**Total assertions across 5 layers: 6,822 (unchanged).**
+
 ### Added
 
 - **First Stage X.2 `securityBestPracticesIntake` run** ([docs/strategy/SECURITY_INTAKE_2026-05-17.md](docs/strategy/SECURITY_INTAKE_2026-05-17.md)). 10-category external-landscape security meta-audit with URL-citation + confidence-level + owner-action constraints honored on every finding. **Headline:** the codebase is in considerably better security posture than the May 2026 Standing Backlog implied. 0 Critical + 6 High + 7 Medium + 2 Speculative findings. **4 Standing Backlog items caught as ALREADY ACTIVE** (Dependabot weekly, GHA action SHA pinning across all 5 workflow files, Trivy image scan HIGH+CRITICAL gating with `.trivyignore` weekly review, CodeQL `security-extended` + `security-and-quality` query packs) - removed from the deferred list to stop wasting operator attention. **1 standing-rule node-version drift fixed inline** (node:25 -> node:24 in the lockfile-regen instruction; matches the actual deployed runtime in `api/Dockerfile`). **9 new DEFERRED items added** to Standing Backlog: API helmet/CSP/HSTS headers (HIGHEST-LEVERAGE NEW GAP; slate for Phase N3), API rate limiting via `@nestjs/throttler`, GDPR Article 17 hard-delete admin path, Azure Postgres Managed Identity migration, quarterly secret rotation policy, `npm ci --audit-signatures` in CI, OpenSSF Scorecard scheduled scan, CODEOWNERS for security-sensitive paths, DPoP (RFC 9449) for endpoint credentials. **3 actionable prompt amendments shipped inline:**
