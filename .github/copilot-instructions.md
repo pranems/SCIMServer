@@ -239,7 +239,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 5.4. **Browser binary sync** - If `npx playwright install` is required (binary version drift), run it as a one-shot setup step before 5.3. Not a per-commit gate, but a per-branch / per-clean-clone gate.
 
 ### Stage 6 - Commit Hygiene + Release Documentation
-6.1. **Version bump** - `api/package.json` + `web/package.json` + lockfiles regenerated **inside node:25-alpine** for cross-platform reproducibility.
+6.1. **Version bump** - `api/package.json` + `web/package.json` + lockfiles regenerated **inside node:24-alpine** for cross-platform reproducibility (matches the deployed runtime in [api/Dockerfile](api/Dockerfile)).
 6.2. **CHANGELOG.md** - One entry per minor/patch with explicit before/after test counts at every layer (API unit, API E2E, Web vitest, Live SCIM, Playwright, PowerShell contract), version delta, files changed summary, and per-phase quality gate result.
 6.3. **Session_starter.md** + **docs/CONTEXT_INSTRUCTIONS.md** updates - Latest test counts, version, recent achievements row.
 6.4. **`generateCommitMessage` prompt** - Use it to compose the commit message; ensures the standing rule about per-sub-phase gate naming is honored.
@@ -290,13 +290,16 @@ Security checks are intentionally threaded through every stage. This map makes t
 | PII redaction + structured-log hygiene | 3b.1 | `logging-verification` |
 | Live SCIM contract on the wire (auth headers, OAuth flow, ETag flow) | 4.2 / 4.3 / 4.4 | `scripts/live-test.ps1` |
 | **External security-landscape changes (proactive)** | **X.2** | **`securityBestPracticesIntake`** |
-| Container image CVEs (OS-level base image) | DEFERRED | (Standing Backlog: trivy gate at Stage 4) |
-| Web security headers (CSP/HSTS/etc.) | DEFERRED | (Standing Backlog: Playwright spec at Stage 5) |
+| Container image CVEs (OS-level base image) | 4 (CI) | **ACTIVE** via [aquasecurity/trivy-action](https://github.com/aquasecurity/trivy) in [.github/workflows/build-and-push.yml](.github/workflows/build-and-push.yml) + [.github/workflows/build-test.yml](.github/workflows/build-test.yml); HIGH+CRITICAL gating; [.trivyignore](.trivyignore) documented exceptions; weekly stale-entry review via [.github/workflows/trivyignore-review.yml](.github/workflows/trivyignore-review.yml). Confirmed ACTIVE by 2026-05-17 Stage X.2 intake (was incorrectly DEFERRED). |
+| Web security headers (CSP/HSTS/etc.) | DEFERRED | (Standing Backlog: helmet in api/src/main.ts + Playwright spec at Stage 5 - HIGHEST-LEVERAGE NEW GAP per 2026-05-17 intake; slate for Phase N3 design start) |
 | SBOM generation + signing | DEFERRED | (Standing Backlog: syft + cosign at Stage 6) |
-| SAST (semgrep / CodeQL) | DEFERRED | (Standing Backlog: Stage 1 extension) |
-| GHA action pinning + branch protection + OIDC | DEFERRED | (Standing Backlog: repo policy) |
+| SAST (semgrep / CodeQL) | 1 (CI) | **ACTIVE via [CodeQL](https://github.com/github/codeql-action)** with `security-extended` + `security-and-quality` query packs ([.github/workflows/codeql.yml](.github/workflows/codeql.yml)); weekly + per-PR + push schedule. Confirmed ACTIVE by 2026-05-17 Stage X.2 intake (was incorrectly DEFERRED). semgrep optional supplement, not a replacement. |
+| GHA action SHA pinning | 6 (CI) | **ACTIVE** - all `uses:` lines in all 5 workflow files SHA-pinned with `# vX.Y.Z` tag comment. Verified by 2026-05-17 Stage X.2 intake. Branch protection + GHA OIDC for Azure deploys remain DEFERRED. |
+| CORS hardening on API | 3b.4 | **PARTIAL** - configurable via `CORS_ORIGIN` env var ([api/src/security/cors-origin.ts](api/src/security/cors-origin.ts)); default is `true` (allow-all) for backward-compat. Production deployments MUST set explicit allowlist. |
 | Cryptographic deprecation watch | X.2 Category 4 | `securityBestPracticesIntake` |
 | AI/LLM security (when Phase N+ adds LLM features) | X.2 Category 10 | `securityBestPracticesIntake` |
+| HTTP rate limiting (per-IP / per-endpoint) | DEFERRED | (Standing Backlog: `@nestjs/throttler` at Stage 1 - apply at Phase N3 if telemetry endpoint introduces a new unauthenticated surface; broader API rate-limit deferred to Phase O) |
+| Secret rotation cadence (operational) | DEFERRED | (Standing Backlog: rotate `SCIM_SHARED_SECRET`, `JWT_SECRET`, `OAUTH_CLIENT_SECRET` quarterly; track dates in a runbook) |
 
 When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to an active gate, this map MUST be updated in the same commit.
 
@@ -332,6 +335,7 @@ Examples of standing rules that originated from real failures:
 - **Stage 3c.1 codeReviewSelfAudit** (May 2026 Design Deep Analysis precedent: SchemaValidator god class 1,467 lines, service-helpers Swiss army 1,230 lines) - scoped to CHANGED files only; output is suggestions not blocks; catches god-class growth, helper-bloat, naming drift.
 - **Stage X.1 gateStrategySelfAudit** (May 2026 meta-audit need) - formal proactive engine for THIS loop. 4 trigger types (release / monthly / on-demand / incident-driven). Replaces ad-hoc reactive updates with structured introspection.
 - **Stage X.2 securityBestPracticesIntake** (May 2026 security-intake gap) - dedicated security-landscape scan across 10 categories with URL-citation enforcement. Separated from X.1 so security depth is not diluted by general drift. Pairs with the Cross-Cutting Security Gate Map to make threading visible.
+- **First Stage X.2 run (2026-05-17)** - meta-audit caught 4 Standing Backlog items as ALREADY ACTIVE (Dependabot, GHA SHA pinning, Trivy, CodeQL) + 1 standing-rule node-version drift (node:25 -> node:24 in the lockfile-regen rule) + 9 new DEFERRED items (helmet, rate limiting, hard-delete, MI, secret rotation, npm audit-signatures, OpenSSF Scorecard, CODEOWNERS, DPoP). 3 actionable prompt amendments (R1 OWASP API v2023 + R2 RFC 9700 + RFC 7644 §7 + R3 EU AI Act categories) shipped inline. Highest-leverage NEW gap is API HTTP security headers (helmet); slate for Phase N3 design start. Full report: [docs/strategy/SECURITY_INTAKE_2026-05-17.md](docs/strategy/SECURITY_INTAKE_2026-05-17.md).
 
 ### Standing Backlog (recommendations for future evolution; not blockers)
 
@@ -340,17 +344,28 @@ Examples of standing rules that originated from real failures:
 - **CI-time runner for Stage X.1 + X.2** - both prompts are currently operator-invoked. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar) for both.
 - **Auto-creation of `docs/strategy/*_<date>.md`** - X.1 and X.2 outputs are structured Markdown; a small script could open a PR with the report attached, surfacing findings to reviewers without requiring an operator to run the prompt.
 
-**Security tool gates (surfaced by X.2; defer until tool installed):**
-- **Stage 1 SAST gate** - install [semgrep](https://semgrep.dev/) or use [GitHub CodeQL](https://codeql.github.com/) with a tuned ruleset; +30s per commit; ~20% false positive rate before tuning.
-- **Stage 4 container CVE scan** - install [trivy](https://github.com/aquasecurity/trivy) (FOSS gold-standard) or grype; scan the API image after build, fail on Critical/High OS-level CVEs in the base image; +60s per Docker build.
-- **Stage 4 SBOM generation** - [syft](https://github.com/anchore/syft) generates an SPDX SBOM at build time; enables post-deploy CVE lookup; near-zero overhead.
-- **Stage 5 web security headers gate** - new Playwright spec asserts presence + value of `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options` (or CSP `frame-ancestors`), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` on every public response; locks CSP/HSTS as code.
+**Security tool gates (active vs deferred; 2026-05-17 Stage X.2 intake reconciliation):**
+
+*Already ACTIVE (moved from DEFERRED after first Stage X.2 intake):*
+- **Stage 1 SAST gate** - ACTIVE via [CodeQL](https://github.com/github/codeql-action) `security-extended` + `security-and-quality` packs ([.github/workflows/codeql.yml](.github/workflows/codeql.yml)); weekly + per-PR. semgrep optional supplement.
+- **Stage 4 container CVE scan** - ACTIVE via [trivy](https://github.com/aquasecurity/trivy) in `build-and-push.yml` + `build-test.yml`; HIGH+CRITICAL gating; `.trivyignore` documented; weekly stale-entry review.
+- **Repo policy: Dependabot weekly** - ACTIVE via [.github/dependabot.yml](.github/dependabot.yml); npm/api + npm/web + github-actions + docker ecosystems.
+- **Stage 6 GHA action SHA pinning** - ACTIVE; all `uses:` lines SHA-pinned with `# vX.Y.Z` tag comment.
+
+*Still DEFERRED (tool not installed OR cost > value at current scale):*
+- **Stage 4 SBOM generation** - [syft](https://github.com/anchore/syft) generates an SPDX SBOM at build time; enables post-deploy CVE lookup; near-zero overhead. Slate for v0.52.0 stable rollup.
+- **Stage 5 web security headers gate** - new Playwright spec asserts presence + value of `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options` (or CSP `frame-ancestors`), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` on every public response; locks CSP/HSTS as code. **HIGHEST-LEVERAGE NEW GAP per 2026-05-17 intake** - slate for Phase N3 design start (helmet middleware in api/src/main.ts + E2E spec).
 - **Stage 6 image signing** - [cosign](https://github.com/sigstore/cosign) keyless OIDC signs the image after build; verifies image came from our CI.
-- **Stage 6 GHA action SHA pinning** - audit all workflows via [stepsecurity.io](https://app.stepsecurity.io/) and pin every `uses:` line to a SHA; prevents tag-rewrite supply-chain attacks (precedent: tj-actions/changed-files Mar 2025).
-- **Repo policy: Dependabot weekly** - GitHub-native, $0 cost, surfaces dep upgrades automatically; complements `dependencyCveSweep` per-commit checks.
 - **Repo policy: signed commits + branch protection require SHA pinning** - GPG-signed commits, required PR review, no force-push to `main` / `feat/*`.
-- **Migration to distroless or rootless base image** - currently node:25-alpine; evaluate distroless Node image as a security hardening step (smaller attack surface, no shell).
-- **CORS hardening on API** - current CORS is permissive (noted in May 2026 design analysis); tighten to explicit origin list.
-- **Rotate long-lived secrets quarterly** - `SCIM_SHARED_SECRET`, `JWT_SECRET`, `OAUTH_CLIENT_SECRET`; track rotation dates in a runbook.
+- **Migration to distroless or rootless base image** - currently node:24-alpine running as `nestjs` user UID 1001 (rootless already); evaluate distroless Node image as a further hardening step (smaller attack surface, no shell). Cost > value at current scale; harder live-debug.
+- **CORS default tighten** - parseCorsOrigin allows `CORS_ORIGIN` env override but defaults to `true` (allow-all). Production deployments MUST set explicit allowlist; consider flipping the default to deny in v1.0.
+- **API HTTP rate limiting** - `@nestjs/throttler` at the per-endpoint level. Apply at Phase N3 if telemetry endpoint introduces a new unauthenticated surface; broader deferral to Phase O.
+- **Rotate long-lived secrets quarterly** - `SCIM_SHARED_SECRET`, `JWT_SECRET`, `OAUTH_CLIENT_SECRET`; track rotation dates in a runbook. Operational policy, no code change.
+- **GDPR Article 17 hard-delete admin path** - we currently soft-delete; for subject-erasure requests an admin hard-delete endpoint is needed. Defer until first subject request lands.
+- **Migrate Azure Postgres auth to Managed Identity** - removes long-lived secret. Slate for Phase O.
+- **Enable `npm ci --audit-signatures` in CI** - blocks compromised-package class; ~5 sec per CI run.
+- **OpenSSF Scorecard scheduled scan** - 5 min to add; gives a single metric for repo security posture.
+- **CODEOWNERS for security-sensitive paths** - `api/src/security/`, `infra/`, `.github/workflows/`. Useful when team grows past 1 reviewer.
+- **DPoP (RFC 9449) for endpoint credentials** - sender-constrained tokens; tightens our bearer-token model. Low priority at current scale.
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**

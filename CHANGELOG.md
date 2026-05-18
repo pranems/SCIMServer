@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **First Stage X.2 `securityBestPracticesIntake` run** ([docs/strategy/SECURITY_INTAKE_2026-05-17.md](docs/strategy/SECURITY_INTAKE_2026-05-17.md)). 10-category external-landscape security meta-audit with URL-citation + confidence-level + owner-action constraints honored on every finding. **Headline:** the codebase is in considerably better security posture than the May 2026 Standing Backlog implied. 0 Critical + 6 High + 7 Medium + 2 Speculative findings. **4 Standing Backlog items caught as ALREADY ACTIVE** (Dependabot weekly, GHA action SHA pinning across all 5 workflow files, Trivy image scan HIGH+CRITICAL gating with `.trivyignore` weekly review, CodeQL `security-extended` + `security-and-quality` query packs) - removed from the deferred list to stop wasting operator attention. **1 standing-rule node-version drift fixed inline** (node:25 -> node:24 in the lockfile-regen instruction; matches the actual deployed runtime in `api/Dockerfile`). **9 new DEFERRED items added** to Standing Backlog: API helmet/CSP/HSTS headers (HIGHEST-LEVERAGE NEW GAP; slate for Phase N3), API rate limiting via `@nestjs/throttler`, GDPR Article 17 hard-delete admin path, Azure Postgres Managed Identity migration, quarterly secret rotation policy, `npm ci --audit-signatures` in CI, OpenSSF Scorecard scheduled scan, CODEOWNERS for security-sensitive paths, DPoP (RFC 9449) for endpoint credentials. **3 actionable prompt amendments shipped inline:**
+  - **R1:** `securityAudit.prompt.md` now cites **OWASP API Security Top 10 v2023** explicitly with the SCIM-specific call-out that PATCH paths are the API3:2023 BOPLA risk surface and API8:2023 covers the missing-headers gap.
+  - **R2:** `securityAudit.prompt.md` + `auditAgainstRFC.prompt.md` now cite **RFC 9700 (OAuth BCP, Feb 2025)** + **RFC 7644 §7 Security Considerations** explicitly with concrete checklists.
+  - **R3:** `logging-verification.prompt.md` now calls out **EU AI Act (Regulation 2024/1689, Aug 2024)** special PII categories alongside GDPR / CCPA / PIPL.
+- **Cross-Cutting Security Gate Map updated** in `.github/copilot-instructions.md`: 4 cells moved from DEFERRED to ACTIVE with URL citations to the active workflow files; 1 cell changed to PARTIAL (CORS hardening - configurable via `CORS_ORIGIN` env var but default is allow-all for backward-compat); 2 new cells added (HTTP rate limiting + secret rotation cadence).
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- Stage 0 TDD: N/A (this is a meta-audit, not a code change). Discipline preserved on the 3 inline prompt edits (no test broken; the prompts are documentation).
+- Stage 1.x: N/A (Markdown + prompt-Markdown only).
+- Stage 2.x: contract test for `run-all-gates.ps1` still PASS (46/46 assertions) after copilot-instructions.md edits.
+- Stage 3a apiContractVerification: N/A (no API surface).
+- Stage 3b.4 securityAudit: this commit IMPROVES the prompt itself; subsequent runs benefit from R1/R2/R3 amendments.
+- Stage 3c.2 auditAndUpdateDocs: INDEX + CHANGELOG + Session_starter all updated this commit + new SECURITY_INTAKE doc.
+- Stage 4 / 5: N/A.
+- Stage 6: this commit message names per-stage results + the X.2 trigger (on-demand from operator).
+
+### Test counts (unchanged - meta-audit + doc-only changes)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,728 | 3,728 | 0 |
+| API jest E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM (dev) | 984 | 984 | 0 |
+| PowerShell contract | 15 | 15 | 0 |
+
+**Total assertions across 5 layers: 6,822 (unchanged).**
+
+### Added
+
 - **`scripts/run-all-gates.ps1` orchestrator + contract test** ([docs/strategy/SELF_AUDIT_2026-05-16.md](docs/strategy/SELF_AUDIT_2026-05-16.md) D.1 closure). Single-command walker that surfaces all 39 gates from the 7-stage Mandatory Quality Gates strategy in the right order (Stage 0 -> 6; Stage X intentionally NOT walked per-commit). Drops the documented ~25 % gate-invocation tax to near-zero. Shell gates execute and capture PASS / FAIL / SKIPPED / PARTIAL; prompt gates print the `.github/prompts/` path and (unless `-NoPrompt`) pause for operator acknowledgment. Auto-skip-no-op for 6 gates with documented triggers (bundleBudgetAudit when `web/src/routes/` untouched; prismaMigrationAudit when `api/prisma/` untouched; crossBackendParityAudit when no changed `api/src/` file references `isInMemoryBackend`; dependencyCveSweep when no `package*.json` change; Stage 5 trio when no `web/` files touched; Stage 6 version-bump when no `package.json` changes). 4 params: `-SkipPrompts`, `-Stage <N>` (matches 3a+3b+3c when 3 is passed), `-DryRun`, `-NoPrompt`. Exit codes 0 / 1 / 2. Smoke-screen risk mitigated structurally - findings still require operator engagement; the report is a scoreboard, not a stamp.
 - **`scripts/test/run-all-gates.contract.ps1`** - 46 assertions covering script exists + parses + 4 params + 9 stage labels in order + 9 canonical shell-gate keywords + 12 canonical prompt names + exit-code contract + report-writing contract + auto-skip predicates + NoPrompt branch + status vocabulary + strategy doc references. Cheap to run on every push.
 - **[docs/RUN_ALL_GATES_ORCHESTRATOR.md](docs/RUN_ALL_GATES_ORCHESTRATOR.md)** - architecture + per-stage gate mapping + cost-vs-value + DoD. 1 Mermaid flowchart of the orchestrator control flow.
