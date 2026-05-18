@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase N3a: `helmet` middleware (HIGHEST-LEVERAGE NEW GAP from 2026-05-17 Stage X.2 intake)** - new [api/src/security/helmet-config.ts](api/src/security/helmet-config.ts) (~125 LoC, no em-dash) centralises the helmet options so [api/src/main.ts](api/src/main.ts) and [api/test/e2e/helpers/app.helper.ts](api/test/e2e/helpers/app.helper.ts) share one source of truth (no drift). Emits every standard browser-enforced defense-in-depth response header: Content-Security-Policy (default-src/script-src/style-src/img-src/font-src/connect-src/object-src/frame-ancestors/form-action/base-uri all bound to `'self'` with `'unsafe-inline'` permitted on script-src + style-src for the small inline fallback-remove script in `web/index.html` + Fluent UI v9 makeStyles atomic-class runtime injection; tightening to sha256 hashes deferred to a follow-up commit), Strict-Transport-Security (max-age=15552000 + includeSubDomains, production-only - intentionally suppressed in test/dev so localhost is not pinned), X-Frame-Options: DENY (legacy clickjacking defense; redundant with CSP `frame-ancestors 'none'` but kept for older browsers), X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Resource-Policy: same-origin (Cross-Origin-Embedder-Policy intentionally DISABLED to avoid breaking future CDN-hosted assets), Origin-Agent-Cluster: ?1, X-Permitted-Cross-Domain-Policies: none, X-DNS-Prefetch-Control: off, X-Download-Options: noopen, plus a manually-emitted **Permissions-Policy** value denying camera/microphone/geolocation/payment/usb/magnetometer/accelerometer/gyroscope. Closes Standing Backlog row "Web security headers (CSP/HSTS/etc.)" - moved from DEFERRED to ACTIVE in [.github/copilot-instructions.md](.github/copilot-instructions.md) Cross-Cutting Security Gate Map.
+- **Unit test [api/src/security/helmet-config.spec.ts](api/src/security/helmet-config.spec.ts)** (7 assertions, ~28s) pins the factory's internal shape so a future refactor cannot silently drop a header by reordering options.
+- **E2E test [api/test/e2e/security-headers.e2e-spec.ts](api/test/e2e/security-headers.e2e-spec.ts)** (11 assertions, ~35s) locks in the HTTP-level contract across 4 probe routes (SPA shell `/`, public `/scim/health`, auth-protected `/scim/admin/version`, SPA deep-link `/endpoints`) plus 3 invariant checks (HSTS absent in non-prod NODE_ENV, COEP absent, Permissions-Policy present with all 4 baseline denials).
+
+### Changed
+
+- **API version bumped to v0.52.0-alpha.3** (api/package.json + web/package.json).
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- Stage 0 TDD: RED on E2E spec confirmed FIRST (9 failed / 2 passed - the 2 negative assertions trivially passed without helmet). GREEN after install + wire: 11/11 E2E + 7/7 unit. Refactor: zero (single-purpose module, no further extraction needed).
+- Stage 1.2 api tsc build: PASS, 0 errors.
+- Stage 1.3 api ESLint: 0 errors / 465 warnings (exact baseline preserved, no new warnings from helmet-config files).
+- Stage 2.1 api jest unit: **3,735 PASS** (3,728 baseline + 7 new helmet-config unit). 103/103 suites.
+- Stage 2.2 api jest E2E: **1,197 PASS** (1,186 baseline + 11 new security-headers E2E). 62/62 suites.
+- Stage 2.5 crossBackendParityAudit: N/A - helmet middleware operates at the Express layer above any persistence backend; identical headers emitted regardless of `PERSISTENCE_BACKEND`.
+- Stage 3a.3 error-handling-verification: helmet does NOT interfere with the SCIM error envelope; verified via [api/test/e2e/spa-fallback.e2e-spec.ts](api/test/e2e/spa-fallback.e2e-spec.ts) (66/66 still PASS) + the 11 security-headers tests assert headers on both 200 and 401 responses.
+- Stage 3b.4 securityAudit: this commit IS the highest-priority finding from the 2026-05-17 X.2 intake; helmet rollout matches the OWASP API Top 10 v2023 §API8:2023 (security misconfiguration) remediation guidance.
+- Stage 3c.1 codeReviewSelfAudit: 1 module (`helmet-config.ts`) + 1 unit spec + 1 E2E spec. Single responsibility per file; no god-class growth; helper-bloat N/A.
+- Stage 3c.2 auditAndUpdateDocs: CHANGELOG + Session_starter + INDEX + new `docs/PHASE_N3A_HELMET.md` all updated this commit.
+- Stage 4 / 5: deferred to follow-up commit pair (Docker rebuild + dev deploy + 984 live SCIM contract tests, plus a new Playwright spec asserting headers on the live dev surface).
+- Stage 6: this commit message names per-stage results + version bump to v0.52.0-alpha.3 + no `--amend` / no `--force` / no `--no-verify`.
+
+### Test counts
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,728 | **3,735** | +7 (helmet-config.spec) |
+| API jest E2E | 1,186 | **1,197** | +11 (security-headers.e2e-spec) |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM (dev) | 984 | 984 | 0 (post-deploy verification deferred to follow-up commit) |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 70 | 70 | 0 (new headers Playwright spec deferred to post-deploy commit) |
+
+**Total assertions across 6 layers: 6,845 (was 6,827).** Delta: +18.
+
+## [Previously Unreleased]
+
+### Added
+
 - **Playwright OnboardingWizard E2E spec (Stage 5 closure for Steps 1-4)** - new [web/e2e/onboarding.spec.ts](web/e2e/onboarding.spec.ts) with 5 tests covering the chrome-level Phase N2 wizard end-to-end against the live dev tenant: forceOpen flag renders the wizard with all 4 step dots + 3 action buttons; completedAt set hides it; Skip button writes ISO-8601 timestamp and dismisses; Close (X) button writes timestamp and dismisses; Get started advances to step 2 with `entra-id` preset preselected (`data-selected="true"`). Uses the `scimserver.onboarding.forceOpen=1` hatch in `addInitScript` so tests render deterministically against a dev tenant that already has endpoints + completedAt set. Steps 3-4 intentionally not covered E2E (would mutate the live tenant via real endpoint + credential creation); the 14 vitest already cover the full happy path against mocked mutation hooks. All 5 tests PASS vs dev (9.0s).
 - **Retroactive Stage 5 invocation for Steps 1-4** - the `playwrightSpecHygieneAudit` prompt (Stage 5.2) + Playwright vs dev (Stage 5.3) were not invoked during commits 2721c3b / 3b5126e / 6d04ccc / 6dc9b7b despite Steps 1 and 4 touching `web/`. This commit retroactively closes that gap. Hygiene finding: `web/e2e/new-ui.spec.ts` is **not** stale (the `app-shell` / `app-header` / `app-sidebar` / `theme-toggle` / `sidebar-toggle` / `kpi-row` / `endpoint-grid` testids it asserts all still exist in source); the standing-rule "delete new-ui" instruction is overzealous for the current codebase and would lose real coverage - kept as-is.
 

@@ -9,6 +9,7 @@ import * as fs from 'fs';
 
 import { AppModule } from '@app/modules/app/app.module';
 import { applySpaFallback } from '@app/bootstrap/spa-fallback';
+import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from '@app/security/helmet-config';
 
 /**
  * Bootstraps a full NestJS application for E2E testing.
@@ -56,6 +57,15 @@ export async function createTestApp(): Promise<INestApplication> {
     if (req.url.startsWith('/scim/v2')) {
       req.url = req.url.replace('/scim/v2', '/scim');
     }
+    next();
+  });
+
+  // Phase N3a (2026-05-18): mirror the production helmet middleware so
+  // the security-headers E2E spec sees what production sees. See
+  // api/src/security/helmet-config.ts for design rationale.
+  app.use(buildHelmetMiddleware(process.env.NODE_ENV));
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', PERMISSIONS_POLICY_HEADER_VALUE);
     next();
   });
 

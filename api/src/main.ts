@@ -9,6 +9,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './modules/app/app.module';
 import { parseCorsOrigin } from './security/cors-origin';
+import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from './security/helmet-config';
 import { applySpaFallback } from './bootstrap/spa-fallback';
 
 async function bootstrap(): Promise<void> {
@@ -47,6 +48,25 @@ async function bootstrap(): Promise<void> {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     res.setHeader('X-Request-Id', requestId);
+    next();
+  });
+
+  // Phase N3a (2026-05-18): helmet middleware - locks in the standard
+  // browser-enforced defense-in-depth response headers (CSP, X-Frame-Options,
+  // X-Content-Type-Options, Referrer-Policy, COOP/CORP, Origin-Agent-Cluster,
+  // X-Permitted-Cross-Domain-Policies, X-DNS-Prefetch-Control, X-Download-Options
+  // and, in production only, Strict-Transport-Security). See
+  // api/src/security/helmet-config.ts for the full design rationale and
+  // api/test/e2e/security-headers.e2e-spec.ts for the contract.
+  // Inserted EARLY so the headers are set on every response, including
+  // 401/403/415 short-circuits from guards.
+  app.use(buildHelmetMiddleware(process.env.NODE_ENV));
+
+  // Permissions-Policy is NOT set by helmet by default. Emit the locked-down
+  // value alongside helmet so XSS attempts to use camera/mic/geo/payment are
+  // blocked at the browser layer even if they bypass CSP.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', PERMISSIONS_POLICY_HEADER_VALUE);
     next();
   });
 
