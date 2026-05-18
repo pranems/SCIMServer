@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`scripts/run-all-gates.ps1` orchestrator + contract test** ([docs/strategy/SELF_AUDIT_2026-05-16.md](docs/strategy/SELF_AUDIT_2026-05-16.md) D.1 closure). Single-command walker that surfaces all 39 gates from the 7-stage Mandatory Quality Gates strategy in the right order (Stage 0 -> 6; Stage X intentionally NOT walked per-commit). Drops the documented ~25 % gate-invocation tax to near-zero. Shell gates execute and capture PASS / FAIL / SKIPPED / PARTIAL; prompt gates print the `.github/prompts/` path and (unless `-NoPrompt`) pause for operator acknowledgment. Auto-skip-no-op for 6 gates with documented triggers (bundleBudgetAudit when `web/src/routes/` untouched; prismaMigrationAudit when `api/prisma/` untouched; crossBackendParityAudit when no changed `api/src/` file references `isInMemoryBackend`; dependencyCveSweep when no `package*.json` change; Stage 5 trio when no `web/` files touched; Stage 6 version-bump when no `package.json` changes). 4 params: `-SkipPrompts`, `-Stage <N>` (matches 3a+3b+3c when 3 is passed), `-DryRun`, `-NoPrompt`. Exit codes 0 / 1 / 2. Smoke-screen risk mitigated structurally - findings still require operator engagement; the report is a scoreboard, not a stamp.
+- **`scripts/test/run-all-gates.contract.ps1`** - 46 assertions covering script exists + parses + 4 params + 9 stage labels in order + 9 canonical shell-gate keywords + 12 canonical prompt names + exit-code contract + report-writing contract + auto-skip predicates + NoPrompt branch + status vocabulary + strategy doc references. Cheap to run on every push.
+- **[docs/RUN_ALL_GATES_ORCHESTRATOR.md](docs/RUN_ALL_GATES_ORCHESTRATOR.md)** - architecture + per-stage gate mapping + cost-vs-value + DoD. 1 Mermaid flowchart of the orchestrator control flow.
+- **[docs/INDEX.md](docs/INDEX.md)** updated with the new orchestrator doc entry.
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- Stage 0 TDD: contract test `run-all-gates.contract.ps1` written FIRST and confirmed RED (script does not exist), then orchestrator written and confirmed GREEN (46/46 assertions pass).
+- Stage 1.4 web tsc: N/A (PowerShell-only change in scripts/).
+- Stage 2.x: N/A (PowerShell-only change; vitest 909 / jest 3,728 / 1,186 unchanged).
+- Stage 3a apiContractVerification: N/A (no API surface change).
+- Stage 3c.1 codeReviewSelfAudit: orchestrator is 500+ LoC but is a single-responsibility script-level table-driven runner; no SOLID concerns at this scale. Will re-audit if it grows past 800 LoC.
+- Stage 3c.2 auditAndUpdateDocs: INDEX + CHANGELOG + Session_starter all updated in this commit.
+- Stage 4: N/A (no runtime / no deploy).
+- Stage 5: N/A (no UI surface change).
+- Stage 6: this commit message names per-stage gate results.
+
+### Test counts (unchanged - PowerShell-only addition)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,728 | 3,728 | 0 |
+| API jest E2E | 1,186 | 1,186 | 0 |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM (dev) | 984 | 984 | 0 |
+| PowerShell contract | 14 | **15** | **+1** (new `run-all-gates.contract.ps1`) |
+
+**Total assertions across 5 layers: 6,821 -> 6,822 (+1, the 1 new PowerShell contract suite; counted as 1 suite per the standing convention. The suite itself contains 46 internal assertions.)**
+
 ### Changed
 
 - **Web vitest coverage thresholds ratcheted up** ([docs/strategy/SELF_AUDIT_2026-05-16.md](docs/strategy/SELF_AUDIT_2026-05-16.md) F.1 closure). Floor raised in [web/vite.config.ts](web/vite.config.ts) and contract-locked in [web/src/test/coverage-config.test.ts](web/src/test/coverage-config.test.ts):
