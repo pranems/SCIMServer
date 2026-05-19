@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase N5 - Frontend Telemetry MVP, v0.52.0-alpha.6, 2026-05-21)
+
+- **Client-side telemetry ring buffer with privacy-preserving opt-in** - New [web/src/store/telemetry-store.ts](web/src/store/telemetry-store.ts) (~90 LoC) is a Zustand atom that buffers two event variants in-memory: `navigation` (path + timestamp) and `error` (message + optional stack + timestamp). Hard cap at 50 events; hard TTL at 24h; both pruned at record time so no background timer is needed. **Opt-in gating:** `record()` reads `usePreferencesStore.getState().telemetryOptIn` and short-circuits when false - toggling the switch takes effect on the next event without any teardown/resubscribe.
+- **`telemetryOptIn` preference added to preferences-store v1 envelope** ([web/src/store/preferences-store.ts](web/src/store/preferences-store.ts)) - default `true` (frontend-only MVP has zero data leaving the tab, so default-on is privacy-safe). When Phase O ships server-side ingestion, the contract MUST flip to default-off with explicit operator consent.
+- **Boot-time collector wires** ([web/src/store/telemetry-collectors.ts](web/src/store/telemetry-collectors.ts), ~90 LoC) - `bootstrapTelemetryCollectors(router)` subscribes to TanStack Router `'onResolved'` for page views + adds `window.addEventListener('error' | 'unhandledrejection')` for uncaught errors. **Idempotent** (HMR-safe) + returns explicit teardown (test-safe). Wired once in [web/src/main.tsx](web/src/main.tsx) before app mount.
+- **`SettingsPage` TelemetryCard** ([web/src/pages/SettingsPage.tsx](web/src/pages/SettingsPage.tsx)) - new card with Fluent `Switch` for opt-in + "Last 10 events" preview table (newest-first) + "Clear buffer" button + empty-state caption. New testids: `settings-telemetry-card`, `settings-telemetry-opt-in`, `settings-telemetry-clear`, `settings-telemetry-empty`, `settings-telemetry-row-<n>`.
+- **New [web/e2e/telemetry.spec.ts](web/e2e/telemetry.spec.ts)** - browser-side smoke vs dev FQDN, asserts TelemetryCard + 4 controls render on /settings.
+- **New [docs/PHASE_N5_FRONTEND_TELEMETRY.md](docs/PHASE_N5_FRONTEND_TELEMETRY.md)** - architecture (Mermaid), module map, test coverage table, design rationale (why in-memory; why ring + TTL; why default-on for MVP; why subscribe-based wire; why idempotent bootstrap; why no web-vitals dep), Standing Backlog (server ingestion `POST /scim/admin/telemetry`, 7-day retention, web-vitals, sourcemap upload, default-on flip, per-user telemetry history view, PII redaction of path segments).
+
+### Quality gates result (Phase N5)
+
+Per [.github/copilot-instructions.md](.github/copilot-instructions.md) Stages 0-6, every Phase N5 sub-commit was RED-first (Stage 0), preserved the web tsc baseline of 96 errors (Stage 1.4), and shipped only after the full vitest sweep passed (Stage 2.3).
+
+- **Stage 0 TDD**: confirmed RED in 3 RED-then-GREEN cycles (telemetry-store + opt-in preference foundation +10, collectors wire + SettingsPage TelemetryCard +9, docs + Playwright + version bump +0/+1).
+- **Stage 1.4 web tsc**: PASS - baseline of 96 errors preserved across all 3 commits.
+- **Stage 2.3 full vitest**: PASS - 959 -> 969 -> 978 (+19 tests across 4 new/modified suites).
+- **Stage 6 commit hygiene**: em-dash scan PASS on every modified file; version bump v0.52.0-alpha.5 -> v0.52.0-alpha.6 in api/package.json + web/package.json; no `--amend` / `--force` / `--no-verify`.
+
+### Test counts (Phase N5)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,735 | 3,735 | 0 |
+| API jest E2E | 1,197 | 1,197 | 0 |
+| Web vitest | 959 | **978** | **+19** (telemetry-store +10, telemetry-collectors +5, SettingsPage TelemetryCard +4) |
+| Live SCIM | 1,005 | 1,005 | 0 |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 75 | **76** | **+1** (`telemetry.spec.ts` smoke) |
+
+**Total assertions across 6 layers: 6,918 -> 6,938** (+20).
+
+### Files changed (Phase N5)
+
+- `web/src/store/telemetry-store.ts` (NEW)
+- `web/src/store/telemetry-store.test.ts` (NEW)
+- `web/src/store/telemetry-collectors.ts` (NEW)
+- `web/src/store/telemetry-collectors.test.ts` (NEW)
+- `web/src/store/preferences-store.ts` (+telemetryOptIn key + setter)
+- `web/src/store/preferences-store.test.ts` (4 assertions updated for 4-key envelope)
+- `web/src/pages/SettingsPage.tsx` (TelemetryCard component + mount + imports)
+- `web/src/pages/SettingsPage.test.tsx` (4 new tests for TelemetryCard)
+- `web/src/main.tsx` (bootstrapTelemetryCollectors call at boot)
+- `web/e2e/telemetry.spec.ts` (NEW smoke)
+- `docs/PHASE_N5_FRONTEND_TELEMETRY.md` (NEW)
+- `docs/INDEX.md` (entry added)
+- `CHANGELOG.md` (this entry)
+- `Session_starter.md` (chronological row)
+- `api/package.json` + `web/package.json` (version 0.52.0-alpha.5 -> 0.52.0-alpha.6)
+
 ### Added (Phase N4 - Settings Persistence, v0.52.0-alpha.5, 2026-05-20)
 
 - **Per-user UI preferences with versioned localStorage persistence** - New [web/src/store/preferences-store.ts](web/src/store/preferences-store.ts) (~120 LoC) is a Zustand atom + hand-rolled persistence layer (envelope `{v: 1, prefs: {...}}` at localStorage key `scimserver.preferences.v1`). Hand-roll chosen over `zustand/middleware/persist` so we can version + allowlist + clamp at hydrate time (defends against stale storage from a future schema). Three preferences ship in v1:
