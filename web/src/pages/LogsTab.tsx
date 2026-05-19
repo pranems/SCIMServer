@@ -25,7 +25,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -148,6 +148,18 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="logs-tab">
       <div className={classes.header}>
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
+        <ExportSplitButton
+          rows={logs.map((l: any) => ({
+            id: l.id,
+            method: l.method ?? '',
+            url: l.url ?? '',
+            status: l.status ?? '',
+            durationMs: l.durationMs ?? '',
+            createdAt: l.createdAt ?? '',
+          }))}
+          filenameBase={`logs-${endpointId}`}
+          columns={['id', 'method', 'url', 'status', 'durationMs', 'createdAt']}
+        />
         <SearchBox
           placeholder="Filter by URL..."
           value={urlContains}

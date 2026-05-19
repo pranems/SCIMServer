@@ -196,4 +196,44 @@ describe('ActivityTab', () => {
 
     expect(screen.getByTestId('activity-error')).toHaveTextContent(/activity API down/);
   });
+
+  // ==========================================================================
+  // Phase N3 - Export button (CSV / JSON / NDJSON) wired into the toolbar
+  // ==========================================================================
+  it('renders ExportSplitButton when activities exist', () => {
+    (useEndpointActivity as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockResponse, isLoading: false, error: null,
+    });
+
+    renderWithProviders(
+      <ActivityTab endpointId="ep-1" search={baseSearch} onSearchChange={onChangeProp()} />,
+    );
+
+    expect(screen.getByTestId('export-button')).toBeInTheDocument();
+    expect(screen.getByTestId('export-button')).not.toBeDisabled();
+  });
+
+  it('CSV export invokes triggerCsvDownload with flattened activity rows', async () => {
+    const csvExportModule = await import('../utils/csv-export');
+    const csvSpy = vi.spyOn(csvExportModule, 'triggerCsvDownload').mockImplementation(() => {});
+
+    (useEndpointActivity as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockResponse, isLoading: false, error: null,
+    });
+
+    renderWithProviders(
+      <ActivityTab endpointId="ep-1" search={baseSearch} onSearchChange={onChangeProp()} />,
+    );
+    fireEvent.click(screen.getByTestId('export-button'));
+    fireEvent.click(screen.getByTestId('export-menu-csv'));
+
+    expect(csvSpy).toHaveBeenCalledTimes(1);
+    const [filename, body] = csvSpy.mock.calls[0];
+    expect(filename).toMatch(/^activity-ep-1-\d{8}T\d{6}Z\.csv$/);
+    expect(body).toContain('id,timestamp,type,severity,message,details');
+    expect(body).toContain('a1,2026-05-08T10:00:00Z,user,success,User created,POST /Users alice@x.com');
+    expect(body).toContain('a2,2026-05-08T10:01:00Z,group,info,Group updated,PATCH /Groups/g1');
+
+    csvSpy.mockRestore();
+  });
 });

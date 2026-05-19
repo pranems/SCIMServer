@@ -35,7 +35,7 @@ import {
   ArrowReset24Regular,
 } from '@fluentui/react-icons';
 import { useEndpointActivity, type ActivitySummaryItem } from '../api/queries';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
 import {
   ACTIVITY_TYPE_VALUES,
   ACTIVITY_SEVERITY_VALUES,
@@ -170,6 +170,20 @@ export const ActivityTab: React.FC<ActivityTabProps> = ({
   return (
     <div className={classes.root} data-testid="tab-activity">
       <Subtitle2>Activity</Subtitle2>
+
+      {/* Phase N3 - Export button (CSV / JSON / NDJSON) for the current activity page */}
+      <ExportSplitButton
+        rows={(data?.activities ?? []).map((a) => ({
+          id: a.id,
+          timestamp: a.timestamp ?? '',
+          type: a.type ?? '',
+          severity: a.severity ?? '',
+          message: a.message ?? '',
+          details: a.details ?? '',
+        }))}
+        filenameBase={`activity-${endpointId}`}
+        columns={['id', 'timestamp', 'type', 'severity', 'message', 'details']}
+      />
 
       {/* Filter toolbar (URL-driven) */}
       <Toolbar className={classes.toolbar} aria-label="Activity filters">
