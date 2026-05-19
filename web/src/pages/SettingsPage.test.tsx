@@ -20,7 +20,7 @@ vi.mock('../api/queries', async () => {
   };
 });
 
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
+import { useVersion, useHealth, useLogConfig } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
