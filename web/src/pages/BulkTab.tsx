@@ -38,7 +38,6 @@ import {
   Input,
 } from '@fluentui/react-components';
 import {
-  ArrowUpload24Regular,
   Send24Regular,
   ArrowDownload24Regular,
   Stack24Regular,
