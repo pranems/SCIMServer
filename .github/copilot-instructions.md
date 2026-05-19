@@ -177,6 +177,37 @@ Every feature or significant change commit MUST include ALL of the following bef
 8. **Version Management** - Bump version in `package.json` and all relevant version references
 9. **Response Contract Tests** - Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
 
+## Mandatory Local Git Hooks (Standing Rule)
+
+Every clone of this repository MUST run [scripts/install-hooks.ps1](scripts/install-hooks.ps1) once. The installer sets `git config core.hooksPath .githooks` so the versioned hooks under [.githooks/](.githooks) become active for every commit and every push. Hooks are the local enforcement layer for the cheap fast-fail gates so CI never wastes a run on something a 5-second local check would have caught.
+
+Hooks shipped (both are MANDATORY; bypassing them is a violation of the standing rule against `--no-verify`):
+
+| Hook | Trigger | What it runs | Typical duration |
+|---|---|---|---|
+| [`.githooks/pre-commit`](.githooks/pre-commit) | Every `git commit` | Staged-file scan: em-dash (U+2014) ban, `console.log/debug/info` ban in production TS, hardcoded-secret regex (AWS, Stripe, GitHub PAT, Slack, PEM keys). | < 5 s |
+| [`.githooks/pre-push`](.githooks/pre-push) | Every `git push` | Invokes [scripts/pre-push-checks.ps1](scripts/pre-push-checks.ps1) in `Fast` mode by default: api `npm run build` + api `npm run lint` + web `npx tsc --noEmit` (96-error baseline guard) + web `npm run build`. Mirrors the CI `validate` job's static gates. | ~2.5 min |
+
+Escalation knobs (set per push without editing any file):
+
+| Env var | What it adds | Duration | When to use |
+|---|---|---|---|
+| `$env:PREPUSH_MODE = 'Validate'` | + api `prisma generate` + migration linter + api `npm test` + api `npm run test:e2e` (inmemory, `--maxWorkers=2`, same excludes as CI) + web `npm test` | ~8-12 min | BEFORE opening or promoting a PR. Mirrors CI validate job 1-to-1. |
+| `$env:PREPUSH_MODE = 'Full'` | + `docker build` + `trivy` HIGH+CRITICAL scan | ~15-20 min | Before a release-cut PR or after touching `Dockerfile` / dependencies. |
+
+Branch patterns that auto-skip the pre-push hook (work-in-progress only):
+- `wip/**`, `throwaway/**`, `scratch/**`
+
+CI gates NOT mirrored locally (rely on the GitHub Actions run + branch protection):
+- CodeQL `security-extended` + `security-and-quality` query packs ([.github/workflows/codeql.yml](.github/workflows/codeql.yml))
+- GHCR push (`build-and-push.yml`)
+- Dev/prod Azure Container Apps deploy + live SCIM test (Stage 4.4 + Stage 4.2)
+
+Operational rules:
+- Hooks are **versioned** under `.githooks/`. Editing them counts as a behavioral change and follows the same TDD + CHANGELOG discipline as application code.
+- `core.hooksPath` is **per-clone configuration**, not a tracked git setting. Every fresh clone (including CI runners that use git rather than action checkouts) must invoke [scripts/install-hooks.ps1](scripts/install-hooks.ps1). Adding a check to a future bootstrap / dev-setup script that calls the installer automatically is in the Standing Backlog.
+- `--no-verify` remains banned by the existing operational-safety rule. The hook mechanism enforces the rule at the moment of commit/push; the standing rule still governs the policy.
+
 ## Mandatory Quality Gates (Standing Rule)
 
 After implementation AND before considering work complete, ALL of the following quality gates MUST be executed. Use TDD (Red-Green-Refactor) for ALL implementation - including the smallest spot-fix. The gates are organized into 6 stages (Stage 0 -> Stage 5). NEVER skip a stage. NEVER reorder. Higher-numbered stages depend on lower-numbered stages.

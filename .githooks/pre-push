@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Pre-push hook that runs scripts/pre-push-checks.ps1 to mirror CI gates
+# before a push leaves the local machine.
+#
+# Default mode: Fast (~1-2 min) - api build + lint + web tsc + web build
+#
+# Escalation (per-push, without editing this file):
+#   $env:PREPUSH_MODE = 'Validate'; git push origin feat/ui
+#   $env:PREPUSH_MODE = 'Full';     git push origin feat/ui
+#
+# Skip (banned by standing rule, but available in emergencies):
+#   git push --no-verify
+#
+# Branches that skip the hook entirely (work-in-progress / scratch):
+#   wip/**, throwaway/**, scratch/**
+#
+# Per .github/copilot-instructions.md - the standing rule against
+# --no-verify still applies. This hook is the enforcement mechanism.
+
+# Read pushed refs from stdin. Git passes lines of the form:
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+# We only need to know which branches are being pushed.
+pushed_branches=""
+while read local_ref local_sha remote_ref remote_sha; do
+    case "$local_ref" in
+        refs/heads/*)
+            branch="${local_ref#refs/heads/}"
+            pushed_branches="$pushed_branches $branch"
+            ;;
+    esac
+done
+
+# Skip the hook for WIP / scratch branches.
+for b in $pushed_branches; do
+    case "$b" in
+        wip/*|throwaway/*|scratch/*)
+            echo "[pre-push] Branch '$b' matches wip/throwaway/scratch pattern - skipping gates."
+            exit 0
+            ;;
+    esac
+done
+
+# Resolve the PowerShell invocation. Prefer pwsh (cross-platform), fall back
+# to Windows PowerShell. The script tolerates both.
+if command -v pwsh >/dev/null 2>&1; then
+    PS_EXE="pwsh"
+elif command -v powershell >/dev/null 2>&1; then
+    PS_EXE="powershell"
+else
+    echo "[pre-push] FATAL: neither pwsh nor powershell found on PATH. Cannot run gates." >&2
+    echo "[pre-push] Install PowerShell 7+ or use 'git push --no-verify' (banned by standing rule)." >&2
+    exit 1
+fi
+
+# Mode resolution: honor $PREPUSH_MODE if set, else Fast.
+MODE="${PREPUSH_MODE:-Fast}"
+
+# Repo root = parent of .git/hooks
+HOOK_DIR="$(dirname "$0")"
+REPO_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+SCRIPT_PATH="$REPO_ROOT/scripts/pre-push-checks.ps1"
+
+if [ ! -f "$SCRIPT_PATH" ]; then
+    echo "[pre-push] FATAL: $SCRIPT_PATH not found." >&2
+    exit 1
+fi
+
+echo "[pre-push] Branches: $pushed_branches"
+echo "[pre-push] Mode    : $MODE (escalate with: \$env:PREPUSH_MODE='Validate' or 'Full')"
+echo "[pre-push] Script  : $SCRIPT_PATH"
+echo ""
+
+"$PS_EXE" -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_PATH" -Mode "$MODE"
+exit $?
