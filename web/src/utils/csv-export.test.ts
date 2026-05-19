@@ -20,7 +20,14 @@
  *      to a Blob and clicks a synthetic <a> with `download=` set.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { toCsv, triggerCsvDownload } from './csv-export';
+import {
+  toCsv,
+  triggerCsvDownload,
+  toJson,
+  toNdjson,
+  triggerJsonDownload,
+  triggerNdjsonDownload,
+} from './csv-export';
 
 describe('Phase L6 - toCsv (pure RFC 4180 serializer)', () => {
   it('empty rows + no columns -> empty string', () => {
@@ -175,5 +182,153 @@ describe('Phase L6 - triggerCsvDownload', () => {
   it('removes the synthetic anchor from the DOM after the click (no leak)', () => {
     triggerCsvDownload('test.csv', 'a\n1');
     expect(removeChild).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ============================================================================
+// Phase N3 - JSON + NDJSON export format partners.
+// ============================================================================
+//
+// Phase L6 shipped CSV-only export on BulkTab + OperationsPage. Phase N3
+// extends the helper module with JSON (pretty-printed array) + NDJSON
+// (newline-delimited, one JSON object per line) so the upcoming
+// ExportSplitButton primitive can offer all three formats from one menu.
+//
+// Why both:
+//   - CSV is the right cut for "open in Excel" workflows but loses type
+//     information (everything is a string + nested objects are stringified).
+//   - JSON preserves shape exactly. Pretty-printed by default so the
+//     operator can paste it into a code editor and read it.
+//   - NDJSON is the streaming-friendly format consumed by `jq -s`, the
+//     SCIM bulk API, `cat foo.ndjson | jq`, and most ETL tools. Each line
+//     is independently valid JSON so partial parses are fine.
+
+describe('Phase N3 - toJson (pretty-printed JSON array serializer)', () => {
+  it('empty rows -> empty array literal', () => {
+    expect(toJson([])).toBe('[]');
+  });
+
+  it('default pretty=true uses 2-space indent', () => {
+    const json = toJson([{ a: 1 }]);
+    expect(json).toBe('[\n  {\n    "a": 1\n  }\n]');
+  });
+
+  it('opt-in pretty=false emits compact single-line JSON', () => {
+    const json = toJson([{ a: 1 }, { a: 2 }], { pretty: false });
+    expect(json).toBe('[{"a":1},{"a":2}]');
+  });
+
+  it('preserves row order (no implicit sort)', () => {
+    const json = toJson([{ k: 'z' }, { k: 'a' }, { k: 'm' }], { pretty: false });
+    expect(json).toBe('[{"k":"z"},{"k":"a"},{"k":"m"}]');
+  });
+
+  it('preserves nested object + array shape (unlike CSV which stringifies)', () => {
+    const json = toJson([{ tags: ['a', 'b'], meta: { x: 1 } }], { pretty: false });
+    expect(json).toBe('[{"tags":["a","b"],"meta":{"x":1}}]');
+  });
+
+  it('preserves numeric, boolean, and null types exactly', () => {
+    const json = toJson([{ n: 42, b: true, missing: null }], { pretty: false });
+    expect(json).toBe('[{"n":42,"b":true,"missing":null}]');
+  });
+});
+
+describe('Phase N3 - toNdjson (newline-delimited JSON serializer)', () => {
+  it('empty rows -> empty string', () => {
+    expect(toNdjson([])).toBe('');
+  });
+
+  it('single row -> compact single-line JSON, no trailing newline', () => {
+    expect(toNdjson([{ a: 1 }])).toBe('{"a":1}');
+  });
+
+  it('multiple rows -> one compact JSON per line separated by \\n', () => {
+    const ndjson = toNdjson([{ a: 1 }, { a: 2 }, { a: 3 }]);
+    expect(ndjson).toBe('{"a":1}\n{"a":2}\n{"a":3}');
+  });
+
+  it('preserves row order', () => {
+    const ndjson = toNdjson([{ k: 'z' }, { k: 'a' }, { k: 'm' }]);
+    const lines = ndjson.split('\n');
+    expect(lines).toEqual(['{"k":"z"}', '{"k":"a"}', '{"k":"m"}']);
+  });
+
+  it('each line is independently valid JSON (streaming-safe contract)', () => {
+    const rows = [{ a: 1 }, { b: 'two' }, { c: [3, 4] }];
+    const lines = toNdjson(rows).split('\n');
+    for (const line of lines) {
+      // Must round-trip without throwing - the property that makes NDJSON
+      // streamable line-by-line.
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+  });
+
+  it('newlines inside string values are escaped so the line-delimited contract is not broken', () => {
+    // JSON.stringify escapes \n inside strings to \\n so the wire byte
+    // representation contains zero literal newlines until the line terminator.
+    const ndjson = toNdjson([{ note: 'line1\nline2' }]);
+    expect(ndjson).toBe('{"note":"line1\\nline2"}');
+    expect(ndjson.indexOf('\n')).toBe(-1);
+  });
+});
+
+describe('Phase N3 - triggerJsonDownload', () => {
+  let createObjectURL: ReturnType<typeof vi.fn>;
+  let revokeObjectURL: ReturnType<typeof vi.fn>;
+  let clicked: HTMLAnchorElement[];
+
+  beforeEach(() => {
+    clicked = [];
+    createObjectURL = vi.fn(() => 'blob:fake-json-url');
+    revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true, configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, writable: true, configurable: true });
+    vi.spyOn(document.body, 'appendChild').mockImplementation(((node: Node) => {
+      if ((node as HTMLAnchorElement).tagName === 'A') clicked.push(node as HTMLAnchorElement);
+      return node;
+    }) as typeof document.body.appendChild);
+    vi.spyOn(document.body, 'removeChild').mockImplementation(((node: Node) => node) as typeof document.body.removeChild);
+  });
+
+  it('creates a Blob with application/json MIME + anchor download set + revokes the URL', () => {
+    triggerJsonDownload('export.json', '[{"a":1}]');
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blobArg = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blobArg.type).toContain('application/json');
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0].download).toBe('export.json');
+    expect(clicked[0].href).toContain('blob:fake-json-url');
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake-json-url');
+  });
+});
+
+describe('Phase N3 - triggerNdjsonDownload', () => {
+  let createObjectURL: ReturnType<typeof vi.fn>;
+  let revokeObjectURL: ReturnType<typeof vi.fn>;
+  let clicked: HTMLAnchorElement[];
+
+  beforeEach(() => {
+    clicked = [];
+    createObjectURL = vi.fn(() => 'blob:fake-ndjson-url');
+    revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true, configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, writable: true, configurable: true });
+    vi.spyOn(document.body, 'appendChild').mockImplementation(((node: Node) => {
+      if ((node as HTMLAnchorElement).tagName === 'A') clicked.push(node as HTMLAnchorElement);
+      return node;
+    }) as typeof document.body.appendChild);
+    vi.spyOn(document.body, 'removeChild').mockImplementation(((node: Node) => node) as typeof document.body.removeChild);
+  });
+
+  it('creates a Blob with application/x-ndjson MIME + anchor download set + revokes the URL', () => {
+    triggerNdjsonDownload('export.ndjson', '{"a":1}\n{"a":2}');
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blobArg = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blobArg.type).toContain('application/x-ndjson');
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0].download).toBe('export.ndjson');
+    expect(clicked[0].href).toContain('blob:fake-ndjson-url');
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake-ndjson-url');
   });
 });

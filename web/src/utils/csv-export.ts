@@ -122,3 +122,93 @@ export function triggerCsvDownload(filename: string, csv: string): void {
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
 }
+
+// ============================================================================
+// Phase N3 - JSON + NDJSON format partners.
+// ============================================================================
+//
+// The csv-export module owns the entire client-side export surface as of
+// Phase N3. CSV preserves "open-in-Excel" workflows; JSON preserves shape
+// exactly (nested objects + arrays + true number/boolean/null types);
+// NDJSON is the streaming-friendly format consumed by `jq -s`, the SCIM
+// bulk API, and most ETL tools.
+//
+// Single-file organisation rationale: all three formats share the Blob +
+// synthetic-anchor download pattern and the operator picks between them
+// from one menu (ExportSplitButton); co-locating them avoids the import
+// fan-out cost a separate `json-export.ts` + `ndjson-export.ts` pair
+// would introduce.
+
+export interface ToJsonOptions {
+  /**
+   * Pretty-print with 2-space indent. Default true so the operator can
+   * paste the file into a code editor and read it. Set false for the
+   * smallest possible byte size (omits whitespace entirely).
+   */
+  pretty?: boolean;
+}
+
+/**
+ * Serialize an array of plain objects into a JSON array string.
+ *
+ * Preserves shape exactly (numbers stay numbers, nested objects stay
+ * nested) - this is the key contract that distinguishes JSON export
+ * from CSV export which stringifies everything to a cell.
+ */
+export function toJson(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  options?: ToJsonOptions,
+): string {
+  const pretty = options?.pretty !== false;
+  return pretty ? JSON.stringify(rows, null, 2) : JSON.stringify(rows);
+}
+
+/**
+ * Serialize an array of plain objects into newline-delimited JSON
+ * (https://github.com/ndjson/ndjson-spec).
+ *
+ * Contract: each line is independently valid compact JSON. No trailing
+ * newline. Empty input -> empty string. JSON.stringify escapes any
+ * `\n` inside string values so the line-delimited contract holds even
+ * when row content contains literal newlines.
+ */
+export function toNdjson(
+  rows: ReadonlyArray<Record<string, unknown>>,
+): string {
+  if (rows.length === 0) return '';
+  return rows.map((row) => JSON.stringify(row)).join('\n');
+}
+
+/**
+ * Browser-only helper - drops the given JSON text into a Blob and
+ * triggers a download. Mirrors `triggerCsvDownload`'s contract with
+ * the `application/json` MIME type.
+ */
+export function triggerJsonDownload(filename: string, json: string): void {
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Browser-only helper - drops the given NDJSON text into a Blob and
+ * triggers a download. Uses the IANA-registered `application/x-ndjson`
+ * MIME type so curl + jq + most ETL tools recognise the format.
+ */
+export function triggerNdjsonDownload(filename: string, ndjson: string): void {
+  const blob = new Blob([ndjson], { type: 'application/x-ndjson;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}

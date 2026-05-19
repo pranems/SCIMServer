@@ -29,3 +29,6 @@ export type { EtagBadgeProps } from './EtagBadge';
 
 export { ConflictDialog } from './ConflictDialog';
 export type { ConflictDialogProps } from './ConflictDialog';
+
+export { ExportSplitButton } from './ExportSplitButton';
+export type { ExportSplitButtonProps } from './ExportSplitButton';
