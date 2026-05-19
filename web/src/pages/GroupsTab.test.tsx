@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { GroupsTab } from './GroupsTab';
 import { renderWithRouter } from '../test/router-test-utils';
 import { groupsSearchSchema } from '../routes/search-schemas';
@@ -90,5 +90,38 @@ describe('GroupsTab', () => {
       'ep-1',
       expect.objectContaining({ startIndex: 21, count: 20 }),
     );
+  });
+
+  // ==========================================================================
+  // Phase N3 - Export button (CSV / JSON / NDJSON) wired into the toolbar
+  // ==========================================================================
+  it('renders ExportSplitButton in the toolbar when groups exist', async () => {
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockGroups, isLoading: false, error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    expect(await screen.findByTestId('export-button')).toBeInTheDocument();
+    expect(screen.getByTestId('export-button')).not.toBeDisabled();
+  });
+
+  it('clicking CSV in the export menu invokes triggerCsvDownload with flattened group rows', async () => {
+    const csvExportModule = await import('../utils/csv-export');
+    const csvSpy = vi.spyOn(csvExportModule, 'triggerCsvDownload').mockImplementation(() => {});
+
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockGroups, isLoading: false, error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    fireEvent.click(await screen.findByTestId('export-button'));
+    fireEvent.click(await screen.findByTestId('export-menu-csv'));
+
+    expect(csvSpy).toHaveBeenCalledTimes(1);
+    const [filename, body] = csvSpy.mock.calls[0];
+    expect(filename).toMatch(/^groups-ep-1-\d{8}T\d{6}Z\.csv$/);
+    expect(body).toContain('id,displayName,memberCount,created');
+    expect(body).toContain('g1,Engineering,2,');
+    expect(body).toContain('g2,Marketing,0,');
+
+    csvSpy.mockRestore();
   });
 });

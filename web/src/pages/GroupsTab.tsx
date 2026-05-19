@@ -22,7 +22,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
@@ -117,6 +117,16 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="groups-tab">
       <div className={classes.header}>
         <Subtitle2>{total} groups</Subtitle2>
+        <ExportSplitButton
+          rows={groups.map((g: any) => ({
+            id: g.id,
+            displayName: g.displayName ?? '',
+            memberCount: Array.isArray(g.members) ? g.members.length : 0,
+            created: g.meta?.created ?? '',
+          }))}
+          filenameBase={`groups-${endpointId}`}
+          columns={['id', 'displayName', 'memberCount', 'created']}
+        />
       </div>
       <table className={classes.table}>
         <thead>
