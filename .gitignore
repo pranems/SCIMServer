@@ -43,7 +43,7 @@ logs/
 # Test results (generated per run)
 test-results/
 
-# Test artifacts (historical JSON snapshots — never commit)
+# Test artifacts (historical JSON snapshots - never commit)
 api/test-artifacts/
 
 # Test output files (generated per run - never commit)
@@ -113,3 +113,17 @@ docs/insomnia/SCIMServer_v031_*.json
 docs/postman/SCIMServer_v031_*.json
 
 api/.dev-db.tmp
+
+# Local-only deployment secrets + state (NEVER commit - contain DB passwords / ACR creds / tokens)
+.acrname.txt
+.acrcreds.txt
+.pgpass-*.txt
+.oldprod-token.txt
+prod-app-template.json
+migration.log
+migrate-output.log
+scripts/state/
+scripts/_deploy-*-new-tenant.ps1
+
+# Side-project research workspace (separate from SCIMServer)
+coderush/

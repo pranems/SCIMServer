@@ -7,9 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Added (cross-tenant deploy + data migration, 2026-05-19, no version bump)
 
-- **Phase N3a: `helmet` middleware (HIGHEST-LEVERAGE NEW GAP from 2026-05-17 Stage X.2 intake)** - new [api/src/security/helmet-config.ts](api/src/security/helmet-config.ts) (~125 LoC, no em-dash) centralises the helmet options so [api/src/main.ts](api/src/main.ts) and [api/test/e2e/helpers/app.helper.ts](api/test/e2e/helpers/app.helper.ts) share one source of truth (no drift). Emits every standard browser-enforced defense-in-depth response header: Content-Security-Policy (default-src/script-src/style-src/img-src/font-src/connect-src/object-src/frame-ancestors/form-action/base-uri all bound to `'self'` with `'unsafe-inline'` permitted on script-src + style-src for the small inline fallback-remove script in `web/index.html` + Fluent UI v9 makeStyles atomic-class runtime injection; tightening to sha256 hashes deferred to a follow-up commit), Strict-Transport-Security (max-age=15552000 + includeSubDomains, production-only - intentionally suppressed in test/dev so localhost is not pinned), X-Frame-Options: DENY (legacy clickjacking defense; redundant with CSP `frame-ancestors 'none'` but kept for older browsers), X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Resource-Policy: same-origin (Cross-Origin-Embedder-Policy intentionally DISABLED to avoid breaking future CDN-hosted assets), Origin-Agent-Cluster: ?1, X-Permitted-Cross-Domain-Policies: none, X-DNS-Prefetch-Control: off, X-Download-Options: noopen, plus a manually-emitted **Permissions-Policy** value denying camera/microphone/geolocation/payment/usb/magnetometer/accelerometer/gyroscope. Closes Standing Backlog row "Web security headers (CSP/HSTS/etc.)" - moved from DEFERRED to ACTIVE in [.github/copilot-instructions.md](.github/copilot-instructions.md) Cross-Cutting Security Gate Map.
+- **New tenant cutover (Azure)** - Full re-deploy of dev + prod into tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373` (ProvIAM_Subscription `5738ea6a-533b-4c0d-a18a-d322f2094475`). New FQDNs supersede the prior ones:
+  - **prod** = `https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io`
+  - **dev** = `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`
+- **Shared Container App Environment** - `scimserver-env` in `scimserver-prod` RG hosts both apps (sub quota = 1 env globally on the new sub; dev added cross-RG via `--environment <fullResourceId>`).
+- **Per-app PostgreSQL flexible servers (eastus2)** - prod `scimserver-pg-new2`, dev `scimserver-pg-dev-new2`. Admin user `scimadmin`. Both servers have `azure.extensions=CITEXT,PG_TRGM,PGCRYPTO` set + restarted before any `prisma migrate deploy` run.
+- **New ACR** `acrscimserver20622.azurecr.io` in scimserver-prod RG (admin-enabled). Image tag pushed: `scimserver:0.52.0-alpha.3` (digest `sha256:66fb0a9a9715575e88f8b330ab6b7674ad99c377fb4d634e893c5eb110253839`).
+- **Idempotent migration script** [scripts/migrate-old-prod.ps1](scripts/migrate-old-prod.ps1) (~210 LoC, secrets-free) replays endpoints + users + groups from any source SCIM server into one-or-more targets. Paginates `/scim/admin/endpoints?view=full` + `/Users?startIndex&count` + `/Groups?startIndex&count`; strips server-side `id`+`meta`; POSTs to target; builds `srcUserId -> newUserId` map so group `members[].value` rewrites correctly (warns + drops unmapped members). Skips an endpoint when target already has a same-named one. Supports `-DryRun`.
+
+### Changed (Azure PG citext fix + deploy script hardening, 2026-05-19)
+
+- **[scripts/deploy-azure.ps1](scripts/deploy-azure.ps1) root-cause fix for P3009 silent failure on Azure PG** - baseline migration `20260223000000_postgresql_baseline` requires `citext`, `pg_trgm`, `pgcrypto`. On Azure PostgreSQL Flexible Server these are NOT installable by default - must be allow-listed via the `azure.extensions` server parameter (static, requires PG restart). Without the fix Prisma's `migrate deploy` fails P3009 with no SQL visible in app logs. Script now sets `azure.extensions=CITEXT,PG_TRGM,PGCRYPTO` + restarts PG immediately after PG provision; idempotent (checks current value); calls `Stop-Deployment` on failure.
+- **3 new params on deploy-azure.ps1**: `-AcrLoginServer`, `-ImageRepository`, `-PgServerName` (defaults preserved for backward compat).
+- **PS case-insensitive variable shadow bug fix in deploy-azure.ps1** - local `$imageRepository` at line 393 was clobbering the deploy param; renamed to `$ghcrAuthCheckRepo`.
+- **[infra/containerapp.bicep](infra/containerapp.bicep)** - generalized registry credentials path (was GHCR-specific; now works with any ACR via the same `useGhcrCredentials` flag flipping to false when neither GHCR nor explicit creds are provided).
+- **[.gitignore](.gitignore)** - new entries for local-only deployment secrets + state (`.acrname.txt`, `.acrcreds.txt`, `.pgpass-*.txt`, `.oldprod-token.txt`, `prod-app-template.json`, `migration.log`, `migrate-output.log`, `scripts/state/`, `scripts/_deploy-*-new-tenant.ps1`) + side-project workspace (`coderush/`). 1 pre-existing em-dash fixed in line 46 comment.
+
+### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
+
+- **Stage 0 TDD**: N/A (infra/deploy + script only; no production code changed).
+- **Stage 1.2 / 1.3** (api tsc + ESLint): unchanged baseline (no api code touched).
+- **Stage 4.4 dev Azure deploy + live tests**: **GREEN** - `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> **1005/1005 PASS** (72.8 s).
+- **Stage 4.x prod Azure deploy + live tests**: **GREEN** - `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> **1005/1005 PASS**.
+- **Stage 4 data migration**: **GREEN** - 36/36 endpoints + 297/301 users + 40/40 groups replayed to each target. The 4 user outliers (Vishnu-ISV-1) were rejected by StrictSchemaValidation because the source body carried `urn:ietf:params:scim:schemas:extension:veritas:2` without declaring it in `schemas[]` - source-data quality issue, not a script bug. Spot-checked counts on prod: Vishnu-ISV-1=107 (expected 111-4), Sagar-ISV-2=79, Himanshu-ISV-1=28.
+- **Stage 6 commit hygiene**: em-dash scan PASS on all 4 staged files (1 pre-existing em-dash in `.gitignore` fixed inline). No `--amend` / no `--force` / no `--no-verify`. No version bump (infra/deploy + script only).
+
+### Test counts (unchanged)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,735 | 3,735 | 0 |
+| API jest E2E | 1,197 | 1,197 | 0 |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM (new prod) | 984 | **1,005** | (full helmet + 9z-AJ suite verified on new tenant) |
+| Live SCIM (new dev) | 984 | **1,005** | (full helmet + 9z-AJ suite verified on new tenant) |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 70 | 70 | 0 |
+
+**No source-code assertions added.** The verification IS the 2 x 1005/1005 live-SCIM passes on the new tenant.
+
+## [Previously Unreleased]
+
+ - new [api/src/security/helmet-config.ts](api/src/security/helmet-config.ts) (~125 LoC, no em-dash) centralises the helmet options so [api/src/main.ts](api/src/main.ts) and [api/test/e2e/helpers/app.helper.ts](api/test/e2e/helpers/app.helper.ts) share one source of truth (no drift). Emits every standard browser-enforced defense-in-depth response header: Content-Security-Policy (default-src/script-src/style-src/img-src/font-src/connect-src/object-src/frame-ancestors/form-action/base-uri all bound to `'self'` with `'unsafe-inline'` permitted on script-src + style-src for the small inline fallback-remove script in `web/index.html` + Fluent UI v9 makeStyles atomic-class runtime injection; tightening to sha256 hashes deferred to a follow-up commit), Strict-Transport-Security (max-age=15552000 + includeSubDomains, production-only - intentionally suppressed in test/dev so localhost is not pinned), X-Frame-Options: DENY (legacy clickjacking defense; redundant with CSP `frame-ancestors 'none'` but kept for older browsers), X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Resource-Policy: same-origin (Cross-Origin-Embedder-Policy intentionally DISABLED to avoid breaking future CDN-hosted assets), Origin-Agent-Cluster: ?1, X-Permitted-Cross-Domain-Policies: none, X-DNS-Prefetch-Control: off, X-Download-Options: noopen, plus a manually-emitted **Permissions-Policy** value denying camera/microphone/geolocation/payment/usb/magnetometer/accelerometer/gyroscope. Closes Standing Backlog row "Web security headers (CSP/HSTS/etc.)" - moved from DEFERRED to ACTIVE in [.github/copilot-instructions.md](.github/copilot-instructions.md) Cross-Cutting Security Gate Map.
 - **Unit test [api/src/security/helmet-config.spec.ts](api/src/security/helmet-config.spec.ts)** (7 assertions, ~28s) pins the factory's internal shape so a future refactor cannot silently drop a header by reordering options.
 - **E2E test [api/test/e2e/security-headers.e2e-spec.ts](api/test/e2e/security-headers.e2e-spec.ts)** (11 assertions, ~35s) locks in the HTTP-level contract across 4 probe routes (SPA shell `/`, public `/scim/health`, auth-protected `/scim/admin/version`, SPA deep-link `/endpoints`) plus 3 invariant checks (HSTS absent in non-prod NODE_ENV, COEP absent, Permissions-Policy present with all 4 baseline denials).
 
@@ -47,9 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Total assertions across 6 layers: 6,845 (was 6,827).** Delta: +18.
 
-## [Previously Unreleased]
-
-### Added
+### Added (earlier Stage 5 closure, 2026-05-18)
 
 - **Playwright OnboardingWizard E2E spec (Stage 5 closure for Steps 1-4)** - new [web/e2e/onboarding.spec.ts](web/e2e/onboarding.spec.ts) with 5 tests covering the chrome-level Phase N2 wizard end-to-end against the live dev tenant: forceOpen flag renders the wizard with all 4 step dots + 3 action buttons; completedAt set hides it; Skip button writes ISO-8601 timestamp and dismisses; Close (X) button writes timestamp and dismisses; Get started advances to step 2 with `entra-id` preset preselected (`data-selected="true"`). Uses the `scimserver.onboarding.forceOpen=1` hatch in `addInitScript` so tests render deterministically against a dev tenant that already has endpoints + completedAt set. Steps 3-4 intentionally not covered E2E (would mutate the live tenant via real endpoint + credential creation); the 14 vitest already cover the full happy path against mocked mutation hooks. All 5 tests PASS vs dev (9.0s).
 - **Retroactive Stage 5 invocation for Steps 1-4** - the `playwrightSpecHygieneAudit` prompt (Stage 5.2) + Playwright vs dev (Stage 5.3) were not invoked during commits 2721c3b / 3b5126e / 6d04ccc / 6dc9b7b despite Steps 1 and 4 touching `web/`. This commit retroactively closes that gap. Hygiene finding: `web/e2e/new-ui.spec.ts` is **not** stale (the `app-shell` / `app-header` / `app-sidebar` / `theme-toggle` / `sidebar-toggle` / `kpi-row` / `endpoint-grid` testids it asserts all still exist in source); the standing-rule "delete new-ui" instruction is overzealous for the current codebase and would lose real coverage - kept as-is.
