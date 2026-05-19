@@ -28,6 +28,11 @@ import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { resetOnboarding } from '../hooks/useOnboarding';
+import {
+  usePreferencesStore,
+  ALLOWED_PAGE_SIZES,
+  type AllowedPageSize,
+} from '../store/preferences-store';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px' },
@@ -144,6 +149,9 @@ export const SettingsPage: React.FC = () => {
 
       {/* Phase N2 - re-open onboarding wizard */}
       <OnboardingResetCard />
+
+      {/* Phase N4 - persisted user preferences */}
+      <PreferencesCard />
     </div>
   );
 };
@@ -169,6 +177,77 @@ const OnboardingResetCard: React.FC = () => {
           data-testid="settings-onboarding-reset-button"
         >
           Show onboarding
+        </Button>
+      </div>
+    </Card>
+  );
+};
+
+// --- Phase N4: PreferencesCard ------------------------------------
+//
+// Surfaces 3 persisted UI preferences (defaultPageSize, denseMode,
+// sidebarCollapsedDefault) + a reset-to-defaults button. State + I/O
+// live in `web/src/store/preferences-store.ts` (Zustand + versioned
+// localStorage); this component is the chrome.
+
+const PreferencesCard: React.FC = () => {
+  const classes = useStyles();
+  const defaultPageSize = usePreferencesStore((s) => s.defaultPageSize);
+  const denseMode = usePreferencesStore((s) => s.denseMode);
+  const sidebarCollapsedDefault = usePreferencesStore((s) => s.sidebarCollapsedDefault);
+  const setDefaultPageSize = usePreferencesStore((s) => s.setDefaultPageSize);
+  const setDenseMode = usePreferencesStore((s) => s.setDenseMode);
+  const setSidebarCollapsedDefault = usePreferencesStore((s) => s.setSidebarCollapsedDefault);
+  const resetPreferences = usePreferencesStore((s) => s.resetPreferences);
+
+  return (
+    <Card className={classes.card} data-testid="settings-preferences-card">
+      <Subtitle2>Preferences</Subtitle2>
+      <div className={classes.row}>
+        <Text>Default page size</Text>
+        <Dropdown
+          data-testid="settings-preferences-default-page-size"
+          value={String(defaultPageSize)}
+          selectedOptions={[String(defaultPageSize)]}
+          onOptionSelect={(_, d) => {
+            const n = Number(d.optionValue);
+            if ((ALLOWED_PAGE_SIZES as readonly number[]).includes(n)) {
+              setDefaultPageSize(n as AllowedPageSize);
+            }
+          }}
+          style={{ minWidth: '100px' }}
+        >
+          {ALLOWED_PAGE_SIZES.map((s) => (
+            <Option key={s} value={String(s)} text={String(s)}>
+              {s}
+            </Option>
+          ))}
+        </Dropdown>
+      </div>
+      <div className={classes.row}>
+        <Text>Dense mode (tighter row padding)</Text>
+        <Switch
+          data-testid="settings-preferences-dense-mode"
+          checked={denseMode}
+          onChange={(_, d) => setDenseMode(d.checked)}
+        />
+      </div>
+      <div className={classes.row}>
+        <Text>Collapse sidebar by default</Text>
+        <Switch
+          data-testid="settings-preferences-sidebar-collapsed-default"
+          checked={sidebarCollapsedDefault}
+          onChange={(_, d) => setSidebarCollapsedDefault(d.checked)}
+        />
+      </div>
+      <div className={classes.row}>
+        <Text>Reset all preferences to defaults</Text>
+        <Button
+          appearance="subtle"
+          onClick={() => resetPreferences()}
+          data-testid="settings-preferences-reset"
+        >
+          Reset preferences
         </Button>
       </div>
     </Card>

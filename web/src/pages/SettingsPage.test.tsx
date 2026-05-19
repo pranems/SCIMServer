@@ -21,6 +21,11 @@ vi.mock('../api/queries', async () => {
 });
 
 import { useVersion, useHealth, useLogConfig } from '../api/queries';
+import {
+  usePreferencesStore,
+  PREFERENCES_DEFAULTS,
+  PREFERENCES_STORAGE_KEY,
+} from '../store/preferences-store';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -152,5 +157,49 @@ describe('SettingsPage onboarding reset (Phase N2)', () => {
     btn.click();
     expect(localStorage.getItem('scimserver.onboarding.completedAt')).toBeNull();
     expect(localStorage.getItem('scimserver.onboarding.forceOpen')).toBe('1');
+  });
+});
+
+// ─── Phase N4: PreferencesCard ──────────────────────────────────────
+
+describe('SettingsPage preferences (Phase N4)', () => {
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.52.0', runtime: { node: 'v25', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    localStorage.clear();
+    // Reset the preferences store so each test starts from defaults.
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
+  });
+
+  it('renders the preferences card with the 3 controls + reset button', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('settings-preferences-card')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-preferences-default-page-size')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-preferences-dense-mode')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-preferences-sidebar-collapsed-default')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-preferences-reset')).toBeInTheDocument();
+  });
+
+  it('toggling dense mode updates the store AND persists', () => {
+    wrap(<SettingsPage />);
+    const sw = screen.getByTestId('settings-preferences-dense-mode') as HTMLInputElement;
+    expect(usePreferencesStore.getState().denseMode).toBe(false);
+    // Fluent UI Switch renders as a checkbox-role input; click toggles it.
+    sw.click();
+    expect(usePreferencesStore.getState().denseMode).toBe(true);
+    const stored = JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) ?? '{}');
+    expect(stored.prefs.denseMode).toBe(true);
+  });
+
+  it('reset button reverts store + storage to defaults', () => {
+    usePreferencesStore.getState().setDenseMode(true);
+    usePreferencesStore.getState().setDefaultPageSize(100);
+    wrap(<SettingsPage />);
+    screen.getByTestId('settings-preferences-reset').click();
+    expect(usePreferencesStore.getState().denseMode).toBe(PREFERENCES_DEFAULTS.denseMode);
+    expect(usePreferencesStore.getState().defaultPageSize).toBe(PREFERENCES_DEFAULTS.defaultPageSize);
   });
 });
