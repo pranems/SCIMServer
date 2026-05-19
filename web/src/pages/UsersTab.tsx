@@ -28,7 +28,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
 import type { UsersSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
@@ -168,6 +168,18 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="users-tab">
       <div className={classes.header}>
         <Subtitle2>{total} users</Subtitle2>
+        <ExportSplitButton
+          rows={users.map((u: any) => ({
+            id: u.id,
+            userName: u.userName,
+            displayName: u.displayName ?? '',
+            active: u.active !== false,
+            created: u.meta?.created ?? '',
+            lastModified: u.meta?.lastModified ?? '',
+          }))}
+          filenameBase={`users-${endpointId}`}
+          columns={['id', 'userName', 'displayName', 'active', 'created', 'lastModified']}
+        />
       </div>
 
       <table className={classes.table}>

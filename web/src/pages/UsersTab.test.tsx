@@ -141,4 +141,48 @@ describe('UsersTab', () => {
       );
     });
   });
+
+  // ==========================================================================
+  // Phase N3 - Export button (CSV / JSON / NDJSON) wired into the toolbar
+  // ==========================================================================
+  it('renders ExportSplitButton in the toolbar when users exist', async () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockUsers, isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    expect(await screen.findByTestId('export-button')).toBeInTheDocument();
+    expect(screen.getByTestId('export-button')).not.toBeDisabled();
+  });
+
+  it('does NOT render ExportSplitButton when empty (empty state takes over)', async () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockUsers, totalResults: 0, Resources: [] },
+      isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    await screen.findByText(/no users/i);
+    expect(screen.queryByTestId('export-button')).not.toBeInTheDocument();
+  });
+
+  it('clicking CSV in the export menu invokes triggerCsvDownload with flattened user rows', async () => {
+    const csvExportModule = await import('../utils/csv-export');
+    const csvSpy = vi.spyOn(csvExportModule, 'triggerCsvDownload').mockImplementation(() => {});
+
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockUsers, isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    fireEvent.click(await screen.findByTestId('export-button'));
+    fireEvent.click(await screen.findByTestId('export-menu-csv'));
+
+    expect(csvSpy).toHaveBeenCalledTimes(1);
+    const [filename, body] = csvSpy.mock.calls[0];
+    expect(filename).toMatch(/^users-ep-1-\d{8}T\d{6}Z\.csv$/);
+    // Header row + the 3 mock users rendered with the documented column set.
+    expect(body).toContain('id,userName,displayName,active,created,lastModified');
+    expect(body).toContain('u1,alice@corp.com,Alice Smith,true');
+    expect(body).toContain('u3,charlie@corp.com,Charlie Brown,false');
+
+    csvSpy.mockRestore();
+  });
 });
