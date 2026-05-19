@@ -52,6 +52,7 @@ describe('Phase N4 - preferences-store (Zustand + versioned localStorage)', () =
         defaultPageSize: 20,
         denseMode: false,
         sidebarCollapsedDefault: false,
+        telemetryOptIn: true,
       } satisfies Preferences);
     });
 
@@ -69,7 +70,7 @@ describe('Phase N4 - preferences-store (Zustand + versioned localStorage)', () =
       expect(usePreferencesStore.getState().defaultPageSize).toBe(50);
       expect(readStorage()).toEqual({
         v: 1,
-        prefs: { defaultPageSize: 50, denseMode: false, sidebarCollapsedDefault: false },
+        prefs: { defaultPageSize: 50, denseMode: false, sidebarCollapsedDefault: false, telemetryOptIn: true },
       });
     });
 
@@ -106,11 +107,11 @@ describe('Phase N4 - preferences-store (Zustand + versioned localStorage)', () =
     it('reads a well-formed envelope and overrides defaults', () => {
       window.localStorage.setItem(
         PREFERENCES_STORAGE_KEY,
-        JSON.stringify({ v: 1, prefs: { defaultPageSize: 50, denseMode: true, sidebarCollapsedDefault: true } }),
+        JSON.stringify({ v: 1, prefs: { defaultPageSize: 50, denseMode: true, sidebarCollapsedDefault: true, telemetryOptIn: false } }),
       );
       // Force re-hydration via the exported helper for deterministic tests.
             const loaded = loadPreferences();
-      expect(loaded).toEqual({ defaultPageSize: 50, denseMode: true, sidebarCollapsedDefault: true });
+      expect(loaded).toEqual({ defaultPageSize: 50, denseMode: true, sidebarCollapsedDefault: true, telemetryOptIn: false });
     });
 
     it('falls back to defaults when storage is corrupt JSON', () => {
@@ -140,6 +141,7 @@ describe('Phase N4 - preferences-store (Zustand + versioned localStorage)', () =
         defaultPageSize: 100,
         denseMode: false,
         sidebarCollapsedDefault: false,
+        telemetryOptIn: true,
       });
     });
 

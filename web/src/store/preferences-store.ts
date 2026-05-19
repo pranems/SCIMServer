@@ -39,12 +39,20 @@ export interface Preferences {
   defaultPageSize: AllowedPageSize;
   denseMode: boolean;
   sidebarCollapsedDefault: boolean;
+  /**
+   * Phase N5 - frontend telemetry opt-in. Default `true` so a fresh
+   * install captures useful client-side signal; operator can disable
+   * via SettingsPage. When `false`, `useTelemetryStore.record()`
+   * is a no-op.
+   */
+  telemetryOptIn: boolean;
 }
 
 export const PREFERENCES_DEFAULTS: Preferences = {
   defaultPageSize: 20,
   denseMode: false,
   sidebarCollapsedDefault: false,
+  telemetryOptIn: true,
 };
 
 interface StoredEnvelope {
@@ -88,6 +96,10 @@ export function loadPreferences(): Preferences {
       typeof p.sidebarCollapsedDefault === 'boolean'
         ? p.sidebarCollapsedDefault
         : PREFERENCES_DEFAULTS.sidebarCollapsedDefault,
+    telemetryOptIn:
+      typeof p.telemetryOptIn === 'boolean'
+        ? p.telemetryOptIn
+        : PREFERENCES_DEFAULTS.telemetryOptIn,
   };
 }
 
@@ -107,6 +119,7 @@ interface PreferencesState extends Preferences {
   setDefaultPageSize: (size: AllowedPageSize) => void;
   setDenseMode: (enabled: boolean) => void;
   setSidebarCollapsedDefault: (collapsed: boolean) => void;
+  setTelemetryOptIn: (enabled: boolean) => void;
   resetPreferences: () => void;
 }
 
@@ -115,18 +128,23 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
 
   setDefaultPageSize: (size) => {
     set({ defaultPageSize: clampPageSize(size) });
-    const { defaultPageSize, denseMode, sidebarCollapsedDefault } = get();
-    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault });
+    const { defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn } = get();
+    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn });
   },
   setDenseMode: (enabled) => {
     set({ denseMode: enabled });
-    const { defaultPageSize, denseMode, sidebarCollapsedDefault } = get();
-    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault });
+    const { defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn } = get();
+    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn });
   },
   setSidebarCollapsedDefault: (collapsed) => {
     set({ sidebarCollapsedDefault: collapsed });
-    const { defaultPageSize, denseMode, sidebarCollapsedDefault } = get();
-    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault });
+    const { defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn } = get();
+    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn });
+  },
+  setTelemetryOptIn: (enabled) => {
+    set({ telemetryOptIn: enabled });
+    const { defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn } = get();
+    persist({ defaultPageSize, denseMode, sidebarCollapsedDefault, telemetryOptIn });
   },
   resetPreferences: () => {
     set({ ...PREFERENCES_DEFAULTS });
