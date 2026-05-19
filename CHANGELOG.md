@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase N3 - Export Everywhere, v0.52.0-alpha.4, 2026-05-19)
+
+- **Export split-button (CSV / JSON / NDJSON) on all four list surfaces** - UsersTab, GroupsTab, LogsTab, ActivityTab. Operator can now pull the currently-rendered page out to disk in any of the three industry-standard tabular formats from any list. Single shared primitive [web/src/components/primitives/ExportSplitButton.tsx](web/src/components/primitives/ExportSplitButton.tsx) (~140 LoC, Fluent UI Menu/MenuTrigger/MenuPopover/MenuList) drives all four surfaces. UTC stamp `YYYYMMDDTHHMMSSZ` in every filename for stable sort order. CSV reuses the column set previously locked in BulkTab + OperationsPage; JSON ships pretty-printed (2-space indent); NDJSON ships one compact JSON object per line, no trailing newline. Three new exported helpers in [web/src/utils/csv-export.ts](web/src/utils/csv-export.ts) (`toJson`, `toNdjson`, `triggerJsonDownload`, `triggerNdjsonDownload`) with proper Blob MIME types (`application/json;charset=utf-8`, `application/x-ndjson;charset=utf-8`).
+- **New testids reused across every surface**: `export-button`, `export-menu-csv`, `export-menu-json`, `export-menu-ndjson`. Disabled when `rows.length === 0` (eagerEmpty contract).
+- **New [web/e2e/export.spec.ts](web/e2e/export.spec.ts)** - browser-side smoke vs dev FQDN, asserts toolbar wire (export-button present + enabled + three menu items render) on the first endpoint's UsersTab.
+- **New [docs/PHASE_N3_EXPORT_EVERYWHERE.md](docs/PHASE_N3_EXPORT_EVERYWHERE.md)** - architecture (Mermaid), module map, test coverage table, design rationale, out-of-scope items deferred to Phase O.
+
+### Quality gates result (Phase N3)
+
+Per [.github/copilot-instructions.md](.github/copilot-instructions.md) Stages 0-6, every Phase N3 sub-commit was RED-first (Stage 0), preserved the web tsc prod-file baseline of 9 errors (Stage 1.4), and shipped only after the full vitest sweep passed (Stage 2.3). Em-dash scan + version bump consolidated into this commit per "don't bump mid-phase" convention.
+
+- **Stage 0 TDD**: confirmed RED in 5 RED-then-GREEN cycles (foundation +22, UsersTab +3, GroupsTab +2, LogsTab +2, ActivityTab +2).
+- **Stage 1.4 web tsc**: PASS - prod-file baseline of 9 errors preserved across all 5 commits.
+- **Stage 2.3 full vitest**: PASS - 909 -> 931 -> 934 -> 936 -> 940 (+31 tests across 6 new/modified suites).
+- **Stage 6 commit hygiene**: em-dash scan PASS on every modified file; version bump v0.52.0-alpha.3 -> v0.52.0-alpha.4 in api/package.json + web/package.json; no `--amend` / `--force` / `--no-verify`.
+
+### Test counts (Phase N3)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,735 | 3,735 | 0 |
+| API jest E2E | 1,197 | 1,197 | 0 |
+| Web vitest | 909 | **940** | **+31** (csv-export +14, ExportSplitButton +8, UsersTab +3, GroupsTab +2, LogsTab +2, ActivityTab +2) |
+| Live SCIM | 1,005 | 1,005 | 0 |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 73 | **74** | **+1** (`export.spec.ts` smoke) |
+
+**Total assertions across 6 layers: 6,866 -> 6,898** (+32).
+
+### Files changed (Phase N3)
+
+| File | Status | Purpose |
+|---|---|---|
+| [web/src/utils/csv-export.ts](web/src/utils/csv-export.ts) | MODIFIED | + `toJson`, `toNdjson`, `triggerJsonDownload`, `triggerNdjsonDownload` |
+| [web/src/utils/csv-export.test.ts](web/src/utils/csv-export.test.ts) | MODIFIED | +14 tests |
+| [web/src/components/primitives/ExportSplitButton.tsx](web/src/components/primitives/ExportSplitButton.tsx) | NEW | Shared toolbar primitive |
+| [web/src/components/primitives/ExportSplitButton.test.tsx](web/src/components/primitives/ExportSplitButton.test.tsx) | NEW | +8 tests |
+| [web/src/components/primitives/index.ts](web/src/components/primitives/index.ts) | MODIFIED | + ExportSplitButton export |
+| [web/src/pages/UsersTab.tsx](web/src/pages/UsersTab.tsx) | MODIFIED | Toolbar wire |
+| [web/src/pages/GroupsTab.tsx](web/src/pages/GroupsTab.tsx) | MODIFIED | Toolbar wire |
+| [web/src/pages/LogsTab.tsx](web/src/pages/LogsTab.tsx) | MODIFIED | Toolbar wire |
+| [web/src/pages/ActivityTab.tsx](web/src/pages/ActivityTab.tsx) | MODIFIED | Toolbar wire |
+| [web/src/pages/UsersTab.test.tsx](web/src/pages/UsersTab.test.tsx) | MODIFIED | +3 tests |
+| [web/src/pages/GroupsTab.test.tsx](web/src/pages/GroupsTab.test.tsx) | MODIFIED | +2 tests |
+| [web/src/pages/LogsTab.test.tsx](web/src/pages/LogsTab.test.tsx) | MODIFIED | +2 tests |
+| [web/src/pages/ActivityTab.test.tsx](web/src/pages/ActivityTab.test.tsx) | MODIFIED | +2 tests |
+| [web/e2e/export.spec.ts](web/e2e/export.spec.ts) | NEW | Browser-side smoke vs dev |
+| [docs/PHASE_N3_EXPORT_EVERYWHERE.md](docs/PHASE_N3_EXPORT_EVERYWHERE.md) | NEW | Feature doc |
+| [docs/INDEX.md](docs/INDEX.md) | MODIFIED | + N3 row |
+| [api/package.json](api/package.json) | MODIFIED | 0.52.0-alpha.3 -> 0.52.0-alpha.4 |
+| [web/package.json](web/package.json) | MODIFIED | 0.52.0-alpha.3 -> 0.52.0-alpha.4 |
+
 ### Added (Phase N3a Stage 5 closure - Playwright security-headers spec, 2026-05-19, no version bump)
 
 - **New [web/e2e/security-headers.spec.ts](web/e2e/security-headers.spec.ts)** (~120 LoC, zero em-dash, 3 tests / 21 mirrored assertions) - browser-side twin of the [scripts/live-test.ps1 TEST SECTION 9z-AJ](scripts/live-test.ps1) PowerShell HTTP probe + the [api/test/e2e/security-headers.e2e-spec.ts](api/test/e2e/security-headers.e2e-spec.ts) in-process supertest probe. Uses Playwright's `APIRequestContext` (raw HTTP, no browser-fetch CORS gymnastics) so every response header is observed as the server emitted it, identical wire bytes to what a real Chromium navigation would see. Probes 3 routes against `process.env.E2E_BASE_URL`:
