@@ -71,6 +71,9 @@ export class DatabaseService {
           scimId: true,
           externalId: true,
           active: true,
+          // Phase L6 - cross-endpoint operator view needs endpointId to
+          // render the per-row endpoint Badge on /operations.
+          endpointId: true,
           payload: true,
           createdAt: true,
           updatedAt: true,
@@ -134,6 +137,8 @@ export class DatabaseService {
         select: {
           id: true,
           displayName: true,
+          // Phase L6 - cross-endpoint operator view needs endpointId.
+          endpointId: true,
           payload: true,
           createdAt: true,
           updatedAt: true,
@@ -319,7 +324,9 @@ export class DatabaseService {
     let allUsers: any[] = [];
     for (const epId of endpointIds) {
       const users = await this.userRepo.findAll(epId);
-      allUsers.push(...users);
+      // Phase L6 - preserve endpointId on every row so the
+      // cross-endpoint /operations view can render the per-row badge.
+      allUsers.push(...users.map((u: any) => ({ ...u, endpointId: epId })));
     }
 
     // Apply filters
@@ -358,7 +365,8 @@ export class DatabaseService {
     let allGroups: any[] = [];
     for (const epId of endpointIds) {
       const groups = await this.groupRepo.findAllWithMembers(epId);
-      allGroups.push(...groups);
+      // Phase L6 - preserve endpointId on every row.
+      allGroups.push(...groups.map((g: any) => ({ ...g, endpointId: epId })));
     }
 
     if (search) {

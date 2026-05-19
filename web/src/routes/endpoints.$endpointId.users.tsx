@@ -10,11 +10,16 @@
  * page/pageSize/filter so the table renders with data on hover, not
  * after click.
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
-import { UsersTab } from '../pages/UsersTab';
 import { usersSearchSchema } from './search-schemas';
 import { endpointUsersQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load UsersTab into its own chunk.
+const UsersTab = React.lazy(() =>
+  import('../pages/UsersTab').then((m) => ({ default: m.UsersTab })),
+);
 
 function UsersTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();

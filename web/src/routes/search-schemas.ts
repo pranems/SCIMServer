@@ -40,15 +40,19 @@ export const paginationSchema = z.object({
 });
 export type PaginationSearch = z.infer<typeof paginationSchema>;
 
-/** Users tab inside an endpoint: pagination + optional SCIM filter. */
+/** Users tab inside an endpoint: pagination + optional SCIM filter + drawer detail id. */
 export const usersSearchSchema = paginationSchema.extend({
   filter: z.preprocess(emptyToUndef, z.string().optional()),
+  /** Phase E4: id of the user whose detail drawer is open. */
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type UsersSearch = z.infer<typeof usersSearchSchema>;
 
-/** Groups tab inside an endpoint: pagination + optional SCIM filter. */
+/** Groups tab inside an endpoint: pagination + optional SCIM filter + drawer detail id. */
 export const groupsSearchSchema = paginationSchema.extend({
   filter: z.preprocess(emptyToUndef, z.string().optional()),
+  /** Phase E4: id of the group whose detail drawer is open. */
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type GroupsSearch = z.infer<typeof groupsSearchSchema>;
 
@@ -69,12 +73,17 @@ export type LogsSearch = z.infer<typeof logsSearchSchema>;
  * `status` is coerced to number because URL search params are strings.
  * `timeRange` is a closed enum to prevent typo-driven divergence between
  * the UI and the server's accepted set.
+ *
+ * Phase D5 adds `detail` (the id of a log row whose body/headers should
+ * be shown in the slide-over DetailDrawer). Empty / missing means no
+ * drawer is open.
  */
 export const globalLogsSearchSchema = paginationSchema.extend({
   endpointId: z.preprocess(emptyToUndef, z.string().optional()),
   status: z.preprocess(emptyToUndef, z.coerce.number().int().min(100).max(599).optional()),
   timeRange: z.preprocess(emptyToUndef, z.enum(TIME_RANGE_VALUES).optional()),
   urlContains: z.preprocess(emptyToUndef, z.string().optional()),
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type GlobalLogsSearch = z.infer<typeof globalLogsSearchSchema>;
 
@@ -87,3 +96,24 @@ export const endpointsSearchSchema = z.object({
   q: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type EndpointsSearch = z.infer<typeof endpointsSearchSchema>;
+
+/**
+ * Per-endpoint Activity tab (Phase D2): pagination + optional
+ * type/severity/search filters. The activity controller's `type` is
+ * limited to the ActivitySummary union (`user` | `group` | `system`)
+ * and `severity` to (`info` | `success` | `warning` | `error`); we
+ * preserve those server-side enums here as a closed set so the UI
+ * cannot construct a request the controller will silently filter to
+ * zero results.
+ */
+export const ACTIVITY_TYPE_VALUES = ['user', 'group', 'system'] as const;
+export type ActivityType = (typeof ACTIVITY_TYPE_VALUES)[number];
+export const ACTIVITY_SEVERITY_VALUES = ['info', 'success', 'warning', 'error'] as const;
+export type ActivitySeverity = (typeof ACTIVITY_SEVERITY_VALUES)[number];
+
+export const activitySearchSchema = paginationSchema.extend({
+  type: z.preprocess(emptyToUndef, z.enum(ACTIVITY_TYPE_VALUES).optional()),
+  severity: z.preprocess(emptyToUndef, z.enum(ACTIVITY_SEVERITY_VALUES).optional()),
+  search: z.preprocess(emptyToUndef, z.string().optional()),
+});
+export type ActivitySearch = z.infer<typeof activitySearchSchema>;

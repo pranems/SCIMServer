@@ -13,7 +13,14 @@ param(
     [switch]$ProvisionPostgres,
     [string]$PgAdminPassword,
     # Optional: deploy PostgreSQL to a different region (some subscriptions restrict PG in eastus)
-    [string]$PgLocation
+    [string]$PgLocation,
+    # Override container registry (default: ghcr.io with repository pranems/scimserver)
+    # Example: -AcrLoginServer 'acrscimserver20622.azurecr.io' -ImageRepository 'scimserver'
+    [string]$AcrLoginServer,
+    [string]$ImageRepository,
+    # Override PG server name (PG server names are globally unique on Azure; if the default '<appname>-pg' is taken,
+    # supply a custom one like 'scimserver-pg-new1'). Default: '<appname>-pg' truncated to 63 chars.
+    [string]$PgServerName
 )
 
 if (-not $Location -or $Location -eq '') { $Location = 'eastus' }
@@ -383,13 +390,14 @@ if ($script:DeploymentStatePath) {
 
 # GHCR credentials are optional by default.
 # Only prompt for credentials when anonymous pull is not available (private package scenario).
-$imageRepository = 'pranems/scimserver'
+# Note: this local var probes GHCR ONLY; the deploy registry is resolved further below via -AcrLoginServer/-ImageRepository.
+$ghcrAuthCheckRepo = 'pranems/scimserver'
 $anonymousPullSupported = $true
 
 if ([string]::IsNullOrWhiteSpace($GhcrUsername) -and [string]::IsNullOrWhiteSpace($GhcrPassword)) {
-    $anonymousPullSupported = Test-GhcrAnonymousPullSupported -Repository $imageRepository
+    $anonymousPullSupported = Test-GhcrAnonymousPullSupported -Repository $ghcrAuthCheckRepo
     if (-not $anonymousPullSupported) {
-        Write-Host "Anonymous GHCR pull is unavailable for '$($imageRepository):$ImageTag'." -ForegroundColor Yellow
+        Write-Host "Anonymous GHCR pull is unavailable for '$($ghcrAuthCheckRepo):$ImageTag'." -ForegroundColor Yellow
         $ghcrInput = Read-Host "Enter GitHub username for GHCR pull (required for private image)"
         if (-not [string]::IsNullOrWhiteSpace($ghcrInput)) {
             $GhcrUsername = $ghcrInput
@@ -607,7 +615,11 @@ Write-Host ""
 # Step 3/5: PostgreSQL Flexible Server (optional, if -ProvisionPostgres)
 if ($ProvisionPostgres -and -not $DatabaseUrl) {
     Write-Host "🐘 Step 3/5: PostgreSQL Flexible Server" -ForegroundColor Cyan
-    $pgServerName = "$($AppName.ToLower() -replace '[^a-z0-9-]','-')-pg"
+    if ($PgServerName) {
+        $pgServerName = $PgServerName.ToLower()
+    } else {
+        $pgServerName = "$($AppName.ToLower() -replace '[^a-z0-9-]','-')-pg"
+    }
     if ($pgServerName.Length -gt 63) { $pgServerName = $pgServerName.Substring(0,63) }
     Write-Host "   Server name: $pgServerName" -ForegroundColor Gray
 
@@ -630,6 +642,42 @@ if ($ProvisionPostgres -and -not $DatabaseUrl) {
     $DatabaseUrl = $pgOutputs.databaseUrl.value
     Write-Host "   ✅ PostgreSQL Flexible Server provisioned: $pgServerName" -ForegroundColor Green
     Write-Host "      FQDN: $($pgOutputs.serverFqdn.value)" -ForegroundColor Gray
+
+    # CRITICAL: Allow-list required PostgreSQL extensions used by Prisma baseline migration.
+    # Azure Database for PostgreSQL Flexible Server requires extensions to be explicitly
+    # listed in the `azure.extensions` server parameter (static, requires server restart).
+    # Without this, the baseline migration silently fails with P3009 and the app crash-loops.
+    # See: api/prisma/migrations/20260223000000_postgresql_baseline/migration.sql
+    $requiredExtensions = "CITEXT,PG_TRGM,PGCRYPTO"
+    Write-Host "   🔧 Allow-listing required PG extensions: $requiredExtensions" -ForegroundColor Cyan
+    $currentExtValue = az postgres flexible-server parameter show `
+        --resource-group $ResourceGroup `
+        --server-name $pgServerName `
+        --name azure.extensions `
+        --query "value" -o tsv 2>$null
+    if ($currentExtValue -ne $requiredExtensions) {
+        az postgres flexible-server parameter set `
+            --resource-group $ResourceGroup `
+            --server-name $pgServerName `
+            --name azure.extensions `
+            --value $requiredExtensions `
+            --output none 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Stop-Deployment -Message "Failed to set azure.extensions parameter on $pgServerName."
+        }
+        Write-Host "      Restarting PG server (azure.extensions is a static parameter)..." -ForegroundColor Yellow
+        az postgres flexible-server restart `
+            --resource-group $ResourceGroup `
+            --name $pgServerName `
+            --output none 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Stop-Deployment -Message "Failed to restart PG server $pgServerName after enabling extensions."
+        }
+        Write-Host "      ✅ Extensions enabled and server restarted" -ForegroundColor Green
+    } else {
+        Write-Host "      ✅ Required extensions already allow-listed" -ForegroundColor Green
+    }
+
     # Persist to state cache so re-runs don't need to re-enter
     Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret -DbUrl $DatabaseUrl
     Write-Host ""
@@ -772,12 +820,17 @@ if ($appExists) {
 }
 
 if (-not $skipAppDeployment) {
+    # Resolve registry: default to GHCR with pranems/scimserver, allow per-tenant override via -AcrLoginServer + -ImageRepository
+    $effectiveAcrLoginServer = if ($AcrLoginServer) { $AcrLoginServer } else { 'ghcr.io' }
+    $effectiveImageRepository = if ($ImageRepository) { $ImageRepository } else { 'pranems/scimserver' }
+    Write-Host "   Registry: ${effectiveAcrLoginServer}/${effectiveImageRepository}:${ImageTag}" -ForegroundColor Cyan
+
     $containerParams = @{
         appName = $AppName
         environmentName = $envName
         location = $Location
-        acrLoginServer = "ghcr.io"
-        image = "pranems/scimserver:$ImageTag"
+        acrLoginServer = $effectiveAcrLoginServer
+        image = "${effectiveImageRepository}:$ImageTag"
         scimSharedSecret = $ScimSecret
         jwtSecret = $JwtSecret
         oauthClientSecret = $OauthClientSecret

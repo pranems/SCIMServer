@@ -432,6 +432,8 @@ export class EndpointScimGroupsService {
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
+    // Phase J (v0.48.1): broadcast generic update event for cross-tab refresh.
+    this.eventEmitter.emit(SCIM_EVENTS.GROUP_UPDATED, { endpointId, scimId });
     return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 
@@ -528,6 +530,8 @@ export class EndpointScimGroupsService {
     }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Group replaced', { scimId, displayName: dto.displayName, endpointId });
+    // Phase J (v0.48.1): broadcast generic update event for cross-tab refresh.
+    this.eventEmitter.emit(SCIM_EVENTS.GROUP_UPDATED, { endpointId, scimId });
     return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 

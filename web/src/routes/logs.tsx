@@ -9,11 +9,16 @@
  * Phase A4: loader pre-fetches the global logs page using the
  * URL's urlContains filter.
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
-import { LogsPage } from '../pages/LogsPage';
 import { globalLogsSearchSchema } from './search-schemas';
 import { globalLogsQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load LogsPage into its own chunk.
+const LogsPage = React.lazy(() =>
+  import('../pages/LogsPage').then((m) => ({ default: m.LogsPage })),
+);
 
 export const logsRoute = createRoute({
   getParentRoute: () => rootRoute,

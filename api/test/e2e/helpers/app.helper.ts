@@ -3,10 +3,13 @@ import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { json } from 'express';
 import type { Request, Response, NextFunction } from 'express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
 import * as fs from 'fs';
 
 import { AppModule } from '@app/modules/app/app.module';
+import { applySpaFallback } from '@app/bootstrap/spa-fallback';
+import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from '@app/security/helmet-config';
 
 /**
  * Bootstraps a full NestJS application for E2E testing.
@@ -44,7 +47,7 @@ export async function createTestApp(): Promise<INestApplication> {
     imports: [AppModule],
   }).compile();
 
-  const app = moduleFixture.createNestApplication();
+  const app = moduleFixture.createNestApplication<NestExpressApplication>();
 
   // Mirror production middleware from main.ts
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -56,6 +59,22 @@ export async function createTestApp(): Promise<INestApplication> {
     }
     next();
   });
+
+  // Phase N3a (2026-05-18): mirror the production helmet middleware so
+  // the security-headers E2E spec sees what production sees. See
+  // api/src/security/helmet-config.ts for design rationale.
+  app.use(buildHelmetMiddleware(process.env.NODE_ENV));
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', PERMISSIONS_POLICY_HEADER_VALUE);
+    next();
+  });
+
+  // Serve static files + SPA fallback (matches main.ts). Required by
+  // spa-fallback.e2e-spec.ts and by any test that hits a SPA URL.
+  app.useStaticAssets(path.join(__dirname, '..', '..', '..', 'public'), {
+    index: false,
+  });
+  applySpaFallback(app);
 
   app.use(
     json({

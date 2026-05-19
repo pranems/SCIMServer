@@ -293,6 +293,17 @@ export class LogConfigController {
       res.write(`data: ${JSON.stringify(entry)}\n\n`);
     });
 
+    // Phase J (v0.48.1): also subscribe to the SCIM mutation event
+    // channel so cross-tab `useSSE` consumers receive typed
+    // `{type: 'scim.x.y', ...}` payloads. SCIM events are NOT subject
+    // to log-level / category filters - they are admin signals, not
+    // diagnostic logs - but we DO honor the endpointId filter so a
+    // tab scoped to one endpoint doesn't get noise from siblings.
+    const unsubscribeScim = this.scimLogger.subscribeScimEvents((event) => {
+      if (endpointId && event.endpointId !== endpointId) return;
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    });
+
     // Keep-alive ping every 30s to prevent proxy timeouts
     const keepAlive = setInterval(() => {
       res.write(`: ping ${new Date().toISOString()}\n\n`);
@@ -301,6 +312,7 @@ export class LogConfigController {
     // Cleanup on client disconnect
     res.on('close', () => {
       unsubscribe();
+      unsubscribeScim();
       clearInterval(keepAlive);
       res.end();
     });

@@ -5,8 +5,14 @@
  * endpointsSearchSchema. Empty input normalizes to undefined so URLs
  * stay clean.
  *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (3x2 grid of card-shaped tiles mirroring the final layout).
+ * Phase G2: empty state migrated from plain Text to EmptyState
+ * primitive with a contextual CTA ("Create your first endpoint" when
+ * none exist, "Reset filter" when the search filter excludes all).
+ *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.2
- * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3 + S10 G1/G2
  */
 import React from 'react';
 import {
@@ -16,17 +22,19 @@ import {
   CardHeader,
   Text,
   Badge,
-  Spinner,
+  Button,
   SearchBox,
   Subtitle1,
   Caption1,
 } from '@fluentui/react-components';
 import {
   Server24Regular,
+  Add24Regular,
 } from '@fluentui/react-icons';
 import { useEndpoints } from '../api/queries';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import type { EndpointsSearch } from '../routes/search-schemas';
+import { EmptyState, LoadingSkeleton } from '../components/primitives';
 
 const ENDPOINTS_ROUTE_PATH = '/endpoints' as const;
 
@@ -90,9 +98,21 @@ export const EndpointsPage: React.FC = () => {
   };
 
   if (isLoading) {
+    // G1 - card-grid skeleton mirrors the final 3-column layout so the
+    // page does not jump when data arrives. 6 tiles is the typical
+    // above-the-fold count at 1440px wide.
     return (
-      <div className={classes.center} data-testid="endpoints-loading">
-        <Spinner label="Loading endpoints..." />
+      <div className={classes.page} data-testid="endpoints-loading">
+        <div className={classes.grid} data-testid="endpoints-skeleton-grid">
+          {Array.from({ length: 6 }, (_, i) => (
+            <LoadingSkeleton
+              key={i}
+              count={1}
+              height="96px"
+              data-testid="endpoints-skeleton"
+            />
+          ))}
+        </div>
       </div>
     );
   }
@@ -118,12 +138,23 @@ export const EndpointsPage: React.FC = () => {
     <div className={classes.page} data-testid="endpoints-page">
       <div className={classes.header}>
         <Subtitle1>Endpoints ({endpoints.length})</Subtitle1>
-        <SearchBox
-          placeholder="Filter endpoints..."
-          value={q}
-          onChange={(_, d) => setQ(d.value)}
-          data-testid="endpoints-search"
-        />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <SearchBox
+            placeholder="Filter endpoints..."
+            value={q}
+            onChange={(_, d) => setQ(d.value)}
+            data-testid="endpoints-search"
+          />
+          {/* Phase L1 - Create endpoint button. */}
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            data-testid="endpoints-create-button"
+            onClick={() => navigate({ to: '/endpoints/new' })}
+          >
+            Create endpoint
+          </Button>
+        </div>
       </div>
 
       <div className={classes.grid} data-testid="endpoints-grid">
@@ -159,9 +190,24 @@ export const EndpointsPage: React.FC = () => {
       </div>
 
       {filtered.length === 0 && (
-        <div className={classes.center}>
-          <Text>{q ? 'No matching endpoints.' : 'No endpoints configured.'}</Text>
-        </div>
+        // G2 - EmptyState replaces plain Text. CTA depends on whether
+        // the user is filtering (offer reset) or there are zero
+        // endpoints at all (offer the docs/runbook entry point).
+        q ? (
+          <EmptyState
+            data-testid="endpoints-empty-filtered"
+            title="No matching endpoints"
+            body={`No endpoint matches "${q}". Try a different filter or clear it.`}
+            actionLabel="Reset filter"
+            onAction={() => setQ('')}
+          />
+        ) : (
+          <EmptyState
+            data-testid="endpoints-empty"
+            title="No endpoints yet"
+            body="Endpoints are SCIM target tenants that consume your provisioning data. Create one to get started."
+          />
+        )
       )}
     </div>
   );

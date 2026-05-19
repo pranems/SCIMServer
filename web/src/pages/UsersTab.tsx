@@ -7,8 +7,12 @@
  * `?page=N&pageSize=N` is now the single source of truth, parsed by
  * usersSearchSchema (`web/src/routes/search-schemas.ts`).
  *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (table-row shaped; 8 rows above the fold).
+ * Phase G2: empty state migrated from plain Text to EmptyState.
+ *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.4
- * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3 + S10 G1/G2
  */
 import React from 'react';
 import {
@@ -17,13 +21,14 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
 import type { UsersSearch } from '../routes/search-schemas';
+import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
+import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
@@ -92,6 +97,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const search = useSearch({ strict: false }) as Partial<UsersSearch>;
   const page = search.page ?? 1;
   const pageSize = search.pageSize ?? 20;
+  const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;
 
@@ -103,12 +109,33 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
     });
   };
 
+  const openDetail = (userId: string): void => {
+    navigate({
+      to: USERS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as UsersSearch), detail: userId }),
+    });
+  };
+
+  const closeDetail = (): void => {
+    navigate({
+      to: USERS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as UsersSearch), detail: undefined }),
+    });
+  };
+
   const { data, isLoading, error } = useEndpointUsers(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
+    // G1 - row-shaped skeleton mirrors the final table.
     return (
-      <div className={classes.center} data-testid="users-loading">
-        <Spinner label="Loading users..." />
+      <div className={classes.container} data-testid="users-loading">
+        <LoadingSkeleton
+          count={8}
+          height="40px"
+          data-testid="users-skeleton"
+        />
       </div>
     );
   }
@@ -125,10 +152,15 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const total = data?.totalResults ?? 0;
 
   if (total === 0) {
+    // G2 - EmptyState replaces ad-hoc Text. No CTA: user creation
+    // happens via SCIM POST from the IdP, but the manual provision
+    // page exists for manual onboarding.
     return (
-      <div className={classes.empty} data-testid="users-empty">
-        <Text>No users provisioned to this endpoint yet.</Text>
-      </div>
+      <EmptyState
+        data-testid="users-empty"
+        title="No users in this endpoint"
+        body="Users are provisioned to this endpoint via SCIM POST /Users from your identity provider, or manually from the Manual Provision page."
+      />
     );
   }
 
@@ -136,6 +168,18 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="users-tab">
       <div className={classes.header}>
         <Subtitle2>{total} users</Subtitle2>
+        <ExportSplitButton
+          rows={users.map((u: any) => ({
+            id: u.id,
+            userName: u.userName,
+            displayName: u.displayName ?? '',
+            active: u.active !== false,
+            created: u.meta?.created ?? '',
+            lastModified: u.meta?.lastModified ?? '',
+          }))}
+          filenameBase={`users-${endpointId}`}
+          columns={['id', 'userName', 'displayName', 'active', 'created', 'lastModified']}
+        />
       </div>
 
       <table className={classes.table}>
@@ -149,7 +193,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
         </thead>
         <tbody>
           {users.map((user: any) => (
-            <tr key={user.id} className={classes.tr}>
+            <tr
+              key={user.id}
+              className={classes.tr}
+              onClick={() => openDetail(user.id)}
+              style={{ cursor: 'pointer' }}
+              data-testid={`user-row-${user.id}`}
+            >
               <td className={classes.td}>
                 <Text weight="semibold">{user.userName}</Text>
               </td>
@@ -196,6 +246,16 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
             Next
           </Button>
         </div>
+      )}
+
+      {detailId && users.find((u: any) => u.id === detailId) && (
+        <ResourceDetailDrawer
+          kind="user"
+          endpointId={endpointId}
+          resource={users.find((u: any) => u.id === detailId)}
+          open
+          onClose={closeDetail}
+        />
       )}
     </div>
   );

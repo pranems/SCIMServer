@@ -25,6 +25,7 @@ import {
   Post,
   ForbiddenException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as crypto from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
@@ -33,6 +34,10 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import {
+  SCIM_EVENTS,
+  type ScimCredentialEventPayload,
+} from '../../stats/scim-events';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -50,6 +55,7 @@ export class AdminCredentialController {
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly endpointService: EndpointService,
     private readonly logger: ScimLogger,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -109,6 +115,18 @@ export class AdminCredentialController {
 
     this.logger.info(LogCategory.AUTH, `Created per-endpoint credential "${credential.id}" for endpoint "${endpointId}"`);
 
+    // Phase J (v0.48.1): broadcast onto SSE so cross-tab CredentialsTab
+    // refreshes within ms instead of waiting on the 30s staleTime.
+    // Emit AFTER the persisted write + log so a failure in either does
+    // not produce a stale event for consumers.
+    const credentialEventPayload: ScimCredentialEventPayload = {
+      endpointId,
+      credentialId: credential.id,
+      credentialType: credential.credentialType,
+      label: credential.label ?? undefined,
+    };
+    this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_CREATED, credentialEventPayload);
+
     return {
       id: credential.id,
       endpointId: credential.endpointId,
@@ -166,6 +184,15 @@ export class AdminCredentialController {
 
     await this.credentialRepo.deactivate(credentialId);
     this.logger.info(LogCategory.AUTH, `Revoked credential "${credentialId}" for endpoint "${endpointId}"`);
+
+    // Phase J (v0.48.1): emit-after-commit; symmetrical with create.
+    const credentialEventPayload: ScimCredentialEventPayload = {
+      endpointId,
+      credentialId,
+      credentialType: credential.credentialType,
+      label: credential.label ?? undefined,
+    };
+    this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, credentialEventPayload);
   }
 
   private async requireEndpoint(endpointId: string) {

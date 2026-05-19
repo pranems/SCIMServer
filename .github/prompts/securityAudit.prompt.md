@@ -6,6 +6,13 @@ argument-hint: Optional scope - "auth", "secrets", "input-validation", "pii", "h
 
 Perform a security audit of the SCIMServer codebase. This covers areas not handled by `error-handling-verification` (which audits error paths) or `auditAgainstRFC` (which audits RFC compliance).
 
+Authoritative external references (2026-05-17 update from first Stage X.2 intake):
+- **OWASP Top 10 v2021** ([owasp.org/Top10](https://owasp.org/Top10/)) - web app threats.
+- **OWASP API Security Top 10 v2023** ([owasp.org/API-Security](https://owasp.org/API-Security/)) - API-specific threats. **SCIM PATCH paths are the API3:2023 BOPLA (Broken Object Property Level Authorization) risk surface** - every PATCH op MUST go through the per-attribute mutability check. API8:2023 Security Misconfiguration covers the missing-security-headers gap surfaced by the 2026-05-17 intake.
+- **OWASP LLM Top 10 v2024** ([genai.owasp.org/llm-top-10](https://genai.owasp.org/llm-top-10/)) - applies only when Phase N+ adds LLM features. Currently N/A.
+- **OAuth 2.0 Security BCP (RFC 9700, Feb 2025)** ([datatracker.ietf.org/doc/rfc9700](https://datatracker.ietf.org/doc/rfc9700/)) - deprecates ROPC + implicit; requires PKCE for public clients; mentions DPoP for high-security use cases. SCIMServer's `client_credentials` flow is NOT in scope of the deprecations, but audit must confirm: (a) we never enabled ROPC, (b) we never enabled implicit, (c) sender-constrained tokens (DPoP / mTLS) considered for future hardening.
+- **CWE Top 25 2024** ([cwe.mitre.org/top25](https://cwe.mitre.org/top25/)) - CWE-79 XSS / CWE-787 OOB Write / CWE-89 SQLi dominate; covered by CodeQL `security-extended`.
+
 ---
 
 ## Audit Sections

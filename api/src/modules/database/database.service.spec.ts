@@ -255,6 +255,80 @@ describe('DatabaseService', () => {
     });
   });
 
+  // ── Phase L6: cross-endpoint operator view ─────────────────────────────────
+  //
+  // The redesigned UI's /operations route needs `endpointId` on every
+  // user and group row so it can render the per-row endpoint Badge
+  // (clickable -> navigate to that endpoint's UsersTab pre-filtered).
+  // Pre-L6 the prisma `select` block omitted `endpointId`, so the
+  // column was loaded but never projected to the response. L6 adds
+  // it to both selects.
+
+  describe('Phase L6 - cross-endpoint endpointId projection', () => {
+    it('getUsers prisma select includes endpointId', async () => {
+      prisma.scimResource.findMany.mockResolvedValue([]);
+      prisma.scimResource.count.mockResolvedValue(0);
+
+      await service.getUsers({ page: 1, limit: 10 });
+
+      const call = prisma.scimResource.findMany.mock.calls[0][0];
+      expect(call.select.endpointId).toBe(true);
+    });
+
+    it('getUsers response carries endpointId on every row', async () => {
+      prisma.scimResource.findMany.mockResolvedValue([
+        {
+          id: 'u1',
+          userName: 'alice',
+          scimId: 'scim-u1',
+          externalId: null,
+          active: true,
+          endpointId: 'ep-uuid-1',
+          payload: { userName: 'alice' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          membersAsMember: [],
+        },
+      ]);
+      prisma.scimResource.count.mockResolvedValue(1);
+
+      const result = await service.getUsers({ page: 1, limit: 10 });
+
+      expect(result.users).toHaveLength(1);
+      expect(result.users[0].endpointId).toBe('ep-uuid-1');
+    });
+
+    it('getGroups prisma select includes endpointId', async () => {
+      prisma.scimResource.findMany.mockResolvedValue([]);
+      prisma.scimResource.count.mockResolvedValue(0);
+
+      await service.getGroups({ page: 1, limit: 10 });
+
+      const call = prisma.scimResource.findMany.mock.calls[0][0];
+      expect(call.select.endpointId).toBe(true);
+    });
+
+    it('getGroups response carries endpointId on every row', async () => {
+      prisma.scimResource.findMany.mockResolvedValue([
+        {
+          id: 'g1',
+          displayName: 'Eng',
+          endpointId: 'ep-uuid-2',
+          payload: { displayName: 'Eng' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          _count: { membersAsGroup: 3 },
+        },
+      ]);
+      prisma.scimResource.count.mockResolvedValue(1);
+
+      const result = await service.getGroups({ page: 1, limit: 10 });
+
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0].endpointId).toBe('ep-uuid-2');
+    });
+  });
+
   // ── getUserDetails ─────────────────────────────────────────────────────────
 
   describe('getUserDetails', () => {

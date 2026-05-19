@@ -12,10 +12,15 @@
  * child tabs (overview/users/groups/logs/settings) skip the loading
  * spinner for endpoint name + scimBasePath + active flag.
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
-import { EndpointDetailPage } from '../pages/EndpointDetailPage';
 import { endpointDetailQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load EndpointDetailPage into its own chunk.
+const EndpointDetailPage = React.lazy(() =>
+  import('../pages/EndpointDetailPage').then((m) => ({ default: m.EndpointDetailPage })),
+);
 
 function EndpointDetailRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();

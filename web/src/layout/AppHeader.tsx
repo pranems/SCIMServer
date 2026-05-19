@@ -13,10 +13,13 @@ import {
   WeatherMoon24Regular,
   WeatherSunny24Regular,
   Key24Regular,
+  Pulse24Regular,
 } from '@fluentui/react-icons';
 import { HEADER_HEIGHT } from '../design/tokens';
 import { useUIStore } from '../store/ui-store';
 import { clearStoredToken, notifyTokenInvalid } from '../auth/token';
+import { HealthRollup } from './HealthRollup';
+import { NotificationsButton } from './NotificationsButton';
 
 const useStyles = makeStyles({
   header: {
@@ -46,6 +49,8 @@ export const AppHeader: React.FC = () => {
   const classes = useStyles();
   const colorScheme = useUIStore((s) => s.colorScheme);
   const setColorScheme = useUIStore((s) => s.setColorScheme);
+  const toggleLogStream = useUIStore((s) => s.toggleLogStreamDrawer);
+  const logStreamOpen = useUIStore((s) => s.logStreamDrawerOpen);
 
   const isDark = colorScheme === 'dark' || (colorScheme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
 
@@ -58,6 +63,22 @@ export const AppHeader: React.FC = () => {
       </div>
 
       <div className={classes.actions}>
+        <HealthRollup />
+        <NotificationsButton />
+        <Tooltip
+          content={logStreamOpen ? 'Hide live log stream' : 'Show live log stream'}
+          relationship="label"
+        >
+          <Button
+            appearance={logStreamOpen ? 'primary' : 'subtle'}
+            icon={<Pulse24Regular />}
+            onClick={toggleLogStream}
+            aria-label={logStreamOpen ? 'Hide live log stream' : 'Show live log stream'}
+            aria-pressed={logStreamOpen}
+            data-testid="log-stream-toggle"
+            style={{ color: 'inherit' }}
+          />
+        </Tooltip>
         <Tooltip content="Change token" relationship="label">
           <Button
             appearance="subtle"

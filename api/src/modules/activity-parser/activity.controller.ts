@@ -21,12 +21,13 @@ export class ActivityController {
     @Query('severity') severity?: string,
     @Query('search') search?: string,
     @Query('hideKeepalive') hideKeepalive?: string,
+    @Query('endpointId') endpointId?: string,
   ) {
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
 
     if (this.isInMemoryBackend) {
-      return this.getActivitiesInMemory(pageNum, limitNum, type, severity, search, hideKeepalive === 'true');
+      return this.getActivitiesInMemory(pageNum, limitNum, type, severity, search, hideKeepalive === 'true', endpointId);
     }
 
     const skip = (pageNum - 1) * limitNum;
@@ -91,6 +92,16 @@ export class ActivityController {
           { responseBody: { contains: search } },
         ],
       });
+    }
+
+    // Phase D2: per-endpoint scoping. The Activity tab on
+    // /endpoints/$id/activity needs server-side filtering by
+    // endpointId; the indexed `endpointId` column was added in
+    // Phase 17 for exactly this purpose. When the caller omits the
+    // param, the existing global-activity behavior (used by the
+    // legacy ActivityFeed component) is preserved.
+    if (endpointId) {
+      whereConditions.push({ endpointId });
     }
 
     const where: any = { AND: whereConditions };
@@ -254,6 +265,7 @@ export class ActivityController {
   private async getActivitiesInMemory(
     page: number, limit: number,
     type?: string, severity?: string, search?: string, hideKeepalive?: boolean,
+    endpointId?: string,
   ) {
     // Use LoggingService.listLogs which already has inmemory support
     const logResult = await this.loggingService.listLogs({
@@ -261,6 +273,7 @@ export class ActivityController {
       pageSize: limit,
       urlContains: search || undefined,
       hideKeepalive,
+      endpointId: endpointId || undefined,
     });
 
     const logs = logResult.items ?? [];

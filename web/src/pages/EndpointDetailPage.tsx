@@ -27,14 +27,16 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   Tab,
   TabList,
   Subtitle1,
   Caption1,
 } from '@fluentui/react-components';
+import { Edit24Regular, Delete24Regular } from '@fluentui/react-icons';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEndpoint } from '../api/queries';
+import { LoadingSkeleton } from '../components/primitives';
+import { DeleteEndpointDialog } from '../components/endpoint/DeleteEndpointDialog';
 
 const useStyles = makeStyles({
   page: {
@@ -66,7 +68,7 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings';
+type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'bulk' | 'resource-types';
 
 interface EndpointDetailPageProps {
   endpointId: string;
@@ -78,6 +80,11 @@ function pathToTab(pathname: string, endpointId: string): TabValue {
   if (pathname === base || pathname === `${base}/`) return 'overview';
   if (pathname.startsWith(`${base}/users`)) return 'users';
   if (pathname.startsWith(`${base}/groups`)) return 'groups';
+  if (pathname.startsWith(`${base}/activity`)) return 'activity';
+  if (pathname.startsWith(`${base}/bulk`)) return 'bulk';
+  if (pathname.startsWith(`${base}/resource-types`)) return 'resource-types';
+  if (pathname.startsWith(`${base}/schemas`)) return 'schemas';
+  if (pathname.startsWith(`${base}/credentials`)) return 'credentials';
   if (pathname.startsWith(`${base}/logs`)) return 'logs';
   if (pathname.startsWith(`${base}/settings`)) return 'settings';
   return 'overview';
@@ -90,11 +97,17 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
   const activeTab = pathToTab(pathname, endpointId);
 
   const { data: endpoint, isLoading: loadingEndpoint, error: endpointError } = useEndpoint(endpointId);
+  // Phase L1 - delete confirmation modal mounted in the header.
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   if (loadingEndpoint) {
+    // G1 - skeleton mirrors header (title row) + tablist row + an
+    // initial content block so the page does not jump on data arrival.
     return (
-      <div className={classes.center} data-testid="endpoint-detail-loading">
-        <Spinner label="Loading endpoint..." />
+      <div className={classes.page} data-testid="endpoint-detail-loading">
+        <LoadingSkeleton count={1} height="40px" data-testid="endpoint-detail-skeleton-header" />
+        <LoadingSkeleton count={1} height="36px" data-testid="endpoint-detail-skeleton-tabs" />
+        <LoadingSkeleton count={5} height="32px" data-testid="endpoint-detail-skeleton-content" />
       </div>
     );
   }
@@ -118,6 +131,26 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
     }
     if (next === 'groups') {
       navigate({ to: '/endpoints/$endpointId/groups', params: { endpointId } });
+      return;
+    }
+    if (next === 'activity') {
+      navigate({ to: '/endpoints/$endpointId/activity', params: { endpointId } });
+      return;
+    }
+    if (next === 'bulk') {
+      navigate({ to: '/endpoints/$endpointId/bulk', params: { endpointId } });
+      return;
+    }
+    if (next === 'resource-types') {
+      navigate({ to: '/endpoints/$endpointId/resource-types', params: { endpointId } });
+      return;
+    }
+    if (next === 'schemas') {
+      navigate({ to: '/endpoints/$endpointId/schemas', params: { endpointId } });
+      return;
+    }
+    if (next === 'credentials') {
+      navigate({ to: '/endpoints/$endpointId/credentials', params: { endpointId } });
       return;
     }
     if (next === 'logs') {
@@ -149,7 +182,39 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         >
           {endpoint.active ? 'Active' : 'Inactive'}
         </Badge>
+        {/* Phase L1 - Edit + Delete buttons sit at the right edge of the header. */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+          <Button
+            appearance="subtle"
+            icon={<Edit24Regular />}
+            data-testid="endpoint-edit-button"
+            onClick={() =>
+              navigate({ to: '/endpoints/$endpointId/edit', params: { endpointId } })
+            }
+          >
+            Edit
+          </Button>
+          <Button
+            appearance="subtle"
+            icon={<Delete24Regular />}
+            data-testid="endpoint-delete-button"
+            onClick={() => setDeleteOpen(true)}
+          >
+            Delete
+          </Button>
+        </div>
       </div>
+
+      <DeleteEndpointDialog
+        open={deleteOpen}
+        endpointId={endpoint.id}
+        endpointName={endpoint.name}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirmed={() => {
+          setDeleteOpen(false);
+          void navigate({ to: '/endpoints' });
+        }}
+      />
 
       {/* Metadata row */}
       <div className={classes.meta}>
@@ -166,6 +231,11 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="overview">Overview</Tab>
         <Tab value="users">Users</Tab>
         <Tab value="groups">Groups</Tab>
+        <Tab value="activity">Activity</Tab>
+        <Tab value="bulk">Bulk</Tab>
+        <Tab value="resource-types">Resource types</Tab>
+        <Tab value="schemas">Schemas</Tab>
+        <Tab value="credentials">Credentials</Tab>
         <Tab value="logs">Logs</Tab>
         <Tab value="settings">Settings</Tab>
       </TabList>

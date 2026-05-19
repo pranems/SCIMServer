@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Inject, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Endpoint, Prisma } from '../../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -14,6 +15,10 @@ import type { EndpointProfile } from '../../scim/endpoint-profile/endpoint-profi
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
 import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import {
+  SCIM_EVENTS,
+  type ScimEndpointEventPayload,
+} from '../../stats/scim-events';
 
 /** Callback type for profile change notifications (registry hydration) */
 export type ProfileChangeListener = (endpointId: string, profile: EndpointProfile | null) => void;
@@ -151,7 +156,28 @@ export class EndpointService implements OnModuleInit {
     private readonly scimLogger: ScimLogger,
     @Optional() @Inject(USER_REPOSITORY) private readonly userRepo?: IUserRepository,
     @Optional() @Inject(GROUP_REPOSITORY) private readonly groupRepo?: IGroupRepository,
+    /**
+     * Phase J (v0.48.1): EventEmitter2 is Optional so existing test
+     * harnesses that construct EndpointService manually (without the
+     * full Nest container) keep working without a one-line ceremonial
+     * mock. Production wiring always provides it via Nest DI.
+     */
+    @Optional() private readonly eventEmitter?: EventEmitter2,
   ) {}
+
+  /**
+   * Phase J (v0.48.1): emit a Phase-J SCIM endpoint admin event if the
+   * EventEmitter2 dependency is available. The wrapper lets call sites
+   * stay one-liner without sprinkling `if (this.eventEmitter)` checks.
+   */
+  private emitEndpointEvent(
+    type: typeof SCIM_EVENTS.ENDPOINT_CREATED
+      | typeof SCIM_EVENTS.ENDPOINT_UPDATED
+      | typeof SCIM_EVENTS.ENDPOINT_DELETED,
+    payload: ScimEndpointEventPayload,
+  ): void {
+    this.eventEmitter?.emit(type, payload);
+  }
 
   /**
    * Set a listener to be called when an endpoint's profile changes.
@@ -372,6 +398,17 @@ export class EndpointService implements OnModuleInit {
 
     // Persist + cache
     if (this.isInMemoryBackend) {
+      // Cross-backend parity (Finding-B, May 2026): the Prisma branch below
+      // checks `findUnique({ where: { name } })` and throws BadRequestException
+      // on duplicate. The inmemory branch must mirror that exact behavior so
+      // POST /admin/endpoints with a duplicate name returns 400 regardless of
+      // PERSISTENCE_BACKEND. Cache lookup is sufficient because inmemory
+      // backend is single-process and the name->endpoint Map is the source of
+      // truth (no DB to race against). See crossBackendParityAudit prompt.
+      if (this.cacheByName.has(dto.name)) {
+        throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
+      }
+
       // Normalize any deprecated settings keys before caching
       this.normalizeStaleSettingsKeys(resolvedProfile);
       const now = new Date();
@@ -393,6 +430,11 @@ export class EndpointService implements OnModuleInit {
       this.profileChangeListener?.(cached.id, resolvedProfile);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
         endpointId: cached.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
+      });
+      // Phase J (v0.48.1): broadcast onto SSE for cross-tab refresh.
+      this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_CREATED, {
+        endpointId: cached.id,
+        name: cached.name,
       });
       return this.toFullResponse(cached);
     }
@@ -422,6 +464,11 @@ export class EndpointService implements OnModuleInit {
     this.profileChangeListener?.(endpoint.id, resolvedProfile);
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
       endpointId: endpoint.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
+    });
+    // Phase J (v0.48.1): broadcast onto SSE for cross-tab refresh.
+    this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_CREATED, {
+      endpointId: endpoint.id,
+      name: endpoint.name,
     });
     return this.toFullResponse(cached);
   }
@@ -562,6 +609,11 @@ export class EndpointService implements OnModuleInit {
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
         endpointId, name: updated.name,
       });
+      // Phase J (v0.48.1): broadcast onto SSE.
+      this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_UPDATED, {
+        endpointId,
+        name: updated.name,
+      });
 
       return this.toFullResponse(updated);
     }
@@ -612,6 +664,11 @@ export class EndpointService implements OnModuleInit {
 
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
       endpointId, name: cached.name,
+    });
+    // Phase J (v0.48.1): broadcast onto SSE.
+    this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_UPDATED, {
+      endpointId,
+      name: cached.name,
     });
 
     return this.toFullResponse(cached);
@@ -682,6 +739,11 @@ export class EndpointService implements OnModuleInit {
       this.scimLogger.clearEndpointLevel(endpointId);
       this.profileChangeListener?.(endpointId, null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint deleted', { endpointId, name: cached.name });
+      // Phase J (v0.48.1): broadcast onto SSE.
+      this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_DELETED, {
+        endpointId,
+        name: cached.name,
+      });
       return;
     }
 
@@ -706,6 +768,11 @@ export class EndpointService implements OnModuleInit {
     this.scimLogger.clearEndpointLevel(endpointId);
     this.profileChangeListener?.(endpointId, null);
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint deleted', { endpointId, name: endpoint.name });
+    // Phase J (v0.48.1): broadcast onto SSE.
+    this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_DELETED, {
+      endpointId,
+      name: endpoint.name,
+    });
   }
 
   async getEndpointStats(endpointId: string): Promise<EndpointStatsResponse> {

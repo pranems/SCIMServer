@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { renderWithRouter } from '../test/router-test-utils';
 import { logsSearchSchema } from '../routes/search-schemas';
 
@@ -92,5 +92,51 @@ describe('LogsTab', () => {
     const lastCall = mockUseQuery.mock.calls.at(-1) ?? [];
     const queryArg = lastCall[0] as { queryKey: unknown[] };
     expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 3, 20, 'Users']);
+  });
+
+  // ==========================================================================
+  // Phase N3 - Export button (CSV / JSON / NDJSON) wired into the toolbar
+  // ==========================================================================
+  it('renders ExportSplitButton in the toolbar when logs exist', async () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [
+          { id: 'l1', method: 'POST', url: '/Users', status: 201, durationMs: 42, createdAt: '2026-05-01T10:00:00Z' },
+        ],
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    expect(await screen.findByTestId('export-button')).toBeInTheDocument();
+    expect(screen.getByTestId('export-button')).not.toBeDisabled();
+  });
+
+  it('CSV export invokes triggerCsvDownload with flattened log rows', async () => {
+    const csvExportModule = await import('../utils/csv-export');
+    const csvSpy = vi.spyOn(csvExportModule, 'triggerCsvDownload').mockImplementation(() => {});
+
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 2,
+        items: [
+          { id: 'l1', method: 'POST', url: '/Users', status: 201, durationMs: 42, createdAt: '2026-05-01T10:00:00Z' },
+          { id: 'l2', method: 'GET', url: '/Users', status: 200, durationMs: 8, createdAt: '2026-05-01T09:00:00Z' },
+        ],
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    fireEvent.click(await screen.findByTestId('export-button'));
+    fireEvent.click(await screen.findByTestId('export-menu-csv'));
+
+    expect(csvSpy).toHaveBeenCalledTimes(1);
+    const [filename, body] = csvSpy.mock.calls[0];
+    expect(filename).toMatch(/^logs-ep-1-\d{8}T\d{6}Z\.csv$/);
+    expect(body).toContain('id,method,url,status,durationMs,createdAt');
+    expect(body).toContain('l1,POST,/Users,201,42,2026-05-01T10:00:00Z');
+    expect(body).toContain('l2,GET,/Users,200,8,2026-05-01T09:00:00Z');
+
+    csvSpy.mockRestore();
   });
 });

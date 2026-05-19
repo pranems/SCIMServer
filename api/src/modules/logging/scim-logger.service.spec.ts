@@ -667,6 +667,105 @@ describe('ScimLogger', () => {
     });
   });
 
+  // ─── SCIM Event Stream (Phase J v0.48.1) ──────────────────────────
+  // Separate channel from the log stream so the SSE controller can
+  // forward typed `{type: 'scim.x.y', ...}` payloads without polluting
+  // the log ring buffer or filtering through log-level gates. The
+  // `useSSE` hook on the web side dispatches on the `type` field;
+  // before Phase J the channel did not exist and SCIM mutations never
+  // reached the client.
+  describe('SCIM event stream (subscribeScimEvents / emitScimEvent)', () => {
+    it('notifies SCIM-event subscribers when emitScimEvent is called', () => {
+      const received: Array<{ type: string; [k: string]: unknown }> = [];
+      const unsub = logger.subscribeScimEvents(evt => received.push(evt));
+
+      logger.emitScimEvent('scim.user.created', {
+        endpointId: 'ep-1',
+        scimId: 'u-1',
+        active: true,
+      });
+
+      expect(received).toHaveLength(1);
+      expect(received[0].type).toBe('scim.user.created');
+      expect(received[0].endpointId).toBe('ep-1');
+      expect(received[0].scimId).toBe('u-1');
+      expect(received[0].active).toBe(true);
+
+      unsub();
+    });
+
+    it('stops notifying after unsubscribe', () => {
+      const received: Array<Record<string, unknown>> = [];
+      const unsub = logger.subscribeScimEvents(evt => received.push(evt));
+
+      logger.emitScimEvent('scim.user.created', { endpointId: 'ep-1', scimId: 'u-1' });
+      unsub();
+      logger.emitScimEvent('scim.user.deleted', { endpointId: 'ep-1', scimId: 'u-1' });
+
+      expect(received).toHaveLength(1);
+      expect((received[0] as { type: string }).type).toBe('scim.user.created');
+    });
+
+    it('supports multiple concurrent subscribers (multi-tab SSE consumers)', () => {
+      const a: Array<Record<string, unknown>> = [];
+      const b: Array<Record<string, unknown>> = [];
+      const ua = logger.subscribeScimEvents(evt => a.push(evt));
+      const ub = logger.subscribeScimEvents(evt => b.push(evt));
+
+      logger.emitScimEvent('scim.endpoint.created', { endpointId: 'ep-new' });
+
+      expect(a).toHaveLength(1);
+      expect(b).toHaveLength(1);
+
+      ua();
+      ub();
+    });
+
+    it('SCIM event stream is independent from the log stream', () => {
+      // A subscriber to the log stream MUST NOT receive SCIM events
+      // (would corrupt the log ring buffer downstream consumers).
+      const logEntries: StructuredLogEntry[] = [];
+      const scimEvents: Array<Record<string, unknown>> = [];
+      const unsubLog = logger.subscribe(e => logEntries.push(e));
+      const unsubScim = logger.subscribeScimEvents(e => scimEvents.push(e));
+
+      logger.emitScimEvent('scim.user.created', { endpointId: 'ep-1', scimId: 'u-1' });
+
+      expect(scimEvents).toHaveLength(1);
+      expect(logEntries).toHaveLength(0);
+
+      unsubLog();
+      unsubScim();
+    });
+
+    it('forwarded payload preserves arbitrary fields verbatim (no schema enforcement)', () => {
+      // The bridge sends through whatever the upstream service emitted;
+      // schema constraints belong to the SCIM service, not the bridge.
+      const received: Array<Record<string, unknown>> = [];
+      const unsub = logger.subscribeScimEvents(evt => received.push(evt));
+
+      logger.emitScimEvent('scim.credential.created', {
+        endpointId: 'ep-1',
+        credentialId: 'c-1',
+        credentialType: 'oauth_client',
+        label: 'Production token',
+        // Extra arbitrary field
+        future: { extension: 'reserved' },
+      });
+
+      expect(received[0]).toMatchObject({
+        type: 'scim.credential.created',
+        endpointId: 'ep-1',
+        credentialId: 'c-1',
+        credentialType: 'oauth_client',
+        label: 'Production token',
+        future: { extension: 'reserved' },
+      });
+
+      unsub();
+    });
+  });
+
   // ─── Enriched Context (Phase B Step 6) ────────────────────────────
 
   describe('enriched correlation context', () => {

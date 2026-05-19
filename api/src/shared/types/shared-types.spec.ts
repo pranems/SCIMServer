@@ -129,11 +129,13 @@ describe('Shared Type Contracts (@scim/types)', () => {
         stats: { totalEndpoints: 5, totalUsers: 847, totalGroups: 23 },
         endpoints: [],
         recentActivity: [],
+        requestsLast24hSeries: new Array(24).fill(0),
         version: { version: '0.40.2', node: '24.0.0', uptime: 86400 },
       };
       expect(dashboard.health.status).toBe('ok');
       expect(dashboard.stats.totalUsers).toBe(847);
       expect(dashboard.version.version).toBe('0.40.2');
+      expect(dashboard.requestsLast24hSeries).toHaveLength(24);
     });
 
     it('should support endpoint cards with stats', () => {

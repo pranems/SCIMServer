@@ -34,26 +34,59 @@ import { usersTabRoute } from './routes/endpoints.$endpointId.users';
 import { groupsTabRoute } from './routes/endpoints.$endpointId.groups';
 import { logsTabRoute } from './routes/endpoints.$endpointId.logs';
 import { settingsTabRoute } from './routes/endpoints.$endpointId.settings';
+import { activityTabRoute } from './routes/endpoints.$endpointId.activity';
+import { schemasTabRoute } from './routes/endpoints.$endpointId.schemas';
+import { credentialsTabRoute } from './routes/endpoints.$endpointId.credentials';
+import { bulkTabRoute } from './routes/endpoints.$endpointId.bulk';
+import { resourceTypesTabRoute } from './routes/endpoints.$endpointId.resource-types';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
+import { manualProvisionRoute } from './routes/manual-provision';
+import { createEndpointRoute } from './routes/endpoints.new';
+import { editEndpointRoute } from './routes/endpoints.$endpointId.edit';
+import { meRoute } from './routes/me';
+import { discoveryRoute } from './routes/discovery';
+import { operationsRoute } from './routes/operations';
+import { workbenchRoute } from './routes/workbench';
 import { queryClient } from './api/query-client';
 
-/** Endpoint detail layout with its 5 nested tab routes (overview + 4 explicit). */
+/** Endpoint detail layout with its 10 nested tab routes (overview + 9 explicit). */
 const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   overviewTabRoute,
   usersTabRoute,
   groupsTabRoute,
   logsTabRoute,
   settingsTabRoute,
+  activityTabRoute,
+  schemasTabRoute,
+  credentialsTabRoute,
+  // Phase M2 - Bulk Operations UI
+  bulkTabRoute,
+  // Phase M3 - Custom Resource Types UI
+  resourceTypesTabRoute,
 ]);
 
 /** Full route tree exported for inspection in tests. */
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  // Phase L1: createEndpointRoute MUST come before endpointsRoute /
+  // endpointDetailRouteWithChildren so TanStack matches the literal
+  // "/endpoints/new" before the wildcard "/endpoints/$endpointId".
+  createEndpointRoute,
+  editEndpointRoute,
   endpointsRoute,
   endpointDetailRouteWithChildren,
   logsRoute,
   settingsRoute,
+  manualProvisionRoute,
+  // Phase L2 - /Me self-service
+  meRoute,
+  // Phase L5 - Discovery Explorer + two-endpoint diff
+  discoveryRoute,
+  // Phase L6 - Cross-endpoint Operations view
+  operationsRoute,
+  // Phase M1 - SCIM Workbench
+  workbenchRoute,
 ]);
 
 /**

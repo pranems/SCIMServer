@@ -8,10 +8,16 @@
  * `defaultPreload: 'intent'` (router.ts), hovering the Dashboard nav
  * link warms the request before the user clicks.
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
-import { DashboardPage } from '../pages/DashboardPage';
 import { dashboardQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load DashboardPage so it lands in its own chunk
+// (dist/assets/DashboardPage-*.js) instead of the main bundle.
+const DashboardPage = React.lazy(() =>
+  import('../pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
 
 export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,

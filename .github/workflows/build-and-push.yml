@@ -138,10 +138,16 @@ jobs:
       # severities are reported but do not gate the release.
       # Documented exceptions live in repo-root .trivyignore (each entry
       # MUST cite a CVE, rationale, owner, and re-check date).
+      #
+      # NOTE: Trivy + OCI registries require lowercase image names. The
+      # github.repository env var preserves the repo's casing
+      # (`pranems/SCIMServer`) so we lowercase it here. Without this,
+      # Trivy fails with "could not parse reference" before scanning,
+      # blocking releases for an entirely cosmetic reason.
       - name: Trivy image scan (HIGH+CRITICAL gating)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/scimserver@${{ steps.build.outputs.digest }}
           format: table
           exit-code: '1'
           severity: HIGH,CRITICAL

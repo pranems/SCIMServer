@@ -353,8 +353,58 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       const page = Math.max(filters.page ?? 1, 1);
       const skip = (page - 1) * pageSize;
       let filtered = [...this.inMemoryLogRows];
+      // Phase D4 in-memory parity fix: previously only endpointId was
+      // applied here, so callers passing minDurationMs / since / until /
+      // method / status / urlContains / hasError got back the full set
+      // (and tests asserting empty results failed). Mirror the Prisma
+      // branch's filter set 1:1.
       if (filters.endpointId) {
-        filtered = filtered.filter(r => r.endpointId === filters.endpointId);
+        filtered = filtered.filter((r) => r.endpointId === filters.endpointId);
+      }
+      if (filters.method) {
+        const m = filters.method.toUpperCase();
+        filtered = filtered.filter((r) => r.method === m);
+      }
+      if (typeof filters.status === 'number') {
+        filtered = filtered.filter((r) => r.status === filters.status);
+      }
+      if (filters.hasError === true) {
+        filtered = filtered.filter((r) => r.errorMessage !== null && r.errorMessage !== undefined);
+      } else if (filters.hasError === false) {
+        filtered = filtered.filter((r) => r.errorMessage === null || r.errorMessage === undefined);
+      }
+      if (filters.urlContains) {
+        const needle = filters.urlContains;
+        filtered = filtered.filter((r) => r.url.includes(needle));
+      }
+      if (filters.since) {
+        const since = filters.since;
+        filtered = filtered.filter((r) => r.createdAt >= since);
+      }
+      if (filters.until) {
+        const until = filters.until;
+        filtered = filtered.filter((r) => r.createdAt <= until);
+      }
+      if (filters.minDurationMs !== undefined && filters.minDurationMs > 0) {
+        const min = filters.minDurationMs;
+        filtered = filtered.filter((r) => (r.durationMs ?? 0) >= min);
+      }
+      if (!filters.includeAdmin) {
+        filtered = filtered.filter(
+          (r) => !r.url.includes('/scim/admin/') && r.url !== '/' && r.url !== '/health',
+        );
+      }
+      if (filters.search) {
+        const s = filters.search;
+        filtered = filtered.filter(
+          (r) =>
+            r.url.includes(s) ||
+            (r.errorMessage ?? '').includes(s) ||
+            (r.requestHeaders ?? '').includes(s) ||
+            (r.responseHeaders ?? '').includes(s) ||
+            (r.requestBody ?? '').includes(s) ||
+            (r.responseBody ?? '').includes(s),
+        );
       }
       const records = filtered
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -581,6 +631,93 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       errorMessage: r.errorMessage ?? undefined,
       reportableIdentifier: identifier
     };
+  }
+
+  /**
+   * Phase D4 - Hourly request count series for dashboard charts.
+   *
+   * Returns an array of length `hours` containing per-hour request counts
+   * for the last `hours` hours. `result[0]` is the OLDEST hour (i.e.
+   * `hours-1` complete hours back from the current bucket boundary).
+   * `result[hours-1]` is the CURRENT hour (the bucket containing now).
+   *
+   * Buckets are aligned to hour boundaries via:
+   *   currentBucketStart = floor(now / bucketMs) * bucketMs
+   *   oldestBucketStart  = currentBucketStart - (hours - 1) * bucketMs
+   * So the chart axis is stable (same buckets reappear if you call twice
+   * within the same minute) and the current hour is ALWAYS at index
+   * `hours - 1` regardless of the current minute.
+   *
+   * Filters applied (matches the default `listLogs` filters when
+   * `includeAdmin: false`):
+   *   - excludes `/scim/admin/*` (admin API)
+   *   - excludes `/` and `/health` (root + health probes)
+   *
+   * Performance: indexed range scan on `createdAt`, returns `select { createdAt: true }`
+   * only. For a busy 100 req/min server this is ~144k rows in 24h - still
+   * sub-100ms with the default index. If this becomes a hot path we can
+   * push the bucketing to SQL via $queryRaw + date_trunc.
+   *
+   * @param opts.hours number of hours in the series (default 24, clamped 1..168)
+   * @returns number[] of length `hours`, oldest first
+   */
+  async getRequestSeries(opts: { hours?: number } = {}): Promise<number[]> {
+    const hours = Math.min(Math.max(opts.hours ?? 24, 1), 168);
+    const now = Date.now();
+    const bucketMs = 60 * 60 * 1000;
+    // Bucket alignment: result[hours-1] must be the CURRENT hour bucket.
+    // The current bucket starts at floor(now/bucketMs)*bucketMs. To put it
+    // at index hours-1, the oldest visible bucket starts (hours-1) buckets
+    // earlier. With this layout, any row where
+    //   bucketStart <= row.createdAt < bucketStart + bucketMs
+    // lands at index in [0, hours-1].
+    const currentBucketStart = Math.floor(now / bucketMs) * bucketMs;
+    const oldestBucketStart = currentBucketStart - (hours - 1) * bucketMs;
+    const series = new Array<number>(hours).fill(0);
+
+    const tally = (createdAt: Date): void => {
+      const t = createdAt instanceof Date ? createdAt.getTime() : new Date(createdAt).getTime();
+      if (!Number.isFinite(t)) return;
+      const idx = Math.floor((t - oldestBucketStart) / bucketMs);
+      if (idx >= 0 && idx < hours) series[idx] += 1;
+    };
+
+    const cutoff = new Date(oldestBucketStart);
+
+    if (this.isInMemoryBackend) {
+      for (const row of this.inMemoryLogRows) {
+        if (row.createdAt < cutoff) continue;
+        // Mirror listLogs default exclusions (includeAdmin: false)
+        if (row.url.includes('/scim/admin/')) continue;
+        if (row.url === '/' || row.url === '/health') continue;
+        tally(row.createdAt);
+      }
+      return series;
+    }
+
+    // Postgres: indexed range scan, project createdAt only.
+    try {
+      const rows = await this.prisma.requestLog.findMany({
+        where: {
+          createdAt: { gte: cutoff },
+          AND: [
+            { url: { not: { contains: '/scim/admin/' } } },
+            { url: { not: { equals: '/' } } },
+            { url: { not: { equals: '/health' } } },
+          ],
+        },
+        select: { createdAt: true },
+      });
+      for (const r of rows) tally(r.createdAt);
+    } catch (err) {
+      this.logger.error(
+        LogCategory.DATABASE,
+        `getRequestSeries failed: ${(err as Error).message} - returning zero series`,
+      );
+      // Fall through with zeros - dashboard chart shows flat line, not 500.
+    }
+
+    return series;
   }
 
   async getLog(id: string) {

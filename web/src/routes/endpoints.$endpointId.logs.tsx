@@ -5,11 +5,16 @@
  * URL-driven (Phase A3). Phase A4 loader pre-fetches the matching
  * page of admin logs.
  */
+import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
-import { LogsTab } from '../pages/LogsTab';
 import { logsSearchSchema } from './search-schemas';
 import { endpointLogsQueryOptions } from '../api/queries';
+
+// Phase K1 - lazy-load LogsTab into its own chunk.
+const LogsTab = React.lazy(() =>
+  import('../pages/LogsTab').then((m) => ({ default: m.LogsTab })),
+);
 
 function LogsTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();
