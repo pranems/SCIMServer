@@ -33,6 +33,7 @@ import {
   ALLOWED_PAGE_SIZES,
   type AllowedPageSize,
 } from '../store/preferences-store';
+import { useTelemetryStore } from '../store/telemetry-store';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px' },
@@ -152,6 +153,9 @@ export const SettingsPage: React.FC = () => {
 
       {/* Phase N4 - persisted user preferences */}
       <PreferencesCard />
+
+      {/* Phase N5 - frontend telemetry debug card */}
+      <TelemetryCard />
     </div>
   );
 };
@@ -250,6 +254,77 @@ const PreferencesCard: React.FC = () => {
           Reset preferences
         </Button>
       </div>
+    </Card>
+  );
+};
+
+// --- Phase N5: TelemetryCard --------------------------------------
+//
+// In-memory ring-buffer view + opt-out switch + clear button.
+// State lives in `web/src/store/telemetry-store.ts`; opt-in lives in
+// preferences-store. No server round-trip; events are local to the
+// browser tab and never persisted.
+
+const TelemetryCard: React.FC = () => {
+  const classes = useStyles();
+  const events = useTelemetryStore((s) => s.events);
+  const clear = useTelemetryStore((s) => s.clear);
+  const telemetryOptIn = usePreferencesStore((s) => s.telemetryOptIn);
+  const setTelemetryOptIn = usePreferencesStore((s) => s.setTelemetryOptIn);
+
+  // Show the most recent 10 events (newest last in the buffer per
+  // telemetry-store contract; we render newest-first here so the
+  // operator scans top-down).
+  const recent = [...events].slice(-10).reverse();
+
+  return (
+    <Card className={classes.card} data-testid="settings-telemetry-card">
+      <Subtitle2>Telemetry (in-memory, this tab only)</Subtitle2>
+      <div className={classes.row}>
+        <Text>Capture page views + uncaught errors</Text>
+        <Switch
+          data-testid="settings-telemetry-opt-in"
+          checked={telemetryOptIn}
+          onChange={(_, d) => setTelemetryOptIn(d.checked)}
+        />
+      </div>
+      <div className={classes.row}>
+        <Text>Recent events (last {recent.length} of {events.length})</Text>
+        <Button
+          appearance="subtle"
+          onClick={() => clear()}
+          data-testid="settings-telemetry-clear"
+          disabled={events.length === 0}
+        >
+          Clear buffer
+        </Button>
+      </div>
+      {recent.length === 0 ? (
+        <Caption1 data-testid="settings-telemetry-empty">No events captured yet.</Caption1>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+          {recent.map((evt, idx) => (
+            <div
+              key={`${evt.timestamp}-${idx}`}
+              data-testid={`settings-telemetry-row-${idx}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '160px 90px 1fr',
+                gap: '8px',
+                fontSize: '12px',
+                padding: '4px 0',
+                borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+              }}
+            >
+              <Caption1>{new Date(evt.timestamp).toISOString()}</Caption1>
+              <Caption1>{evt.type}</Caption1>
+              <Caption1>
+                {evt.type === 'navigation' ? evt.path : evt.message}
+              </Caption1>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 };

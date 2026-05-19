@@ -203,3 +203,54 @@ describe('SettingsPage preferences (Phase N4)', () => {
     expect(usePreferencesStore.getState().defaultPageSize).toBe(PREFERENCES_DEFAULTS.defaultPageSize);
   });
 });
+
+// ─── Phase N5: TelemetryCard ────────────────────────────────────────
+
+describe('SettingsPage telemetry (Phase N5)', () => {
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.52.0', runtime: { node: 'v24', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    localStorage.clear();
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
+  });
+
+  it('renders the telemetry card with opt-in switch + clear button + empty state', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('settings-telemetry-card')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-telemetry-opt-in')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-telemetry-clear')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-telemetry-empty')).toBeInTheDocument();
+  });
+
+  it('renders buffered events as table rows when present', async () => {
+    const { useTelemetryStore } = await import('../store/telemetry-store');
+    useTelemetryStore.getState().record({ type: 'navigation', path: '/endpoints' });
+    useTelemetryStore.getState().record({ type: 'error', message: 'boom' });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('settings-telemetry-row-0')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-telemetry-row-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-telemetry-empty')).not.toBeInTheDocument();
+  });
+
+  it('toggling opt-in updates preferences-store AND persists', () => {
+    wrap(<SettingsPage />);
+    const sw = screen.getByTestId('settings-telemetry-opt-in') as HTMLInputElement;
+    expect(usePreferencesStore.getState().telemetryOptIn).toBe(true);
+    sw.click();
+    expect(usePreferencesStore.getState().telemetryOptIn).toBe(false);
+    const stored = JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) ?? '{}');
+    expect(stored.prefs.telemetryOptIn).toBe(false);
+  });
+
+  it('clear button empties the buffer', async () => {
+    const { useTelemetryStore } = await import('../store/telemetry-store');
+    useTelemetryStore.getState().record({ type: 'navigation', path: '/x' });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('settings-telemetry-row-0')).toBeInTheDocument();
+    screen.getByTestId('settings-telemetry-clear').click();
+    expect(useTelemetryStore.getState().events).toHaveLength(0);
+  });
+});
