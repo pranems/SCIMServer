@@ -103,3 +103,34 @@ describe('AppHeader', () => {
     await waitFor(() => expect(useUIStore.getState().colorScheme).toBe('dark'));
   });
 });
+
+// ─── Phase N7 - denseMode wire to documentElement[data-density] ──────
+
+import { usePreferencesStore } from '../store/preferences-store';
+
+describe('AppShell - N7 denseMode wire', () => {
+  beforeEach(() => {
+    setStoredToken('test-token');
+    usePreferencesStore.getState().resetPreferences();
+    document.documentElement.removeAttribute('data-density');
+  });
+
+  it('sets data-density="dense" on documentElement when denseMode=true', async () => {
+    usePreferencesStore.getState().setDenseMode(true);
+    await renderShell();
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute('data-density')).toBe('dense'),
+    );
+  });
+
+  it('removes data-density attribute when denseMode=false', async () => {
+    usePreferencesStore.getState().setDenseMode(true);
+    document.documentElement.setAttribute('data-density', 'dense');
+    usePreferencesStore.getState().setDenseMode(false);
+    await renderShell();
+    await waitFor(() =>
+      expect(document.documentElement.hasAttribute('data-density')).toBe(false),
+    );
+  });
+});
+

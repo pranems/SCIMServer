@@ -1,6 +1,6 @@
 {
   "name": "scimserver-api",
-  "version": "0.52.0-alpha.7",
+  "version": "0.52.0-alpha.8",
   "description": "SCIMServer backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",

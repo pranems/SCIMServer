@@ -106,3 +106,40 @@ describe('ui-store - K4 log stream drawer slice', () => {
   });
 });
 
+// ─── Phase N7 - applyPreferenceDefaults (sidebarCollapsedDefault wire) ──
+
+import { usePreferencesStore } from './preferences-store';
+
+describe('ui-store - N7 applyPreferenceDefaults', () => {
+  beforeEach(() => {
+    usePreferencesStore.getState().resetPreferences();
+    useUIStore.setState({ sidebarCollapsed: false });
+  });
+
+  it('exposes applyPreferenceDefaults() function', () => {
+    const { applyPreferenceDefaults } = useUIStore.getState();
+    expect(typeof applyPreferenceDefaults).toBe('function');
+  });
+
+  it('sets sidebarCollapsed=true when preferences.sidebarCollapsedDefault is true', () => {
+    usePreferencesStore.getState().setSidebarCollapsedDefault(true);
+    useUIStore.setState({ sidebarCollapsed: false });
+    useUIStore.getState().applyPreferenceDefaults();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(true);
+  });
+
+  it('sets sidebarCollapsed=false when preferences.sidebarCollapsedDefault is false', () => {
+    usePreferencesStore.getState().setSidebarCollapsedDefault(false);
+    useUIStore.setState({ sidebarCollapsed: true });
+    useUIStore.getState().applyPreferenceDefaults();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+  });
+
+  it('is idempotent (safe to call twice)', () => {
+    usePreferencesStore.getState().setSidebarCollapsedDefault(true);
+    useUIStore.getState().applyPreferenceDefaults();
+    useUIStore.getState().applyPreferenceDefaults();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(true);
+  });
+});
+

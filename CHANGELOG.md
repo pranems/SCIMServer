@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase N7 - denseMode + sidebarCollapsedDefault Wiring, v0.52.0-alpha.8, 2026-05-22)
+
+- **Closes Phase N4 deferred items** - the `denseMode` + `sidebarCollapsedDefault` preferences (introduced in v0.52.0-alpha.5) persisted to localStorage but had no consumers. N7 ships the minimal consumer surface for each.
+- **`useUIStore.applyPreferenceDefaults()` new boot-time action** ([web/src/store/ui-store.ts](web/src/store/ui-store.ts)) - reads `usePreferencesStore.getState().sidebarCollapsedDefault` and writes to `ui-store.sidebarCollapsed`. Top-level ESM import of preferences-store is safe (preferences-store imports nothing from ui-store; no cycle). Idempotent (safe to call multiple times).
+- **`AppShell` denseMode -> `data-density` reflection** ([web/src/layout/AppShell.tsx](web/src/layout/AppShell.tsx)) - new `React.useEffect` subscribed to `usePreferencesStore((s) => s.denseMode)`. Toggles `data-density="dense"` attribute on `document.documentElement` (root-level so portaled overlays + drawers see it). SSR-safe via `typeof document === 'undefined'` guard. Future tables / CSS opt in via `[data-density='dense']` selector.
+- **Boot wire** ([web/src/main.tsx](web/src/main.tsx)) - `useUIStore.getState().applyPreferenceDefaults()` called once after `bootstrapCommandRegistry()` (N6) and `bootstrapTelemetryCollectors(router)` (N5) so the sidebar honours operator preference on first paint without a flash.
+- **Tests added (+6 web vitest, 999 -> 1005):** 4 in [ui-store.test.ts](web/src/store/ui-store.test.ts) (applyPreferenceDefaults exposed, true/false wiring, idempotency) + 2 in [AppShell.test.tsx](web/src/layout/AppShell.test.tsx) (denseMode=true sets `data-density="dense"`, denseMode=false removes attribute).
+- **Stage-by-stage quality gate result** - Stage 0 TDD: 6 RED -> 6 GREEN. Stage 1.4 web `tsc --noEmit` baseline 96: PRESERVED. Stage 2.3 web `vitest run`: 1005/1005 GREEN (84 files). Stage 6: em-dash scan + version bump + docs + commit + push. No API change, no Playwright delta, no size-limit budget delta.
+- **Deferred to follow-up phases (Standing Backlog):** per-table dense-row CSS (belongs in shared DataTable primitive when consolidated, OR per-tab surgical styles); server-side `/admin/me/preferences` so preferences follow operators across devices (Phase O alongside Managed Identity); system-preference detection (`prefers-reduced-data` etc.) with explicit override remaining in Settings.
+
 ### Added (Phase N6 - Extensible Command Palette, v0.52.0-alpha.7, 2026-05-22)
 
 - **Scope pivot documented** - Original "keyboard ergonomics MVP" already shipped: Phase F1 delivered the `cmdk`-based CommandPalette (Cmd+K / Ctrl+K, 3 groups: Routes / Endpoints / Quick actions), Phase F2 delivered the `?` help overlay + skip link. Rather than ship a duplicate palette UI, Phase N6 is rescoped to a SINGLE-COMMIT ship adding the EXTENSIBILITY layer the F1 palette was missing.
