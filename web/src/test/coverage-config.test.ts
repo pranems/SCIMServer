@@ -74,7 +74,7 @@ describe('Phase H4 - coverage gate config contract', () => {
       'src/test/**',
     ];
     for (const pattern of expectedExcludes) {
-      const literal = pattern.replace(/\*/g, '\\*');
+      const literal = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(
         CONFIG_TEXT,
         `expected exclude list to contain ${pattern}`,
