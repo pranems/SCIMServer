@@ -27,7 +27,7 @@
  * @see web/src/utils/filter-builder.ts
  * @see web/src/utils/patch-builder.ts
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   makeStyles,
   tokens,
