@@ -19,7 +19,7 @@
  *     deleting your own /Me is the largest data-loss footgun on
  *     the page.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   makeStyles,
   tokens,
