@@ -119,11 +119,20 @@ api/.dev-db.tmp
 .acrcreds.txt
 .pgpass-*.txt
 .oldprod-token.txt
+.prodtok.txt
+.prodvishnuid.txt
+.oldvishnuid.txt
+.prodvishnu-full.json
+.oldvishnu-full.json
+.veritas-carriers.json
+.live-after-recovery-*.log
 prod-app-template.json
 migration.log
 migrate-output.log
 scripts/state/
 scripts/_deploy-*-new-tenant.ps1
+# Root-level ad-hoc scripts written during ops (inspect / recover / verify)
+_*.ps1
 
 # Side-project research workspace (separate from SCIMServer)
 coderush/

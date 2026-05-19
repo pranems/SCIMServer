@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stage 1.2 / 1.3** (api tsc + ESLint): unchanged baseline (no api code touched).
 - **Stage 4.4 dev Azure deploy + live tests**: **GREEN** - `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> **1005/1005 PASS** (72.8 s).
 - **Stage 4.x prod Azure deploy + live tests**: **GREEN** - `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> **1005/1005 PASS**.
-- **Stage 4 data migration**: **GREEN** - 36/36 endpoints + 297/301 users + 40/40 groups replayed to each target. The 4 user outliers (Vishnu-ISV-1) were rejected by StrictSchemaValidation because the source body carried `urn:ietf:params:scim:schemas:extension:veritas:2` without declaring it in `schemas[]` - source-data quality issue, not a script bug. Spot-checked counts on prod: Vishnu-ISV-1=107 (expected 111-4), Sagar-ISV-2=79, Himanshu-ISV-1=28.
+- **Stage 4 data migration**: **GREEN** - 36/36 endpoints + **301/301 users** + 40/40 groups on EACH target after Option B recovery (initial run 297/301; 4 Vishnu-ISV-1 users recovered via targeted strip-undeclared-URN pass - see RCA Issue 6 update). Spot-checked counts on prod: Vishnu-ISV-1=**111/111**, Sagar-ISV-2=79, Himanshu-ISV-1=28. **Post-recovery regression: 1005/1005 PASS on both prod (71.7s) + dev (75.7s).**
 - **Stage 6 commit hygiene**: em-dash scan PASS on all 4 staged files (1 pre-existing em-dash in `.gitignore` fixed inline). No `--amend` / no `--force` / no `--no-verify`. No version bump (infra/deploy + script only).
 
 ### Test counts (unchanged)
@@ -41,12 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | API jest unit | 3,735 | 3,735 | 0 |
 | API jest E2E | 1,197 | 1,197 | 0 |
 | Web vitest | 909 | 909 | 0 |
-| Live SCIM (new prod) | 984 | **1,005** | (full helmet + 9z-AJ suite verified on new tenant) |
-| Live SCIM (new dev) | 984 | **1,005** | (full helmet + 9z-AJ suite verified on new tenant) |
+| Live SCIM (new prod) | 984 | **1,005** | (full helmet + 9z-AJ suite verified on new tenant; re-run 1005/1005 after Issue 6 recovery in 71.7 s) |
+| Live SCIM (new dev) | 984 | **1,005** | (full helmet + 9z-AJ suite verified on new tenant; re-run 1005/1005 after Issue 6 recovery in 75.7 s) |
 | PowerShell contract | 15 | 15 | 0 |
 | Playwright (web/e2e) | 70 | 70 | 0 |
 
-**No source-code assertions added.** The verification IS the 2 x 1005/1005 live-SCIM passes on the new tenant.
+**No source-code assertions added.** The verification IS the 4 x 1005/1005 live-SCIM passes on the new tenant (pre-recovery prod + dev, post-recovery prod + dev).
+
+### Added (Issue 6 follow-up: Vishnu-ISV-1 user recovery, 2026-05-19)
+
+- **4/4 missing Vishnu-ISV-1 users recovered on prod + dev** via Option B (strip undeclared URN). Final state: **111/111 users on prod, 111/111 users on dev**.
+- **Decision rationale documented in [docs/NEW_TENANT_DEPLOY_RCA_2026-05-19.md](docs/NEW_TENANT_DEPLOY_RCA_2026-05-19.md)** Issue 6 section: source `veritas:2` payload contained malformed attribute key `"0:User:emailAliases"` that is not a valid SCIM attribute path. Declaring a synthetic schema to accept malformed data would pollute the schema registry; stripping the orphaned URN preserves user identity + all valid attributes while leaving the original body intact on old prod for forensic review.
+- **Recovery script** (local-only, gitignored under `_*` prefix): inspects target user list, identifies missing source users by `userName`, strips any top-level key whose name is a URN not present in `schemas[]`, POSTs to target. Idempotent (only POSTs missing users); supports `-DryRun`. Same script ran cleanly against both prod + dev with no failures.
+- **Post-recovery regression**: re-ran full live-test suite on both targets - **1005/1005 PASS** on each (prod 71.7 s, dev 75.7 s). No flakes.
 
 ## [Previously Unreleased]
 

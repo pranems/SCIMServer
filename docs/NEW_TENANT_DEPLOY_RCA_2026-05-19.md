@@ -36,7 +36,7 @@
 | 3 | Cross-RG env reference | High | `--environment <name>` fails across RGs | Use full `resourceId` for cross-RG |
 | 4 | PS variable name shadow | Medium | Param `$ImageRepository` collided with local `$imageRepository` (PS case-insensitive) | Renamed local to `$ghcrAuthCheckRepo` |
 | 5 | `$` in random password | Medium | `New-StrongPassword` charset included `$` -> `cmd.exe` env-expansion broke psql `PGPASSWORD` | Excluded `$` from charset |
-| 6 | 4 user-migration failures | Low (data) | Source bodies carried undeclared extension URN `urn:ietf:params:scim:schemas:extension:veritas:2` -> rejected by `StrictSchemaValidation` | None (correct server behavior); manual remediation tracked |
+| 6 | 4 user-migration failures | Low (data) | Source bodies carried undeclared extension URN `urn:ietf:params:scim:schemas:extension:veritas:2` -> rejected by `StrictSchemaValidation` | **RESOLVED** via Option B (strip undeclared URN; data was malformed). 4/4 recovered on both targets. Final: 111/111 users. |
 | 7 | 1004/1005 live-test flake | Low | Single transient failure on first run; clean on retry | None needed; documented |
 | 8 | Duplicate CHANGELOG heading | Trivial | Edit-tool replacement created duplicate `[Previously Unreleased]` heading | Resolved during commit prep |
 
@@ -405,18 +405,60 @@ sequenceDiagram
   Mig->>Mig: log + continue<br/>(idempotent; safe to retry later)
 ```
 
-### Resolution (Documented, Not Auto-Fixed)
+### Resolution (Option B - chosen + executed 2026-05-19)
 
-Two valid remediation paths, **awaiting operator direction**:
+**Both options were originally proposed:**
 
-**Option A - server-side (preferred):**
-1. PATCH `Vishnu-ISV-1` endpoint to include the `veritas:2` schema URN in its registered `schemas[]`.
-2. Re-run `scripts/migrate-old-prod.ps1` (idempotent - skips the 35 already-migrated endpoints + 107 already-migrated users; retries only the 4 failed users).
+**Option A (initially preferred):** PATCH `Vishnu-ISV-1` endpoint to declare `veritas:2` in its `schemas[]` registry, then re-run migration.
 
-**Option B - migration-script-side:**
-- Modify `scripts/migrate-old-prod.ps1` `Remove-ServerSideFields` to also strip any top-level key whose name is a URN not present in `schemas[]`. This silently drops the orphaned extension data.
+**Option B (chosen):** Strip any top-level URN key from the body that is not declared in `schemas[]`, then POST. Drops the orphaned extension data; preserves user identity + all valid attributes.
 
-Option A preserves source data; Option B loses it. **Recommendation:** Option A.
+### Why Option A was rejected after inspection
+
+Direct inspection of a carrier user (script: `_inspect3.ps1`) revealed the actual `veritas:2` payload shape on old prod:
+
+```json
+"urn:ietf:params:scim:schemas:extension:veritas:2": {
+  "0:User:emailAliases": [
+    { "value": "SMTP:ladel8c264677@proviamla01.onmicrosoft.com" }
+  ]
+}
+```
+
+Key observations:
+1. **The inner attribute name `"0:User:emailAliases"` is not a valid SCIM attribute path.** It looks like an artifact of a botched bulk import that concatenated `<sortIndex>:User:<attr>` as the key.
+2. **Neither the source nor the target endpoint declares `veritas:2`** in its `profile.schemas` or `profile.extensionSchemas` registry. The data leaked into old prod through some past leniency, not via a legitimate extension definition.
+3. **No schema definition could make `"0:User:emailAliases"` well-formed** without inventing fake attribute metadata.
+
+Declaring a synthetic schema to accept malformed data would:
+- Pollute the schema registry of the new prod endpoint with a custom schema that's effectively junk.
+- Create a precedent for future malformed-data "fix-ups" via schema invention.
+- Not survive the next strict-validation tightening.
+
+Dropping the orphaned key:
+- Preserves the **user identity** + all the **valid** core/enterprise attributes (the actual provisioning payload).
+- Leaves the original body intact on **old prod** for forensic review if anyone ever needs to investigate the malformed data.
+- Is fully reversible: if veritas:2 ever becomes a real registered schema, a future migration pass can re-pull from old prod.
+
+### Recovery execution + outcome
+
+Recovery script `_recover-vishnu-users.ps1` (local-only, gitignored under `_*` prefix):
+1. Lists target users on Vishnu-ISV-1 -> builds `existingNames` set by `userName`.
+2. Lists source users on Vishnu-ISV-1.
+3. For each source user **not in `existingNames`**: clones the body, strips `id`+`meta`, strips any top-level key whose name is `urn:*` and NOT present in `schemas[]`, POSTs to target.
+4. Idempotent (only POSTs missing users); supports `-DryRun`.
+
+**Outcome:**
+
+| Target | Pre-recovery | Recovered | Post-recovery | Stripped URNs |
+|--------|--------------|-----------|---------------|---------------|
+| Prod   | 107/111      | 4/4 OK    | **111/111**   | `urn:ietf:params:scim:schemas:extension:veritas:2` (x4) |
+| Dev    | 107/111      | 4/4 OK    | **111/111**   | `urn:ietf:params:scim:schemas:extension:veritas:2` (x4) |
+
+**Verification:**
+- Direct API user-count query: prod=111, dev=111.
+- Filter-by-userName for 2 recovered users -> found, with `hasVeritas2 = False` on the response body.
+- **Post-recovery live-test regression: 1005/1005 PASS on prod (71.7 s) + 1005/1005 PASS on dev (75.7 s).** No flakes, no new failures.
 
 ### Why This Is Not a Deploy/Migration Regression
 
@@ -478,7 +520,7 @@ Before any "demote `[Unreleased]` to `[Previously Unreleased]`" replacement, rea
 | 3 | Cross-RG env | High | < 1 min | 5 min (resourceId) | Doc + topology pattern |
 | 4 | PS var shadow | Medium | ~10 min (image-pull 404) | 5 min (rename) | Code-review rule |
 | 5 | `$` in password | Medium | ~5 min (psql auth fail) | 2 min (charset) | Code rule + comment |
-| 6 | 4 user invalidSyntax | Low (data) | Immediate (per-row log) | N/A (operator decision pending) | Server behavior is correct |
+| 6 | 4 user invalidSyntax | Low (data) | Immediate (per-row log) | **RESOLVED** (Option B recovery; 4/4 recovered both targets) | Targeted recovery script `_recover-vishnu-users.ps1` |
 | 7 | 1004/1005 flake | Low | 1 test run | 0 (cleared on retry) | Doc |
 | 8 | CHANGELOG dup | Trivial | Immediate (grep) | < 1 min (replace) | Pre-read heading state |
 
@@ -520,8 +562,8 @@ Before any "demote `[Unreleased]` to `[Previously Unreleased]`" replacement, rea
 
 1. **Migrate Azure PG auth to Managed Identity** - removes the `$`-in-password class entirely (Issue 5). Slate for Phase O.
 2. **Cross-tenant deploy runbook** in `docs/` referencing this RCA + the topology section. Defer until 2nd cross-tenant deploy informs the abstraction.
-3. **Resolve 4 `veritas:2` users** - awaiting operator decision between Option A (PATCH endpoint schemas) and Option B (script strips undeclared URNs).
-4. **Optional:** Investigate Issue 7's bulk-throttle cold-start interaction if it recurs.
+3. **Optional:** Investigate Issue 7's bulk-throttle cold-start interaction if it recurs.
+4. **Migration-script hardening (from Issue 6 recovery):** consider porting the `Sanitize-User` strip-undeclared-URN logic into `scripts/migrate-old-prod.ps1` `Remove-ServerSideFields` as an opt-in `-StripUndeclaredUrns` flag, so future migrations from any source with similar data-quality issues can be handled in a single pass. Awaits a 2nd occurrence to justify the abstraction (YAGNI for now).
 
 ---
 
