@@ -30,7 +30,6 @@ import {
   tokens,
   Card,
   Subtitle1,
-  Subtitle2,
   Caption1,
   Text,
   Button,
