@@ -17,6 +17,20 @@
 # Bypass (banned by standing rule, mechanism kept for emergencies):
 #   git commit --no-verify -m "..."
 
+# Defensive: the three checks below pipe through `grep`. If grep is missing
+# (rare, but possible if the hook is invoked through a bare sh.exe outside
+# Git-for-Windows' bundled MSYS2 PATH), the previous behavior was silent-pass
+# (the `if ... | grep ... >/dev/null 2>&1` branch evaluates false, hits stay
+# empty, exit 0). That would let em-dashes / console.log / secrets leak
+# through. Fail loud instead.
+for tool in grep git sed; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "[pre-commit] FATAL: required tool '$tool' not on PATH." >&2
+        echo "[pre-commit] If invoked outside 'git commit' (e.g. via bare sh.exe), prepend Git's usr/bin to PATH first." >&2
+        exit 1
+    fi
+done
+
 # Files staged for this commit (Added/Copied/Modified/Renamed - no deletes)
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 if [ -z "$staged" ]; then

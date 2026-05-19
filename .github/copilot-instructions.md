@@ -207,6 +207,7 @@ Operational rules:
 - Hooks are **versioned** under `.githooks/`. Editing them counts as a behavioral change and follows the same TDD + CHANGELOG discipline as application code.
 - `core.hooksPath` is **per-clone configuration**, not a tracked git setting. Every fresh clone (including CI runners that use git rather than action checkouts) must invoke [scripts/install-hooks.ps1](scripts/install-hooks.ps1). Adding a check to a future bootstrap / dev-setup script that calls the installer automatically is in the Standing Backlog.
 - `--no-verify` remains banned by the existing operational-safety rule. The hook mechanism enforces the rule at the moment of commit/push; the standing rule still governs the policy.
+- **`git -c core.hooksPath=` and `git --config-env=core.hooksPath` are also banned** as bypass mechanisms. They override the hooks directory to empty for one invocation and accomplish the same evasion as `--no-verify` via a different mechanism. The standing rule covers any technique that skips the hook, including these. Origin: [docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md](../docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md) - operator reached for this 3x during Phase N under an incorrect diagnosis; the RCA closes the loophole and ships a self-test ([scripts/test-hooks.ps1](../scripts/test-hooks.ps1)) that proves the hook is read-only with respect to the index AND that it loudly fails on dirty input (no more silent-pass when `grep` is off PATH).
 
 ## Mandatory Quality Gates (Standing Rule)
 
@@ -274,7 +275,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 6.2. **CHANGELOG.md** - One entry per minor/patch with explicit before/after test counts at every layer (API unit, API E2E, Web vitest, Live SCIM, Playwright, PowerShell contract), version delta, files changed summary, and per-phase quality gate result.
 6.3. **Session_starter.md** + **docs/CONTEXT_INSTRUCTIONS.md** updates - Latest test counts, version, recent achievements row.
 6.4. **`generateCommitMessage` prompt** - Use it to compose the commit message; ensures the standing rule about per-sub-phase gate naming is honored.
-6.5. **No `--amend` on pushed commits, no `--force` push, no `--no-verify`** - All three are disallowed by the standing operational-safety rules.
+6.5. **No `--amend` on pushed commits, no `--force` push, no `--no-verify`, no `git -c core.hooksPath=` / `--config-env=core.hooksPath`** - All are disallowed by the standing operational-safety rules. The `core.hooksPath` override accomplishes the same evasion as `--no-verify`; ban added 2026-05-19 per [docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md](../docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md).
 
 ### Stage X - Meta / Strategy Evolution (not per-commit)
 Stage X does NOT gate any single commit. It runs on inflection points to evolve the gate strategy itself. The other 6 stages are the floor; Stage X is what raises the floor over time.
