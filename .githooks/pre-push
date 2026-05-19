@@ -56,9 +56,10 @@ fi
 # Mode resolution: honor $PREPUSH_MODE if set, else Fast.
 MODE="${PREPUSH_MODE:-Fast}"
 
-# Repo root = parent of .git/hooks
-HOOK_DIR="$(dirname "$0")"
-REPO_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+# Repo root: resolve via git so the hook works from either .git/hooks/
+# (legacy location, 2 levels deep) or .githooks/ (versioned location, 1
+# level deep). git rev-parse is the only reliable answer.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 SCRIPT_PATH="$REPO_ROOT/scripts/pre-push-checks.ps1"
 
 if [ ! -f "$SCRIPT_PATH" ]; then
