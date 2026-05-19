@@ -10345,6 +10345,118 @@ try {
 Write-Host "`n--- 9z-AI: Custom Resource Types UI Contract (M3) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AJ: Web Security Headers (Phase N3a)
+$script:currentSection = "9z-AJ: Web Security Headers (N3a)"
+# ============================================
+# Phase N3a (v0.52.0-alpha.3, 2026-05-18) wired helmet@^8.1.0 + a manual
+# Permissions-Policy middleware into the API bootstrap so every response carries
+# the browser-enforced defense-in-depth header set. This section is the wire-level
+# lock-in: it asserts the headers are actually emitted by the deployed runtime
+# (Docker container OR Azure Container App), independent of the unit + E2E locks
+# in api/src/security/helmet-config.spec.ts + api/test/e2e/security-headers.e2e-spec.ts.
+#
+# Probe routes intentionally span 2xx, 401, and 404 paths to confirm headers fire
+# on every status code (helmet sits BEFORE auth in main.ts so 401s still emit them).
+Write-Host "`n`n========================================" -ForegroundColor Cyan
+Write-Host "TEST SECTION 9z-AJ: Web Security Headers (Phase N3a)" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+# Production-only headers: HSTS is suppressed when NODE_ENV is not 'production' so
+# localhost is never poisoned. The deployed dev container app DOES run with
+# NODE_ENV=production, so we treat HSTS as REQUIRED when the response is over
+# HTTPS and OPTIONAL when the response is over plain HTTP (Docker smoke run).
+$isHttpsDeployment = $baseUrl.StartsWith("https://")
+
+# Helper: probe a URL and return a normalised hashtable of headers + status.
+# Implemented inline (not as a separate function) so it runs in script scope
+# and can read $baseUrl + $headers from the enclosing variable bag without
+# any cross-scope surprises in PowerShell 7.
+$probeScript = {
+    param([string]$Path, [string]$BaseFromCaller, $AuthHeadersFromCaller)
+    try {
+        $invokeArgs = @{
+            Uri                = "$BaseFromCaller$Path"
+            Method             = 'GET'
+            SkipHttpErrorCheck = $true
+            ErrorAction        = 'Stop'
+        }
+        if ($AuthHeadersFromCaller) { $invokeArgs.Headers = $AuthHeadersFromCaller }
+        # NOTE: call the REAL cmdlet, bypassing the script's Invoke-WebRequest wrapper
+        # (the wrapper does not expose -UseBasicParsing nor return the full Headers dict
+        # in the shape we need, AND it adds the response to flowSteps which we don't want
+        # for security-header probes).
+        $resp = Microsoft.PowerShell.Utility\Invoke-WebRequest @invokeArgs
+        $flat = @{}
+        foreach ($k in $resp.Headers.Keys) {
+            $v = $resp.Headers[$k]
+            if ($v -is [System.Collections.IEnumerable] -and -not ($v -is [string])) {
+                $flat[$k] = ($v -join ', ')
+            } else {
+                $flat[$k] = [string]$v
+            }
+        }
+        return @{ ok = $true; status = [int]$resp.StatusCode; headers = $flat; err = $null }
+    } catch {
+        return @{ ok = $false; status = 0; headers = @{}; err = $_.Exception.Message }
+    }
+}
+
+# Probe 1: GET /scim/health (200, no auth required)
+$p1 = & $probeScript "/scim/health" $baseUrl $null
+if (-not $p1.ok) { Write-Host "  9z-AJ.probe1 raw error: $($p1.err)" -ForegroundColor Yellow }
+Test-Result -Success ($p1.ok -and $p1.status -eq 200) -Message "9z-AJ.1: GET /scim/health returns 200 (smoke)"
+
+# Required headers on EVERY response (helmet defaults)
+Test-Result -Success ([string]$p1.headers["Content-Security-Policy"] -match "default-src 'self'") -Message "9z-AJ.2: CSP includes default-src 'self'"
+Test-Result -Success ([string]$p1.headers["Content-Security-Policy"] -match "frame-ancestors 'none'") -Message "9z-AJ.3: CSP includes frame-ancestors 'none'"
+Test-Result -Success ([string]$p1.headers["Content-Security-Policy"] -match "object-src 'none'") -Message "9z-AJ.4: CSP includes object-src 'none'"
+Test-Result -Success ([string]$p1.headers["X-Frame-Options"] -eq "DENY") -Message "9z-AJ.5: X-Frame-Options: DENY"
+Test-Result -Success ([string]$p1.headers["X-Content-Type-Options"] -eq "nosniff") -Message "9z-AJ.6: X-Content-Type-Options: nosniff"
+Test-Result -Success ([string]$p1.headers["Referrer-Policy"] -eq "strict-origin-when-cross-origin") -Message "9z-AJ.7: Referrer-Policy: strict-origin-when-cross-origin"
+Test-Result -Success ([string]$p1.headers["Cross-Origin-Opener-Policy"] -eq "same-origin") -Message "9z-AJ.8: COOP: same-origin"
+Test-Result -Success ([string]$p1.headers["Cross-Origin-Resource-Policy"] -eq "same-origin") -Message "9z-AJ.9: CORP: same-origin"
+Test-Result -Success ([string]$p1.headers["X-Permitted-Cross-Domain-Policies"] -eq "none") -Message "9z-AJ.10: X-Permitted-Cross-Domain-Policies: none"
+Test-Result -Success ([string]$p1.headers["X-DNS-Prefetch-Control"] -eq "off") -Message "9z-AJ.11: X-DNS-Prefetch-Control: off"
+Test-Result -Success ([string]$p1.headers["X-Download-Options"] -eq "noopen") -Message "9z-AJ.12: X-Download-Options: noopen"
+
+# Permissions-Policy: separate middleware after helmet
+$pp = [string]$p1.headers["Permissions-Policy"]
+Test-Result -Success ($pp -match "camera=\(\)" -and $pp -match "microphone=\(\)" -and $pp -match "geolocation=\(\)" -and $pp -match "payment=\(\)" -and $pp -match "usb=\(\)") -Message "9z-AJ.13: Permissions-Policy denies camera/microphone/geolocation/payment/usb"
+
+# COEP must be ABSENT (intentionally disabled in helmet-config.ts)
+Test-Result -Success ([string]$p1.headers["Cross-Origin-Embedder-Policy"] -eq "") -Message "9z-AJ.14: COEP is intentionally absent (CDN-asset compatibility)"
+
+# HSTS: REQUIRED over HTTPS deployments, must NOT be required over plain HTTP.
+# Helmet emits HSTS unconditionally when NODE_ENV=production, so a plain-HTTP
+# Docker smoke will see it but a browser will never honor it without HTTPS.
+$hsts = [string]$p1.headers["Strict-Transport-Security"]
+if ($isHttpsDeployment) {
+    Test-Result -Success ($hsts -match "max-age=15552000" -and $hsts -match "includeSubDomains") -Message "9z-AJ.15: HSTS is set on HTTPS deployment (max-age=15552000; includeSubDomains)"
+} else {
+    if ($hsts) {
+        Test-Result -Success ($hsts -match "max-age=15552000") -Message "9z-AJ.15: HSTS (if present on HTTP) carries max-age=15552000"
+    } else {
+        Test-Result -Success $true -Message "9z-AJ.15: HSTS absent over HTTP (acceptable; helmet honored NODE_ENV)"
+    }
+}
+
+# Probe 2: GET /scim/admin/version (200 with auth)
+$p2 = & $probeScript "/scim/admin/version" $baseUrl $headers
+if (-not $p2.ok) { Write-Host "  9z-AJ.probe2 raw error: $($p2.err)" -ForegroundColor Yellow }
+Test-Result -Success ($p2.ok -and ($p2.status -eq 200 -or $p2.status -eq 401 -or $p2.status -eq 404)) -Message "9z-AJ.16: GET /scim/admin/version returns 200|401|404 with headers"
+Test-Result -Success ([string]$p2.headers["X-Frame-Options"] -eq "DENY") -Message "9z-AJ.17: Admin route still emits X-Frame-Options DENY"
+Test-Result -Success ([string]$p2.headers["Content-Security-Policy"] -match "default-src 'self'") -Message "9z-AJ.18: Admin route still emits CSP"
+
+# Probe 3: GET / (SPA fallback, 200 text/html or 404 in inmemory)
+$p3 = & $probeScript "/" $baseUrl $null
+if (-not $p3.ok) { Write-Host "  9z-AJ.probe3 raw error: $($p3.err)" -ForegroundColor Yellow }
+Test-Result -Success ($p3.ok) -Message "9z-AJ.19: GET / returns response (SPA fallback)"
+Test-Result -Success ([string]$p3.headers["X-Content-Type-Options"] -eq "nosniff") -Message "9z-AJ.20: SPA shell carries X-Content-Type-Options nosniff"
+Test-Result -Success ([string]$p3.headers["Content-Security-Policy"] -match "script-src .* 'unsafe-inline'") -Message "9z-AJ.21: SPA-serving response CSP allows 'unsafe-inline' for script-src (Fluent UI v9 requirement)"
+
+Write-Host "`n--- 9z-AJ: Web Security Headers (Phase N3a) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

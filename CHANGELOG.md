@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **API version bumped to v0.52.0-alpha.3** (api/package.json + web/package.json).
+- **Live SCIM contract: new TEST SECTION 9z-AJ in [scripts/live-test.ps1](scripts/live-test.ps1)** (21 assertions) locks the helmet headers + Permissions-Policy + HSTS + COEP-absent contract at the wire level for both local Docker and the live Azure FQDNs. Run baseline raised from 984 -> **1005/1005** vs local Docker container (port 8080, 31.7s). Probes 3 routes (`/scim/health` unauth 200, `/scim/admin/version` auth 200/401, `/` SPA fallback) to confirm headers fire on every status code (helmet is wired BEFORE auth in [api/src/main.ts](api/src/main.ts) so 401s still emit them). Uses `Microsoft.PowerShell.Utility\Invoke-WebRequest` directly to bypass the script's request-logging wrapper.
+- **Docker build hygiene: [api/.dockerignore](api/.dockerignore) now excludes `*.tsbuildinfo`** - fixes a JS-emission bug where the TypeScript incremental-build cache (`api/tsconfig.build.tsbuildinfo`) from the Windows host was being COPY'd into the build context, confusing `tsc -p tsconfig.build.json` so it produced only `.d.ts` declarations (151 of them) and zero `.js` files. Symptom was the container exiting at startup with `Cannot find module '/app/dist/main.js'`. Diagnosed by manually running `tsc` inside the container against a fresh outDir and confirming both `.js` + `.d.ts` were produced; root-caused to the stale incremental cache.
 
 ### Quality gates result (per [MANDATORY_QUALITY_GATES_STRATEGY.md](docs/MANDATORY_QUALITY_GATES_STRATEGY.md))
 
