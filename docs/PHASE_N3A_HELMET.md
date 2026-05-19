@@ -141,10 +141,10 @@ helmet does NOT emit Permissions-Policy by default (as of helmet v8.1.0). The sp
 |---|---|---|---|
 | Unit | [api/src/security/helmet-config.spec.ts](../api/src/security/helmet-config.spec.ts) | 7 | ~28s |
 | E2E | [api/test/e2e/security-headers.e2e-spec.ts](../api/test/e2e/security-headers.e2e-spec.ts) | 11 | ~35s |
-| Live SCIM | [scripts/live-test.ps1](../scripts/live-test.ps1) | (post-deploy commit will add) | TBD |
-| Playwright | [web/e2e/security-headers.spec.ts](../web/e2e/security-headers.spec.ts) | (post-deploy commit will add) | TBD |
+| Live SCIM | [scripts/live-test.ps1](../scripts/live-test.ps1) section 9z-AJ | 21 | ~3s (subset of 1005/1005 full run) |
+| Playwright | [web/e2e/security-headers.spec.ts](../web/e2e/security-headers.spec.ts) | 3 tests / 21 mirrored assertions | ~1.4s vs dev |
 
-**Total new assertions in this commit: 18 (7 unit + 11 E2E).**
+**Total new assertions across the four layers: 60 (7 unit + 11 E2E + 21 live + 21 Playwright-mirrored).** Stage 4 + Stage 5 closed in the 2026-05-19 follow-up commit pair (live closed by the cross-tenant cutover live regression at 1005/1005 PASS vs new prod + dev; Playwright closed by `web/e2e/security-headers.spec.ts` 3/3 PASS vs new dev).
 
 ### Unit-level (7 assertions)
 
@@ -189,21 +189,22 @@ Following [MANDATORY_QUALITY_GATES_STRATEGY.md](MANDATORY_QUALITY_GATES_STRATEGY
 | 3b.4 | securityAudit | This commit IS the highest-priority finding from 2026-05-17 X.2 intake |
 | 3c.1 | codeReviewSelfAudit | 1 module + 1 unit spec + 1 E2E spec; single responsibility per file |
 | 3c.2 | auditAndUpdateDocs | CHANGELOG + Session_starter + INDEX + this doc all updated in this commit |
-| 4 / 5 | Docker + dev deploy + live + Playwright | Deferred to follow-up commit pair (rebuild image + push + redeploy + 984 live SCIM contract + new Playwright spec asserting headers on dev FQDN) |
+| 4 | Docker + dev deploy + live SCIM contract | PASS - closed 2026-05-19 by the cross-tenant cutover (live-test 9z-AJ section, 21 assertions covering all 12 helmet headers + Permissions-Policy + HSTS branch + COEP-absent) running 1005/1005 PASS vs new prod + new dev (commit 346645e) |
+| 5 | Playwright spec asserting headers on dev FQDN | PASS - closed in this commit by `web/e2e/security-headers.spec.ts` (3 tests / 21 mirrored assertions) 3/3 PASS vs `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` in 1.4s |
 | 6 | Commit hygiene | Version bumped to v0.52.0-alpha.3; no `--amend` / `--force` / `--no-verify` |
 
 ---
 
 ## Follow-up work (slated)
 
-| Item | Where it goes | When |
-|---|---|---|
-| Playwright spec asserting headers on dev FQDN | new `web/e2e/security-headers.spec.ts` | Next commit (Stage 5 closure) |
-| Live SCIM contract section for headers | new section in `scripts/live-test.ps1` before TEST SECTION 10 | Next commit (Stage 4 closure) |
-| Tighten CSP: replace `'unsafe-inline'` script-src with sha256 hashes | refactor `web/index.html` + `helmet-config.ts` + this doc | Phase N3b or later |
-| Tighten CSP: replace `'unsafe-inline'` style-src with nonce or Fluent UI server-rendered sheet | requires Fluent UI v9 nonce wiring | Future phase (substantial design) |
-| Add CSP `report-uri` / `report-to` directive | requires the Phase N3 telemetry sink | Phase N3b (telemetry endpoint) |
-| Move CORS default from allow-all to deny-by-default | breaking change, requires v1.0 cut | Future major release |
+| Item | Where it goes | When | Status |
+|---|---|---|---|
+| Playwright spec asserting headers on dev FQDN | new `web/e2e/security-headers.spec.ts` | Stage 5 closure | DONE 2026-05-19 (3/3 PASS vs new dev) |
+| Live SCIM contract section for headers | new section in `scripts/live-test.ps1` before TEST SECTION 10 (section 9z-AJ) | Stage 4 closure | DONE 2026-05-18 (Docker) + revalidated 2026-05-19 (new prod + new dev, 21/21 PASS each) |
+| Tighten CSP: replace `'unsafe-inline'` script-src with sha256 hashes | refactor `web/index.html` + `helmet-config.ts` + this doc | Phase N3b or later | OPEN |
+| Tighten CSP: replace `'unsafe-inline'` style-src with nonce or Fluent UI server-rendered sheet | requires Fluent UI v9 nonce wiring | Future phase (substantial design) | OPEN |
+| Add CSP `report-uri` / `report-to` directive | requires the Phase N3 telemetry sink | Phase N3b (telemetry endpoint) | OPEN |
+| Move CORS default from allow-all to deny-by-default | breaking change, requires v1.0 cut | Future major release | OPEN |
 
 ---
 

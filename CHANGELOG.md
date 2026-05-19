@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase N3a Stage 5 closure - Playwright security-headers spec, 2026-05-19, no version bump)
+
+- **New [web/e2e/security-headers.spec.ts](web/e2e/security-headers.spec.ts)** (~120 LoC, zero em-dash, 3 tests / 21 mirrored assertions) - browser-side twin of the [scripts/live-test.ps1 TEST SECTION 9z-AJ](scripts/live-test.ps1) PowerShell HTTP probe + the [api/test/e2e/security-headers.e2e-spec.ts](api/test/e2e/security-headers.e2e-spec.ts) in-process supertest probe. Uses Playwright's `APIRequestContext` (raw HTTP, no browser-fetch CORS gymnastics) so every response header is observed as the server emitted it, identical wire bytes to what a real Chromium navigation would see. Probes 3 routes against `process.env.E2E_BASE_URL`:
+  - `/scim/health` (unauthenticated): asserts all 12 helmet headers + Permissions-Policy (camera/microphone/geolocation/payment/usb denials) + COEP absent + HSTS branch (required on HTTPS, optional on HTTP).
+  - `/scim/admin/version` (authenticated): asserts headers still fire on 200|401|404 responses (helmet sits before auth in main.ts).
+  - `/` (SPA fallback HTML): asserts the CSP `script-src 'unsafe-inline'` Fluent UI v9 compatibility carve-out is intact + X-Content-Type-Options is emitted on HTML responses.
+- **Stage 5 closure for Phase N3a**: completes the third leg of the four-layer header lockdown started 2026-05-18. Configuration -> in-process -> wire -> browser. Future operator cannot silently drop a directive in any one layer without all three turning red.
+- **Stage 4 closure for Phase N3a** (retroactive 2026-05-19): the cross-tenant cutover live regression (1005/1005 PASS vs new prod + new dev) includes the 21-assertion 9z-AJ section, which was the originally-deferred Stage 4 work. Marked closed in [docs/PHASE_N3A_HELMET.md](docs/PHASE_N3A_HELMET.md).
+
+### Quality gates result (Phase N3a Stage 5 closure)
+
+- **Stage 0 TDD**: the spec WAS the RED-first test for the 2026-05-18 helmet middleware build (locked at the unit + E2E layer in that commit); this commit ships the third layer that the original RED plan referenced. GREEN on first run because helmet is already deployed in v0.52.0-alpha.3.
+- **Stage 1.4 web tsc**: PASS - 0 new errors in [web/e2e/security-headers.spec.ts](web/e2e/security-headers.spec.ts).
+- **Stage 5.2 playwrightSpecHygieneAudit**: PASS - audited `web/e2e/`; [new-ui.spec.ts](web/e2e/new-ui.spec.ts) testids confirmed still present in current source (`app-shell`, `app-header`, `app-sidebar`, `theme-toggle`, `sidebar-toggle`, `kpi-row`, `endpoint-grid`). Per Standing Backlog item the file is "name-legacy but content-current" - KEEP. No specs deleted in this commit.
+- **Stage 5.3 Playwright vs dev**: PASS - `cd web; $env:E2E_BASE_URL='https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'; $env:E2E_TOKEN='changeme-scim'; npx playwright test e2e/security-headers.spec.ts --reporter=line` -> **3/3 passed in 1.4s**.
+- **Stage 6 commit hygiene**: em-dash scan PASS on the new spec; doc updates to [docs/PHASE_N3A_HELMET.md](docs/PHASE_N3A_HELMET.md) Stage 4/5 status table; no `--amend` / `--force` / `--no-verify`; no version bump (test-only addition).
+
+### Test counts (Phase N3a Stage 5 closure)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,735 | 3,735 | 0 |
+| API jest E2E | 1,197 | 1,197 | 0 |
+| Web vitest | 909 | 909 | 0 |
+| Live SCIM | 1,005 | 1,005 | 0 |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 70 | **73** | +3 (`security-headers.spec.ts` x 3 tests / 21 mirrored assertions) |
+
+**Total assertions across 6 layers: 6,845 -> 6,866** (+ 21 assertion mirrors, packaged as 3 Playwright tests).
+
 ### Added (cross-tenant deploy + data migration, 2026-05-19, no version bump)
 
 - **New tenant cutover (Azure)** - Full re-deploy of dev + prod into tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373` (ProvIAM_Subscription `5738ea6a-533b-4c0d-a18a-d322f2094475`). New FQDNs supersede the prior ones:
