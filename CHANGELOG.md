@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-05-22 - Phase N (UX & Polish) - COMPLETE (7 sub-phases + 1 security hardening)
+
+**Stable rollup of v0.52.0-alpha.1 through v0.52.0-alpha.8.** Phase N closes the redesigned UI's UX gap-list from [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S5.x. No new functionality in this commit beyond the version bump - all behavior was shipped in the alphas listed below.
+
+### Sub-phases shipped under v0.52.0
+
+| Alpha | Phase | Title | Key delta |
+| --- | --- | --- | --- |
+| alpha.1 | N1 | Notifications Inbox | Bell icon + drawer + severity-coded entries + SSE bridge + Take-me-there link. +33 vitest. |
+| alpha.2 | N2 | First-Run Onboarding Wizard | 4-step wizard mounted chrome-level + SettingsPage reset card. +16 vitest. |
+| alpha.3 | N3a | `helmet` middleware (Web Security Headers) | CSP + HSTS + X-Frame-Options + X-Content-Type-Options + Referrer-Policy + COOP/CORP + Permissions-Policy. +7 API unit + 11 API E2E. Moves "Web security headers" row in Cross-Cutting Security Gate Map from DEFERRED to ACTIVE. |
+| alpha.4 | N3 | Export Everywhere (CSV / JSON / NDJSON) | Uniform export split-button on UsersTab + GroupsTab + LogsTab + ActivityTab. +31 vitest, +1 Playwright. |
+| alpha.5 | N4 | Settings Persistence | preferences-store + SettingsPage PreferencesCard + defaultPageSize wired to 4 lists + 4 route loaders. +19 vitest, +1 Playwright. |
+| alpha.6 | N5 | Frontend Telemetry MVP | telemetry-store + opt-in preference + collectors module + SettingsPage TelemetryCard. +19 vitest, +1 Playwright. |
+| alpha.7 | N6 | Extensible Command Palette | commandRegistry singleton + 4 bootstrap-registered ops commands + 4th "Custom commands" group in existing F1 palette. +21 vitest. |
+| alpha.8 | N7 | denseMode + sidebarCollapsedDefault Wiring | applyPreferenceDefaults() at boot + AppShell useEffect for data-density attribute. Closes Phase N4 deferred items. +6 vitest. |
+
+### Cumulative test-count delta across v0.52.0
+
+| Layer | v0.51.0 (Phase M close) | v0.52.0 (Phase N close) | Delta |
+| --- | --- | --- | --- |
+| API unit | 3,728 | 3,735 | +7 (N3a helmet) |
+| API E2E | 1,186 | 1,197 | +11 (N3a security-headers) |
+| Web vitest | 860 | **1,005** | **+145** (N1 +33, N2 +16, N3 +31, N4 +19, N5 +19, N6 +21, N7 +6) |
+| Live SCIM | 1,005 | 1,005 | 0 |
+| PowerShell | 15 | 15 | 0 |
+| Playwright | 73 | 76 | +3 (N3 export + N4 preferences + N5 telemetry smoke) |
+| **Total** | **6,867** | **7,033** | **+166** |
+
+### Quality gate result for the rollup commit
+
+- Stage 1.4 web tsc baseline 96 errors: PRESERVED (every alpha held the line).
+- Stage 2.3 web vitest: 1,005 / 1,005 GREEN.
+- Stage 6: em-dash scan PASS, version bump api + web -> 0.52.0, no lockfile change (no dep change since alpha.3 helmet), no `--amend` / `--force` / `--no-verify`.
+- Stage 4.4 dev Azure deploy + 1,005+ live SCIM test: **NEXT - separate deploy commit** per the standing convention ("No deploy in this commit; dev + prod still on v0.52.0-alpha.3 until a follow-up deploy commit lifts them.").
+- Stage 4.5 prod promotion: **NOT triggered** - prod promotion is NEVER automatic; requires explicit `promote-to-prod.ps1` or `deployAndPromote` prompt invocation per standing operational-safety rule.
+
+### Standing Backlog opened by v0.52.0 (for future phases)
+
+- **N3a follow-up**: Stage 4 live SCIM header lockdown + Stage 5 Playwright `web/e2e/security-headers.spec.ts` vs dev FQDN (server-side helmet is live; the wire-level smoke is the remaining tail).
+- **N4 follow-up**: per-table dense-row CSS opt-in (the `data-density` attribute is exposed by N7; consumers wire it surgically per surface).
+- **N5 follow-up (Phase O)**: server-side telemetry ingestion `POST /scim/admin/telemetry` + 7-day retention + per-tenant scoping + default-on flip to default-off; web-vitals capture; sourcemap upload for stack symbolication.
+- **N6 follow-up**: per-endpoint commands (`endpoint.<id>.activate/.deactivate/.rotate-secret`) registered/unregistered on endpoint mount/unmount; recent-commands history persisted to preferences-store; telemetry: emit a `navigation` event on command invocation.
+- **N7 follow-up**: server-side `/admin/me/preferences` so preferences follow operators across devices (Phase O alongside Managed Identity).
+
+### Next major scope: Phase O - Azure PG Managed Identity + Server-Side Telemetry Ingestion
+
+Phase O is the natural successor: removes the long-lived Postgres password (Managed Identity), opens the durable telemetry layer (closes N5 + multiple Standing Backlog items), and is the right time to flip `CORS_ORIGIN` default to deny.
+
 ### Added (Phase N7 - denseMode + sidebarCollapsedDefault Wiring, v0.52.0-alpha.8, 2026-05-22)
 
 - **Closes Phase N4 deferred items** - the `denseMode` + `sidebarCollapsedDefault` preferences (introduced in v0.52.0-alpha.5) persisted to localStorage but had no consumers. N7 ships the minimal consumer surface for each.
