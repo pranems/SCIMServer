@@ -20,7 +20,6 @@
  * @see docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md S6.6
  * @see docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md
  */
-import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
