@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { router } from './router';
 import { bootstrapTelemetryCollectors } from './store/telemetry-collectors';
+import { bootstrapCommandRegistry } from './store/command-bootstrap';
 
 /**
  * Phase B.3 (v0.48.1): MSW browser worker opt-in mount.
@@ -37,6 +38,11 @@ async function bootstrap(): Promise<void> {
   // is enforced inside useTelemetryStore.record() against
   // preferences-store.telemetryOptIn.
   bootstrapTelemetryCollectors(router);
+
+  // Phase N6 - register operator-useful palette commands so the
+  // Cmd/Ctrl+K "Custom commands" group has content out of the box.
+  bootstrapCommandRegistry();
+
   createRoot(document.getElementById('root')!).render(<App />);
 }
 
