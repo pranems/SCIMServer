@@ -12,6 +12,7 @@ import { createRoute, useSearch, useNavigate } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
 import { activitySearchSchema, type ActivitySearch } from './search-schemas';
 import { endpointActivityQueryOptions } from '../api/queries';
+import { usePreferencesStore } from '../store/preferences-store';
 
 // Phase K1 - lazy-load ActivityTab into its own chunk.
 const ActivityTab = React.lazy(() =>
@@ -58,15 +59,19 @@ export const activityTabRoute = createRoute({
     severity: search.severity,
     search: search.search,
   }),
-  loader: ({ context, params, deps }) =>
-    context.queryClient.ensureQueryData(
+  loader: ({ context, params, deps }) => {
+    // Phase N4: fall back to the persisted user preference when the URL
+    // has no explicit `?pageSize`.
+    const limit = deps.pageSize ?? usePreferencesStore.getState().defaultPageSize;
+    return context.queryClient.ensureQueryData(
       endpointActivityQueryOptions({
         endpointId: params.endpointId,
         page: deps.page,
-        limit: deps.pageSize,
+        limit,
         type: deps.type,
         severity: deps.severity,
         search: deps.search,
       }),
-    ),
+    );
+  },
 });

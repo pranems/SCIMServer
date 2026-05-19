@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase N4 - Settings Persistence, v0.52.0-alpha.5, 2026-05-20)
+
+- **Per-user UI preferences with versioned localStorage persistence** - New [web/src/store/preferences-store.ts](web/src/store/preferences-store.ts) (~120 LoC) is a Zustand atom + hand-rolled persistence layer (envelope `{v: 1, prefs: {...}}` at localStorage key `scimserver.preferences.v1`). Hand-roll chosen over `zustand/middleware/persist` so we can version + allowlist + clamp at hydrate time (defends against stale storage from a future schema). Three preferences ship in v1:
+  - `defaultPageSize` (10 / 20 / 50 / 100, default 20) - clamped via `ALLOWED_PAGE_SIZES`. Live across UsersTab + GroupsTab + LogsTab + ActivityTab.
+  - `denseMode` (boolean, default false) - persists; UI wiring into table primitives deferred.
+  - `sidebarCollapsedDefault` (boolean, default false) - persists; UI wiring into `ui-store` bootstrap deferred.
+- **`SettingsPage` PreferencesCard** ([web/src/pages/SettingsPage.tsx](web/src/pages/SettingsPage.tsx)) - new card with Fluent `Dropdown` for page size + 2 `Switch` for booleans + Reset button. New testids: `settings-preferences-card`, `settings-preferences-default-page-size`, `settings-preferences-dense-mode`, `settings-preferences-sidebar-collapsed-default`, `settings-preferences-reset`.
+- **`paginationSchema.pageSize` flipped from `.default(20)` to `.optional()`** ([web/src/routes/search-schemas.ts](web/src/routes/search-schemas.ts)) so preferences-store is the single source of truth for page-size defaults. The historic value 20 is preserved because `PREFERENCES_DEFAULTS.defaultPageSize === 20` for fresh visitors. URL `?pageSize=N` always wins (deep-link + share intact).
+- **4 tabs + 4 route loaders wired to fall back to preferences-store** - `usePreferencesStore((s) => s.defaultPageSize)` inside React components; `usePreferencesStore.getState().defaultPageSize` inside TanStack Router loaders (synchronous outside render). The loader's prefetch and the component's render must agree on `count`, otherwise prefetched query is missed.
+- **New [web/e2e/preferences.spec.ts](web/e2e/preferences.spec.ts)** - browser-side smoke vs dev FQDN, asserts the PreferencesCard + its 4 controls render on /settings.
+- **New [docs/PHASE_N4_SETTINGS_PERSISTENCE.md](docs/PHASE_N4_SETTINGS_PERSISTENCE.md)** - architecture (Mermaid), module map, test coverage table, design rationale (why hand-rolled persist / why separate from ui-store / why URL stays winning / why route loaders use getState), deferred items.
+
+### Quality gates result (Phase N4)
+
+Per [.github/copilot-instructions.md](.github/copilot-instructions.md) Stages 0-6, every Phase N4 sub-commit was RED-first (Stage 0), preserved the web tsc baseline of 96 errors (Stage 1.4), and shipped only after the full vitest sweep passed (Stage 2.3).
+
+- **Stage 0 TDD**: confirmed RED in 3 RED-then-GREEN cycles (preferences-store +13, SettingsPage PreferencesCard +3, consumer wire +3).
+- **Stage 1.4 web tsc**: PASS - baseline of 96 errors preserved across all 3 commits.
+- **Stage 2.3 full vitest**: PASS - 940 -> 953 -> 956 -> 959 (+19 tests across 5 new/modified suites).
+- **Stage 6 commit hygiene**: em-dash scan PASS on every modified file; version bump v0.52.0-alpha.4 -> v0.52.0-alpha.5 in api/package.json + web/package.json; no `--amend` / `--force` / `--no-verify`.
+
+### Test counts (Phase N4)
+
+| Layer | Pre | Post | Delta |
+|---|---|---|---|
+| API jest unit | 3,735 | 3,735 | 0 |
+| API jest E2E | 1,197 | 1,197 | 0 |
+| Web vitest | 940 | **959** | **+19** (preferences-store +13, SettingsPage PreferencesCard +3, UsersTab +1, GroupsTab +1, LogsTab +1) |
+| Live SCIM | 1,005 | 1,005 | 0 |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 74 | **75** | **+1** (`preferences.spec.ts` smoke) |
+
+**Total assertions across 6 layers: 6,898 -> 6,918** (+20).
+
+### Files changed (Phase N4)
+
+- `web/src/store/preferences-store.ts` (NEW)
+- `web/src/store/preferences-store.test.ts` (NEW)
+- `web/src/pages/SettingsPage.tsx` (PreferencesCard component + mount)
+- `web/src/pages/SettingsPage.test.tsx` (3 new tests)
+- `web/src/routes/search-schemas.ts` (paginationSchema.pageSize -> .optional())
+- `web/src/routes/search-schemas.test.ts` (assertions updated for optional)
+- `web/src/pages/{Users,Groups,Logs,Activity}Tab.tsx` (defaultPageSize selector)
+- `web/src/pages/{Users,Groups,Logs}Tab.test.tsx` (1 new test each)
+- `web/src/pages/ActivityTab.tsx` (props.search.pageSize -> optional)
+- `web/src/routes/endpoints.$endpointId.{users,groups,logs,activity}.tsx` (loader fallback)
+- `web/src/pages/LogsPage.tsx` (drop hardcoded `pageSize: 20` in reset link)
+- `web/e2e/preferences.spec.ts` (NEW smoke)
+- `docs/PHASE_N4_SETTINGS_PERSISTENCE.md` (NEW)
+- `docs/INDEX.md` (entry added)
+- `CHANGELOG.md` (this entry)
+- `Session_starter.md` (chronological row)
+- `api/package.json` + `web/package.json` (version 0.52.0-alpha.4 -> 0.52.0-alpha.5)
+
 ### Added (Phase N3 - Export Everywhere, v0.52.0-alpha.4, 2026-05-19)
 
 - **Export split-button (CSV / JSON / NDJSON) on all four list surfaces** - UsersTab, GroupsTab, LogsTab, ActivityTab. Operator can now pull the currently-rendered page out to disk in any of the three industry-standard tabular formats from any list. Single shared primitive [web/src/components/primitives/ExportSplitButton.tsx](web/src/components/primitives/ExportSplitButton.tsx) (~140 LoC, Fluent UI Menu/MenuTrigger/MenuPopover/MenuList) drives all four surfaces. UTC stamp `YYYYMMDDTHHMMSSZ` in every filename for stable sort order. CSV reuses the column set previously locked in BulkTab + OperationsPage; JSON ships pretty-printed (2-space indent); NDJSON ships one compact JSON object per line, no trailing newline. Three new exported helpers in [web/src/utils/csv-export.ts](web/src/utils/csv-export.ts) (`toJson`, `toNdjson`, `triggerJsonDownload`, `triggerNdjsonDownload`) with proper Blob MIME types (`application/json;charset=utf-8`, `application/x-ndjson;charset=utf-8`).

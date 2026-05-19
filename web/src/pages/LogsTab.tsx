@@ -26,6 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
 import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -73,7 +74,9 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const search = useSearch({ strict: false }) as Partial<LogsSearch>;
   const page = search.page ?? 1;
-  const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
+  // Phase N4: fall back to the persisted user preference when no URL override is set.
+  const defaultPageSize = usePreferencesStore((s) => s.defaultPageSize);
+  const pageSize = search.pageSize ?? defaultPageSize;
   const urlContains = search.urlContains ?? '';
   const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointLogs(endpointId, page, urlContains, pageSize);

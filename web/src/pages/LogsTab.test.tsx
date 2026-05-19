@@ -18,6 +18,7 @@ vi.mock('@tanstack/react-query', async () => {
 });
 
 import { LogsTab } from './LogsTab';
+import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
 function wrap(
   ui: React.ReactElement,
@@ -31,7 +32,12 @@ function wrap(
 }
 
 describe('LogsTab', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Phase N4: each test starts from default preferences (pageSize=20).
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
+    localStorage.clear();
+  });
 
   it('shows loading state', async () => {
     mockUseQuery.mockReturnValue({
@@ -138,5 +144,22 @@ describe('LogsTab', () => {
     expect(body).toContain('l2,GET,/Users,200,8,2026-05-01T09:00:00Z');
 
     csvSpy.mockRestore();
+  });
+
+  // ==========================================================================
+  // Phase N4 - honor defaultPageSize preference when URL has no ?pageSize
+  // ==========================================================================
+  it('honors preferences-store defaultPageSize when URL has no ?pageSize override', async () => {
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS, defaultPageSize: 50 });
+    mockUseQuery.mockReturnValue({
+      data: { total: 0, items: [] },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    await screen.findByText(/no request logs/i);
+    // Hook is called via useQuery({queryKey: ['endpoint-logs', endpointId, page, pageSize, urlContains]}).
+    const lastCall = mockUseQuery.mock.calls.at(-1) ?? [];
+    const queryArg = lastCall[0] as { queryKey: unknown[] };
+    expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 1, 50, '']);
   });
 });

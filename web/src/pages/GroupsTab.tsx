@@ -23,6 +23,7 @@ import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { usePreferencesStore } from '../store/preferences-store';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
@@ -46,7 +47,9 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const search = useSearch({ strict: false }) as Partial<GroupsSearch>;
   const page = search.page ?? 1;
-  const pageSize = search.pageSize ?? 20;
+  // Phase N4: fall back to the persisted user preference when no URL override is set.
+  const defaultPageSize = usePreferencesStore((s) => s.defaultPageSize);
+  const pageSize = search.pageSize ?? defaultPageSize;
   const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;

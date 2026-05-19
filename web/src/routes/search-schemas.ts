@@ -34,9 +34,14 @@ const emptyToUndef = (v: unknown) =>
  * page is 1-indexed; pageSize is capped to align with the server-side
  * `count` ceiling.
  */
+// Phase N4 - `pageSize` is optional (not defaulted). Consumers fall
+// back to `usePreferencesStore.getState().defaultPageSize` so the
+// persisted user preference is the single source of truth. The store
+// itself defaults to 20, preserving the historic out-of-the-box page
+// size for fresh sessions.
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
 export type PaginationSearch = z.infer<typeof paginationSchema>;
 
