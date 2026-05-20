@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deployed - 2026-05-20 - v0.52.0 to dev (Stage 4.4)
+
+- **Image:** `acrscimserver20622.azurecr.io/scimserver:48e389a` (also tagged `:0.52.0`); digest `sha256:9e45ec1b1a91a38b7a42e21546d30935bb6b30074f8ae867c41cc2877fc36110`.
+- **Target:** `scimserver-dev` container app in resource group `scimserver-dev` (single-revision mode); FQDN `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`.
+- **Revision:** `scimserver-dev--0000001` Healthy + RunningAtMaxScale + 100% traffic; superseded prior `scimserver-dev--5agfnkw` on `:0.52.0-alpha.3` (N3a / helmet only).
+- **Live SCIM test:** [scripts/live-test.ps1](scripts/live-test.ps1) executed against the dev FQDN with OAuth client_credentials. **1,005 / 1,005 GREEN in 74.2s** ([logs/live-test-dev-48e389a.log](logs/live-test-dev-48e389a.log)). Covers all 8 alphas (N1 Notifications + N2 Onboarding + N3 Export + N3a helmet headers + N4 Preferences + N5 Telemetry + N6 Command Palette + N7 denseMode) plus the hooks fix from `48e389a`.
+- **Pipeline:** `az acr login` -> `docker build -t :0.52.0 -t :48e389a -f Dockerfile .` (14.6s build, 856 byte manifest) -> `docker push` both tags (digest matched, no duplicate layer upload) -> `az containerapp update --image :48e389a` (single-revision rollover) -> 30s warm-up -> live-test 74.2s. Total ~6 min wall clock.
+- **No source change.** This is a deploy-only commit per the project convention. Prod is NOT promoted (still on whatever tag last shipped); prod promotion is NEVER automatic and requires explicit operator action.
+
 ### Fixed - 2026-05-19 - Pre-commit hook false-alarm RCA + 2 latent bugs
 
 Closed during investigation of the Phase N "hijacked-by-hook" commit symptom (`0d24860`). The original diagnosis ("the new hook is buggy and hijacked the staged set") was wrong - the commit faithfully captured what was actually staged, which was 4 hook-infra files because `git add` had not yet covered the N6 source edits. But the investigation uncovered two real latent bugs that are now fixed:
