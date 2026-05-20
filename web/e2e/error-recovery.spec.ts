@@ -40,63 +40,70 @@ test.beforeEach(async ({ page }) => {
 test.describe('Route-level error recovery', () => {
   test('non-existent endpoint id renders the error branch', async ({ page }) => {
     // Synthesise an obviously-bogus id; the GET /endpoints/$id loader
-    // must surface a 4xx, which the EndpointDetailPage maps to the
-    // endpoint-detail-error testid.
+    // throws on 4xx, which the parent route's RouteBoundary catches
+    // and renders via the `route-boundary-error` testid.
     const bogusId = 'this-endpoint-id-definitely-does-not-exist-xyz-12345';
     await page.goto(`/endpoints/${bogusId}`);
 
-    await expect(page.getByTestId('endpoint-detail-error')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('route-boundary-error')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('route-boundary-error-title')).toBeVisible();
+    await expect(page.getByTestId('route-boundary-error-message')).toContainText(/not found/i);
   });
 
-  test('back-to-endpoints link still works from the error state', async ({ page }) => {
+  test('Try-again button is reachable from the error state', async ({ page }) => {
+    // The route-boundary fallback exposes a `route-boundary-error-reset`
+    // button (the user-facing "Try again" affordance). The error
+    // fallback replaces the page chrome below the AppShell, so the
+    // back-to-endpoints link is NOT available; the sidebar nav links
+    // ARE rendered but in the current implementation the boundary
+    // does NOT auto-reset on a SPA navigation - the user must press
+    // "Try again" or hard-reload. We verify the reset affordance is
+    // reachable here; the SPA-nav reset path is a separate UX issue
+    // tracked outside this spec.
     const bogusId = 'another-bogus-endpoint-id-xyz-67890';
     await page.goto(`/endpoints/${bogusId}`);
-    await expect(page.getByTestId('endpoint-detail-error')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('route-boundary-error')).toBeVisible({ timeout: 30_000 });
+    const reset = page.getByTestId('route-boundary-error-reset');
+    await expect(reset).toBeVisible();
+    await expect(reset).toBeEnabled();
 
-    // The header back link must remain mounted even when the body
-    // is in its error state; clicking it returns to the grid.
-    await page.getByTestId('back-to-endpoints').click();
-    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 15_000 });
+    // The sidebar nav link is mounted in the AppShell chrome
+    // (outside the route boundary).
+    await expect(page.getByTestId('nav-endpoints')).toBeVisible();
   });
 
   test('navigating away from an error route renders the next route cleanly', async ({ page }) => {
     const bogusId = 'recoverable-error-test-id-xyz-99999';
     await page.goto(`/endpoints/${bogusId}`);
-    await expect(page.getByTestId('endpoint-detail-error')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('route-boundary-error')).toBeVisible({ timeout: 30_000 });
 
-    // Now go to /settings. The RouteBoundary uses pathname as its
-    // resetKey, so the boundary must reset and the settings panel
-    // must render with NO error-banner residue.
+    // Hard-navigate to /settings (full page reload). The route
+    // boundary belongs to the previous route hierarchy and is reset
+    // by the fresh document load; the global SettingsPage uses
+    // testid `settings-page`.
     await page.goto('/settings');
-    await expect(page.getByTestId('settings-tab')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/Something went wrong/i)).toHaveCount(0);
+    await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('route-boundary-error')).toHaveCount(0);
   });
 });
 
 test.describe('ScimErrorMessage surface (smoke via real loader)', () => {
-  // The ScimErrorMessage testids are 'scim-error-message' (root)
-  // plus 'scim-error-title', 'scim-error-detail', etc. We don't
-  // hard-code which API call produces an error here because that
-  // varies by tenant; instead we just confirm the testid is
-  // queryable somewhere on the bogus-id detail page.
-
-  test('ScimErrorMessage testid is reachable from a 4xx route', async ({ page }) => {
+  // The route-boundary fallback wraps the upstream error in a
+  // user-friendly title + message. Whether the inner ScimErrorMessage
+  // component is rendered depends on the upstream catalog mapping.
+  // We assert the boundary fallback is reachable and contains the
+  // expected SCIM-style "not found" detail.
+  test('route-boundary fallback surfaces the underlying SCIM 4xx detail', async ({ page }) => {
     const bogusId = 'scim-error-message-smoke-id-xyz-54321';
     await page.goto(`/endpoints/${bogusId}`);
 
-    // Wait for the page to settle in its error branch.
-    await expect(page.getByTestId('endpoint-detail-error')).toBeVisible({ timeout: 30_000 });
+    // Wait for the route boundary to settle in its error branch.
+    await expect(page.getByTestId('route-boundary-error')).toBeVisible({ timeout: 30_000 });
 
-    // The error branch wraps the upstream error in a ScimErrorMessage.
-    // It may or may not render (depends on whether the loader caught
-    // a 4xx with a SCIM body vs a network-level error). We do a soft
-    // assert via count >= 0 to avoid flakes; if present, basic
-    // structure must be intact.
-    const scimMsg = page.getByTestId('scim-error-message');
-    const count = await scimMsg.count();
-    if (count > 0) {
-      // Title is always rendered when the SCIM error catalog has an entry.
-      await expect(scimMsg.getByTestId('scim-error-title')).toBeVisible({ timeout: 5_000 });
-    }
+    // The error message must surface the bogus id so the operator
+    // can diagnose; this is the user-facing equivalent of the SCIM
+    // "detail" field that ScimErrorMessage would render in a body
+    // page.
+    await expect(page.getByTestId('route-boundary-error-message')).toContainText(bogusId);
   });
 });

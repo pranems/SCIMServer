@@ -92,9 +92,11 @@ test.describe('NotificationsDrawer - empty state', () => {
     await expect(page.getByTestId('notifications-drawer')).toBeVisible();
 
     await page.getByTestId('notifications-close').click();
-    // OverlayDrawer renders a marker div when closed; assert the
-    // visible-drawer body is gone.
-    await expect(page.getByTestId('notifications-drawer')).toHaveCount(0, { timeout: 5_000 });
+    // The component renders a marker div with data-open="false" when
+    // closed (see NotificationsDrawer.tsx ~line 161). Assert closed
+    // state via the data-open attribute rather than expecting zero
+    // count.
+    await expect(page.getByTestId('notifications-drawer')).toHaveAttribute('data-open', 'false', { timeout: 5_000 });
   });
 });
 

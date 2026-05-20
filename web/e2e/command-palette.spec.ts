@@ -42,13 +42,14 @@ async function gotoShell(page: Page): Promise<void> {
 test.describe('CommandPalette - open / close / search / select', () => {
   test('Ctrl+K opens the palette', async ({ page }) => {
     await gotoShell(page);
-    await page.keyboard.press('Control+K');
+    // Playwright key syntax: 'Control+k' = Ctrl+K; 'Control+K' = Ctrl+Shift+K.
+    await page.keyboard.press('Control+k');
     await expect(page.getByTestId('command-palette')).toBeVisible({ timeout: 5_000 });
   });
 
   test('Meta+K opens the palette (mac binding)', async ({ page }) => {
     await gotoShell(page);
-    await page.keyboard.press('Meta+K');
+    await page.keyboard.press('Meta+k');
     await expect(page.getByTestId('command-palette')).toBeVisible({ timeout: 5_000 });
   });
 
@@ -62,7 +63,7 @@ test.describe('CommandPalette - open / close / search / select', () => {
 
   test('Esc closes the palette', async ({ page }) => {
     await gotoShell(page);
-    await page.keyboard.press('Control+K');
+    await page.keyboard.press('Control+k');
     await expect(page.getByTestId('command-palette')).toBeVisible({ timeout: 5_000 });
 
     await page.keyboard.press('Escape');
@@ -71,7 +72,7 @@ test.describe('CommandPalette - open / close / search / select', () => {
 
   test('typing "endpoint" surfaces at least one matching item', async ({ page }) => {
     await gotoShell(page);
-    await page.keyboard.press('Control+K');
+    await page.keyboard.press('Control+k');
 
     const palette = page.getByTestId('command-palette');
     await expect(palette).toBeVisible({ timeout: 5_000 });
@@ -91,7 +92,7 @@ test.describe('CommandPalette - open / close / search / select', () => {
 
   test('selecting a route item navigates', async ({ page }) => {
     await gotoShell(page);
-    await page.keyboard.press('Control+K');
+    await page.keyboard.press('Control+k');
 
     const palette = page.getByTestId('command-palette');
     await expect(palette).toBeVisible({ timeout: 5_000 });
@@ -99,9 +100,10 @@ test.describe('CommandPalette - open / close / search / select', () => {
     const input = palette.getByPlaceholder(/type a command or search/i);
     await input.fill('settings');
 
-    // Press ArrowDown + Enter to commit the highlighted item rather
-    // than relying on a click-position - cmdk handles arrow nav.
-    await input.press('ArrowDown');
+    // cmdk auto-selects the first matching item ("Go to Settings")
+    // on input change. Pressing ArrowDown would move past it onto the
+    // second match (a custom command), so press Enter directly to
+    // commit the auto-selected route.
     await input.press('Enter');
 
     // Palette closes after selection.
@@ -112,14 +114,14 @@ test.describe('CommandPalette - open / close / search / select', () => {
 
   test('palette opens with empty input each time', async ({ page }) => {
     await gotoShell(page);
-    await page.keyboard.press('Control+K');
+    await page.keyboard.press('Control+k');
     let palette = page.getByTestId('command-palette');
     let input = palette.getByPlaceholder(/type a command or search/i);
     await input.fill('something-random-xyz');
     await page.keyboard.press('Escape');
     await expect(palette).toHaveCount(0);
 
-    await page.keyboard.press('Control+K');
+    await page.keyboard.press('Control+k');
     palette = page.getByTestId('command-palette');
     await expect(palette).toBeVisible();
     input = palette.getByPlaceholder(/type a command or search/i);

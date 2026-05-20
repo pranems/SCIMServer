@@ -95,13 +95,20 @@ test.describe('EndpointDetailPage - tab matrix', () => {
   //   (a) clicking the Fluent UI Tab navigates to the panel
   //   (b) the URL search parameter reflects the change
   //   (c) the panel testid is rendered
+  //
+  // For tabs that render an empty-state component instead of the
+  // container when the endpoint has zero items (Users, Groups), the
+  // expected testid is matched against an alternative empty-state
+  // testid as well. The spec is intentionally tolerant because the
+  // test tenant data is not seeded by this spec.
   const TAB_CASES: ReadonlyArray<{
     key: string;
     label: RegExp;
     panelTestId: string;
+    altEmptyTestId?: string;
   }> = [
-    { key: 'users', label: /^Users$/i, panelTestId: 'users-tab' },
-    { key: 'groups', label: /^Groups$/i, panelTestId: 'groups-tab' },
+    { key: 'users', label: /^Users$/i, panelTestId: 'users-tab', altEmptyTestId: 'users-empty' },
+    { key: 'groups', label: /^Groups$/i, panelTestId: 'groups-tab', altEmptyTestId: 'groups-empty' },
     { key: 'activity', label: /^Activity$/i, panelTestId: 'tab-activity' },
     { key: 'bulk', label: /^Bulk$/i, panelTestId: 'bulk-page' },
     { key: 'resource-types', label: /Resource Types/i, panelTestId: 'resource-types-tab' },
@@ -120,14 +127,20 @@ test.describe('EndpointDetailPage - tab matrix', () => {
       await tabBtn.click();
 
       // Loading skeletons may flash; wait up to 20s for the
-      // post-load panel testid.
-      await expect(page.getByTestId(tab.panelTestId)).toBeVisible({ timeout: 20_000 });
+      // post-load panel testid (or the empty-state alternative).
+      const selector = tab.altEmptyTestId
+        ? `[data-testid="${tab.panelTestId}"], [data-testid="${tab.altEmptyTestId}"]`
+        : `[data-testid="${tab.panelTestId}"]`;
+      await page.waitForSelector(selector, { state: 'visible', timeout: 20_000 });
     });
 
     test(`deep-link to "${tab.key}" tab renders the same panel`, async ({ page }) => {
       const id = await openFirstEndpoint(page);
       await page.goto(`/endpoints/${id}/${tab.key}`);
-      await expect(page.getByTestId(tab.panelTestId)).toBeVisible({ timeout: 20_000 });
+      const selector = tab.altEmptyTestId
+        ? `[data-testid="${tab.panelTestId}"], [data-testid="${tab.altEmptyTestId}"]`
+        : `[data-testid="${tab.panelTestId}"]`;
+      await page.waitForSelector(selector, { state: 'visible', timeout: 20_000 });
     });
   }
 
@@ -136,6 +149,8 @@ test.describe('EndpointDetailPage - tab matrix', () => {
     await page.getByRole('tab', { name: /^Logs$/i }).click();
     // The Logs panel uses route-specific testids covered by
     // smoke-test.spec.ts; here we just confirm navigation succeeded.
-    await expect(page).toHaveURL(/\/logs$/);
+    // URL may include `?page=1` or other search params, so use a
+    // loose regex that allows either end-of-string or query string.
+    await expect(page).toHaveURL(/\/logs(\?|$)/);
   });
 });

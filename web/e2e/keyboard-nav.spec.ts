@@ -105,16 +105,17 @@ test.describe('Global keyboard shortcuts', () => {
     await gotoShell(page);
     await page.getByTestId('app-shell').click({ position: { x: 5, y: 5 } });
 
-    // Shift+/ on a US layout produces '?'. page.keyboard.press('?')
-    // also dispatches a single ? key event via Playwright's keymap.
-    await page.keyboard.press('Shift+/');
+    // Playwright `Shift+/` dispatches key='/'+shiftKey rather than key='?',
+    // so the hook (which matches on key === '?') would not fire. Press '?'
+    // directly to dispatch the question-mark key event.
+    await page.keyboard.press('?');
     await expect(page.getByTestId('shortcuts-help')).toBeVisible({ timeout: 5_000 });
   });
 
   test('Esc closes the KeyboardShortcutsHelp modal', async ({ page }) => {
     await gotoShell(page);
     await page.getByTestId('app-shell').click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press('Shift+/');
+    await page.keyboard.press('?');
     await expect(page.getByTestId('shortcuts-help')).toBeVisible({ timeout: 5_000 });
 
     await page.keyboard.press('Escape');

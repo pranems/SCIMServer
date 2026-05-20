@@ -75,7 +75,9 @@ test.describe('TokenGate - v0.52.1 RCA paths', () => {
 
     // Bug 1 invariant: no "Token expired" / "invalid" copy before the
     // user has typed anything.
-    const dialogBody = page.getByRole('dialog');
+    // TokenGate uses Fluent UI v9 Dialog with modalType="alert" which
+    // emits role="alertdialog" (NOT "dialog").
+    const dialogBody = page.getByRole('alertdialog');
     await expect(dialogBody).not.toContainText(/token expired/i);
     await expect(dialogBody).not.toContainText(/invalid/i);
     await expect(dialogBody).not.toContainText(/cannot be empty/i);
