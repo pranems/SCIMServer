@@ -18,11 +18,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   - **Bug 3 (loader error state persists):** `queryClient.invalidateQueries()` tells TanStack Query to refetch but does NOT clear TanStack Router's independent LOADER error state. The route was still in error (loader had thrown 401) when `TokenGate` closed and rendered children - `<Outlet>` rendered the route's error component instead of the page. **Fix (`web/src/layout/TokenGate.tsx`):** Call `router.invalidate()` (via `useRouter` from `@tanstack/react-router`) after `queryClient.invalidateQueries()` in `handleSave`. This re-runs all active TanStack Router loaders with the new token, clearing the error state.
 
-- **New test file `web/src/layout/TokenGate.test.tsx`** (5 tests): dialog shows without token, children render with token, `handleSave` calls `router.invalidate()` (Bug 3 regression lock), `TOKEN_INVALID_EVENT` re-opens dialog, empty token rejected.
+- **New test file `web/src/layout/TokenGate.test.tsx`** (6 tests): dialog shows without token, children render with token, `handleSave` calls `router.invalidate()` (Bug 3 regression lock), `TOKEN_INVALID_EVENT` re-opens dialog, empty token rejected, rapid double-click ignored via ref-backed `pendingRef` guard (Stage 3a Gap 3 fix).
 - **Updated `web/src/api/queries.test.ts`** (+1 test): `fetchWithAuth` throws `ScimApiError(401)` WITHOUT making a network request and WITHOUT firing `notifyTokenInvalid` when there is no stored token (Bug 2 regression lock).
-- **Updated `web/src/router-loaders.integration.test.tsx`**: added `vi.mock` for `./auth/token` so the `fetchWithAuth` no-token short-circuit does not break the existing loader integration test (which previously relied on jsdom's empty localStorage passing through to the mock fetch).
+- **Updated `web/src/router-loaders.integration.test.tsx`** (+3 tests): added `vi.mock` for `./auth/token` so the `fetchWithAuth` no-token short-circuit does not break the existing loader integration test, PLUS three new composition-level RCA scenarios from the Stage 3a audit:
+  - **CRITICAL Path 2**: loader 401 -> `notifyTokenInvalid` + `clearStoredToken` fire (TokenGate listener chain end-to-end).
+  - **HIGH Path 1**: loader non-401 (500) error surfaces to `errorComponent` without dispatching `TOKEN_INVALID_EVENT` (server errors must not impersonate auth events).
+  - **HIGH Path 5**: no-token loader run dispatches zero HTTP calls, zero `notifyTokenInvalid`, zero `clearStoredToken` (Bug 2 lock at the loader-composition level).
+- **TokenGate `pendingRef` synchronous double-click guard** (`web/src/layout/TokenGate.tsx`): added a `useRef`-backed pending flag because React state batching means two synchronous `fireEvent.click()` calls both observe `isPending === false`. The ref flips inside the first call and short-circuits the second, ensuring `setStoredToken` / `queryClient.invalidateQueries` / `router.invalidate` each run exactly once per save (Stage 3a Gap 3 HIGH fix).
 
-**Test counts after fix:** API unit 3,735 / API E2E 1,197 / Web vitest **1,011** (+6) / Live SCIM 1,005 / PowerShell 15 / Playwright 76 = **7,039 total**. tsc baseline 96 (unchanged).
+**Test counts after fix:** API unit 3,735 / API E2E 1,197 / Web vitest **1,015** (+10 vs v0.52.0) / Live SCIM 1,005 / PowerShell 15 / Playwright **138** (+62) = **7,105 total**. tsc baseline 96 (unchanged).
+
+**Playwright UI path audit (Stage 5):** systematic inventory of every route under `web/src/routes/*.tsx` + every page-level component vs the existing 76-test baseline surfaced 7 high-value gap clusters. Authored 7 new spec files (62 new tests), bringing the suite from 76 -> 138 tests across 12 -> 19 files:
+
+  - **[web/e2e/token-gate.spec.ts](web/e2e/token-gate.spec.ts)** (8 tests): end-to-end RCA scenarios for Bug 1 (first-load no-error invariant), Bug 2 (TOKEN_INVALID_EVENT branch), Bug 3 (post-save router.invalidate clears loader error), pendingRef double-click guard, Enter-key submit, reload persistence.
+  - **[web/e2e/endpoint-detail-tabs.spec.ts](web/e2e/endpoint-detail-tabs.spec.ts)** (20 tests): all 10 detail tabs (overview/users/groups/activity/schemas/credentials/bulk/resource-types/logs/settings) via click + deep-link parity; back link; header buttons.
+  - **[web/e2e/endpoint-crud.spec.ts](web/e2e/endpoint-crud.spec.ts)** (9 tests): 4-step CreateEndpointWizard validation + happy path; back-step preserves state; edit form fields; DeleteEndpointDialog name-match gate. Mutation tests gated behind `E2E_ALLOW_MUTATIONS=1` so default dev run is non-destructive.
+  - **[web/e2e/command-palette.spec.ts](web/e2e/command-palette.spec.ts)** (7 tests): Ctrl+K / Meta+K / `/` open, Esc close, type-to-filter, ArrowDown+Enter navigate, fresh-open empty input.
+  - **[web/e2e/notifications-drawer.spec.ts](web/e2e/notifications-drawer.spec.ts)** (7 tests): empty state + seeded entries via `scimserver.notifications.v1` localStorage pre-seed; badge count; Mark all read; close button.
+  - **[web/e2e/keyboard-nav.spec.ts](web/e2e/keyboard-nav.spec.ts)** (8 tests): `g d`/`g e`/`g m`/`g l`/`g s` navigation sequences; `?` opens shortcut help; Esc closes help; editable-target skip rule.
+  - **[web/e2e/error-recovery.spec.ts](web/e2e/error-recovery.spec.ts)** (4 tests): bogus-id detail route surfaces `endpoint-detail-error` testid; back link escape hatch; RouteBoundary auto-reset on navigation; ScimErrorMessage smoke.
+
+  Conventions: `page.addInitScript` for token injection (matches existing `router-behavior.spec.ts` / `onboarding.spec.ts`), `data-testid` selectors only, `E2E_BASE_URL` + `E2E_TOKEN` env contract documented in each spec header, no em-dashes, no `console.log`, no `.only` / `.skip` (except `E2E_ALLOW_MUTATIONS` guard). Discovery: `npx playwright test --list` -> **138 tests in 19 files**, all parse + valid.
+
+  Remaining Stage 5 backlog (deferred, low priority): users-tab CRUD drilldown (pagination prev/next, DetailDrawer click, ExportSplitButton menu items - partially covered by visual-regression snapshot), bulk-tab CSV upload end-to-end (mutation cost), credentials-tab create+copy+delete (mutation cost), manual-provision page (legacy UI surface), resource-types create+delete (per-endpoint mutation), SSE notification arrival path (current spec pre-seeds; doesn't observe live SSE push).
+
+  Stale-spec finding (no deletion this run): [web/e2e/new-ui.spec.ts](web/e2e/new-ui.spec.ts) is name-legacy (pre-Phase-I) but content-current; all asserted testids still exist in source. The Stage 5.2 "delete list" in [.github/copilot-instructions.md](.github/copilot-instructions.md) should be amended; existing Standing Backlog note already documents this.
 
 **Version:** `0.52.0` -> `0.52.1` (patch bump; bug fix on the stable v0.52.0 release).
 

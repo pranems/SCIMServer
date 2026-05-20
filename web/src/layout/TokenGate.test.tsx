@@ -165,4 +165,32 @@ describe('TokenGate', () => {
     expect(mockInvalidate).not.toHaveBeenCalled();
     expect(screen.getByTestId('fluent-dialog')).toBeInTheDocument(); // dialog still open
   });
+
+  it('guards against rapid double-click on Save button (isPending guard prevents double save)', () => {
+    // Path 3 gap: User clicks Save twice rapidly (e.g. nervous double-tap).
+    // The isPending guard inside handleSave must short-circuit the second
+    // click so setStoredToken / queryClient.invalidateQueries / router.invalidate
+    // each run exactly once. Note: the dialog unmounts after the first click
+    // (showDialog flips to false), so we assert on the side-effect counts
+    // rather than the button's DOM disabled attribute (the button no longer
+    // exists in the DOM by the time the second click is processed).
+    renderGate(false);
+    const input = screen.getByTestId('token-input');
+    fireEvent.change(input, { target: { value: 'my-token' } });
+
+    const saveBtn = screen.getByTestId('token-save') as HTMLButtonElement;
+
+    // Click twice rapidly (synchronous - simulates a fast double-tap that
+    // would race before setIsPending(true) takes effect for a naive impl).
+    fireEvent.click(saveBtn);
+    fireEvent.click(saveBtn);
+
+    // Only one save must have occurred. This is the actual invariant the
+    // guard protects - duplicate setStoredToken / router.invalidate calls
+    // would have happened without the guard.
+    expect(mockSetStoredToken).toHaveBeenCalledTimes(1);
+    expect(mockSetStoredToken).toHaveBeenCalledWith('my-token');
+    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1);
+    expect(mockInvalidate).toHaveBeenCalledTimes(1);
+  });
 });

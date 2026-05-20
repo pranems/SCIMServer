@@ -7,7 +7,7 @@
  *
  * Also listens for TOKEN_INVALID_EVENT (401 from API) to re-show the dialog.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogSurface,
@@ -48,6 +48,12 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
   const [showDialog, setShowDialog] = useState(!getStoredToken());
   const [tokenValue, setTokenValue] = useState('');
   const [error, setError] = useState('');
+  const [isPending, setIsPending] = useState(false);
+  // Ref-backed guard for synchronous double-click protection. React state
+  // updates are batched, so two fireEvent.click() in the same tick both see
+  // isPending===false. The ref flips synchronously inside the first call
+  // and short-circuits the second.
+  const pendingRef = useRef(false);
 
   // Listen for 401 token-invalid events from fetchWithAuth
   useEffect(() => {
@@ -60,11 +66,14 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
   }, []);
 
   const handleSave = useCallback(() => {
+    if (pendingRef.current) return; // synchronous double-click guard
     const trimmed = tokenValue.trim();
     if (!trimmed) {
       setError('Token cannot be empty.');
       return;
     }
+    pendingRef.current = true;
+    setIsPending(true);
     setStoredToken(trimmed);
     setShowDialog(false);
     setError('');
@@ -78,6 +87,11 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
     // sees "Something went wrong" immediately after saving the token
     // (Bug 3 of the post-token-save error-screen RCA 2026-05-20).
     router.invalidate();
+    // Clear pending after router operations have been queued
+    setTimeout(() => {
+      pendingRef.current = false;
+      setIsPending(false);
+    }, 0);
   }, [tokenValue, queryClient, router]);
 
   const handleKeyDown = useCallback(
@@ -125,6 +139,7 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
               <Button
                 appearance="primary"
                 onClick={handleSave}
+                disabled={isPending}
                 data-testid="token-save"
               >
                 Save Token
