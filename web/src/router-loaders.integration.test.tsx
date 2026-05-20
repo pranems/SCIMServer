@@ -22,6 +22,19 @@ import {
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { dashboardQueryOptions } from './api/queries';
 
+// fetchWithAuth now short-circuits when getStoredToken() returns null
+// (Bug 2 fix, RCA 2026-05-20). Stub the token module so the loader's
+// fetch actually reaches the globalThis.fetch mock below.
+vi.mock('./auth/token', () => ({
+  getStoredToken: vi.fn(() => 'integration-test-token'),
+  setStoredToken: vi.fn(),
+  clearStoredToken: vi.fn(),
+  notifyTokenInvalid: vi.fn(),
+  TOKEN_INVALID_EVENT: 'scimserver:token-invalid',
+  TOKEN_CHANGED_EVENT: 'scimserver:token-changed',
+  TOKEN_STORAGE_KEY: 'scimserver.authToken',
+}));
+
 interface Ctx {
   queryClient: QueryClient;
 }

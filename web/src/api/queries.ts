@@ -36,9 +36,19 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 /** Authenticated fetch wrapper with automatic 401 handling */
 export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredToken();
+
+  // Short-circuit when there is no token at all. Do NOT fire
+  // notifyTokenInvalid() here - there was never a valid session to
+  // invalidate. Firing it would show a spurious "Token expired" error
+  // message in the TokenGate dialog before the user has entered anything
+  // (Bug 2 of the post-token-save error-screen RCA 2026-05-20).
+  if (!token) {
+    throw new ScimApiError({ status: 401, detail: 'Authentication required' });
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    Authorization: `Bearer ${token}`,
     ...(init?.headers as Record<string, string> ?? {}),
   };
 

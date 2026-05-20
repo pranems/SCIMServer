@@ -23,6 +23,7 @@ import {
 } from '@fluentui/react-components';
 import { Key24Regular } from '@fluentui/react-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from '@tanstack/react-router';
 import {
   getStoredToken,
   setStoredToken,
@@ -43,6 +44,7 @@ const useStyles = makeStyles({
 export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const classes = useStyles();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [showDialog, setShowDialog] = useState(!getStoredToken());
   const [tokenValue, setTokenValue] = useState('');
   const [error, setError] = useState('');
@@ -67,9 +69,16 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
     setShowDialog(false);
     setError('');
     setTokenValue('');
-    // Invalidate all queries so they refetch with the new token
+    // Invalidate all TanStack Query cache entries so they refetch with
+    // the new token.
     queryClient.invalidateQueries();
-  }, [tokenValue, queryClient]);
+    // Re-run all active TanStack Router loaders. Without this the route
+    // stays in the error state produced by the pre-authentication loader
+    // run (which threw 401 because there was no token yet) and the user
+    // sees "Something went wrong" immediately after saving the token
+    // (Bug 3 of the post-token-save error-screen RCA 2026-05-20).
+    router.invalidate();
+  }, [tokenValue, queryClient, router]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -77,6 +86,7 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
     },
     [handleSave],
   );
+
 
   if (showDialog) {
     return (

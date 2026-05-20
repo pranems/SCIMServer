@@ -152,6 +152,29 @@ describe('fetchWithAuth', () => {
     expect(notifyTokenInvalid).toHaveBeenCalled();
   });
 
+  it('throws ScimApiError(401) WITHOUT making an HTTP request when there is no stored token', async () => {
+    // Bug 2 fix (RCA 2026-05-20): when getStoredToken() returns null the
+    // function must short-circuit without calling fetch so that the route
+    // loader fails gracefully during the pre-authentication window and
+    // the TokenGate dialog does not show a spurious "Token expired" error.
+    const { getStoredToken, notifyTokenInvalid, clearStoredToken } = await import('../auth/token');
+    vi.mocked(getStoredToken).mockReturnValueOnce(null);
+    // Clear call history accumulated by prior tests in this describe block.
+    vi.mocked(notifyTokenInvalid).mockClear();
+    vi.mocked(clearStoredToken).mockClear();
+
+    const { ScimApiError } = await import('./scim-error');
+    // Call fetchWithAuth exactly ONCE so the Once-mock is consumed here only.
+    const thrown = await fetchWithAuth('/scim/admin/version').catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(ScimApiError);
+    expect((thrown as { status: number }).status).toBe(401);
+    // Must NOT make an HTTP call (no token = no request to server)
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // Must NOT fire TOKEN_INVALID_EVENT - there was never a valid session
+    expect(notifyTokenInvalid).not.toHaveBeenCalled();
+    expect(clearStoredToken).not.toHaveBeenCalled();
+  });
+
   it('returns parsed JSON on success', async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
