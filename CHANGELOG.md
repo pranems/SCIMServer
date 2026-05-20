@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.52.1] - 2026-05-20 - TokenGate "Something went wrong" after first token entry (3-bug fix)
+
+### Fixed
+
+- **TokenGate post-token-save error-screen (3-bug RCA):** Entering the SCIM bearer token in the auth dialog on a fresh page load showed "Something went wrong" immediately after clicking Save. A hard refresh always worked. Reproduced on both dev and prod Azure Container App deployments. Three independent bugs collaborated:
+
+  - **Bug 1 (root trigger):** TanStack Router mounts via `RouterProvider` in `App.tsx` above `AppShell`/`TokenGate`. Route loaders run immediately on first render - before `TokenGate` can conditionally show its children. The index route loader calls `fetchWithAuth('/scim/admin/dashboard')` with no token stored; the server responds 401.
+
+  - **Bug 2 (spurious TOKEN_INVALID_EVENT):** The previous `fetchWithAuth` called `clearStoredToken()` + `notifyTokenInvalid()` on every 401 response regardless of why the 401 happened. With no token at all this was wrong - it dispatched `TOKEN_INVALID_EVENT` and caused `TokenGate` to display "Token expired or invalid" before the user typed anything. **Fix (`web/src/api/queries.ts`):** Short-circuit `fetchWithAuth` when `getStoredToken()` returns `null` - throw `ScimApiError(401, 'Authentication required')` immediately WITHOUT making an HTTP request and WITHOUT calling `notifyTokenInvalid`.
+
+  - **Bug 3 (loader error state persists):** `queryClient.invalidateQueries()` tells TanStack Query to refetch but does NOT clear TanStack Router's independent LOADER error state. The route was still in error (loader had thrown 401) when `TokenGate` closed and rendered children - `<Outlet>` rendered the route's error component instead of the page. **Fix (`web/src/layout/TokenGate.tsx`):** Call `router.invalidate()` (via `useRouter` from `@tanstack/react-router`) after `queryClient.invalidateQueries()` in `handleSave`. This re-runs all active TanStack Router loaders with the new token, clearing the error state.
+
+- **New test file `web/src/layout/TokenGate.test.tsx`** (5 tests): dialog shows without token, children render with token, `handleSave` calls `router.invalidate()` (Bug 3 regression lock), `TOKEN_INVALID_EVENT` re-opens dialog, empty token rejected.
+- **Updated `web/src/api/queries.test.ts`** (+1 test): `fetchWithAuth` throws `ScimApiError(401)` WITHOUT making a network request and WITHOUT firing `notifyTokenInvalid` when there is no stored token (Bug 2 regression lock).
+- **Updated `web/src/router-loaders.integration.test.tsx`**: added `vi.mock` for `./auth/token` so the `fetchWithAuth` no-token short-circuit does not break the existing loader integration test (which previously relied on jsdom's empty localStorage passing through to the mock fetch).
+
+**Test counts after fix:** API unit 3,735 / API E2E 1,197 / Web vitest **1,011** (+6) / Live SCIM 1,005 / PowerShell 15 / Playwright 76 = **7,039 total**. tsc baseline 96 (unchanged).
+
+**Version:** `0.52.0` -> `0.52.1` (patch bump; bug fix on the stable v0.52.0 release).
+
 
 ### Deployed - 2026-05-20 - v0.52.0 to dev (Stage 4.4)
 
