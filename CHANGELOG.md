@@ -30,6 +30,22 @@ Categories fixed:
 
 **Stage 1-2 gate signal:** api build 0 errors, api lint 0 errors / 465 warnings (baseline holds), web tsc 96 errors (baseline holds: 8 prod + 88 test), web build success (1,325 kB main / 384 kB gzip).
 
+### Fixed - Stage 5 closure for the previously deferred 7 Playwright failures
+
+Closed the 7 failures previously called out as pre-existing in the prior entry. Current full Playwright result vs dev is **133 pass / 0 fail / 5 skip**.
+
+What was fixed:
+
+- **Settings smoke auth bootstrap (2 tests):** [web/e2e/preferences.spec.ts](web/e2e/preferences.spec.ts) and [web/e2e/telemetry.spec.ts](web/e2e/telemetry.spec.ts) now seed `scimserver.authToken` in `test.beforeEach` via `page.addInitScript`, matching the rest of the suite's authenticated e2e harness pattern.
+- **Visual-regression stability hardening:** [web/e2e/visual-regression.spec.ts](web/e2e/visual-regression.spec.ts) expanded `NON_DETERMINISTIC_SELECTORS` to include KPI/endpoint-grid/activity surfaces that legitimately drift with tenant data and runtime activity.
+- **Overlay snapshot strategy:** command palette and keyboard shortcuts help now capture element-level snapshots instead of full-page snapshots, reducing false diffs from dynamic background content.
+- **Baseline refresh after intentional capture-strategy change:** regenerated the 5 affected snapshot files under `web/e2e/visual-regression.spec.ts-snapshots/` (`dashboard-light`, `dashboard-dark`, `endpoints-list`, `command-palette`, `keyboard-shortcuts-help`).
+
+Net effect:
+
+- Previous state: 126 pass / 7 fail / 5 skip.
+- Current state: 133 pass / 0 fail / 5 skip.
+
 ## [0.52.1] - 2026-05-20 - TokenGate "Something went wrong" after first token entry (3-bug fix)
 
 ### Fixed

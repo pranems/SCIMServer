@@ -20,6 +20,22 @@
  */
 import { test, expect } from '@playwright/test';
 
+const TOKEN_STORAGE_KEY = 'scimserver.authToken';
+const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(
+    ({ key, value }) => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        // Best-effort seed for hosted e2e runs.
+      }
+    },
+    { key: TOKEN_STORAGE_KEY, value: TOKEN },
+  );
+});
+
 test.describe('Phase N4 - Settings persistence (smoke vs dev FQDN)', () => {
   test('SettingsPage exposes PreferencesCard with its 4 controls', async ({ page }) => {
     await page.goto('/settings');
