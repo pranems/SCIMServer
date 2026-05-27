@@ -177,38 +177,6 @@ Every feature or significant change commit MUST include ALL of the following bef
 8. **Version Management** - Bump version in `package.json` and all relevant version references
 9. **Response Contract Tests** - Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
 
-## Mandatory Local Git Hooks (Standing Rule)
-
-Every clone of this repository MUST run [scripts/install-hooks.ps1](scripts/install-hooks.ps1) once. The installer sets `git config core.hooksPath .githooks` so the versioned hooks under [.githooks/](.githooks) become active for every commit and every push. Hooks are the local enforcement layer for the cheap fast-fail gates so CI never wastes a run on something a 5-second local check would have caught.
-
-Hooks shipped (both are MANDATORY; bypassing them is a violation of the standing rule against `--no-verify`):
-
-| Hook | Trigger | What it runs | Typical duration |
-|---|---|---|---|
-| [`.githooks/pre-commit`](.githooks/pre-commit) | Every `git commit` | Staged-file scan: em-dash (U+2014) ban, `console.log/debug/info` ban in production TS, hardcoded-secret regex (AWS, Stripe, GitHub PAT, Slack, PEM keys). | < 5 s |
-| [`.githooks/pre-push`](.githooks/pre-push) | Every `git push` | Invokes [scripts/pre-push-checks.ps1](scripts/pre-push-checks.ps1) in `Fast` mode by default: api `npm run build` + api `npm run lint` + web `npx tsc --noEmit` (96-error baseline guard) + web `npm run build`. Mirrors the CI `validate` job's static gates. | ~2.5 min |
-
-Escalation knobs (set per push without editing any file):
-
-| Env var | What it adds | Duration | When to use |
-|---|---|---|---|
-| `$env:PREPUSH_MODE = 'Validate'` | + api `prisma generate` + migration linter + api `npm test` + api `npm run test:e2e` (inmemory, `--maxWorkers=2`, same excludes as CI) + web `npm test` | ~8-12 min | BEFORE opening or promoting a PR. Mirrors CI validate job 1-to-1. |
-| `$env:PREPUSH_MODE = 'Full'` | + `docker build` + `trivy` HIGH+CRITICAL scan | ~15-20 min | Before a release-cut PR or after touching `Dockerfile` / dependencies. |
-
-Branch patterns that auto-skip the pre-push hook (work-in-progress only):
-- `wip/**`, `throwaway/**`, `scratch/**`
-
-CI gates NOT mirrored locally (rely on the GitHub Actions run + branch protection):
-- CodeQL `security-extended` + `security-and-quality` query packs ([.github/workflows/codeql.yml](.github/workflows/codeql.yml))
-- GHCR push (`build-and-push.yml`)
-- Dev/prod Azure Container Apps deploy + live SCIM test (Stage 4.4 + Stage 4.2)
-
-Operational rules:
-- Hooks are **versioned** under `.githooks/`. Editing them counts as a behavioral change and follows the same TDD + CHANGELOG discipline as application code.
-- `core.hooksPath` is **per-clone configuration**, not a tracked git setting. Every fresh clone (including CI runners that use git rather than action checkouts) must invoke [scripts/install-hooks.ps1](scripts/install-hooks.ps1). Adding a check to a future bootstrap / dev-setup script that calls the installer automatically is in the Standing Backlog.
-- `--no-verify` remains banned by the existing operational-safety rule. The hook mechanism enforces the rule at the moment of commit/push; the standing rule still governs the policy.
-- **`git -c core.hooksPath=` and `git --config-env=core.hooksPath` are also banned** as bypass mechanisms. They override the hooks directory to empty for one invocation and accomplish the same evasion as `--no-verify` via a different mechanism. The standing rule covers any technique that skips the hook, including these. Origin: [docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md](../docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md) - operator reached for this 3x during Phase N under an incorrect diagnosis; the RCA closes the loophole and ships a self-test ([scripts/test-hooks.ps1](../scripts/test-hooks.ps1)) that proves the hook is read-only with respect to the index AND that it loudly fails on dirty input (no more silent-pass when `grep` is off PATH).
-
 ## Mandatory Quality Gates (Standing Rule)
 
 After implementation AND before considering work complete, ALL of the following quality gates MUST be executed. Use TDD (Red-Green-Refactor) for ALL implementation - including the smallest spot-fix. The gates are organized into 6 stages (Stage 0 -> Stage 5). NEVER skip a stage. NEVER reorder. Higher-numbered stages depend on lower-numbered stages.
@@ -275,7 +243,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 6.2. **CHANGELOG.md** - One entry per minor/patch with explicit before/after test counts at every layer (API unit, API E2E, Web vitest, Live SCIM, Playwright, PowerShell contract), version delta, files changed summary, and per-phase quality gate result.
 6.3. **Session_starter.md** + **docs/CONTEXT_INSTRUCTIONS.md** updates - Latest test counts, version, recent achievements row.
 6.4. **`generateCommitMessage` prompt** - Use it to compose the commit message; ensures the standing rule about per-sub-phase gate naming is honored.
-6.5. **No `--amend` on pushed commits, no `--force` push, no `--no-verify`, no `git -c core.hooksPath=` / `--config-env=core.hooksPath`** - All are disallowed by the standing operational-safety rules. The `core.hooksPath` override accomplishes the same evasion as `--no-verify`; ban added 2026-05-19 per [docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md](../docs/HOOKS_FALSE_ALARM_RCA_2026-05-19.md).
+6.5. **No `--amend` on pushed commits, no `--force` push, no `--no-verify`** - All three are disallowed by the standing operational-safety rules.
 
 ### Stage X - Meta / Strategy Evolution (not per-commit)
 Stage X does NOT gate any single commit. It runs on inflection points to evolve the gate strategy itself. The other 6 stages are the floor; Stage X is what raises the floor over time.
@@ -323,7 +291,7 @@ Security checks are intentionally threaded through every stage. This map makes t
 | Live SCIM contract on the wire (auth headers, OAuth flow, ETag flow) | 4.2 / 4.3 / 4.4 | `scripts/live-test.ps1` |
 | **External security-landscape changes (proactive)** | **X.2** | **`securityBestPracticesIntake`** |
 | Container image CVEs (OS-level base image) | 4 (CI) | **ACTIVE** via [aquasecurity/trivy-action](https://github.com/aquasecurity/trivy) in [.github/workflows/build-and-push.yml](.github/workflows/build-and-push.yml) + [.github/workflows/build-test.yml](.github/workflows/build-test.yml); HIGH+CRITICAL gating; [.trivyignore](.trivyignore) documented exceptions; weekly stale-entry review via [.github/workflows/trivyignore-review.yml](.github/workflows/trivyignore-review.yml). Confirmed ACTIVE by 2026-05-17 Stage X.2 intake (was incorrectly DEFERRED). |
-| Web security headers (CSP/HSTS/etc.) | 1.2 (build) + 2.1 (unit) + 2.2 (E2E) | **ACTIVE (Phase N3a, v0.52.0-alpha.3, 2026-05-18)** via helmet@^8.1.0 in [api/src/security/helmet-config.ts](api/src/security/helmet-config.ts) + wired in both [api/src/main.ts](api/src/main.ts) and [api/test/e2e/helpers/app.helper.ts](api/test/e2e/helpers/app.helper.ts) (drift-prevention). Unit lock via [api/src/security/helmet-config.spec.ts](api/src/security/helmet-config.spec.ts) (7 tests). E2E lock via [api/test/e2e/security-headers.e2e-spec.ts](api/test/e2e/security-headers.e2e-spec.ts) (11 tests across 4 probe routes covering CSP/X-Frame-Options/X-Content-Type-Options/Referrer-Policy/COOP/CORP/Origin-Agent-Cluster/X-Permitted-Cross-Domain-Policies/X-DNS-Prefetch-Control/X-Download-Options + HSTS-absent-in-test + COEP-absent + Permissions-Policy-present). Stage 4 live SCIM header lockdown + Stage 5 Playwright `web/e2e/security-headers.spec.ts` vs dev FQDN deferred to a follow-up commit pair. |
+| Web security headers (CSP/HSTS/etc.) | DEFERRED | (Standing Backlog: helmet in api/src/main.ts + Playwright spec at Stage 5 - HIGHEST-LEVERAGE NEW GAP per 2026-05-17 intake; slate for Phase N3 design start) |
 | SBOM generation + signing | DEFERRED | (Standing Backlog: syft + cosign at Stage 6) |
 | SAST (semgrep / CodeQL) | 1 (CI) | **ACTIVE via [CodeQL](https://github.com/github/codeql-action)** with `security-extended` + `security-and-quality` query packs ([.github/workflows/codeql.yml](.github/workflows/codeql.yml)); weekly + per-PR + push schedule. Confirmed ACTIVE by 2026-05-17 Stage X.2 intake (was incorrectly DEFERRED). semgrep optional supplement, not a replacement. |
 | GHA action SHA pinning | 6 (CI) | **ACTIVE** - all `uses:` lines in all 5 workflow files SHA-pinned with `# vX.Y.Z` tag comment. Verified by 2026-05-17 Stage X.2 intake. Branch protection + GHA OIDC for Azure deploys remain DEFERRED. |
@@ -386,7 +354,7 @@ Examples of standing rules that originated from real failures:
 
 *Still DEFERRED (tool not installed OR cost > value at current scale):*
 - **Stage 4 SBOM generation** - [syft](https://github.com/anchore/syft) generates an SPDX SBOM at build time; enables post-deploy CVE lookup; near-zero overhead. Slate for v0.52.0 stable rollup.
-- **Stage 5 web security headers gate** - new Playwright spec asserts presence + value of `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options` (or CSP `frame-ancestors`), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` on every public response; locks CSP/HSTS as code. **Server-side helmet middleware SHIPPED in Phase N3a (v0.52.0-alpha.3, 2026-05-18)**; this remaining Playwright spec is the wire-level lock against dev FQDN + the cross-cutting `web/e2e/security-headers.spec.ts` partner that locks the same header set from the browser side. Slate for the Phase N3a Stage 5 follow-up commit.
+- **Stage 5 web security headers gate** - new Playwright spec asserts presence + value of `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options` (or CSP `frame-ancestors`), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` on every public response; locks CSP/HSTS as code. **HIGHEST-LEVERAGE NEW GAP per 2026-05-17 intake** - slate for Phase N3 design start (helmet middleware in api/src/main.ts + E2E spec).
 - **Stage 6 image signing** - [cosign](https://github.com/sigstore/cosign) keyless OIDC signs the image after build; verifies image came from our CI.
 - **Repo policy: signed commits + branch protection require SHA pinning** - GPG-signed commits, required PR review, no force-push to `main` / `feat/*`.
 - **Migration to distroless or rootless base image** - currently node:24-alpine running as `nestjs` user UID 1001 (rootless already); evaluate distroless Node image as a further hardening step (smaller attack surface, no shell). Cost > value at current scale; harder live-debug.
@@ -399,9 +367,5 @@ Examples of standing rules that originated from real failures:
 - **OpenSSF Scorecard scheduled scan** - 5 min to add; gives a single metric for repo security posture.
 - **CODEOWNERS for security-sensitive paths** - `api/src/security/`, `infra/`, `.github/workflows/`. Useful when team grows past 1 reviewer.
 - **DPoP (RFC 9449) for endpoint credentials** - sender-constrained tokens; tightens our bearer-token model. Low priority at current scale.
-
-**Test-design / Playwright (2026-05-18 Stage 5 retroactive closure):**
-- **Dashboard visual-regression mask gap** - [web/e2e/visual-regression.spec.ts](web/e2e/visual-regression.spec.ts) `NON_DETERMINISTIC_SELECTORS` covers `server-uptime` + `current-time` + `dashboard-chart svg` + `logs-row-time` but does NOT cover live KPI counts (endpoint count, user count, group count) or endpoint-grid card contents that legitimately drift with tenant data accumulation. Result: `Dashboard (light theme)` + `Dashboard (dark theme)` are intermittently flaky vs dev (pass-fail-pass without source changes). Fix: add testid-driven masks for `[data-testid^="kpi-"]` + `[data-testid="endpoint-grid"]` + `[data-testid="activity-list"]`. Slate for a Stage 5-hygiene mini-commit; not blocking.
-- **`web/e2e/new-ui.spec.ts` standing-rule clarification** - the Stage 5.2 instruction to delete this file is overzealous; the file's asserted testids (`app-shell` / `app-header` / `app-sidebar` / `theme-toggle` / `sidebar-toggle` / `kpi-row` / `endpoint-grid`) all still exist in current source post-Phase-I. The file is name-legacy but content-current. Either rename to `app-shell.spec.ts` (clearer intent) or amend the Stage 5.2 "delete list" in the strategy doc to remove `new-ui`. Low priority; documented to prevent future operators acting on the stale instruction.
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**

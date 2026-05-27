@@ -104,33 +104,10 @@ describe('AppHeader', () => {
   });
 });
 
-// ─── Phase N7 - denseMode wire to documentElement[data-density] ──────
-
-import { usePreferencesStore } from '../store/preferences-store';
-
-describe('AppShell - N7 denseMode wire', () => {
-  beforeEach(() => {
-    setStoredToken('test-token');
-    usePreferencesStore.getState().resetPreferences();
-    document.documentElement.removeAttribute('data-density');
-  });
-
-  it('sets data-density="dense" on documentElement when denseMode=true', async () => {
-    usePreferencesStore.getState().setDenseMode(true);
-    await renderShell();
-    await waitFor(() =>
-      expect(document.documentElement.getAttribute('data-density')).toBe('dense'),
-    );
-  });
-
-  it('removes data-density attribute when denseMode=false', async () => {
-    usePreferencesStore.getState().setDenseMode(true);
-    document.documentElement.setAttribute('data-density', 'dense');
-    usePreferencesStore.getState().setDenseMode(false);
-    await renderShell();
-    await waitFor(() =>
-      expect(document.documentElement.hasAttribute('data-density')).toBe(false),
-    );
-  });
-});
+// Phase N7 denseMode wire to documentElement[data-density] was rolled
+// back in the 2026-05-27 partial-rollback commit alongside the matching
+// AppShell.tsx effect removal. The N7 test suite below was deleted to
+// keep production code and tests consistent. See
+// docs/UNFINISHED_PHASE_N_HANDOFF_2026-05-27.md for the restore plan
+// when N7 wiring resumes.
 

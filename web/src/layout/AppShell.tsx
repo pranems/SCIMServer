@@ -23,7 +23,6 @@ import {
 import { QueryClientProvider } from '@tanstack/react-query';
 import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
-import { usePreferencesStore } from '../store/preferences-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
 import { CommandPalette } from '../components/CommandPalette';
@@ -69,21 +68,9 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const classes = useStyles();
   const colorScheme = useUIStore((s) => s.colorScheme);
-  const denseMode = usePreferencesStore((s) => s.denseMode);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [helpOpen, setHelpOpen] = React.useState(false);
   const navigate = useNavigate();
-
-  // Phase N7 - reflect denseMode preference to documentElement[data-density]
-  // so any CSS rule + table primitive can opt in via [data-density='dense'].
-  React.useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (denseMode) {
-      document.documentElement.setAttribute('data-density', 'dense');
-    } else {
-      document.documentElement.removeAttribute('data-density');
-    }
-  }, [denseMode]);
 
   // Phase F2 keyboard shortcuts: g d/e/m/l/s navigate; / opens the
   // command palette (which doubles as global search); ? opens the

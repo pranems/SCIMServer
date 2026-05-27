@@ -55,6 +55,9 @@ test.beforeEach(async ({ page }) => {
     { key: 'scimserver.authToken', value: token },
   );
   await page.goto('/');
+  // Stuff the bearer into localStorage so TokenGate doesn't show its
+  // prompt in the screenshot. Same pattern as the existing specs.
+  await page.evaluate((t) => localStorage.setItem('scim_token', t), token);
 });
 
 /**
@@ -72,10 +75,6 @@ const NON_DETERMINISTIC_SELECTORS = [
   '[data-testid="dashboard-chart"] svg',
   // Logs table createdAt column shifts every second on real data.
   '[data-testid="logs-row-time"]',
-  // Live tenant data and activity can legitimately drift between runs.
-  '[data-testid^="kpi-"]',
-  '[data-testid="endpoint-grid"]',
-  '[data-testid="activity-list"]',
 ];
 
 /** Common options for `toHaveScreenshot` - keep one source of truth. */
@@ -173,9 +172,8 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     // the same code path as the user.
     await page.keyboard.press('Control+KeyK');
     // Wait for the dialog to be in the DOM and visible.
-    const palette = page.locator('[data-testid="command-palette"]');
-    await palette.waitFor({ state: 'visible' });
-    await expect(palette).toHaveScreenshot('command-palette.png', SNAPSHOT_OPTIONS);
+    await page.locator('[data-testid="command-palette"]').waitFor({ state: 'visible' });
+    await expect(page).toHaveScreenshot('command-palette.png', SNAPSHOT_OPTIONS);
   });
 
   test('Keyboard Shortcuts Help (? open state)', async ({ page }) => {
@@ -184,9 +182,8 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     // ? is shift+/ on US layout. Pressing the literal key is the most
     // robust cross-platform incantation.
     await page.keyboard.press('Shift+Slash');
-    const help = page.locator('[data-testid="shortcuts-help"]');
-    await help.waitFor({ state: 'visible' });
-    await expect(help).toHaveScreenshot('keyboard-shortcuts-help.png', SNAPSHOT_OPTIONS);
+    await page.locator('[data-testid="shortcuts-help"]').waitFor({ state: 'visible' });
+    await expect(page).toHaveScreenshot('keyboard-shortcuts-help.png', SNAPSHOT_OPTIONS);
   });
 
   // Endpoint-detail tabs: scoped to first endpoint that exists. Skipped
