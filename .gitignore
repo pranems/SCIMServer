@@ -43,6 +43,11 @@ logs/
 # Test results (generated per run)
 test-results/
 
+# Playwright generated outputs (regenerated per run)
+web/playwright-result.json
+web/playwright-report/
+web/test-results/
+
 # Test artifacts (historical JSON snapshots - never commit)
 api/test-artifacts/
 
