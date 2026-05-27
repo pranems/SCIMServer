@@ -1,0 +1,422 @@
+{
+  "name": "OpenText-May-22-ISV-1",
+  "displayName": "OpenText (May 22, 2026 - ISV #1)",
+  "description": "SCIM endpoint built from the OpenText schema supplied on 2026-05-22 (opentext scim schema_himanshu_May_22_2026.json). Includes the OpenText Mailbox extension and the standard EnterpriseUser extension.",
+  "profile": {
+    "schemas": [
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "name": "User",
+        "description": "Customer Portal User Account",
+        "attributes": [
+          {
+            "name": "userName",
+            "type": "string",
+            "multiValued": false,
+            "required": true,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "server",
+            "description": "Unique identifier for a user."
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "multiValued": false,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Soft-delete flag for the user."
+          },
+          {
+            "name": "name",
+            "type": "complex",
+            "multiValued": false,
+            "required": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The components of the user's real name.",
+            "subAttributes": [
+              {
+                "name": "givenName",
+                "type": "string",
+                "multiValued": false,
+                "required": true,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The given name of the User, or first name in most Western languages."
+              },
+              {
+                "name": "familyName",
+                "type": "string",
+                "multiValued": false,
+                "required": true,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The family name of the User, or last name in most Western languages."
+              }
+            ]
+          },
+          {
+            "name": "displayName",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The name of the User, suitable for display to end-users."
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The user's title, such as 'Vice President'."
+          },
+          {
+            "name": "emails",
+            "type": "complex",
+            "multiValued": true,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Email addresses for the user. Canonical type values: 'work'.",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The significant value for the attribute."
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function.",
+                "canonicalValues": ["work"]
+              }
+            ]
+          },
+          {
+            "name": "phoneNumbers",
+            "type": "complex",
+            "multiValued": true,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Phone numbers for the User. Canonical type values: 'work', 'mobile', 'fax'.",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The significant value for the attribute."
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function.",
+                "canonicalValues": ["work", "mobile", "fax"]
+              }
+            ]
+          },
+          {
+            "name": "addresses",
+            "type": "complex",
+            "multiValued": true,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "A physical mailing address for this User. Canonical type values: 'work'.",
+            "subAttributes": [
+              {
+                "name": "streetAddress",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The full street address component."
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function.",
+                "canonicalValues": ["work"]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "multiValued": false,
+                "required": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A Boolean value indicating the 'primary' or preferred attribute value for this attribute."
+              },
+              {
+                "name": "country",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The country name component."
+              },
+              {
+                "name": "locality",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The city or locality component."
+              },
+              {
+                "name": "postalCode",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The postalCode component."
+              },
+              {
+                "name": "region",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The state or region component."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "name": "EnterpriseUser",
+        "description": "Customer Portal User Account - Enterprise",
+        "attributes": [
+          {
+            "name": "department",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Identifies the name of a department."
+          }
+        ]
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox",
+        "name": "MailboxExtensionResource",
+        "description": "OpenText extension schema for mailbox-specific attributes not defined in the SCIM core schema.",
+        "attributes": [
+          {
+            "name": "proxyAddresses",
+            "type": "complex",
+            "multiValued": true,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Known address entities for the resource. SHOULD be prefixed by the address type (e.g., 'SMTP:bjensen@example.com').",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The significant value for the attribute."
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function.",
+                "canonicalValues": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "name": "Group",
+        "description": "Customer Portal Group Account",
+        "attributes": [
+          {
+            "name": "displayName",
+            "type": "string",
+            "multiValued": false,
+            "required": true,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "server",
+            "description": "A human-readable name for the Group. REQUIRED. (uniqueness tightened from OpenText 'none' to 'server' to satisfy the server's RFC 7643 §7 tightening-only policy.)"
+          },
+          {
+            "name": "members",
+            "type": "complex",
+            "multiValued": true,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "A list of members of the Group.",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "immutable",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "Identifier of the member of this Group."
+              },
+              {
+                "name": "$ref",
+                "type": "reference",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "immutable",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The URI of the corresponding 'User' resource to which the user belongs.",
+                "referenceTypes": ["User"]
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readOnly",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "resourceTypes": [
+      {
+        "id": "User",
+        "name": "User",
+        "endpoint": "/Users",
+        "description": "Customer Portal User Account",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [
+          { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
+          { "schema": "urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox", "required": false }
+        ]
+      },
+      {
+        "id": "Group",
+        "name": "Group",
+        "endpoint": "/Groups",
+        "description": "Customer Portal Group Account",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "schemaExtensions": []
+      }
+    ],
+    "serviceProviderConfig": {
+      "patch": { "supported": true },
+      "bulk": { "supported": false, "maxOperations": 0, "maxPayloadSize": 0 },
+      "filter": { "supported": true, "maxResults": 200 },
+      "changePassword": { "supported": false },
+      "sort": { "supported": false },
+      "etag": { "supported": false },
+      "authenticationSchemes": [
+        {
+          "type": "oauthbearertoken",
+          "name": "OAuth Bearer Token",
+          "description": "OAuth 2.0 Bearer Token Authentication",
+          "specUri": "https://tools.ietf.org/html/rfc6750"
+        }
+      ]
+    },
+    "settings": {
+      "StrictSchemaValidation": true,
+      "VerbosePatchSupported": true,
+      "AllowAndCoerceBooleanStrings": true,
+      "PatchOpAllowRemoveAllMembers": false,
+      "MultiMemberPatchOpForGroupEnabled": true,
+      "PrimaryEnforcement": "normalize",
+      "SchemaDiscoveryEnabled": true
+    }
+  }
+}
