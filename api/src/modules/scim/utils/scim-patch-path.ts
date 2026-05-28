@@ -26,12 +26,51 @@ export interface ValuePathExpression {
   subAttribute?: string;
 }
 
-/** Result of parsing a URN-prefixed extension path */
+/**
+ * Result of parsing a URN-prefixed extension path in the flat or dotted form.
+ *
+ * Flat:    `urn:...:User:manager`               -> { schemaUrn, attributePath: 'manager' }
+ * Dotted:  `urn:...:User:manager.displayName`   -> { schemaUrn, attributePath: 'manager', subAttribute: 'displayName' }
+ *
+ * The valuePath form (`urn:...:Mailbox:aliases[type eq "smtp"].value`) is
+ * represented by the separate `ExtensionValuePathExpression` interface so it
+ * can carry the nested `ValuePathExpression`. Discriminate via the
+ * `isExtensionValuePath()` type guard.
+ */
 export interface ExtensionPathExpression {
   /** The full schema URN, e.g. "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" */
   schemaUrn: string;
-  /** The attribute path after the URN, e.g. "manager" */
+  /** The top-level attribute name after the URN, e.g. "manager" */
   attributePath: string;
+  /** F6: present when the path was dotted (e.g. "manager.displayName"). */
+  subAttribute?: string;
+}
+
+/**
+ * Result of parsing a URN-prefixed extension path that contains a valuePath
+ * filter expression (F7). Example:
+ *   `urn:...:Mailbox:aliases[type eq "smtp"].value`
+ * Engines dispatch on this shape via `isExtensionValuePath()` and call
+ * `applyExtensionValuePathUpdate` / `removeExtensionValuePathEntry`, both of
+ * which return `ValuePathOpResult` so the engine can emit a SCIM `noTarget`
+ * error on zero-match filters (RFC 7644 §3.5.2.2).
+ */
+export interface ExtensionValuePathExpression {
+  /** The full schema URN. */
+  schemaUrn: string;
+  /** The inner valuePath expression scoped to the extension namespace. */
+  valuePath: ValuePathExpression;
+}
+
+/** Discriminator between flat/dotted and valuePath extension shapes. */
+export function isExtensionValuePath(
+  parsed: unknown,
+): parsed is ExtensionValuePathExpression {
+  return (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'valuePath' in (parsed as Record<string, unknown>)
+  );
 }
 
 /**
@@ -87,23 +126,67 @@ export function isExtensionPath(path: string, extensionUrns?: readonly string[])
 }
 
 /**
- * Parses a URN-prefixed extension path into the schema URN and the attribute path.
+ * Parses a URN-prefixed extension path into one of three shapes per RFC 7644
+ * §3.10 syntax:
+ *
+ *   flat       `urn:...:User:manager`                 -> ExtensionPathExpression (no subAttribute)
+ *   dotted     `urn:...:User:manager.displayName`     -> ExtensionPathExpression (subAttribute='displayName')
+ *   valuePath  `urn:...:Mailbox:aliases[type eq "x"]` -> ExtensionValuePathExpression
+ *
+ * Use `isExtensionValuePath()` to discriminate at call sites.
  *
  * @example
- *   parseExtensionPath("urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager")
- *   // → { schemaUrn: "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", attributePath: "manager" }
+ *   parseExtensionPath('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager')
+ *   // -> { schemaUrn: '...User', attributePath: 'manager' }
+ *
+ * @example
+ *   parseExtensionPath('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager.displayName')
+ *   // -> { schemaUrn: '...User', attributePath: 'manager', subAttribute: 'displayName' }
+ *
+ * @example
+ *   parseExtensionPath('urn:...:Mailbox:aliases[type eq "smtp"].value', [URN])
+ *   // -> { schemaUrn: '...Mailbox', valuePath: { attribute: 'aliases', ... } }
  */
-export function parseExtensionPath(path: string, extensionUrns?: readonly string[]): ExtensionPathExpression | null {
+export function parseExtensionPath(
+  path: string,
+  extensionUrns?: readonly string[],
+): ExtensionPathExpression | ExtensionValuePathExpression | null {
   const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
   const lowerPath = path.toLowerCase();
   for (const urn of urns) {
     const prefix = urn.toLowerCase() + ':';
-    if (lowerPath.startsWith(prefix)) {
-      const attributePath = path.slice(prefix.length); // preserve original casing for the attribute
-      if (attributePath.length > 0) {
-        return { schemaUrn: urn, attributePath };
+    if (!lowerPath.startsWith(prefix)) continue;
+    // preserve original casing for the attribute (RFC 7643 §2.1)
+    const remainder = path.slice(prefix.length);
+    if (remainder.length === 0) continue;
+
+    // F7: valuePath form. parseValuePath returns null if the bracket form is
+    // malformed; in that case we fall back to the flat-path interpretation
+    // (literal remainder as attributePath) so the existing behavior is
+    // preserved for unparseable bracket expressions.
+    if (remainder.includes('[')) {
+      const vp = parseValuePath(remainder);
+      if (vp) {
+        return { schemaUrn: urn, valuePath: vp };
       }
+      // Fall through to flat-path treatment
     }
+
+    // F6: dotted form. The first '.' splits attributePath from subAttribute.
+    // URNs (which contain dots in version segments like "2.0") have already
+    // been stripped at this point so the dot must be a SCIM sub-attribute
+    // separator.
+    const dotIdx = remainder.indexOf('.');
+    if (dotIdx > 0 && dotIdx < remainder.length - 1) {
+      return {
+        schemaUrn: urn,
+        attributePath: remainder.slice(0, dotIdx),
+        subAttribute: remainder.slice(dotIdx + 1),
+      };
+    }
+
+    // Flat form (pre-F6 behavior)
+    return { schemaUrn: urn, attributePath: remainder };
   }
   return null;
 }
@@ -324,12 +407,23 @@ export function addValuePathEntry(
 /**
  * Applies an add/replace operation to a URN extension attribute inside rawPayload.
  *
+ * Handles both the flat form (`urn:...:User:manager`, no `subAttribute`) and
+ * the dotted form (`urn:...:User:manager.displayName`, `subAttribute='displayName'`).
+ * For the valuePath form use `applyExtensionValuePathUpdate` instead.
+ *
  * @example
  *   applyExtensionUpdate(rawPayload,
  *     { schemaUrn: "urn:...:User", attributePath: "manager" },
  *     { value: "MANAGER_ID" }
  *   )
  *   // Sets rawPayload["urn:...:User"].manager = { value: "MANAGER_ID" }
+ *
+ * @example
+ *   applyExtensionUpdate(rawPayload,
+ *     { schemaUrn: "urn:...:User", attributePath: "manager", subAttribute: "displayName" },
+ *     null
+ *   )
+ *   // Deletes manager.displayName, preserves manager.value (F6 + F1).
  */
 export function applyExtensionUpdate(
   rawPayload: Record<string, unknown>,
@@ -337,6 +431,25 @@ export function applyExtensionUpdate(
   value: unknown
 ): Record<string, unknown> {
   const ext = (rawPayload[parsed.schemaUrn] as Record<string, unknown>) ?? {};
+
+  // F6: dotted form. Update only the named sub-attribute of the complex parent,
+  // using F1 merge semantics so a null incoming value deletes only that
+  // sub-key and preserves siblings of the parent complex.
+  if (parsed.subAttribute) {
+    const parent = ext[parsed.attributePath];
+    const parentObj: Record<string, unknown> =
+      typeof parent === 'object' && parent !== null && !Array.isArray(parent)
+        ? { ...(parent as Record<string, unknown>) }
+        : {};
+    if (value === null || value === undefined) {
+      delete parentObj[parsed.subAttribute];
+    } else {
+      parentObj[parsed.subAttribute] = value;
+    }
+    ext[parsed.attributePath] = parentObj;
+    rawPayload[parsed.schemaUrn] = { ...ext };
+    return rawPayload;
+  }
 
   // RFC 7644 §3.5.2.3: If the target attribute value is set to the attribute's
   // default or an empty value, the attribute SHALL be removed from the resource.
@@ -393,11 +506,21 @@ function isEmptyScimValue(value: unknown): boolean {
 /**
  * Removes an attribute from a URN extension object inside rawPayload.
  *
+ * Honors the dotted form too: when `parsed.subAttribute` is set, only the
+ * sub-attribute of the complex parent is deleted; the parent and its other
+ * sub-attributes are preserved.
+ *
  * @example
  *   removeExtensionAttribute(rawPayload,
  *     { schemaUrn: "urn:...:User", attributePath: "manager" }
  *   )
  *   // Deletes rawPayload["urn:...:User"].manager
+ *
+ * @example
+ *   removeExtensionAttribute(rawPayload,
+ *     { schemaUrn: "urn:...:User", attributePath: "manager", subAttribute: "displayName" }
+ *   )
+ *   // Deletes only manager.displayName (F6)
  */
 export function removeExtensionAttribute(
   rawPayload: Record<string, unknown>,
@@ -406,10 +529,74 @@ export function removeExtensionAttribute(
   const ext = rawPayload[parsed.schemaUrn];
   if (typeof ext === 'object' && ext !== null) {
     const copy = { ...(ext as Record<string, unknown>) };
-    delete copy[parsed.attributePath];
+    if (parsed.subAttribute) {
+      const parent = copy[parsed.attributePath];
+      if (typeof parent === 'object' && parent !== null && !Array.isArray(parent)) {
+        const parentCopy = { ...(parent as Record<string, unknown>) };
+        delete parentCopy[parsed.subAttribute];
+        copy[parsed.attributePath] = parentCopy;
+      }
+    } else {
+      delete copy[parsed.attributePath];
+    }
     rawPayload[parsed.schemaUrn] = copy;
   }
   return rawPayload;
+}
+
+/**
+ * F7: applies a valuePath PATCH operation (add/replace) scoped to an extension
+ * namespace. Returns `{matched, payload}` so the engine can emit RFC 7644
+ * §3.5.2.2 `noTarget` on zero-match filters, exactly the same contract as
+ * core `applyValuePathUpdate`.
+ *
+ * @example
+ *   applyExtensionValuePathUpdate(payload,
+ *     { schemaUrn: '...Mailbox', valuePath: parseValuePath('aliases[type eq "smtp"].value')! },
+ *     'updated@x.com'
+ *   )
+ *   // -> rawPayload['...Mailbox'].aliases[<matchingIdx>].value = 'updated@x.com'
+ */
+export function applyExtensionValuePathUpdate(
+  rawPayload: Record<string, unknown>,
+  parsed: ExtensionValuePathExpression,
+  value: unknown,
+  caseExact = false,
+): ValuePathOpResult {
+  const ext = rawPayload[parsed.schemaUrn];
+  if (typeof ext !== 'object' || ext === null || Array.isArray(ext)) {
+    return { matched: false, payload: rawPayload };
+  }
+  const extObj = { ...(ext as Record<string, unknown>) };
+  const inner = applyValuePathUpdate(extObj, parsed.valuePath, value, caseExact);
+  if (!inner.matched) {
+    return { matched: false, payload: rawPayload };
+  }
+  rawPayload[parsed.schemaUrn] = inner.payload;
+  return { matched: true, payload: rawPayload };
+}
+
+/**
+ * F7: removes a matched element from a multi-valued attribute inside an
+ * extension namespace, scoped by a valuePath filter. Returns `{matched, payload}`
+ * so the engine can emit RFC 7644 §3.5.2.2 `noTarget` on zero-match.
+ */
+export function removeExtensionValuePathEntry(
+  rawPayload: Record<string, unknown>,
+  parsed: ExtensionValuePathExpression,
+  caseExact = false,
+): ValuePathOpResult {
+  const ext = rawPayload[parsed.schemaUrn];
+  if (typeof ext !== 'object' || ext === null || Array.isArray(ext)) {
+    return { matched: false, payload: rawPayload };
+  }
+  const extObj = { ...(ext as Record<string, unknown>) };
+  const inner = removeValuePathEntry(extObj, parsed.valuePath, caseExact);
+  if (!inner.matched) {
+    return { matched: false, payload: rawPayload };
+  }
+  rawPayload[parsed.schemaUrn] = inner.payload;
+  return { matched: true, payload: rawPayload };
 }
 
 /**
@@ -432,10 +619,21 @@ export function resolveNoPathValue(
 ): Record<string, unknown> {
   for (const [key, value] of Object.entries(updateObj)) {
     if (isExtensionPath(key, extensionUrns)) {
-      // Extension URN key: urn:...:User:employeeNumber → update extension namespace
+      // Extension URN key: urn:...:User:employeeNumber -> update extension namespace
       const parsed = parseExtensionPath(key, extensionUrns);
       if (parsed) {
-        rawPayload = applyExtensionUpdate(rawPayload, parsed, value);
+        if (isExtensionValuePath(parsed)) {
+          // F7: a path-less PATCH value should not normally carry a valuePath
+          // key (Entra sends URN-prefixed valuePath only with explicit `path`),
+          // but if it does, route via the noTarget-aware helper. We discard the
+          // matched signal here because path-less PATCH cannot raise noTarget
+          // at the resolver level (the engine has no error vocabulary in this
+          // branch). Engines that need the noTarget signal use path-mode.
+          const inner = applyExtensionValuePathUpdate(rawPayload, parsed, value);
+          rawPayload = inner.payload;
+        } else {
+          rawPayload = applyExtensionUpdate(rawPayload, parsed, value);
+        }
       } else {
         rawPayload[key] = value;
       }
