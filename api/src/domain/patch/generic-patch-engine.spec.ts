@@ -366,4 +366,122 @@ describe('GenericPatchEngine', () => {
       expect(result.active).toBe(false);
     });
   });
+
+  // Step H - PATCH null-handling parity for custom resource types
+  // See docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md
+
+  describe('F1 - complex-parent merge with null-as-unset (custom RT parity)', () => {
+    it('should merge a partial object value into existing complex parent (single-segment path)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name', value: { model: 'Gadget' } });
+      const name = engine.getResult().name as Record<string, unknown>;
+      expect(name.model).toBe('Gadget');
+      expect(name.manufacturer).toBe('Acme');
+    });
+
+    it('should treat null sub-value as unset and preserve siblings (single-segment path)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name', value: { manufacturer: null } });
+      const name = engine.getResult().name as Record<string, unknown>;
+      expect('manufacturer' in name).toBe(false);
+      expect(name.model).toBe('Widget');
+    });
+  });
+
+  describe('F4 - reject null elements in multi-valued PATCH arrays (custom RT parity)', () => {
+    it('should throw 400 invalidValue when add value contains null element', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      try {
+        engine.apply({ op: 'add', path: 'tags', value: ['lab', null] as unknown as unknown[] });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+
+    it('should throw 400 invalidValue when replace value contains null element', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      try {
+        engine.apply({ op: 'replace', path: 'tags', value: ['lab', null] as unknown as unknown[] });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F5 - prune empty extension namespaces after PATCH (custom RT parity)', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Device';
+
+    it('should remove the extension URN key from payload when last attribute is cleared', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { tag: 'A' } },
+        [URN],
+      );
+      engine.apply({ op: 'replace', path: `${URN}:tag`, value: null });
+      expect(URN in engine.getResult()).toBe(false);
+    });
+
+    it('should keep the extension URN key when at least one other attribute remains', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { tag: 'A', color: 'red' } },
+        [URN],
+      );
+      engine.apply({ op: 'replace', path: `${URN}:tag`, value: null });
+      const result = engine.getResult();
+      expect(URN in result).toBe(true);
+      const ext = result[URN] as Record<string, unknown>;
+      expect('tag' in ext).toBe(false);
+      expect(ext.color).toBe('red');
+    });
+  });
+
+  describe('F6 - extension dotted sub-attribute null clear (custom RT parity)', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Device';
+
+    it('should clear only the named sub-attribute via dotted path and preserve siblings', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { owner: { value: 'mgr-1', displayName: 'Old' } } },
+        [URN],
+      );
+      engine.apply({ op: 'replace', path: `${URN}:owner.displayName`, value: null });
+      const owner = (engine.getResult()[URN] as Record<string, unknown>).owner as Record<string, unknown>;
+      expect('displayName' in owner).toBe(false);
+      expect(owner.value).toBe('mgr-1');
+    });
+  });
+
+  describe('F7 - extension valuePath noTarget (custom RT parity)', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Device';
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (remove)', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { aliases: [{ type: 'a', value: 'x' }] } },
+        [URN],
+      );
+      try {
+        engine.apply({ op: 'remove', path: `${URN}:aliases[type eq "missing"]` });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (replace)', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { aliases: [{ type: 'a', value: 'x' }] } },
+        [URN],
+      );
+      try {
+        engine.apply({ op: 'replace', path: `${URN}:aliases[type eq "missing"].value`, value: 'y' });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+  });
 });
