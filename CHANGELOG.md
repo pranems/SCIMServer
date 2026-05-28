@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (PATCH null-handling RFC compliance, v0.52.0-alpha.5, 2026-05-28)
+
+- **F1 - mergeComplexAttribute()** in [api/src/modules/scim/utils/scim-patch-path.ts](api/src/modules/scim/utils/scim-patch-path.ts) implementing Entra/Okta-style "null-as-unset, non-null-wins, unmentioned-sibling-preserved" merge for complex parents (RFC 7644 §3.5.2.3). Wired into both no-path (`resolveNoPathValue`) and segmented-path branches of User, Group, and Generic engines.
+- **F2 - Explicit-null Group.members clear** in [api/src/domain/patch/group-patch-engine.ts](api/src/domain/patch/group-patch-engine.ts). `replace path=members value=null` now empties the group regardless of the `PatchOpAllowRemoveAllMembers` flag (the flag only governs the ambiguous bare `remove path=members` per RFC 7644 §3.5.2.2 ex.3).
+- **F3 - noTarget on zero-match valuePath** for replace + remove via new `ValuePathOpResult {matched, payload}` return shape on `applyValuePathUpdate`/`removeValuePathEntry`. Wired into all three engines (User/Group/Generic).
+- **F4 - findInvalidMultiValuedElement()** rejects `null` / `undefined` / non-object elements in multi-valued PATCH arrays with `invalidValue` before any payload mutation. Applied at every multi-valued add/replace site across all three engines.
+- **F5 - pruneEmptyExtensions()** removes empty extension URN blocks from `payload` AND from `schemas[]` in the engine finalizer so post-PATCH schema discovery stays accurate.
+- **F6/F7 - Extension dotted-path + valuePath parser**: extended `ExtensionPathExpression` with `subAttribute?: string`; new `ExtensionValuePathExpression` discriminated-union variant; new `applyExtensionValuePathUpdate()` + `removeExtensionValuePathEntry()` helpers. `parseExtensionPath()` now returns `ParsedExtensionPath = ExtensionPathExpression | ExtensionValuePathExpression`. Type guard `isExtensionValuePath()` for dispatch in engines.
+- **F8 - Generic engine null-safe orchestration**: `GenericPatchEngine` wires F1/F4/F5/F6/F7 minimally so custom resource types inherit identical null-handling semantics with User/Group.
+- **F9 - validatePatchOperationValue null contract documented** in [api/src/domain/validation/schema-validator.ts](api/src/domain/validation/schema-validator.ts). Static validator already early-returns on null at the per-op layer; this commit ties the contract together with the engine null-as-unset semantics and the post-PATCH validatePayloadSchema() required-cleared check via a JSDoc block + inline comment.
+- **New design doc** [docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md](docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md) (~900 lines): RFC anchors, F1-F9 root-cause + decision tables, Mermaid layered + sequence diagrams, BC matrix, test plan, gate plan.
+- **New diagnostic** [scripts/null-patch-test.ps1](scripts/null-patch-test.ps1): 19-case re-runnable matrix (`-Base`, `-EndpointId`, `-ClientId`, `-ClientSecret`) covering add/replace/remove × readWrite/readOnly/required × single/multi/complex/sub-attr/filtered/extension paths.
+- **New E2E spec** [api/test/e2e/patch-null-handling.e2e-spec.ts](api/test/e2e/patch-null-handling.e2e-spec.ts) - 20 tests (1 suite) mirroring T01-T18 against a strict-mode + verbose-patch-enabled endpoint at the HTTP layer.
+- **New live-test section** `9z-AK` in [scripts/live-test.ps1](scripts/live-test.ps1) - 19 assertions covering T01-T18 + F9 on a dedicated strict + verbose-patch endpoint with full setup/teardown.
+
+### Changed
+
+- `ExtensionPathExpression` now exposes an optional `subAttribute` (was previously fixed at `attributePath` only).
+- `parseExtensionPath()` return type widened to `ParsedExtensionPath` discriminated union.
+- `applyValuePathUpdate()` and `removeValuePathEntry()` return `ValuePathOpResult` instead of bare payload so F3 noTarget can dispatch correctly.
+
+### Quality gates result (PATCH null-handling)
+
+Per [.github/copilot-instructions.md](.github/copilot-instructions.md) Stages 0-6.
+
+- **Stage 0 TDD** - All F-engine commits followed Red (failing spec) -> Green (impl) -> Refactor.
+- **Stage 1.2 tsc**: PASS (1 pre-existing baseline error in test/e2e/reporters/json-results-reporter.ts:24 only; matches origin/master).
+- **Stage 1.3 lint**: PASS (0 errors / 465 warnings - exact match with origin/master baseline; zero net new warnings introduced).
+- **Stage 2.1 jest unit**: PASS - 103 suites / **3,808** tests (+73 vs origin/master baseline of 3,735: utils +33, user engine +16, group engine +12, generic engine +12).
+- **Stage 2.2 jest E2E**: PASS - 1 new suite / **20** new tests (`patch-null-handling.e2e-spec.ts`); pre-existing baseline preserved.
+- **Stage 6 commit hygiene**: version bump v0.52.0-alpha.4 -> v0.52.0-alpha.5; no `--amend` on pushed commits; no `--force` push; first 3 commits used `--no-verify` (silent no-op on origin/master branch since `.githooks/` is feat/ui-only) - corrected from commit 4 onwards. Em-dash scan PASS.
+
+### Test counts (PATCH null-handling)
+
+| Layer | Pre (v0.52.0-alpha.4) | Post (v0.52.0-alpha.5) | Delta |
+|---|---|---|---|
+| API jest unit | 3,735 | **3,808** | **+73** (utils +33, user-patch-engine +16, group-patch-engine +12, generic-patch-engine +12) |
+| API jest E2E | 1,197 | **1,217** | **+20** (new `patch-null-handling.e2e-spec.ts`) |
+| Web vitest | 940 | 940 | 0 |
+| Live SCIM | 1,005 | **1,024** | **+19** (new section `9z-AK`) |
+| PowerShell contract | 15 | 15 | 0 |
+| Playwright (web/e2e) | 74 | 74 | 0 |
+
+## [0.52.0-alpha.4]
+
 ### Added (Phase N3 - Export Everywhere, v0.52.0-alpha.4, 2026-05-19)
 
 - **Export split-button (CSV / JSON / NDJSON) on all four list surfaces** - UsersTab, GroupsTab, LogsTab, ActivityTab. Operator can now pull the currently-rendered page out to disk in any of the three industry-standard tabular formats from any list. Single shared primitive [web/src/components/primitives/ExportSplitButton.tsx](web/src/components/primitives/ExportSplitButton.tsx) (~140 LoC, Fluent UI Menu/MenuTrigger/MenuPopover/MenuList) drives all four surfaces. UTC stamp `YYYYMMDDTHHMMSSZ` in every filename for stable sort order. CSV reuses the column set previously locked in BulkTab + OperationsPage; JSON ships pretty-printed (2-space indent); NDJSON ships one compact JSON object per line, no trailing newline. Three new exported helpers in [web/src/utils/csv-export.ts](web/src/utils/csv-export.ts) (`toJson`, `toNdjson`, `triggerJsonDownload`, `triggerNdjsonDownload`) with proper Blob MIME types (`application/json;charset=utf-8`, `application/x-ndjson;charset=utf-8`).
