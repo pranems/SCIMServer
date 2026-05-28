@@ -23,6 +23,12 @@ import {
   parseExtensionPath,
   applyExtensionUpdate,
   removeExtensionAttribute,
+  isExtensionValuePath,
+  applyExtensionValuePathUpdate,
+  removeExtensionValuePathEntry,
+  pruneEmptyExtensions,
+  findInvalidMultiValuedElement,
+  mergeComplexAttribute,
 } from '../../modules/scim/utils/scim-patch-path';
 
 // ─── Prototype pollution guard ──────────────────────────────────────────────
@@ -91,6 +97,12 @@ export class GenericPatchEngine {
 
   /** Get the resulting payload after all operations. */
   getResult(): Record<string, unknown> {
+    // F5: prune extension namespace keys that became empty after PATCH so the
+    // URN is naturally dropped from schemas[] when the response is projected
+    // (RFC 7643 S3.3: extension is "in use" only when at least one attribute is assigned).
+    if (this.extensionUrns.length > 0) {
+      pruneEmptyExtensions(this.payload, this.extensionUrns);
+    }
     return this.payload;
   }
 
@@ -162,6 +174,30 @@ export class GenericPatchEngine {
     if (this.extensionUrns.length > 0 && isExtensionPath(path, this.extensionUrns)) {
       const parsed = parseExtensionPath(path, this.extensionUrns);
       if (parsed) {
+        // F7: extension valuePath -> route via the noTarget-aware helper
+        if (isExtensionValuePath(parsed)) {
+          const inner = applyExtensionValuePathUpdate(this.payload, parsed, value);
+          if (!inner.matched) {
+            throw new PatchError(
+              400,
+              `Filter ${parsed.valuePath.filterAttribute} ${parsed.valuePath.filterOperator} "${parsed.valuePath.filterValue}" did not match any value in extension ${parsed.schemaUrn}:${parsed.valuePath.attribute}.`,
+              'noTarget',
+            );
+          }
+          this.payload = inner.payload;
+          return;
+        }
+        // F4: validate multi-valued array elements
+        if (Array.isArray(value)) {
+          const bad = findInvalidMultiValuedElement(value);
+          if (bad) {
+            throw new PatchError(
+              400,
+              `Multi-valued attribute ${parsed.schemaUrn}:${parsed.attributePath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+              'invalidValue',
+            );
+          }
+        }
         this.payload = applyExtensionUpdate(this.payload, parsed, value);
         return;
       }
@@ -180,10 +216,27 @@ export class GenericPatchEngine {
       return;
     }
 
+    // F4: validate multi-valued array elements before assignment
+    if (Array.isArray(value)) {
+      const bad = findInvalidMultiValuedElement(value);
+      if (bad) {
+        throw new PatchError(
+          400,
+          `Multi-valued attribute ${path} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+          'invalidValue',
+        );
+      }
+    }
+
     const segments = path.split('.');
     if (segments.length === 1) {
       if (merge && Array.isArray(this.payload[path]) && Array.isArray(value)) {
         (this.payload[path] as unknown[]).push(...(value as unknown[]));
+      } else if (!merge) {
+        // F1: when replacing a complex parent, merge with null-as-unset so a
+        // partial object preserves siblings (RFC 7644 S3.5.2.3 Entra/Okta).
+        // Arrays / primitives still whole-replace via mergeComplexAttribute's fallback.
+        this.payload[path] = mergeComplexAttribute(this.payload[path], value);
       } else {
         this.payload[path] = value;
       }
@@ -225,6 +278,19 @@ export class GenericPatchEngine {
     if (this.extensionUrns.length > 0 && isExtensionPath(path, this.extensionUrns)) {
       const parsed = parseExtensionPath(path, this.extensionUrns);
       if (parsed) {
+        // F7: extension valuePath remove -> noTarget on zero-match
+        if (isExtensionValuePath(parsed)) {
+          const inner = removeExtensionValuePathEntry(this.payload, parsed);
+          if (!inner.matched) {
+            throw new PatchError(
+              400,
+              `Filter ${parsed.valuePath.filterAttribute} ${parsed.valuePath.filterOperator} "${parsed.valuePath.filterValue}" did not match any value in extension ${parsed.schemaUrn}:${parsed.valuePath.attribute}.`,
+              'noTarget',
+            );
+          }
+          this.payload = inner.payload;
+          return;
+        }
         this.payload = removeExtensionAttribute(this.payload, parsed);
         return;
       }

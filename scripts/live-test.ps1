@@ -10457,6 +10457,321 @@ Test-Result -Success ([string]$p3.headers["Content-Security-Policy"] -match "scr
 Write-Host "`n--- 9z-AJ: Web Security Headers (Phase N3a) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AK: PATCH NULL-HANDLING RFC COMPLIANCE
+# (RFC 7644 §3.5.2.1/2/3, RFC 7643 §2.2/§7)
+# Mirrors scripts/null-patch-test.ps1 against a dedicated endpoint with
+# StrictSchemaValidation + VerbosePatchSupported both enabled. Each test
+# corresponds to a T-id in docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md.
+# ============================================
+$script:currentSection = "9z-AK: PATCH null-handling (F1-F9)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AK: PATCH NULL-HANDLING RFC COMPLIANCE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# ---- Create a dedicated strict + verbose-patch endpoint ----
+$nullPatchEpBody = @{
+    name = "live-test-null-patch-$(Get-Random)"
+    displayName = "PATCH Null-Handling Live Test"
+    description = "RFC 7644 §3.5.2.3 null-as-unset coverage"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
+$nullPatchEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $nullPatchEpBody
+$nullPatchEpId = $nullPatchEp.id
+$nullPatchCfgBody = @{ profile = @{ settings = @{
+    StrictSchemaValidation       = "True"
+    VerbosePatchSupported        = "True"
+    PatchOpAllowRemoveAllMembers = "False"
+} } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$nullPatchEpId" -Method PATCH -Headers $headers -Body $nullPatchCfgBody -ContentType "application/json" | Out-Null
+$nullPatchBase = "$baseUrl/scim/endpoints/$nullPatchEpId"
+$scimHeaders   = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/scim+json"; Accept = "application/scim+json" }
+Test-Result -Success ($null -ne $nullPatchEpId) -Message "9z-AK.setup: Created dedicated PATCH-null endpoint $nullPatchEpId"
+
+# Helper: safe PATCH that captures status without throwing
+function Invoke-NullPatch($url, $body) {
+    try {
+        $resp = Invoke-WebRequest -Uri $url -Method Patch -Headers $scimHeaders -Body ($body | ConvertTo-Json -Depth 10 -Compress) -SkipHttpErrorCheck
+        $parsed = $null
+        if ($resp.Content) {
+            # PowerShell 7 returns the response Content as a String for known text
+            # MIME types but as a byte[] for unknown ones like application/scim+json.
+            # Normalize to a UTF-8 string before parsing so scimType / detail are reachable.
+            $contentStr = if ($resp.Content -is [byte[]]) {
+                [System.Text.Encoding]::UTF8.GetString($resp.Content)
+            } else {
+                [string]$resp.Content
+            }
+            try { $parsed = $contentStr | ConvertFrom-Json } catch { $parsed = $contentStr }
+        }
+        return [pscustomobject]@{ Status = [int]$resp.StatusCode; Body = $parsed }
+    } catch {
+        return [pscustomobject]@{ Status = -1; Body = $_.Exception.Message }
+    }
+}
+
+# ---- Seed user + group ----
+$npRand = Get-Random -Maximum 999999
+$npUserBody = @{
+    schemas  = @("urn:ietf:params:scim:schemas:core:2.0:User","urn:ietf:params:scim:schemas:extension:enterprise:2.0:User")
+    userName = "null-patch-live-$npRand@test.local"
+    displayName = "Null Patch Live"
+    nickName = "nplive"
+    name = @{ givenName = "Null"; familyName = "Tester"; formatted = "Null Tester" }
+    emails = @(
+        @{ value = "work-$npRand@test.local"; type = "work"; primary = $true },
+        @{ value = "home-$npRand@test.local"; type = "home"; primary = $false }
+    )
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" = @{ department = "Eng"; manager = @{ value = "mgr-123" } }
+} | ConvertTo-Json -Depth 10
+$npUser = Invoke-RestMethod -Uri "$nullPatchBase/Users" -Method POST -Headers $scimHeaders -Body $npUserBody
+$npUid = $npUser.id
+Test-Result -Success ($null -ne $npUid) -Message "9z-AK.setup: Seeded user $npUid"
+
+$npGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "null-patch-live-grp-$npRand"
+    members = @(@{ value = $npUid; type = "User" })
+} | ConvertTo-Json -Depth 10
+$npGroup = Invoke-RestMethod -Uri "$nullPatchBase/Groups" -Method POST -Headers $scimHeaders -Body $npGroupBody
+$npGid = $npGroup.id
+Test-Result -Success ($null -ne $npGid) -Message "9z-AK.setup: Seeded group $npGid"
+
+function Get-NpUser  { Invoke-RestMethod -Uri "$nullPatchBase/Users/$npUid"  -Headers $scimHeaders }
+function Get-NpGroup { Invoke-RestMethod -Uri "$nullPatchBase/Groups/$npGid" -Headers $scimHeaders }
+
+# ---- T01: replace:null on single-valued readWrite (nickName) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="nickName"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.nickName)) -Message "9z-AK.T01: replace:null on single-valued readWrite (nickName) clears attr (status=$($r.Status))"
+
+# ---- T02: replace:null on REQUIRED attribute (userName) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="userName"; value=$null })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T02: replace:null on REQUIRED (userName) rejected 400 (status=$($r.Status))"
+
+# ---- T03: replace:null on readOnly attribute (id) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="id"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,400) -and ($u.id -eq $npUid)) -Message "9z-AK.T03: replace:null on readOnly (id) conformant (status=$($r.Status); id preserved)"
+
+# ---- T04: replace:null on multi-valued bare path (emails) ----
+$npReseed = @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="emails"; value=@(
+        @{ value="work-$npRand@test.local"; type="work"; primary=$true },
+        @{ value="home-$npRand@test.local"; type="home"; primary=$false }
+    )})
+}
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="emails"; value=$null })
+}
+$u = Get-NpUser
+$emailCount = if ($u.emails) { @($u.emails).Count } else { 0 }
+Test-Result -Success (($r.Status -in 200,204) -and ($emailCount -eq 0)) -Message "9z-AK.T04: replace:null on multi-valued (emails) clears array (count=$emailCount)"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+
+# ---- T05: replace:null on filtered sub-attribute (emails[type eq "work"].value) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path='emails[type eq "work"].value'; value=$null })
+}
+Test-Result -Success ($r.Status -in 200,204,400) -Message "9z-AK.T05: replace:null on filtered sub-attr (emails[work].value) is conformant (status=$($r.Status))"
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+
+# ---- T06: F3 - remove with zero-match filter -> noTarget ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="remove"; path='emails[type eq "doesnotexist"]' })
+}
+Test-Result -Success (($r.Status -eq 400) -and ($r.Body.scimType -eq 'noTarget')) -Message "9z-AK.T06: F3 - remove with zero-match filter rejected as noTarget"
+
+# ---- T07: add:null on optional attribute (title) - permissive no-op ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="title"; value=$null })
+}
+Test-Result -Success ($r.Status -in 200,204,400) -Message "9z-AK.T07: add:null on optional missing attr (title) is conformant (status=$($r.Status))"
+
+# ---- T08: F1 - path-less replace with nested nulls (Entra style) ----
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(
+        @{ op="replace"; path="nickName"; value="nplive2" },
+        @{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } }
+    )
+} | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; value=@{
+        nickName=$null
+        name=@{ familyName=$null }
+        emails=$null
+    }})
+}
+$u = Get-NpUser
+$emailCount = if ($u.emails) { @($u.emails).Count } else { 0 }
+$t08Pass = ($r.Status -in 200,204) -and (-not $u.nickName) -and (-not $u.name.familyName) -and ($u.name.givenName -eq 'Null') -and ($emailCount -eq 0)
+Test-Result -Success $t08Pass -Message "9z-AK.T08: F1 - path-less replace with nested nulls (nickName/familyName cleared, givenName preserved, emails empty)"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(
+        @{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } },
+        @{ op="replace"; path="emails"; value=@(
+            @{ value="work-$npRand@test.local"; type="work"; primary=$true },
+            @{ value="home-$npRand@test.local"; type="home"; primary=$false }
+        )}
+    )
+} | Out-Null
+
+# ---- T09: replace:null on complex parent (name) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.name)) -Message "9z-AK.T09: replace:null on complex parent (name) unassigns it"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } })
+} | Out-Null
+
+# ---- T10: replace:null on sub-attribute (name.familyName) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name.familyName"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.name.familyName) -and ($u.name.givenName -eq 'Null')) -Message "9z-AK.T10: replace:null on sub-attr (name.familyName) clears it; siblings preserved"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } })
+} | Out-Null
+
+# ---- T11: F1 - replace complex with partial+null (merge semantics) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName=$null; givenName="NullReplaced" } })
+}
+$u = Get-NpUser
+$t11Pass = ($r.Status -in 200,204) -and (-not $u.name.familyName) -and ($u.name.givenName -eq 'NullReplaced') -and ($u.name.formatted -eq 'Null Tester')
+Test-Result -Success $t11Pass -Message "9z-AK.T11: F1 - replace complex with partial+null merges (formatted preserved)"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } })
+} | Out-Null
+
+# ---- T12: F5 - replace:null on extension attribute (enterprise:manager) ----
+# First clear department so removing manager leaves the URN empty
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department"; value=$null })
+} | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"; value=$null })
+}
+$u = Get-NpUser
+$ent = $u.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+$mgr = if ($ent) { $ent.manager } else { $null }
+$hasExtUrn = $u.schemas -contains 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+$t12Pass = ($r.Status -in 200,204) -and (-not $mgr) -and (-not $hasExtUrn)
+Test-Result -Success $t12Pass -Message "9z-AK.T12: F5 - replace:null on extension (enterprise:manager) clears + prunes empty URN from schemas[]"
+
+# ---- T13: empty string vs null on string attr (displayName) ----
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="displayName"; value="Live Null Patch" })
+} | Out-Null
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="displayName"; value="" })
+} | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="displayName"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.displayName)) -Message "9z-AK.T13: null unassigns displayName (after empty-string round-trip)"
+
+# ---- T14: F4 - replace:null on Group members[X].value (required sub-attr) ----
+$r = Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="members[value eq `"$npUid`"].value"; value=$null })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T14: F4 - replace:null on Group members[X].value rejected 400 (status=$($r.Status))"
+
+# ---- T15: F2 - replace:null on Group.members clears all members ----
+$r = Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="members"; value=$null })
+}
+$g = Get-NpGroup
+$mc = if ($g.members) { @($g.members).Count } else { 0 }
+Test-Result -Success (($r.Status -in 200,204) -and ($mc -eq 0)) -Message "9z-AK.T15: F2 - replace:null on Group.members clears all (count=$mc)"
+
+# Re-add member for T16
+Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="members"; value=@(@{ value=$npUid; type="User" }) })
+} | Out-Null
+
+# ---- T16: remove (no value) on Group.members with strict-by-default ----
+# PatchOpAllowRemoveAllMembers=False -> bare remove should be rejected.
+$r = Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="remove"; path="members" })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T16: remove (no value) on Group.members strict-rejected when flag=False (status=$($r.Status))"
+
+# ---- T17: remove with filter + explicit null value (value ignored) ----
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="remove"; path='emails[type eq "home"]'; value=$null })
+}
+$u = Get-NpUser
+$emails = if ($u.emails) { @($u.emails) } else { @() }
+$hasHome = [bool]($emails | Where-Object { $_.type -eq 'home' })
+$hasWork = [bool]($emails | Where-Object { $_.type -eq 'work' })
+Test-Result -Success (($r.Status -in 200,204) -and (-not $hasHome) -and $hasWork) -Message "9z-AK.T17: remove filter + explicit-null value ignores value; only matching entry removed"
+
+# ---- T18: F4 - add multi-valued with [null] element ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="emails"; value=@($null) })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T18: F4 - add multi-valued with [null] element rejected 400 (status=$($r.Status))"
+
+# ---- F9 - validatePatchOperationValue null contract: any add:null with valid path returns 2xx ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="nickName"; value=$null })
+}
+Test-Result -Success ($r.Status -in 200,204,400) -Message "9z-AK.F9: add:null on optional attribute is conformant (validatePatchOperationValue null contract; status=$($r.Status))"
+
+# ---- Cleanup the dedicated endpoint ----
+try { Invoke-RestMethod -Uri "$nullPatchBase/Users/$npUid" -Method DELETE -Headers $scimHeaders | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$nullPatchBase/Groups/$npGid" -Method DELETE -Headers $scimHeaders | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$nullPatchEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-AK: PATCH null-handling (F1-F9) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
