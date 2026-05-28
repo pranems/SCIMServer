@@ -155,25 +155,38 @@ export function matchesFilter(
 }
 
 /**
+ * Result shape returned by valuePath apply/remove utilities.
+ *
+ * `matched` indicates whether the filter inside the valuePath actually selected
+ * an array entry. When it is `false`, callers SHOULD raise a SCIM `noTarget`
+ * error per RFC 7644 §3.5.2.2.
+ */
+export interface ValuePathOpResult {
+  matched: boolean;
+  payload: Record<string, unknown>;
+}
+
+/**
  * Applies a valuePath PATCH operation (add/replace) to a rawPayload.
  *
  * Finds the matching element inside the multi-valued attribute array and
  * updates the specified sub-attribute in place.
  *
- * @returns The updated rawPayload (mutated in-place for the array entry)
+ * @returns `{ matched, payload }`. When `matched === false` the payload is
+ *   returned unchanged and the caller is responsible for emitting a SCIM
+ *   `noTarget` error if the operation requires a successful filter match
+ *   (RFC 7644 §3.5.2.2).
  */
 export function applyValuePathUpdate(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
   value: unknown,
   caseExact = false,
-): Record<string, unknown> {
+): ValuePathOpResult {
   const arr = rawPayload[parsed.attribute];
 
   if (!Array.isArray(arr)) {
-    // If the attribute doesn't exist as an array yet, we can't resolve the filter
-    // Return payload as-is (no match)
-    return rawPayload;
+    return { matched: false, payload: rawPayload };
   }
 
   const matchIdx = arr.findIndex((item: unknown) => {
@@ -187,37 +200,38 @@ export function applyValuePathUpdate(
     );
   });
 
-  if (matchIdx >= 0) {
-    if (parsed.subAttribute) {
-      // Update specific sub-attribute: emails[type eq "work"].value = "new@example.com"
-      (arr[matchIdx] as Record<string, unknown>)[parsed.subAttribute] = value;
-    } else {
-      // Replace the entire matched element
-      arr[matchIdx] = value;
-    }
-    rawPayload[parsed.attribute] = [...arr];
+  if (matchIdx < 0) {
+    return { matched: false, payload: rawPayload };
   }
 
-  return rawPayload;
+  if (parsed.subAttribute) {
+    (arr[matchIdx] as Record<string, unknown>)[parsed.subAttribute] = value;
+  } else {
+    arr[matchIdx] = value;
+  }
+  rawPayload[parsed.attribute] = [...arr];
+
+  return { matched: true, payload: rawPayload };
 }
 
 /**
  * Removes the matching element from a multi-valued attribute array based on a valuePath filter.
  *
- * @returns The updated rawPayload
+ * @returns `{ matched, payload }`. When `matched === false` the payload is
+ *   returned unchanged and the caller is responsible for emitting a SCIM
+ *   `noTarget` error (RFC 7644 §3.5.2.2).
  */
 export function removeValuePathEntry(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
   caseExact = false,
-): Record<string, unknown> {
+): ValuePathOpResult {
   const arr = rawPayload[parsed.attribute];
   if (!Array.isArray(arr)) {
-    return rawPayload;
+    return { matched: false, payload: rawPayload };
   }
 
   if (parsed.subAttribute) {
-    // Remove just the sub-attribute from the matching element
     const matchIdx = arr.findIndex((item: unknown) => {
       if (typeof item !== 'object' || item === null) return false;
       return matchesFilter(
@@ -228,27 +242,29 @@ export function removeValuePathEntry(
         caseExact,
       );
     });
-    if (matchIdx >= 0) {
-      const entry = { ...(arr[matchIdx] as Record<string, unknown>) };
-      delete entry[parsed.subAttribute];
-      arr[matchIdx] = entry;
-      rawPayload[parsed.attribute] = [...arr];
+    if (matchIdx < 0) {
+      return { matched: false, payload: rawPayload };
     }
-  } else {
-    // Remove the entire matched element from the array
-    rawPayload[parsed.attribute] = arr.filter((item: unknown) => {
-      if (typeof item !== 'object' || item === null) return true;
-      return !matchesFilter(
-        item as Record<string, unknown>,
-        parsed.filterAttribute,
-        parsed.filterOperator,
-        parsed.filterValue,
-        caseExact,
-      );
-    });
+    const entry = { ...(arr[matchIdx] as Record<string, unknown>) };
+    delete entry[parsed.subAttribute];
+    arr[matchIdx] = entry;
+    rawPayload[parsed.attribute] = [...arr];
+    return { matched: true, payload: rawPayload };
   }
 
-  return rawPayload;
+  const beforeLen = arr.length;
+  const filtered = arr.filter((item: unknown) => {
+    if (typeof item !== 'object' || item === null) return true;
+    return !matchesFilter(
+      item as Record<string, unknown>,
+      parsed.filterAttribute,
+      parsed.filterOperator,
+      parsed.filterValue,
+      caseExact,
+    );
+  });
+  rawPayload[parsed.attribute] = filtered;
+  return { matched: filtered.length < beforeLen, payload: rawPayload };
 }
 
 /**
@@ -428,18 +444,36 @@ export function resolveNoPathValue(
       // URNs may contain dots (version segments like "2.0") which are NOT
       // JSON path separators. RFC 2141 URN syntax must be preserved atomically.
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        // Merge with existing extension object if present
+        // F1: per-sub-key merge with null-as-unset semantics, mirroring core
+        // complex-attribute merge. Without this an incoming
+        //   { 'urn:...:User': { department: null } }
+        // would write a literal null into the extension namespace instead of
+        // deleting the attribute, breaking Entra deprovision flows.
         const existing = rawPayload[key];
-        if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-          rawPayload[key] = { ...(existing as Record<string, unknown>), ...(value as Record<string, unknown>) };
-        } else {
-          rawPayload[key] = value;
+        const merged: Record<string, unknown> =
+          typeof existing === 'object' && existing !== null && !Array.isArray(existing)
+            ? { ...(existing as Record<string, unknown>) }
+            : {};
+        for (const [subKey, subVal] of Object.entries(value as Record<string, unknown>)) {
+          if (subVal === null) {
+            delete merged[subKey];
+          } else if (
+            typeof subVal === 'object' &&
+            subVal !== null &&
+            !Array.isArray(subVal)
+          ) {
+            // Nested complex (e.g. enterprise:manager) - merge per F1
+            merged[subKey] = mergeComplexAttribute(merged[subKey], subVal);
+          } else {
+            merged[subKey] = subVal;
+          }
         }
+        rawPayload[key] = merged;
       } else {
         rawPayload[key] = value;
       }
     } else if (key.includes('.')) {
-      // Dot-notation: name.givenName → update nested object
+      // Dot-notation: name.givenName -> update nested object
       const dotIndex = key.indexOf('.');
       const parentAttr = key.substring(0, dotIndex);
       const childAttr = key.substring(dotIndex + 1);
@@ -450,8 +484,115 @@ export function resolveNoPathValue(
         rawPayload[parentAttr] = { [childAttr]: value };
       }
     } else {
-      rawPayload[key] = value;
+      // F1: plain key. If both existing and incoming are non-array objects,
+      // perform a merge with null-as-unset semantics so a path-less PATCH like
+      //   { op: 'Replace', value: { name: { familyName: null } } }
+      // clears only `familyName` and preserves `givenName` / `formatted`.
+      // Matches the Entra/Okta de-facto interpretation of RFC 7644 §3.5.2.3.
+      // Arrays (multi-valued) still whole-replace.
+      rawPayload[key] = mergeComplexAttribute(rawPayload[key], value);
     }
   }
   return rawPayload;
+}
+
+/**
+ * F1 helper: Merge an incoming PATCH value into an existing attribute value
+ * using SCIM complex-merge semantics (RFC 7644 §3.5.2.3, Entra/Okta
+ * interpretation).
+ *
+ *   - If `existing` and `incoming` are both non-null, non-array objects, the
+ *     result is a shallow merge of `existing` overlaid with `incoming`. Any
+ *     sub-attribute in `incoming` whose value is `null` is removed from the
+ *     merged result (explicit "unset" intent). Sub-attributes not mentioned
+ *     in `incoming` are preserved from `existing`.
+ *   - Otherwise (`incoming` is a primitive, null, array, or `existing` is
+ *     not a plain object), the function performs a whole-attribute
+ *     replacement and simply returns `incoming`. This preserves correct
+ *     multi-valued-attribute behavior (arrays always whole-replace) and
+ *     primitive replacement.
+ *
+ * RFC 7643 §2.3.8 forbids complex-within-complex, so single-level merge is
+ * the maximum recursion depth SCIM ever needs.
+ */
+export function mergeComplexAttribute(existing: unknown, incoming: unknown): unknown {
+  const incomingIsObject =
+    typeof incoming === 'object' && incoming !== null && !Array.isArray(incoming);
+  const existingIsObject =
+    typeof existing === 'object' && existing !== null && !Array.isArray(existing);
+
+  if (!incomingIsObject || !existingIsObject) {
+    return incoming;
+  }
+
+  const merged: Record<string, unknown> = { ...(existing as Record<string, unknown>) };
+  for (const [subKey, subVal] of Object.entries(incoming as Record<string, unknown>)) {
+    if (subVal === null) {
+      delete merged[subKey];
+    } else {
+      merged[subKey] = subVal;
+    }
+  }
+  return merged;
+}
+
+/**
+ * F5 helper: After PATCH application, prune any extension URN keys whose value
+ * is an empty object. RFC 7643 §3.3 considers an extension "in use" only when
+ * at least one of its attributes is assigned, so an extension namespace with
+ * no remaining sub-attributes SHOULD be removed from the resource (and
+ * consequently from `schemas[]` once the resource is projected for the
+ * response).
+ *
+ * Only extension URNs supplied via `extensionUrns` are considered; unknown
+ * keys are left alone so this is safe to call on arbitrary payloads.
+ *
+ * @returns The same payload reference, mutated for caller convenience.
+ */
+export function pruneEmptyExtensions(
+  payload: Record<string, unknown>,
+  extensionUrns: readonly string[],
+): Record<string, unknown> {
+  for (const urn of extensionUrns) {
+    const ext = payload[urn];
+    if (
+      ext !== undefined &&
+      typeof ext === 'object' &&
+      ext !== null &&
+      !Array.isArray(ext) &&
+      Object.keys(ext as Record<string, unknown>).length === 0
+    ) {
+      delete payload[urn];
+    }
+  }
+  return payload;
+}
+
+/**
+ * F4 helper: Validate that every element of a multi-valued PATCH array is a
+ * non-null, non-undefined value. A `null` element cannot satisfy any
+ * multi-valued sub-schema (each entry must at minimum carry the attribute's
+ * required sub-attributes per RFC 7643 §2.4), so we reject the operation
+ * eagerly at the engine level.
+ *
+ * Strings inside a multi-valued string-list extension (e.g. opentext
+ * `proxyAddresses`) are still allowed: the helper only rejects literal
+ * `null` / `undefined` elements. Whole-attribute replace with `value: null`
+ * is handled separately by the engines (it means "unassign the array").
+ *
+ * @returns `{ index, reason }` describing the offending element, or `null`
+ *   when every element is valid (or when `value` is not an array). Engines
+ *   wrap a non-null return in a `PatchError(400, ..., 'invalidValue')`.
+ */
+export function findInvalidMultiValuedElement(
+  value: unknown,
+): { index: number; reason: string } | null {
+  if (!Array.isArray(value)) return null;
+  for (let i = 0; i < value.length; i++) {
+    const el = value[i];
+    if (el === null || el === undefined) {
+      return { index: i, reason: 'element is null' };
+    }
+  }
+  return null;
 }

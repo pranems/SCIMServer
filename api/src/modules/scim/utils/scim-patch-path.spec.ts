@@ -10,6 +10,9 @@ import {
   removeExtensionAttribute,
   addValuePathEntry,
   resolveNoPathValue,
+  mergeComplexAttribute,
+  pruneEmptyExtensions,
+  findInvalidMultiValuedElement,
 } from './scim-patch-path';
 
 describe('scim-patch-path utilities', () => {
@@ -315,8 +318,9 @@ describe('scim-patch-path utilities', () => {
       };
 
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
 
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('new@example.com');
       // Other fields untouched
       expect((result.emails as Record<string, unknown>[])[0].primary).toBe(true);
@@ -324,19 +328,21 @@ describe('scim-patch-path utilities', () => {
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('home@example.com');
     });
 
-    it('should not modify payload when attribute array is missing', () => {
+    it('should report matched=false when attribute array is missing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = { displayName: 'Test' };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      expect(matched).toBe(false);
       expect(result).toEqual({ displayName: 'Test' });
     });
 
-    it('should not modify payload when no element matches the filter', () => {
+    it('should report matched=false when no element matches the filter (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = {
         emails: [{ type: 'home', value: 'home@example.com' }],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      expect(matched).toBe(false);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('home@example.com');
     });
 
@@ -347,7 +353,8 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"]')!;
-      const result = applyValuePathUpdate(payload, parsed, { type: 'work', value: 'replaced@example.com' });
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, { type: 'work', value: 'replaced@example.com' });
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[])[0]).toEqual({
         type: 'work',
         value: 'replaced@example.com',
@@ -361,7 +368,8 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('addresses[type eq "work"].streetAddress')!;
-      const result = applyValuePathUpdate(payload, parsed, '456 New Ave');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, '456 New Ave');
+      expect(matched).toBe(true);
       expect((result.addresses as Record<string, unknown>[])[0].streetAddress).toBe('456 New Ave');
       expect((result.addresses as Record<string, unknown>[])[0].locality).toBe('OldCity');
     });
@@ -371,7 +379,8 @@ describe('scim-patch-path utilities', () => {
         emails: ['not-an-object', { type: 'work', value: 'old@example.com' }],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      expect(matched).toBe(true);
       expect((result.emails as unknown[])[0]).toBe('not-an-object');
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('new@example.com');
     });
@@ -384,7 +393,8 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'updated@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'updated@example.com');
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('updated@example.com');
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('second@example.com');
     });
@@ -400,8 +410,9 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"].primary')!;
-      const result = removeValuePathEntry(payload, parsed);
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
       const emails = result.emails as Record<string, unknown>[];
+      expect(matched).toBe(true);
       expect(emails[0]).toEqual({ type: 'work', value: 'work@example.com' });
     });
 
@@ -413,26 +424,38 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"]')!;
-      const result = removeValuePathEntry(payload, parsed);
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[]).length).toBe(1);
       expect((result.emails as Record<string, unknown>[])[0].type).toBe('home');
     });
 
-    it('should be a no-op when no element matches the filter', () => {
+    it('should report matched=false when sub-attr filter matches nothing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = {
         emails: [{ type: 'home', value: 'home@example.com' }],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = removeValuePathEntry(payload, parsed);
-      // Nothing should change
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(false);
       expect((result.emails as Record<string, unknown>[]).length).toBe(1);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('home@example.com');
     });
 
-    it('should be a no-op when attribute array does not exist', () => {
+    it('should report matched=false when whole-entry filter matches nothing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
+      const payload: Record<string, unknown> = {
+        emails: [{ type: 'home', value: 'home@example.com' }],
+      };
+      const parsed = parseValuePath('emails[type eq "work"]')!;
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(false);
+      expect((result.emails as Record<string, unknown>[]).length).toBe(1);
+    });
+
+    it('should report matched=false when attribute array does not exist (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = { displayName: 'Test' };
       const parsed = parseValuePath('emails[type eq "work"]')!;
-      const result = removeValuePathEntry(payload, parsed);
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(false);
       expect(result).toEqual({ displayName: 'Test' });
     });
   });
@@ -773,6 +796,175 @@ describe('scim-patch-path utilities', () => {
       });
       const ext = result[CUSTOM_URN] as Record<string, unknown>;
       expect(ext.department).toBe('Sales');
+    });
+
+    // F1: complex-merge with null-as-unset (RFC 7644 S3.5.2.3, Entra/Okta interpretation)
+    describe('complex-merge with null-as-unset (F1)', () => {
+      it('should merge a nested complex value into an existing complex parent', () => {
+        const payload: Record<string, unknown> = {
+          name: { givenName: 'Alice', familyName: 'Old', formatted: 'Alice Old' },
+        };
+        const result = resolveNoPathValue(payload, {
+          name: { familyName: 'New' },
+        });
+        const name = result.name as Record<string, unknown>;
+        expect(name.familyName).toBe('New');
+        expect(name.givenName).toBe('Alice');
+        expect(name.formatted).toBe('Alice Old');
+      });
+
+      it('should treat a null sub-value as unset of just that sub-attribute (path-less)', () => {
+        const payload: Record<string, unknown> = {
+          name: { givenName: 'Alice', familyName: 'Old', formatted: 'Alice Old' },
+        };
+        const result = resolveNoPathValue(payload, {
+          name: { familyName: null },
+        });
+        const name = result.name as Record<string, unknown>;
+        expect('familyName' in name).toBe(false);
+        expect(name.givenName).toBe('Alice');
+        expect(name.formatted).toBe('Alice Old');
+      });
+
+      it('should set the value when the existing parent is not yet present', () => {
+        const payload: Record<string, unknown> = {};
+        const result = resolveNoPathValue(payload, {
+          name: { givenName: 'Bob' },
+        });
+        expect(result.name).toEqual({ givenName: 'Bob' });
+      });
+
+      it('should whole-replace when the new value is an array (multi-valued)', () => {
+        const payload: Record<string, unknown> = {
+          emails: [{ type: 'work', value: 'old@e.com' }],
+        };
+        const result = resolveNoPathValue(payload, {
+          emails: [{ type: 'home', value: 'new@e.com' }],
+        });
+        expect(result.emails).toEqual([{ type: 'home', value: 'new@e.com' }]);
+      });
+
+      it('should null-as-unset on extension namespace sub-keys (URN branch parity)', () => {
+        const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+        const payload: Record<string, unknown> = {
+          [URN]: { department: 'Eng', employeeNumber: 'E1' },
+        };
+        const result = resolveNoPathValue(payload, {
+          [URN]: { department: null },
+        });
+        const ext = result[URN] as Record<string, unknown>;
+        expect('department' in ext).toBe(false);
+        expect(ext.employeeNumber).toBe('E1');
+      });
+    });
+  });
+
+  // mergeComplexAttribute (F1 helper)
+
+  describe('mergeComplexAttribute (F1)', () => {
+    it('should merge sub-attributes when both sides are objects', () => {
+      const out = mergeComplexAttribute(
+        { givenName: 'Alice', familyName: 'Old' },
+        { familyName: 'New' },
+      );
+      expect(out).toEqual({ givenName: 'Alice', familyName: 'New' });
+    });
+
+    it('should delete sub-attributes whose incoming value is null', () => {
+      const out = mergeComplexAttribute(
+        { givenName: 'Alice', familyName: 'Old', formatted: 'Alice Old' },
+        { familyName: null, givenName: 'Bob' },
+      );
+      expect(out).toEqual({ givenName: 'Bob', formatted: 'Alice Old' });
+    });
+
+    it('should return incoming as-is when existing is not an object', () => {
+      expect(mergeComplexAttribute(undefined, { a: 1 })).toEqual({ a: 1 });
+      expect(mergeComplexAttribute(null, { a: 1 })).toEqual({ a: 1 });
+      expect(mergeComplexAttribute('str', { a: 1 })).toEqual({ a: 1 });
+    });
+
+    it('should return incoming when incoming is null (whole-attribute unset)', () => {
+      expect(mergeComplexAttribute({ a: 1 }, null)).toBeNull();
+    });
+
+    it('should return incoming when incoming is an array (multi-valued whole-replace)', () => {
+      const arr = [{ x: 1 }];
+      expect(mergeComplexAttribute({ a: 1 }, arr)).toBe(arr);
+    });
+  });
+
+  // pruneEmptyExtensions (F5 helper)
+
+  describe('pruneEmptyExtensions (F5)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const OTHER_URN = 'urn:example:custom:2.0:User';
+
+    it('should remove an extension key whose value is an empty object', () => {
+      const payload: Record<string, unknown> = { displayName: 'Test', [URN]: {} };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(URN in payload).toBe(false);
+      expect(payload.displayName).toBe('Test');
+    });
+
+    it('should keep an extension key that still has at least one sub-attribute', () => {
+      const payload: Record<string, unknown> = { [URN]: { department: 'Eng' } };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(URN in payload).toBe(true);
+    });
+
+    it('should not touch keys not listed in extensionUrns', () => {
+      const payload: Record<string, unknown> = { [OTHER_URN]: {} };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(OTHER_URN in payload).toBe(true);
+    });
+
+    it('should be a no-op on an empty extensionUrns list', () => {
+      const payload: Record<string, unknown> = { [URN]: {} };
+      pruneEmptyExtensions(payload, []);
+      expect(URN in payload).toBe(true);
+    });
+
+    it('should not delete arrays or primitives even if "empty"', () => {
+      const payload: Record<string, unknown> = { [URN]: [] };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(URN in payload).toBe(true);
+    });
+  });
+
+  // findInvalidMultiValuedElement (F4 helper)
+
+  describe('findInvalidMultiValuedElement (F4)', () => {
+    it('should return null for a valid array of objects', () => {
+      expect(findInvalidMultiValuedElement([{ a: 1 }, { b: 2 }])).toBeNull();
+    });
+
+    it('should return null for a valid array of strings (multi-valued string list)', () => {
+      expect(findInvalidMultiValuedElement(['a', 'b'])).toBeNull();
+    });
+
+    it('should return null for an empty array', () => {
+      expect(findInvalidMultiValuedElement([])).toBeNull();
+    });
+
+    it('should return null for non-array input (caller handles separately)', () => {
+      expect(findInvalidMultiValuedElement(null)).toBeNull();
+      expect(findInvalidMultiValuedElement(undefined)).toBeNull();
+      expect(findInvalidMultiValuedElement({ a: 1 })).toBeNull();
+      expect(findInvalidMultiValuedElement('s')).toBeNull();
+    });
+
+    it('should report the first null element', () => {
+      const result = findInvalidMultiValuedElement([{ a: 1 }, null, { b: 2 }]);
+      expect(result).not.toBeNull();
+      expect(result!.index).toBe(1);
+      expect(result!.reason).toContain('null');
+    });
+
+    it('should report the first undefined element', () => {
+      const result = findInvalidMultiValuedElement([{ a: 1 }, undefined]);
+      expect(result).not.toBeNull();
+      expect(result!.index).toBe(1);
     });
   });
 });
