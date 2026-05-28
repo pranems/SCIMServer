@@ -10492,7 +10492,17 @@ function Invoke-NullPatch($url, $body) {
     try {
         $resp = Invoke-WebRequest -Uri $url -Method Patch -Headers $scimHeaders -Body ($body | ConvertTo-Json -Depth 10 -Compress) -SkipHttpErrorCheck
         $parsed = $null
-        if ($resp.Content) { try { $parsed = $resp.Content | ConvertFrom-Json } catch { $parsed = $resp.Content } }
+        if ($resp.Content) {
+            # PowerShell 7 returns the response Content as a String for known text
+            # MIME types but as a byte[] for unknown ones like application/scim+json.
+            # Normalize to a UTF-8 string before parsing so scimType / detail are reachable.
+            $contentStr = if ($resp.Content -is [byte[]]) {
+                [System.Text.Encoding]::UTF8.GetString($resp.Content)
+            } else {
+                [string]$resp.Content
+            }
+            try { $parsed = $contentStr | ConvertFrom-Json } catch { $parsed = $contentStr }
+        }
         return [pscustomobject]@{ Status = [int]$resp.StatusCode; Body = $parsed }
     } catch {
         return [pscustomobject]@{ Status = -1; Body = $_.Exception.Message }
