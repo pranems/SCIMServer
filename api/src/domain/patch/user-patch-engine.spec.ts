@@ -666,4 +666,227 @@ describe('UserPatchEngine', () => {
       }
     });
   });
+
+  // Step F - PATCH null-handling wiring (F1+F3+F4+F5+F6+F7)
+  // See docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md
+
+  describe('F1 - complex-parent merge with null-as-unset', () => {
+    it('should merge into the existing complex parent when value is a partial object (path-mode)', () => {
+      const result = apply([
+        { op: 'replace', path: 'name', value: { givenName: 'Bob' } },
+      ]);
+      const name = result.payload.name as Record<string, unknown>;
+      expect(name.givenName).toBe('Bob');
+      expect(name.familyName).toBe('Doe');
+    });
+
+    it('should null-as-unset on a sub-attribute when value contains null (path-mode)', () => {
+      const result = apply([
+        { op: 'replace', path: 'name', value: { familyName: null } },
+      ]);
+      const name = result.payload.name as Record<string, unknown>;
+      expect('familyName' in name).toBe(false);
+      expect(name.givenName).toBe('John');
+    });
+
+    it('should merge AND null-as-unset in path-less PATCH (Entra-style)', () => {
+      const result = apply([
+        { op: 'replace', value: { name: { familyName: null, givenName: 'NewGiven' } } },
+      ]);
+      const name = result.payload.name as Record<string, unknown>;
+      expect('familyName' in name).toBe(false);
+      expect(name.givenName).toBe('NewGiven');
+    });
+  });
+
+  describe('F3 - noTarget on zero-match valuePath filter', () => {
+    it('should throw 400 noTarget when replace filter matches zero entries (RFC 7644 S3.5.2.2 MUST)', () => {
+      expect(() =>
+        apply([
+          { op: 'replace', path: 'emails[type eq "absent"].value', value: 'x@y.com' },
+        ]),
+      ).toThrow(PatchError);
+      try {
+        apply([
+          { op: 'replace', path: 'emails[type eq "absent"].value', value: 'x@y.com' },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.status).toBe(400);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should throw 400 noTarget when remove filter matches zero entries', () => {
+      try {
+        apply([
+          { op: 'remove', path: 'emails[type eq "absent"]' },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.status).toBe(400);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should NOT throw noTarget when the filter matches at least one entry', () => {
+      const result = apply([
+        { op: 'replace', path: 'emails[type eq "work"].value', value: 'new@e.com' },
+      ]);
+      const emails = result.payload.emails as Record<string, unknown>[];
+      expect(emails[0].value).toBe('new@e.com');
+    });
+  });
+
+  describe('F4 - reject null elements in multi-valued PATCH arrays', () => {
+    it('should throw 400 invalidValue when add value contains null element', () => {
+      try {
+        apply([{ op: 'add', path: 'emails', value: [null] as unknown as unknown[] }]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.status).toBe(400);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+
+    it('should throw 400 invalidValue when replace value contains null element', () => {
+      try {
+        apply([
+          { op: 'replace', path: 'emails', value: [{ type: 'work', value: 'a@b.com' }, null] as unknown as unknown[] },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F5 - prune empty extension namespaces after PATCH', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const cfg: PatchConfig = { verbosePatch: false, extensionUrns: [URN] };
+
+    it('should remove the extension URN key from payload when last attribute is cleared', () => {
+      const state = makeState({
+        rawPayload: {
+          name: { givenName: 'A' },
+          [URN]: { manager: { value: 'MGR-1' } },
+        },
+      });
+      const result = UserPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:manager`, value: null }],
+        state,
+        cfg,
+      );
+      expect(URN in result.payload).toBe(false);
+    });
+
+    it('should keep the extension URN key when at least one other attribute remains', () => {
+      const state = makeState({
+        rawPayload: {
+          [URN]: { manager: { value: 'MGR-1' }, department: 'Eng' },
+        },
+      });
+      const result = UserPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:manager`, value: null }],
+        state,
+        cfg,
+      );
+      expect(URN in result.payload).toBe(true);
+      const ext = result.payload[URN] as Record<string, unknown>;
+      expect('manager' in ext).toBe(false);
+      expect(ext.department).toBe('Eng');
+    });
+  });
+
+  describe('F6 - extension dotted sub-attribute null clear', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const cfg: PatchConfig = { verbosePatch: false, extensionUrns: [URN] };
+
+    it('should clear only manager.displayName and preserve manager.value', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { manager: { value: 'MGR-1', displayName: 'Old' } } },
+      });
+      const result = UserPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:manager.displayName`, value: null }],
+        state,
+        cfg,
+      );
+      const mgr = (result.payload[URN] as Record<string, unknown>).manager as Record<string, unknown>;
+      expect('displayName' in mgr).toBe(false);
+      expect(mgr.value).toBe('MGR-1');
+    });
+
+    it('should set manager.displayName via dotted path without disturbing manager.value', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { manager: { value: 'MGR-1', displayName: 'Old' } } },
+      });
+      const result = UserPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:manager.displayName`, value: 'New' }],
+        state,
+        cfg,
+      );
+      const mgr = (result.payload[URN] as Record<string, unknown>).manager as Record<string, unknown>;
+      expect(mgr.displayName).toBe('New');
+      expect(mgr.value).toBe('MGR-1');
+    });
+  });
+
+  describe('F7 - extension valuePath noTarget', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox';
+    const cfg: PatchConfig = { verbosePatch: false, extensionUrns: [URN] };
+
+    function stateWithAliases(): UserPatchState {
+      return makeState({
+        rawPayload: {
+          [URN]: {
+            aliases: [
+              { type: 'smtp', value: 'a@x.com' },
+              { type: 'work', value: 'b@x.com' },
+            ],
+          },
+        },
+      });
+    }
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries', () => {
+      try {
+        UserPatchEngine.apply(
+          [{ op: 'remove', path: `${URN}:aliases[type eq "missing"]` }],
+          stateWithAliases(),
+          cfg,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.status).toBe(400);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should remove the matched extension array entry when filter matches', () => {
+      const result = UserPatchEngine.apply(
+        [{ op: 'remove', path: `${URN}:aliases[type eq "smtp"]` }],
+        stateWithAliases(),
+        cfg,
+      );
+      const aliases = (result.payload[URN] as Record<string, unknown>).aliases as Record<string, unknown>[];
+      expect(aliases.length).toBe(1);
+      expect(aliases[0].type).toBe('work');
+    });
+
+    it('should update extension valuePath sub-attribute when filter matches', () => {
+      const result = UserPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:aliases[type eq "smtp"].value`, value: 'updated@x.com' }],
+        stateWithAliases(),
+        cfg,
+      );
+      const aliases = (result.payload[URN] as Record<string, unknown>).aliases as Record<string, unknown>[];
+      expect(aliases[0].value).toBe('updated@x.com');
+      expect(aliases[1].value).toBe('b@x.com');
+    });
+  });
 });

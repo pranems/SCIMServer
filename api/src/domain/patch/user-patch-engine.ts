@@ -26,6 +26,12 @@ import {
   applyExtensionUpdate,
   removeExtensionAttribute,
   resolveNoPathValue,
+  isExtensionValuePath,
+  applyExtensionValuePathUpdate,
+  removeExtensionValuePathEntry,
+  mergeComplexAttribute,
+  pruneEmptyExtensions,
+  findInvalidMultiValuedElement,
 } from '../../modules/scim/utils/scim-patch-path';
 
 import type {
@@ -165,6 +171,14 @@ export class UserPatchEngine {
 
     rawPayload = UserPatchEngine.stripReservedAttributes(rawPayload);
 
+    // F5: prune extension namespace keys that became empty after PATCH so the
+    // URN is naturally dropped from schemas[] when the response is projected
+    // (RFC 7643 S3.3: an extension is in use only when at least one attribute
+    // is assigned).
+    if (config.extensionUrns && config.extensionUrns.length > 0) {
+      pruneEmptyExtensions(rawPayload, config.extensionUrns);
+    }
+
     const extractedFields: UserExtractedFields = {
       userName,
       displayName,
@@ -224,7 +238,33 @@ export class UserPatchEngine {
     if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
       const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
       if (extParsed) {
-        rawPayload = applyExtensionUpdate(rawPayload, extParsed, value);
+        // F7: extension valuePath -> route via the noTarget-aware helper
+        if (isExtensionValuePath(extParsed)) {
+          const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
+          const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
+          const inner = applyExtensionValuePathUpdate(rawPayload, extParsed, value, vpCaseExact);
+          if (!inner.matched) {
+            throw new PatchError(
+              400,
+              `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
+              'noTarget',
+            );
+          }
+          rawPayload = inner.payload;
+        } else {
+          // F4: validate multi-valued PATCH array elements before assignment
+          if (Array.isArray(value)) {
+            const bad = findInvalidMultiValuedElement(value);
+            if (bad) {
+              throw new PatchError(
+                400,
+                `Multi-valued attribute ${extParsed.schemaUrn}:${extParsed.attributePath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+                'invalidValue',
+              );
+            }
+          }
+          rawPayload = applyExtensionUpdate(rawPayload, extParsed, value);
+        }
       }
       return { userName, displayName, externalId, active, rawPayload };
     }
@@ -235,9 +275,21 @@ export class UserPatchEngine {
         // Resolve caseExact for the filter attribute from schema cache
         const filterPath = `${vpParsed.attribute.toLowerCase()}.${vpParsed.filterAttribute.toLowerCase()}`;
         const caseExact = config.caseExactPaths?.has(filterPath) ?? false;
-        rawPayload = op === 'add'
-          ? addValuePathEntry(rawPayload, vpParsed, value, caseExact)
-          : applyValuePathUpdate(rawPayload, vpParsed, value, caseExact);
+        if (op === 'add') {
+          // add-with-valuePath creates the entry on no-match by design
+          rawPayload = addValuePathEntry(rawPayload, vpParsed, value, caseExact);
+        } else {
+          // F3: replace-with-valuePath MUST raise noTarget on zero-match (RFC 7644 S3.5.2.2)
+          const inner = applyValuePathUpdate(rawPayload, vpParsed, value, caseExact);
+          if (!inner.matched) {
+            throw new PatchError(
+              400,
+              `Filter ${vpParsed.filterAttribute} ${vpParsed.filterOperator} "${vpParsed.filterValue}" did not match any value in ${vpParsed.attribute}.`,
+              'noTarget',
+            );
+          }
+          rawPayload = inner.payload;
+        }
       }
       return { userName, displayName, externalId, active, rawPayload };
     }
@@ -250,7 +302,24 @@ export class UserPatchEngine {
 
     if (originalPath) {
       guardPrototypePollution(originalPath);
-      rawPayload = { ...rawPayload, [originalPath]: value };
+      // F4: validate multi-valued array elements
+      if (Array.isArray(value)) {
+        const bad = findInvalidMultiValuedElement(value);
+        if (bad) {
+          throw new PatchError(
+            400,
+            `Multi-valued attribute ${originalPath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+            'invalidValue',
+          );
+        }
+      }
+      // F1: when the target already holds a complex (non-array) object and the
+      // incoming value is also a non-array object, merge with null-as-unset
+      // semantics (Entra/Okta de-facto interpretation of RFC 7644 S3.5.2.3).
+      // Arrays and primitives whole-replace.
+      const existing = rawPayload[originalPath];
+      const merged = mergeComplexAttribute(existing, value);
+      rawPayload = { ...rawPayload, [originalPath]: merged };
       return { userName, displayName, externalId, active, rawPayload };
     }
 
@@ -318,7 +387,22 @@ export class UserPatchEngine {
     if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
       const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
       if (extParsed) {
-        rawPayload = removeExtensionAttribute(rawPayload, extParsed);
+        if (isExtensionValuePath(extParsed)) {
+          // F7: extension valuePath remove -> noTarget on zero-match
+          const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
+          const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
+          const inner = removeExtensionValuePathEntry(rawPayload, extParsed, vpCaseExact);
+          if (!inner.matched) {
+            throw new PatchError(
+              400,
+              `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
+              'noTarget',
+            );
+          }
+          rawPayload = inner.payload;
+        } else {
+          rawPayload = removeExtensionAttribute(rawPayload, extParsed);
+        }
       }
       return { active, rawPayload };
     }
@@ -328,7 +412,16 @@ export class UserPatchEngine {
       if (vpParsed) {
         const filterPath = `${vpParsed.attribute.toLowerCase()}.${vpParsed.filterAttribute.toLowerCase()}`;
         const caseExact = config.caseExactPaths?.has(filterPath) ?? false;
-        rawPayload = removeValuePathEntry(rawPayload, vpParsed, caseExact);
+        // F3: remove-with-valuePath MUST raise noTarget on zero-match (RFC 7644 S3.5.2.2)
+        const inner = removeValuePathEntry(rawPayload, vpParsed, caseExact);
+        if (!inner.matched) {
+          throw new PatchError(
+            400,
+            `Filter ${vpParsed.filterAttribute} ${vpParsed.filterOperator} "${vpParsed.filterValue}" did not match any value in ${vpParsed.attribute}.`,
+            'noTarget',
+          );
+        }
+        rawPayload = inner.payload;
       }
       return { active, rawPayload };
     }
