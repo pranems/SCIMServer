@@ -235,7 +235,11 @@ export class SchemaValidator {
     options: ValidationOptions,
     errors: ValidationError[],
   ): void {
-    // Null/undefined values are valid (means "not set") - required check is done separately
+    // Null/undefined values are valid (means "not set") - required check is done separately.
+    // F9 NULL CONTRACT (see validatePatchOperationValue docstring): In 'patch' mode this early
+    // return is intentional - null is a SCIM UNASSIGN signal per RFC 7644 §3.5.2.3, not an
+    // invalid INCOMING value. The Patch Engine applies unset semantics; the post-PATCH
+    // validatePayloadSchema() pass catches required-cleared in strict mode.
     if (value === null || value === undefined) return;
 
     // ── Mutability check ──
@@ -954,9 +958,19 @@ export class SchemaValidator {
    *
    * Does NOT check required (patch mode) or immutable (done post-PATCH by H-2).
    *
+   * F9 NULL CONTRACT (RFC 7644 §3.5.2.3 / docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md):
+   *   `null` and `undefined` PATCH values are intentionally allowed through this
+   *   pre-validation layer because they signal attribute UNASSIGN per the SCIM
+   *   spec, not invalid INCOMING values. The downstream Patch Engine
+   *   (User/Group/Generic) applies the null-as-unset semantics (F1-F8), and the
+   *   post-PATCH validatePayloadSchema() pass (H-1) is the authoritative point
+   *   where "required attribute cleared via null" is caught (strict mode).
+   *   Multi-valued PATCH arrays containing null ELEMENTS are still rejected
+   *   here by the engine's F4 guard before they ever reach this validator.
+   *
    * @param op     - Operation type: 'add' | 'replace' | 'remove'
    * @param path   - SCIM attribute path (e.g. "userName", "name.givenName", "emails[type eq \"work\"].value")
-   * @param value  - Operation value (may be object for no-path ops)
+   * @param value  - Operation value (may be object for no-path ops; may be null/undefined - see F9 NULL CONTRACT above)
    * @param schemas - Schema definitions for the resource type
    * @returns ValidationResult with errors (if any)
    */
