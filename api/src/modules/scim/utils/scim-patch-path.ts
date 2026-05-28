@@ -758,7 +758,7 @@ export function pruneEmptyExtensions(
       typeof ext === 'object' &&
       ext !== null &&
       !Array.isArray(ext) &&
-      Object.keys(ext as Record<string, unknown>).length === 0
+      Object.keys(ext).length === 0
     ) {
       delete payload[urn];
     }

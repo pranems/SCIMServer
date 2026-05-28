@@ -743,7 +743,7 @@ describe('UserPatchEngine', () => {
   describe('F4 - reject null elements in multi-valued PATCH arrays', () => {
     it('should throw 400 invalidValue when add value contains null element', () => {
       try {
-        apply([{ op: 'add', path: 'emails', value: [null] as unknown as unknown[] }]);
+        apply([{ op: 'add', path: 'emails', value: [null] }]);
         fail('should have thrown');
       } catch (e: any) {
         expect(e).toBeInstanceOf(PatchError);
@@ -755,7 +755,7 @@ describe('UserPatchEngine', () => {
     it('should throw 400 invalidValue when replace value contains null element', () => {
       try {
         apply([
-          { op: 'replace', path: 'emails', value: [{ type: 'work', value: 'a@b.com' }, null] as unknown as unknown[] },
+          { op: 'replace', path: 'emails', value: [{ type: 'work', value: 'a@b.com' }, null] },
         ]);
         fail('should have thrown');
       } catch (e: any) {

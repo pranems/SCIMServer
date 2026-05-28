@@ -392,7 +392,7 @@ describe('GenericPatchEngine', () => {
     it('should throw 400 invalidValue when add value contains null element', () => {
       const engine = new GenericPatchEngine(makePayload());
       try {
-        engine.apply({ op: 'add', path: 'tags', value: ['lab', null] as unknown as unknown[] });
+        engine.apply({ op: 'add', path: 'tags', value: ['lab', null] });
         fail('should have thrown');
       } catch (e: any) {
         expect(e).toBeInstanceOf(PatchError);
@@ -403,7 +403,7 @@ describe('GenericPatchEngine', () => {
     it('should throw 400 invalidValue when replace value contains null element', () => {
       const engine = new GenericPatchEngine(makePayload());
       try {
-        engine.apply({ op: 'replace', path: 'tags', value: ['lab', null] as unknown as unknown[] });
+        engine.apply({ op: 'replace', path: 'tags', value: ['lab', null] });
         fail('should have thrown');
       } catch (e: any) {
         expect(e).toBeInstanceOf(PatchError);

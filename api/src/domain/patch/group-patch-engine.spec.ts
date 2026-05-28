@@ -571,7 +571,7 @@ describe('GroupPatchEngine', () => {
     it('should throw 400 invalidValue when add members value contains null element', () => {
       try {
         apply([
-          { op: 'add', path: 'members', value: [{ value: 'user-3' }, null] as unknown as unknown[] },
+          { op: 'add', path: 'members', value: [{ value: 'user-3' }, null] },
         ]);
         fail('should have thrown');
       } catch (e: any) {
@@ -583,7 +583,7 @@ describe('GroupPatchEngine', () => {
     it('should throw 400 invalidValue when replace members value contains null element', () => {
       try {
         apply([
-          { op: 'replace', path: 'members', value: [{ value: 'user-3' }, null] as unknown as unknown[] },
+          { op: 'replace', path: 'members', value: [{ value: 'user-3' }, null] },
         ]);
         fail('should have thrown');
       } catch (e: any) {
