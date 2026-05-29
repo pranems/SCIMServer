@@ -17,16 +17,16 @@
     "size:why": "size-limit --why"
   },
   "dependencies": {
-    "@fluentui/react-components": "^9.73.8",
-    "@fluentui/react-icons": "^2.0.325",
-    "@tanstack/react-query": "^5.100.9",
-    "@tanstack/react-router": "^1.169.1",
+    "@fluentui/react-components": "^9.74.1",
+    "@fluentui/react-icons": "^2.0.328",
+    "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-router": "^1.170.9",
     "cmdk": "^1.1.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "recharts": "^3.8.1",
     "zod": "^4.4.3",
-    "zustand": "^5.0.13"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
@@ -37,16 +37,16 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "^4.1.7",
     "axe-core": "^4.11.4",
     "jsdom": "^29.1.1",
     "msw": "^2.14.3",
     "size-limit": "^12.1.0",
     "typescript": "6.0.3",
-    "vite": "^8.0.10",
+    "vite": "^8.0.14",
     "vitest": "^4.1.5"
   },
   "size-limit": [
