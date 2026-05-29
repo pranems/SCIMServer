@@ -10,6 +10,7 @@ import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
 import { logsSearchSchema } from './search-schemas';
 import { endpointLogsQueryOptions } from '../api/queries';
+import { usePreferencesStore } from '../store/preferences-store';
 
 // Phase K1 - lazy-load LogsTab into its own chunk.
 const LogsTab = React.lazy(() =>
@@ -31,13 +32,17 @@ export const logsTabRoute = createRoute({
     pageSize: search.pageSize,
     urlContains: search.urlContains,
   }),
-  loader: ({ context, params, deps }) =>
-    context.queryClient.ensureQueryData(
+  loader: ({ context, params, deps }) => {
+    // Phase N4: fall back to the persisted user preference when the URL
+    // has no explicit `?pageSize`.
+    const pageSize = deps.pageSize ?? usePreferencesStore.getState().defaultPageSize;
+    return context.queryClient.ensureQueryData(
       endpointLogsQueryOptions({
         endpointId: params.endpointId,
         page: deps.page,
-        pageSize: deps.pageSize,
+        pageSize,
         urlContains: deps.urlContains,
       }),
-    ),
+    );
+  },
 });

@@ -19,6 +19,7 @@ vi.mock('../api/queries', async () => {
 });
 
 import { useEndpointUsers } from '../api/queries';
+import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
 function wrap(
   ui: React.ReactElement,
@@ -44,7 +45,12 @@ const mockUsers = {
 };
 
 describe('UsersTab', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Phase N4: each test starts from default preferences (pageSize=20).
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
+    localStorage.clear();
+  });
 
   it('shows loading state', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -184,5 +190,22 @@ describe('UsersTab', () => {
     expect(body).toContain('u3,charlie@corp.com,Charlie Brown,false');
 
     csvSpy.mockRestore();
+  });
+
+  // ==========================================================================
+  // Phase N4 - honor defaultPageSize preference when URL has no ?pageSize
+  // ==========================================================================
+  it('honors preferences-store defaultPageSize when URL has no ?pageSize override', async () => {
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS, defaultPageSize: 50 });
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockUsers, totalResults: 100, itemsPerPage: 50 },
+      isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    await screen.findByText('alice@corp.com');
+    expect(useEndpointUsers).toHaveBeenCalledWith(
+      'ep-1',
+      expect.objectContaining({ startIndex: 1, count: 50 }),
+    );
   });
 });

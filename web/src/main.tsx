@@ -1,6 +1,10 @@
 ﻿import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { router } from './router';
+import { bootstrapTelemetryCollectors } from './store/telemetry-collectors';
+import { bootstrapCommandRegistry } from './store/command-bootstrap';
+import { useUIStore } from './store/ui-store';
 
 /**
  * Phase B.3 (v0.48.1): MSW browser worker opt-in mount.
@@ -30,6 +34,21 @@ async function bootstrap(): Promise<void> {
     const { worker } = await import('./test/msw/browser');
     await worker.start({ onUnhandledRequest: 'bypass' });
   }
+  // Phase N5 - wire frontend telemetry collectors once at boot.
+  // Idempotent: HMR re-imports won't double-subscribe. Opt-in gating
+  // is enforced inside useTelemetryStore.record() against
+  // preferences-store.telemetryOptIn.
+  bootstrapTelemetryCollectors(router);
+
+  // Phase N6 - register operator-useful palette commands so the
+  // Cmd/Ctrl+K "Custom commands" group has content out of the box.
+  bootstrapCommandRegistry();
+
+  // Phase N7 - apply persisted preferences-store defaults to ui-store
+  // chrome state. Currently wires sidebarCollapsedDefault -> sidebarCollapsed
+  // so the sidebar honors operator preference on first paint.
+  useUIStore.getState().applyPreferenceDefaults();
+
   createRoot(document.getElementById('root')!).render(<App />);
 }
 

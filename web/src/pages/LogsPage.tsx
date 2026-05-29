@@ -262,7 +262,9 @@ export const LogsPage: React.FC = () => {
   const resetFilters = (): void => {
     navigate({
       to: LOGS_ROUTE_PATH,
-      search: () => ({ page: 1, pageSize: 20 } as GlobalLogsSearch),
+      // Phase N4: omit pageSize so the schema's optional() leaves it
+      // unset; consumers fall back to the persisted user preference.
+      search: () => ({ page: 1 } as GlobalLogsSearch),
     });
   };
 

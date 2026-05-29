@@ -60,6 +60,13 @@ export const AppHeader: React.FC = () => {
         <Text size={500} weight="semibold" style={{ color: 'inherit' }}>
           SCIMServer
         </Text>
+        <Text
+          size={200}
+          style={{ color: 'inherit', opacity: 0.85 }}
+          data-testid="app-version"
+        >
+          v{__APP_VERSION__}
+        </Text>
       </div>
 
       <div className={classes.actions}>

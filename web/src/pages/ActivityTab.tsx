@@ -36,6 +36,7 @@ import {
 } from '@fluentui/react-icons';
 import { useEndpointActivity, type ActivitySummaryItem } from '../api/queries';
 import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { usePreferencesStore } from '../store/preferences-store';
 import {
   ACTIVITY_TYPE_VALUES,
   ACTIVITY_SEVERITY_VALUES,
@@ -93,7 +94,10 @@ export interface ActivityTabProps {
   /** Current URL-driven filter state (from useSearch on the route). */
   search: {
     page: number;
-    pageSize: number;
+    // Phase N4: pageSize is now optional in the URL schema (preference
+    // store provides the fallback). Component honors `defaultPageSize`
+    // from `usePreferencesStore` when this is undefined.
+    pageSize?: number;
     type?: ActivityType;
     severity?: ActivitySeverity;
     search?: string;
@@ -132,10 +136,14 @@ export const ActivityTab: React.FC<ActivityTabProps> = ({
   onSearchChange,
 }) => {
   const classes = useStyles();
+  // Phase N4: fall back to the persisted user preference when the URL
+  // has no explicit `?pageSize`.
+  const defaultPageSize = usePreferencesStore((s) => s.defaultPageSize);
+  const limit = search.pageSize ?? defaultPageSize;
   const { data, isLoading, error } = useEndpointActivity({
     endpointId,
     page: search.page,
-    limit: search.pageSize,
+    limit,
     type: search.type,
     severity: search.severity,
     search: search.search,

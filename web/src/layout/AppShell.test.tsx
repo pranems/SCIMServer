@@ -103,3 +103,11 @@ describe('AppHeader', () => {
     await waitFor(() => expect(useUIStore.getState().colorScheme).toBe('dark'));
   });
 });
+
+// Phase N7 denseMode wire to documentElement[data-density] was rolled
+// back in the 2026-05-27 partial-rollback commit alongside the matching
+// AppShell.tsx effect removal. The N7 test suite below was deleted to
+// keep production code and tests consistent. See
+// docs/UNFINISHED_PHASE_N_HANDOFF_2026-05-27.md for the restore plan
+// when N7 wiring resumes.
+

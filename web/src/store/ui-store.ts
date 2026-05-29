@@ -16,6 +16,7 @@
  * @see docs/PHASE_K2_SERVICE_HEALTH_ROLLUP.md
  */
 import { create } from 'zustand';
+import { usePreferencesStore } from './preferences-store';
 
 /** Lifecycle states the SSE EventSource transitions through. */
 export type SseConnectionState =
@@ -78,6 +79,14 @@ interface UIState {
   // Phase N1
   setNotificationsDrawerOpen: (open: boolean) => void;
   toggleNotificationsDrawer: () => void;
+
+  /**
+   * Phase N7 - apply persisted preferences-store defaults to chrome state.
+   * Currently wires `sidebarCollapsedDefault` -> `sidebarCollapsed`. Called
+   * ONCE at boot from main.tsx after preferences-store hydrates from
+   * localStorage. Idempotent (safe to call multiple times).
+   */
+  applyPreferenceDefaults: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -108,4 +117,10 @@ export const useUIStore = create<UIState>((set) => ({
   // Phase N1
   setNotificationsDrawerOpen: (open) => set({ notificationsDrawerOpen: open }),
   toggleNotificationsDrawer: () => set((s) => ({ notificationsDrawerOpen: !s.notificationsDrawerOpen })),
+
+  // Phase N7 - read sidebarCollapsedDefault from preferences-store and apply it to sidebarCollapsed.
+  applyPreferenceDefaults: () => {
+    const sidebarCollapsedDefault = usePreferencesStore.getState().sidebarCollapsedDefault;
+    set({ sidebarCollapsed: sidebarCollapsedDefault });
+  },
 }));

@@ -32,6 +32,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import { useEndpoints } from '../api/queries';
+import { commandRegistry } from '../store/command-registry';
 
 // ─── Hook: global Cmd+K listener ────────────────────────────────────
 
@@ -174,6 +175,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onOpenChan
 
   if (!open) return null;
 
+  // Phase N6 - dynamic commands contributed by feature modules via
+  // `commandRegistry.register()`. Read on every render so newly-
+  // registered commands appear without re-mounting the palette.
+  const customCommands = commandRegistry.all();
+
   return (
     <Dialog open={open} onOpenChange={(_, d) => onOpenChange(d.open)}>
       <DialogSurface className={classes.surface} aria-label="Command palette">
@@ -234,6 +240,25 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onOpenChan
                   Create group
                 </Command.Item>
               </Command.Group>
+
+              {customCommands.length > 0 && (
+                <Command.Group heading="Custom commands" className={classes.groupHeading}>
+                  {customCommands.map((cmd) => (
+                    <Command.Item
+                      key={cmd.id}
+                      value={`${cmd.label} ${(cmd.keywords ?? []).join(' ')}`}
+                      className={classes.item}
+                      data-testid={`command-palette-custom-${cmd.id}`}
+                      onSelect={() => {
+                        close();
+                        void cmd.run();
+                      }}
+                    >
+                      {cmd.label}
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+              )}
             </Command.List>
             <div className={classes.hint}>
               <kbd>Cmd+K</kbd> / <kbd>Ctrl+K</kbd> opens, <kbd>Esc</kbd> closes,

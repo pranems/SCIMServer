@@ -19,6 +19,11 @@ web/dist
 coverage/
 .nyc_output
 
+# Prisma-generated client (regenerated inside the image by `npx prisma generate`).
+# Must be excluded so that worktree junction/symlink at api/src/generated/
+# does not poison the build context.
+api/src/generated
+
 # Logs and temporary files
 *.log
 *.tmp

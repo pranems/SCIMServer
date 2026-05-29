@@ -29,9 +29,10 @@ import {
 } from './search-schemas';
 
 describe('paginationSchema', () => {
-  it('returns defaults when called with empty object', () => {
+  it('returns defaults when called with empty object (Phase N4: pageSize optional)', () => {
     const result = paginationSchema.parse({});
-    expect(result).toEqual({ page: 1, pageSize: 20 });
+    expect(result).toEqual({ page: 1 });
+    expect(result.pageSize).toBeUndefined();
   });
 
   it('coerces numeric strings (URL search params arrive as strings)', () => {
@@ -60,7 +61,7 @@ describe('paginationSchema', () => {
 describe('usersSearchSchema', () => {
   it('extends pagination with optional filter', () => {
     const result = usersSearchSchema.parse({});
-    expect(result).toEqual({ page: 1, pageSize: 20 });
+    expect(result).toEqual({ page: 1 });
     expect((result as { filter?: string }).filter).toBeUndefined();
   });
 
@@ -78,14 +79,14 @@ describe('usersSearchSchema', () => {
 describe('groupsSearchSchema', () => {
   it('mirrors usersSearchSchema shape', () => {
     const result = groupsSearchSchema.parse({ page: '2', filter: 'displayName co "admin"' });
-    expect(result).toEqual({ page: 2, pageSize: 20, filter: 'displayName co "admin"' });
+    expect(result).toEqual({ page: 2, filter: 'displayName co "admin"' });
   });
 });
 
 describe('logsSearchSchema (per-endpoint)', () => {
   it('returns defaults including no urlContains', () => {
     const result = logsSearchSchema.parse({});
-    expect(result).toEqual({ page: 1, pageSize: 20 });
+    expect(result).toEqual({ page: 1 });
     expect((result as LogsSearch).urlContains).toBeUndefined();
   });
 
@@ -110,7 +111,6 @@ describe('globalLogsSearchSchema', () => {
     });
     expect(result).toEqual({
       page: 1,
-      pageSize: 20,
       endpointId: 'ep-123',
       status: 500,
       timeRange: '24h',
@@ -150,6 +150,6 @@ describe('exported types', () => {
   it('PaginationSearch is assignable from parse result', () => {
     const value: PaginationSearch = paginationSchema.parse({});
     expect(value.page).toBe(1);
-    expect(value.pageSize).toBe(20);
+    expect(value.pageSize).toBeUndefined();
   });
 });

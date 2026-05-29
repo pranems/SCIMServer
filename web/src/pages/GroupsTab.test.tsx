@@ -16,6 +16,7 @@ vi.mock('../api/queries', async () => {
 });
 
 import { useEndpointGroups } from '../api/queries';
+import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
 function wrap(
   ui: React.ReactElement,
@@ -40,7 +41,12 @@ const mockGroups = {
 };
 
 describe('GroupsTab', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Phase N4: each test starts from default preferences (pageSize=20).
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
+    localStorage.clear();
+  });
 
   it('shows loading state', async () => {
     (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -123,5 +129,22 @@ describe('GroupsTab', () => {
     expect(body).toContain('g2,Marketing,0,');
 
     csvSpy.mockRestore();
+  });
+
+  // ==========================================================================
+  // Phase N4 - honor defaultPageSize preference when URL has no ?pageSize
+  // ==========================================================================
+  it('honors preferences-store defaultPageSize when URL has no ?pageSize override', async () => {
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS, defaultPageSize: 50 });
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockGroups, totalResults: 100, itemsPerPage: 50 },
+      isLoading: false, error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    await screen.findByText('Engineering');
+    expect(useEndpointGroups).toHaveBeenCalledWith(
+      'ep-1',
+      expect.objectContaining({ startIndex: 1, count: 50 }),
+    );
   });
 });

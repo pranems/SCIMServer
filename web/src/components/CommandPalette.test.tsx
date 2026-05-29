@@ -130,6 +130,50 @@ describe('CommandPalette', () => {
   });
 });
 
+// ─── Phase N6: Custom commands group ────────────────────────────────
+
+describe('CommandPalette - Custom commands group (Phase N6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: ENDPOINTS, isLoading: false, error: null,
+    });
+  });
+
+  it('renders custom commands registered into commandRegistry', async () => {
+    const { commandRegistry } = await import('../store/command-registry');
+    commandRegistry.clear();
+    commandRegistry.register({ id: 'do.thing', label: 'Do a registered thing', run: vi.fn() });
+    commandRegistry.register({ id: 'do.other', label: 'Do another thing', run: vi.fn() });
+
+    wrap(<CommandPalette open onOpenChange={() => undefined} />);
+
+    expect(screen.getByTestId('command-palette-custom-do.thing')).toBeInTheDocument();
+    expect(screen.getByTestId('command-palette-custom-do.other')).toBeInTheDocument();
+  });
+
+  it('does NOT render the Custom commands group when registry is empty', async () => {
+    const { commandRegistry } = await import('../store/command-registry');
+    commandRegistry.clear();
+    wrap(<CommandPalette open onOpenChange={() => undefined} />);
+    expect(screen.queryByText(/Custom commands/i)).not.toBeInTheDocument();
+  });
+
+  it('selecting a registered command runs its handler and closes the palette', async () => {
+    const { commandRegistry } = await import('../store/command-registry');
+    commandRegistry.clear();
+    const handler = vi.fn();
+    commandRegistry.register({ id: 'do.click', label: 'Click me', run: handler });
+
+    const onOpenChange = vi.fn();
+    wrap(<CommandPalette open onOpenChange={onOpenChange} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('command-palette-custom-do.click'));
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
 describe('global Cmd+K shortcut', () => {
   it('Cmd+K (mac) toggles the palette open', async () => {
     const onOpenChange = vi.fn();

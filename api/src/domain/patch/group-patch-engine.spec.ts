@@ -533,4 +533,149 @@ describe('GroupPatchEngine', () => {
       expect(result.externalId).toBe('new-ext');
     });
   });
+
+  // Step G - PATCH null-handling wiring (F2 + F3 + F4 + F5 + F6 + F7)
+  // See docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md
+
+  describe('F2 - explicit-null clear on Group.members', () => {
+    it('should empty members when value is null regardless of flag (RFC 7644 S3.5.2.3 explicit unassign)', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'members', value: null }],
+        undefined,
+        { ...strictConfig, allowRemoveAllMembers: false },
+      );
+      expect(result.members.length).toBe(0);
+    });
+
+    it('should empty members when value is null even with strictConfig (flag governs only ambiguous bare remove)', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'members', value: null }],
+        undefined,
+        strictConfig,
+      );
+      expect(result.members.length).toBe(0);
+    });
+
+    it('should still reject members replace with non-array non-null value', () => {
+      try {
+        apply([{ op: 'replace', path: 'members', value: 'not-an-array' }]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F4 - reject null elements in Group.members array', () => {
+    it('should throw 400 invalidValue when add members value contains null element', () => {
+      try {
+        apply([
+          { op: 'add', path: 'members', value: [{ value: 'user-3' }, null] },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+
+    it('should throw 400 invalidValue when replace members value contains null element', () => {
+      try {
+        apply([
+          { op: 'replace', path: 'members', value: [{ value: 'user-3' }, null] },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F5 - prune empty extension namespaces after PATCH', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Group';
+    const cfg: GroupMemberPatchConfig = { ...defaultConfig, extensionUrns: [URN] };
+
+    it('should remove the extension URN key from payload when last attribute is cleared', () => {
+      const state = makeState({ rawPayload: { [URN]: { tag: 'A' } } });
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:tag`, value: null }],
+        state,
+        cfg,
+      );
+      expect(URN in result.payload).toBe(false);
+    });
+
+    it('should keep the extension URN key when at least one other attribute remains', () => {
+      const state = makeState({ rawPayload: { [URN]: { tag: 'A', color: 'red' } } });
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:tag`, value: null }],
+        state,
+        cfg,
+      );
+      expect(URN in result.payload).toBe(true);
+      const ext = result.payload[URN] as Record<string, unknown>;
+      expect('tag' in ext).toBe(false);
+      expect(ext.color).toBe('red');
+    });
+  });
+
+  describe('F6 - Group extension dotted sub-attribute null clear', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Group';
+    const cfg: GroupMemberPatchConfig = { ...defaultConfig, extensionUrns: [URN] };
+
+    it('should clear only the sub-attribute via dotted path and preserve siblings', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { owner: { value: 'mgr-1', displayName: 'Alice' } } },
+      });
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:owner.displayName`, value: null }],
+        state,
+        cfg,
+      );
+      const owner = (result.payload[URN] as Record<string, unknown>).owner as Record<string, unknown>;
+      expect('displayName' in owner).toBe(false);
+      expect(owner.value).toBe('mgr-1');
+    });
+  });
+
+  describe('F7 - Group extension valuePath noTarget', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Group';
+    const cfg: GroupMemberPatchConfig = { ...defaultConfig, extensionUrns: [URN] };
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (remove)', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { tags: [{ type: 'red', value: 'r' }] } },
+      });
+      try {
+        GroupPatchEngine.apply(
+          [{ op: 'remove', path: `${URN}:tags[type eq "missing"]` }],
+          state,
+          cfg,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (replace)', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { tags: [{ type: 'red', value: 'r' }] } },
+      });
+      try {
+        GroupPatchEngine.apply(
+          [{ op: 'replace', path: `${URN}:tags[type eq "missing"].value`, value: 'x' }],
+          state,
+          cfg,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+  });
 });
