@@ -24,6 +24,12 @@ export type { KpiChartProps } from './KpiChart';
 export { ScimErrorMessage } from './ScimErrorMessage';
 export type { ScimErrorMessageProps } from './ScimErrorMessage';
 
+export { TruncatedText } from './TruncatedText';
+export type { TruncatedTextProps } from './TruncatedText';
+
+export { CopyableField } from './CopyableField';
+export type { CopyableFieldProps } from './CopyableField';
+
 export { EtagBadge } from './EtagBadge';
 export type { EtagBadgeProps } from './EtagBadge';
 
