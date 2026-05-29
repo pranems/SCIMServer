@@ -29,6 +29,7 @@ import {
   pruneEmptyExtensions,
   findInvalidMultiValuedElement,
   mergeComplexAttribute,
+  safePropertyKey,
 } from '../../modules/scim/utils/scim-patch-path';
 
 // ─── Prototype pollution guard ──────────────────────────────────────────────
@@ -231,14 +232,14 @@ export class GenericPatchEngine {
     const segments = path.split('.');
     if (segments.length === 1) {
       if (merge && Array.isArray(this.payload[path]) && Array.isArray(value)) {
-        (this.payload[path] as unknown[]).push(...(value as unknown[]));
+        (this.payload[safePropertyKey(path)] as unknown[]).push(...(value as unknown[]));
       } else if (!merge) {
         // F1: when replacing a complex parent, merge with null-as-unset so a
         // partial object preserves siblings (RFC 7644 S3.5.2.3 Entra/Okta).
         // Arrays / primitives still whole-replace via mergeComplexAttribute's fallback.
-        this.payload[path] = mergeComplexAttribute(this.payload[path], value);
+        this.payload[safePropertyKey(path)] = mergeComplexAttribute(this.payload[path], value);
       } else {
-        this.payload[path] = value;
+        this.payload[safePropertyKey(path)] = value;
       }
     } else {
       this.setNested(this.payload, segments, value, merge);

@@ -31,7 +31,6 @@ import {
 } from './helpers/request.helper';
 import { validUser, validGroup, patchOp, resetFixtureCounter } from './helpers/fixtures';
 
-const PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 const ENT_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 
 /**

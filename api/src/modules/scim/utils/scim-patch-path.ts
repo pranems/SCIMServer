@@ -12,6 +12,35 @@
  */
 import { KNOWN_EXTENSION_URNS } from '../common/scim-constants';
 
+// CWE-1321 / js/remote-property-injection - prototype pollution sink barrier.
+// The engines call guardPrototypePollution() at parse-time, so in practice
+// the keys flowing into the sinks below are already validated. This in-util
+// guard is defense-in-depth and serves as the CodeQL barrier that the
+// interprocedural taint analysis does not always trace from the engines.
+const PROTOTYPE_POLLUTING_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * Throws when `key` is reserved by JavaScript's object model and writing to
+ * it would pollute `Object.prototype` or interfere with built-in behavior.
+ * Returns the key unchanged on the safe path so it can be inlined at sinks:
+ *   `obj[safePropertyKey(parsed.attribute)] = value`
+ *
+ * Exported so engines outside this module can apply the same barrier at
+ * their own sink sites (e.g. `rawPayload[safePropertyKey(originalPath)]`).
+ */
+export function safePropertyKey(key: string): string {
+  if (typeof key !== 'string' || PROTOTYPE_POLLUTING_KEYS.has(key)) {
+    throw new Error(
+      `[scim-patch-path] Refusing to write to reserved property key '${String(key)}' (CWE-1321 prototype pollution guard).`,
+    );
+  }
+  return key;
+}
+
 /** Result of parsing a valuePath expression like `emails[type eq "work"].value` */
 export interface ValuePathExpression {
   /** The multi-valued attribute name, e.g. "emails" */
@@ -266,6 +295,11 @@ export function applyValuePathUpdate(
   value: unknown,
   caseExact = false,
 ): ValuePathOpResult {
+  // Validate keys at entry so a prototype-polluting attribute name throws
+  // BEFORE any property reads (reading `rawPayload['__proto__']` would resolve
+  // to Object.prototype instead of undefined and silently mask the attack).
+  safePropertyKey(parsed.attribute);
+  if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
   const arr = rawPayload[parsed.attribute];
 
   if (!Array.isArray(arr)) {
@@ -288,11 +322,11 @@ export function applyValuePathUpdate(
   }
 
   if (parsed.subAttribute) {
-    (arr[matchIdx] as Record<string, unknown>)[parsed.subAttribute] = value;
+    (arr[matchIdx] as Record<string, unknown>)[safePropertyKey(parsed.subAttribute)] = value;
   } else {
     arr[matchIdx] = value;
   }
-  rawPayload[parsed.attribute] = [...arr];
+  rawPayload[safePropertyKey(parsed.attribute)] = [...arr];
 
   return { matched: true, payload: rawPayload };
 }
@@ -309,6 +343,9 @@ export function removeValuePathEntry(
   parsed: ValuePathExpression,
   caseExact = false,
 ): ValuePathOpResult {
+  // See applyValuePathUpdate: entry-validate to throw before any read.
+  safePropertyKey(parsed.attribute);
+  if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
   const arr = rawPayload[parsed.attribute];
   if (!Array.isArray(arr)) {
     return { matched: false, payload: rawPayload };
@@ -329,9 +366,9 @@ export function removeValuePathEntry(
       return { matched: false, payload: rawPayload };
     }
     const entry = { ...(arr[matchIdx] as Record<string, unknown>) };
-    delete entry[parsed.subAttribute];
+    delete entry[safePropertyKey(parsed.subAttribute)];
     arr[matchIdx] = entry;
-    rawPayload[parsed.attribute] = [...arr];
+    rawPayload[safePropertyKey(parsed.attribute)] = [...arr];
     return { matched: true, payload: rawPayload };
   }
 
@@ -346,7 +383,7 @@ export function removeValuePathEntry(
       caseExact,
     );
   });
-  rawPayload[parsed.attribute] = filtered;
+  rawPayload[safePropertyKey(parsed.attribute)] = filtered;
   return { matched: filtered.length < beforeLen, payload: rawPayload };
 }
 
@@ -365,6 +402,10 @@ export function addValuePathEntry(
   value: unknown,
   caseExact = false,
 ): Record<string, unknown> {
+  // See applyValuePathUpdate: entry-validate to throw before any read.
+  safePropertyKey(parsed.attribute);
+  safePropertyKey(parsed.filterAttribute);
+  if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
   let arr = rawPayload[parsed.attribute] as unknown[] | undefined;
 
   if (!Array.isArray(arr)) {
@@ -385,22 +426,22 @@ export function addValuePathEntry(
   if (matchIdx >= 0) {
     // Update existing matching element
     if (parsed.subAttribute) {
-      (arr[matchIdx] as Record<string, unknown>)[parsed.subAttribute] = value;
+      (arr[matchIdx] as Record<string, unknown>)[safePropertyKey(parsed.subAttribute)] = value;
     } else {
       arr[matchIdx] = value;
     }
   } else {
     // Create new element with filter criteria and the value
     const newEntry: Record<string, unknown> = {
-      [parsed.filterAttribute]: parsed.filterValue,
+      [safePropertyKey(parsed.filterAttribute)]: parsed.filterValue,
     };
     if (parsed.subAttribute) {
-      newEntry[parsed.subAttribute] = value;
+      newEntry[safePropertyKey(parsed.subAttribute)] = value;
     }
     arr.push(newEntry);
   }
 
-  rawPayload[parsed.attribute] = [...arr];
+  rawPayload[safePropertyKey(parsed.attribute)] = [...arr];
   return rawPayload;
 }
 
@@ -442,11 +483,11 @@ export function applyExtensionUpdate(
         ? { ...(parent as Record<string, unknown>) }
         : {};
     if (value === null || value === undefined) {
-      delete parentObj[parsed.subAttribute];
+      delete parentObj[safePropertyKey(parsed.subAttribute)];
     } else {
-      parentObj[parsed.subAttribute] = value;
+      parentObj[safePropertyKey(parsed.subAttribute)] = value;
     }
-    ext[parsed.attributePath] = parentObj;
+    ext[safePropertyKey(parsed.attributePath)] = parentObj;
     rawPayload[parsed.schemaUrn] = { ...ext };
     return rawPayload;
   }
@@ -456,7 +497,7 @@ export function applyExtensionUpdate(
   // Detect "empty" values: null, undefined, "", or an object whose only key is
   // "value" set to null / "".
   if (isEmptyScimValue(value)) {
-    delete ext[parsed.attributePath];
+    delete ext[safePropertyKey(parsed.attributePath)];
     rawPayload[parsed.schemaUrn] = { ...ext };
     return rawPayload;
   }
@@ -465,9 +506,9 @@ export function applyExtensionUpdate(
   // When a string value is provided, wrap it as {value: string} per SCIM spec
   // (manager is a complex attribute with a 'value' sub-attribute).
   if (parsed.attributePath.toLowerCase() === 'manager' && typeof value === 'string') {
-    ext[parsed.attributePath] = { value };
+    ext[safePropertyKey(parsed.attributePath)] = { value };
   } else {
-    ext[parsed.attributePath] = value;
+    ext[safePropertyKey(parsed.attributePath)] = value;
   }
 
   rawPayload[parsed.schemaUrn] = { ...ext };
@@ -533,11 +574,11 @@ export function removeExtensionAttribute(
       const parent = copy[parsed.attributePath];
       if (typeof parent === 'object' && parent !== null && !Array.isArray(parent)) {
         const parentCopy = { ...(parent as Record<string, unknown>) };
-        delete parentCopy[parsed.subAttribute];
-        copy[parsed.attributePath] = parentCopy;
+        delete parentCopy[safePropertyKey(parsed.subAttribute)];
+        copy[safePropertyKey(parsed.attributePath)] = parentCopy;
       }
     } else {
-      delete copy[parsed.attributePath];
+      delete copy[safePropertyKey(parsed.attributePath)];
     }
     rawPayload[parsed.schemaUrn] = copy;
   }
@@ -617,6 +658,11 @@ export function resolveNoPathValue(
   updateObj: Record<string, unknown>,
   extensionUrns?: readonly string[],
 ): Record<string, unknown> {
+  // Entry-validate every key in the input object so the throw fires before
+  // any property reads. Object.entries() skips literal `__proto__` setters,
+  // so the realistic attack vector here is a JSON-parsed payload like
+  // `JSON.parse('{"__proto__":{...}}')` where __proto__ IS an own-property.
+  for (const k of Object.keys(updateObj)) safePropertyKey(k);
   for (const [key, value] of Object.entries(updateObj)) {
     if (isExtensionPath(key, extensionUrns)) {
       // Extension URN key: urn:...:User:employeeNumber -> update extension namespace
@@ -654,21 +700,21 @@ export function resolveNoPathValue(
             : {};
         for (const [subKey, subVal] of Object.entries(value as Record<string, unknown>)) {
           if (subVal === null) {
-            delete merged[subKey];
+            delete merged[safePropertyKey(subKey)];
           } else if (
-            typeof subVal === 'object' &&
             subVal !== null &&
+            typeof subVal === 'object' &&
             !Array.isArray(subVal)
           ) {
             // Nested complex (e.g. enterprise:manager) - merge per F1
-            merged[subKey] = mergeComplexAttribute(merged[subKey], subVal);
+            merged[safePropertyKey(subKey)] = mergeComplexAttribute(merged[subKey], subVal);
           } else {
-            merged[subKey] = subVal;
+            merged[safePropertyKey(subKey)] = subVal;
           }
         }
-        rawPayload[key] = merged;
+        rawPayload[safePropertyKey(key)] = merged;
       } else {
-        rawPayload[key] = value;
+        rawPayload[safePropertyKey(key)] = value;
       }
     } else if (key.includes('.')) {
       // Dot-notation: name.givenName -> update nested object
@@ -677,9 +723,9 @@ export function resolveNoPathValue(
       const childAttr = key.substring(dotIndex + 1);
       const existing = rawPayload[parentAttr];
       if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-        rawPayload[parentAttr] = { ...(existing as Record<string, unknown>), [childAttr]: value };
+        rawPayload[safePropertyKey(parentAttr)] = { ...(existing as Record<string, unknown>), [safePropertyKey(childAttr)]: value };
       } else {
-        rawPayload[parentAttr] = { [childAttr]: value };
+        rawPayload[safePropertyKey(parentAttr)] = { [safePropertyKey(childAttr)]: value };
       }
     } else {
       // F1: plain key. If both existing and incoming are non-array objects,
@@ -688,7 +734,7 @@ export function resolveNoPathValue(
       // clears only `familyName` and preserves `givenName` / `formatted`.
       // Matches the Entra/Okta de-facto interpretation of RFC 7644 §3.5.2.3.
       // Arrays (multi-valued) still whole-replace.
-      rawPayload[key] = mergeComplexAttribute(rawPayload[key], value);
+      rawPayload[safePropertyKey(key)] = mergeComplexAttribute(rawPayload[key], value);
     }
   }
   return rawPayload;
@@ -725,10 +771,14 @@ export function mergeComplexAttribute(existing: unknown, incoming: unknown): unk
 
   const merged: Record<string, unknown> = { ...(existing as Record<string, unknown>) };
   for (const [subKey, subVal] of Object.entries(incoming as Record<string, unknown>)) {
+    // Comparison order: null-check FIRST then typeof. CodeQL's narrowing
+    // analysis flags `typeof x === 'object'` followed by `x !== null` as
+    // a comparison-between-incompatible-types because the narrowed type
+    // after `typeof` includes null. Doing null-check first sidesteps that.
     if (subVal === null) {
-      delete merged[subKey];
+      delete merged[safePropertyKey(subKey)];
     } else {
-      merged[subKey] = subVal;
+      merged[safePropertyKey(subKey)] = subVal;
     }
   }
   return merged;

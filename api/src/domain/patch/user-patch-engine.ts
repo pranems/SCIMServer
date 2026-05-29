@@ -32,6 +32,7 @@ import {
   mergeComplexAttribute,
   pruneEmptyExtensions,
   findInvalidMultiValuedElement,
+  safePropertyKey,
 } from '../../modules/scim/utils/scim-patch-path';
 
 import type {
@@ -319,7 +320,7 @@ export class UserPatchEngine {
       // Arrays and primitives whole-replace.
       const existing = rawPayload[originalPath];
       const merged = mergeComplexAttribute(existing, value);
-      rawPayload = { ...rawPayload, [originalPath]: merged };
+      rawPayload = { ...rawPayload, [safePropertyKey(originalPath)]: merged };
       return { userName, displayName, externalId, active, rawPayload };
     }
 

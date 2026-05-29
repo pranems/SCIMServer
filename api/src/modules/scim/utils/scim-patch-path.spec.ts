@@ -1185,4 +1185,70 @@ describe('scim-patch-path utilities', () => {
       expect(aliases.length).toBe(2);
     });
   });
+
+  // CWE-1321 / js/remote-property-injection - prototype pollution sink barrier
+  // The engines already gate paths via guardPrototypePollution() at parse-time,
+  // so these cases are unreachable via SCIM PATCH. This block locks the
+  // defense-in-depth barrier at the util layer (CodeQL barrier).
+  describe('safePropertyKey (prototype pollution guard)', () => {
+    const dangerous = ['__proto__', 'constructor', 'prototype'];
+
+    it.each(dangerous)(
+      'applyValuePathUpdate rejects attribute %s as unsafe key',
+      (key) => {
+        expect(() =>
+          applyValuePathUpdate(
+            {},
+            { attribute: key, filterAttribute: 'type', filterOperator: 'eq', filterValue: 'x' },
+            'v',
+          ),
+        ).toThrow(/prototype pollution/i);
+      },
+    );
+
+    it('applyExtensionUpdate rejects __proto__ as attributePath', () => {
+      expect(() =>
+        applyExtensionUpdate(
+          {},
+          { schemaUrn: 'urn:x:y', attributePath: '__proto__' },
+          'v',
+        ),
+      ).toThrow(/prototype pollution/i);
+    });
+
+    it('removeExtensionAttribute rejects constructor as attributePath', () => {
+      expect(() =>
+        removeExtensionAttribute(
+          { 'urn:x:y': { foo: 'bar' } },
+          { schemaUrn: 'urn:x:y', attributePath: 'constructor' },
+        ),
+      ).toThrow(/prototype pollution/i);
+    });
+
+    it('addValuePathEntry rejects prototype as attribute', () => {
+      expect(() =>
+        addValuePathEntry(
+          {},
+          { attribute: 'prototype', filterAttribute: 'type', filterOperator: 'eq', filterValue: 'x' },
+          'v',
+        ),
+      ).toThrow(/prototype pollution/i);
+    });
+
+    it('resolveNoPathValue rejects __proto__ as a top-level key (via JSON.parse own-property)', () => {
+      // Object literal `{__proto__: x}` is a prototype-setter (no own-property),
+      // but JSON.parse produces a real own-property. Realistic attack vector.
+      const obj = JSON.parse('{"__proto__":{"polluted":true}}');
+      expect(() => resolveNoPathValue({}, obj as Record<string, unknown>)).toThrow(/prototype pollution/i);
+    });
+
+    it('safe keys (e.g. displayName, emails) pass through unchanged', () => {
+      const result = applyValuePathUpdate(
+        { emails: [{ type: 'work', value: 'a@b.com' }] },
+        { attribute: 'emails', filterAttribute: 'type', filterOperator: 'eq', filterValue: 'work', subAttribute: 'value' },
+        'new@b.com',
+      );
+      expect(result.matched).toBe(true);
+    });
+  });
 });
