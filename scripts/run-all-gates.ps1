@@ -379,7 +379,7 @@ $STAGES = [ordered]@{
         @{
             Name = 'Dev Azure live tests (current commit SHA; scimserver-dev)'
             Kind = 'Shell'
-            Command = "pwsh -NoProfile -File scripts/live-test.ps1 -BaseUrl https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io -ClientSecret 'changeme-oauth'"
+            Command = "pwsh -NoProfile -File scripts/live-test.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret 'changeme-oauth'"
         }
     )
 
@@ -401,7 +401,7 @@ $STAGES = [ordered]@{
         @{
             Name = 'Playwright vs dev (cd web; npx playwright test)'
             Kind = 'Shell'
-            Command = '$env:E2E_BASE_URL = "https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io"; $env:E2E_TOKEN = "changeme-scim"; npx playwright test --reporter=line'
+            Command = '$env:E2E_BASE_URL = "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io"; $env:E2E_TOKEN = "changeme-scim"; npx playwright test --reporter=line'
             WorkDir = 'web'
             When = { Test-PathTouched 'web[\\/]' }
             Reason = 'no web/ files touched'
