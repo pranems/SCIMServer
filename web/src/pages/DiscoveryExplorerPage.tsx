@@ -59,7 +59,7 @@ import {
   type ScimResourceType,
   type ScimServiceProviderConfig,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import {
   compareSchemas,
@@ -561,7 +561,14 @@ const ResourceTypesSection: React.FC<{
           <div key={rt.id} data-testid={`discovery-resourcetype-row-${rt.id}`} style={{ marginBottom: '8px' }}>
             <Text weight="semibold">{rt.name}</Text>
             <span className={classes.schemaIdMono}> · endpoint {rt.endpoint}</span>
-            <div className={classes.schemaIdMono}>schema: {rt.schema}</div>
+            <CopyableField
+              value={`schema: ${rt.schema}`}
+              copyValue={rt.schema}
+              monospace
+              truncate
+              maxWidth="100%"
+              data-testid={`discovery-resourcetype-schema-${rt.id}`}
+            />
             {sRt && sRt.schema !== rt.schema && (
               <Badge appearance="filled" color="warning" size="small">
                 differs from secondary
@@ -605,7 +612,13 @@ const SchemasSection: React.FC<{
             style={{ marginBottom: '6px' }}
           >
             <Text weight="semibold">{s.name ?? s.id}</Text>
-            <div className={classes.schemaIdMono}>{s.id}</div>
+            <CopyableField
+              value={s.id}
+              monospace
+              truncate
+              maxWidth="100%"
+              data-testid={`discovery-schema-urn-${s.id}`}
+            />
             <Caption1>{s.attributes.length} attributes</Caption1>
           </div>
         ))}
@@ -662,7 +675,13 @@ const SchemasDiffView: React.FC<{
         return (
           <div key={urn} style={{ marginBottom: '20px' }}>
             <Subtitle2>{a?.name ?? b?.name ?? urn}</Subtitle2>
-            <div className={classes.schemaIdMono}>{urn}</div>
+            <CopyableField
+              value={urn}
+              monospace
+              truncate
+              maxWidth="100%"
+              data-testid={`discovery-diff-schema-urn-${urn}`}
+            />
             <Caption1>
               {diff.summary.tightenCount} tightened ·{' '}
               {diff.summary.relaxCount} relaxed ·{' '}

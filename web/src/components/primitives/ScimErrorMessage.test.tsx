@@ -112,4 +112,37 @@ describe('ScimErrorMessage', () => {
     // The original detail is still surfaced.
     expect(screen.getByText(/unrecognized failure/)).toBeInTheDocument();
   });
+
+  // ─── Phase P1 - CopyableField primitives ───────────────────────────
+  describe('Phase P1 - CopyableField primitives', () => {
+    it('renders copy button next to the detail line', () => {
+      const err = new ScimApiError({ status: 409, scimType: 'uniqueness', detail: 'userName already taken' });
+      renderWithFluent(<ScimErrorMessage error={err} />);
+      expect(screen.getByTestId('scim-error-detail-action-copy-button')).toBeInTheDocument();
+    });
+
+    it('renders copy button next to the requestId line', () => {
+      const err = new ScimApiError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: 'dup',
+        requestId: 'req-abc-123',
+      });
+      renderWithFluent(<ScimErrorMessage error={err} />);
+      expect(screen.getByTestId('scim-error-request-id-action-copy-button')).toBeInTheDocument();
+    });
+
+    it('renders copy button next to the rawBody pre when expanded', async () => {
+      const err = new ScimApiError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: 'dup',
+        rawBody: { schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'], status: '409' },
+      });
+      renderWithFluent(<ScimErrorMessage error={err} />);
+      const toggle = screen.getByTestId('scim-error-toggle-raw');
+      await userEvent.click(toggle);
+      expect(screen.getByTestId('scim-error-raw-json-action-copy-button')).toBeInTheDocument();
+    });
+  });
 });

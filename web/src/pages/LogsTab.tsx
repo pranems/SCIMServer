@@ -25,7 +25,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
-import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -190,7 +190,13 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
                 </Badge>
               </td>
               <td className={classes.td}>
-                <Caption1 style={{ fontFamily: 'monospace' }}>{log.url}</Caption1>
+                <CopyableField
+                  value={log.url}
+                  truncate
+                  monospace
+                  maxWidth="500px"
+                  data-testid={`log-url-${log.id}`}
+                />
               </td>
               <td className={classes.td}>
                 <Badge appearance="outline" color={log.status >= 400 ? 'danger' : 'success'}>

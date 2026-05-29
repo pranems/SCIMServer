@@ -194,4 +194,40 @@ describe('LogsPage', () => {
       expect(args[0]).toBe('log-42');
     });
   });
+
+  // ─── Phase P1 - CopyableField primitives on row + drawer ─────────
+  describe('Phase P1 - CopyableField primitives', () => {
+    it('renders row URL column via CopyableField with stable testid + copy button', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      wrap(<LogsPage />);
+      const cell = await screen.findByTestId('log-row-url-l1');
+      expect(cell).toBeInTheDocument();
+      expect(screen.getByTestId('log-row-url-l1-copy-button')).toBeInTheDocument();
+    });
+
+    it('renders copy buttons in drawer for request body / response headers / response body', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      mockUseGlobalLog.mockReturnValue({
+        data: {
+          id: 'l1',
+          method: 'GET',
+          url: '/scim/endpoints/ep-prod/Users',
+          status: 200,
+          durationMs: 5,
+          createdAt: '2026-05-01T10:00:00Z',
+          requestHeaders: { 'x-trace-id': 'abc' },
+          requestBody: { foo: 'bar' },
+          responseHeaders: { etag: 'W/"v1"' },
+          responseBody: { Resources: [] },
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs?detail=l1');
+      expect(await screen.findByTestId('log-detail-url-copy-button')).toBeInTheDocument();
+      expect(screen.getByTestId('log-detail-request-body-copy-button')).toBeInTheDocument();
+      expect(screen.getByTestId('log-detail-response-headers-copy-button')).toBeInTheDocument();
+      expect(screen.getByTestId('log-detail-response-body-copy-button')).toBeInTheDocument();
+    });
+  });
 });

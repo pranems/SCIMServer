@@ -147,6 +147,26 @@ describe('LogsTab', () => {
   });
 
   // ==========================================================================
+  // Phase P1 - URL column uses CopyableField (truncate + copy-to-clipboard)
+  // ==========================================================================
+  it('renders URL column via CopyableField with stable testid + copy button', async () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [
+          { id: 'l1', method: 'POST', url: '/Users/very-long-id-1234567890', status: 201, durationMs: 42, createdAt: '2026-05-01T10:00:00Z' },
+        ],
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    const field = await screen.findByTestId('log-url-l1');
+    expect(field).toBeInTheDocument();
+    // Companion copy button must be present + clickable.
+    expect(screen.getByTestId('log-url-l1-copy-button')).toBeInTheDocument();
+  });
+
+  // ==========================================================================
   // Phase N4 - honor defaultPageSize preference when URL has no ?pageSize
   // ==========================================================================
   it('honors preferences-store defaultPageSize when URL has no ?pageSize override', async () => {

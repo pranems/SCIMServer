@@ -221,6 +221,25 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
     expect(screen.getByTestId('discovery-resourcetype-row-Group')).toBeInTheDocument();
   });
 
+  // ─── Phase P1 - CopyableField on schema URNs ───────────────────────
+  it('Phase P1 - schema row exposes CopyableField for the URN', () => {
+    renderWithProviders(<DiscoveryExplorerPage />);
+    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    fireEvent.click(screen.getByTestId('discovery-tab-schemas'));
+    expect(
+      screen.getByTestId('discovery-schema-urn-urn:ietf:params:scim:schemas:core:2.0:User-copy-button'),
+    ).toBeInTheDocument();
+  });
+
+  it('Phase P1 - resource type row exposes CopyableField for the schema URN', () => {
+    renderWithProviders(<DiscoveryExplorerPage />);
+    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    fireEvent.click(screen.getByTestId('discovery-tab-resourceTypes'));
+    expect(
+      screen.getByTestId('discovery-resourcetype-schema-User-copy-button'),
+    ).toBeInTheDocument();
+  });
+
   it('ServiceProviderConfig tab in single-endpoint mode shows the SPC capability rows', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
     fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));

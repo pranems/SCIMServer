@@ -59,6 +59,7 @@ import {
   type WorkbenchHistoryEntry,
 } from '../utils/workbench-history';
 import { emitLiveTestSnippet } from '../utils/live-test-snippet';
+import { CopyableField } from '../components/primitives';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -113,6 +114,16 @@ const useStyles = makeStyles({
     whiteSpace: 'pre-wrap',
     margin: 0,
     overflowX: 'auto',
+  },
+  requestIdRow: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  responseBodyToolbar: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: '4px',
   },
   historyTable: {
     width: '100%',
@@ -419,12 +430,34 @@ export const WorkbenchPage: React.FC = () => {
                   {response.durationMs} ms
                 </Caption1>
                 {response.requestId && (
-                  <Caption1 data-testid="workbench-response-request-id">
-                    requestId: {response.requestId}
-                  </Caption1>
+                  <div className={classes.requestIdRow}>
+                    <Caption1>requestId: {response.requestId}</Caption1>
+                    <CopyableField
+                      value=""
+                      copyValue={response.requestId}
+                      buttonOnly
+                      ariaLabel="Copy requestId"
+                      data-testid="workbench-response-request-id"
+                    />
+                  </div>
                 )}
               </div>
-              <pre className={classes.responseBody} data-testid="workbench-response-body">
+              <div className={classes.responseBodyToolbar}>
+                <CopyableField
+                  value=""
+                  copyValue={
+                    response.body !== undefined
+                      ? typeof response.body === 'string'
+                        ? response.body
+                        : JSON.stringify(response.body, null, 2)
+                      : ''
+                  }
+                  buttonOnly
+                  ariaLabel="Copy response body"
+                  data-testid="workbench-response-body"
+                />
+              </div>
+              <pre className={classes.responseBody} data-testid="workbench-response-body-pre">
                 {response.body !== undefined
                   ? typeof response.body === 'string'
                     ? response.body
@@ -489,7 +522,14 @@ export const WorkbenchPage: React.FC = () => {
                     </Text>
                   </td>
                   <td className={classes.historyCell} style={{ fontFamily: tokens.fontFamilyMonospace }}>
-                    {entry.path}
+                    <CopyableField
+                      value={entry.path}
+                      copyValue={entry.path}
+                      truncate
+                      monospace
+                      maxWidth="320px"
+                      data-testid={`workbench-history-path-${entry.id}`}
+                    />
                   </td>
                   <td className={classes.historyCell}>
                     <Badge appearance="filled" color={statusColor(entry.status)} size="small">

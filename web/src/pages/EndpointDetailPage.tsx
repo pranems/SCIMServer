@@ -35,7 +35,7 @@ import {
 import { Edit24Regular, Delete24Regular } from '@fluentui/react-icons';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEndpoint } from '../api/queries';
-import { LoadingSkeleton } from '../components/primitives';
+import { CopyableField, LoadingSkeleton } from '../components/primitives';
 import { DeleteEndpointDialog } from '../components/endpoint/DeleteEndpointDialog';
 
 const useStyles = makeStyles({
@@ -56,6 +56,12 @@ const useStyles = makeStyles({
     gap: '16px',
     flexWrap: 'wrap',
     color: tokens.colorNeutralForeground3,
+  },
+  scimRow: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    minWidth: 0,
   },
   tabContent: {
     marginTop: '8px',
@@ -219,7 +225,16 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
       {/* Metadata row */}
       <div className={classes.meta}>
         <Caption1>ID: {endpoint.id}</Caption1>
-        <Caption1>SCIM: {endpoint.scimBasePath}</Caption1>
+        <span className={classes.scimRow}>
+          <Caption1>SCIM:</Caption1>
+          <CopyableField
+            value={endpoint.scimBasePath}
+            monospace
+            truncate
+            maxWidth="480px"
+            data-testid="endpoint-scim-base-path"
+          />
+        </span>
         <Caption1>Created: {new Date(endpoint.createdAt).toLocaleDateString()}</Caption1>
       </div>
 
