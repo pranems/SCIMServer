@@ -22,7 +22,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
-import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
@@ -149,7 +149,12 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
               data-testid={`group-row-${group.id}`}
             >
               <td className={classes.td}>
-                <Text weight="semibold">{group.displayName}</Text>
+                <CopyableField
+                  value={group.displayName}
+                  truncate
+                  maxWidth="320px"
+                  data-testid={`group-displayname-${group.id}`}
+                />
               </td>
               <td className={classes.td}>
                 <Badge appearance="outline">{group.members?.length ?? 0}</Badge>

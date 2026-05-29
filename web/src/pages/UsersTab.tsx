@@ -28,7 +28,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
 import type { UsersSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
-import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
@@ -204,10 +204,23 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
               data-testid={`user-row-${user.id}`}
             >
               <td className={classes.td}>
-                <Text weight="semibold">{user.userName}</Text>
+                <CopyableField
+                  value={user.userName}
+                  truncate
+                  maxWidth="280px"
+                  data-testid={`user-username-${user.id}`}
+                />
               </td>
               <td className={classes.td}>
-                {user.displayName ?? <Caption1>-</Caption1>}
+                {user.displayName ? (
+                  <TruncatedText
+                    text={user.displayName}
+                    maxWidth="220px"
+                    data-testid={`user-displayname-${user.id}`}
+                  />
+                ) : (
+                  <Caption1>-</Caption1>
+                )}
               </td>
               <td className={classes.td}>
                 <Badge

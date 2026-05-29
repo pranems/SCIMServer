@@ -45,6 +45,7 @@ import { DetailDrawer } from '../primitives/DetailDrawer';
 import { ScimErrorMessage } from '../primitives/ScimErrorMessage';
 import { EtagBadge } from '../primitives/EtagBadge';
 import { ConflictDialog } from '../primitives/ConflictDialog';
+import { CopyableField } from '../primitives/CopyableField';
 import {
   formatIfMatchValue,
   parseResourceEtag,
@@ -303,19 +304,33 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       data-testid="resource-detail-drawer"
     >
       <div className={classes.body}>
-        {/* ── Read-only metadata card ──────────────────────────── */}
+        {/* -- Read-only metadata card -- */}
         <Caption1>Identity</Caption1>
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>id</Caption1>
-          <Caption1 className={classes.monospace}>{resource.id}</Caption1>
+          <CopyableField
+            value={resource.id}
+            monospace
+            truncate
+            maxWidth="360px"
+            data-testid="resource-detail-id"
+          />
         </div>
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>Created</Caption1>
-          <Caption1>{resource.meta?.created ?? '-'}</Caption1>
+          <CopyableField
+            value={resource.meta?.created ?? '-'}
+            monospace
+            data-testid="resource-detail-created"
+          />
         </div>
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>Last modified</Caption1>
-          <Caption1>{resource.meta?.lastModified ?? '-'}</Caption1>
+          <CopyableField
+            value={resource.meta?.lastModified ?? '-'}
+            monospace
+            data-testid="resource-detail-lastmodified"
+          />
         </div>
         {/* K5 - ETag badge in the metadata card. Renders nothing
             when the server never sent meta.version. */}
