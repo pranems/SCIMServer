@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.45.0-alpha.3 - **Updated:** May 8, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,169 tests (3,643 unit + 1,172 E2E + 385 web vitest) + 7 Playwright + 901 live SCIM
+> **Version:** 0.52.3 - **Updated:** May 28, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 6,031 tests (3,808 unit + 1,217 E2E + 1,006 web vitest) + 76 Playwright + 1,027 live SCIM
 
 ---
 
@@ -115,6 +115,7 @@
 | [SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md](SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md) | Attribute customization guide - tighten-only rules, 12 scenarios, 4 templates |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH add/remove config |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema, custom extensions |
+| [CUSTOM_EXTENSIONS_RFC_GUIDE.md](CUSTOM_EXTENSIONS_RFC_GUIDE.md) | **RFC-compliant custom extension authoring** - URN structure (RFC 7643 §10), schema meta-schema (§7), ResourceType binding (§6), worked `proxyAddresses` example, authoring checklist, error catalogue, end-to-end flow, common anti-patterns |
 | [COLLISION-TESTING-GUIDE.md](COLLISION-TESTING-GUIDE.md) | Entra collision (409) testing guide |
 
 ## Feature Implementation Docs
@@ -127,6 +128,7 @@
 | [G8F_GROUP_UNIQUENESS_PUT_PATCH.md](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) | Group displayName uniqueness on PUT/PATCH |
 | [G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md](G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md) | Write-response attribute projection |
 | [G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md](G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md) | Primary sub-attribute enforcement (RFC 7643 S2.4) - tri-state config |
+| [PATCH_NULL_HANDLING_RFC_COMPLIANCE.md](PATCH_NULL_HANDLING_RFC_COMPLIANCE.md) | **PATCH null-handling RFC compliance (v0.52.3, F1-F9)** - RFC 7644 S3.5.2 null semantics across all 3 engines (User/Group/Generic). F1 mergeComplexAttribute null-as-unset merge for complex parents. F2 explicit-null Group.members clear regardless of `PatchOpAllowRemoveAllMembers` flag (per S3.5.2.2 ex.3). F3 noTarget on zero-match valuePath via `ValuePathOpResult` dispatch. F4 `findInvalidMultiValuedElement` rejects null array elements with `invalidValue`. F5 `pruneEmptyExtensions` removes empty extension URN blocks from payload AND `schemas[]`. F6/F7 `ExtensionPathExpression.subAttribute` + new `ExtensionValuePathExpression` (filter on extension valuePath). F8 GenericPatchEngine inherits F1/F4/F5/F6/F7 for custom resource type parity. F9 `validatePatchOperationValue` null contract documented (RFC 7644 S3.5.2.3 - null at per-op layer is intentional UNASSIGN signal; post-PATCH `validatePayloadSchema` is the authoritative required-cleared check). New 19-case diagnostic `scripts/null-patch-test.ps1`, new E2E spec `api/test/e2e/patch-null-handling.e2e-spec.ts` (20 tests), new live-test section `9z-AK` (22 assertions T01-T18 + F9 + setup). Validated 1027/1027 PASS end-to-end across inmemory + Prisma + dev Azure. |
 | [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint credentials - 3-tier auth chain |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Bulk operations (RFC 7644 S3.7) |
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | /Me endpoint (RFC 7644 S3.11) |
@@ -145,6 +147,7 @@
 | [P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md](P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md) | **v0.37.0** - source-verified gap analysis |
 | [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) | **2026-05-13** - 6-layer methodology (RFC discovery / behavioural / side-channel / OSINT / triangulation / chaos) for systematically + laterally probing any ISV SCIM endpoint; includes probe-corpus YAML seed, per-attribute matrix template, drop-in probe-isv.ps1 script, and a 26-day SCIMServer roadmap to ship probing as a first-class capability |
 | [OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md](OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md) | **2026-05-13** - OpenText-ISV-1 endpoint per-attribute walk + 6-gap register + Section 10 RCA on why the SyncFabric bot User add fails (format rules: phone E.164, ISO country, hosted-domain userName) while the Microsoft SCIM Validator passes |
+| [OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md](OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md) | **2026-05-28** - OpenText-ISV-3 endpoint `128f64b5-…` (`scimserver-prod`) source-JSON-vs-live `/Schemas` audit. Schema-by-schema attribute diff (User / EnterpriseUser / Group / Mailbox). Identifies 2 real semantic differences: (1) Group.displayName.uniqueness tightened `none -> server` by the tighten-only-validator; (2) Mailbox.proxyAddresses STRUCTURAL DIVERGENCE (complex value/type vs flat string, wire-incompatible). All other deltas are benign (RFC §3.1 common attrs materialized, RFC §2.2 defaults explicit). §9 adds payload-vs-schema juxtaposition for the May 28, 2026 production POST rejection (req-id `510cd960-…`): all 32 unique violations across Groups A-F walked individually with the source-says-no + live-says-no + validator-rule columns; proves source/live agreement = 100% on every rejection, plus 5 enterprise-block duplicate `attributePaths` accounted for. Mermaid inventory diagram + reproducibility script + per-stakeholder action list. |
 | [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | Gap matrix - characteristic enforcement status |
 | [RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md) | Full RFC 7643 attribute characteristic audit |
 | [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) | Attribute characteristics analysis |
