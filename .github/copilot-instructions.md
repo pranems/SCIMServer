@@ -334,24 +334,41 @@ When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to 
 - **NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
 - Prod promotion requires Stage 4.4 (dev live tests) green on the exact image SHA being promoted, not the "latest" tag.
 
-### Deployment Topology (CURRENT - 2026-05-29)
+### Deployment Topology (CURRENT - corrected 2026-05-29 post-promote)
 
-| Environment | App Name | Resource Group | OAuth Secret | SCIM Shared Secret (E2E_TOKEN) | FQDN | Container Registry |
-|---|---|---|---|---|---|---|
-| **Dev (CURRENT)** | `scimserver-dev` | `scimserver-dev` | `changeme-oauth` | `changeme-scim` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
-| **Prod (CURRENT)** | `scimserver` | `scimserver-prod` | `changeme-oauth` | `changeme-scim` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update incorrectly marked calmsand as RETIRED; it is in fact the customer-facing prod and was just promoted to v0.52.3 alongside the proudbush instance.
 
-### Deployment Topology (HISTORICAL - kept for reference)
+| Environment | App Name | Resource Group | Subscription | OAuth Secret | SCIM Shared Secret (E2E_TOKEN) | FQDN | Container Registry |
+|---|---|---|---|---|---|---|---|
+| **Prod (CUSTOMER-FACING)** | `scimserver-prod` | `scimserver-rg-prod` | `AnandSa-Test-150` | `changeme-oauth` | `changeme-scim` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | `ghcr.io/pranems/scimserver` (anonymous pull) |
+| **Prod (parallel, eastus)** | `scimserver` | `scimserver-prod` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+| **Dev** | `scimserver-dev` | `scimserver-dev` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
 
-These environments existed in prior tenants/subscriptions and are now retired. Any tooling, doc, or script reference to these FQDNs / app names / RGs should be treated as historical context, not a deployment target.
+**Customer-facing prod (calmsand, centralus, AnandSa-Test-150 sub):**
+- App `scimserver-prod` / RG `scimserver-rg-prod` / FQDN `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io`
+- Running real workloads (Ryan-Gruss, Ryan-Eakins, OpenText-* ISVs, 2,000+ users)
+- Uses GHCR image pulls (anonymous; public path)
+- Multiple revision mode with `latestRevision: True, weight: 100` (auto-routes to newest)
+- Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version>` (requires `az account set --subscription AnandSa-Test-150` first)
+
+**Parallel prod (proudbush, eastus, ProvIAM_Subscription):**
+- App `scimserver` / RG `scimserver-prod` (different from calmsand's `scimserver-rg-prod`) / FQDN `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io`
+- Uses ACR image (`acrscimserver20622.azurecr.io/scimserver:<sha>`) with Managed Identity pull; lower cold-start latency
+- Same SCIM contract surface; both are kept in lockstep version-wise
+- Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <version>` (in `ProvIAM_Subscription`)
+
+**Important when promoting prod:** if the operator says "promote to prod" without naming which one, ask which one (or promote BOTH). Both deserve the same image. Single-prod promotion leaves the other on a stale version - that's exactly the v0.52.3 mistake of 2026-05-29 (proudbush got v0.52.3 first; calmsand left on v0.52.2 until the operator surfaced the discrepancy via screenshot).
+
+### Deployment Topology (HISTORICAL - retired)
+
+These deployments are retired and not live. Any tooling, doc, or script reference to these FQDNs / app names / RGs should be treated as historical context, not a deployment target.
 
 | Era | App Name | Resource Group | FQDN | Status |
 |---|---|---|---|---|
 | Tenant-migration era (pre-2026-05-19) | `scimserver2` | `scimserver-rg` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | RETIRED (mgmt-plane expired during 2026-05-19 cross-tenant migration; data-plane was read-only during the migration window) |
 | Pre-tenant-migration dev | `scimserver-dev` | `scimserver-rg-dev` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | RETIRED (same tenant-migration cutover) |
-| Side-experiment | `scimserver-prod` | (unknown) | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | RETIRED (no longer in the active subscription) |
 
-**Image registry note:** the runtime registry for prod + dev is now Azure Container Registry (`acrscimserver20622.azurecr.io`); the public OSS-distribution registry is GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
+**Image registry note:** the runtime registry for the parallel proudbush prod + dev is Azure Container Registry (`acrscimserver20622.azurecr.io`); the customer-facing calmsand prod pulls from GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)
