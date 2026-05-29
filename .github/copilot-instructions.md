@@ -163,6 +163,32 @@ NEVER hardcode an expected characteristic value (e.g. `expect(attr.uniqueness).t
 
 **Tightening allowance:** Per RFC 7643 §7 a server MAY enforce uniqueness/mutability stricter than what it advertises (e.g. advertise `uniqueness:none` while enforcing `server`). Tests that verify "the server publishes a valid keyword and the runtime enforcement is consistent" must use `expectCharacteristicIn(attr, key, VALID_<KEYWORD>)`, not a single-value `toBe()`.
 
+## Always Add Playwright Coverage Rule (CRITICAL)
+
+Whenever the agent observes a UI behavior - including a bug, a new feature, a fix, a regression, a workaround, a flow change, or any user-visible delta - it MUST add or update a Playwright spec under `web/e2e/` that exercises that behavior end-to-end through the browser **before** the work is considered complete. This rule applies to:
+
+- New routes, pages, tabs, drawers, modals, dialogs
+- New buttons, links, form fields, validation messages
+- New error states, empty states, loading states, retry behaviors
+- New keyboard shortcuts, command palette commands, accessibility flows
+- Fixed bugs (spec MUST reproduce the bug as a regression test)
+- Behavioral changes to existing flows (update the existing spec)
+- Combination flows (multi-step user journeys spanning >= 2 pages)
+
+The spec MUST be runnable via `npx playwright test --reporter=line` against all three deployment form factors: local dev server (`http://localhost:4000`), local Docker compose (`http://localhost:8080`), and Azure dev (`E2E_BASE_URL=https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). A change that ships without its Playwright spec is incomplete. The Stage 5.3 + 5.4 gates fail when any new web/ behavior in the diff lacks Playwright coverage.
+
+## Dev Deployment Pipeline Rule (CRITICAL)
+
+Whenever the operator asks to "deploy to dev", "prepare for prod", "run full validation", "test on the latest deployment", "do the full pipeline", or any equivalent phrase, the agent MUST:
+
+1. Run `pwsh -NoProfile -File scripts/dev-deployment-pipeline.ps1` (full mode, no `-Skip*` flags), OR walk every numbered stage in [.github/prompts/devDeploymentPipeline.prompt.md](.github/prompts/devDeploymentPipeline.prompt.md) manually with a per-stage PASS / FAIL / SKIPPED-with-reason row in a report file under `test-results/dev-deploy-<timestamp>.md`.
+2. NEVER claim "validation complete" or "dev is green" without an explicit per-gate result. Aggregated phrases ("all tests passed") are insufficient.
+3. NEVER skip Stage 5.3 (Playwright vs dev) because "Playwright is slow". The earliest such miss (v0.52.3 dev-deploy run, 2026-05-29) is exactly why this rule exists.
+4. NEVER defer Stage 1.6 (size-limit) failures as "pre-existing baseline". Either fix the config or fix the bundle. The v0.52.3 run treated a real failure as deferrable, then the operator surfaced it.
+5. NEVER promote to prod without an explicit `promote to prod` confirmation message from the operator.
+
+References: [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1) - orchestrator. [.github/prompts/devDeploymentPipeline.prompt.md](.github/prompts/devDeploymentPipeline.prompt.md) - authoritative gate walk. Both are kept in lockstep with this section.
+
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 
 Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:
@@ -170,6 +196,7 @@ Every feature or significant change commit MUST include ALL of the following bef
 1. **Unit Tests** - Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
 2. **E2E Tests** - End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
 3. **Live Integration Tests** - New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` (Docker)
+3a. **Playwright Spec** (when the change touches `web/src/`) - End-to-end browser spec under `web/e2e/*.spec.ts` exercising the new/changed UI surface, runnable against local dev (`http://localhost:4000`), Docker compose (`http://localhost:8080`), AND Azure dev (`https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). For a bug fix, the spec MUST reproduce the bug as a regression test before the fix lands. See "Always Add Playwright Coverage Rule" above.
 4. **Feature Documentation** - Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
 5. **INDEX.md Update** - Add the new feature doc reference to `docs/INDEX.md`
 6. **CHANGELOG.md Update** - Version bump entry with full test counts and feature summary
@@ -230,7 +257,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 4.1. **`fullValidationPipeline` prompt** - End-to-end local build + Docker build + container smoke. Must pass cleanly before any deployment.
 4.2. **Docker compose live tests** - `docker compose up -d api`, then `pwsh scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). Confirms the Prisma backend behaves identically to the inmemory mode AND identical to dev.
 4.3. **Local node live tests** - `node api/dist/main.js` (inmemory backend, port 6000), then `pwsh scripts/live-test.ps1` -> all current-baseline tests pass. Confirms inmemory parity. **A live-test failure on local that passes on Docker/dev is a parity bug; fix it at the source (usually `api/src/infrastructure/repositories/inmemory/` or in the service-layer `isInMemoryBackend` branch), don't suppress.**
-4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). **This is the sub-phase gate the commit message names.**
+4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 1,027 assertions). **This is the sub-phase gate the commit message names.**
 
 ### Stage 5 - UI-Specific Gates (when the change touches `web/`)
 5.1. **`uiTestAndValidation` prompt** - Full React/vitest test suite + a11y + visual regression sanity check.
@@ -261,7 +288,7 @@ X.2. **`securityBestPracticesIntake` prompt** - Sibling to X.1, scoped exclusive
 | Incident-driven | After ANY bug/security-incident escapes Stages 1-5 to live/dev | focused on the escape path | Auto-captures Finding-B / Finding-C / supply-chain class events |
 
 **Hard constraints (apply to both X.1 and X.2):**
-- External claims require URL citations (no URL = "speculative — verify before action").
+- External claims require URL citations (no URL = "speculative - verify before action").
 - Confidence levels required (`Critical` / `High` / `Medium` / `Speculative` for X.2; `High` / `Medium` / `Speculative` for X.1).
 - Owner action required on every finding.
 - New prompt recommendations require >=2 escape-pattern matches (single-escape patterns go into an EXISTING prompt as a new check).
@@ -307,11 +334,24 @@ When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to 
 - **NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
 - Prod promotion requires Stage 4.4 (dev live tests) green on the exact image SHA being promoted, not the "latest" tag.
 
-### Deployment Topology
-| Environment | App Name | OAuth Secret | FQDN |
-|-------------|----------|-------------|------|
-| Dev | `scimserver-dev` (scimserver-rg-dev) | `changeme-oauth` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` |
-| Prod | `scimserver2` (scimserver-rg) | `changeme-oauth` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` |
+### Deployment Topology (CURRENT - 2026-05-29)
+
+| Environment | App Name | Resource Group | OAuth Secret | SCIM Shared Secret (E2E_TOKEN) | FQDN | Container Registry |
+|---|---|---|---|---|---|---|
+| **Dev (CURRENT)** | `scimserver-dev` | `scimserver-dev` | `changeme-oauth` | `changeme-scim` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+| **Prod (CURRENT)** | `scimserver` | `scimserver-prod` | `changeme-oauth` | `changeme-scim` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+
+### Deployment Topology (HISTORICAL - kept for reference)
+
+These environments existed in prior tenants/subscriptions and are now retired. Any tooling, doc, or script reference to these FQDNs / app names / RGs should be treated as historical context, not a deployment target.
+
+| Era | App Name | Resource Group | FQDN | Status |
+|---|---|---|---|---|
+| Tenant-migration era (pre-2026-05-19) | `scimserver2` | `scimserver-rg` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | RETIRED (mgmt-plane expired during 2026-05-19 cross-tenant migration; data-plane was read-only during the migration window) |
+| Pre-tenant-migration dev | `scimserver-dev` | `scimserver-rg-dev` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | RETIRED (same tenant-migration cutover) |
+| Side-experiment | `scimserver-prod` | (unknown) | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | RETIRED (no longer in the active subscription) |
+
+**Image registry note:** the runtime registry for prod + dev is now Azure Container Registry (`acrscimserver20622.azurecr.io`); the public OSS-distribution registry is GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)
