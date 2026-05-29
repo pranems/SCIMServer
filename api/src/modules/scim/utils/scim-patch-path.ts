@@ -702,11 +702,13 @@ export function resolveNoPathValue(
           if (subVal === null) {
             delete merged[safePropertyKey(subKey)];
           } else if (
-            subVal !== null &&
             typeof subVal === 'object' &&
             !Array.isArray(subVal)
           ) {
-            // Nested complex (e.g. enterprise:manager) - merge per F1
+            // Nested complex (e.g. enterprise:manager) - merge per F1.
+            // (No redundant subVal !== null check: the preceding `if (subVal === null)`
+            // branch returns control flow before reaching here, so the typeof check
+            // here is non-null-narrowed.)
             merged[safePropertyKey(subKey)] = mergeComplexAttribute(merged[subKey], subVal);
           } else {
             merged[safePropertyKey(subKey)] = subVal;
