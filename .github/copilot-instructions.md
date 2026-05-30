@@ -177,6 +177,67 @@ Whenever the agent observes a UI behavior - including a bug, a new feature, a fi
 
 The spec MUST be runnable via `npx playwright test --reporter=line` against all three deployment form factors: local dev server (`http://localhost:4000`), local Docker compose (`http://localhost:8080`), and Azure dev (`E2E_BASE_URL=https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). A change that ships without its Playwright spec is incomplete. The Stage 5.3 + 5.4 gates fail when any new web/ behavior in the diff lacks Playwright coverage.
 
+## Visual Layout + Self-Improvement Discipline (CRITICAL - added 2026-05-29 after Finding-D)
+
+Origin: 2026-05-29 P1 follow-up deploy. The `<span>`-based `TruncatedText` primitive applied `text-overflow:ellipsis + overflow:hidden + white-space:nowrap` but never set `display:inline-block`, so the CSS was inert and userNames rendered at full width on dev. Four separate gates (vitest layout assertions, Playwright `getComputedStyle` check, visual-regression PNG diff, operator's first manual look) all failed to flag it. The operator caught it after dev deploy by eye. The following rules are the standing fix for this whole class of "CSS applied but layout not achieved" failure.
+
+### R1. Visual-layout assertions MUST measure bounds, not CSS properties
+
+Any Playwright spec exercising truncation / overflow / ellipsis / masking / sticky positioning / responsive width / clipping MUST assert at least one of:
+
+- `el.scrollWidth > el.clientWidth` (content overflowed → ellipsis/clip actually fired)
+- `el.clientWidth <= <expected-max-width-px>` (element is actually bounded)
+- `displayedText.length < fullValue.length` (visible string is shorter than the value)
+- `el.getBoundingClientRect().width <= <expected>` (rendered width is bounded)
+
+Asserting only `getComputedStyle(el).textOverflow === 'ellipsis'` or `whiteSpace === 'nowrap'` is FORBIDDEN as the sole assertion. Those checks verify CSS was applied, not that layout happened. They will green-light a bug where the property is set but the element's `display` value prevents it from taking effect.
+
+### R2. Vitest tests MUST NOT assert visual-layout outcomes
+
+JSDOM (vitest's DOM) does not compute layout. `getBoundingClientRect()` returns `{0,0,0,0}`, `scrollWidth === clientWidth` always, `offsetWidth === 0`. Any vitest assertion about truncation, overflow, viewport fit, scrollbar presence, sticky behavior, or column width is a false-positive farm. Move those assertions to Playwright. Vitest assertions are reserved for: rendered DOM structure (`getByTestId`), text content, props/events/callbacks, and ARIA semantics. Layout is Playwright-only.
+
+### R3. A visual-regression FAIL is a BLOCKER until the diff PNG is inspected
+
+When Stage 5.3 reports a visual-regression diff, the agent MUST:
+
+1. Open the `*-diff.png` (or describe inability to open it) for every failing test.
+2. State explicitly in chat AND in the commit message: "intended visual change because <X>" or "unintended regression - investigating."
+3. Only AFTER a written "intended" classification may the agent regenerate baselines.
+4. Regenerating baselines without inspecting the diff is FORBIDDEN.
+
+Default response to a visual-regression FAIL is "investigate," NOT "regenerate." The 4-fail / 113-pass result on the 2026-05-29 dev run was dismissed as "expected P1 drift"; one of those 4 was the actual bug the gate was trying to flag. This rule prevents the recurrence.
+
+### R4. Truncation primitives MUST self-contain their display context
+
+A primitive that depends on a specific parent layout context to function (e.g., `display:flex` parent + `min-width:0` + sized column) is fragile and will silently fail in raw `<td>`, `<span>`, or `<div>` contexts. Truncation primitives MUST set their own `display:inline-block` (or `block` for full-width variants) so the CSS contract holds regardless of parent. The same applies to: focus rings (own `position:relative`), sticky elements (own `position:sticky` + `top`), z-index layers (own stacking context), and transforms (own `will-change` hints).
+
+### R5. Tables with truncating cells MUST use `table-layout: fixed` + explicit column widths
+
+`table-layout: auto` (the browser default) sizes columns to the natural width of their content. This defeats any `max-width` on inner cell content - the column itself expands. Any `<table>` containing a `<CopyableField truncate>` or `<TruncatedText>` MUST either:
+
+- Set `table-layout: fixed` on the `<table>` AND give each `<th>` an explicit width, OR
+- Set `max-width` directly on each affected `<td>` (less robust; only works if the column is narrow enough that contents would overflow anyway).
+
+### R6. UI commits MUST receive explicit operator visual verification before "ready for prod"
+
+The agent may not declare a UI commit "validated on dev" or "ready for prod" based on automated gates alone. The agent MUST request and receive an explicit operator statement of the form "I have visually verified <surface> on dev URL <X>; the change looks correct." Until that operator statement arrives, the agent's status is "awaiting visual verification," not "validated." This is the only gate that catches the "CSS applied but layout not achieved" class of bug, because every synthetic gate can be defeated by writing the wrong assertion (R1) or by trusting a misleading green (R3).
+
+### R7. Self-improvement step in every activity (commit / prompt / gate / pipeline run)
+
+Origin: 2026-05-29 operator request "be self-improving and not digressing/regressing." The agent MUST end every completed activity with one of:
+
+- **(a) Improvement identified + applied in-place**: add the rule/test/check that would have caught the issue. Land it in the SAME commit chain.
+- **(b) Improvement identified + scheduled**: open a follow-up in `docs/strategy/SELF_AUDIT_<date>.md` with the gap + owner + target date.
+- **(c) No improvement identified**: state this explicitly with one-line justification ("ran a green test; rule already exists").
+
+Every audit prompt (Stage 3a-c) MUST end with: "What did this run reveal that the rule set / test set / pipeline does not currently cover? Was the gap closed in-place, scheduled, or accepted?" Every gate failure analysis MUST update the gate definition with the lesson learned. Every operator-surfaced bug MUST trigger a "why didn't a gate catch this?" walk and produce at least one new rule, test, or audit step in the same commit chain that fixes the bug.
+
+This is the discipline that prevents the agent from repeating the same class of mistake. Without it, every fix is local; with it, the rule set self-densifies over time. **Refusing to add a self-improvement step because "the fix is small" or "we already have a rule that covers this loosely" is FORBIDDEN** - the loose rule did not prevent the bug, so the rule needs to be tightened or operationalized.
+
+### R8. Standing audit prompt: `visualRegressionDiagnosis` (Stage 5.3a)
+
+When Stage 5.3 produces ANY Playwright FAIL, a `visualRegressionDiagnosis` prompt MUST run before any deploy proceeds. The prompt walks: (a) list every failed test, (b) for each, open and describe the diff PNG, (c) classify intended vs unintended, (d) if intended, generate the CHANGELOG entry + regenerate baselines + commit; if unintended, fail the deploy and route to bug-fix flow. This is the structural fix for R3 - without an audit prompt forcing the discipline, the agent can still dismiss a real bug as "expected drift" (which is exactly what happened on 2026-05-29).
+
 ## Dev Deployment Pipeline Rule (CRITICAL)
 
 Whenever the operator asks to "deploy to dev", "prepare for prod", "run full validation", "test on the latest deployment", "do the full pipeline", or any equivalent phrase, the agent MUST:

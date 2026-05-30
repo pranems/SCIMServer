@@ -13,14 +13,16 @@ describe('TruncatedText primitive', () => {
     expect(screen.getByTestId('t1')).toHaveTextContent(long);
   });
 
-  it('applies CSS ellipsis + nowrap so the cell does not blow out the column', () => {
-    renderWithFluent(<TruncatedText text="some-long-thing" data-testid="t2" />);
-    const el = screen.getByTestId('t2');
-    const style = window.getComputedStyle(el);
-    expect(style.overflow).toBe('hidden');
-    expect(style.textOverflow).toBe('ellipsis');
-    expect(style.whiteSpace).toBe('nowrap');
-  });
+  // R2 (copilot-instructions.md "Visual Layout + Self-Improvement
+  // Discipline"): vitest runs in JSDOM, which does not compute
+  // layout. Asserting CSS property values like
+  // `textOverflow === 'ellipsis'` is a false-positive farm - the
+  // assertion passes even when the property is inert (e.g. when the
+  // parent display defaults to `inline`, which is exactly the
+  // 2026-05-29 truncation-distortion bug that Finding-D exposed).
+  // Layout outcome assertions (boundingRect, scrollWidth) live in
+  // web/e2e/copy-and-truncate.spec.ts, which runs in a real browser
+  // where they can actually be measured.
 
   it('respects the maxWidth prop when set (operator can pin a cell width)', () => {
     renderWithFluent(<TruncatedText text="x" maxWidth={240} data-testid="t3" />);

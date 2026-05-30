@@ -26,10 +26,17 @@ import { Tooltip, makeStyles, tokens, mergeClasses } from '@fluentui/react-compo
 
 const useStyles = makeStyles({
   root: {
+    // R4 (copilot-instructions.md): truncation primitives MUST self-contain
+    // their display context. `<span>` defaults to `display:inline`, which
+    // makes overflow/text-overflow no-ops; without this line the ellipsis
+    // never fires regardless of the other 3 properties.
+    display: 'inline-block',
+    maxWidth: '100%',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     minWidth: 0,
+    verticalAlign: 'bottom',
   },
   monospace: {
     fontFamily: 'Consolas, "Courier New", monospace',

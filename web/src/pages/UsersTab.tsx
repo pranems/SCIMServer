@@ -17,6 +17,7 @@
 import React from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Text,
   Badge,
@@ -47,6 +48,11 @@ const useStyles = makeStyles({
   table: {
     width: '100%',
     borderCollapse: 'collapse',
+    // R5 (copilot-instructions.md): tables with truncating cells MUST
+    // use `table-layout:fixed` so column widths follow our explicit
+    // <th> widths instead of auto-expanding to natural text width
+    // (which defeats the inner TruncatedText max-width).
+    tableLayout: 'fixed',
   },
   th: {
     textAlign: 'left',
@@ -56,10 +62,18 @@ const useStyles = makeStyles({
     fontSize: '13px',
     color: tokens.colorNeutralForeground3,
   },
+  thUsername: { width: '320px' },
+  thDisplayName: { width: '240px' },
+  thStatus: { width: '110px' },
+  thCreated: { width: '130px' },
   td: {
     padding: '10px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     fontSize: '13px',
+    // Belt + braces: tableLayout:fixed already bounds columns, but
+    // overflow:hidden on the cell guarantees no inner descendant can
+    // visually overflow its column.
+    overflow: 'hidden',
   },
   tr: {
     ':hover': {
@@ -188,10 +202,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
       <table className={classes.table}>
         <thead>
           <tr>
-            <th className={classes.th}>Username</th>
-            <th className={classes.th}>Display Name</th>
-            <th className={classes.th}>Status</th>
-            <th className={classes.th}>Created</th>
+            <th className={mergeClasses(classes.th, classes.thUsername)}>Username</th>
+            <th className={mergeClasses(classes.th, classes.thDisplayName)}>Display Name</th>
+            <th className={mergeClasses(classes.th, classes.thStatus)}>Status</th>
+            <th className={mergeClasses(classes.th, classes.thCreated)}>Created</th>
           </tr>
         </thead>
         <tbody>

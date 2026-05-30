@@ -50,122 +50,159 @@ test.beforeEach(async ({ page, context }) => {
 });
 
 /**
- * Opens the first endpoint card and lands on /endpoints/$id.
- * Returns the resolved endpointId, or skips the test when the tenant
- * is empty.
+ * Discovers an endpoint with a long (>= 40 char) userName via the
+ * SCIM API (much faster than walking the UI 25x), then navigates
+ * directly to its Users tab. Returns the chosen endpointId + the
+ * first long-userName user-row testid + the full userName.
+ *
+ * Skips the spec when:
+ *   - the tenant has zero endpoints, OR
+ *   - none of the first N endpoints carry users with userName >= 40
+ *     chars (the truncation bug is not exercisable on this deployment
+ *     and R1 cannot legitimately fire).
+ *
+ * The earlier UI-walking version stopped at "first endpoint with any
+ * users" - which on dev landed on Sagar-ISV with short test1234567@...
+ * names, causing the test to PASS even when truncation was broken.
+ * Walking the cards sequentially also took 30s+ per empty endpoint
+ * and frequently hit navigate timeouts. Going through the API directly
+ * keeps the test deterministic and fast.
  */
-async function openFirstEndpoint(page: Page): Promise<string> {
+async function openEndpointWithLongUserName(
+  page: Page,
+): Promise<{ endpointId: string; userId: string; fullValue: string }> {
+  const token = process.env.E2E_TOKEN || 'changeme-scim';
+
+  // Navigate to the app first so subsequent page.evaluate() fetch
+  // calls run with a real origin (relative URLs work, and CORS is a
+  // non-issue since we hit our own backend).
   await page.goto('/endpoints');
   await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
 
-  const cards = page.locator('[data-testid^="endpoint-"]').filter({
-    hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-  });
+  // Step 1: list all endpoints via admin API. Bearer = SCIM shared secret.
+  const epList = await page.evaluate(
+    async (token: string) => {
+      const r = await fetch('/scim/admin/endpoints', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error(`endpoints list failed: ${r.status} ${await r.text()}`);
+      const data = await r.json();
+      return (data.endpoints ?? []) as Array<{ id: string; name: string }>;
+    },
+    token,
+  );
+  test.skip(epList.length === 0, 'Tenant has zero endpoints; cannot exercise P1 primitives.');
 
-  const count = await cards.count();
-  test.skip(count === 0, 'Tenant has zero endpoints; cannot exercise P1 primitives.');
+  // Step 2: probe each endpoint's first 5 users for a long userName.
+  // Typical dev/prod tenant has 1-2 endpoints with Entra-shaped users;
+  // checking 25 covers low-density tenants too.
+  const target = await page.evaluate(
+    async ({ token, endpoints }: { token: string; endpoints: Array<{ id: string; name: string }> }) => {
+      for (const ep of endpoints.slice(0, 25)) {
+        try {
+          const r = await fetch(`/scim/endpoints/${ep.id}/Users?count=5`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!r.ok) continue;
+          const data = await r.json();
+          for (const user of data.Resources ?? []) {
+            if (typeof user.userName === 'string' && user.userName.length >= 40) {
+              return { endpointId: ep.id, userId: user.id, userName: user.userName as string };
+            }
+          }
+        } catch {
+          // try next endpoint
+        }
+      }
+      return null;
+    },
+    { token, endpoints: epList },
+  );
 
-  const first = cards.first();
-  const cardTestId = await first.getAttribute('data-testid');
-  const endpointId = (cardTestId ?? '').replace(/^endpoint-/, '');
-  expect(endpointId).not.toBe('');
+  test.skip(
+    target === null,
+    'No endpoint among the first 25 has a userName >= 40 chars; ' +
+      'cannot exercise P1 truncation. Add an endpoint with Entra-shaped userNames to dev.',
+  );
 
-  await first.click();
+  // Step 3: navigate directly to the target endpoint's Users tab.
+  await page.goto(`/endpoints/${target!.endpointId}/users`);
   await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
-  return endpointId;
-}
+  await expect(page.getByTestId('users-tab')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId(`user-row-${target!.userId}`)).toBeVisible({ timeout: 20_000 });
 
-/**
- * Navigates to the Users tab of the endpoint and returns the first
- * user-row testid attribute (e.g. `user-row-<uuid>`). Skips the test
- * when the endpoint has zero users.
- */
-async function openFirstUserRow(page: Page): Promise<string> {
-  const usersTab = page.getByRole('tab', { name: /^Users$/i });
-  await usersTab.click();
-
-  // Wait for either the populated users table OR the empty-state
-  // testid - we tolerate either, and skip on empty.
-  const tableOrEmpty = await Promise.race([
-    page
-      .getByTestId('users-tab')
-      .waitFor({ timeout: 20_000 })
-      .then(() => 'populated'),
-    page
-      .getByTestId('users-empty')
-      .waitFor({ timeout: 20_000 })
-      .then(() => 'empty'),
-  ]).catch(() => 'unknown');
-
-  test.skip(tableOrEmpty !== 'populated', 'Endpoint has zero users; cannot exercise P1 user-row primitives.');
-
-  const rows = page.locator('[data-testid^="user-row-"]');
-  const rowCount = await rows.count();
-  test.skip(rowCount === 0, 'Users table rendered without rows.');
-
-  const firstRow = rows.first();
-  const rowTestId = await firstRow.getAttribute('data-testid');
-  expect(rowTestId).toMatch(/^user-row-/);
-  return rowTestId as string;
+  return { endpointId: target!.endpointId, userId: target!.userId, fullValue: target!.userName };
 }
 
 test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
-  test('userName cell truncates with CSS ellipsis (no horizontal overflow distortion)', async ({ page }) => {
-    await openFirstEndpoint(page);
-    const rowTestId = await openFirstUserRow(page);
-    const userId = rowTestId.replace(/^user-row-/, '');
-
-    const usernameCell = page.getByTestId(`user-username-${userId}`);
-    await expect(usernameCell).toBeVisible();
-
-    // The CopyableField wraps the visible value in a span whose
-    // computed style MUST clip overflow. We assert the three CSS
-    // properties that together produce the ellipsis effect.
-    const overflowStyles = await usernameCell.evaluate((el) => {
-      // The displayed text lives in a nested TruncatedText span when
-      // truncate=true; walk the descendant tree to find it.
-      const textSpan = el.querySelector('span[class*="root"]') ?? el;
-      const cs = window.getComputedStyle(textSpan as Element);
-      return {
-        overflow: cs.overflow,
-        textOverflow: cs.textOverflow,
-        whiteSpace: cs.whiteSpace,
-      };
-    });
-
-    expect(overflowStyles.whiteSpace).toBe('nowrap');
-    expect(overflowStyles.textOverflow).toBe('ellipsis');
-    // overflow can be 'hidden' or 'clip' depending on browser; both
-    // satisfy the no-distortion guarantee.
-    expect(['hidden', 'clip']).toContain(overflowStyles.overflow);
-  });
-
-  test('copy button writes the full userName to the clipboard', async ({ page }) => {
-    await openFirstEndpoint(page);
-    const rowTestId = await openFirstUserRow(page);
-    const userId = rowTestId.replace(/^user-row-/, '');
+  test('userName cell ACTUALLY truncates (bounded width + visible text shorter than full value)', async ({ page }) => {
+    const { userId, fullValue } = await openEndpointWithLongUserName(page);
 
     const usernameCell = page.getByTestId(`user-username-${userId}`);
     const copyButton = page.getByTestId(`user-username-${userId}-copy-button`);
-
+    await expect(usernameCell).toBeVisible();
     await expect(copyButton).toBeVisible();
 
-    // Capture what the cell displays (this is the value the
-    // CopyableField was given via its `value` prop).
-    const expectedValue = (await usernameCell.innerText()).trim();
-    expect(expectedValue.length).toBeGreaterThan(0);
+    // R1 (copilot-instructions.md "Visual Layout Discipline"): assert
+    // RENDERED layout outcomes, not just computed CSS. A `<span>` with
+    // text-overflow:ellipsis but default display:inline silently no-ops
+    // - the styles ARE applied (so getComputedStyle passes) but the
+    // user sees the full text expanded. The only assertions that catch
+    // this class of bug measure real bounds in a real browser.
+
+    // Full value was already captured by the helper; reconfirm it
+    // matches what the copy button currently advertises.
+    const copyAriaLabel = (await copyButton.getAttribute('aria-label')) ?? '';
+    const recheckedFull = copyAriaLabel.startsWith('Copy ')
+      ? copyAriaLabel.slice('Copy '.length)
+      : copyAriaLabel;
+    expect(recheckedFull).toBe(fullValue);
+    expect(fullValue.length).toBeGreaterThanOrEqual(40);
+
+    // Outer cell rect - the CopyableField root (inline-flex with
+    // max-width:100%). When the inner TruncatedText fails to clip, the
+    // cell expands to fit the unbounded content, so the bug is visible
+    // as an oversized rect.
+    const cellRect = await usernameCell.boundingBox();
+    expect(cellRect, 'cell must render with a bounding box').not.toBeNull();
+    const cellWidth = cellRect?.width ?? 0;
+
+    // The cell's effective container is the <td> which has the column
+    // share of the table width. The TruncatedText maxWidth is 280px;
+    // total cell adds icon + gap so cap is 280 + 24 (icon) + 4 (gap)
+    // + ~12 (cell padding) = ~320px. Allow 340 to absorb rendering
+    // subpixel rounding + browser zoom variance.
+    expect(
+      cellWidth,
+      `username cell width ${cellWidth}px exceeds 340px cap on a "${fullValue}" (${fullValue.length} chars). ` +
+        `This means R4 (TruncatedText display:inline-block) and/or R5 (table-layout:fixed) are not in effect.`,
+    ).toBeLessThanOrEqual(340);
+
+    // Long-value sub-assertion: rendered text MUST be shorter than
+    // the full value (because ellipsis fired and truncated some
+    // chars). The helper guarantees fullValue.length >= 40 so this
+    // assertion always fires.
+    const renderedText = (await usernameCell.innerText()).trim();
+    expect(
+      renderedText.length,
+      `for full value "${fullValue}" (${fullValue.length} chars), rendered text should be shorter; ` +
+        `got "${renderedText}" (${renderedText.length} chars). Ellipsis is not firing.`,
+    ).toBeLessThan(fullValue.length);
+  });
+
+  test('copy button writes the full userName to the clipboard', async ({ page }) => {
+    const { userId, fullValue } = await openEndpointWithLongUserName(page);
+
+    const copyButton = page.getByTestId(`user-username-${userId}-copy-button`);
+    await expect(copyButton).toBeVisible();
 
     await copyButton.click();
-
-    // Read what the click placed on the clipboard.
     const clipboardValue = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardValue).toBe(expectedValue);
+    expect(clipboardValue).toBe(fullValue);
   });
 
   test('clicking the copy button does NOT open the row detail drawer', async ({ page }) => {
-    await openFirstEndpoint(page);
-    const rowTestId = await openFirstUserRow(page);
-    const userId = rowTestId.replace(/^user-row-/, '');
+    const { userId } = await openEndpointWithLongUserName(page);
 
     const copyButton = page.getByTestId(`user-username-${userId}-copy-button`);
     const drawer = page.getByTestId('resource-detail-drawer');
