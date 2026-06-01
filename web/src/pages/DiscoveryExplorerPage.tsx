@@ -59,7 +59,7 @@ import {
   type ScimResourceType,
   type ScimServiceProviderConfig,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import {
   compareSchemas,
@@ -359,15 +359,12 @@ export const DiscoveryExplorerPage: React.FC = () => {
 
       {/* Action toolbar */}
       <div className={classes.toolbar}>
-        <Button
+        <CopyJsonButton
+          value={activePayload}
+          label="Copy as JSON"
           appearance="secondary"
-          icon={<Copy16Regular />}
-          onClick={() => void handleCopyJson()}
-          disabled={!primaryId}
           data-testid="discovery-copy-json"
-        >
-          {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy as JSON'}
-        </Button>
+        />
         <Button
           appearance="secondary"
           icon={<Copy16Regular />}

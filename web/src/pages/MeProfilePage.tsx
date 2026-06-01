@@ -39,7 +39,7 @@ import {
 import { Person24Regular, Delete24Regular } from '@fluentui/react-icons';
 import { useEndpoints, useMe, usePatchMe, useDeleteMe } from '../api/queries';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, EditableField } from '../components/primitives';
 import { FormDialog } from '../components/primitives/FormDialog';
 import { ScimApiError } from '../api/scim-error';
 
@@ -248,13 +248,12 @@ export const MeProfilePage: React.FC = () => {
               )}
             </div>
 
-            <Field label="Display name">
-              <Input
-                value={displayName}
-                onChange={(_e, d) => setDisplayName(d.value)}
-                data-testid="me-displayname-input"
-              />
-            </Field>
+            <EditableField
+              label="Display name"
+              value={displayName}
+              onChange={setDisplayName}
+              data-testid="me-displayname"
+            />
 
             <Field label="Active">
               <Switch

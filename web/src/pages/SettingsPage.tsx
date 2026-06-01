@@ -25,7 +25,7 @@ import {
 } from '@fluentui/react-components';
 import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
-import { LoadingSkeleton } from '../components/primitives';
+import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { resetOnboarding } from '../hooks/useOnboarding';
 
@@ -87,20 +87,42 @@ export const SettingsPage: React.FC = () => {
 
       <div className={classes.grid}>
         <Card className={classes.card}>
-          <Subtitle2>Server Info</Subtitle2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Subtitle2>Server Info</Subtitle2>
+            {version && (
+              <CopyJsonButton
+                value={version}
+                label="Copy server info as JSON"
+                data-testid="settings-version-copy-json"
+              />
+            )}
+          </div>
           {version && (
             <>
               <div className={classes.row}>
                 <Text>Version</Text>
-                <Text weight="semibold">{version.version}</Text>
+                <CopyableField
+                  value={version.version}
+                  monospace
+                  data-testid="settings-version-value"
+                  ariaLabel={`Copy version ${version.version}`}
+                />
               </div>
               <div className={classes.row}>
                 <Text>Node.js</Text>
-                <Caption1>{version.runtime?.node}</Caption1>
+                <CopyableField
+                  value={version.runtime?.node ?? '-'}
+                  monospace
+                  data-testid="settings-node-value"
+                />
               </div>
               <div className={classes.row}>
                 <Text>Platform</Text>
-                <Caption1>{version.runtime?.platform} / {version.runtime?.arch}</Caption1>
+                <CopyableField
+                  value={`${version.runtime?.platform ?? '?'} / ${version.runtime?.arch ?? '?'}`}
+                  monospace
+                  data-testid="settings-platform-value"
+                />
               </div>
               <div className={classes.row}>
                 <Text>Uptime</Text>

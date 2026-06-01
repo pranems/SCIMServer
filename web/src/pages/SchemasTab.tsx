@@ -30,14 +30,13 @@ import {
   DocumentBulletList24Regular,
   ChevronRight20Regular,
   ChevronDown20Regular,
-  Copy16Regular,
 } from '@fluentui/react-icons';
 import {
   useEndpointSchemas,
   type ScimAttributeCharacteristic,
   type ScimSchemaResource,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../components/primitives';
 
 const useStyles = makeStyles({
   root: {
@@ -166,25 +165,9 @@ export const SchemasTab: React.FC<SchemasTabProps> = ({ endpointId }) => {
 const SchemaRow: React.FC<{ schema: ScimSchemaResource }> = ({ schema }) => {
   const classes = useStyles();
   const [expanded, setExpanded] = React.useState(false);
-  const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'error'>('idle');
 
   const attrCount = schema.attributes.length;
   const countLabel = attrCount === 1 ? '1 attribute' : `${attrCount} attributes`;
-
-  const onCopy = async (): Promise<void> => {
-    try {
-      // navigator.clipboard.writeText is unavailable in some legacy
-      // browsers and in jsdom by default; the test stubs it via
-      // Object.defineProperty, and at runtime the admin tool is
-      // chrome/edge-only so the path is reliable in production.
-      await navigator.clipboard.writeText(schema.id);
-      setCopyState('copied');
-      setTimeout(() => setCopyState('idle'), 1500);
-    } catch {
-      setCopyState('error');
-      setTimeout(() => setCopyState('idle'), 1500);
-    }
-  };
 
   return (
     <Card
@@ -203,19 +186,24 @@ const SchemaRow: React.FC<{ schema: ScimSchemaResource }> = ({ schema }) => {
         <div className={classes.schemaTitle}>
           <span style={{ fontWeight: 600 }}>{schema.name ?? schema.id}</span>
           <div className={classes.urnRow}>
-            <span className={classes.urn}>{schema.id}</span>
+            <CopyableField
+              value={schema.id}
+              monospace
+              truncate
+              maxWidth="380px"
+              data-testid={`schema-urn-${schema.id}`}
+              ariaLabel="Copy schema URN"
+              className={classes.urn}
+            />
             <Caption1 className={classes.attrCount}>· {countLabel}</Caption1>
           </div>
         </div>
-        <Button
+        <CopyJsonButton
+          value={schema}
+          label="Copy schema as JSON"
+          data-testid={`schema-copy-json-${schema.id}`}
           appearance="secondary"
-          icon={<Copy16Regular />}
-          onClick={() => { void onCopy(); }}
-          aria-label="Copy schema URN"
-          data-testid={`schema-copy-${schema.id}`}
-        >
-          {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy URN'}
-        </Button>
+        />
       </div>
       {expanded && (
         <div className={classes.attrList}>

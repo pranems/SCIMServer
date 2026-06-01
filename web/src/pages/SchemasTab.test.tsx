@@ -199,7 +199,7 @@ describe('SchemasTab', () => {
     ).toBeInTheDocument();
   });
 
-  it('exposes a copy-URN button per schema', () => {
+  it('exposes a copy-URN button + a copy-schema-as-JSON button per schema', () => {
     (useEndpointSchemas as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockSchemas,
       isLoading: false,
@@ -214,11 +214,24 @@ describe('SchemasTab', () => {
     });
 
     renderWithProviders(<SchemasTab endpointId="ep-1" />);
-    const copyBtn = screen.getByTestId(
-      'schema-copy-urn:ietf:params:scim:schemas:core:2.0:User',
+    // Phase Q1 primitive sweep (2026-05-29): URN copy now comes from
+    // CopyableField, whole-schema copy comes from CopyJsonButton.
+    const urnCopyBtn = screen.getByTestId(
+      'schema-urn-urn:ietf:params:scim:schemas:core:2.0:User-copy-button',
     );
-    fireEvent.click(copyBtn);
+    fireEvent.click(urnCopyBtn);
     expect(writeText).toHaveBeenCalledWith('urn:ietf:params:scim:schemas:core:2.0:User');
+
+    writeText.mockClear();
+    const jsonCopyBtn = screen.getByTestId(
+      'schema-copy-json-urn:ietf:params:scim:schemas:core:2.0:User',
+    );
+    fireEvent.click(jsonCopyBtn);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    // Whole-schema payload includes id + name + attributes array.
+    const payload = JSON.parse(writeText.mock.calls[0][0] as string);
+    expect(payload.id).toBe('urn:ietf:params:scim:schemas:core:2.0:User');
+    expect(Array.isArray(payload.attributes)).toBe(true);
   });
 
   it('shows EmptyState when schema discovery is disabled (404 / zero schemas)', () => {
