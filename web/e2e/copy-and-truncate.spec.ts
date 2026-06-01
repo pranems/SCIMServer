@@ -329,4 +329,53 @@ test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
       }
     }
   });
+
+  // Finding-D #3 (2026-05-29): operator screenshot showed the entire
+  // drawer scrolled horizontally - long monospace tokens (Entra
+  // userNames embedded in JSON values) pushed the body past the
+  // drawer width, clipping content off the LEFT edge ("formatted"
+  // became "tted", IDs disappeared, the title scrolled). R1 says
+  // measure bounds, not CSS; this test asserts the canonical
+  // "no horizontal overflow" invariant: drawer body scrollWidth
+  // must equal clientWidth (no horizontal scroll possible).
+  test('user detail drawer body MUST NOT overflow horizontally regardless of content length', async ({ page }) => {
+    const { endpointId, userId, fullValue } = await openEndpointWithLongUserName(page);
+    await page.goto(`/endpoints/${endpointId}/users?detail=${userId}`);
+    const drawer = page.getByTestId('resource-detail-drawer');
+    await expect(drawer).toBeVisible({ timeout: 30_000 });
+    const body = page.getByTestId('resource-detail-drawer-body');
+    await expect(body).toBeVisible();
+
+    const overflow = await body.evaluate((el: HTMLElement) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(
+      overflow.scrollWidth,
+      `drawer body scrollWidth (${overflow.scrollWidth}px) exceeds clientWidth ` +
+        `(${overflow.clientWidth}px) on a ${fullValue.length}-char userName. ` +
+        `That means content is hidden off the left/right edge of the drawer ` +
+        `and the operator cannot see it. Add wordBreak:break-all + overflowX:hidden ` +
+        `to the offending container.`,
+    ).toBeLessThanOrEqual(overflow.clientWidth + 1);
+
+    // Belt-and-braces: also verify every attr-* JSON row's pre block
+    // is itself width-bounded (no inner horizontal scroll either).
+    const innerOverflow = await body.evaluate((el: HTMLElement) => {
+      const pres = Array.from(el.querySelectorAll('pre'));
+      return pres.map((p) => ({
+        scrollWidth: p.scrollWidth,
+        clientWidth: p.clientWidth,
+        text: (p.textContent ?? '').slice(0, 40),
+      }));
+    });
+    for (const r of innerOverflow) {
+      expect(
+        r.scrollWidth,
+        `JSON <pre> block "${r.text}..." scrollWidth=${r.scrollWidth} > clientWidth=${r.clientWidth}; ` +
+          `long unbreakable tokens (URLs/URNs) are pushing it past its container. ` +
+          `Add wordBreak:break-all + overflowWrap:anywhere.`,
+      ).toBeLessThanOrEqual(r.clientWidth + 1);
+    }
+  });
 });

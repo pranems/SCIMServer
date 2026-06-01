@@ -30,6 +30,15 @@ const useStyles = makeStyles({
   body: {
     paddingTop: '8px',
     paddingBottom: '8px',
+    // CRITICAL (Finding-D #3, 2026-05-29): the drawer width is fixed
+    // by the caller. Without these guards a single oversized child
+    // (long monospace token, wide table) pushes the entire drawer
+    // body horizontally, hiding content off the left edge. minWidth:0
+    // is the canonical flex-child shrink fix; overflowX:hidden makes
+    // it explicit. Vertical scroll stays - it is the intended axis.
+    minWidth: 0,
+    maxWidth: '100%',
+    overflowX: 'hidden',
   },
   footer: {
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,

@@ -66,6 +66,15 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
+    // CRITICAL (Finding-D #3, 2026-05-29): the drawer is fixed-width
+    // (520px - 640px). Long monospace tokens (SCIM userNames, JSON
+    // values with long URLs) MUST be constrained so they do not push
+    // the body wider than the drawer. Without these two lines the
+    // whole drawer scrolls horizontally and content disappears off
+    // the left edge (operator screenshot 2026-05-29).
+    minWidth: 0,
+    maxWidth: '100%',
+    overflowX: 'hidden',
   },
   metaRow: {
     display: 'flex',
@@ -73,6 +82,11 @@ const useStyles = makeStyles({
     alignItems: 'center',
     padding: '4px 0',
     gap: '12px',
+    // Same anti-overflow guard as `body`. CopyableField's truncate
+    // handles the value, but the row container itself must not let
+    // a child's natural width push past the drawer.
+    minWidth: 0,
+    maxWidth: '100%',
   },
   metaLabel: { color: tokens.colorNeutralForeground3 },
   monospace: { fontFamily: 'monospace', fontSize: '12px' },
@@ -109,8 +123,18 @@ const useStyles = makeStyles({
     padding: '6px 8px',
     borderRadius: tokens.borderRadiusSmall,
     margin: 0,
+    // CRITICAL (Finding-D #3): SCIM payloads carry long unbreakable
+    // tokens (Entra userNames, URN URIs) inside JSON values. With
+    // `whiteSpace: pre-wrap` alone the browser refuses to break
+    // mid-token, so a single email value can push the <pre> past
+    // the drawer width. wordBreak + overflowWrap force breaking at
+    // any character, which keeps the JSON inside the drawer.
     whiteSpace: 'pre-wrap',
-    overflowX: 'auto',
+    wordBreak: 'break-all',
+    overflowWrap: 'anywhere',
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     maxHeight: '200px',
     overflowY: 'auto',
   },
@@ -365,7 +389,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       open={open}
       onClose={onClose}
       title={title}
-      width="520px"
+      width="640px"
       footer={footer}
       data-testid="resource-detail-drawer"
     >
@@ -378,7 +402,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
             value={resource.id}
             monospace
             truncate
-            maxWidth="360px"
+            maxWidth="320px"
             data-testid="resource-detail-id"
           />
         </div>
@@ -387,6 +411,8 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           <CopyableField
             value={resource.meta?.created ?? '-'}
             monospace
+            truncate
+            maxWidth="320px"
             data-testid="resource-detail-created"
           />
         </div>
@@ -395,6 +421,8 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           <CopyableField
             value={resource.meta?.lastModified ?? '-'}
             monospace
+            truncate
+            maxWidth="320px"
             data-testid="resource-detail-lastmodified"
           />
         </div>
