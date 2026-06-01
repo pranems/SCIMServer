@@ -44,8 +44,8 @@ Same result - interactive prompts for all configuration. If run from within a cl
 
 ```powershell
 .\scripts\deploy-azure.ps1 `
-  -ResourceGroup "scimserver-rg" `
-  -AppName "scimserver-prod" `
+  -ResourceGroup "scimserver-prod" `
+  -AppName "scimserver" `
   -Location "eastus" `
   -ScimSecret "your-secure-secret"
 ```
@@ -105,30 +105,47 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 
 When the production instance has active users, deploy a **separate dev resource group** for development. This gives full blast-radius isolation - the production deployment is never touched during development.
 
-### Architecture
+### Architecture (CURRENT - 2026-05-29)
 
 ```
-scimserver-rg           ← PROD (users) - do not touch
-├── VNet, subnets
-├── Container Apps Env + Log Analytics
-├── PostgreSQL Flexible Server (scimdb)
-└── Container App: scimserver2 (ghcr.io/pranems/scimserver:0.38.0)
+scimserver-prod         <- PROD (users) - do not touch
+|-- VNet, subnets
+|-- Container Apps Env + Log Analytics
+|-- PostgreSQL Flexible Server (scimserver-pg-new2)
+`-- Container App: scimserver (acrscimserver20622.azurecr.io/scimserver:<sha>)
+    FQDN: scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io
 
-scimserver-rg-dev       ← DEV (your iteration) - fully isolated
-├── VNet, subnets
-├── Container Apps Env + Log Analytics
-├── PostgreSQL Flexible Server (scimdb)
-└── Container App: scimserver-dev (ghcr.io/pranems/scimserver:dev)
+scimserver-dev          <- DEV (your iteration) - fully isolated
+|-- VNet, subnets (shares scimserver-env Container Apps Environment across RGs)
+|-- PostgreSQL Flexible Server (scimserver-pg-dev-new2)
+`-- Container App: scimserver-dev (acrscimserver20622.azurecr.io/scimserver:<sha>)
+    FQDN: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+```
+
+Both apps also accept `ghcr.io/pranems/scimserver:<sha>` and `ghcr.io/pranems/scimserver:latest` (public anonymous-pull image, identical bits, used by the public bootstrap path).
+
+### Architecture (HISTORICAL)
+
+These deployments are retired but their FQDNs may appear in older PR descriptions, commit messages, or external docs. They are NOT live:
+
+```
+scimserver-rg           [RETIRED 2026-05-19 tenant cutover]
+`-- Container App: scimserver2 (ghcr.io/pranems/scimserver:0.38.0)
+    Was: scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io
+
+scimserver-rg-dev       [RETIRED 2026-05-19]
+`-- Container App: scimserver-dev
+    Was: scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io
 ```
 
 ### Deploy Dev Environment
 
 ```powershell
 # One-time: provision the full dev environment (~5 min, ~$15-25/mo)
-.\scripts\deploy-dev.ps1 -ProdResourceGroup "scimserver-rg"
+.\scripts\deploy-dev.ps1 -ProdResourceGroup "scimserver-prod"
 
 # Optional: deploy a specific image tag
-.\scripts\deploy-dev.ps1 -ProdResourceGroup "scimserver-rg" -ImageTag "dev"
+.\scripts\deploy-dev.ps1 -ProdResourceGroup "scimserver-prod" -ImageTag "dev"
 ```
 
 ### Daily Dev Workflow
@@ -147,18 +164,19 @@ scimserver-rg-dev       ← DEV (your iteration) - fully isolated
 ### Promote to Production
 
 ```powershell
-# Promote the tested dev image tag to prod (rolling update, zero downtime)
-.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-rg" -DevResourceGroup "scimserver-rg-dev"
+# Promote the tested dev image tag to prod (rolling update, zero downtime).
+# CURRENT prod target: -ProdResourceGroup scimserver-prod -ProdAppName scimserver
+.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-prod" -ProdAppName "scimserver" -DevResourceGroup "scimserver-dev"
 
 # Or promote a specific version directly
-.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-rg" -ImageTag "0.38.0"
+.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-prod" -ProdAppName "scimserver" -ImageTag "0.52.3"
 ```
 
 ### Tear Down Dev (Optional)
 
 ```powershell
 # Delete the entire dev resource group when no longer needed
-az group delete --name scimserver-rg-dev --yes --no-wait
+az group delete --name scimserver-dev --yes --no-wait
 ```
 
 ### Dev/Prod Scripts Summary
@@ -383,7 +401,7 @@ iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/up
   Update-SCIMServer -Version v0.31.0
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:latest
+az containerapp update -n scimserver -g scimserver-prod --image ghcr.io/pranems/scimserver:latest
 ```
 
 ---

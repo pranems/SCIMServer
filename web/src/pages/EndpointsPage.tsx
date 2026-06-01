@@ -34,7 +34,7 @@ import {
 import { useEndpoints } from '../api/queries';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import type { EndpointsSearch } from '../routes/search-schemas';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
 
 const ENDPOINTS_ROUTE_PATH = '/endpoints' as const;
 
@@ -183,7 +183,14 @@ export const EndpointsPage: React.FC = () => {
               }
             />
             <div className={classes.cardBody}>
-              <Caption1 style={{ fontFamily: 'monospace' }}>{ep.scimBasePath}</Caption1>
+              <CopyableField
+                value={ep.scimBasePath}
+                monospace
+                truncate
+                maxWidth="100%"
+                data-testid={`endpoint-${ep.id}-scim-base-path`}
+                ariaLabel={`Copy SCIM base path ${ep.scimBasePath}`}
+              />
             </div>
           </Card>
         ))}

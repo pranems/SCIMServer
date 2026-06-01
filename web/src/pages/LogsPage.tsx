@@ -45,7 +45,7 @@ import {
 } from '../api/queries';
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
 import { TIME_RANGE_VALUES } from '../routes/search-schemas';
-import { DetailDrawer, EmptyState, LoadingSkeleton } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton } from '../components/primitives';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -129,6 +129,12 @@ const useStyles = makeStyles({
     textTransform: 'uppercase',
     fontSize: '11px',
     letterSpacing: '0.5px',
+  },
+  drawerSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
   },
   pre: {
     backgroundColor: tokens.colorNeutralBackground3,
@@ -415,7 +421,13 @@ export const LogsPage: React.FC = () => {
                   </Badge>
                 </td>
                 <td className={classes.td}>
-                  <Caption1 style={{ fontFamily: 'monospace' }}>{log.url}</Caption1>
+                  <CopyableField
+                    value={log.url}
+                    truncate
+                    monospace
+                    maxWidth="500px"
+                    data-testid={`log-row-url-${log.id}`}
+                  />
                 </td>
                 <td className={classes.td}>
                   <Badge appearance="outline" color={statusColor(log.status)}>
@@ -468,6 +480,17 @@ export const LogsPage: React.FC = () => {
         {detailQuery.data && (
           <>
             <div className={classes.drawerSection}>
+              <Caption1 className={classes.drawerSectionTitle}>URL</Caption1>
+              <CopyableField
+                value={detailQuery.data.url ?? ''}
+                truncate
+                monospace
+                maxWidth="100%"
+                data-testid="log-detail-url"
+              />
+            </div>
+
+            <div className={classes.drawerSection}>
               <Caption1 className={classes.drawerSectionTitle}>Status</Caption1>
               <Badge appearance="filled" color={statusColor(detailQuery.data.status)}>
                 {detailQuery.data.status ?? '-'}
@@ -480,31 +503,35 @@ export const LogsPage: React.FC = () => {
             </div>
 
             <div className={classes.drawerSection}>
-              <Caption1 className={classes.drawerSectionTitle}>Request headers</Caption1>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.requestHeaders ?? {}, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.requestHeaders ?? {}}
+                label="Request headers"
+                data-testid="log-detail-request-headers"
+              />
             </div>
 
             <div className={classes.drawerSection}>
-              <Caption1 className={classes.drawerSectionTitle}>Request body</Caption1>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.requestBody ?? null, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.requestBody ?? null}
+                label="Request body"
+                data-testid="log-detail-request-body"
+              />
             </div>
 
             <div className={classes.drawerSection}>
-              <Caption1 className={classes.drawerSectionTitle}>Response headers</Caption1>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.responseHeaders ?? {}, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.responseHeaders ?? {}}
+                label="Response headers"
+                data-testid="log-detail-response-headers"
+              />
             </div>
 
             <div className={classes.drawerSection}>
-              <Caption1 className={classes.drawerSectionTitle}>Response body</Caption1>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.responseBody ?? null, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.responseBody ?? null}
+                label="Response body"
+                data-testid="log-detail-response-body"
+              />
             </div>
 
             {detailQuery.data.errorMessage && (

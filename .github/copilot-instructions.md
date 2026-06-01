@@ -163,6 +163,121 @@ NEVER hardcode an expected characteristic value (e.g. `expect(attr.uniqueness).t
 
 **Tightening allowance:** Per RFC 7643 §7 a server MAY enforce uniqueness/mutability stricter than what it advertises (e.g. advertise `uniqueness:none` while enforcing `server`). Tests that verify "the server publishes a valid keyword and the runtime enforcement is consistent" must use `expectCharacteristicIn(attr, key, VALID_<KEYWORD>)`, not a single-value `toBe()`.
 
+## Always Add Playwright Coverage Rule (CRITICAL)
+
+Whenever the agent observes a UI behavior - including a bug, a new feature, a fix, a regression, a workaround, a flow change, or any user-visible delta - it MUST add or update a Playwright spec under `web/e2e/` that exercises that behavior end-to-end through the browser **before** the work is considered complete. This rule applies to:
+
+- New routes, pages, tabs, drawers, modals, dialogs
+- New buttons, links, form fields, validation messages
+- New error states, empty states, loading states, retry behaviors
+- New keyboard shortcuts, command palette commands, accessibility flows
+- Fixed bugs (spec MUST reproduce the bug as a regression test)
+- Behavioral changes to existing flows (update the existing spec)
+- Combination flows (multi-step user journeys spanning >= 2 pages)
+
+The spec MUST be runnable via `npx playwright test --reporter=line` against all three deployment form factors: local dev server (`http://localhost:4000`), local Docker compose (`http://localhost:8080`), and Azure dev (`E2E_BASE_URL=https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). A change that ships without its Playwright spec is incomplete. The Stage 5.3 + 5.4 gates fail when any new web/ behavior in the diff lacks Playwright coverage.
+
+## Visual Layout + Self-Improvement Discipline (CRITICAL - added 2026-05-29 after Finding-D)
+
+Origin: 2026-05-29 P1 follow-up deploy. The `<span>`-based `TruncatedText` primitive applied `text-overflow:ellipsis + overflow:hidden + white-space:nowrap` but never set `display:inline-block`, so the CSS was inert and userNames rendered at full width on dev. Four separate gates (vitest layout assertions, Playwright `getComputedStyle` check, visual-regression PNG diff, operator's first manual look) all failed to flag it. The operator caught it after dev deploy by eye. The following rules are the standing fix for this whole class of "CSS applied but layout not achieved" failure.
+
+### R1. Visual-layout assertions MUST measure bounds, not CSS properties
+
+Any Playwright spec exercising truncation / overflow / ellipsis / masking / sticky positioning / responsive width / clipping MUST assert at least one of:
+
+- `el.scrollWidth > el.clientWidth` (content overflowed → ellipsis/clip actually fired). **This is the most reliable signal across browsers.** Measure the inner truncation primitive (the `<span>` with `text-overflow:ellipsis`), NOT the outer `<td>`/`<div>` wrapper (which usually has `overflow:hidden` and would never report overflow).
+- `el.clientWidth <= <expected-max-width-px>` (element is actually bounded)
+- `el.getBoundingClientRect().width <= <expected>` (rendered width is bounded)
+
+Asserting only `getComputedStyle(el).textOverflow === 'ellipsis'` or `whiteSpace === 'nowrap'` is FORBIDDEN as the sole assertion. Those checks verify CSS was applied, not that layout happened. They will green-light a bug where the property is set but the element's `display` value prevents it from taking effect.
+
+**`locator.innerText()` and `node.textContent` are NOT valid signals for ellipsis activation.** They return the full underlying DOM text regardless of CSS clipping. The 2026-05-29 Finding-D follow-up spec hit this exact trap: even after the fix was live and ellipsis was rendering visibly, `innerText().length === fullValue.length` because innerText serialises the un-clipped source string. Use `scrollWidth > clientWidth` instead.
+
+### R2. Vitest tests MUST NOT assert visual-layout outcomes
+
+JSDOM (vitest's DOM) does not compute layout. `getBoundingClientRect()` returns `{0,0,0,0}`, `scrollWidth === clientWidth` always, `offsetWidth === 0`. Any vitest assertion about truncation, overflow, viewport fit, scrollbar presence, sticky behavior, or column width is a false-positive farm. Move those assertions to Playwright. Vitest assertions are reserved for: rendered DOM structure (`getByTestId`), text content, props/events/callbacks, and ARIA semantics. Layout is Playwright-only.
+
+### R3. A visual-regression FAIL is a BLOCKER until the diff PNG is inspected
+
+When Stage 5.3 reports a visual-regression diff, the agent MUST:
+
+1. Open the `*-diff.png` (or describe inability to open it) for every failing test.
+2. State explicitly in chat AND in the commit message: "intended visual change because <X>" or "unintended regression - investigating."
+3. Only AFTER a written "intended" classification may the agent regenerate baselines.
+4. Regenerating baselines without inspecting the diff is FORBIDDEN.
+
+Default response to a visual-regression FAIL is "investigate," NOT "regenerate." The 4-fail / 113-pass result on the 2026-05-29 dev run was dismissed as "expected P1 drift"; one of those 4 was the actual bug the gate was trying to flag. This rule prevents the recurrence.
+
+### R4. Truncation primitives MUST self-contain their display context
+
+A primitive that depends on a specific parent layout context to function (e.g., `display:flex` parent + `min-width:0` + sized column) is fragile and will silently fail in raw `<td>`, `<span>`, or `<div>` contexts. Truncation primitives MUST set their own `display:inline-block` (or `block` for full-width variants) so the CSS contract holds regardless of parent. The same applies to: focus rings (own `position:relative`), sticky elements (own `position:sticky` + `top`), z-index layers (own stacking context), and transforms (own `will-change` hints).
+
+### R5. Tables with truncating cells MUST use `table-layout: fixed` + explicit column widths
+
+`table-layout: auto` (the browser default) sizes columns to the natural width of their content. This defeats any `max-width` on inner cell content - the column itself expands. Any `<table>` containing a `<CopyableField truncate>` or `<TruncatedText>` MUST either:
+
+- Set `table-layout: fixed` on the `<table>` AND give each `<th>` an explicit width, OR
+- Set `max-width` directly on each affected `<td>` (less robust; only works if the column is narrow enough that contents would overflow anyway).
+
+### R6. UI commits MUST receive explicit operator visual verification before "ready for prod"
+
+The agent may not declare a UI commit "validated on dev" or "ready for prod" based on automated gates alone. The agent MUST request and receive an explicit operator statement of the form "I have visually verified <surface> on dev URL <X>; the change looks correct." Until that operator statement arrives, the agent's status is "awaiting visual verification," not "validated." This is the only gate that catches the "CSS applied but layout not achieved" class of bug, because every synthetic gate can be defeated by writing the wrong assertion (R1) or by trusting a misleading green (R3).
+
+### R7. Self-improvement step in every activity (commit / prompt / gate / pipeline run)
+
+Origin: 2026-05-29 operator request "be self-improving and not digressing/regressing." The agent MUST end every completed activity with one of:
+
+- **(a) Improvement identified + applied in-place**: add the rule/test/check that would have caught the issue. Land it in the SAME commit chain.
+- **(b) Improvement identified + scheduled**: open a follow-up in `docs/strategy/SELF_AUDIT_<date>.md` with the gap + owner + target date.
+- **(c) No improvement identified**: state this explicitly with one-line justification ("ran a green test; rule already exists").
+
+Every audit prompt (Stage 3a-c) MUST end with: "What did this run reveal that the rule set / test set / pipeline does not currently cover? Was the gap closed in-place, scheduled, or accepted?" Every gate failure analysis MUST update the gate definition with the lesson learned. Every operator-surfaced bug MUST trigger a "why didn't a gate catch this?" walk and produce at least one new rule, test, or audit step in the same commit chain that fixes the bug.
+
+This is the discipline that prevents the agent from repeating the same class of mistake. Without it, every fix is local; with it, the rule set self-densifies over time. **Refusing to add a self-improvement step because "the fix is small" or "we already have a rule that covers this loosely" is FORBIDDEN** - the loose rule did not prevent the bug, so the rule needs to be tightened or operationalized.
+
+### R8. Standing audit prompt: `visualRegressionDiagnosis` (Stage 5.3a)
+
+When Stage 5.3 produces ANY Playwright FAIL, a `visualRegressionDiagnosis` prompt MUST run before any deploy proceeds. The prompt walks: (a) list every failed test, (b) for each, open and describe the diff PNG, (c) classify intended vs unintended, (d) if intended, generate the CHANGELOG entry + regenerate baselines + commit; if unintended, fail the deploy and route to bug-fix flow. This is the structural fix for R3 - without an audit prompt forcing the discipline, the agent can still dismiss a real bug as "expected drift" (which is exactly what happened on 2026-05-29).
+
+### R9. Copy-everywhere primitive discipline (Phase Q, added 2026-05-29)
+
+Origin: 2026-05-29 operator request "make sure in all sections subsections screens tabs subtabs that the copy button is present for all the test display fields and boxes for display and output and input, for input also have undo redo and other useful buttons also have copy as json buttons at all possible places." The complete UI was inconsistent: some surfaces had hand-rolled copy buttons (each with their own state machine), some had raw `<pre>{JSON.stringify(...)}</pre>` blocks with NO copy affordance, some had bare `<Input>`s with no undo/copy/reset. The fix is the primitive trio + standing rule below.
+
+**R9.1. Three primitives, one source of truth.** Every "make this thing copyable" pattern in the app MUST go through one of:
+
+- **`CopyableField`** ([web/src/components/primitives/CopyableField.tsx](web/src/components/primitives/CopyableField.tsx)) - inline display of a single string value paired with a copy button. Use for IDs, URNs, paths, timestamps, scalar attribute values, any monospace single-line text the operator might paste elsewhere.
+- **`CopyableJsonBlock`** ([web/src/components/primitives/CopyableJsonBlock.tsx](web/src/components/primitives/CopyableJsonBlock.tsx)) - read-only pretty-printed JSON viewer with built-in header copy button. Use INSTEAD OF hand-rolled `<pre>{JSON.stringify(x, null, 2)}</pre>` patterns. Enforces R5 overflow safety so long unbreakable tokens cannot push the pre past its container. Drawer / detail / response / preview / result blocks all use this.
+- **`CopyJsonButton`** ([web/src/components/primitives/CopyJsonButton.tsx](web/src/components/primitives/CopyJsonButton.tsx)) - section-level "copy this whole thing as JSON" button. Use in section headers (drawer "Copy full resource", schema row "Copy schema as JSON", bulk envelope "Copy full envelope", workbench response "Copy as JSON") and for any structured payload the operator wants to grab without the JSON block being visible.
+
+**R9.2. Every editable input MUST use `EditableField`.** [web/src/components/primitives/EditableField.tsx](web/src/components/primitives/EditableField.tsx) wraps Fluent `<Input>` / `<Textarea>` with 4 first-class affordances every editable field should carry: copy, undo, redo, reset-to-original. Native browser Ctrl+Z only covers one keystroke session and silently fails on paste / programmatic reset / focus-loss-and-return. EditableField makes all 4 discoverable + keyboard-reachable + clipboard-friendly.
+
+**R9.3. Forbidden patterns.** New code MUST NOT:
+- Render `<pre>{JSON.stringify(x, null, 2)}</pre>` directly. Use `CopyableJsonBlock` so the copy button + R5 overflow safety come for free.
+- Hand-roll a local `useState<'idle' | 'copied' | 'error'>('idle')` + `navigator.clipboard.writeText(...)` + `setTimeout` cycle. All copy state goes through `useCopyToClipboard` (via the 4 primitives). This guarantees uniform UX and prevents stale-state bugs.
+- Render a bare `<Input value={x} onChange={...} />` for a SCIM scalar that the operator might want to copy / undo / reset. Use `EditableField`.
+
+**R9.4. Test ID pattern.** All 4 primitives accept `data-testid`; their buttons derive predictably:
+- `CopyableField`: `<id>` (root) + `<id>-copy-button`
+- `CopyJsonButton`: `<id>` (the button itself)
+- `CopyableJsonBlock`: `<id>` (root) + `<id>-copy-button` + `<id>-pre`
+- `EditableField`: `<id>` (root) + `<id>-input` + `<id>-copy-button` + `<id>-undo-button` + `<id>-redo-button` + `<id>-reset-button`
+
+Specs assert presence by testid, never by text label, so future label tweaks do not break specs.
+
+**R9.5. New-surface checklist.** When authoring a new page / tab / drawer / dialog / popup / detail panel, the PR MUST surface every display value, every editable input, every JSON payload through one of the 4 primitives. The `addMissingTests` prompt + `codeReviewSelfAudit` prompt both check for raw `<pre>` blocks + bare `<Input>` usages and flag them as R9 violations.
+
+## Dev Deployment Pipeline Rule (CRITICAL)
+
+Whenever the operator asks to "deploy to dev", "prepare for prod", "run full validation", "test on the latest deployment", "do the full pipeline", or any equivalent phrase, the agent MUST:
+
+1. Run `pwsh -NoProfile -File scripts/dev-deployment-pipeline.ps1` (full mode, no `-Skip*` flags), OR walk every numbered stage in [.github/prompts/devDeploymentPipeline.prompt.md](.github/prompts/devDeploymentPipeline.prompt.md) manually with a per-stage PASS / FAIL / SKIPPED-with-reason row in a report file under `test-results/dev-deploy-<timestamp>.md`.
+2. NEVER claim "validation complete" or "dev is green" without an explicit per-gate result. Aggregated phrases ("all tests passed") are insufficient.
+3. NEVER skip Stage 5.3 (Playwright vs dev) because "Playwright is slow". The earliest such miss (v0.52.3 dev-deploy run, 2026-05-29) is exactly why this rule exists.
+4. NEVER defer Stage 1.6 (size-limit) failures as "pre-existing baseline". Either fix the config or fix the bundle. The v0.52.3 run treated a real failure as deferrable, then the operator surfaced it.
+5. NEVER promote to prod without an explicit `promote to prod` confirmation message from the operator.
+
+References: [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1) - orchestrator. [.github/prompts/devDeploymentPipeline.prompt.md](.github/prompts/devDeploymentPipeline.prompt.md) - authoritative gate walk. Both are kept in lockstep with this section.
+
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 
 Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:
@@ -170,6 +285,7 @@ Every feature or significant change commit MUST include ALL of the following bef
 1. **Unit Tests** - Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
 2. **E2E Tests** - End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
 3. **Live Integration Tests** - New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` (Docker)
+3a. **Playwright Spec** (when the change touches `web/src/`) - End-to-end browser spec under `web/e2e/*.spec.ts` exercising the new/changed UI surface, runnable against local dev (`http://localhost:4000`), Docker compose (`http://localhost:8080`), AND Azure dev (`https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). For a bug fix, the spec MUST reproduce the bug as a regression test before the fix lands. See "Always Add Playwright Coverage Rule" above.
 4. **Feature Documentation** - Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
 5. **INDEX.md Update** - Add the new feature doc reference to `docs/INDEX.md`
 6. **CHANGELOG.md Update** - Version bump entry with full test counts and feature summary
@@ -230,7 +346,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 4.1. **`fullValidationPipeline` prompt** - End-to-end local build + Docker build + container smoke. Must pass cleanly before any deployment.
 4.2. **Docker compose live tests** - `docker compose up -d api`, then `pwsh scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). Confirms the Prisma backend behaves identically to the inmemory mode AND identical to dev.
 4.3. **Local node live tests** - `node api/dist/main.js` (inmemory backend, port 6000), then `pwsh scripts/live-test.ps1` -> all current-baseline tests pass. Confirms inmemory parity. **A live-test failure on local that passes on Docker/dev is a parity bug; fix it at the source (usually `api/src/infrastructure/repositories/inmemory/` or in the service-layer `isInMemoryBackend` branch), don't suppress.**
-4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). **This is the sub-phase gate the commit message names.**
+4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 1,027 assertions). **This is the sub-phase gate the commit message names.**
 
 ### Stage 5 - UI-Specific Gates (when the change touches `web/`)
 5.1. **`uiTestAndValidation` prompt** - Full React/vitest test suite + a11y + visual regression sanity check.
@@ -261,7 +377,7 @@ X.2. **`securityBestPracticesIntake` prompt** - Sibling to X.1, scoped exclusive
 | Incident-driven | After ANY bug/security-incident escapes Stages 1-5 to live/dev | focused on the escape path | Auto-captures Finding-B / Finding-C / supply-chain class events |
 
 **Hard constraints (apply to both X.1 and X.2):**
-- External claims require URL citations (no URL = "speculative — verify before action").
+- External claims require URL citations (no URL = "speculative - verify before action").
 - Confidence levels required (`Critical` / `High` / `Medium` / `Speculative` for X.2; `High` / `Medium` / `Speculative` for X.1).
 - Owner action required on every finding.
 - New prompt recommendations require >=2 escape-pattern matches (single-escape patterns go into an EXISTING prompt as a new check).
@@ -307,11 +423,41 @@ When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to 
 - **NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
 - Prod promotion requires Stage 4.4 (dev live tests) green on the exact image SHA being promoted, not the "latest" tag.
 
-### Deployment Topology
-| Environment | App Name | OAuth Secret | FQDN |
-|-------------|----------|-------------|------|
-| Dev | `scimserver-dev` (scimserver-rg-dev) | `changeme-oauth` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` |
-| Prod | `scimserver2` (scimserver-rg) | `changeme-oauth` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` |
+### Deployment Topology (CURRENT - corrected 2026-05-29 post-promote)
+
+There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update incorrectly marked calmsand as RETIRED; it is in fact the customer-facing prod and was just promoted to v0.52.3 alongside the proudbush instance.
+
+| Environment | App Name | Resource Group | Subscription | OAuth Secret | SCIM Shared Secret (E2E_TOKEN) | FQDN | Container Registry |
+|---|---|---|---|---|---|---|---|
+| **Prod (CUSTOMER-FACING)** | `scimserver-prod` | `scimserver-rg-prod` | `AnandSa-Test-150` | `changeme-oauth` | `changeme-scim` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | `ghcr.io/pranems/scimserver` (anonymous pull) |
+| **Prod (parallel, eastus)** | `scimserver` | `scimserver-prod` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+| **Dev** | `scimserver-dev` | `scimserver-dev` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+
+**Customer-facing prod (calmsand, centralus, AnandSa-Test-150 sub):**
+- App `scimserver-prod` / RG `scimserver-rg-prod` / FQDN `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io`
+- Running real workloads (Ryan-Gruss, Ryan-Eakins, OpenText-* ISVs, 2,000+ users)
+- Uses GHCR image pulls (anonymous; public path)
+- Multiple revision mode with `latestRevision: True, weight: 100` (auto-routes to newest)
+- Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version>` (requires `az account set --subscription AnandSa-Test-150` first)
+
+**Parallel prod (proudbush, eastus, ProvIAM_Subscription):**
+- App `scimserver` / RG `scimserver-prod` (different from calmsand's `scimserver-rg-prod`) / FQDN `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io`
+- Uses ACR image (`acrscimserver20622.azurecr.io/scimserver:<sha>`) with Managed Identity pull; lower cold-start latency
+- Same SCIM contract surface; both are kept in lockstep version-wise
+- Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <version>` (in `ProvIAM_Subscription`)
+
+**Important when promoting prod:** if the operator says "promote to prod" without naming which one, ask which one (or promote BOTH). Both deserve the same image. Single-prod promotion leaves the other on a stale version - that's exactly the v0.52.3 mistake of 2026-05-29 (proudbush got v0.52.3 first; calmsand left on v0.52.2 until the operator surfaced the discrepancy via screenshot).
+
+### Deployment Topology (HISTORICAL - retired)
+
+These deployments are retired and not live. Any tooling, doc, or script reference to these FQDNs / app names / RGs should be treated as historical context, not a deployment target.
+
+| Era | App Name | Resource Group | FQDN | Status |
+|---|---|---|---|---|
+| Tenant-migration era (pre-2026-05-19) | `scimserver2` | `scimserver-rg` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | RETIRED (mgmt-plane expired during 2026-05-19 cross-tenant migration; data-plane was read-only during the migration window) |
+| Pre-tenant-migration dev | `scimserver-dev` | `scimserver-rg-dev` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | RETIRED (same tenant-migration cutover) |
+
+**Image registry note:** the runtime registry for the parallel proudbush prod + dev is Azure Container Registry (`acrscimserver20622.azurecr.io`); the customer-facing calmsand prod pulls from GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)

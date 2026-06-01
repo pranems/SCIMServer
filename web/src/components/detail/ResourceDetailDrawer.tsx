@@ -28,8 +28,6 @@ import React from 'react';
 import {
   makeStyles,
   tokens,
-  Field,
-  Input,
   Switch,
   Button,
   Caption1,
@@ -45,6 +43,10 @@ import { DetailDrawer } from '../primitives/DetailDrawer';
 import { ScimErrorMessage } from '../primitives/ScimErrorMessage';
 import { EtagBadge } from '../primitives/EtagBadge';
 import { ConflictDialog } from '../primitives/ConflictDialog';
+import { CopyableField } from '../primitives/CopyableField';
+import { EditableField } from '../primitives/EditableField';
+import { CopyableJsonBlock } from '../primitives/CopyableJsonBlock';
+import { CopyJsonButton } from '../primitives/CopyJsonButton';
 import {
   formatIfMatchValue,
   parseResourceEtag,
@@ -65,6 +67,15 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
+    // CRITICAL (Finding-D #3, 2026-05-29): the drawer is fixed-width
+    // (520px - 640px). Long monospace tokens (SCIM userNames, JSON
+    // values with long URLs) MUST be constrained so they do not push
+    // the body wider than the drawer. Without these two lines the
+    // whole drawer scrolls horizontally and content disappears off
+    // the left edge (operator screenshot 2026-05-29).
+    minWidth: 0,
+    maxWidth: '100%',
+    overflowX: 'hidden',
   },
   metaRow: {
     display: 'flex',
@@ -72,6 +83,11 @@ const useStyles = makeStyles({
     alignItems: 'center',
     padding: '4px 0',
     gap: '12px',
+    // Same anti-overflow guard as `body`. CopyableField's truncate
+    // handles the value, but the row container itself must not let
+    // a child's natural width push past the drawer.
+    minWidth: 0,
+    maxWidth: '100%',
   },
   metaLabel: { color: tokens.colorNeutralForeground3 },
   monospace: { fontFamily: 'monospace', fontSize: '12px' },
@@ -80,6 +96,55 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: '4px',
+  },
+  sectionHeaderRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  attrRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    padding: '4px 0',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  attrLabel: {
+    color: tokens.colorNeutralForeground3,
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '12px',
+    wordBreak: 'break-all',
+  },
+  attrValueScalar: {
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground1,
+    wordBreak: 'break-all',
+  },
+  attrValueJson: {
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground1,
+    backgroundColor: tokens.colorNeutralBackground2,
+    padding: '6px 8px',
+    borderRadius: tokens.borderRadiusSmall,
+    margin: 0,
+    // CRITICAL (Finding-D #3): SCIM payloads carry long unbreakable
+    // tokens (Entra userNames, URN URIs) inside JSON values. With
+    // `whiteSpace: pre-wrap` alone the browser refuses to break
+    // mid-token, so a single email value can push the <pre> past
+    // the drawer width. wordBreak + overflowWrap force breaking at
+    // any character, which keeps the JSON inside the drawer.
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-all',
+    overflowWrap: 'anywhere',
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    maxHeight: '200px',
+    overflowY: 'auto',
   },
   confirmBlock: {
     border: `1px solid ${tokens.colorPaletteRedBorder1}`,
@@ -131,6 +196,40 @@ function buildOperations(
     path,
     value,
   }));
+}
+
+// ─── Helper: enumerate non-editable extra attributes ────────────────
+// Finding-D follow-up (2026-05-29): operator caught that the drawer
+// rendered only the 3 editable scalars even when the SCIM resource
+// carried name.*, emails[], externalId, and enterprise-extension
+// fields. The drawer is the canonical "what does this resource look
+// like" surface, so EVERY non-meta, non-id, non-schemas, non-editable
+// attribute MUST surface read-only. We keep the editable form as-is.
+
+const ALWAYS_HIDDEN_KEYS = new Set(['schemas', 'id', 'meta']);
+const USER_EDITABLE_KEYS = new Set(['userName', 'displayName', 'active']);
+const GROUP_EDITABLE_KEYS = new Set(['displayName', 'externalId', 'members']);
+
+function getReadOnlyAttributes(
+  kind: ResourceKind,
+  resource: ScimResource,
+): Array<{ key: string; value: unknown }> {
+  const editable = kind === 'user' ? USER_EDITABLE_KEYS : GROUP_EDITABLE_KEYS;
+  return Object.entries(resource)
+    .filter(([k, v]) => {
+      if (ALWAYS_HIDDEN_KEYS.has(k)) return false;
+      if (editable.has(k)) return false;
+      // Skip null / undefined / empty arrays so we do not clutter the
+      // drawer with rows that say "[]".
+      if (v === null || v === undefined) return false;
+      if (Array.isArray(v) && v.length === 0) return false;
+      return true;
+    })
+    .map(([key, value]) => ({ key, value }));
+}
+
+function isScalar(v: unknown): v is string | number | boolean {
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -298,24 +397,42 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       open={open}
       onClose={onClose}
       title={title}
-      width="520px"
+      width="640px"
       footer={footer}
       data-testid="resource-detail-drawer"
     >
       <div className={classes.body}>
-        {/* ── Read-only metadata card ──────────────────────────── */}
+        {/* -- Read-only metadata card -- */}
         <Caption1>Identity</Caption1>
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>id</Caption1>
-          <Caption1 className={classes.monospace}>{resource.id}</Caption1>
+          <CopyableField
+            value={resource.id}
+            monospace
+            truncate
+            maxWidth="320px"
+            data-testid="resource-detail-id"
+          />
         </div>
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>Created</Caption1>
-          <Caption1>{resource.meta?.created ?? '-'}</Caption1>
+          <CopyableField
+            value={resource.meta?.created ?? '-'}
+            monospace
+            truncate
+            maxWidth="320px"
+            data-testid="resource-detail-created"
+          />
         </div>
         <div className={classes.metaRow}>
           <Caption1 className={classes.metaLabel}>Last modified</Caption1>
-          <Caption1>{resource.meta?.lastModified ?? '-'}</Caption1>
+          <CopyableField
+            value={resource.meta?.lastModified ?? '-'}
+            monospace
+            truncate
+            maxWidth="320px"
+            data-testid="resource-detail-lastmodified"
+          />
         </div>
         {/* K5 - ETag badge in the metadata card. Renders nothing
             when the server never sent meta.version. */}
@@ -329,12 +446,18 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
 
         {kind === 'user' ? (
           <>
-            <Field label="userName">
-              <Input value={userName} onChange={(_, d) => setUserName(d.value)} />
-            </Field>
-            <Field label="displayName">
-              <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} />
-            </Field>
+            <EditableField
+              label="userName"
+              value={userName}
+              onChange={setUserName}
+              data-testid="drawer-username"
+            />
+            <EditableField
+              label="displayName"
+              value={displayName}
+              onChange={setDisplayName}
+              data-testid="drawer-displayname"
+            />
             <div className={classes.switchRow}>
               <Text>active</Text>
               <Switch
@@ -346,18 +469,72 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           </>
         ) : (
           <>
-            <Field label="displayName">
-              <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} />
-            </Field>
-            <Field label="externalId">
-              <Input value={externalId} onChange={(_, d) => setExternalId(d.value)} />
-            </Field>
+            <EditableField
+              label="displayName"
+              value={displayName}
+              onChange={setDisplayName}
+              data-testid="drawer-displayname"
+            />
+            <EditableField
+              label="externalId"
+              value={externalId}
+              onChange={setExternalId}
+              data-testid="drawer-externalid"
+            />
             <div className={classes.metaRow}>
               <Caption1 className={classes.metaLabel}>Membership</Caption1>
               <Badge appearance="outline">{resource.members?.length ?? 0} members</Badge>
             </div>
           </>
         )}
+
+        {/* Finding-D follow-up: read-only "Additional attributes"
+            section surfaces every non-editable non-meta field the
+            SCIM resource carries (name.*, emails[], externalId for
+            users, enterprise extension URN, custom extensions, etc.).
+            Scalars render inline; objects/arrays render as pretty
+            JSON in a scrollable monospace block so deep structures
+            (enterprise extension, multi-valued emails/phones) stay
+            readable without truncating data. */}
+        {(() => {
+          const extras = getReadOnlyAttributes(kind, resource);
+          if (extras.length === 0) return null;
+          return (
+            <>
+              <div className={classes.sectionHeaderRow}>
+                <Subtitle2>Additional attributes</Subtitle2>
+                <CopyJsonButton
+                  value={resource}
+                  label="Copy full resource as JSON"
+                  data-testid="drawer-copy-full-resource"
+                />
+              </div>
+              {extras.map(({ key, value }) => (
+                <div key={key} className={classes.attrRow} data-testid={`attr-${key}`}>
+                  {isScalar(value) ? (
+                    <>
+                      <span className={classes.attrLabel}>{key}</span>
+                      <CopyableField
+                        value={String(value)}
+                        monospace
+                        truncate
+                        maxWidth="100%"
+                        data-testid={`attr-${key}-value`}
+                      />
+                    </>
+                  ) : (
+                    <CopyableJsonBlock
+                      value={value}
+                      label={key}
+                      maxHeight="240px"
+                      data-testid={`attr-${key}-json`}
+                    />
+                  )}
+                </div>
+              ))}
+            </>
+          );
+        })()}
 
         {error !== null && error !== undefined ? (
           <ScimErrorMessage error={error} data-testid="drawer-error" />

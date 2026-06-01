@@ -154,7 +154,10 @@ describe('DashboardController', () => {
 
       expect(result.health.status).toBe('ok');
       expect(result.health.uptime).toBeGreaterThan(0);
-      expect(result.health.dbType).toBe('postgresql');
+      // Mirror the controller's own derivation so this test is parity-safe
+      // across PERSISTENCE_BACKEND=prisma (default) and =inmemory runs.
+      const expectedDbType = process.env.PERSISTENCE_BACKEND === 'inmemory' ? 'inmemory' : 'postgresql';
+      expect(result.health.dbType).toBe(expectedDbType);
     });
 
     it('should return global stats from StatsProjectionService (0 DB queries)', async () => {

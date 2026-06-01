@@ -153,4 +153,15 @@ describe('EndpointDetailPage', () => {
     renderDetail();
     expect(await screen.findByText(/\/scim\/endpoints\/ep-1\/v2/)).toBeInTheDocument();
   });
+
+  // ─── Phase P1 - SCIM base path is copyable ──────────────────────────
+  it('Phase P1 - SCIM base path exposes a CopyableField with copy button', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
+    });
+
+    renderDetail();
+    await screen.findByTestId('endpoint-detail-page');
+    expect(screen.getByTestId('endpoint-scim-base-path-copy-button')).toBeInTheDocument();
+  });
 });

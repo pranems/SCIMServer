@@ -34,6 +34,7 @@ import {
 } from '@fluentui/react-components';
 import { ChevronDown16Regular, ChevronRight16Regular } from '@fluentui/react-icons';
 import { parseScimError } from '../../api/scim-error';
+import { CopyableField } from './CopyableField';
 
 const useStyles = makeStyles({
   root: {
@@ -51,6 +52,21 @@ const useStyles = makeStyles({
     fontSize: '12px',
     fontFamily: 'monospace',
     wordBreak: 'break-word',
+  },
+  inlineRow: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    minWidth: 0,
+  },
+  preRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  preToolbar: {
+    display: 'flex',
+    justifyContent: 'flex-end',
   },
   linkRow: {
     fontSize: '12px',
@@ -114,13 +130,31 @@ export const ScimErrorMessage: React.FC<ScimErrorMessageProps> = ({
         <div className={classes.body}>
           <span>{catalogEntry.explanation}</span>
           {detail && detail !== catalogEntry.explanation ? (
-            <span className={classes.detail} data-testid="scim-error-detail">
-              {detail}
+            <span className={classes.inlineRow}>
+              <span className={classes.detail} data-testid="scim-error-detail">
+                {detail}
+              </span>
+              <CopyableField
+                value=""
+                copyValue={detail}
+                buttonOnly
+                ariaLabel="Copy error detail"
+                data-testid="scim-error-detail-action"
+              />
             </span>
           ) : null}
           {requestId ? (
-            <span className={classes.requestId} data-testid="scim-error-request-id">
-              Request id: {requestId}
+            <span className={classes.inlineRow}>
+              <span className={classes.requestId} data-testid="scim-error-request-id">
+                Request id: {requestId}
+              </span>
+              <CopyableField
+                value=""
+                copyValue={requestId}
+                buttonOnly
+                ariaLabel="Copy request id"
+                data-testid="scim-error-request-id-action"
+              />
             </span>
           ) : null}
           {catalogEntry.docsUrl ? (
@@ -150,9 +184,20 @@ export const ScimErrorMessage: React.FC<ScimErrorMessageProps> = ({
             </div>
           ) : null}
           {showRaw && hasRawBody ? (
-            <pre className={classes.pre} data-testid="scim-error-raw-json">
-              {prettyJson(rawBody)}
-            </pre>
+            <div className={classes.preRow}>
+              <div className={classes.preToolbar}>
+                <CopyableField
+                  value=""
+                  copyValue={prettyJson(rawBody)}
+                  buttonOnly
+                  ariaLabel="Copy raw error body"
+                  data-testid="scim-error-raw-json-action"
+                />
+              </div>
+              <pre className={classes.pre} data-testid="scim-error-raw-json">
+                {prettyJson(rawBody)}
+              </pre>
+            </div>
           ) : null}
         </div>
       </MessageBarBody>

@@ -11,6 +11,7 @@
 import React from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Text,
   Badge,
@@ -22,7 +23,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
-import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
@@ -30,9 +31,12 @@ const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' },
   th: { textAlign: 'left', padding: '10px 12px', borderBottom: `2px solid ${tokens.colorNeutralStroke1}`, fontWeight: 600, fontSize: '13px', color: tokens.colorNeutralForeground3 },
-  td: { padding: '10px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: '13px' },
+  thDisplayName: { width: '320px' },
+  thMembers: { width: '140px' },
+  thCreated: { width: '160px' },
+  td: { padding: '10px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: '13px', overflow: 'hidden' },
   tr: { ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   center: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' },
   empty: { textAlign: 'center' as const, padding: '32px', color: tokens.colorNeutralForeground3 },
@@ -134,9 +138,9 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
       <table className={classes.table}>
         <thead>
           <tr>
-            <th className={classes.th}>Display Name</th>
-            <th className={classes.th}>Members</th>
-            <th className={classes.th}>Created</th>
+            <th className={mergeClasses(classes.th, classes.thDisplayName)}>Display Name</th>
+            <th className={mergeClasses(classes.th, classes.thMembers)}>Members</th>
+            <th className={mergeClasses(classes.th, classes.thCreated)}>Created</th>
           </tr>
         </thead>
         <tbody>
@@ -149,7 +153,12 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
               data-testid={`group-row-${group.id}`}
             >
               <td className={classes.td}>
-                <Text weight="semibold">{group.displayName}</Text>
+                <CopyableField
+                  value={group.displayName}
+                  truncate
+                  maxWidth="320px"
+                  data-testid={`group-displayname-${group.id}`}
+                />
               </td>
               <td className={classes.td}>
                 <Badge appearance="outline">{group.members?.length ?? 0}</Badge>

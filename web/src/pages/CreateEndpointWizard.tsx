@@ -53,7 +53,7 @@ import {
   usePresetDetail,
   type CreateEndpointBody,
 } from '../api/queries';
-import { LoadingSkeleton, EmptyState } from '../components/primitives';
+import { LoadingSkeleton, EmptyState, CopyJsonButton } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 
 const useStyles = makeStyles({
@@ -384,6 +384,14 @@ const PresetPreview: React.FC<{ detail: { profile: Record<string, unknown> } }> 
 
   return (
     <div data-testid="wizard-preset-preview" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <CopyJsonButton
+          value={profile}
+          label="Copy preset profile as JSON"
+          data-testid="wizard-preset-copy-json"
+          appearance="secondary"
+        />
+      </div>
       <Card>
         <Subtitle2>Schemas ({schemas.length} schemas)</Subtitle2>
         <ul>

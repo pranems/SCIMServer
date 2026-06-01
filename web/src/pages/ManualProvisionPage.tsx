@@ -41,7 +41,7 @@ import {
 } from '@fluentui/react-components';
 import { Add24Regular, Person24Regular, People24Regular } from '@fluentui/react-icons';
 import { useEndpoints, useCreateUser, useCreateGroup } from '../api/queries';
-import { LoadingSkeleton, ScimErrorMessage } from '../components/primitives';
+import { LoadingSkeleton, ScimErrorMessage, CopyableField, CopyableJsonBlock } from '../components/primitives';
 
 // ─── Styles ───────────────────────────────────────────────────────────
 
@@ -252,11 +252,20 @@ const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
       <MessageBar intent="success">
         <MessageBarBody>
           <MessageBarTitle>Created</MessageBarTitle>
-          Resource id: <Text weight="semibold">{id}</Text>
+          <span>Resource id: </span>
+          <CopyableField
+            value={id}
+            monospace
+            data-testid="provision-result-id"
+            ariaLabel={`Copy resource id ${id}`}
+          />
         </MessageBarBody>
       </MessageBar>
-      <Caption1>Server response</Caption1>
-      <pre className={classes.pre}>{JSON.stringify(result.resource, null, 2)}</pre>
+      <CopyableJsonBlock
+        value={result.resource}
+        label="Server response"
+        data-testid="provision-result-json"
+      />
     </Card>
   );
 };

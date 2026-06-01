@@ -35,7 +35,7 @@ import {
   ArrowReset24Regular,
 } from '@fluentui/react-icons';
 import { useEndpointActivity, type ActivitySummaryItem } from '../api/queries';
-import { EmptyState, ExportSplitButton, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyJsonButton } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 import {
   ACTIVITY_TYPE_VALUES,
@@ -331,6 +331,13 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate }) => {
         {entry.icon} {entry.message}
       </span>
       <Caption1 className={classes.details}>{entry.details}</Caption1>
+      <CopyJsonButton
+        value={entry}
+        label="Copy"
+        iconOnly
+        ariaLabel="Copy this activity entry as JSON"
+        data-testid={`activity-row-${entry.id}-copy-json`}
+      />
     </div>
   );
 };

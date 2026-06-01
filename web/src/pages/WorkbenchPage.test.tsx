@@ -174,7 +174,7 @@ describe('WorkbenchPage (Phase M1)', () => {
     expect(screen.getByTestId('workbench-response-status')).toHaveTextContent('200');
     expect(screen.getByTestId('workbench-response-duration')).toHaveTextContent('42');
     // Body shown as pretty-printed JSON.
-    const body = screen.getByTestId('workbench-response-body');
+    const body = screen.getByTestId('workbench-response-body-pre');
     expect(body.textContent).toContain('"ok"');
   });
 
@@ -267,5 +267,42 @@ describe('WorkbenchPage (Phase M1)', () => {
     const body = screen.getByTestId('workbench-body') as HTMLTextAreaElement;
     expect(body.value).toContain('"userName"');
     expect(body.value).toContain('"pre@x.com"');
+  });
+
+  // ─── Phase P1 - CopyableField primitives in response + history ────
+  describe('Phase P1 - CopyableField primitives', () => {
+    it('renders copy button next to requestId in the response header', async () => {
+      renderWithProviders(<WorkbenchPage />);
+      fireEvent.change(screen.getByTestId('workbench-path'), {
+        target: { value: '/scim/endpoints/ep-1/Users' },
+      });
+      fireEvent.click(screen.getByTestId('workbench-send'));
+      await waitFor(() => expect(screen.getByTestId('workbench-response')).toBeInTheDocument());
+      expect(screen.getByTestId('workbench-response-request-id-copy-button')).toBeInTheDocument();
+    });
+
+    it('renders copy button for the response body', async () => {
+      renderWithProviders(<WorkbenchPage />);
+      fireEvent.change(screen.getByTestId('workbench-path'), {
+        target: { value: '/scim/endpoints/ep-1/Users' },
+      });
+      fireEvent.click(screen.getByTestId('workbench-send'));
+      await waitFor(() => expect(screen.getByTestId('workbench-response')).toBeInTheDocument());
+      expect(screen.getByTestId('workbench-response-body-copy-button')).toBeInTheDocument();
+    });
+
+    it('renders copy button on each history row path cell', async () => {
+      renderWithProviders(<WorkbenchPage />);
+      fireEvent.change(screen.getByTestId('workbench-path'), {
+        target: { value: '/scim/endpoints/ep-1/Users' },
+      });
+      fireEvent.click(screen.getByTestId('workbench-send'));
+      await waitFor(() => expect(screen.getByTestId('workbench-history')).toBeInTheDocument());
+      const rows = screen.getAllByTestId(/^workbench-history-row-/);
+      expect(rows.length).toBe(1);
+      const rowId = rows[0].getAttribute('data-testid')?.replace('workbench-history-row-', '');
+      expect(rowId).toBeTruthy();
+      expect(screen.getByTestId(`workbench-history-path-${rowId}-copy-button`)).toBeInTheDocument();
+    });
   });
 });

@@ -51,6 +51,7 @@ import {
 } from '../utils/bulk-builder';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
+import { CopyableJsonBlock, CopyJsonButton } from '../components/primitives';
 
 type BulkResource = 'Users' | 'Groups';
 
@@ -337,18 +338,21 @@ export const BulkTab: React.FC<BulkTabProps> = ({ endpointId }) => {
 
       {envelope && !parsed.error && (
         <Card style={{ padding: '12px' }} data-testid="bulk-preview">
-          <Subtitle2>Preview (first 10 operations)</Subtitle2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <Subtitle2>Preview (first 10 operations)</Subtitle2>
+            <CopyJsonButton
+              value={envelope}
+              label="Copy full envelope as JSON"
+              data-testid="bulk-preview-copy-full"
+            />
+          </div>
           <Caption1>{envelope.Operations.length} total operations queued.</Caption1>
-          <pre className={classes.preview}>
-            {JSON.stringify(
-              {
-                ...envelope,
-                Operations: envelope.Operations.slice(0, 10),
-              },
-              null,
-              2,
-            )}
-          </pre>
+          <CopyableJsonBlock
+            value={{ ...envelope, Operations: envelope.Operations.slice(0, 10) }}
+            label="First 10 operations"
+            maxHeight="360px"
+            data-testid="bulk-preview-json"
+          />
         </Card>
       )}
 

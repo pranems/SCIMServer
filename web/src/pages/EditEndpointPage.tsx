@@ -19,7 +19,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import { useEndpoint, useUpdateEndpointConfig } from '../api/queries';
-import { LoadingSkeleton } from '../components/primitives';
+import { LoadingSkeleton, EditableField, CopyableField } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 
 const useStyles = makeStyles({
@@ -99,23 +99,29 @@ export const EditEndpointPage: React.FC<EditEndpointPageProps> = ({ endpointId }
 
   return (
     <div className={classes.page} data-testid="edit-endpoint-page">
-      <Subtitle1>Edit endpoint: {endpoint.name}</Subtitle1>
-
-      <Field label="Display name">
-        <Input
-          value={displayName}
-          onChange={(_e, d) => setDisplayName(d.value)}
-          data-testid="edit-endpoint-displayname-input"
+      <Subtitle1>
+        <span>Edit endpoint: </span>
+        <CopyableField
+          value={endpoint.name}
+          monospace
+          data-testid="edit-endpoint-name-copy"
+          ariaLabel={`Copy endpoint name ${endpoint.name}`}
         />
-      </Field>
+      </Subtitle1>
 
-      <Field label="Description">
-        <Input
-          value={description}
-          onChange={(_e, d) => setDescription(d.value)}
-          data-testid="edit-endpoint-description-input"
-        />
-      </Field>
+      <EditableField
+        label="Display name"
+        value={displayName}
+        onChange={setDisplayName}
+        data-testid="edit-endpoint-displayname"
+      />
+
+      <EditableField
+        label="Description"
+        value={description}
+        onChange={setDescription}
+        data-testid="edit-endpoint-description"
+      />
 
       <Field label="Active">
         <Switch

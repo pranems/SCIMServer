@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - ResourceDetailDrawer surfaces all non-editable attributes (Finding-D #2)
+
+Operator visual verification on dev (R6) caught a second Finding-D companion bug: the [user detail drawer](web/src/components/detail/ResourceDetailDrawer.tsx) rendered ONLY the 3 editable scalars (`userName` / `displayName` / `active`) even when the SCIM resource carried `name.familyName`, `emails[0].value`, `externalId`, and the enterprise extension URN with `employeeNumber`. Hiding half the SCIM record broke the operator's mental model and forced a trip to the raw-JSON workbench for every check.
+
+**Fix:**
+- New "Additional attributes" read-only section iterates every top-level resource key NOT in `[schemas, id, meta, <editable>]`.
+- Scalar values render inline; objects/arrays render as pretty JSON in a scrollable monospace block so deep structures (enterprise extension, multi-valued emails/phones/addresses) stay readable.
+- Empty arrays / null / undefined are skipped.
+- Each row carries `data-testid="attr-<key>"` for spec assertions.
+
+**R6 verified directly:** opened the actual drawer on dev for `Test6User.Happy@aadsyncfabricprodpreview` via integrated Playwright browser tools; confirmed `attr-name`, `attr-emails`, `attr-externalId`, `attr-urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` all render with correct data.
+
+**Tests added (R1 + R7):**
+- Vitest [src/components/detail/ResourceDetailDrawer.test.tsx](web/src/components/detail/ResourceDetailDrawer.test.tsx): 2 new tests (rich user surfaces every key; minimal user omits the section).
+- Playwright [web/e2e/copy-and-truncate.spec.ts](web/e2e/copy-and-truncate.spec.ts): 4th test reads the underlying SCIM resource via API then asserts every enrichment key has a visible `attr-<key>` row.
+
+**Test counts:** Vitest 88 files / **1041 tests** pass (1039 → 1041); Playwright `copy-and-truncate.spec.ts` **4/4** pass (3 → 4); tsc baseline 96/96 preserved.
+
+**R7 self-improvement applied in-place:** the "operator caught a UI bug that 6 gates missed" pattern triggered R6, which mandated the agent verify the UI itself rather than punt to the operator. This time the agent drove the browser via Playwright tools, opened the actual drawer on dev, and confirmed the fix visually BEFORE saying "done." The Additional-attributes section is now permanently locked in by both vitest and Playwright assertions; the next regression cannot escape silently.
+
+### Fixed - P1 truncation distortion (Finding-D) + 8 standing ground rules (R1-R8)
+
+The 2026-05-29 P1 follow-up commit `f06c4d6` shipped `CopyableField` + `TruncatedText` primitives wired onto the Users + Groups tables. The pipeline went green (vitest 1040/1040, tsc 96/96, Playwright 113/121, live SCIM 1027/1027) and was deployed to `scimserver-dev`. The operator then surfaced a screenshot proving the visual bug it was supposed to fix was STILL present on dev: Entra-shaped userNames (50+ chars) overflowed their table cells and visually distorted the row, exactly the operator complaint the P1 surface was supposed to address.
+
+**Root cause:**
+1. **`TruncatedText` primitive missing `display: inline-block`** ([web/src/components/primitives/TruncatedText.tsx](web/src/components/primitives/TruncatedText.tsx)) - the `<span>` defaulted to `display: inline`, which makes `text-overflow: ellipsis + overflow: hidden + white-space: nowrap` inert. The CSS was applied but the layout outcome never happened. Added `display: inline-block`.
+2. **Tables used `table-layout: auto`** ([web/src/pages/UsersTab.tsx](web/src/pages/UsersTab.tsx), [web/src/pages/GroupsTab.tsx](web/src/pages/GroupsTab.tsx)) - the browser sized columns to the natural content width, defeating the inner `max-width` on the primitive. Added `table-layout: fixed` + explicit `<th>` widths + `overflow: hidden` on `<td>`.
+
+**Why 6 separate gates missed it:**
+- **Vitest layout assertion** ([web/src/components/primitives/TruncatedText.test.tsx](web/src/components/primitives/TruncatedText.test.tsx)) checked `getComputedStyle(el).textOverflow === 'ellipsis'`. JSDOM does not compute layout - the CSS property was present but the layout never happened. The test passed during the bug.
+- **Playwright `getComputedStyle` check** ([web/e2e/copy-and-truncate.spec.ts](web/e2e/copy-and-truncate.spec.ts)) asserted CSS values not layout bounds. Same false positive.
+- **Visual-regression PNG diff** correctly FAILED with 8528-pixel diff on Endpoint detail Users tab. The diff was dismissed as "expected P1 drift" without inspecting the `*-diff.png`. The diff was the bug.
+- **First manual visual check** scanned dashboard + endpoint cards, not the populated Users tab.
+- **Stage 5.3a `visualRegressionDiagnosis` prompt** did not exist.
+- **R7 self-improvement step** was not in place; the gate set could not self-densify after escape.
+
+**Eight standing rules added to [.github/copilot-instructions.md](.github/copilot-instructions.md) "Visual Layout + Self-Improvement Discipline":**
+- **R1** - Visual-layout assertions MUST measure bounds (boundingRect, scrollWidth, displayedText length), not CSS values. `getComputedStyle` checks alone are FORBIDDEN as the sole assertion.
+- **R2** - Vitest MUST NOT assert visual-layout outcomes (JSDOM does not compute layout). Layout is Playwright-only.
+- **R3** - A visual-regression FAIL is a BLOCKER until the `*-diff.png` is inspected. Default response is "investigate," NOT "regenerate baselines."
+- **R4** - Truncation primitives MUST self-contain their display context (e.g. `display: inline-block` on `<span>`) so the CSS contract holds in any parent.
+- **R5** - Tables with truncating cells MUST use `table-layout: fixed` + explicit column widths OR `max-width` on the `<td>`.
+- **R6** - UI commits MUST receive explicit operator visual verification before "ready for prod" - automated gates alone are not sufficient.
+- **R7** - Self-improvement step in every activity: end every commit/audit/gate-failure with either (a) improvement applied in-place, (b) scheduled in `docs/strategy/SELF_AUDIT_<date>.md`, or (c) explicit "no improvement identified" with justification.
+- **R8** - Standing `visualRegressionDiagnosis` audit prompt for Stage 5.3a; mandatory PNG-diff classification before any deploy.
+
+**Files modified (6):**
+- [.github/copilot-instructions.md](.github/copilot-instructions.md) (+61 lines, rules R1-R8)
+- [web/src/components/primitives/TruncatedText.tsx](web/src/components/primitives/TruncatedText.tsx) (+7 lines, `display: inline-block` per R4)
+- [web/src/pages/UsersTab.tsx](web/src/pages/UsersTab.tsx) (+22/-3, `table-layout: fixed` + 4 column widths + `overflow: hidden` on td per R5)
+- [web/src/pages/GroupsTab.tsx](web/src/pages/GroupsTab.tsx) (+14/-3, same R5 fix for displayName column)
+- [web/e2e/copy-and-truncate.spec.ts](web/e2e/copy-and-truncate.spec.ts) (+/-, rewritten with `openEndpointWithLongUserName` helper that walks the SCIM API to find an endpoint with `userName.length >= 40` chars and asserts `boundingBox().width <= 340` AND `renderedText.length < fullValue.length` per R1)
+- [web/src/components/primitives/TruncatedText.test.tsx](web/src/components/primitives/TruncatedText.test.tsx) (-9, removed the false-positive `textOverflow === 'ellipsis'` vitest assertion per R2)
+
+**RED -> GREEN confirmed:**
+1. RED: rewritten spec on dev surfaced "username cell width 392.25px exceeds 340px cap on a 'testDeletionUser1@aadsyncfabricprodpreview.onmicrosoft.com' (58 chars). This means R4 and/or R5 are not in effect."
+2. GREEN: targeted vitest 4 files / 34 tests pass; full vitest 88 files / 1039 tests pass (1040 -> 1039 = the deleted false-positive); tsc baseline 96/96 preserved.
+3. Per R6, operator visual verification on dev is REQUIRED before this commit chain can be called "validated"; the agent will deploy + re-run the rewritten Playwright spec vs dev + ask the operator for an explicit "I have visually verified userName truncation on dev URL ...; the change looks correct" statement.
+
 ### Fixed - Playwright spec authoring bugs (10 categories across 6 specs; 19 -> 0 failures vs dev)
 
 Following the v0.52.1 Playwright run that surfaced 19 failures in the 62 newly-authored specs (41 pass / 19 fail / 2 skip), each failure was root-caused via live-browser inspection vs `scimserver-dev`. All 19 were spec-authoring bugs (spec assumptions vs actual rendered DOM); zero app changes required.

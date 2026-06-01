@@ -118,6 +118,69 @@ describe('ResourceDetailDrawer (User)', () => {
     expect((screen.getByLabelText(/displayName/i) as HTMLInputElement).value).toBe(USER.displayName);
   });
 
+  // Finding-D follow-up (2026-05-29): operator caught that the drawer
+  // rendered ONLY userName + displayName + active even when the SCIM
+  // resource carried name.familyName, emails[0].value, externalId, and
+  // an enterprise extension (employeeNumber). All non-editable fields
+  // MUST be rendered read-only so the operator can SEE the full SCIM
+  // record without having to dig into the raw JSON tab. The drawer is
+  // the canonical "what does this user look like" surface in the UI.
+  it('renders read-only rows for every non-editable top-level attribute (name, emails, externalId, enterprise extension)', () => {
+    const richUser = {
+      id: 'u-rich',
+      userName: 'rich@corp.com',
+      displayName: 'Rich User',
+      externalId: 'ext-rich-1234',
+      active: true,
+      name: { familyName: 'User', givenName: 'Rich', formatted: 'Rich User' },
+      emails: [{ type: 'work', value: 'rich@corp.com', primary: true }],
+      'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User': {
+        employeeNumber: 'EMP-001',
+        department: 'Engineering',
+      },
+      meta: { resourceType: 'User', created: '2026-01-01T00:00:00Z', lastModified: '2026-05-01T00:00:00Z' },
+    };
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={richUser}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    // Each surfaced row carries data-testid="attr-<key>" so specs can
+    // assert presence without coupling to layout. Section heading
+    // "Additional attributes" anchors the read-only block.
+    expect(screen.getByText(/Additional attributes/i)).toBeInTheDocument();
+    expect(screen.getByTestId('attr-externalId')).toBeInTheDocument();
+    expect(screen.getByTestId('attr-externalId').textContent).toMatch(/ext-rich-1234/);
+    expect(screen.getByTestId('attr-name')).toBeInTheDocument();
+    expect(screen.getByTestId('attr-name').textContent).toMatch(/familyName/);
+    expect(screen.getByTestId('attr-name').textContent).toMatch(/Rich/);
+    expect(screen.getByTestId('attr-emails')).toBeInTheDocument();
+    expect(screen.getByTestId('attr-emails').textContent).toMatch(/rich@corp\.com/);
+    expect(
+      screen.getByTestId('attr-urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('attr-urn:ietf:params:scim:schemas:extension:enterprise:2.0:User').textContent,
+    ).toMatch(/EMP-001/);
+  });
+
+  it('omits the Additional attributes section when the resource has only the editable fields', () => {
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={USER}
+        open
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.queryByText(/Additional attributes/i)).not.toBeInTheDocument();
+  });
+
   it('Save fires useUpdateUser PATCH (SCIM Operations envelope) with only changed fields', async () => {
     const user = userEvent.setup();
     wrap(

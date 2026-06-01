@@ -56,7 +56,7 @@ import {
   type DatabaseUserRow,
   type DatabaseGroupRow,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 
@@ -331,7 +331,14 @@ const UsersSection: React.FC<{
                   <td className={classes.rowCell}>
                     <Text weight="semibold">{u.userName ?? '-'}</Text>
                     <br />
-                    <Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{u.id}</Caption1>
+                    <CopyableField
+                      value={u.id}
+                      monospace
+                      truncate
+                      maxWidth="260px"
+                      data-testid={`operations-user-row-${u.id}-id`}
+                      ariaLabel={`Copy user id ${u.id}`}
+                    />
                   </td>
                   <td className={classes.rowCell}>
                     {u.active === true ? (
@@ -480,7 +487,14 @@ const GroupsSection: React.FC<{
                   <td className={classes.rowCell}>
                     <Text weight="semibold">{g.displayName ?? '-'}</Text>
                     <br />
-                    <Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{g.id}</Caption1>
+                    <CopyableField
+                      value={g.id}
+                      monospace
+                      truncate
+                      maxWidth="260px"
+                      data-testid={`operations-group-row-${g.id}-id`}
+                      ariaLabel={`Copy group id ${g.id}`}
+                    />
                   </td>
                   <td className={classes.rowCell}>
                     <Badge appearance="outline" size="small">
