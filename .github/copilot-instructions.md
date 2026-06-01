@@ -185,12 +185,13 @@ Origin: 2026-05-29 P1 follow-up deploy. The `<span>`-based `TruncatedText` primi
 
 Any Playwright spec exercising truncation / overflow / ellipsis / masking / sticky positioning / responsive width / clipping MUST assert at least one of:
 
-- `el.scrollWidth > el.clientWidth` (content overflowed → ellipsis/clip actually fired)
+- `el.scrollWidth > el.clientWidth` (content overflowed → ellipsis/clip actually fired). **This is the most reliable signal across browsers.** Measure the inner truncation primitive (the `<span>` with `text-overflow:ellipsis`), NOT the outer `<td>`/`<div>` wrapper (which usually has `overflow:hidden` and would never report overflow).
 - `el.clientWidth <= <expected-max-width-px>` (element is actually bounded)
-- `displayedText.length < fullValue.length` (visible string is shorter than the value)
 - `el.getBoundingClientRect().width <= <expected>` (rendered width is bounded)
 
 Asserting only `getComputedStyle(el).textOverflow === 'ellipsis'` or `whiteSpace === 'nowrap'` is FORBIDDEN as the sole assertion. Those checks verify CSS was applied, not that layout happened. They will green-light a bug where the property is set but the element's `display` value prevents it from taking effect.
+
+**`locator.innerText()` and `node.textContent` are NOT valid signals for ellipsis activation.** They return the full underlying DOM text regardless of CSS clipping. The 2026-05-29 Finding-D follow-up spec hit this exact trap: even after the fix was live and ellipsis was rendering visibly, `innerText().length === fullValue.length` because innerText serialises the un-clipped source string. Use `scrollWidth > clientWidth` instead.
 
 ### R2. Vitest tests MUST NOT assert visual-layout outcomes
 

@@ -178,16 +178,58 @@ test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
         `This means R4 (TruncatedText display:inline-block) and/or R5 (table-layout:fixed) are not in effect.`,
     ).toBeLessThanOrEqual(340);
 
-    // Long-value sub-assertion: rendered text MUST be shorter than
-    // the full value (because ellipsis fired and truncated some
-    // chars). The helper guarantees fullValue.length >= 40 so this
-    // assertion always fires.
-    const renderedText = (await usernameCell.innerText()).trim();
+    // Canonical "CSS ellipsis actually fired" detection (R1):
+    // scrollWidth > clientWidth means the inner content is wider
+    // than the rendered cell, i.e. the browser had to clip something.
+    // We measure the TruncatedText <span> directly (CopyableField's
+    // truncate-target) - the <td> wrapper would have scrollWidth ==
+    // clientWidth thanks to td overflow:hidden and would not report
+    // overflow. innerText() / textContent give the full DOM string
+    // even when CSS clips visually, so they are NOT a valid signal
+    // for ellipsis activation (Finding-D lesson).
+    const overflowReport = await usernameCell.evaluate((root: HTMLElement) => {
+      // Walk the subtree for any inline-block <span> that owns the
+      // text-overflow:ellipsis style (the TruncatedText primitive).
+      const spans = Array.from(root.querySelectorAll('span'));
+      const truncators = spans
+        .map((s) => {
+          const cs = window.getComputedStyle(s);
+          return {
+            text: (s.textContent ?? '').trim(),
+            display: cs.display,
+            textOverflow: cs.textOverflow,
+            whiteSpace: cs.whiteSpace,
+            scrollWidth: s.scrollWidth,
+            clientWidth: s.clientWidth,
+          };
+        })
+        .filter(
+          (info) =>
+            info.textOverflow === 'ellipsis' &&
+            info.whiteSpace === 'nowrap' &&
+            info.display === 'inline-block',
+        );
+      return truncators;
+    });
     expect(
-      renderedText.length,
-      `for full value "${fullValue}" (${fullValue.length} chars), rendered text should be shorter; ` +
-        `got "${renderedText}" (${renderedText.length} chars). Ellipsis is not firing.`,
-    ).toBeLessThan(fullValue.length);
+      overflowReport.length,
+      `expected at least one TruncatedText span with display:inline-block + textOverflow:ellipsis + ` +
+        `whiteSpace:nowrap inside the username cell; got ${overflowReport.length}. ` +
+        `R4 says truncation primitives MUST self-contain display:inline-block.`,
+    ).toBeGreaterThan(0);
+    const truncatorMatch = overflowReport.find((info) => info.text === fullValue);
+    expect(
+      truncatorMatch,
+      `expected a TruncatedText span whose textContent === "${fullValue}"; ` +
+        `report = ${JSON.stringify(overflowReport)}`,
+    ).toBeDefined();
+    expect(
+      truncatorMatch!.scrollWidth,
+      `TruncatedText scrollWidth (${truncatorMatch!.scrollWidth}px) must exceed clientWidth ` +
+        `(${truncatorMatch!.clientWidth}px) on a ${fullValue.length}-char value, proving CSS ` +
+        `ellipsis actually fired. If they are equal, the browser did not clip - layout-distortion ` +
+        `risk remains.`,
+    ).toBeGreaterThan(truncatorMatch!.clientWidth);
   });
 
   test('copy button writes the full userName to the clipboard', async ({ page }) => {
