@@ -45,7 +45,7 @@ import {
 } from '../api/queries';
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
 import { TIME_RANGE_VALUES } from '../routes/search-schemas';
-import { CopyableField, DetailDrawer, EmptyState, LoadingSkeleton } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton } from '../components/primitives';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -503,67 +503,35 @@ export const LogsPage: React.FC = () => {
             </div>
 
             <div className={classes.drawerSection}>
-              <div className={classes.drawerSectionHeader}>
-                <Caption1 className={classes.drawerSectionTitle}>Request headers</Caption1>
-                <CopyableField
-                  value=""
-                  copyValue={JSON.stringify(detailQuery.data.requestHeaders ?? {}, null, 2)}
-                  buttonOnly
-                  ariaLabel="Copy request headers"
-                  data-testid="log-detail-request-headers"
-                />
-              </div>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.requestHeaders ?? {}, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.requestHeaders ?? {}}
+                label="Request headers"
+                data-testid="log-detail-request-headers"
+              />
             </div>
 
             <div className={classes.drawerSection}>
-              <div className={classes.drawerSectionHeader}>
-                <Caption1 className={classes.drawerSectionTitle}>Request body</Caption1>
-                <CopyableField
-                  value=""
-                  copyValue={JSON.stringify(detailQuery.data.requestBody ?? null, null, 2)}
-                  buttonOnly
-                  ariaLabel="Copy request body"
-                  data-testid="log-detail-request-body"
-                />
-              </div>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.requestBody ?? null, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.requestBody ?? null}
+                label="Request body"
+                data-testid="log-detail-request-body"
+              />
             </div>
 
             <div className={classes.drawerSection}>
-              <div className={classes.drawerSectionHeader}>
-                <Caption1 className={classes.drawerSectionTitle}>Response headers</Caption1>
-                <CopyableField
-                  value=""
-                  copyValue={JSON.stringify(detailQuery.data.responseHeaders ?? {}, null, 2)}
-                  buttonOnly
-                  ariaLabel="Copy response headers"
-                  data-testid="log-detail-response-headers"
-                />
-              </div>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.responseHeaders ?? {}, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.responseHeaders ?? {}}
+                label="Response headers"
+                data-testid="log-detail-response-headers"
+              />
             </div>
 
             <div className={classes.drawerSection}>
-              <div className={classes.drawerSectionHeader}>
-                <Caption1 className={classes.drawerSectionTitle}>Response body</Caption1>
-                <CopyableField
-                  value=""
-                  copyValue={JSON.stringify(detailQuery.data.responseBody ?? null, null, 2)}
-                  buttonOnly
-                  ariaLabel="Copy response body"
-                  data-testid="log-detail-response-body"
-                />
-              </div>
-              <pre className={classes.pre}>
-                {JSON.stringify(detailQuery.data.responseBody ?? null, null, 2)}
-              </pre>
+              <CopyableJsonBlock
+                value={detailQuery.data.responseBody ?? null}
+                label="Response body"
+                data-testid="log-detail-response-body"
+              />
             </div>
 
             {detailQuery.data.errorMessage && (

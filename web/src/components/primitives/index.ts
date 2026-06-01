@@ -30,6 +30,15 @@ export type { TruncatedTextProps } from './TruncatedText';
 export { CopyableField } from './CopyableField';
 export type { CopyableFieldProps } from './CopyableField';
 
+export { CopyJsonButton } from './CopyJsonButton';
+export type { CopyJsonButtonProps } from './CopyJsonButton';
+
+export { CopyableJsonBlock } from './CopyableJsonBlock';
+export type { CopyableJsonBlockProps } from './CopyableJsonBlock';
+
+export { EditableField } from './EditableField';
+export type { EditableFieldProps } from './EditableField';
+
 export { EtagBadge } from './EtagBadge';
 export type { EtagBadgeProps } from './EtagBadge';
 

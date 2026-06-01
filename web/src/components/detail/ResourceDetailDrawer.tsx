@@ -28,8 +28,6 @@ import React from 'react';
 import {
   makeStyles,
   tokens,
-  Field,
-  Input,
   Switch,
   Button,
   Caption1,
@@ -46,6 +44,9 @@ import { ScimErrorMessage } from '../primitives/ScimErrorMessage';
 import { EtagBadge } from '../primitives/EtagBadge';
 import { ConflictDialog } from '../primitives/ConflictDialog';
 import { CopyableField } from '../primitives/CopyableField';
+import { EditableField } from '../primitives/EditableField';
+import { CopyableJsonBlock } from '../primitives/CopyableJsonBlock';
+import { CopyJsonButton } from '../primitives/CopyJsonButton';
 import {
   formatIfMatchValue,
   parseResourceEtag,
@@ -95,6 +96,13 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: '4px',
+  },
+  sectionHeaderRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    marginTop: '8px',
   },
   attrRow: {
     display: 'flex',
@@ -438,12 +446,18 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
 
         {kind === 'user' ? (
           <>
-            <Field label="userName">
-              <Input value={userName} onChange={(_, d) => setUserName(d.value)} />
-            </Field>
-            <Field label="displayName">
-              <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} />
-            </Field>
+            <EditableField
+              label="userName"
+              value={userName}
+              onChange={setUserName}
+              data-testid="drawer-username"
+            />
+            <EditableField
+              label="displayName"
+              value={displayName}
+              onChange={setDisplayName}
+              data-testid="drawer-displayname"
+            />
             <div className={classes.switchRow}>
               <Text>active</Text>
               <Switch
@@ -455,12 +469,18 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           </>
         ) : (
           <>
-            <Field label="displayName">
-              <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} />
-            </Field>
-            <Field label="externalId">
-              <Input value={externalId} onChange={(_, d) => setExternalId(d.value)} />
-            </Field>
+            <EditableField
+              label="displayName"
+              value={displayName}
+              onChange={setDisplayName}
+              data-testid="drawer-displayname"
+            />
+            <EditableField
+              label="externalId"
+              value={externalId}
+              onChange={setExternalId}
+              data-testid="drawer-externalid"
+            />
             <div className={classes.metaRow}>
               <Caption1 className={classes.metaLabel}>Membership</Caption1>
               <Badge appearance="outline">{resource.members?.length ?? 0} members</Badge>
@@ -481,14 +501,34 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           if (extras.length === 0) return null;
           return (
             <>
-              <Subtitle2>Additional attributes</Subtitle2>
+              <div className={classes.sectionHeaderRow}>
+                <Subtitle2>Additional attributes</Subtitle2>
+                <CopyJsonButton
+                  value={resource}
+                  label="Copy full resource as JSON"
+                  data-testid="drawer-copy-full-resource"
+                />
+              </div>
               {extras.map(({ key, value }) => (
                 <div key={key} className={classes.attrRow} data-testid={`attr-${key}`}>
-                  <span className={classes.attrLabel}>{key}</span>
                   {isScalar(value) ? (
-                    <span className={classes.attrValueScalar}>{String(value)}</span>
+                    <>
+                      <span className={classes.attrLabel}>{key}</span>
+                      <CopyableField
+                        value={String(value)}
+                        monospace
+                        truncate
+                        maxWidth="100%"
+                        data-testid={`attr-${key}-value`}
+                      />
+                    </>
                   ) : (
-                    <pre className={classes.attrValueJson}>{JSON.stringify(value, null, 2)}</pre>
+                    <CopyableJsonBlock
+                      value={value}
+                      label={key}
+                      maxHeight="240px"
+                      data-testid={`attr-${key}-json`}
+                    />
                   )}
                 </div>
               ))}

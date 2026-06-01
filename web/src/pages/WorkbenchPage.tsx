@@ -59,7 +59,7 @@ import {
   type WorkbenchHistoryEntry,
 } from '../utils/workbench-history';
 import { emitLiveTestSnippet } from '../utils/live-test-snippet';
-import { CopyableField } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, CopyJsonButton, EditableField } from '../components/primitives';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -456,6 +456,13 @@ export const WorkbenchPage: React.FC = () => {
                   ariaLabel="Copy response body"
                   data-testid="workbench-response-body"
                 />
+                {response.body !== undefined && typeof response.body !== 'string' && (
+                  <CopyJsonButton
+                    value={response.body}
+                    label="Copy as JSON"
+                    data-testid="workbench-response-body-json"
+                  />
+                )}
               </div>
               <pre className={classes.responseBody} data-testid="workbench-response-body-pre">
                 {response.body !== undefined
