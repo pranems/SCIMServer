@@ -82,6 +82,38 @@ const useStyles = makeStyles({
     alignItems: 'center',
     paddingTop: '4px',
   },
+  attrRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    padding: '4px 0',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  attrLabel: {
+    color: tokens.colorNeutralForeground3,
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '12px',
+    wordBreak: 'break-all',
+  },
+  attrValueScalar: {
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground1,
+    wordBreak: 'break-all',
+  },
+  attrValueJson: {
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground1,
+    backgroundColor: tokens.colorNeutralBackground2,
+    padding: '6px 8px',
+    borderRadius: tokens.borderRadiusSmall,
+    margin: 0,
+    whiteSpace: 'pre-wrap',
+    overflowX: 'auto',
+    maxHeight: '200px',
+    overflowY: 'auto',
+  },
   confirmBlock: {
     border: `1px solid ${tokens.colorPaletteRedBorder1}`,
     backgroundColor: tokens.colorPaletteRedBackground1,
@@ -132,6 +164,40 @@ function buildOperations(
     path,
     value,
   }));
+}
+
+// ─── Helper: enumerate non-editable extra attributes ────────────────
+// Finding-D follow-up (2026-05-29): operator caught that the drawer
+// rendered only the 3 editable scalars even when the SCIM resource
+// carried name.*, emails[], externalId, and enterprise-extension
+// fields. The drawer is the canonical "what does this resource look
+// like" surface, so EVERY non-meta, non-id, non-schemas, non-editable
+// attribute MUST surface read-only. We keep the editable form as-is.
+
+const ALWAYS_HIDDEN_KEYS = new Set(['schemas', 'id', 'meta']);
+const USER_EDITABLE_KEYS = new Set(['userName', 'displayName', 'active']);
+const GROUP_EDITABLE_KEYS = new Set(['displayName', 'externalId', 'members']);
+
+function getReadOnlyAttributes(
+  kind: ResourceKind,
+  resource: ScimResource,
+): Array<{ key: string; value: unknown }> {
+  const editable = kind === 'user' ? USER_EDITABLE_KEYS : GROUP_EDITABLE_KEYS;
+  return Object.entries(resource)
+    .filter(([k, v]) => {
+      if (ALWAYS_HIDDEN_KEYS.has(k)) return false;
+      if (editable.has(k)) return false;
+      // Skip null / undefined / empty arrays so we do not clutter the
+      // drawer with rows that say "[]".
+      if (v === null || v === undefined) return false;
+      if (Array.isArray(v) && v.length === 0) return false;
+      return true;
+    })
+    .map(([key, value]) => ({ key, value }));
+}
+
+function isScalar(v: unknown): v is string | number | boolean {
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -373,6 +439,34 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
             </div>
           </>
         )}
+
+        {/* Finding-D follow-up: read-only "Additional attributes"
+            section surfaces every non-editable non-meta field the
+            SCIM resource carries (name.*, emails[], externalId for
+            users, enterprise extension URN, custom extensions, etc.).
+            Scalars render inline; objects/arrays render as pretty
+            JSON in a scrollable monospace block so deep structures
+            (enterprise extension, multi-valued emails/phones) stay
+            readable without truncating data. */}
+        {(() => {
+          const extras = getReadOnlyAttributes(kind, resource);
+          if (extras.length === 0) return null;
+          return (
+            <>
+              <Subtitle2>Additional attributes</Subtitle2>
+              {extras.map(({ key, value }) => (
+                <div key={key} className={classes.attrRow} data-testid={`attr-${key}`}>
+                  <span className={classes.attrLabel}>{key}</span>
+                  {isScalar(value) ? (
+                    <span className={classes.attrValueScalar}>{String(value)}</span>
+                  ) : (
+                    <pre className={classes.attrValueJson}>{JSON.stringify(value, null, 2)}</pre>
+                  )}
+                </div>
+              ))}
+            </>
+          );
+        })()}
 
         {error !== null && error !== undefined ? (
           <ScimErrorMessage error={error} data-testid="drawer-error" />

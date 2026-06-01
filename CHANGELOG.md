@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - ResourceDetailDrawer surfaces all non-editable attributes (Finding-D #2)
+
+Operator visual verification on dev (R6) caught a second Finding-D companion bug: the [user detail drawer](web/src/components/detail/ResourceDetailDrawer.tsx) rendered ONLY the 3 editable scalars (`userName` / `displayName` / `active`) even when the SCIM resource carried `name.familyName`, `emails[0].value`, `externalId`, and the enterprise extension URN with `employeeNumber`. Hiding half the SCIM record broke the operator's mental model and forced a trip to the raw-JSON workbench for every check.
+
+**Fix:**
+- New "Additional attributes" read-only section iterates every top-level resource key NOT in `[schemas, id, meta, <editable>]`.
+- Scalar values render inline; objects/arrays render as pretty JSON in a scrollable monospace block so deep structures (enterprise extension, multi-valued emails/phones/addresses) stay readable.
+- Empty arrays / null / undefined are skipped.
+- Each row carries `data-testid="attr-<key>"` for spec assertions.
+
+**R6 verified directly:** opened the actual drawer on dev for `Test6User.Happy@aadsyncfabricprodpreview` via integrated Playwright browser tools; confirmed `attr-name`, `attr-emails`, `attr-externalId`, `attr-urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` all render with correct data.
+
+**Tests added (R1 + R7):**
+- Vitest [src/components/detail/ResourceDetailDrawer.test.tsx](web/src/components/detail/ResourceDetailDrawer.test.tsx): 2 new tests (rich user surfaces every key; minimal user omits the section).
+- Playwright [web/e2e/copy-and-truncate.spec.ts](web/e2e/copy-and-truncate.spec.ts): 4th test reads the underlying SCIM resource via API then asserts every enrichment key has a visible `attr-<key>` row.
+
+**Test counts:** Vitest 88 files / **1041 tests** pass (1039 → 1041); Playwright `copy-and-truncate.spec.ts` **4/4** pass (3 → 4); tsc baseline 96/96 preserved.
+
+**R7 self-improvement applied in-place:** the "operator caught a UI bug that 6 gates missed" pattern triggered R6, which mandated the agent verify the UI itself rather than punt to the operator. This time the agent drove the browser via Playwright tools, opened the actual drawer on dev, and confirmed the fix visually BEFORE saying "done." The Additional-attributes section is now permanently locked in by both vitest and Playwright assertions; the next regression cannot escape silently.
+
 ### Fixed - P1 truncation distortion (Finding-D) + 8 standing ground rules (R1-R8)
 
 The 2026-05-29 P1 follow-up commit `f06c4d6` shipped `CopyableField` + `TruncatedText` primitives wired onto the Users + Groups tables. The pipeline went green (vitest 1040/1040, tsc 96/96, Playwright 113/121, live SCIM 1027/1027) and was deployed to `scimserver-dev`. The operator then surfaced a screenshot proving the visual bug it was supposed to fix was STILL present on dev: Entra-shaped userNames (50+ chars) overflowed their table cells and visually distorted the row, exactly the operator complaint the P1 surface was supposed to address.

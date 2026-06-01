@@ -260,4 +260,73 @@ test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
     await page.waitForTimeout(500);
     await expect(drawer).toBeHidden();
   });
+
+  // Finding-D follow-up #2 (2026-05-29): operator surfaced that the
+  // user detail drawer only rendered userName + displayName + active
+  // and hid name.*, emails[], externalId, and the enterprise
+  // extension. Adds the "Additional attributes" read-only section so
+  // every non-editable top-level attribute is visible on dev.
+  test('user detail drawer renders Additional attributes section for rich users', async ({ page }) => {
+    const { endpointId, userId, fullValue } = await openEndpointWithLongUserName(page);
+
+    // Open the drawer for this row.
+    await page.goto(`/endpoints/${endpointId}/users?detail=${userId}`);
+    const drawer = page.getByTestId('resource-detail-drawer');
+    await expect(drawer).toBeVisible({ timeout: 30_000 });
+
+    // Read the underlying SCIM record so we can assert ONLY the
+    // attributes the resource actually carries. Skips when none of
+    // the expected enrichment fields are present (e.g. a stub user).
+    const token = process.env.E2E_TOKEN || 'changeme-scim';
+    const scimUser = await page.evaluate(
+      async ({ endpointId, userId, token }: { endpointId: string; userId: string; token: string }) => {
+        const r = await fetch(`/scim/endpoints/${endpointId}/Users/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) {
+          // Fall back to OAuth client-credentials.
+          const t = await (
+            await fetch('/scim/oauth/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                grant_type: 'client_credentials',
+                client_id: 'scimserver-client',
+                client_secret: 'changeme-oauth',
+              }),
+            })
+          ).json();
+          const r2 = await fetch(`/scim/endpoints/${endpointId}/Users/${userId}`, {
+            headers: { Authorization: `Bearer ${t.access_token}` },
+          });
+          return await r2.json();
+        }
+        return await r.json();
+      },
+      { endpointId, userId, token },
+    );
+
+    const enrichmentKeys = ['name', 'emails', 'externalId', 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'];
+    const present = enrichmentKeys.filter((k) => scimUser[k] !== undefined && scimUser[k] !== null);
+    test.skip(
+      present.length === 0,
+      `User ${fullValue} (${userId}) has none of [${enrichmentKeys.join(', ')}]; ` +
+        `cannot exercise the Additional-attributes section.`,
+    );
+
+    // Section heading anchors the read-only block.
+    await expect(page.getByText('Additional attributes', { exact: false })).toBeVisible();
+
+    // Each present enrichment key MUST have a corresponding attr-<key>
+    // row, with the textContent containing the underlying value.
+    for (const key of present) {
+      const row = page.getByTestId(`attr-${key}`);
+      await expect(row, `attr-${key} row must be present`).toBeVisible();
+      // For scalar keys, the value text must appear in the row.
+      const value = scimUser[key];
+      if (typeof value === 'string') {
+        await expect(row).toContainText(value);
+      }
+    }
+  });
 });
