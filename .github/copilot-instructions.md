@@ -239,6 +239,33 @@ This is the discipline that prevents the agent from repeating the same class of 
 
 When Stage 5.3 produces ANY Playwright FAIL, a `visualRegressionDiagnosis` prompt MUST run before any deploy proceeds. The prompt walks: (a) list every failed test, (b) for each, open and describe the diff PNG, (c) classify intended vs unintended, (d) if intended, generate the CHANGELOG entry + regenerate baselines + commit; if unintended, fail the deploy and route to bug-fix flow. This is the structural fix for R3 - without an audit prompt forcing the discipline, the agent can still dismiss a real bug as "expected drift" (which is exactly what happened on 2026-05-29).
 
+### R9. Copy-everywhere primitive discipline (Phase Q, added 2026-05-29)
+
+Origin: 2026-05-29 operator request "make sure in all sections subsections screens tabs subtabs that the copy button is present for all the test display fields and boxes for display and output and input, for input also have undo redo and other useful buttons also have copy as json buttons at all possible places." The complete UI was inconsistent: some surfaces had hand-rolled copy buttons (each with their own state machine), some had raw `<pre>{JSON.stringify(...)}</pre>` blocks with NO copy affordance, some had bare `<Input>`s with no undo/copy/reset. The fix is the primitive trio + standing rule below.
+
+**R9.1. Three primitives, one source of truth.** Every "make this thing copyable" pattern in the app MUST go through one of:
+
+- **`CopyableField`** ([web/src/components/primitives/CopyableField.tsx](web/src/components/primitives/CopyableField.tsx)) - inline display of a single string value paired with a copy button. Use for IDs, URNs, paths, timestamps, scalar attribute values, any monospace single-line text the operator might paste elsewhere.
+- **`CopyableJsonBlock`** ([web/src/components/primitives/CopyableJsonBlock.tsx](web/src/components/primitives/CopyableJsonBlock.tsx)) - read-only pretty-printed JSON viewer with built-in header copy button. Use INSTEAD OF hand-rolled `<pre>{JSON.stringify(x, null, 2)}</pre>` patterns. Enforces R5 overflow safety so long unbreakable tokens cannot push the pre past its container. Drawer / detail / response / preview / result blocks all use this.
+- **`CopyJsonButton`** ([web/src/components/primitives/CopyJsonButton.tsx](web/src/components/primitives/CopyJsonButton.tsx)) - section-level "copy this whole thing as JSON" button. Use in section headers (drawer "Copy full resource", schema row "Copy schema as JSON", bulk envelope "Copy full envelope", workbench response "Copy as JSON") and for any structured payload the operator wants to grab without the JSON block being visible.
+
+**R9.2. Every editable input MUST use `EditableField`.** [web/src/components/primitives/EditableField.tsx](web/src/components/primitives/EditableField.tsx) wraps Fluent `<Input>` / `<Textarea>` with 4 first-class affordances every editable field should carry: copy, undo, redo, reset-to-original. Native browser Ctrl+Z only covers one keystroke session and silently fails on paste / programmatic reset / focus-loss-and-return. EditableField makes all 4 discoverable + keyboard-reachable + clipboard-friendly.
+
+**R9.3. Forbidden patterns.** New code MUST NOT:
+- Render `<pre>{JSON.stringify(x, null, 2)}</pre>` directly. Use `CopyableJsonBlock` so the copy button + R5 overflow safety come for free.
+- Hand-roll a local `useState<'idle' | 'copied' | 'error'>('idle')` + `navigator.clipboard.writeText(...)` + `setTimeout` cycle. All copy state goes through `useCopyToClipboard` (via the 4 primitives). This guarantees uniform UX and prevents stale-state bugs.
+- Render a bare `<Input value={x} onChange={...} />` for a SCIM scalar that the operator might want to copy / undo / reset. Use `EditableField`.
+
+**R9.4. Test ID pattern.** All 4 primitives accept `data-testid`; their buttons derive predictably:
+- `CopyableField`: `<id>` (root) + `<id>-copy-button`
+- `CopyJsonButton`: `<id>` (the button itself)
+- `CopyableJsonBlock`: `<id>` (root) + `<id>-copy-button` + `<id>-pre`
+- `EditableField`: `<id>` (root) + `<id>-input` + `<id>-copy-button` + `<id>-undo-button` + `<id>-redo-button` + `<id>-reset-button`
+
+Specs assert presence by testid, never by text label, so future label tweaks do not break specs.
+
+**R9.5. New-surface checklist.** When authoring a new page / tab / drawer / dialog / popup / detail panel, the PR MUST surface every display value, every editable input, every JSON payload through one of the 4 primitives. The `addMissingTests` prompt + `codeReviewSelfAudit` prompt both check for raw `<pre>` blocks + bare `<Input>` usages and flag them as R9 violations.
+
 ## Dev Deployment Pipeline Rule (CRITICAL)
 
 Whenever the operator asks to "deploy to dev", "prepare for prod", "run full validation", "test on the latest deployment", "do the full pipeline", or any equivalent phrase, the agent MUST:
