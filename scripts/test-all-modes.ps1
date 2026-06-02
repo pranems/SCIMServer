@@ -173,7 +173,7 @@ if (-not $SkipPrisma -and [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
 Invoke-TestMode `
     -Mode 'api-unit-inmemory' `
     -WorkDir (Join-Path $repoRoot 'api') `
-    -Command 'npm test -- --run' `
+    -Command 'npm test' `
     -EnvVars @{ PERSISTENCE_BACKEND = 'inmemory' }
 
 # ─── Mode 2: API unit tests, prisma backend ──────────────────────────
@@ -181,7 +181,7 @@ if (-not $SkipPrisma) {
     Invoke-TestMode `
         -Mode 'api-unit-prisma' `
         -WorkDir (Join-Path $repoRoot 'api') `
-        -Command 'npm test -- --run' `
+        -Command 'npm test' `
         -EnvVars @{ PERSISTENCE_BACKEND = 'prisma'; DATABASE_URL = $DatabaseUrl }
 }
 

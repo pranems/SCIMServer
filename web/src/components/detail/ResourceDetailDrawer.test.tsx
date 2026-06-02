@@ -215,8 +215,9 @@ describe('ResourceDetailDrawer (User)', () => {
         onClose={() => undefined}
       />,
     );
-    await user.click(screen.getByRole('switch', { name: /active/i }));
-    await user.click(screen.getByRole('button', { name: /Save/i }));
+    await user.click(screen.getByRole('switch', { name: /active/i, hidden: true }));
+    await user.click(screen.getByRole('button', { name: /Save/i, hidden: true }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledTimes(1));
     const args = updateUser.mock.calls[0][0] as { body: Record<string, unknown> };
     const ops = args.body.Operations as Array<{ op: string; path: string; value: unknown }>;
     expect(ops).toContainEqual({ op: 'replace', path: 'active', value: false });
