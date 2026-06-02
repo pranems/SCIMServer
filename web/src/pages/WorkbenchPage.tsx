@@ -62,6 +62,8 @@ import {
   ArrowSync20Regular,
   Code16Regular,
   DocumentText16Regular,
+  LayoutColumnTwo20Regular,
+  LayoutRowTwo20Regular,
 } from '@fluentui/react-icons';
 import { useSearch } from '@tanstack/react-router';
 import { useEndpoints, useScimRequest, type ScimRequestOutcome } from '../api/queries';
@@ -134,6 +136,24 @@ const useStyles = makeStyles({
     gap: '8px',
     flexWrap: 'wrap',
     alignItems: 'center',
+  },
+  bodyResponseWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    minWidth: 0,
+  },
+  bodyResponseHorizontal: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+    minWidth: 0,
+    '@media (max-width: 900px)': {
+      gridTemplateColumns: '1fr',
+    },
+    '& > *': {
+      minWidth: 0,
+    },
   },
   sectionCard: {
     padding: '12px',
@@ -283,6 +303,22 @@ export const WorkbenchPage: React.FC = () => {
     { key: 'Accept', value: 'application/scim+json', enabled: true },
   ]);
   const [headersOpen, setHeadersOpen] = useState(false);
+
+  const [layoutMode, setLayoutMode] = useState<'vertical' | 'horizontal'>(() => {
+    if (typeof window === 'undefined') return 'vertical';
+    return window.localStorage.getItem('scimserver:workbench:layout') === 'horizontal'
+      ? 'horizontal'
+      : 'vertical';
+  });
+  const toggleLayoutMode = (): void => {
+    setLayoutMode((prev) => {
+      const next = prev === 'vertical' ? 'horizontal' : 'vertical';
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('scimserver:workbench:layout', next);
+      }
+      return next;
+    });
+  };
 
   const [bodyHistory, setBodyHistory] = useState<string[]>([bodyText]);
   const [bodyCursor, setBodyCursor] = useState(0);
@@ -626,6 +662,24 @@ export const WorkbenchPage: React.FC = () => {
               Export Postman file
             </Button>
           </Tooltip>
+          <Tooltip
+            relationship="label"
+            content={
+              layoutMode === 'vertical'
+                ? 'Switch to side-by-side layout (request left, response right).'
+                : 'Switch to stacked layout (request on top, response below).'
+            }
+          >
+            <Button
+              appearance="subtle"
+              icon={layoutMode === 'vertical' ? <LayoutColumnTwo20Regular /> : <LayoutRowTwo20Regular />}
+              onClick={toggleLayoutMode}
+              data-testid="workbench-layout-toggle"
+              aria-pressed={layoutMode === 'horizontal'}
+            >
+              {layoutMode === 'vertical' ? 'Side-by-side' : 'Stacked'}
+            </Button>
+          </Tooltip>
         </div>
       </Card>
 
@@ -701,6 +755,15 @@ export const WorkbenchPage: React.FC = () => {
         )}
       </Card>
 
+      <div
+        className={
+          layoutMode === 'horizontal'
+            ? classes.bodyResponseHorizontal
+            : classes.bodyResponseWrapper
+        }
+        data-testid="workbench-body-response-wrapper"
+        data-layout={layoutMode}
+      >
       <Card className={classes.sectionCard} data-testid="workbench-body-card">
         <div className={classes.sectionHeader}>
           <Subtitle2>Request body {showBody ? '' : `(omitted for ${method})`}</Subtitle2>
@@ -880,6 +943,7 @@ export const WorkbenchPage: React.FC = () => {
           <Caption1>Send a request to see the response here.</Caption1>
         )}
       </Card>
+      </div>
 
       <Card className={classes.sectionCard} data-testid="workbench-history">
         <div className={classes.sectionHeader}>
