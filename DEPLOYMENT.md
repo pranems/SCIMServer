@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Updated: April 23, 2026 · v0.38.0 · Scope: production + local deployment paths
+> Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -169,7 +169,7 @@ scimserver-rg-dev       [RETIRED 2026-05-19]
 .\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-prod" -ProdAppName "scimserver" -DevResourceGroup "scimserver-dev"
 
 # Or promote a specific version directly
-.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-prod" -ProdAppName "scimserver" -ImageTag "0.52.3"
+.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-prod" -ProdAppName "scimserver" -ImageTag "0.53.0"
 ```
 
 ### Tear Down Dev (Optional)

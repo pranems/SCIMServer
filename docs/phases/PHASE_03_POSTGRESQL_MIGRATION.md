@@ -33,7 +33,7 @@ Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17**
 
 | Dimension | Before (Phase 2) | After (Phase 3) |
 |---|---|---|
-| **Database** | better-sqlite3 (embedded) | PostgreSQL 17-alpine (networked) |
+| **Database** | better-sqlite3 (embedded) | PostgreSQL 17 (networked) |
 | **Column types** | `TEXT` for everything | `UUID`, `CITEXT`, `JSONB`, `TIMESTAMPTZ`, `VARCHAR` |
 | **Case insensitivity** | `userNameLower` / `displayNameLower` helper columns | PostgreSQL `CITEXT` extension - native |
 | **Payload storage** | `rawPayload TEXT` (JSON string) | `payload JSONB` - queryable, GIN-indexable |
@@ -99,7 +99,7 @@ Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17**
                 │
                 ▼
 ┌───────────────────────────────┐
-│   PostgreSQL 17-alpine        │
+│   PostgreSQL 17               │
 │   Extensions:                 │
 │     • citext   (case-insens.) │
 │     • pgcrypto (UUID gen)     │
@@ -1196,7 +1196,7 @@ The baseline migration creates all tables, indexes, constraints, and extensions 
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | PostgreSQL 17-alpine + API service orchestration |
+| `docker-compose.yml` | PostgreSQL 17 + API service orchestration |
 | `scripts/init-pg-extensions.sql` | PostgreSQL extension initialization |
 | `api/prisma/migrations/20260301000000_postgresql_baseline/migration.sql` | Fresh PostgreSQL baseline migration |
 
@@ -1235,7 +1235,7 @@ PASS: 301 / 302
 FAIL: 1 (Non-existent endpoint returns 404 - pre-existing)
 Duration: ~10s
 Container: scimserver-api (healthy)
-Database: scimserver-postgres (PostgreSQL 17-alpine)
+Database: scimserver-postgres (PostgreSQL 17)
 ```
 
 ---

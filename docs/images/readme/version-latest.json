@@ -1,5 +1,5 @@
 {
-  "version": "0.40.0",
+  "version": "0.53.0",
   "service": {
     "name": "SCIMServer API",
     "environment": "production",
@@ -53,10 +53,10 @@
       "host": "postgres",
       "port": 5432,
       "name": "scimdb",
-      "provider": "PostgreSQL 17-alpine"
+      "provider": "PostgreSQL 17"
     }
   },
   "deployment": {
-    "migratePhase": "Phase 18 - Primary sub-attribute enforcement + RFC compliance + test gap audit #5 (v0.38.0)"
+    "migratePhase": "Phase Q4 follow-up - Workbench redesign + PostgreSQL parity + docs audit (v0.53.0)"
   }
 }
