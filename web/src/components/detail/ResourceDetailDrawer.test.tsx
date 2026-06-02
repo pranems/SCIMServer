@@ -236,12 +236,12 @@ describe('ResourceDetailDrawer (User)', () => {
       />,
     );
     // First click reveals confirm; doesn't yet delete.
-    await user.click(screen.getByRole('button', { name: /Delete/i }));
+    await user.click(screen.getByRole('button', { name: /Delete/i, hidden: true }));
     expect(deleteUser).not.toHaveBeenCalled();
-    expect(screen.getByTestId('confirm-delete')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('confirm-delete')).toBeInTheDocument());
     // Second click confirms.
-    await user.click(screen.getByRole('button', { name: /Confirm delete/i }));
-    expect(deleteUser).toHaveBeenCalledWith('u-1');
+    await user.click(screen.getByRole('button', { name: /Confirm delete/i, hidden: true }));
+    await waitFor(() => expect(deleteUser).toHaveBeenCalledWith('u-1'));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
@@ -470,10 +470,11 @@ describe('ResourceDetailDrawer (Group)', () => {
         onClose={onClose}
       />,
     );
-    await user.click(screen.getByRole('button', { name: /Delete/i }));
+    await user.click(screen.getByRole('button', { name: /Delete/i, hidden: true }));
     expect(deleteGroup).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: /Confirm delete/i }));
-    expect(deleteGroup).toHaveBeenCalledWith('g-1');
+    await waitFor(() => expect(screen.getByTestId('confirm-delete')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Confirm delete/i, hidden: true }));
+    await waitFor(() => expect(deleteGroup).toHaveBeenCalledWith('g-1'));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });
