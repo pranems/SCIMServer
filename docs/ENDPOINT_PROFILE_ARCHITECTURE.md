@@ -31,8 +31,8 @@ Every endpoint has a **profile** that fully defines its SCIM behavior. A profile
 
 ```mermaid
 flowchart TD
-    A[Operator Input] -->|profilePreset: 'entra-id'| B[Preset Loader]
-    A -->|profile: {...}| C[Inline Profile]
+    A[Operator Input] -->|"profilePreset: 'entra-id'"| B[Preset Loader]
+    A -->|"profile: {...}"| C[Inline Profile]
     B --> D[Auto-Expand Engine]
     C --> D
     D -->|Expand 'all' attrs<br>Fill from RFC baseline| E[Tighten-Only Validator]
