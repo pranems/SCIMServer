@@ -53,7 +53,7 @@ flowchart LR
             Prisma[Prisma Client]
             React[React UI<br>/admin]
         end
-        subgraph pg [PostgreSQL Container - postgres:17-alpine]
+        subgraph pg [PostgreSQL Container - postgres:17]
             DB[(scimdb)]
         end
     end
@@ -71,7 +71,7 @@ flowchart LR
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim

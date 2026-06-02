@@ -417,7 +417,7 @@ If the sovereign cloud supports containers but not managed PostgreSQL, run Postg
 version: '3.8'
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim

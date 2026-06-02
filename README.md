@@ -270,7 +270,7 @@ Or manually:
 # docker-compose.yml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim

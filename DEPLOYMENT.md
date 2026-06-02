@@ -196,7 +196,7 @@ az group delete --name scimserver-dev --yes --no-wait
 version: '3.8'
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       - POSTGRES_USER=scim
       - POSTGRES_PASSWORD=scim

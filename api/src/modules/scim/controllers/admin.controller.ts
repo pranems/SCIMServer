@@ -437,7 +437,7 @@ export class AdminController {
           host: url.hostname,
           port: parseInt(url.port, 10) || 5432,
           name: url.pathname.replace(/^\//, ''),
-          provider: 'PostgreSQL 17-alpine',
+          provider: 'PostgreSQL 17',
           version: process.env.POSTGRES_VERSION || undefined,
         };
       } catch {

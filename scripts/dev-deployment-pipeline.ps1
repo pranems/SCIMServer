@@ -52,7 +52,7 @@
 
 .PARAMETER PgImage
     PostgreSQL image for the local Stage 2.2 E2E DB (default:
-    postgres:16-alpine). Started on :5432 user=scim pass=scim db=scimdb
+    postgres:17). Started on :5432 user=scim pass=scim db=scimdb
     if not already running.
 
 .PARAMETER SkipDocker
@@ -106,7 +106,7 @@ param(
     [string]$DevResourceGroup = 'scimserver-dev',
     [string]$DevAppName = 'scimserver-dev',
     [string]$DevFqdn,
-    [string]$PgImage = 'postgres:16-alpine',
+    [string]$PgImage = 'postgres:17',
     [switch]$SkipDocker,
     [switch]$SkipPlaywright,
     [switch]$SkipDeploy,

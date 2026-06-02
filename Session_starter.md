@@ -314,7 +314,7 @@ iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/up
 **Core Technologies:**
 - Node.js 24 & TypeScript 5.9
 - NestJS 11 service layer with Prisma 7 ORM (pg driver adapter)
-- PostgreSQL 17 (Docker postgres:17-alpine) for persistence
+- PostgreSQL 17 (Docker postgres:17, Debian-based to match Azure Flexible Server glibc) for persistence
 - React 19 + Vite 7 frontend
 - ESLint 10 (flat config) + Jest 30
 - Docker (node:24-alpine) & Azure Container Apps (deployment target)

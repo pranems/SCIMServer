@@ -27,7 +27,7 @@
 | **Language** | TypeScript | 5.x |
 | **Framework** | NestJS | 11.x |
 | **ORM** | Prisma | 7.x |
-| **Database** | PostgreSQL 17 | (via Prisma, docker postgres:17-alpine) |
+| **Database** | PostgreSQL 17 | (via Prisma, docker postgres:17, Debian-based to match Azure Flexible Server glibc) |
 | **Frontend** | React | 19.x |
 | **Bundler** | Vite | 7.x |
 | **Auth** | JWT + Bearer token | @nestjs/jwt |

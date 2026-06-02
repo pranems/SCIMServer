@@ -64,7 +64,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 ### Stage 2 - Local test gates
 
 2.1. **API unit jest** (`cd api; npm test`) - capture pass/fail counts. Default env (no `PERSISTENCE_BACKEND` override).
-2.2. **API E2E jest** (`cd api; npm run test:e2e`) - needs PostgreSQL on `localhost:5432` (user=scim, pass=scim, db=scimdb). Orchestrator starts a `postgres:16-alpine` container if not already running.
+2.2. **API E2E jest** (`cd api; npm run test:e2e`) - needs PostgreSQL on `localhost:5432` (user=scim, pass=scim, db=scimdb). Orchestrator starts a `postgres:17` container if not already running.
 2.3. **Web vitest** (`cd web; npm test`) - capture pass/fail counts.
 2.4. **Web vitest coverage gate** (`cd web; npm run test:coverage`) - meets ratchet floors: lines:78 / branches:70 / functions:65 / statements:75. Floor never lowers; raise when feasible.
 2.5. `crossBackendParityAudit` - for any changed file matching `isInMemoryBackend`, both backends behave identically.

@@ -327,7 +327,7 @@ This preserves the domain model's `rawPayload: string` contract while storing da
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim
@@ -374,8 +374,8 @@ Phase 3 supports **four** deployment scenarios. Each has distinct container topo
 
 | # | Scenario | PostgreSQL | API Container | Network | DATABASE_URL | Port |
 |---|---|---|---|---|---|---|
-| 1 | **Docker Compose (Dev)** | `postgres:17-alpine` container | Built from `Dockerfile` | Docker bridge (`scimserver_default`) | `postgresql://scim:scim@postgres:5432/scimdb` | `8080` |
-| 2 | **Docker Compose (Debug)** | `postgres:17-alpine` container | `node:24` with live mount | Docker bridge | `postgresql://scim:scim@postgres:5432/scimdb` | `3000` + `9229` |
+| 1 | **Docker Compose (Dev)** | `postgres:17` container | Built from `Dockerfile` | Docker bridge (`scimserver_default`) | `postgresql://scim:scim@postgres:5432/scimdb` | `8080` |
+| 2 | **Docker Compose (Debug)** | `postgres:17` container | `node:24` with live mount | Docker bridge | `postgresql://scim:scim@postgres:5432/scimdb` | `3000` + `9229` |
 | 3 | **Standalone Docker Run** | External (host or remote) | Built from `Dockerfile` | Host / bridge | Varies (see below) | `8080` |
 | 4 | **E2E / Unit Tests** | None (InMemory backend) | None (Jest in-process) | localhost | Not used | `3000` (test) |
 | 5 | **Azure Container Apps** | Azure PG Flexible Server | Container App (ACR/GHCR) | Azure VNet | `postgresql://...@<server>.postgres.database.azure.com:5432/scimdb?sslmode=require` | `80`→HTTPS |
@@ -397,7 +397,7 @@ Phase 3 supports **four** deployment scenarios. Each has distinct container topo
  │   │                                                                │  │
  │   │   ┌──────────────────────┐      ┌──────────────────────────┐  │  │
  │   │   │ postgres             │      │ api                      │  │  │
- │   │   │ (postgres:17-alpine) │◄────▶│ (Dockerfile multi-stage) │  │  │
+ │   │   │ (postgres:17)        │◄────▶│ (Dockerfile multi-stage) │  │  │
  │   │   │                      │ 5432 │                          │  │  │
  │   │   │ DB: scimdb           │      │ NestJS + Prisma 7        │  │  │
  │   │   │ User: scim           │      │ PrismaPg adapter         │  │  │
@@ -441,7 +441,7 @@ Browser ──GET http://localhost:8080/──▶ Docker:8080 ──▶ api cont
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     container_name: scimserver-postgres
     environment:
       POSTGRES_DB: scimdb
@@ -538,7 +538,7 @@ docker compose down -v
  │   │                                                                │  │
  │   │   ┌──────────────────────┐      ┌──────────────────────────┐  │  │
  │   │   │ postgres             │      │ api (debug)              │  │  │
- │   │   │ (postgres:17-alpine) │◄────▶│ (node:24 with live code) │  │  │
+ │   │   │ (postgres:17)        │◄────▶│ (node:24 with live code) │  │  │
  │   │   │                      │ 5432 │                          │  │  │
  │   │   │ Same config as       │      │ npm run start:dev        │  │  │
  │   │   │ Scenario 1           │      │ (ts-node + nodemon)      │  │  │
@@ -560,7 +560,7 @@ docker compose down -v
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     # ... same as Scenario 1 ...
 
   api:
