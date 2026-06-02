@@ -7,13 +7,16 @@ import type { StructuredLogEntry } from './scim-logger.service';
 describe('FileLogTransport', () => {
   let tmpDir: string;
   let origLogFile: string | undefined;
+  let origCwd: string;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flt-test-'));
     origLogFile = process.env.LOG_FILE;
+    origCwd = process.cwd();
   });
 
   afterEach(() => {
+    process.chdir(origCwd);
     if (origLogFile !== undefined) {
       process.env.LOG_FILE = origLogFile;
     } else {
@@ -51,6 +54,7 @@ describe('FileLogTransport', () => {
 
   it('should default to logs/scimserver.log when LOG_FILE is unset (L.5)', () => {
     delete process.env.LOG_FILE;
+    process.chdir(tmpDir);
 
     const transport = new FileLogTransport();
     transport.write(makeEntry({ message: 'default file test' }));
@@ -62,9 +66,6 @@ describe('FileLogTransport', () => {
 
     const content = fs.readFileSync(defaultPath, 'utf-8').trim();
     expect(content).toContain('default file test');
-
-    // Cleanup
-    fs.rmSync(path.resolve('logs'), { recursive: true, force: true });
   });
 
   it('should not create main file when LOG_FILE is empty string', () => {
