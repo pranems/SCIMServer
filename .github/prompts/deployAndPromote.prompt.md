@@ -98,6 +98,14 @@ There are TWO live prod instances (kept in lockstep, same image per promotion) +
 
 Use `-BlueGreen` on `promote-to-prod.ps1`. It: (1) pins 100% traffic to the current revision by NAME (switches off `latestRevision` auto-routing), (2) creates the new revision (green) at 0% weight, (3) soaks the green `--green` label FQDN health, (4) runs `verify-deployment.ps1` against green (live SCIM + Playwright + data/ID before-after diff), (5) flips traffic green=100/blue=0 only after green passes, (6) re-verifies the public FQDN, and auto-rolls-back to blue on ANY failure. Customers stay on blue the entire soak.
 
+### Blue/green gotchas (lessons from the 2bc338e proudbush canary, 2026-06-03)
+
+These three behaviors are now handled by the scripts; do NOT re-introduce the bugs they fixed:
+
+1. **Live-env Playwright excludes data-coupled pixel baselines.** `verify-deployment.ps1` runs Playwright with `--grep-invert 'Visual regression|Visual Snapshots'` by default, because `toHaveScreenshot` baselines were captured against the dev SCIM data set and false-fail (a 27% pixel diff on the Schemas tab) against a live prod env that holds different data. Pass `-IncludeVisualBaselines` ONLY for a same-data baseline run. A pixel-baseline FAIL against a live env is a data mismatch, not a code regression - do not lower thresholds or regenerate baselines from prod data.
+2. **Idempotency checks the SERVED image, not the app template.** After a blue/green abort the template image can equal the desired image while traffic still serves the old blue revision. `promote-to-prod.ps1` resolves the highest-weight revision via `az containerapp ingress traffic show`, reads THAT revision's actual image, and only short-circuits when the served image equals desired. Never short-circuit on the template image alone.
+3. **Post-flip ingress fields are briefly inconsistent.** Right after a traffic flip, `ingress traffic show` and the revision-level `properties.active` / `trafficWeight` fields can disagree for ~8s (control-plane eventual consistency). Wait and re-query; `az containerapp ingress traffic show` is authoritative. Do not treat the transient mismatch as a failed flip.
+
 ### 4a - Parallel prod canary (proudbush, ProvIAM tenant) - ALWAYS FIRST
 
 1. Ensure ProvIAM context: `az account set --subscription ProvIAM_Subscription`
