@@ -110,12 +110,12 @@ sequenceDiagram
     participant J as Microsoft JWKS
     participant S as ISV SCIM Endpoint
     E->>E: Sign client_assertion JWT with Entra key
-    E->>T: POST /oauth/token (form-urlencoded)<br/>grant_type=client_credentials<br/>client_id=...<br/>client_assertion=<JWT><br/>client_assertion_type=...jwt-bearer<br/>scope=zoom-scim-access
-    T->>J: Fetch signing keys (by kid; cached)
+    E->>T: POST /oauth/token form-urlencoded<br/>grant_type=client_credentials<br/>client_id<br/>client_assertion=JWT<br/>client_assertion_type=jwt-bearer<br/>scope=zoom-scim-access
+    T->>J: Fetch signing keys by kid, cached
     J-->>T: JWKS
     T->>T: Validate sig + iss/aud/sub/exp/nbf/tid + roles
-    T-->>E: 200 {access_token, token_type:Bearer, expires_in:3600}
-    E->>S: GET/POST /scim/v2/... Authorization: Bearer <ISV token>
+    T-->>E: 200 access_token, token_type Bearer, expires_in 3600
+    E->>S: GET/POST /scim/v2 Authorization Bearer ISV-token
     S-->>E: 200 SCIM payload
 ```
 
