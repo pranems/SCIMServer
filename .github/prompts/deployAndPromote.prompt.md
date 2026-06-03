@@ -6,26 +6,34 @@ argument-hint: "dev" (default - deploy to dev + live tests), "prod" (promote to 
 
 Automate the full build-deploy-verify cycle. Replaces the current manual 3-step dance (publish-ghcr.yml -> az containerapp update -> live-test.ps1).
 
-**IMPORTANT:** Prod promotion is NEVER automatic. Phase 4 (Promote to Prod) only runs when the user explicitly passes "prod" as argument or explicitly asks for promotion. Default behavior is dev-only.
+**IMPORTANT:** Customer-facing prod (calmsand) promotion is NEVER automatic. Phase 4b only runs when the user explicitly passes "prod" / asks for promotion AND has given a go-ahead after the proudbush canary is green. Default behavior is dev-only.
+
+**AUTO-CANARY EXCEPTION:** The parallel prod (proudbush, SAME tenant as dev) MAY be promoted automatically as a blue/green canary by `dev-deployment-pipeline.ps1 -AutoCanary` (Stage 6.5), guarded by zero-FAIL / zero-SKIPPED / no change-freeze / kill-switch checks. This is the canary the operator does not worry about traffic on. calmsand always stays behind an explicit manual gate.
 
 ---
 
 ## Environment Topology
 
-| Environment | Resource Group | Container App | FQDN | PG Server |
-|-------------|---------------|---------------|------|-----------|
-| **Dev** | `scimserver-rg-dev` | `scimserver-dev` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | `scimserver-dev-pg` |
-| **Prod** | `scimserver-rg` | `scimserver2` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | `scimserver2-pg` |
+> Authoritative source is the **Deployment Topology** section of [`.github/copilot-instructions.md`](../copilot-instructions.md). Keep this table in lockstep with it.
 
-## Credentials (same for dev and prod)
+There are TWO live prod instances (kept in lockstep, same image per promotion) + one dev.
+
+| Environment | Subscription / Tenant | Resource Group | Container App | FQDN | Registry |
+|-------------|----------------------|---------------|---------------|------|----------|
+| **Dev** | `ProvIAM_Subscription` (tenant `f08e6aff-...`) | `scimserver-dev` | `scimserver-dev` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | ACR `acrscimserver20622.azurecr.io` + GHCR |
+| **Prod (parallel, proudbush)** | `ProvIAM_Subscription` (tenant `f08e6aff-...`) | `scimserver-prod` | `scimserver` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | ACR + GHCR |
+| **Prod (CUSTOMER-FACING, calmsand)** | `AnandSa-Test-150` (**separate tenant**) | `scimserver-rg-prod` | `scimserver-prod` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | GHCR `ghcr.io/pranems/scimserver` (anonymous pull) |
+
+**CROSS-TENANT WARNING:** The customer-facing prod (calmsand) is in a DIFFERENT Azure AD tenant than dev + parallel prod. You cannot promote both in one `az` session - re-auth between them. Calmsand cannot pull from the ProvIAM-tenant ACR, which is why it uses anonymous GHCR; the image MUST be on GHCR (`publish-ghcr.yml`) before a calmsand promotion.
+
+## Credentials (same for dev and both prods)
 
 | Secret | Value |
 |--------|-------|
-| SCIM_SHARED_SECRET | `changeme-scim` |
+| SCIM_SHARED_SECRET (E2E_TOKEN) | `changeme-scim` |
 | JWT_SECRET | `changeme-jwt` |
 | OAUTH_CLIENT_SECRET | `changeme-oauth` |
 | OAUTH_CLIENT_ID | `scimserver-client` |
-| PG admin password | `ScimP0stgres@2026` |
 
 ---
 
@@ -64,18 +72,18 @@ Automate the full build-deploy-verify cycle. Replaces the current manual 3-step 
 
 1. Update dev Container App image:
    ```powershell
-   az containerapp update --name scimserver-dev --resource-group scimserver-rg-dev `
+   az containerapp update --name scimserver-dev --resource-group scimserver-dev `
      --image "ghcr.io/pranems/scimserver:<tag>" `
      --revision-suffix "v<tag-short>-$(Get-Date -Format 'HHmm')" --output none
    ```
 2. Wait 90s for startup probe to pass
 3. Health check:
    ```powershell
-   Invoke-RestMethod -Uri "https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io/scim/health"
+   Invoke-RestMethod -Uri "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/health"
    ```
 4. Run full live tests:
    ```powershell
-   .\scripts\live-test.ps1 -BaseUrl "https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io" -ClientSecret "changeme-oauth"
+   .\scripts\live-test.ps1 -BaseUrl "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io" -ClientSecret "changeme-oauth"
    ```
 5. **Gate**: If live tests have ANY failures, STOP. Do not proceed to prod.
 6. Report: "Dev deployment validated: X/Y tests passed"
@@ -84,22 +92,49 @@ Automate the full build-deploy-verify cycle. Replaces the current manual 3-step 
 
 ## Phase 4 - Promote to Prod (only if argument is "prod" or "full")
 
-1. Run the promote script:
+**CANARY-FIRST ORDERING (mandatory):** Always promote the parallel prod (proudbush, same tenant as dev) FIRST as a canary, prove it green with full verification, and ONLY THEN promote the customer-facing prod (calmsand). Never flip calmsand's ingress before the same flow has been proven on proudbush. The two prods are in DIFFERENT tenants, so each gets its own `az` context.
+
+### True blue/green (default for prod promotes)
+
+Use `-BlueGreen` on `promote-to-prod.ps1`. It: (1) pins 100% traffic to the current revision by NAME (switches off `latestRevision` auto-routing), (2) creates the new revision (green) at 0% weight, (3) soaks the green `--green` label FQDN health, (4) runs `verify-deployment.ps1` against green (live SCIM + Playwright + data/ID before-after diff), (5) flips traffic green=100/blue=0 only after green passes, (6) re-verifies the public FQDN, and auto-rolls-back to blue on ANY failure. Customers stay on blue the entire soak.
+
+### Blue/green gotchas (lessons from the 2bc338e proudbush canary, 2026-06-03)
+
+These three behaviors are now handled by the scripts; do NOT re-introduce the bugs they fixed:
+
+1. **Live-env Playwright excludes data-coupled pixel baselines.** `verify-deployment.ps1` runs Playwright with `--grep-invert 'Visual regression|Visual Snapshots'` by default, because `toHaveScreenshot` baselines were captured against the dev SCIM data set and false-fail (a 27% pixel diff on the Schemas tab) against a live prod env that holds different data. Pass `-IncludeVisualBaselines` ONLY for a same-data baseline run. A pixel-baseline FAIL against a live env is a data mismatch, not a code regression - do not lower thresholds or regenerate baselines from prod data.
+2. **Idempotency checks the SERVED image, not the app template.** After a blue/green abort the template image can equal the desired image while traffic still serves the old blue revision. `promote-to-prod.ps1` resolves the highest-weight revision via `az containerapp ingress traffic show`, reads THAT revision's actual image, and only short-circuits when the served image equals desired. Never short-circuit on the template image alone.
+3. **Post-flip ingress fields are briefly inconsistent.** Right after a traffic flip, `ingress traffic show` and the revision-level `properties.active` / `trafficWeight` fields can disagree for ~8s (control-plane eventual consistency). Wait and re-query; `az containerapp ingress traffic show` is authoritative. Do not treat the transient mismatch as a failed flip.
+
+### 4a - Parallel prod canary (proudbush, ProvIAM tenant) - ALWAYS FIRST
+
+1. Ensure ProvIAM context: `az account set --subscription ProvIAM_Subscription`
+2. (Optional rehearsal) dry-run the plan with zero changes: add `-DryRun`.
+3. Run the blue/green promote with full verification:
    ```powershell
-   .\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-rg" -DevResourceGroup "scimserver-rg-dev" -ProdAppName "scimserver2"
+   .\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-prod" -ProdAppName "scimserver" -ImageTag "<tag>" -BlueGreen -RunVerification -VerifyPlaywright
    ```
-   - This resolves the immutable digest and pins it
-   - Requires interactive "yes" confirmation
-2. Wait for health check (the script does this automatically)
-3. Run live tests against prod:
+   - Resolves the immutable digest and pins it; requires interactive "yes".
+   - `-RunVerification -VerifyPlaywright` runs `verify-deployment.ps1` (live + browser + data diff) on green before the flip.
+4. **Gate:** If proudbush blue/green did not reach a green flip, STOP. Do NOT touch calmsand.
+
+### 4b - Customer-facing prod (calmsand, separate AnandSa-Test-150 tenant) - ONLY after 4a is green + explicit operator go-ahead
+
+1. **Re-auth into the AnandSa tenant** (different tenant - cannot reuse the ProvIAM session):
    ```powershell
-   .\scripts\live-test.ps1 -BaseUrl "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io" -ClientSecret "changeme-oauth"
+   az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950
+   az account set --subscription AnandSa-Test-150
    ```
-4. Report: "Prod promotion validated: X/Y tests passed"
-5. Print rollback command:
+2. Confirm the image is on GHCR (calmsand pulls anonymously from GHCR, not ACR). If only ACR has it, run `publish-ghcr.yml` first.
+3. Run the blue/green promote (explicit `-ImageTag` is REQUIRED - the dev app is in the other tenant):
+   ```powershell
+   .\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-rg-prod" -ProdAppName "scimserver-prod" -ImageTag "<tag>" -Subscription "AnandSa-Test-150" -BlueGreen -RunVerification -VerifyPlaywright
    ```
-   az containerapp update -n scimserver2 -g scimserver-rg --image ghcr.io/pranems/scimserver:<previous-tag>
-   ```
+
+### 4c - Report + rollback
+
+4. Report: \"Prod promotion validated: proudbush X/Y, calmsand X/Y tests passed\"\n5. Blue/green rollback is instant (traffic flip back to blue; blue revision stays warm):
+   ```\n   az containerapp ingress traffic set -n scimserver -g scimserver-prod --revision-weight <blue-revision>=100 <green-revision>=0\n   az containerapp ingress traffic set -n scimserver-prod -g scimserver-rg-prod --revision-weight <blue-revision>=100 <green-revision>=0\n   ```\n   (`promote-to-prod.ps1 -BlueGreen` auto-rolls-back on any verification failure and prints the exact revision names.)
 
 ---
 
@@ -115,12 +150,14 @@ Output a deployment report:
 | Publish <tag> | PASS | Xs |
 | Deploy to dev | PASS | Xs |
 | Dev live tests | X/Y PASS | Xs |
-| Promote to prod | PASS/SKIP | Xs |
-| Prod live tests | X/Y PASS/SKIP | Xs |
+| Promote proudbush prod | PASS/SKIP | Xs |
+| Promote calmsand prod | PASS/SKIP | Xs |
+| Prod live tests (both) | X/Y PASS/SKIP | Xs |
 
 **Image:** ghcr.io/pranems/scimserver:<tag>
 **Digest:** sha256:...
-**Rollback:** az containerapp update -n scimserver2 -g scimserver-rg --image ghcr.io/pranems/scimserver:<previous>
+**Rollback (proudbush):** az containerapp update -n scimserver -g scimserver-prod --image ghcr.io/pranems/scimserver:<previous>
+**Rollback (calmsand):** az containerapp update -n scimserver-prod -g scimserver-rg-prod --image ghcr.io/pranems/scimserver:<previous>
 ```
 
 ---

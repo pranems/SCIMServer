@@ -72,7 +72,7 @@ Live integration tests exercise the **full HTTP stack** against a running SCIMSe
 |--------|---------|-------------------|----------|---------------|---------|
 | **Local dev** | `http://localhost:6000` | `inmemory` (Maps) | None | Wiped on process restart | `node dist/main.js` |
 | **Local dev + PG** | `http://localhost:6000` | `prisma` (default) | Local PostgreSQL | Persistent until DB reset | `npm run start:dev` |
-| **Docker Compose** | `http://localhost:8080` | `prisma` | `postgres:17-alpine` container | Persistent via `pgdata` volume | `docker compose up` |
+| **Docker Compose** | `http://localhost:8080` | `prisma` | `postgres:17` container | Persistent via `pgdata` volume | `docker compose up` |
 | **Azure Container Apps** | `https://<app>.azurecontainerapps.io` | `prisma` | Azure PG Flexible Server | Persistent | Azure platform |
 
 ### Persistence Architecture (Docker Compose)
@@ -83,7 +83,7 @@ Live integration tests exercise the **full HTTP stack** against a running SCIMSe
 │                                                               │
 │  ┌──────────────────────┐    ┌────────────────────────────┐  │
 │  │  postgres             │    │  api                        │  │
-│  │  (postgres:17-alpine) │◄───│  (scimserver:latest)        │  │
+│  │  (postgres:17)        │◄───│  (scimserver:latest)        │  │
 │  │  Port: 5432           │    │  Port: 8080                 │  │
 │  │  DB: scimdb           │    │  PERSISTENCE_BACKEND=prisma │  │
 │  │  User: scim           │    │  DATABASE_URL=postgresql://  │  │
@@ -212,7 +212,7 @@ PostgreSQL defaults to **Read Committed** isolation:
 
 | Setting | Default | Note |
 |---------|---------|------|
-| PG max connections | 100 | `postgres:17-alpine` default |
+| PG max connections | 100 | `postgres:17` default |
 | Prisma connection pool | 10 | Default pool size |
 | Recommendation | Don't exceed pool size in parallel test requests | Sequential test execution avoids pool exhaustion |
 
@@ -394,7 +394,7 @@ Every run produces `test-results/live-<timestamp>.json` + `test-results/live-res
 
 ```powershell
 # From repo root
-docker compose build                    # Build api image + use postgres:17-alpine
+docker compose build                    # Build api image + use postgres:17
 docker compose up -d                    # Start both containers
 docker compose logs -f api              # Watch API startup (migrations + boot)
 
@@ -444,7 +444,7 @@ SELECT * FROM "_prisma_migrations" ORDER BY "finished_at" DESC LIMIT 5;    -- Mi
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim

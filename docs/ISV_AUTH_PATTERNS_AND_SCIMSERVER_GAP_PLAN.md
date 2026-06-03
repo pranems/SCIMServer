@@ -2,12 +2,13 @@
 
 > **Date:** 2026-05-19
 > **Audience:** SCIMServer maintainers, Microsoft Entra connector engineers, identity-integration teams onboarding any new ISV.
-> **Premise:** SCIMServer's job is to **mock any ISV SCIM endpoint**, **probe any ISV SCIM endpoint**, and (later) act as an **OAuth resource server** that real customers integrate against. The single biggest hidden cost in shipping that to a new ISV is not the SCIM schema work - it's the **auth handshake the ISV expects**, which varies wildly across the industry. This doc inventories the 7 industry-standard patterns, maps them against the in-repo current state, and lays out a phased plan to close the gap.
+> **Premise:** SCIMServer's job is to **mock any ISV SCIM endpoint**, **probe any ISV SCIM endpoint**, and (later) act as an **OAuth resource server** that real customers integrate against. The single biggest hidden cost in shipping that to a new ISV is not the SCIM schema work - it's the **auth handshake the ISV expects**, which varies wildly across the industry. This doc inventories the 8 industry-standard patterns (the 7 classic patterns plus Workload Identity Federation), maps them against the in-repo current state, and lays out a phased plan to close the gap.
 > **Source-of-truth rule (operator constraint):** every claim about SCIMServer behavior is grounded in the in-repo source (cited paths + line refs). Every claim about an ISV is grounded in that ISV's official docs (cited URLs). No invented behavior; gaps are flagged with confidence levels.
 > **Companion docs:**
 > - [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the per-endpoint-bearer architecture already shipped
 > - [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) - 6-layer ISV probing methodology
 > - [OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md](OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md) - real ISV walk-through that motivated this audit
+> - [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) - deep analysis of Entra Workload Identity Federation (the credential-free token-exchange method) and the Q6 design it drives
 
 ---
 
@@ -16,7 +17,7 @@
 - [0. TL;DR + Recommendation](#0-tldr--recommendation)
 - [1. Current SCIMServer Auth State (in-repo)](#1-current-scimserver-auth-state-in-repo)
 - [2. Industry Pattern Matrix (10 ISVs)](#2-industry-pattern-matrix-10-isvs)
-- [3. The 7 Auth Patterns Distilled](#3-the-7-auth-patterns-distilled)
+- [3. The 8 Auth Patterns Distilled](#3-the-8-auth-patterns-distilled)
 - [4. Gap Analysis: SCIMServer vs Industry](#4-gap-analysis-scimserver-vs-industry)
 - [5. Phased Implementation Plan (Phase Q)](#5-phased-implementation-plan-phase-q)
 - [6. Detailed Design Sketches](#6-detailed-design-sketches)
@@ -28,7 +29,7 @@
 
 ## 0. TL;DR + Recommendation
 
-SCIMServer today supports 3 of the 7 auth patterns commonly seen in ISV SCIM endpoints. Specifically:
+SCIMServer today supports 3 of the 8 auth patterns commonly seen in ISV SCIM endpoints. Specifically:
 
 | # | Pattern | Status | Evidence |
 |---|---|---|---|
@@ -39,6 +40,9 @@ SCIMServer today supports 3 of the 7 auth patterns commonly seen in ISV SCIM end
 | 5 | **OAuth 2.0 client_credentials with per-endpoint client_id/secret pairs** (Entra gallery mandate) | **GAP** | Only 1 global client_id/secret pair exists ([oauth.service.ts](../api/src/oauth/oauth.service.ts) line 56) |
 | 6 | **OAuth Authorization-Code + refresh_token** (legacy gallery, AppRiver/OpenText pattern) | **GAP** | Token endpoint explicitly rejects everything except `client_credentials` ([oauth.controller.ts](../api/src/oauth/oauth.controller.ts) line 47) |
 | 7 | **mTLS / client certificate** + **DPoP sender-constrained tokens** | **GAP** | No client-cert validation; no DPoP nonce handling |
+| 8 | **Workload Identity Federation (WIF)** - Entra presents a signed JWT assertion at the token endpoint; ISV validates via Microsoft JWKS and issues its **own** short-lived token (credential-free) | **GAP** | Token endpoint has no `client_assertion` path, no external-JWKS validation, no per-endpoint federated-trust config. See [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) |
+
+> **WIF is the strategic future-default, not an optional extra.** Per the internal Entra design doc ("Workload Identity Federation between Entra Provisioning and SaaS ISVs"), the legacy methods (username-password, long-lived bearer, OAuth Auth Code Grant) are being **deprecated** (Auth Code Grant deprecation already underway), **Client Credentials is currently the only method offered to new ISVs**, and **WIF is its credential-free replacement** that ISVs like Google, Zoom, and SAP are asking for. That makes **Q6 (WIF)** the highest-value new auth work after the Q1+Q2 primitives it builds on. Pattern 8 is analyzed in full in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md).
 
 **Recommendation - sub-phases for Phase Q ("ISV-auth parity"):**
 
@@ -49,6 +53,7 @@ SCIMServer today supports 3 of the 7 auth patterns commonly seen in ISV SCIM end
 | **Q3** | SCIMServer as **OAuth client** for probing (probe-direction) | The probing harness from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) §4.4 needs to actually run the auth handshake against ISVs (bearer / client_credentials / authorization_code) before it can run any probe. Today the probe doc is paper-only because we have no client. | L | low - axios + standard libs |
 | **Q4** | Authorization-Code + refresh_token (#6) | Some pre-2026 ISVs still use this; mostly historical. Optional. Ship only if a real ISV mock requires it. | L | medium - state machine + redirect URI infra |
 | **Q5** | mTLS + DPoP (#7) | Cutting-edge security profile; flagged in Stage X.2 [SECURITY_INTAKE_2026-05-17.md](strategy/SECURITY_INTAKE_2026-05-17.md). Defer until an enterprise customer asks. | L | high - requires reverse-proxy cooperation |
+| **Q6** | Workload Identity Federation - JWT Bearer Assertion token exchange (#8) | The strategic credential-free method Entra is rolling out for all new ISV onboarding; reuses Q1 (per-endpoint client) + Q2 (external JWKS validation) and adds the assertion-acceptance path + roles enforcement + reciprocal ISV-portal UI. Full design in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). | M | low - builds on Q1+Q2 primitives |
 
 The single highest-leverage gap to close first is **Q1 (per-endpoint OAuth client_id/secret pairs)** because it converts SCIMServer from "1 customer per deployment" to "N customers per deployment" for the auth mode that Microsoft Entra is **mandating** for all new gallery connectors. The architecture already exists in G11; Q1 is the natural extension from "per-endpoint bearer" to "per-endpoint client_credentials pair."
 
@@ -148,7 +153,7 @@ The four "HIGH-confidence + documented in this audit" rows (Microsoft Entra, Okt
 
 ---
 
-## 3. The 7 Auth Patterns Distilled
+## 3. The 8 Auth Patterns Distilled
 
 Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md)):
 
@@ -229,6 +234,19 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 | Used by | FAPI 2.0 financial APIs; some healthcare / govcloud profiles; defense ISVs. Surfaced as a DEFERRED recommendation in [SECURITY_INTAKE_2026-05-17.md](strategy/SECURITY_INTAKE_2026-05-17.md). |
 | **SCIMServer** | **GAP** - no client-cert validation; no DPoP nonce handling. Q5 - low priority at current scale. |
 
+### Pattern 8 - Workload Identity Federation (WIF / JWT Bearer Assertion token exchange)
+
+| Aspect | Detail |
+|---|---|
+| Wire | Entra POSTs `grant_type=client_credentials` + `client_assertion=<Entra-signed JWT>` + `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` (RFC 7523 §2.2 client authentication) to the ISV **token endpoint** as `application/x-www-form-urlencoded`. The ISV validates the assertion against Microsoft's JWKS + claims + roles, then issues its **own** access token. Entra uses that ISV-issued token as `Authorization: Bearer` on SCIM calls. |
+| Issuance | Credential-free: the admin copies only **public** values (issuer, subject, audience, JWKS URL) from Entra into the ISV portal; the ISV emits Client ID / Token URL / SCIM URL back. No secret is stored or transferred. |
+| Tenant binding | `tid` claim in the assertion + the per-endpoint token URL / `client_id` |
+| Lifetime | ISV-issued token is short-lived (**1-6 hours** per the Entra spec); the trust itself is touch-free (no rotation) |
+| Used by | **Microsoft Entra Provisioning (SyncFabric)** - the credential-free replacement for Client Credentials; requested by Google, Zoom, SAP |
+| **SCIMServer** | **GAP** - this is the distinct token-**exchange** flow (vs Pattern 4's *direct* JWT verification). The token endpoint rejects anything but plain `client_credentials`, reads JSON not form-urlencoded, has no `client_assertion` field, and has no per-endpoint federated-trust config. Closes in **Q6**; reuses the Q1 (per-endpoint client) + Q2 (external JWKS) primitives. Full analysis + backend + UI design: [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). |
+
+> **Pattern 4 vs Pattern 8 (do not conflate).** Pattern 4 is *direct* external JWT: Entra puts its own JWT on the SCIM call and the ISV verifies it per request, issuing nothing. Pattern 8 (WIF) adds a **token-exchange hop**: the Microsoft JWT is a *client-authentication assertion* presented at the **token endpoint**, and the ISV mints its **own** scoped short-lived token that rides the SCIM calls. WIF reuses Pattern 4's JWKS validator (Q2) but is a separate flow (Q6).
+
 ---
 
 ## 4. Gap Analysis: SCIMServer vs Industry
@@ -285,23 +303,24 @@ These gaps come up in the **same** integration conversation as auth, so it's wor
 | **Q3** | SCIMServer as OAuth **client** (probe direction) | (a) New module `api/src/probe/auth-handlers/` with classes: `BearerAuthHandler`, `OAuthClientCredsHandler`, `OAuthAuthCodeHandler`, `JwtBearerAssertionHandler`; (b) `POST /admin/probes` accepts `{targetUrl, authMode, authConfig}` and runs the probe-corpus from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) §13; (c) Token caching (per-target, per-config, TTL-aware); (d) Per-probe-run audit log of every auth handshake + every probe-call outcome. | L | Fourth; enables Layer 2-6 probing for real ISVs |
 | **Q4** | Authorization-Code + refresh_token (Pattern #6) | (a) `/oauth/authorize` endpoint (browser redirect); (b) `grant_type=authorization_code` + `grant_type=refresh_token` accepted at `/oauth/token`; (c) Redirect URI allowlist per endpoint; (d) PKCE (RFC 7636) for public clients. | L | Fifth; gate on real ISV mock requirement |
 | **Q5** | mTLS + DPoP (Pattern #7) | (a) Reverse-proxy passes client cert via `X-Forwarded-Client-Cert` header; guard validates against per-endpoint cert allowlist; (b) DPoP header validation (RFC 9449); (c) `cnf` claim in issued tokens. | L | Defer; gate on enterprise/govcloud customer ask |
+| **Q6** | Workload Identity Federation (Pattern #8) | (a) Accept `client_assertion` at the per-endpoint token endpoint (RFC 7523 §2.2) with form-urlencoded parsing; (b) new `wif` `credentialType` storing per-endpoint federated trust (`expectedIssuer`, `expectedSubject`, `expectedAudience`, `jwksUri`, `allowedTenantId`, `requiredRoles`, `scope`, `issuedTokenTtlSec`) - **no secret stored**; (c) `WifAssertionValidatorService` (reuses Q2 `jose` JWKS client) validates signature + `iss`/`aud`/`sub`/`exp`/`nbf`/`tid` + required roles, then issues a 1-6 h token; (d) reciprocal ISV-portal UI in [web/src/pages/CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) ("Federated Identity (WIF)" section: input the 4 Entra values, display Client ID / Token URL / SCIM URL, **Test Connection** dry-run). Full design: [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). | M | Sixth; depends on Q1 + Q2 + Pre-Q.A + Pre-Q.B |
 
 ### 5.2 Acceptance criteria per sub-phase (TDD discipline)
 
 Per [.github/copilot-instructions.md](../.github/copilot-instructions.md) Stage 0 + Standing Rule "Feature / Bug-Fix Commit Checklist," each sub-phase requires:
 
-| Layer | Q0 | Q1 | Q2 | Q3 | Q4 | Q5 |
-|---|---|---|---|---|---|---|
-| Unit tests (`.service.spec.ts` + `.controller.spec.ts`) | +5 | +12 | +14 | +18 | +20 | +12 |
-| E2E tests (`test/e2e/*.e2e-spec.ts`) | +3 | +8 | +10 | +12 | +14 | +8 |
-| Live tests (`scripts/live-test.ps1` new section) | +3 | +5 | +6 | n/a (admin-only) | +6 | +4 |
-| Cross-backend parity audit (Stage 2.5) | n/a | YES | YES | n/a | YES | YES |
-| Response contract tests (`expect(ALLOWED_KEYS).toContain(key)`) | +1 | +3 | +3 | +3 | +3 | +2 |
-| RFC audit prompt invocation (Stage 3b.2 `auditAgainstRFC`) | RFC 6750 + RFC 7644 §2 | RFC 6749 §4.4 + RFC 7644 §2 | RFC 7519 + RFC 7517 + RFC 8414 | RFC 6749 + RFC 7521 | RFC 6749 §4.1 + RFC 7636 | RFC 9449 + RFC 8705 |
-| Security audit prompt invocation (Stage 3b.4 `securityAudit`) | YES | YES | YES (JWKS pinning + algorithm-confusion guard) | YES (SSRF on `jwksUri`) | YES (open-redirect on redirect_uri) | YES (cert-spoofing) |
-| New feature doc in `docs/` | This doc | `docs/Q1_PER_ENDPOINT_OAUTH_CLIENTS.md` | `docs/Q2_EXTERNAL_JWT_VALIDATION.md` | `docs/Q3_PROBE_AUTH_HANDLERS.md` | `docs/Q4_OAUTH_AUTH_CODE.md` | `docs/Q5_MTLS_DPOP.md` |
-| INDEX.md update | YES | YES | YES | YES | YES | YES |
-| CHANGELOG.md version bump | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 |
+| Layer | Q0 | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|---|
+| Unit tests (`.service.spec.ts` + `.controller.spec.ts`) | +5 | +12 | +14 | +18 | +20 | +12 | +18 |
+| E2E tests (`test/e2e/*.e2e-spec.ts`) | +3 | +8 | +10 | +12 | +14 | +8 | +10 |
+| Live tests (`scripts/live-test.ps1` new section) | +3 | +5 | +6 | n/a (admin-only) | +6 | +4 | +6 |
+| Cross-backend parity audit (Stage 2.5) | n/a | YES | YES | n/a | YES | YES | YES |
+| Response contract tests (`expect(ALLOWED_KEYS).toContain(key)`) | +1 | +3 | +3 | +3 | +3 | +2 | +3 (assert no secret/hash key on `wif` response) |
+| RFC audit prompt invocation (Stage 3b.2 `auditAgainstRFC`) | RFC 6750 + RFC 7644 §2 | RFC 6749 §4.4 + RFC 7644 §2 | RFC 7519 + RFC 7517 + RFC 8414 | RFC 6749 + RFC 7521 | RFC 6749 §4.1 + RFC 7636 | RFC 9449 + RFC 8705 | RFC 7521 + RFC 7523 §2.2 + RFC 7519 + RFC 7517 + RFC 6749 §5.2 |
+| Security audit prompt invocation (Stage 3b.4 `securityAudit`) | YES | YES | YES (JWKS pinning + algorithm-confusion guard) | YES (SSRF on `jwksUri`) | YES (open-redirect on redirect_uri) | YES (cert-spoofing) | YES (JWKS SSRF + alg-confusion + tenant isolation + roles enforcement + no-secret-leak) |
+| New feature doc in `docs/` | This doc | `docs/Q1_PER_ENDPOINT_OAUTH_CLIENTS.md` | `docs/Q2_EXTERNAL_JWT_VALIDATION.md` | `docs/Q3_PROBE_AUTH_HANDLERS.md` | `docs/Q4_OAUTH_AUTH_CODE.md` | `docs/Q5_MTLS_DPOP.md` | [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) (already written) |
+| INDEX.md update | YES | YES | YES | YES | YES | YES | YES |
+| CHANGELOG.md version bump | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 | +0.1.0 |
 
 ---
 
@@ -590,6 +609,7 @@ The following entries from [.github/copilot-instructions.md](../.github/copilot-
 - [api/test/e2e/per-endpoint-credentials.e2e-spec.ts](../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) - the contract for G11 admin API
 - [web/src/pages/CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) - the UI surface to extend for Q1 + Q2
 - [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the shipped per-endpoint-bearer architecture
+- [docs/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) - the deep WIF analysis + Q6 backend/UI design this plan references
 - [docs/ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) - the probing methodology that Q3 makes runnable
 - [docs/COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - the API reference to update at every Q sub-phase
 - [docs/strategy/SECURITY_INTAKE_2026-05-17.md](strategy/SECURITY_INTAKE_2026-05-17.md) - Stage X.2 findings that flag DPoP + mTLS

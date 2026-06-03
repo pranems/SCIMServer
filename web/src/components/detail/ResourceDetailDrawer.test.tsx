@@ -215,8 +215,9 @@ describe('ResourceDetailDrawer (User)', () => {
         onClose={() => undefined}
       />,
     );
-    await user.click(screen.getByRole('switch', { name: /active/i }));
-    await user.click(screen.getByRole('button', { name: /Save/i }));
+    await user.click(screen.getByRole('switch', { name: /active/i, hidden: true }));
+    await user.click(screen.getByRole('button', { name: /Save/i, hidden: true }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledTimes(1));
     const args = updateUser.mock.calls[0][0] as { body: Record<string, unknown> };
     const ops = args.body.Operations as Array<{ op: string; path: string; value: unknown }>;
     expect(ops).toContainEqual({ op: 'replace', path: 'active', value: false });
@@ -235,12 +236,12 @@ describe('ResourceDetailDrawer (User)', () => {
       />,
     );
     // First click reveals confirm; doesn't yet delete.
-    await user.click(screen.getByRole('button', { name: /Delete/i }));
+    await user.click(screen.getByRole('button', { name: /Delete/i, hidden: true }));
     expect(deleteUser).not.toHaveBeenCalled();
-    expect(screen.getByTestId('confirm-delete')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('confirm-delete')).toBeInTheDocument());
     // Second click confirms.
-    await user.click(screen.getByRole('button', { name: /Confirm delete/i }));
-    expect(deleteUser).toHaveBeenCalledWith('u-1');
+    await user.click(screen.getByRole('button', { name: /Confirm delete/i, hidden: true }));
+    await waitFor(() => expect(deleteUser).toHaveBeenCalledWith('u-1'));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
@@ -469,10 +470,11 @@ describe('ResourceDetailDrawer (Group)', () => {
         onClose={onClose}
       />,
     );
-    await user.click(screen.getByRole('button', { name: /Delete/i }));
+    await user.click(screen.getByRole('button', { name: /Delete/i, hidden: true }));
     expect(deleteGroup).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: /Confirm delete/i }));
-    expect(deleteGroup).toHaveBeenCalledWith('g-1');
+    await waitFor(() => expect(screen.getByTestId('confirm-delete')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Confirm delete/i, hidden: true }));
+    await waitFor(() => expect(deleteGroup).toHaveBeenCalledWith('g-1'));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

@@ -10,6 +10,7 @@
  */
 
 import { createScimError } from './scim-errors';
+import { SCIM_ERROR_TYPE } from './scim-constants';
 import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
 import {
   getConfigBoolean,
@@ -60,6 +61,7 @@ export function handleRepositoryError(
     });
     throw createScimError({
       status: repositoryErrorToHttpStatus(error.code),
+      scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : undefined,
       detail: `Failed to ${operation}: ${error.message}`,
       diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });

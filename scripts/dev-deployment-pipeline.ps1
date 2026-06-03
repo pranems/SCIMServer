@@ -52,7 +52,7 @@
 
 .PARAMETER PgImage
     PostgreSQL image for the local Stage 2.2 E2E DB (default:
-    postgres:16-alpine). Started on :5432 user=scim pass=scim db=scimdb
+    postgres:17). Started on :5432 user=scim pass=scim db=scimdb
     if not already running.
 
 .PARAMETER SkipDocker
@@ -63,6 +63,24 @@
 
 .PARAMETER SkipDeploy
     Stop after Stage 3c (no image push, no deploy).
+
+.PARAMETER AutoCanary
+    After dev is green, AUTO-promote the same digest to the parallel prod
+    (proudbush, app 'scimserver', ProvIAM tenant - same tenant as dev) using a
+    TRUE blue/green deploy with full verification (live + Playwright + data/ID
+    before-and-after diff). No operator go-ahead is required for THIS canary
+    because it is same-tenant and not the customer-facing instance. Guardrails:
+    every dev gate must be PASS, ZERO gates SKIPPED, no change-freeze file
+    (scripts/.deploy-freeze), and the kill switch env var
+    SCIMSERVER_AUTOCANARY_DISABLE must be unset. The customer-facing prod
+    (calmsand, separate AnandSa tenant) is NEVER auto-promoted - it always
+    needs an explicit operator go-ahead after the canary is green.
+
+.PARAMETER CanaryResourceGroup
+    Resource group of the auto-canary prod (default: scimserver-prod / proudbush).
+
+.PARAMETER CanaryAppName
+    Container App name of the auto-canary prod (default: scimserver / proudbush).
 
 .PARAMETER DryRun
     Print plan only; do not execute.
@@ -106,10 +124,13 @@ param(
     [string]$DevResourceGroup = 'scimserver-dev',
     [string]$DevAppName = 'scimserver-dev',
     [string]$DevFqdn,
-    [string]$PgImage = 'postgres:16-alpine',
+    [string]$PgImage = 'postgres:17',
     [switch]$SkipDocker,
     [switch]$SkipPlaywright,
     [switch]$SkipDeploy,
+    [switch]$AutoCanary,
+    [string]$CanaryResourceGroup = 'scimserver-prod',
+    [string]$CanaryAppName = 'scimserver',
     [switch]$DryRun,
     [switch]$ConfirmTag,
     [string]$ReportDir
@@ -476,6 +497,78 @@ if (-not $SkipDeploy) {
 }
 
 # =============================================================================
+# Stage 6.5 - Auto-canary to parallel prod (proudbush, same tenant)
+# =============================================================================
+# Guarded auto-promotion to the same-tenant parallel prod (proudbush). The
+# customer-facing prod (calmsand, separate AnandSa tenant) is NEVER touched
+# here - it requires an explicit operator go-ahead after this canary is green.
+if ($AutoCanary -and -not $SkipDeploy) {
+    Write-Stage '6.5' 'Auto-canary to parallel prod (proudbush)'
+
+    # Interim gate tally (PENDING operator-prompt gates do not block the canary).
+    $interimFail = ($script:results | Where-Object { $_.Status -eq 'FAIL' }).Count
+    $interimSkip = ($script:results | Where-Object { $_.Status -eq 'SKIPPED' }).Count
+    $freezeFile = Join-Path $repoRoot 'scripts/.deploy-freeze'
+
+    $blocked = $false
+    if ($interimFail -gt 0) {
+        Add-Result -Stage '6.5' -Gate 'Auto-canary precondition: zero FAIL' -Status 'SKIPPED' -Detail "$interimFail failing gate(s) - canary blocked"
+        $blocked = $true
+    }
+    if ($interimSkip -gt 0) {
+        Add-Result -Stage '6.5' -Gate 'Auto-canary precondition: zero SKIPPED' -Status 'SKIPPED' -Detail "$interimSkip skipped gate(s) - canary requires a full clean run"
+        $blocked = $true
+    }
+    if (Test-Path $freezeFile) {
+        Add-Result -Stage '6.5' -Gate 'Auto-canary precondition: no change-freeze' -Status 'SKIPPED' -Detail "change-freeze file present ($freezeFile)"
+        $blocked = $true
+    }
+    if ($env:SCIMSERVER_AUTOCANARY_DISABLE) {
+        Add-Result -Stage '6.5' -Gate 'Auto-canary precondition: kill switch off' -Status 'SKIPPED' -Detail 'SCIMSERVER_AUTOCANARY_DISABLE is set'
+        $blocked = $true
+    }
+
+    if ($blocked) {
+        Write-Host "  Auto-canary BLOCKED by a precondition - falling back to manual prompt." -ForegroundColor Yellow
+    } elseif ($DryRun) {
+        Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush' -Status 'PENDING' -Detail 'dry-run'
+    } else {
+        # Resolve canary FQDN + capture the BEFORE inventory from live blue.
+        $canaryFqdn = az containerapp show -n $CanaryAppName -g $CanaryResourceGroup --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
+        $verifyScript = Join-Path $repoRoot 'scripts/verify-deployment.ps1'
+        $beforeSnap = Join-Path $ReportDir "inventory-$CanaryAppName-before.json"
+
+        if ($canaryFqdn -and (Test-Path $verifyScript)) {
+            Write-Host "  Capturing proudbush before-snapshot from live blue..." -ForegroundColor Yellow
+            & pwsh -NoProfile -File $verifyScript -BaseUrl "https://$canaryFqdn" -ClientSecret 'changeme-oauth' -Label "$CanaryAppName-before" -SnapshotOnly
+        }
+
+        # TRUE blue/green promote with full verification (live + Playwright +
+        # data/ID before-after diff). promote-to-prod.ps1 handles the 0% green
+        # soak, the verify-on-green, the flip, and auto-rollback on any failure.
+        $promoteScript = Join-Path $repoRoot 'scripts/promote-to-prod.ps1'
+        Write-Host "  Auto blue/green promote proudbush ($CanaryAppName/$CanaryResourceGroup) @ $ImageTag..." -ForegroundColor Yellow
+
+        # promote-to-prod.ps1 prompts for 'yes'; feed it non-interactively.
+        $promoteOut = 'yes' | & pwsh -NoProfile -File $promoteScript `
+            -ProdResourceGroup $CanaryResourceGroup `
+            -ProdAppName $CanaryAppName `
+            -ImageTag $ImageTag `
+            -BlueGreen -RunVerification -VerifyPlaywright 2>&1
+        $promoteExit = $LASTEXITCODE
+        $promoteOut | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+
+        if ($promoteExit -eq 0) {
+            Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush (verified)' -Status 'PASS' -Detail "$CanaryAppName @ $ImageTag flipped + verified"
+        } else {
+            Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush' -Status 'FAIL' -Detail "promote-to-prod exit=$promoteExit (green rolled back; customers stayed on blue)"
+        }
+    }
+} elseif (-not $AutoCanary) {
+    Add-Result -Stage '6.5' -Gate 'Auto-canary to parallel prod' -Status 'SKIPPED' -Detail '-AutoCanary not set (manual prod promotion path)'
+}
+
+# =============================================================================
 # Stage 7 - Operator handoff
 # =============================================================================
 Write-Stage 7 'Operator handoff'
@@ -528,10 +621,26 @@ $reportLines += ""
 if ($failCount -eq 0 -and -not $SkipDeploy) {
     $reportLines += "## Next step"
     $reportLines += ""
-    $reportLines += '> Dev is green. To promote to prod (image swap; prod DB / endpoints / IDs preserved):'
-    $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag ' + $ImageTag + '`'
+    $canaryDone = ($script:results | Where-Object { $_.Stage -eq '6.5' -and $_.Status -eq 'PASS' }).Count -gt 0
+    if ($canaryDone) {
+        $reportLines += '> Dev green + parallel prod (proudbush) auto-canary blue/green verified.'
+        $reportLines += '> The customer-facing prod (calmsand, separate AnandSa tenant) is NOT promoted automatically.'
+        $reportLines += '> To promote calmsand, get explicit operator go-ahead, then:'
+        $reportLines += '> ```'
+        $reportLines += '> az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950'
+        $reportLines += '> az account set --subscription AnandSa-Test-150'
+        $reportLines += '> pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag ' + $ImageTag + ' -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright'
+        $reportLines += '> ```'
+    } else {
+        $reportLines += '> Dev is green. Parallel prod (proudbush) blue/green promote (image swap; prod DB / endpoints / IDs preserved):'
+        $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag ' + $ImageTag + ' -BlueGreen -RunVerification -VerifyPlaywright`'
+        $reportLines += ''
+        $reportLines += '> Then, with explicit operator go-ahead, promote calmsand (separate AnandSa tenant):'
+        $reportLines += '> `az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950; az account set --subscription AnandSa-Test-150`'
+        $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag ' + $ImageTag + ' -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright`'
+    }
     $reportLines += ""
-    $reportLines += 'After promote: re-run live-test.ps1 + Playwright against prod FQDN.'
+    $reportLines += 'After every promote: verify-deployment.ps1 runs live + Playwright + data/ID diff automatically.'
 }
 $reportLines | Out-File -FilePath $reportPath -Encoding utf8
 

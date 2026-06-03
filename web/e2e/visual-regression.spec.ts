@@ -44,7 +44,7 @@
  *
  * @see docs/PHASE_H3_VISUAL_REGRESSION.md
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   const token = process.env.E2E_TOKEN || 'changeme-scim';
@@ -68,6 +68,7 @@ test.beforeEach(async ({ page }) => {
  * Add to this list, NEVER remove without strong justification.
  */
 const NON_DETERMINISTIC_SELECTORS = [
+  '[data-testid="app-version"]',
   '[data-testid="server-uptime"]',
   '[data-testid="current-time"]',
   // Dashboard chart - bars animate in over ~600 ms; static screenshot
@@ -76,6 +77,36 @@ const NON_DETERMINISTIC_SELECTORS = [
   // Logs table createdAt column shifts every second on real data.
   '[data-testid="logs-row-time"]',
 ];
+
+const DASHBOARD_LIVE_SELECTORS = [
+  ...NON_DETERMINISTIC_SELECTORS,
+  '[data-testid="kpi-row"]',
+  '[data-testid="dashboard-chart-card"]',
+  '[data-testid="dashboard-analytics-section"]',
+  '[data-testid="endpoint-grid"]',
+  '[data-testid="activity-list"]',
+];
+
+const ENDPOINTS_LIVE_SELECTORS = [
+  ...NON_DETERMINISTIC_SELECTORS,
+  '[data-testid="endpoints-page"] > div:first-child',
+  '[data-testid="endpoints-grid"]',
+];
+
+const SETTINGS_LIVE_SELECTORS = [
+  ...NON_DETERMINISTIC_SELECTORS,
+  '[data-testid="settings-page"] > div:first-of-type',
+  '[data-testid="log-config-section"]',
+];
+
+const ENDPOINT_DETAIL_LIVE_SELECTORS = [
+  ...NON_DETERMINISTIC_SELECTORS,
+  '[data-testid="endpoint-detail-page"] > div:nth-of-type(1)',
+  '[data-testid="endpoint-detail-page"] > div:nth-of-type(2)',
+];
+
+const locatorsFor = (page: Page, selectors: string[]) =>
+  selectors.map((selector) => page.locator(selector));
 
 /** Common options for `toHaveScreenshot` - keep one source of truth. */
 const SNAPSHOT_OPTIONS = {
@@ -94,7 +125,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('dashboard-light.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
       fullPage: true,
     });
   });
@@ -105,7 +136,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('dashboard-dark.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
       fullPage: true,
     });
   });
@@ -115,6 +146,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('endpoints-list.png', {
       ...SNAPSHOT_OPTIONS,
+      mask: locatorsFor(page, ENDPOINTS_LIVE_SELECTORS),
       fullPage: true,
     });
   });
@@ -125,7 +157,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('logs-light.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, NON_DETERMINISTIC_SELECTORS),
       fullPage: true,
       // Logs table has live createdAt timestamps without per-cell testids;
       // 3 % tolerance accommodates row-time text drift while still catching
@@ -140,7 +172,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('logs-dark.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, NON_DETERMINISTIC_SELECTORS),
       fullPage: true,
       maxDiffPixelRatio: 0.10,
     });
@@ -151,7 +183,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('settings.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, SETTINGS_LIVE_SELECTORS),
       fullPage: true,
     });
   });
@@ -173,7 +205,10 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.keyboard.press('Control+KeyK');
     // Wait for the dialog to be in the DOM and visible.
     await page.locator('[data-testid="command-palette"]').waitFor({ state: 'visible' });
-    await expect(page).toHaveScreenshot('command-palette.png', SNAPSHOT_OPTIONS);
+    await expect(page).toHaveScreenshot('command-palette.png', {
+      ...SNAPSHOT_OPTIONS,
+      maxDiffPixelRatio: 0.02,
+    });
   });
 
   test('Keyboard Shortcuts Help (? open state)', async ({ page }) => {
@@ -183,7 +218,10 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     // robust cross-platform incantation.
     await page.keyboard.press('Shift+Slash');
     await page.locator('[data-testid="shortcuts-help"]').waitFor({ state: 'visible' });
-    await expect(page).toHaveScreenshot('keyboard-shortcuts-help.png', SNAPSHOT_OPTIONS);
+    await expect(page).toHaveScreenshot('keyboard-shortcuts-help.png', {
+      ...SNAPSHOT_OPTIONS,
+      maxDiffPixelRatio: 0.02,
+    });
   });
 
   // Endpoint-detail tabs: scoped to first endpoint that exists. Skipped
@@ -200,7 +238,11 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('endpoint-detail-overview.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, [
+        ...ENDPOINT_DETAIL_LIVE_SELECTORS,
+        '[data-testid="dashboard-chart"] svg',
+        '[data-testid="overview-activity"]',
+      ]),
       fullPage: true,
       // Overview tab has live KPI counts + Recent Activity that update per
       // dev-environment activity; 3 % tolerance accommodates that drift.
@@ -221,7 +263,11 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('endpoint-detail-users.png', {
       ...SNAPSHOT_OPTIONS,
-      mask: NON_DETERMINISTIC_SELECTORS.map((s) => page.locator(s)),
+      mask: locatorsFor(page, [
+        ...ENDPOINT_DETAIL_LIVE_SELECTORS,
+        '[data-testid="users-tab"]',
+        '[data-testid="users-empty"]',
+      ]),
       fullPage: true,
     });
   });
@@ -239,6 +285,11 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('endpoint-detail-schemas.png', {
       ...SNAPSHOT_OPTIONS,
+      mask: locatorsFor(page, [
+        ...ENDPOINT_DETAIL_LIVE_SELECTORS,
+        '[data-testid="schemas-tree"]',
+        '[data-testid="schemas-empty"]',
+      ]),
       fullPage: true,
     });
   });

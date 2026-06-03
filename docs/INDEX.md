@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.52.3 - **Updated:** May 28, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 6,031 tests (3,808 unit + 1,217 E2E + 1,006 web vitest) + 76 Playwright + 1,027 live SCIM
+> **Version:** 0.53.0 - **Updated:** June 2, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 7,277 checks (3,816 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,027 live SCIM + 15 PowerShell)
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, architecture, quick start, compliance, deployment, full API summary |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats - LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 to v0.40.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 to v0.53.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -31,6 +31,7 @@
 | Document | Description |
 |----------|-------------|
 | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 84 routes, request/response examples, route summary table |
+| [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
@@ -106,6 +107,7 @@
 | [SCIM_CASE_INSENSITIVITY_REFERENCE.md](SCIM_CASE_INSENSITIVITY_REFERENCE.md) | Case-insensitivity rules (RFC 7643 S2.1) |
 | [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) | RFC schema & extension URN deep dive |
 | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery endpoints RFC audit - all gaps resolved |
+| [DISCOVERY_OUTPUT_VS_ADMIN_INPUT_INTEROP.md](DISCOVERY_OUTPUT_VS_ADMIN_INPUT_INTEROP.md) | Can discovery output (`/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`) from foreign servers or SCIMServer itself be fed as-is into `POST`/`PATCH /admin/endpoints`? Shape diff, validation rejections, RFC compliance verdict |
 
 ## Per-Endpoint Configuration
 
@@ -130,6 +132,8 @@
 | [G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md](G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md) | Primary sub-attribute enforcement (RFC 7643 S2.4) - tri-state config |
 | [PATCH_NULL_HANDLING_RFC_COMPLIANCE.md](PATCH_NULL_HANDLING_RFC_COMPLIANCE.md) | **PATCH null-handling RFC compliance (v0.52.3, F1-F9)** - RFC 7644 S3.5.2 null semantics across all 3 engines (User/Group/Generic). F1 mergeComplexAttribute null-as-unset merge for complex parents. F2 explicit-null Group.members clear regardless of `PatchOpAllowRemoveAllMembers` flag (per S3.5.2.2 ex.3). F3 noTarget on zero-match valuePath via `ValuePathOpResult` dispatch. F4 `findInvalidMultiValuedElement` rejects null array elements with `invalidValue`. F5 `pruneEmptyExtensions` removes empty extension URN blocks from payload AND `schemas[]`. F6/F7 `ExtensionPathExpression.subAttribute` + new `ExtensionValuePathExpression` (filter on extension valuePath). F8 GenericPatchEngine inherits F1/F4/F5/F6/F7 for custom resource type parity. F9 `validatePatchOperationValue` null contract documented (RFC 7644 S3.5.2.3 - null at per-op layer is intentional UNASSIGN signal; post-PATCH `validatePayloadSchema` is the authoritative required-cleared check). New 19-case diagnostic `scripts/null-patch-test.ps1`, new E2E spec `api/test/e2e/patch-null-handling.e2e-spec.ts` (20 tests), new live-test section `9z-AK` (22 assertions T01-T18 + F9 + setup). Validated 1027/1027 PASS end-to-end across inmemory + Prisma + dev Azure. |
 | [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint credentials - 3-tier auth chain |
+| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | **Workload Identity Federation (WIF) deep analysis + SCIMServer design** - Entra's secret-less SCIM auth via RFC 7523 §2.2 JWT Bearer Assertion. Distinguishes WIF's two-step token-exchange (Entra assertion -> ISV validates via JWKS -> ISV issues own short-lived token) from direct external-JWT usage. Full protocol flow (sequence + flowchart + ER diagrams), claims table, 3-step admin setup with reciprocal ISV-portal obligation, gap analysis vs current OAuth issuer, proposed Phase Q6 token-exchange sub-phase, backend design (`wif` credentialType + assertion validator + per-endpoint token endpoint), UI design (CredentialsTab "Federated Identity" section using R9 Copyable/Editable primitives + Test Connection), security mitigations (JWKS SSRF, algorithm confusion, tenant isolation), and full per-layer test matrix. |
+| [ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md) | ISV auth pattern survey + Phase Q gap plan (Q0-Q6) |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Bulk operations (RFC 7644 S3.7) |
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | /Me endpoint (RFC 7644 S3.11) |
 | [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Sorting + service deduplication |

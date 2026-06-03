@@ -24,7 +24,7 @@
   table shapes are byte-identical and pg_dump | pg_restore is a clean
   pipeline with no transformation needed.
 
-    All Postgres tooling runs in containerized postgres:17-alpine (no local
+    All Postgres tooling runs in containerized postgres:17 (no local
   psql/pg_dump install required, matches what scripts/deploy-azure.ps1 uses).
 
 .PARAMETER Stage
@@ -133,7 +133,7 @@ $repoRoot   = Split-Path -Parent $PSScriptRoot
 $stateDir   = Join-Path $repoRoot 'scripts\state'
 $dumpDir    = Join-Path $stateDir 'restore'
 $stamp      = Get-Date -Format 'yyyyMMdd-HHmmss'
-$pgImage    = 'postgres:17-alpine'
+$pgImage    = 'postgres:17'
 
 if (-not (Test-Path $dumpDir)) { New-Item -ItemType Directory -Path $dumpDir | Out-Null }
 

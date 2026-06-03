@@ -1809,6 +1809,8 @@ describe('handleRepositoryError', () => {
       handleRepositoryError(repoError, 'create user', mockLogger, 'scim.user' as any);
     } catch (e) {
       expect((e as HttpException).getStatus()).toBe(409);
+      const body = (e as HttpException).getResponse() as Record<string, unknown>;
+      expect(body.scimType).toBe('uniqueness');
     }
   });
 

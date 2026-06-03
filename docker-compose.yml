@@ -3,7 +3,7 @@
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     container_name: scimserver-postgres
     environment:
       POSTGRES_DB: scimdb

@@ -13,7 +13,7 @@ This prompt is the **mandatory** orchestrator for every full dev deployment of S
 When the operator asks to "deploy to dev", "prepare for prod", "run full validation", "test on the latest deployment", "do the full pipeline", or any equivalent phrase, the agent MUST:
 1. Run `pwsh -NoProfile -File scripts/dev-deployment-pipeline.ps1` (full mode, no `-Skip*` flags), OR walk every numbered step in this prompt manually with a per-step PASS / FAIL / SKIPPED-with-reason row in a report file under `test-results/dev-deploy-<timestamp>.md`.
 2. NEVER claim "validation complete" or "dev is green" without an explicit per-gate result. Aggregated phrases ("all tests passed") are insufficient.
-3. NEVER promote to prod without an explicit confirmation message from the operator (see Section 8 below).
+3. NEVER promote the customer-facing prod (calmsand) without an explicit confirmation message from the operator (see Section 8 below). The same-tenant parallel prod (proudbush) MAY be auto-canaried via `-AutoCanary` (Stage 6.5) under guardrails; calmsand always stays behind the manual gate, and its ingress is flipped only after proudbush proves the flow.
 
 ## Standing rule: Playwright coverage for every observation, new change, new functionality, new fix
 
@@ -64,7 +64,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 ### Stage 2 - Local test gates
 
 2.1. **API unit jest** (`cd api; npm test`) - capture pass/fail counts. Default env (no `PERSISTENCE_BACKEND` override).
-2.2. **API E2E jest** (`cd api; npm run test:e2e`) - needs PostgreSQL on `localhost:5432` (user=scim, pass=scim, db=scimdb). Orchestrator starts a `postgres:16-alpine` container if not already running.
+2.2. **API E2E jest** (`cd api; npm run test:e2e`) - needs PostgreSQL on `localhost:5432` (user=scim, pass=scim, db=scimdb). Orchestrator starts a `postgres:17` container if not already running.
 2.3. **Web vitest** (`cd web; npm test`) - capture pass/fail counts.
 2.4. **Web vitest coverage gate** (`cd web; npm run test:coverage`) - meets ratchet floors: lines:78 / branches:70 / functions:65 / statements:75. Floor never lowers; raise when feasible.
 2.5. `crossBackendParityAudit` - for any changed file matching `isInMemoryBackend`, both backends behave identically.
@@ -125,18 +125,38 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 6.4. **`Session_starter.md` + `docs/CONTEXT_INSTRUCTIONS.md`** updates - latest test counts, version, achievement row.
 6.5. **Atomic commits** - separate commits for: (a) test additions/fixes, (b) production code changes, (c) doc updates, (d) version bumps. Never combine in one commit. Always `git commit -m "..."` (never `--amend` on pushed commits, never `--no-verify`).
 
-### Stage 7 - Operator handoff for prod
+### Stage 6.5 - Auto-canary to parallel prod (proudbush, same tenant)
+
+Runs ONLY when `dev-deployment-pipeline.ps1 -AutoCanary` is passed AND `-SkipDeploy` is not. This auto-promotes the dev-validated image to the **same-tenant parallel prod (proudbush)** as a true blue/green canary. The customer-facing prod (calmsand) is NEVER touched here.
+
+6.5.1. **Guardrails (any one blocks the canary, falls back to the manual Stage 7 path):**
+   - interim FAIL count > 0
+   - interim SKIPPED count > 0 (a clean run is required)
+   - change-freeze file `scripts/.deploy-freeze` present
+   - kill switch env `SCIMSERVER_AUTOCANARY_DISABLE` set
+6.5.2. **Before-snapshot** - capture proudbush live inventory via `verify-deployment.ps1 -SnapshotOnly -Label scimserver-before`.
+6.5.3. **Blue/green promote + verify** - `promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <SHA> -BlueGreen -RunVerification -VerifyPlaywright` (fed `yes` non-interactively). This pins blue by name, creates green at 0%, soaks the `--green` label FQDN, runs `verify-deployment.ps1` (live SCIM + Playwright + data/ID before-after diff) on green, flips to green only on pass, re-verifies the public FQDN, and auto-rolls-back on any failure. Customers stay on blue throughout the soak.
+6.5.4. **Result** - PASS on `promote-to-prod` exit 0; FAIL otherwise (green is already rolled back, blue untouched). A FAIL here does NOT auto-fix - surface it and stop before calmsand.
+6.5.5. **Live-env Playwright excludes data-coupled pixel baselines.** `verify-deployment.ps1` runs Playwright with `--grep-invert 'Visual regression|Visual Snapshots'` by default - those `toHaveScreenshot` baselines were captured against dev SCIM data and false-fail against a live prod env with different data (a 27% Schemas-tab pixel diff aborted the 2bc338e canary before this fix). A pixel FAIL against a live env is a data mismatch, not a code regression. Idempotency short-circuits only when the SERVED image (highest-weight revision) equals desired, never on the app template alone. Post-flip ingress fields are briefly inconsistent (~8s); `az containerapp ingress traffic show` is authoritative.
+
+### Stage 7 - Operator handoff for prod (customer-facing calmsand)
+
+**Canary-first invariant:** calmsand's ingress is flipped ONLY after the proudbush canary (Stage 6.5, or a manual proudbush blue/green) has been proven green with full verification. Never roll the ingress change to calmsand before it has been seen working on proudbush.
 
 7.1. Surface a clear summary:
    - Image promoted to dev: `<registry>/scimserver:<SHA>` (digest `sha256:...`)
    - Dev live SCIM: `<pass>/<total>` in `<elapsed>s`
    - Dev Playwright: `<pass>/<total>` in `<elapsed>s` (across `<spec-count>` specs)
    - Dev data integrity: `<endpoints>` endpoints / `<users>` users / `<groups>` groups, **0 changes**, **0 ID changes**
+   - Proudbush canary (if Stage 6.5 ran): blue/green flip + verification result
    - Gap list (every SKIPPED or FAIL gate with reason)
-7.2. **Ask the operator** for explicit `promote to prod` confirmation. NEVER auto-promote.
-7.3. If approved: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <SHA>` - image swap only; prod DB / endpoints / IDs preserved.
-7.4. After promote: repeat Stage 4.7 (live SCIM) + 5.3 (Playwright) against prod FQDN (`https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io`).
-7.5. Repeat Stage 6.1 against prod (before/after inventory diff). Any non-zero data delta on prod is a P0 incident.
+7.2. **Ask the operator** for explicit `promote to prod` confirmation for calmsand. NEVER auto-promote calmsand. (Proudbush MAY have been auto-canaried in Stage 6.5; calmsand always stays behind this manual gate.)
+7.3. If proudbush was NOT already canaried (no `-AutoCanary`), promote it FIRST as the canary, then calmsand. Both use true blue/green (`-BlueGreen -RunVerification -VerifyPlaywright`), each in its own `az` tenant context:
+   - **Parallel prod canary (proudbush, ProvIAM tenant) - FIRST:** `az account set --subscription ProvIAM_Subscription` then `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <SHA> -BlueGreen -RunVerification -VerifyPlaywright`.
+   - **Customer-facing prod (calmsand, separate AnandSa-Test-150 tenant) - ONLY after proudbush is green + operator go-ahead:** the image MUST be on GHCR first (calmsand pulls anonymously from GHCR, not the ProvIAM ACR). Re-auth: `az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950` then `az account set --subscription AnandSa-Test-150`, then `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <SHA> -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright` (explicit `-ImageTag` is REQUIRED - the dev app is in the other tenant).
+   - Image swap only; prod DB / endpoints / IDs preserved on both. `-BlueGreen` keeps customers on blue until green passes verification.
+7.4. `promote-to-prod.ps1 -RunVerification` already runs live SCIM + Playwright + data diff on green and post-flip; no separate re-run needed. (Legacy auto-flip without `-BlueGreen` still requires a manual Stage 4.7 + 5.3 re-run.)
+7.5. Blue/green rollback is instant (traffic flip back to blue, which stays warm). The script auto-rolls-back on verification failure and prints the exact `az containerapp ingress traffic set` command. Any non-zero data delta on prod is a P0 incident.
 
 ## Report structure (mandatory)
 

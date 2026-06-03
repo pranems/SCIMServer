@@ -33,7 +33,7 @@ Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17**
 
 | Dimension | Before (Phase 2) | After (Phase 3) |
 |---|---|---|
-| **Database** | better-sqlite3 (embedded) | PostgreSQL 17-alpine (networked) |
+| **Database** | better-sqlite3 (embedded) | PostgreSQL 17 (networked) |
 | **Column types** | `TEXT` for everything | `UUID`, `CITEXT`, `JSONB`, `TIMESTAMPTZ`, `VARCHAR` |
 | **Case insensitivity** | `userNameLower` / `displayNameLower` helper columns | PostgreSQL `CITEXT` extension - native |
 | **Payload storage** | `rawPayload TEXT` (JSON string) | `payload JSONB` - queryable, GIN-indexable |
@@ -99,7 +99,7 @@ Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17**
                 │
                 ▼
 ┌───────────────────────────────┐
-│   PostgreSQL 17-alpine        │
+│   PostgreSQL 17               │
 │   Extensions:                 │
 │     • citext   (case-insens.) │
 │     • pgcrypto (UUID gen)     │
@@ -327,7 +327,7 @@ This preserves the domain model's `rawPayload: string` contract while storing da
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim
@@ -374,8 +374,8 @@ Phase 3 supports **four** deployment scenarios. Each has distinct container topo
 
 | # | Scenario | PostgreSQL | API Container | Network | DATABASE_URL | Port |
 |---|---|---|---|---|---|---|
-| 1 | **Docker Compose (Dev)** | `postgres:17-alpine` container | Built from `Dockerfile` | Docker bridge (`scimserver_default`) | `postgresql://scim:scim@postgres:5432/scimdb` | `8080` |
-| 2 | **Docker Compose (Debug)** | `postgres:17-alpine` container | `node:24` with live mount | Docker bridge | `postgresql://scim:scim@postgres:5432/scimdb` | `3000` + `9229` |
+| 1 | **Docker Compose (Dev)** | `postgres:17` container | Built from `Dockerfile` | Docker bridge (`scimserver_default`) | `postgresql://scim:scim@postgres:5432/scimdb` | `8080` |
+| 2 | **Docker Compose (Debug)** | `postgres:17` container | `node:24` with live mount | Docker bridge | `postgresql://scim:scim@postgres:5432/scimdb` | `3000` + `9229` |
 | 3 | **Standalone Docker Run** | External (host or remote) | Built from `Dockerfile` | Host / bridge | Varies (see below) | `8080` |
 | 4 | **E2E / Unit Tests** | None (InMemory backend) | None (Jest in-process) | localhost | Not used | `3000` (test) |
 | 5 | **Azure Container Apps** | Azure PG Flexible Server | Container App (ACR/GHCR) | Azure VNet | `postgresql://...@<server>.postgres.database.azure.com:5432/scimdb?sslmode=require` | `80`→HTTPS |
@@ -397,7 +397,7 @@ Phase 3 supports **four** deployment scenarios. Each has distinct container topo
  │   │                                                                │  │
  │   │   ┌──────────────────────┐      ┌──────────────────────────┐  │  │
  │   │   │ postgres             │      │ api                      │  │  │
- │   │   │ (postgres:17-alpine) │◄────▶│ (Dockerfile multi-stage) │  │  │
+ │   │   │ (postgres:17)        │◄────▶│ (Dockerfile multi-stage) │  │  │
  │   │   │                      │ 5432 │                          │  │  │
  │   │   │ DB: scimdb           │      │ NestJS + Prisma 7        │  │  │
  │   │   │ User: scim           │      │ PrismaPg adapter         │  │  │
@@ -441,7 +441,7 @@ Browser ──GET http://localhost:8080/──▶ Docker:8080 ──▶ api cont
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     container_name: scimserver-postgres
     environment:
       POSTGRES_DB: scimdb
@@ -538,7 +538,7 @@ docker compose down -v
  │   │                                                                │  │
  │   │   ┌──────────────────────┐      ┌──────────────────────────┐  │  │
  │   │   │ postgres             │      │ api (debug)              │  │  │
- │   │   │ (postgres:17-alpine) │◄────▶│ (node:24 with live code) │  │  │
+ │   │   │ (postgres:17)        │◄────▶│ (node:24 with live code) │  │  │
  │   │   │                      │ 5432 │                          │  │  │
  │   │   │ Same config as       │      │ npm run start:dev        │  │  │
  │   │   │ Scenario 1           │      │ (ts-node + nodemon)      │  │  │
@@ -560,7 +560,7 @@ docker compose down -v
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     # ... same as Scenario 1 ...
 
   api:
@@ -1196,7 +1196,7 @@ The baseline migration creates all tables, indexes, constraints, and extensions 
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | PostgreSQL 17-alpine + API service orchestration |
+| `docker-compose.yml` | PostgreSQL 17 + API service orchestration |
 | `scripts/init-pg-extensions.sql` | PostgreSQL extension initialization |
 | `api/prisma/migrations/20260301000000_postgresql_baseline/migration.sql` | Fresh PostgreSQL baseline migration |
 
@@ -1235,7 +1235,7 @@ PASS: 301 / 302
 FAIL: 1 (Non-existent endpoint returns 404 - pre-existing)
 Duration: ~10s
 Container: scimserver-api (healthy)
-Database: scimserver-postgres (PostgreSQL 17-alpine)
+Database: scimserver-postgres (PostgreSQL 17)
 ```
 
 ---

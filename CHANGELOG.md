@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-06-02 - Phase Q follow-up: Workbench redesign, endpoint wiki, docs, and PostgreSQL parity
+
+### Added
+
+- Redesigned the Workbench into full-width stacked panels with toolbar, request headers editor, request body toolbar, response toolbar, history copy/export, path autocomplete, and curl/fetch/Insomnia/Postman export flows.
+- Added a Workbench layout toggle so operators can switch request/response panels between stacked and side-by-side layouts. The choice is persisted in localStorage and covered by a Playwright browser spec.
+- Added typed Microsoft test custom-extension attributes to the Entra ID preset where placeholder extensions were previously empty.
+- Added [docs/ENDPOINT_CREATION_WIKI.md](docs/ENDPOINT_CREATION_WIKI.md), [docs/DISCOVERY_OUTPUT_VS_ADMIN_INPUT_INTEROP.md](docs/DISCOVERY_OUTPUT_VS_ADMIN_INPUT_INTEROP.md), and [docs/OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md](docs/OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md).
+
+### Changed
+
+- Standardized active Docker/local PostgreSQL tooling on `postgres:17` (Debian-based) instead of Alpine images to better match Azure Database for PostgreSQL Flexible Server's glibc runtime.
+- Fixed the runtime version endpoint metadata provider from `PostgreSQL 17-alpine` to `PostgreSQL 17`.
+- Refreshed high-value user-facing docs for current version, test counts, Workbench capabilities, Docker image guidance, and admin profile/discovery interop guidance.
+
+### Validation
+
+- API build: PASS.
+- API lint: PASS, baseline 0 errors / 465 warnings.
+- API E2E against `postgres:17`: 63 suites / 1,217 tests PASS.
+- Web TypeScript baseline preserved at 96/96.
+- Web vitest: 1,068/1,068 PASS after Workbench export utilities.
+- Workbench layout Playwright spec: 1/1 PASS vs dev.
+- Docker Compose: `scimserver-postgres` image is `postgres:17`; DB reports PostgreSQL 17.10 Debian; version endpoint reports `PostgreSQL 17`.
+- Docker live tests: 1,027/1,027 PASS.
+- Prod to dev data audit: dev is already a strict superset of new prod by primary key IDs across Endpoint, ScimResource, ResourceMember, and EndpointCredential.
+
 ### Fixed - ResourceDetailDrawer surfaces all non-editable attributes (Finding-D #2)
 
 Operator visual verification on dev (R6) caught a second Finding-D companion bug: the [user detail drawer](web/src/components/detail/ResourceDetailDrawer.tsx) rendered ONLY the 3 editable scalars (`userName` / `displayName` / `active`) even when the SCIM resource carried `name.familyName`, `emails[0].value`, `externalId`, and the enterprise extension URN with `employeeNumber`. Hiding half the SCIM record broke the operator's mental model and forced a trip to the raw-JSON workbench for every check.
