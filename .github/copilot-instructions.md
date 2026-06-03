@@ -420,7 +420,11 @@ Security checks are intentionally threaded through every stage. This map makes t
 When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to an active gate, this map MUST be updated in the same commit.
 
 ### Prod Promotion (separate, on-demand only)
-- **NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
+- **Customer-facing prod (calmsand) is NEVER automatic.** Only when the user explicitly requests via `deployAndPromote` prompt or manual `pwsh scripts/promote-to-prod.ps1`.
+- **Auto-canary carve-out (parallel prod / proudbush, SAME tenant as dev):** `dev-deployment-pipeline.ps1 -AutoCanary` MAY auto-promote a dev-validated image to proudbush as a true blue/green canary (Stage 6.5), because proudbush shares the dev tenant and the operator does not worry about its traffic. The auto-canary is guarded: it is BLOCKED if there is any FAIL gate, any SKIPPED gate, a change-freeze file `scripts/.deploy-freeze`, or the kill switch env `SCIMSERVER_AUTOCANARY_DISABLE`. A blocked canary falls back to the manual prompt. calmsand is NEVER auto-promoted - its ingress is flipped only after the proudbush canary is proven green AND the operator gives an explicit `promote to prod`.
+- **Canary-first invariant:** the ingress / traffic-routing change (switch from `latestRevision` auto-routing to named-revision weighted routing) MUST be proven on proudbush BEFORE it is applied to calmsand. Never roll an unproven ingress change to the customer-facing prod first.
+- **True blue/green:** `promote-to-prod.ps1 -BlueGreen` pins blue by revision name (100%), creates green at 0%, soaks the `--green` label FQDN, runs `verify-deployment.ps1` (live SCIM + Playwright + data/ID before-after diff) on green, flips to green only on pass, re-verifies the public FQDN, and auto-rolls-back on any failure. Customers stay on blue throughout. Legacy auto-flip (no `-BlueGreen`) remains the default for backward compat but has no 0% soak.
+- **Expected canary-ahead window:** after an auto-canary run, proudbush will intentionally be one version AHEAD of calmsand until the operator approves the calmsand promote. This drift is EXPECTED and must NOT be flagged as the v0.52.3-style stale-prod mistake. The stale-prod rule applies only when a MANUAL dual-promote leaves one behind unintentionally.
 - Prod promotion requires Stage 4.4 (dev live tests) green on the exact image SHA being promoted, not the "latest" tag.
 
 ### Deployment Topology (CURRENT - corrected 2026-05-29 post-promote)
@@ -438,7 +442,8 @@ There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update i
 - Running real workloads (Ryan-Gruss, Ryan-Eakins, OpenText-* ISVs, 2,000+ users)
 - Uses GHCR image pulls (anonymous; public path)
 - Multiple revision mode with `latestRevision: True, weight: 100` (auto-routes to newest)
-- Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version>` (requires `az account set --subscription AnandSa-Test-150` first)
+- **Separate Azure AD tenant** `9de357c6-4488-4a8d-bd2f-14696f1af950` (not the ProvIAM `f08e6aff-...` tenant) - requires its own `az login` before promotion
+- Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version> -Subscription AnandSa-Test-150` (requires `az login` into the AnandSa tenant then `az account set --subscription AnandSa-Test-150` first; pass `-ImageTag` explicitly - dev app is in the other tenant)
 
 **Parallel prod (proudbush, eastus, ProvIAM_Subscription):**
 - App `scimserver` / RG `scimserver-prod` (different from calmsand's `scimserver-rg-prod`) / FQDN `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io`
@@ -446,7 +451,23 @@ There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update i
 - Same SCIM contract surface; both are kept in lockstep version-wise
 - Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <version>` (in `ProvIAM_Subscription`)
 
-**Important when promoting prod:** if the operator says "promote to prod" without naming which one, ask which one (or promote BOTH). Both deserve the same image. Single-prod promotion leaves the other on a stale version - that's exactly the v0.52.3 mistake of 2026-05-29 (proudbush got v0.52.3 first; calmsand left on v0.52.2 until the operator surfaced the discrepancy via screenshot).
+**Important when promoting prod:** ALWAYS canary-first - promote proudbush (same-tenant parallel prod) FIRST with `-BlueGreen -RunVerification -VerifyPlaywright`, prove it green, and ONLY THEN promote calmsand (after explicit operator go-ahead). If the operator says "promote to prod" without naming which one, promote proudbush as the canary and ask for confirmation before calmsand. Both deserve the same image. An UNINTENTIONAL single-prod promotion that leaves the other behind is the v0.52.3 mistake of 2026-05-29 (proudbush got v0.52.3 first; calmsand left on v0.52.2 until the operator surfaced it). Note: an auto-canary run intentionally leaves proudbush ahead until the calmsand go-ahead - that drift is expected, not the v0.52.3 mistake.
+
+**CRITICAL - the two prods live in DIFFERENT Azure AD tenants.** Dev + parallel prod (proudbush) are in `ProvIAM_Subscription`, tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373`. Customer-facing prod (calmsand) is in `AnandSa-Test-150`, a **separate tenant** `9de357c6-4488-4a8d-bd2f-14696f1af950` (distinct from the ProvIAM tenant). Consequences for promotion:
+- You **cannot** promote both prods in a single `az` session. You must re-auth / switch context between them. Promote proudbush + dev work under the ProvIAM tenant; promoting calmsand requires `az login` into the AnandSa tenant first, then `az account set --subscription AnandSa-Test-150`.
+- The calmsand tenant **cannot pull from the ProvIAM-tenant ACR** (`acrscimserver20622.azurecr.io`) - cross-tenant ACR pull would need cross-tenant credentials. That is WHY calmsand pulls the image anonymously from **GHCR** (`ghcr.io/pranems/scimserver`). The publish step MUST push to GHCR (`publish-ghcr.yml`) before a calmsand promotion, not only ACR.
+- For the calmsand promotion always pass `-ImageTag <version>` explicitly. Do NOT let `promote-to-prod.ps1` auto-read the tag from the dev app - the dev app is in the OTHER tenant and would not be reachable in the active (AnandSa) `az` context.
+- Promotion commands (run in the matching tenant context for each):
+  ```powershell
+  # proudbush parallel prod + dev (ProvIAM tenant - usually already the active context)
+  az account set --subscription ProvIAM_Subscription
+  pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <version>
+
+  # calmsand customer-facing prod (separate AnandSa tenant - MUST re-login)
+  az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950
+  az account set --subscription AnandSa-Test-150
+  pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version> -Subscription AnandSa-Test-150
+  ```
 
 ### Deployment Topology (HISTORICAL - retired)
 
