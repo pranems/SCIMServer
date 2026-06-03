@@ -76,6 +76,7 @@ param(
     [string]$Label = 'target',
     [bool]$RunLiveTests = $true,
     [switch]$RunPlaywright,
+    [switch]$IncludeVisualBaselines,
     [string]$BeforeSnapshot,
     [switch]$SnapshotOnly,
     [string]$ReportDir
@@ -256,7 +257,21 @@ if ($RunPlaywright) {
         try {
             $env:E2E_BASE_URL = $BaseUrl
             $env:E2E_TOKEN = $ScimToken
-            npx playwright test --reporter=line
+            # Pixel-baseline specs (visual-regression.spec.ts / visual-snapshots.spec.ts)
+            # are captured against a FIXED fixture and are data-coupled: the rendered
+            # content (e.g. an endpoint's Schemas card height) depends on the SCIM data in
+            # the target environment. Running them against a live env whose data differs
+            # from the baseline-capture env guarantees a false toHaveScreenshot() mismatch,
+            # which would trip the blue/green abort on a perfectly healthy image. They are
+            # validated separately in Stage 5.3 against the dev FQDN where baselines live.
+            # The promote gate runs only the FUNCTIONAL specs. Opt back in with
+            # -IncludeVisualBaselines if the target shares the baseline fixture data.
+            $pwArgs = @('playwright', 'test', '--reporter=line')
+            if (-not $IncludeVisualBaselines) {
+                $pwArgs += @('--grep-invert', 'Visual regression|Visual Snapshots')
+                Write-Host "   (excluding data-coupled pixel-baseline specs; pass -IncludeVisualBaselines to include)" -ForegroundColor DarkGray
+            }
+            npx @pwArgs
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "   ❌ Playwright suite FAILED (exit=$LASTEXITCODE)" -ForegroundColor Red
                 $failures += "playwright exit=$LASTEXITCODE"

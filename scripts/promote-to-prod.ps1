@@ -293,8 +293,31 @@ Write-Host "   Current prod image: $prodImage" -ForegroundColor Gray
 Write-Host "   Desired prod image: $desiredImage" -ForegroundColor Yellow
 Write-Host "   Pinned via immutable digest: $devDigest" -ForegroundColor Gray
 
-if ($prodImage -eq $desiredImage) {
-    Write-Host "   ✅ Production already running $ImageTag at $devDigest - nothing to do." -ForegroundColor Green
+# Determine the image actually being SERVED (the highest-traffic active revision),
+# not just the app template image. After a blue/green ABORT the app template can be
+# the desired image (it was set when the green revision was created) while traffic
+# is still pinned to the old blue revision and the green revision was deactivated.
+# A template-only check would wrongly short-circuit and never complete the flip.
+$servingRevName = $null
+$servingImage = $null
+try {
+    $trafficJson = az containerapp ingress traffic show --name $ProdAppName --resource-group $ProdResourceGroup -o json 2>$null | ConvertFrom-Json
+    $topRev = $trafficJson | Sort-Object -Property weight -Descending | Select-Object -First 1
+    if ($topRev -and $topRev.revisionName) {
+        $servingRevName = $topRev.revisionName
+        $servingImage = az containerapp revision show --name $ProdAppName --resource-group $ProdResourceGroup `
+            --revision $servingRevName --query "properties.template.containers[0].image" -o tsv 2>$null
+    }
+} catch { }
+# Fallback to the template image when traffic is in latestRevision mode (no explicit
+# revisionName) - there the template IS the served image, preserving original behavior.
+if ([string]::IsNullOrWhiteSpace($servingImage)) { $servingImage = $prodImage }
+if ($servingRevName) {
+    Write-Host "   Currently serving:  $servingImage (revision $servingRevName)" -ForegroundColor Gray
+}
+
+if ($servingImage -eq $desiredImage) {
+    Write-Host "   ✅ Production already SERVING $ImageTag at $devDigest - nothing to do." -ForegroundColor Green
     exit 0
 }
 
