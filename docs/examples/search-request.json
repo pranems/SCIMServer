@@ -1,7 +1,9 @@
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
-  "filter": "userName eq \"alice@example.com\"",
+  "filter": "displayName co \"John\" and active eq true",
   "startIndex": 1,
-  "count": 10,
-  "attributes": "userName,displayName,emails"
+  "count": 25,
+  "sortBy": "userName",
+  "sortOrder": "ascending",
+  "attributes": ["userName", "displayName", "emails", "active"]
 }

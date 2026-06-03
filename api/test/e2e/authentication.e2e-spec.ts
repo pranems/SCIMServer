@@ -2,7 +2,6 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken, getLegacyToken } from './helpers/auth.helper';
-import { resetDatabase } from './helpers/db.helper';
 import {
   scimGet,
   scimPost,
@@ -23,7 +22,6 @@ describe('Authentication (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(app);
     resetFixtureCounter();
   });
 

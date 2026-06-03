@@ -1,532 +1,401 @@
-# SCIMServer — Azure Deployment & Usage Guide
+# Azure Deployment & Usage Guide
 
-> **Version**: 0.9.2 | **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Source of truth:** [deploy.ps1](../deploy.ps1), [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), [infra/](../infra/)
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#1-architecture-overview)
-2. [Prerequisites](#2-prerequisites)
-3. [Deployment Step-by-Step](#3-deployment-step-by-step)
-4. [What Gets Deployed](#4-what-gets-deployed)
-5. [Post-Deployment Configuration](#5-post-deployment-configuration)
-6. [Using the Application](#6-using-the-application)
-7. [Updating & Maintenance](#7-updating--maintenance)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Cost Estimate](#9-cost-estimate)
-10. [Security Notes](#10-security-notes)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Quick Deploy (One-Click)](#quick-deploy-one-click)
+- [Manual Deployment](#manual-deployment)
+- [Deployment Parameters](#deployment-parameters)
+- [Post-Deployment Setup](#post-deployment-setup)
+- [Entra ID Integration](#entra-id-integration)
+- [Environment Variables](#environment-variables)
+- [Infrastructure Components](#infrastructure-components)
+- [Monitoring & Logs](#monitoring--logs)
+- [Updating & Redeployment](#updating--redeployment)
+- [Troubleshooting](#troubleshooting)
+- [Cost Estimation](#cost-estimation)
 
 ---
 
-## 1. Architecture Overview
+## Overview
 
-### High-Level Flow
+SCIMServer deploys to Azure Container Apps with a managed PostgreSQL Flexible Server backend. The deployment is fully automated via PowerShell scripts and Azure Bicep templates.
 
-```
-┌─────────────────────┐       SCIM 2.0 HTTPS        ┌──────────────────────────┐
-│                     │ ──────────────────────────▶  │                          │
-│  Microsoft Entra ID │                              │   Azure Container Apps   │
-│  (Provisioning)     │ ◀──────────────────────────  │   (SCIMServer)           │
-│                     │       JSON Responses         │                          │
-└─────────────────────┘                              └────────────┬─────────────┘
-                                                                  │
-                                                     ┌────────────▼─────────────┐
-                                                     │   SQLite (ephemeral)     │
-                                                     │   /tmp/local-data/scim.db│
-                                                     └────────────┬─────────────┘
-                                                                  │ periodic
-                                                                  │ snapshots
-                                                     ┌────────────▼─────────────┐
-                                                     │   Azure Blob Storage     │
-                                                     │   (Private Endpoint)     │
-                                                     │   SQLite backups         │
-                                                     └──────────────────────────┘
-```
+```mermaid
+flowchart LR
+    subgraph Azure
+        subgraph Container Apps Environment
+            CA[Container App<br>SCIMServer<br>node:24-alpine]
+        end
+        subgraph PostgreSQL
+            PG[(Flexible Server<br>PostgreSQL 17)]
+        end
+        subgraph Container Registry
+            GHCR[GHCR<br>ghcr.io/your-org/scimserver]
+        end
+    end
 
-### Azure Resource Architecture
-
-```
-Resource Group (e.g. scimserver-rg)
-├── Virtual Network (10.40.0.0/16)
-│   ├── aca-infra subnet        (10.40.0.0/21)   ← Container Apps Environment
-│   ├── aca-runtime subnet      (10.40.8.0/21)   ← Container workloads
-│   └── private-endpoints subnet(10.40.16.0/24)  ← Blob Storage PE
-│
-├── Private DNS Zone (privatelink.blob.core.windows.net)
-│   └── VNet Link → Virtual Network
-│
-├── Container Apps Environment
-│   └── Container App (SCIMServer)
-│       ├── Image: ghcr.io/pranems/scimserver:latest
-│       ├── Secrets: SCIM token, JWT, OAuth
-│       ├── System-Assigned Managed Identity
-│       └── Ingress: HTTPS (auto TLS cert)
-│
-├── Storage Account (private, no public access)
-│   ├── Private Endpoint → private-endpoints subnet
-│   └── Blob Container: scimserver-backups
-│       └── SQLite snapshots (timestamped)
-│
-└── Log Analytics Workspace
-    └── Container App logs & metrics
-```
-
-### Container Image Build Pipeline
-
-```
-GitHub Repository (pranems/SCIMServer)
-│
-├── Push to test/dev/feature/* branch
-│   └── .github/workflows/build-test.yml
-│       └── Builds & pushes: ghcr.io/pranems/scimserver:test-<branch>
-│
-└── Manual workflow_dispatch (version tag)
-    └── .github/workflows/publish-ghcr.yml
-        └── Builds & pushes: ghcr.io/pranems/scimserver:<version>
-        └── Optionally tags: ghcr.io/pranems/scimserver:latest
+    Internet[Internet / Entra ID] -->|HTTPS| CA
+    CA -->|Connection String| PG
+    CA -->|Pull Image| GHCR
 ```
 
 ---
 
-## 2. Prerequisites
+## Architecture
 
-| Requirement | Details |
-|---|---|
-| **Azure CLI** | v2.50+ — Install: https://aka.ms/InstallAzureCLI |
-| **Azure Subscription** | Active subscription with permission to create resources |
-| **PowerShell** | Windows PowerShell 5.1+ or PowerShell 7+ (macOS/Linux) |
-| **Resource Providers** | `Microsoft.App` and `Microsoft.ContainerService` (auto-registered by script) |
-
-### Verify prerequisites
-
-```powershell
-# Check Azure CLI
-az --version
-
-# Login to Azure
-az login
-
-# Confirm subscription
-az account show --query "{name:name, id:id}" --output table
-```
+| Component | Azure Service | SKU |
+|-----------|--------------|-----|
+| Application | Container Apps | Consumption (serverless) |
+| Database | PostgreSQL Flexible Server | Burstable B1ms |
+| Container Registry | GitHub Container Registry | Free tier |
+| Networking | Container Apps Environment | Managed VNet |
 
 ---
 
-## 3. Deployment Step-by-Step
+## Quick Deploy (One-Click)
 
-### Option A: One-Liner Bootstrap (Recommended)
-
-The simplest way — no git clone needed:
+### Option 1: Bootstrap Script
 
 ```powershell
-iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
+irm https://raw.githubusercontent.com/your-org/SCIMServer/main/bootstrap.ps1 | iex
 ```
 
-This will:
-1. Download `setup.ps1` from GitHub
-2. Prompt for Resource Group, App Name, Region, and Secrets
-3. Call `deploy-azure.ps1` internally
-4. Print the deployment URL and all secrets
+This downloads and runs `setup.ps1` which:
+1. Checks Azure CLI is logged in
+2. Prompts for subscription selection
+3. Auto-generates secure secrets (48-char base64url)
+4. Deploys PostgreSQL + Container App
+5. Waits for the app to become healthy
+6. Prints the URL and credentials
 
-### Option B: Direct Script with Parameters
+### Option 2: Deploy Script
 
 ```powershell
-# Clone the repo first
-git clone https://github.com/pranems/SCIMServer.git
+git clone https://github.com/your-org/SCIMServer.git
 cd SCIMServer
-
-# Deploy with explicit parameters
-.\scripts\deploy-azure.ps1 `
-  -ResourceGroup "scimserver-rg" `
-  -AppName "scimserver-prod" `
-  -Location "eastus" `
-  -ScimSecret "MySecureToken123"
+.\deploy.ps1
 ```
 
-### Option C: Fully Automated (Non-Interactive)
+Interactive prompts guide through:
+- Azure subscription selection
+- Container App name (2-32 chars, lowercase, alphanumeric + hyphens)
+- Secret generation (auto or manual)
+- Region selection
+
+---
+
+## Manual Deployment
+
+### Prerequisites
+
+- Azure CLI (`az`) installed and logged in
+- PowerShell 7+
+- Azure subscription with `Microsoft.App` and `Microsoft.ContainerService` providers registered
+
+### Step-by-Step
 
 ```powershell
-.\scripts\deploy-azure.ps1 `
-  -ResourceGroup "scimserver-rg" `
-  -AppName "scimserver-prod" `
+# 1. Login to Azure
+az login
+az account set --subscription "your-subscription"
+
+# 2. Run the deployment script
+cd scripts
+.\deploy-azure.ps1 `
+  -ResourceGroup "rg-scim" `
+  -AppName "scimserver" `
   -Location "eastus" `
-  -ScimSecret "MySecureToken123" `
-  -JwtSecret "my-jwt-signing-key-64chars-long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" `
-  -OauthClientSecret "my-oauth-secret-64chars-long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  -ScimSecret "your-scim-secret-min-16-chars" `
+  -JwtSecret "your-jwt-secret" `
+  -OauthClientSecret "your-oauth-secret" `
+  -ProvisionPostgres `
+  -PgAdminPassword "your-pg-admin-password"
 ```
 
-### Deployment Parameters Reference
+### What the Script Does
+
+```mermaid
+flowchart TD
+    A[Start] --> B[Check Azure CLI Login]
+    B --> C[Register Resource Providers]
+    C --> D[Create Resource Group]
+    D --> E{ProvisionPostgres?}
+    E -->|Yes| F[Deploy PostgreSQL Flexible Server<br>via postgres.bicep]
+    F --> G[Create Database + Extensions]
+    E -->|No| H[Use Existing DATABASE_URL]
+    G --> I[Deploy Container App Environment<br>via containerapp-env.bicep]
+    H --> I
+    I --> J[Deploy Container App<br>via containerapp.bicep]
+    J --> K[Configure Secrets<br>SCIM_SHARED_SECRET, JWT_SECRET, etc.]
+    K --> L[Wait for FQDN<br>Poll up to 90s]
+    L --> M[Verify Health Check]
+    M --> N[Print URL + Credentials]
+```
+
+---
+
+## Deployment Parameters
 
 | Parameter | Required | Default | Description |
-|---|---|---|---|
-| `-ResourceGroup` | Yes (prompted) | — | Azure Resource Group name |
-| `-AppName` | Yes (prompted) | — | Container App name (2-32 chars, lowercase, letters/numbers/hyphens) |
-| `-Location` | No | `eastus` | Azure region |
-| `-ScimSecret` | No (auto-gen) | `SCIM-<random>-<date>` | Bearer token for SCIM authentication |
-| `-ImageTag` | No | `latest` | Docker image tag |
-| `-JwtSecret` | No (auto-gen) | 64-char random | JWT signing secret |
-| `-OauthClientSecret` | No (auto-gen) | 64-char random | OAuth client secret |
-| `-BlobBackupAccount` | No | `<appname>backup` | Storage account name |
-| `-BlobBackupContainer` | No | `scimserver-backups` | Blob container name |
+|-----------|----------|---------|-------------|
+| `ResourceGroup` | Yes | - | Azure resource group name |
+| `AppName` | Yes | - | Container App name (2-32 chars) |
+| `Location` | No | `eastus` | Azure region |
+| `ScimSecret` | No | Auto-generated | SCIM shared secret |
+| `JwtSecret` | No | Auto-generated | JWT signing key |
+| `OauthClientSecret` | No | Auto-generated | OAuth client secret |
+| `ImageTag` | No | From package.json | Docker image version |
+| `GhcrUsername` | No | - | GHCR username (if private) |
+| `GhcrPassword` | No | - | GHCR PAT (if private) |
+| `DatabaseUrl` | No | - | Existing PostgreSQL URL |
+| `ProvisionPostgres` | No | `false` | Auto-create PostgreSQL |
+| `PgAdminPassword` | If provisioning | - | PostgreSQL admin password |
+| `PgLocation` | No | Same as Location | Override PG region |
 
-### What Happens During Deployment (6 Steps)
+### Secret Generation
 
-```
-Step 1/6: Resource Group
-  └── Creates or reuses the Azure Resource Group
-
-Step 2/6: Network & Private DNS
-  ├── Creates VNet (10.40.0.0/16) with 3 subnets
-  ├── Creates Private DNS Zone (privatelink.blob.core.windows.net)
-  └── Links DNS zone to VNet
-
-Step 3/6: Blob Storage (Private Endpoint)
-  ├── Creates Storage Account (public access disabled)
-  ├── Creates blob container for SQLite snapshots
-  └── Creates Private Endpoint in VNet
-
-Step 4/6: Container App Environment
-  ├── Creates Log Analytics Workspace (30-day retention)
-  └── Creates Container Apps Environment (VNet-integrated)
-
-Step 5/6: Container App
-  ├── Pulls ghcr.io/pranems/scimserver:<tag>
-  ├── Configures secrets (SCIM, JWT, OAuth)
-  ├── Sets environment variables
-  ├── Enables System-Assigned Managed Identity
-  └── Configures HTTPS ingress (auto TLS)
-
-Step 6/6: Finalize
-  ├── Assigns "Storage Blob Data Contributor" role to managed identity
-  └── Prints deployment URL + all secrets
-```
-
-### Deployment Output
-
-At the end of deployment, you'll see:
-
-```
-═══════════════════════════════════════════════════
-🎉 Deployment Successful!
-═══════════════════════════════════════════════════
-
-📋 Deployment Summary:
-   App URL: https://scimserver-prod.purplestone-xxxxx.eastus.azurecontainerapps.io
-   SCIM Endpoint: https://scimserver-prod.purplestone-xxxxx.eastus.azurecontainerapps.io/scim/v2
-   Resource Group: scimserver-rg
-   SCIM Shared Secret: SCIM-12345-20260212
-   JWT Secret: <64-char string>
-   OAuth Client Secret: <64-char string>
-```
-
-> **IMPORTANT**: Copy and save all three secrets. They are not stored anywhere else.
+When secrets are not provided, the scripts auto-generate them using `[System.Security.Cryptography.RandomNumberGenerator]::GetBytes(36)` - 48-character base64url-encoded strings.
 
 ---
 
-## 4. What Gets Deployed
+## Post-Deployment Setup
 
-### Azure Resources Created
+### 1. Verify Health
 
-| Resource | Type | Purpose | Estimated Cost |
-|---|---|---|---|
-| **Resource Group** | `Microsoft.Resources/resourceGroups` | Container for all resources | Free |
-| **Virtual Network** | `Microsoft.Network/virtualNetworks` | Network isolation | Free |
-| **Private DNS Zone** | `Microsoft.Network/privateDnsZones` | Blob private endpoint DNS | ~$0.50/mo |
-| **Storage Account** | `Microsoft.Storage/storageAccounts` | SQLite snapshot backups | ~$0.20-0.50/mo |
-| **Private Endpoint** | `Microsoft.Network/privateEndpoints` | Secure blob access | ~$7.50/mo |
-| **Log Analytics** | `Microsoft.OperationalInsights/workspaces` | Container logs | ~$0-5/mo |
-| **Container Apps Env** | `Microsoft.App/managedEnvironments` | Hosting platform | Included |
-| **Container App** | `Microsoft.App/containerApps` | SCIMServer application | ~$5-15/mo |
+```bash
+curl https://your-app.azurecontainerapps.io/health
+# {"status":"ok","uptime":5,"timestamp":"2026-04-24T10:00:00.000Z"}
+```
 
-### Container Configuration
+### 2. Create Your First Endpoint
 
-- **Image**: `ghcr.io/pranems/scimserver:latest`
-- **CPU**: 0.5 cores | **Memory**: 1 GiB
-- **Replicas**: 1 (fixed — SQLite requires single replica; increase after migrating to PostgreSQL)
-- **Port**: 80 (internal) → HTTPS (external, auto TLS)
-- **Health check**: HTTP GET `/health` every 60s
+```bash
+curl -X POST https://your-app.azurecontainerapps.io/scim/admin/endpoints \
+  -H "Authorization: Bearer your-scim-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "entra-prod", "profilePreset": "entra-id"}'
+```
+
+### 3. Check Version
+
+```bash
+curl https://your-app.azurecontainerapps.io/scim/admin/version \
+  -H "Authorization: Bearer your-scim-secret"
+```
 
 ---
 
-## 5. Post-Deployment Configuration
+## Entra ID Integration
 
-### Step 1: Verify SCIMServer is Running
+### 1. Get Your SCIM URL
 
-Open the App URL in your browser. You should see the SCIMServer web dashboard:
+After creating an endpoint, use the `scimBasePath` from the response:
 
 ```
-https://<your-app>.purplestone-xxxxx.eastus.azurecontainerapps.io
+https://your-app.azurecontainerapps.io/scim/endpoints/{endpointId}/
 ```
 
-### Step 2: Create an Endpoint
+### 2. Configure in Azure Portal
 
-SCIMServer supports multiple isolated SCIM endpoints. Create one via the web UI or API:
+1. Navigate to **Enterprise Applications** > your application
+2. Go to **Provisioning** > **Get started**
+3. Set **Provisioning Mode** to **Automatic**
+4. Enter:
+   - **Tenant URL:** `https://your-app.azurecontainerapps.io/scim/endpoints/{endpointId}/`
+   - **Secret Token:** Your `SCIM_SHARED_SECRET` value
+5. Click **Test Connection** - should succeed
+6. Configure attribute mappings
+7. Turn provisioning **On**
+
+### 3. Monitor Provisioning
+
+```bash
+# Live log stream
+curl -N https://your-app.azurecontainerapps.io/scim/endpoints/{id}/logs/stream \
+  -H "Authorization: Bearer your-scim-secret"
+
+# Audit trail
+curl "https://your-app.azurecontainerapps.io/scim/admin/logs?page=1&pageSize=50" \
+  -H "Authorization: Bearer your-scim-secret"
+
+# Endpoint stats
+curl https://your-app.azurecontainerapps.io/scim/admin/endpoints/{id}/stats \
+  -H "Authorization: Bearer your-scim-secret"
+```
+
+---
+
+## Environment Variables
+
+Set as Container App secrets/environment variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PERSISTENCE_BACKEND` | No | `prisma` (default) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `SCIM_SHARED_SECRET` | Yes | Bearer token for authentication |
+| `JWT_SECRET` | Yes | JWT signing key |
+| `OAUTH_CLIENT_SECRET` | Yes | OAuth client secret |
+| `OAUTH_CLIENT_ID` | No | OAuth client ID (default: `scimserver-client`) |
+| `PORT` | No | `8080` (default in Docker) |
+| `NODE_ENV` | No | `production` |
+| `LOG_LEVEL` | No | `INFO` (default) |
+
+---
+
+## Infrastructure Components
+
+### Bicep Templates
+
+| File | Resource |
+|------|----------|
+| `infra/containerapp-env.bicep` | Container Apps Environment |
+| `infra/containerapp.bicep` | Container App + secrets + scaling |
+| `infra/postgres.bicep` | PostgreSQL Flexible Server |
+| `infra/acr.bicep` | Azure Container Registry (optional) |
+| `infra/networking.bicep` | VNet + subnets (optional) |
+
+### Container App Configuration
+
+| Setting | Value |
+|---------|-------|
+| Image | `ghcr.io/your-org/scimserver:{version}` |
+| Port | 8080 |
+| Min replicas | 0 (scale to zero) |
+| Max replicas | 10 |
+| CPU | 0.5 |
+| Memory | 1.0 Gi |
+| Health probe | `GET /scim/health` |
+
+---
+
+## Monitoring & Logs
+
+### Azure CLI Log Access
 
 ```powershell
-# Create an endpoint via API
-$appUrl = "https://<your-app-url>"
-$secret = "<your-scim-secret>"
+# View container logs
+az containerapp logs show -g rg-scim -n scimserver --follow
 
-Invoke-RestMethod -Uri "$appUrl/scim/admin/endpoints" `
-  -Method POST `
-  -Headers @{ Authorization = "Bearer $secret"; "Content-Type" = "application/json" } `
-  -Body '{"name": "entra-prod", "displayName": "Entra Production"}'
+# View system logs
+az containerapp logs show -g rg-scim -n scimserver --type system
 ```
 
-The response includes an `id` (e.g., `cmlfuqaft0002i30tlv47pq1f`) — this becomes part of your SCIM URL.
+### Application-Level Monitoring
 
-### Step 3: Configure Microsoft Entra ID
+```bash
+# SSE live stream
+curl -N https://app.azurecontainerapps.io/scim/admin/log-config/stream \
+  -H "Authorization: Bearer secret"
 
-```
-Entra Portal Flow:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Download logs
+curl https://app.azurecontainerapps.io/scim/admin/log-config/download?format=ndjson \
+  -H "Authorization: Bearer secret" -o logs.ndjson
 
-1. Azure Portal → Microsoft Entra ID → Enterprise Applications
-   └── + New Application → Create your own application
-       └── "Integrate any other application" → Create
-
-2. Your App → Provisioning → Get started
-   └── Provisioning Mode: Automatic
-
-3. Admin Credentials:
-   ┌────────────────────────────────────────────────────────┐
-   │ Tenant URL:    https://<your-app-url>/scim/v2          │
-   │                                                        │
-   │ Secret Token:  <your-scim-secret>                      │
-   └────────────────────────────────────────────────────────┘
-
-   If using multi-endpoint mode:
-   ┌────────────────────────────────────────────────────────┐
-   │ Tenant URL:    https://<your-app-url>/scim/endpoints/  │
-   │                <endpoint-id>/                          │
-   └────────────────────────────────────────────────────────┘
-
-4. Click "Test Connection" → Expect ✅ success
-
-5. Mappings: Configure user/group attribute mappings as needed
-
-6. Settings:
-   └── Provisioning Status: On
-   └── Scope: Assign users/groups → Sync assigned only
-
-7. Users and Groups → Assign users/groups to provision
+# Set DEBUG level for investigation
+curl -X PUT https://app.azurecontainerapps.io/scim/admin/log-config/level/DEBUG \
+  -H "Authorization: Bearer secret"
 ```
 
-### Step 4: Verify Provisioning
+### Web Admin UI
 
-After turning provisioning ON:
-
-1. **Assign a test user** to the Enterprise App
-2. Wait for the provisioning cycle (~40 minutes for first full sync, or click "Provision on demand")
-3. Open the SCIMServer web dashboard to see events in real-time
-4. Check the Activity Feed for "User Created" events
-
----
-
-## 6. Using the Application
-
-### Web Dashboard
-
-The web dashboard is available at your app URL (no `/scim` suffix):
+Access the admin dashboard at:
 
 ```
-https://<your-app-url>/
-```
-
-Features:
-- **Activity Feed** — Real-time SCIM request/response log with human-readable translations
-- **User Browser** — View all provisioned users and their attributes
-- **Group Browser** — View groups and memberships
-- **Database Stats** — User/group counts and database info
-- **Endpoint Management** — Create/manage multiple SCIM endpoints
-- **Backup Status** — View blob snapshot backup health
-- **Log Configuration** — Adjust log levels dynamically
-- **Dark/Light Theme** — Toggle via UI
-
-### API Endpoints
-
-#### Discovery (No Auth Required)
-
-| Method | URL | Description |
-|---|---|---|
-| GET | `/scim/ServiceProviderConfig` | SCIM capabilities |
-| GET | `/scim/ResourceTypes` | Supported resource types |
-| GET | `/scim/Schemas` | SCIM schemas |
-
-#### SCIM Operations (Bearer Auth)
-
-| Method | URL | Description |
-|---|---|---|
-| POST | `/scim/endpoints/:id/Users` | Create user |
-| GET | `/scim/endpoints/:id/Users` | List/filter users |
-| GET | `/scim/endpoints/:id/Users/:id` | Get user by ID |
-| PUT | `/scim/endpoints/:id/Users/:id` | Replace user |
-| PATCH | `/scim/endpoints/:id/Users/:id` | Update user |
-| DELETE | `/scim/endpoints/:id/Users/:id` | Delete user |
-| POST | `/scim/endpoints/:id/Groups` | Create group |
-| GET | `/scim/endpoints/:id/Groups` | List/filter groups |
-| PATCH | `/scim/endpoints/:id/Groups/:id` | Update group |
-| DELETE | `/scim/endpoints/:id/Groups/:id` | Delete group |
-
-#### Admin API (Bearer Auth)
-
-| Method | URL | Description |
-|---|---|---|
-| GET | `/scim/admin/endpoints` | List endpoints |
-| POST | `/scim/admin/endpoints` | Create endpoint |
-| GET | `/scim/admin/endpoints/:id` | Get endpoint |
-| PATCH | `/scim/admin/endpoints/:id` | Update endpoint |
-| DELETE | `/scim/admin/endpoints/:id` | Delete endpoint |
-| GET | `/scim/admin/database/statistics` | DB stats |
-| GET | `/scim/admin/database/users` | Browse users |
-| GET | `/scim/admin/database/groups` | Browse groups |
-| GET | `/scim/admin/logs` | View request logs |
-| GET | `/scim/admin/backup/stats` | Backup status |
-| POST | `/scim/admin/backup/trigger` | Trigger backup |
-| GET | `/scim/admin/version` | App version info |
-
-### Authentication
-
-All SCIM and Admin requests require a Bearer token:
-
-```
-Authorization: Bearer <your-scim-secret>
-```
-
-Example:
-```powershell
-$headers = @{ Authorization = "Bearer SCIM-12345-20260212" }
-Invoke-RestMethod -Uri "https://<your-app>/scim/admin/endpoints" -Headers $headers
-```
-
-### OAuth Token Endpoint
-
-For OAuth2 client_credentials flow:
-
-```powershell
-$body = @{
-  grant_type = "client_credentials"
-  client_id = "scimserver"
-  client_secret = "<your-oauth-client-secret>"
-}
-$token = Invoke-RestMethod -Uri "https://<your-app>/scim/oauth/token" -Method POST -Body $body
-# Use $token.access_token for subsequent requests
+https://your-app.azurecontainerapps.io/admin
 ```
 
 ---
 
-## 7. Updating & Maintenance
+## Updating & Redeployment
 
 ### Update to New Version
 
-When a new version notification appears in the web dashboard:
-
 ```powershell
-# Auto-discovery (finds your RG and App automatically)
-iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.9.1
-
-# Explicit (if multiple deployments)
-Update-SCIMServer -Version v0.9.1 -ResourceGroup scimserver-rg -AppName scimserver-prod
+# Re-run deploy with new image tag
+.\scripts\deploy-azure.ps1 `
+  -ResourceGroup "rg-scim" `
+  -AppName "scimserver" `
+  -ImageTag "0.40.0" `
+  -ScimSecret "existing-secret" `
+  -JwtSecret "existing-jwt-secret" `
+  -OauthClientSecret "existing-oauth-secret" `
+  -DatabaseUrl "postgresql://..."
 ```
 
-### Manual Image Update
+### Deployment State Recovery
+
+The deploy script saves state to `scripts/state/deploy-state-{rg}-{app}.json` for idempotent re-deployments. This file contains:
+- Generated secrets
+- Resource group and app name
+- Database URL
+- GHCR credentials
+
+---
+
+## Troubleshooting
+
+### Container Won't Start
 
 ```powershell
-az containerapp update `
-  -n scimserver-prod `
-  -g scimserver-rg `
-  --image ghcr.io/pranems/scimserver:0.9.1
+# Check container logs
+az containerapp logs show -g rg-scim -n scimserver --tail 50
+
+# Common causes:
+# 1. DATABASE_URL not set or wrong
+# 2. PostgreSQL not accessible (firewall rules)
+# 3. Image pull failure (check GHCR credentials)
 ```
 
-### View Logs
+### Database Connection Issues
 
 ```powershell
-# Stream live logs
-az containerapp logs show -n scimserver-prod -g scimserver-rg --follow
+# Test PostgreSQL connectivity
+az postgres flexible-server show -g rg-scim -n scim-pg
 
-# Query Log Analytics
-az monitor log-analytics query `
-  -w <workspace-id> `
-  --analytics-query "ContainerAppConsoleLogs_CL | where ContainerAppName_s == 'scimserver-prod' | top 50 by TimeGenerated"
+# Check firewall rules
+az postgres flexible-server firewall-rule list -g rg-scim -n scim-pg
 ```
 
-### Trigger Manual Backup
+### Health Check Failures
+
+```bash
+curl https://your-app.azurecontainerapps.io/health
+curl https://your-app.azurecontainerapps.io/scim/admin/version \
+  -H "Authorization: Bearer your-secret"
+```
+
+### Secret Rotation
 
 ```powershell
-Invoke-RestMethod -Uri "https://<your-app>/scim/admin/backup/trigger" `
-  -Method POST `
-  -Headers @{ Authorization = "Bearer <your-secret>" }
+# Update a secret
+az containerapp secret set -g rg-scim -n scimserver \
+  --secrets scim-secret=new-value
+
+# Restart to pick up new secrets
+az containerapp revision restart -g rg-scim -n scimserver \
+  --revision $(az containerapp revision list -g rg-scim -n scimserver --query "[0].name" -o tsv)
 ```
 
 ---
 
-## 8. Troubleshooting
+## Cost Estimation
 
-| Issue | Diagnosis | Solution |
-|---|---|---|
-| **Test Connection fails** | Wrong URL or secret | Ensure URL ends with `/scim/v2` (or `/scim/endpoints/<id>/`); verify secret matches |
-| **No events appear** | Provisioning not started | Turn provisioning ON in Entra; assign users/groups; wait for sync cycle |
-| **Deploy script exits early** | Not authenticated | Run `az login` first |
-| **Container won't start** | Image pull or crash | Check `az containerapp logs show -n <app> -g <rg>` |
-| **Database errors (P2021)** | Migration not applied | Container entrypoint runs `prisma migrate deploy` automatically; check logs for errors |
-| **Blob backup failures** | Role not assigned | Verify managed identity has `Storage Blob Data Contributor` on the storage account |
-| **409 Conflict on user creation** | Duplicate userName/externalId | User already exists; Entra will PATCH instead |
-| **Slow first response** | Container cold start | First request after scale-to-zero takes ~5-10s; subsequent requests are fast |
+| Component | SKU | Estimated Monthly Cost |
+|-----------|-----|----------------------|
+| Container Apps | Consumption (scale to zero) | $0-15 (based on usage) |
+| PostgreSQL Flexible | Burstable B1ms | ~$15-25 |
+| Container Registry | GHCR Free | $0 |
+| **Total** | | **~$15-40/month** |
 
----
-
-## 9. Cost Estimate
-
-| Resource | Monthly Cost |
-|---|---|
-| Container App (0.5 vCPU, 1 GiB) | ~$5–15 (scales to zero when idle) |
-| Blob Storage (snapshots) | ~$0.20–0.50 |
-| Private Endpoint | ~$7.50 |
-| Log Analytics | ~$0–5 (depends on volume) |
-| VNet / DNS | ~$0.50 |
-| **Total** | **~$13–28/month** |
-
-> Costs vary by region and usage. Scale-to-zero means minimal charges during idle periods.
-
----
-
-## 10. Security Notes
-
-- **HTTPS only**: Auto-managed TLS certificate via Azure Container Apps
-- **No public blob access**: Storage account uses private endpoint only
-- **VNet isolation**: All inter-service traffic stays within the virtual network
-- **Managed Identity**: Container uses system-assigned identity for blob access (no storage keys)
-- **Secrets management**: SCIM, JWT, and OAuth secrets stored as Container Apps secrets (encrypted at rest)
-- **No hardcoded credentials**: All sensitive values are injected via environment variables
-
----
-
-## Quick Reference Card
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  SCIMServer Quick Reference                              │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  Deploy:                                                 │
-│  iex (iwr https://raw.githubusercontent.com/pranems/     │
-│    SCIMServer/master/bootstrap.ps1).Content               │
-│                                                          │
-│  Web Dashboard:  https://<your-app-url>/                 │
-│  SCIM Base:      https://<your-app-url>/scim/v2          │
-│  Auth Header:    Authorization: Bearer <secret>          │
-│                                                          │
-│  Update:                                                 │
-│  iex (irm '...update-scimserver-func.ps1');              │
-│    Update-SCIMServer -Version v<new>                     │
-│                                                          │
-│  Logs:                                                   │
-│  az containerapp logs show -n <app> -g <rg> --follow     │
-│                                                          │
-│  GitHub:  https://github.com/pranems/SCIMServer          │
-│  Image:   ghcr.io/pranems/scimserver:latest              │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
+Costs scale with:
+- Number of provisioning requests (Container Apps billing per vCPU-second)
+- Database storage (charged per GB)
+- Network egress (first 5 GB free)

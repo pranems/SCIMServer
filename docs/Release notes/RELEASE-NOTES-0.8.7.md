@@ -7,7 +7,7 @@
 
 ## Upgrade Notes
 - Redeploy the container to pick up the new admin endpoints and UI bundle; restart afterward to confirm blob snapshot hydration still succeeds.
-- Manual provisioning requires the SCIM bearer token—ensure you’ve supplied a valid token in the UI before creating test resources.
+- Manual provisioning requires the SCIM bearer token-ensure you’ve supplied a valid token in the UI before creating test resources.
 
 ## Commands
 ```powershell

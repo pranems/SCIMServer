@@ -20,7 +20,11 @@ describe('LogConfigController', () => {
     process.env.LOG_FORMAT = 'json';
 
     scimLogger = new ScimLogger();
-    controller = new LogConfigController(scimLogger);
+    const mockLoggingService = {
+      getAutoPruneConfig: jest.fn().mockReturnValue({ enabled: true, retentionDays: 1, intervalMs: 3600000 }),
+      setAutoPruneConfig: jest.fn(),
+    } as any;
+    controller = new LogConfigController(scimLogger, mockLoggingService);
 
     stdoutSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
@@ -74,7 +78,7 @@ describe('LogConfigController', () => {
 
     it('should include all available categories', () => {
       const result = controller.getConfig();
-      expect(result.availableCategories).toHaveLength(12);
+      expect(result.availableCategories).toHaveLength(14);
       expect(result.availableCategories).toContain('http');
       expect(result.availableCategories).toContain('scim.user');
       expect(result.availableCategories).toContain('scim.patch');
@@ -182,11 +186,16 @@ describe('LogConfigController', () => {
       expect(result.message).toBe("Category 'scim.patch' log level set to TRACE");
     });
 
-    it('should return error for unknown category', () => {
-      const result = controller.setCategoryLevel('nonexistent', 'DEBUG');
-      expect(result).toHaveProperty('error');
-      expect(result.error).toContain("Unknown category 'nonexistent'");
-      expect(result.availableCategories).toHaveLength(12);
+    it('should throw 400 for unknown category', () => {
+      expect(() => controller.setCategoryLevel('nonexistent', 'DEBUG')).toThrow();
+      try {
+        controller.setCategoryLevel('nonexistent', 'DEBUG');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        expect(body.error).toContain("Unknown category 'nonexistent'");
+        expect(body.availableCategories).toHaveLength(14);
+      }
     });
 
     it('should accept all valid categories', () => {
@@ -222,8 +231,12 @@ describe('LogConfigController', () => {
     });
 
     it('should be a no-op for non-existent endpoint', () => {
-      // Should not throw
+      const configBefore = scimLogger.getConfig();
+      const levelsBefore = { ...configBefore.endpointLevels };
+      // Should not throw and should not change any existing config
       controller.clearEndpointLevel('ep-nonexistent');
+      const configAfter = scimLogger.getConfig();
+      expect(configAfter.endpointLevels).toEqual(levelsBefore);
     });
   });
 
@@ -297,6 +310,13 @@ describe('LogConfigController', () => {
       expect(result.count).toBe(0);
       expect(result.entries).toHaveLength(0);
     });
+
+    it('should include hint when ring buffer returns empty with requestId filter (P8)', () => {
+      const result = controller.getRecentLogs(undefined, undefined, undefined, 'nonexistent-req-id') as any;
+      expect(result.count).toBe(0);
+      expect(result.hint).toBeDefined();
+      expect(result.hint).toContain('/scim/admin/logs');
+    });
   });
 
   // ─── DELETE /admin/log-config/recent ──────────────────────────────
@@ -308,6 +328,363 @@ describe('LogConfigController', () => {
 
       controller.clearRecentLogs();
       expect(scimLogger.getRecentLogs()).toHaveLength(0);
+    });
+  });
+
+  // ─── GET /admin/log-config/stream (SSE) ───────────────────────────
+
+  describe('streamLogs (SSE)', () => {
+    function createMockResponse() {
+      const chunks: string[] = [];
+      const headers: Record<string, string> = {};
+      const res = {
+        setHeader: jest.fn((key: string, value: string) => { headers[key] = value; }),
+        flushHeaders: jest.fn(),
+        write: jest.fn((data: string) => { chunks.push(data); return true; }),
+        end: jest.fn(),
+        on: jest.fn(),
+        chunks,
+        headers,
+      };
+      return res;
+    }
+
+    it('should set SSE headers', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Type']).toBe('text/event-stream');
+      expect(res.headers['Cache-Control']).toBe('no-cache');
+      expect(res.headers['Connection']).toBe('keep-alive');
+      expect(res.headers['X-Accel-Buffering']).toBe('no');
+      expect(res.flushHeaders).toHaveBeenCalled();
+    });
+
+    it('should send initial connected event', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      expect(res.chunks[0]).toContain('event: connected');
+      expect(res.chunks[0]).toContain('Log stream connected');
+    });
+
+    it('should stream log entries in real-time', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      const initialCount = res.chunks.length;
+
+      // Emit a log entry
+      scimLogger.info(LogCategory.HTTP, 'streamed entry');
+
+      expect(res.chunks.length).toBeGreaterThan(initialCount);
+      const lastChunk = res.chunks[res.chunks.length - 1];
+      expect(lastChunk).toContain('data:');
+      expect(lastChunk).toContain('streamed entry');
+
+      // Trigger cleanup (simulate disconnect)
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should filter by level', () => {
+      const res = createMockResponse();
+      controller.streamLogs('WARN', undefined, undefined, res as never);
+      const afterConnect = res.chunks.length;
+
+      scimLogger.info(LogCategory.HTTP, 'info entry - should be filtered');
+      expect(res.chunks.length).toBe(afterConnect); // no new chunk
+
+      scimLogger.warn(LogCategory.HTTP, 'warn entry - should pass');
+      expect(res.chunks.length).toBe(afterConnect + 1);
+
+      // Cleanup
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should filter by category', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, 'auth', undefined, res as never);
+      const afterConnect = res.chunks.length;
+
+      scimLogger.info(LogCategory.HTTP, 'http entry - should be filtered');
+      expect(res.chunks.length).toBe(afterConnect);
+
+      scimLogger.info(LogCategory.AUTH, 'auth entry - should pass');
+      expect(res.chunks.length).toBe(afterConnect + 1);
+
+      // Cleanup
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should filter by endpointId', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, 'ep-123', res as never);
+      const afterConnect = res.chunks.length;
+
+      scimLogger.info(LogCategory.HTTP, 'no endpoint');
+      expect(res.chunks.length).toBe(afterConnect);
+
+      scimLogger.runWithContext({ requestId: 'r1', endpointId: 'ep-123' }, () => {
+        scimLogger.info(LogCategory.HTTP, 'target endpoint');
+      });
+      expect(res.chunks.length).toBe(afterConnect + 1);
+
+      // Cleanup
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should unsubscribe on close', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      const afterConnect = res.chunks.length;
+
+      // Trigger close
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      expect(closeHandler).toBeDefined();
+      closeHandler![1]();
+
+      // New log should NOT appear
+      scimLogger.info(LogCategory.HTTP, 'after disconnect');
+      expect(res.chunks.length).toBe(afterConnect);
+      expect(res.end).toHaveBeenCalled();
+    });
+  });
+
+  // ─── GET /admin/log-config/download ───────────────────────────────
+
+  describe('downloadLogs', () => {
+    function createMockResponse() {
+      const headers: Record<string, string> = {};
+      let body = '';
+      const res = {
+        setHeader: jest.fn((key: string, value: string) => { headers[key] = value; }),
+        send: jest.fn((data: string) => { body = data; }),
+        headers,
+        get body() { return body; },
+      };
+      return res;
+    }
+
+    beforeEach(() => {
+      scimLogger.clearRecentLogs();
+      scimLogger.info(LogCategory.HTTP, 'log entry 1');
+      scimLogger.warn(LogCategory.AUTH, 'log entry 2');
+      scimLogger.error(LogCategory.DATABASE, 'log entry 3', new Error('db issue'));
+    });
+
+    it('should default to NDJSON format', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Type']).toBe('application/x-ndjson');
+      expect(res.headers['Content-Disposition']).toContain('attachment');
+      expect(res.headers['Content-Disposition']).toContain('.ndjson');
+    });
+
+    it('should support JSON format', () => {
+      const res = createMockResponse();
+      controller.downloadLogs('json', undefined, undefined, undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Type']).toBe('application/json');
+      expect(res.headers['Content-Disposition']).toContain('.json');
+      const parsed = JSON.parse(res.body);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed.length).toBe(3);
+    });
+
+    it('should produce valid NDJSON with all entries', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, undefined, undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(3);
+      for (const line of lines) {
+        expect(() => JSON.parse(line)).not.toThrow();
+      }
+    });
+
+    it('should filter by level', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, 'ERROR', undefined, undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0]).level).toBe('ERROR');
+    });
+
+    it('should filter by category', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, 'auth', undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0]).category).toBe('auth');
+    });
+
+    it('should include timestamp in filename', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Disposition']).toMatch(/scimserver-logs-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}/);
+    });
+
+    it('should respect limit parameter', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, '2', undefined, undefined, undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(2);
+    });
+  });
+
+  // ─── Admin Audit Trail (Phase C Step 10) ────────────────────────────
+
+  describe('admin audit trail logging', () => {
+    let infoSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      infoSpy = jest.spyOn(scimLogger, 'info');
+    });
+
+    afterEach(() => {
+      infoSpy.mockRestore();
+    });
+
+    it('updateConfig should log INFO with changed field keys', () => {
+      controller.updateConfig({ globalLevel: 'WARN', includePayloads: false });
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('configuration updated'),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[2].changes).toHaveProperty('globalLevel');
+      expect(auditCall[2].changes).toHaveProperty('includePayloads');
+    });
+
+    it('updateConfig should log before/after values for changed fields (P8)', () => {
+      // Set initial state
+      controller.updateConfig({ globalLevel: 'INFO' });
+      infoSpy.mockClear();
+
+      // Change to WARN
+      controller.updateConfig({ globalLevel: 'WARN' });
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('configuration updated'),
+      );
+      expect(auditCall).toBeDefined();
+      // Should have before/after values, not just key names
+      expect(auditCall[2].changes).toHaveProperty('globalLevel');
+      expect(auditCall[2].changes.globalLevel).toHaveProperty('from');
+      expect(auditCall[2].changes.globalLevel).toHaveProperty('to');
+    });
+
+    it('setGlobalLevel should log INFO with new level', () => {
+      controller.setGlobalLevel('ERROR');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('Global log level changed'),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[1]).toContain('ERROR');
+    });
+
+    it('setCategoryLevel should log INFO with category and level', () => {
+      controller.setCategoryLevel('auth', 'WARN');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes("Category 'auth'"),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[1]).toContain('WARN');
+    });
+
+    it('setEndpointLevel should log INFO with endpointId and level', () => {
+      controller.setEndpointLevel('ep-audit-1', 'TRACE');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes("Endpoint 'ep-audit-1'"),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[1]).toContain('TRACE');
+    });
+
+    it('clearEndpointLevel should log INFO with endpointId', () => {
+      scimLogger.setEndpointLevel('ep-audit-2', LogLevel.DEBUG);
+      controller.clearEndpointLevel('ep-audit-2');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes("Endpoint 'ep-audit-2'") && c[1]?.includes('removed'),
+      );
+      expect(auditCall).toBeDefined();
+    });
+  });
+
+  describe('getAuditLog (Step 4.3)', () => {
+    it('should return ring buffer entries filtered to audit categories', () => {
+      // Generate some audit and non-audit entries
+      scimLogger.info(LogCategory.CONFIG, 'Level changed', { changes: {} });
+      scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', { endpointId: 'ep-1' });
+      scimLogger.info(LogCategory.AUTH, 'Credential created', { credentialId: 'c-1' });
+      scimLogger.info(LogCategory.SCIM_USER, 'User created', { scimId: 'u-1' }); // NOT audit
+
+      const result = controller.getAuditLog();
+      expect(result.count).toBeGreaterThanOrEqual(3);
+      // All returned entries should be in audit categories
+      for (const entry of result.entries) {
+        expect(['config', 'endpoint', 'auth']).toContain(entry.category);
+      }
+    });
+  });
+
+  // ── Auto-Prune Endpoints ──────────────────────────────────────────
+
+  describe('getAutoPruneConfig', () => {
+    it('should delegate to loggingService.getAutoPruneConfig()', () => {
+      const result = controller.getAutoPruneConfig();
+      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000 });
+    });
+  });
+
+  describe('updateAutoPruneConfig', () => {
+    it('should pass valid retentionDays to setAutoPruneConfig', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ retentionDays: 30 });
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ retentionDays: 30 }));
+    });
+
+    it('should pass valid intervalMs to setAutoPruneConfig', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ intervalMs: 120000 });
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ intervalMs: 120000 }));
+    });
+
+    it('should pass enabled flag to setAutoPruneConfig', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ enabled: false });
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+    });
+
+    it('should ignore retentionDays <= 0', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ retentionDays: 0 });
+      expect(mockSet).toHaveBeenCalledWith({});
+    });
+
+    it('should ignore intervalMs < 60000', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ intervalMs: 5000 });
+      expect(mockSet).toHaveBeenCalledWith({});
+    });
+
+    it('should return updated config from getAutoPruneConfig', () => {
+      const result = controller.updateAutoPruneConfig({ retentionDays: 14 });
+      // Returns the mock's return value
+      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000 });
     });
   });
 });

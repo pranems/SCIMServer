@@ -6,7 +6,7 @@
 
 ## Upgrade Notes
 - No API or frontend changes in this release; update is documentation-only.
-- Existing deployments remain compatible—no action required beyond referencing the refreshed guide when testing collisions.
+- Existing deployments remain compatible-no action required beyond referencing the refreshed guide when testing collisions.
 
 ## Links
 - [Quick Start Collision Guide](../COLLISION-TESTING-GUIDE.md)

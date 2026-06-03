@@ -1,4 +1,4 @@
-﻿name: Build and Push Container Image
+name: Build and Push Container Image
 
 on:
   push:
@@ -11,7 +11,91 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # OPS-1: Gate image push on full test suite. No image is pushed unless
+  # lint + unit + E2E + web build all pass. Uses PERSISTENCE_BACKEND=inmemory
+  # for E2E so no PostgreSQL service container is needed (fast, reliable).
+  # Full prisma-mode validation runs in scripts/full-validation-pipeline.ps1
+  # locally and via the live-test pipeline post-deploy.
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # prisma.config.ts uses env('DATABASE_URL') which throws at config-load time
+    # if the var is missing - even for `prisma generate` which doesn't connect.
+    # Tests run with PERSISTENCE_BACKEND=inmemory so the value is never used.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci --no-audit --no-fund
+
+      # Prisma client must be generated BEFORE lint so type-aware ESLint rules
+      # (no-redundant-type-constituents, require-await) can resolve @prisma/client
+      # types. Without it those types appear as 'error' types and trip lint.
+      - name: Generate Prisma client (required for lint + type-check + tests)
+        working-directory: api
+        run: npx prisma generate
+
+      - name: Lint API
+        working-directory: api
+        run: npm run lint
+
+      # Migration linter - blocks destructive Prisma DDL on new migrations.
+      # Historical destructives are accepted via api/prisma/.migration-lint-baseline.json
+      # (SHA-256 hash allowlist). Set ALLOW_DESTRUCTIVE_MIGRATION=1 in CI plus
+      # justify in the PR description to override for new destructive migrations.
+      - name: Lint Prisma migrations (additive-only enforcement)
+        working-directory: api
+        run: npx ts-node --transpile-only src/scripts/lint-migrations.ts
+
+      - name: Unit tests (API)
+        working-directory: api
+        run: npm test
+
+      # Two specs filter persistent logs by minDurationMs which the InMemory
+      # log repository does not honor. They run against real Prisma backend in
+      # the post-deploy live-test suite (scripts/live-test.ps1). Excluded here
+      # to keep CI fast and PG-free.
+      # --maxWorkers=2 matches the 2-core GitHub-hosted runner. The default
+      # config uses 4 workers (faster for local dev with more cores), but on
+      # CI the over-subscription causes ECONNRESET in parallel-HTTP tests
+      # (multi-endpoint-isolation: 4 simultaneous Promise.all POSTs).
+      - name: E2E tests (API, in-memory backend)
+        working-directory: api
+        run: npm run test:e2e -- --maxWorkers=2 --testPathIgnorePatterns 'endpoint-scoped-logs.e2e-spec.ts' --testPathIgnorePatterns 'log-config.e2e-spec.ts'
+        env:
+          PERSISTENCE_BACKEND: inmemory
+          SCIM_SHARED_SECRET: ci-shared-secret-not-for-production
+          JWT_SECRET: ci-jwt-secret-not-for-production
+          OAUTH_CLIENT_SECRET: ci-oauth-secret-not-for-production
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+
+      - name: Test web (Vitest)
+        working-directory: web
+        run: npm test
+
+      - name: Build web (production bundle)
+        working-directory: web
+        run: npm run build
+
   build-and-push:
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -19,10 +103,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -30,19 +114,56 @@ jobs:
 
       - name: Extract metadata (tags & labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
 
       - name: Build and push unified image
-        uses: docker/build-push-action@v6
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # OPS-3: Trivy CVE scan on the just-pushed image. Fails the build on
+      # any HIGH or CRITICAL OS-package or library vulnerability. Lower
+      # severities are reported but do not gate the release.
+      # Documented exceptions live in repo-root .trivyignore (each entry
+      # MUST cite a CVE, rationale, owner, and re-check date).
+      #
+      # NOTE: Trivy + OCI registries require lowercase image names. The
+      # github.repository env var preserves the repo's casing
+      # (`pranems/SCIMServer`) so we lowercase it here. Without this,
+      # Trivy fails with "could not parse reference" before scanning,
+      # blocking releases for an entirely cosmetic reason.
+      - name: Trivy image scan (HIGH+CRITICAL gating)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/scimserver@${{ steps.build.outputs.digest }}
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          vuln-type: os,library
+          trivyignores: .trivyignore
+
+      - name: Summary
+        run: |
+          echo "## Image Built and Pushed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Pin production deployments to the digest above for immutable references (OPS-2)." >> $GITHUB_STEP_SUMMARY

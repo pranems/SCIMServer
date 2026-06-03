@@ -1,0 +1,487 @@
+import { GenericPatchEngine } from './generic-patch-engine';
+import { PatchError } from './patch-error';
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+function makePayload(): Record<string, unknown> {
+  return {
+    displayName: 'Test Device',
+    serialNumber: 'SN-001',
+    active: true,
+    name: { model: 'Widget', manufacturer: 'Acme' },
+    tags: ['iot', 'production'],
+  };
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('GenericPatchEngine', () => {
+  // ─── Basic construction ────────────────────────────────────────────
+
+  it('should deep clone the input payload', () => {
+    const original = makePayload();
+    const engine = new GenericPatchEngine(original);
+    engine.apply({ op: 'replace', path: 'displayName', value: 'Changed' });
+    expect(original.displayName).toBe('Test Device'); // untouched
+    expect(engine.getResult().displayName).toBe('Changed');
+  });
+
+  // ─── replace operations ───────────────────────────────────────────
+
+  describe('replace', () => {
+    it('should replace a top-level attribute', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'displayName', value: 'New Name' });
+      expect(engine.getResult().displayName).toBe('New Name');
+    });
+
+    it('should replace a nested attribute (dot notation)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name.model', value: 'Gadget' });
+      expect((engine.getResult().name as Record<string, unknown>).model).toBe('Gadget');
+    });
+
+    it('should replace an entire sub-object', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({
+        op: 'replace',
+        path: 'name',
+        value: { model: 'NewModel', manufacturer: 'NewCorp' },
+      });
+      const name = engine.getResult().name as Record<string, unknown>;
+      expect(name.model).toBe('NewModel');
+      expect(name.manufacturer).toBe('NewCorp');
+    });
+
+    it('should replace an array attribute entirely', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'tags', value: ['staging'] });
+      expect(engine.getResult().tags).toEqual(['staging']);
+    });
+
+    it('should replace without path (merge into root)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({
+        op: 'replace',
+        value: { displayName: 'Merged', newField: 'hello' },
+      });
+      const r = engine.getResult();
+      expect(r.displayName).toBe('Merged');
+      expect(r.newField).toBe('hello');
+      expect(r.serialNumber).toBe('SN-001'); // preserved
+    });
+
+    it('should throw if replace without path has non-object value', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() => engine.apply({ op: 'replace', value: 'string' })).toThrow(PatchError);
+    });
+  });
+
+  // ─── add operations ───────────────────────────────────────────────
+
+  describe('add', () => {
+    it('should add a new top-level attribute', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'add', path: 'location', value: 'Building A' });
+      expect(engine.getResult().location).toBe('Building A');
+    });
+
+    it('should add a nested attribute (creates intermediates)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'add', path: 'specs.weight', value: 1.5 });
+      const specs = engine.getResult().specs as Record<string, unknown>;
+      expect(specs.weight).toBe(1.5);
+    });
+
+    it('should merge arrays when adding to an existing array', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'add', path: 'tags', value: ['staging', 'test'] });
+      expect(engine.getResult().tags).toEqual(['iot', 'production', 'staging', 'test']);
+    });
+
+    it('should merge into root when no path is given', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'add', value: { firmware: 'v2.1' } });
+      expect(engine.getResult().firmware).toBe('v2.1');
+    });
+
+    it('should throw if add without path has non-object value', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() => engine.apply({ op: 'add', value: 42 })).toThrow(PatchError);
+    });
+  });
+
+  // ─── remove operations ────────────────────────────────────────────
+
+  describe('remove', () => {
+    it('should remove a top-level attribute', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'remove', path: 'serialNumber' });
+      expect(engine.getResult().serialNumber).toBeUndefined();
+    });
+
+    it('should remove a nested attribute (dot notation)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'remove', path: 'name.manufacturer' });
+      const name = engine.getResult().name as Record<string, unknown>;
+      expect(name.manufacturer).toBeUndefined();
+      expect(name.model).toBe('Widget'); // sibling preserved
+    });
+
+    it('should no-op when removing a non-existent path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'remove', path: 'nonexistent.deep.path' });
+      // Should not throw
+      expect(engine.getResult().displayName).toBe('Test Device');
+    });
+
+    it('should throw when remove has no path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() => engine.apply({ op: 'remove' })).toThrow(PatchError);
+    });
+  });
+
+  // ─── Extension URN paths (DOT separator - legacy) ──────────────────
+
+  describe('extension URN paths (DOT separator)', () => {
+    const urn = 'urn:example:ext:device:2.0';
+
+    it('should set a field inside an extension URN', () => {
+      const engine = new GenericPatchEngine({ displayName: 'Dev' });
+      engine.apply({ op: 'add', path: `${urn}.firmware`, value: 'v1.0' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.firmware).toBe('v1.0');
+    });
+
+    it('should replace a field inside an existing extension', () => {
+      const engine = new GenericPatchEngine({
+        displayName: 'Dev',
+        [urn]: { firmware: 'v1.0', color: 'red' },
+      });
+      engine.apply({ op: 'replace', path: `${urn}.firmware`, value: 'v2.0' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.firmware).toBe('v2.0');
+      expect(ext.color).toBe('red');
+    });
+
+    it('should remove a field inside an extension URN', () => {
+      const engine = new GenericPatchEngine({
+        displayName: 'Dev',
+        [urn]: { firmware: 'v1.0', color: 'red' },
+      });
+      engine.apply({ op: 'remove', path: `${urn}.color` });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.color).toBeUndefined();
+      expect(ext.firmware).toBe('v1.0');
+    });
+  });
+
+  // ─── Extension URN paths (COLON separator - RFC-compliant) ─────────
+
+  describe('extension URN paths (COLON separator with extensionUrns)', () => {
+    const urn = 'urn:ietf:params:scim:schemas:extension:custom:2.0:User';
+
+    it('should add a field using colon separator when extensionUrns provided', () => {
+      const engine = new GenericPatchEngine({ displayName: 'Dev' }, [urn]);
+      engine.apply({ op: 'add', path: `${urn}:badgeNumber`, value: 'B-001' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.badgeNumber).toBe('B-001');
+    });
+
+    it('should replace a field using colon separator', () => {
+      const engine = new GenericPatchEngine({
+        displayName: 'Dev',
+        [urn]: { badgeNumber: 'B-001', costCenter: 'ENG' },
+      }, [urn]);
+      engine.apply({ op: 'replace', path: `${urn}:badgeNumber`, value: 'B-999' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.badgeNumber).toBe('B-999');
+      expect(ext.costCenter).toBe('ENG');
+    });
+
+    it('should remove a field using colon separator', () => {
+      const engine = new GenericPatchEngine({
+        displayName: 'Dev',
+        [urn]: { badgeNumber: 'B-001', costCenter: 'ENG' },
+      }, [urn]);
+      engine.apply({ op: 'remove', path: `${urn}:costCenter` });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.costCenter).toBeUndefined();
+      expect(ext.badgeNumber).toBe('B-001');
+    });
+
+    it('should create extension object if it does not exist', () => {
+      const engine = new GenericPatchEngine({ displayName: 'Dev' }, [urn]);
+      engine.apply({ op: 'replace', path: `${urn}:location`, value: 'Building A' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.location).toBe('Building A');
+    });
+
+    it('should prioritize colon separator over dot fallback when extensionUrns provided', () => {
+      const shortUrn = 'urn:example:ext:2.0';
+      const engine = new GenericPatchEngine({ displayName: 'Dev' }, [shortUrn]);
+      engine.apply({ op: 'add', path: `${shortUrn}:field`, value: 'colon-value' });
+      const ext = engine.getResult()[shortUrn] as Record<string, unknown>;
+      expect(ext.field).toBe('colon-value');
+    });
+
+    it('should still support dot separator for non-extension paths', () => {
+      const engine = new GenericPatchEngine(makePayload(), [urn]);
+      engine.apply({ op: 'replace', path: 'name.model', value: 'Gadget' });
+      expect((engine.getResult().name as Record<string, unknown>).model).toBe('Gadget');
+    });
+  });
+
+  // ─── V19: Prototype pollution guard ─────────────────────────────
+
+  describe('V19 - prototype pollution guard', () => {
+    it('should reject add op with __proto__ in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'add', path: '__proto__.polluted', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject replace op with constructor in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: 'constructor.name', value: 'Evil' }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject replace op with prototype in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: 'prototype.isAdmin', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject remove op with __proto__ in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'remove', path: '__proto__.polluted' }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject __proto__ as a simple (non-dot) path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: '__proto__', value: { polluted: true } }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject deeply nested __proto__ in dot-notation path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'add', path: 'name.__proto__.polluted', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject constructor in second segment of dot-notation', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: 'x.constructor.y', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should strip dangerous keys from no-path add value objects', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({
+        op: 'add',
+        value: {
+          displayName: 'Updated',
+          __proto__: { polluted: true },
+          constructor: { polluted: true },
+        },
+      });
+      const result = engine.getResult();
+      expect(result.displayName).toBe('Updated');
+      expect(Object.getOwnPropertyNames(result).includes('__proto__')).toBe(false);
+      expect(Object.getOwnPropertyNames(result).includes('constructor')).toBe(false);
+    });
+
+    it('should strip dangerous keys from no-path replace value objects', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({
+        op: 'replace',
+        value: {
+          displayName: 'Replaced',
+          prototype: { polluted: true },
+        },
+      });
+      const result = engine.getResult();
+      expect(result.displayName).toBe('Replaced');
+      expect(Object.getOwnPropertyNames(result).includes('prototype')).toBe(false);
+    });
+
+    it('should allow normal dot-notation paths', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name.model', value: 'Safe' });
+      expect((engine.getResult().name as Record<string, unknown>).model).toBe('Safe');
+    });
+
+    it('should reject __proto__ in legacy URN dot-notation path', () => {
+      const urn = 'urn:example:ext:2.0';
+      const engine = new GenericPatchEngine({ displayName: 'Dev' });
+      expect(() =>
+        engine.apply({ op: 'add', path: `${urn}.__proto__`, value: true }),
+      ).toThrow(PatchError);
+    });
+  });
+
+  // ─── Error handling ───────────────────────────────────────────────
+
+  describe('error handling', () => {
+    it('should throw PatchError for missing op field', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() => engine.apply({} as any)).toThrow(PatchError);
+    });
+
+    it('should throw PatchError for unsupported op', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() => engine.apply({ op: 'move', path: 'a' })).toThrow(PatchError);
+    });
+
+    it('should handle case-insensitive op names', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'Replace', path: 'displayName', value: 'CaseTest' });
+      expect(engine.getResult().displayName).toBe('CaseTest');
+    });
+  });
+
+  // ─── Multiple operations ──────────────────────────────────────────
+
+  describe('multiple operations', () => {
+    it('should apply a sequence of operations correctly', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'displayName', value: 'Updated' });
+      engine.apply({ op: 'add', path: 'location', value: 'Lab 3' });
+      engine.apply({ op: 'remove', path: 'serialNumber' });
+      engine.apply({ op: 'replace', path: 'active', value: false });
+
+      const result = engine.getResult();
+      expect(result.displayName).toBe('Updated');
+      expect(result.location).toBe('Lab 3');
+      expect(result.serialNumber).toBeUndefined();
+      expect(result.active).toBe(false);
+    });
+  });
+
+  // Step H - PATCH null-handling parity for custom resource types
+  // See docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md
+
+  describe('F1 - complex-parent merge with null-as-unset (custom RT parity)', () => {
+    it('should merge a partial object value into existing complex parent (single-segment path)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name', value: { model: 'Gadget' } });
+      const name = engine.getResult().name as Record<string, unknown>;
+      expect(name.model).toBe('Gadget');
+      expect(name.manufacturer).toBe('Acme');
+    });
+
+    it('should treat null sub-value as unset and preserve siblings (single-segment path)', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name', value: { manufacturer: null } });
+      const name = engine.getResult().name as Record<string, unknown>;
+      expect('manufacturer' in name).toBe(false);
+      expect(name.model).toBe('Widget');
+    });
+  });
+
+  describe('F4 - reject null elements in multi-valued PATCH arrays (custom RT parity)', () => {
+    it('should throw 400 invalidValue when add value contains null element', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      try {
+        engine.apply({ op: 'add', path: 'tags', value: ['lab', null] });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+
+    it('should throw 400 invalidValue when replace value contains null element', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      try {
+        engine.apply({ op: 'replace', path: 'tags', value: ['lab', null] });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F5 - prune empty extension namespaces after PATCH (custom RT parity)', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Device';
+
+    it('should remove the extension URN key from payload when last attribute is cleared', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { tag: 'A' } },
+        [URN],
+      );
+      engine.apply({ op: 'replace', path: `${URN}:tag`, value: null });
+      expect(URN in engine.getResult()).toBe(false);
+    });
+
+    it('should keep the extension URN key when at least one other attribute remains', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { tag: 'A', color: 'red' } },
+        [URN],
+      );
+      engine.apply({ op: 'replace', path: `${URN}:tag`, value: null });
+      const result = engine.getResult();
+      expect(URN in result).toBe(true);
+      const ext = result[URN] as Record<string, unknown>;
+      expect('tag' in ext).toBe(false);
+      expect(ext.color).toBe('red');
+    });
+  });
+
+  describe('F6 - extension dotted sub-attribute null clear (custom RT parity)', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Device';
+
+    it('should clear only the named sub-attribute via dotted path and preserve siblings', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { owner: { value: 'mgr-1', displayName: 'Old' } } },
+        [URN],
+      );
+      engine.apply({ op: 'replace', path: `${URN}:owner.displayName`, value: null });
+      const owner = (engine.getResult()[URN] as Record<string, unknown>).owner as Record<string, unknown>;
+      expect('displayName' in owner).toBe(false);
+      expect(owner.value).toBe('mgr-1');
+    });
+  });
+
+  describe('F7 - extension valuePath noTarget (custom RT parity)', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Device';
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (remove)', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { aliases: [{ type: 'a', value: 'x' }] } },
+        [URN],
+      );
+      try {
+        engine.apply({ op: 'remove', path: `${URN}:aliases[type eq "missing"]` });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (replace)', () => {
+      const engine = new GenericPatchEngine(
+        { ...makePayload(), [URN]: { aliases: [{ type: 'a', value: 'x' }] } },
+        [URN],
+      );
+      try {
+        engine.apply({ op: 'replace', path: `${URN}:aliases[type eq "missing"].value`, value: 'y' });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+  });
+});

@@ -1,6 +1,7 @@
 ﻿import {
   ArrayNotEmpty,
   IsArray,
+  IsNotEmpty,
   IsOptional,
   IsString,
   ValidateNested
@@ -9,6 +10,7 @@ import { Type } from 'class-transformer';
 
 export class GroupMemberDto {
   @IsString()
+  @IsNotEmpty({ message: 'member value (id) must not be empty.' })
   value!: string;
 
   @IsOptional()
@@ -26,6 +28,7 @@ export class CreateGroupDto {
   schemas!: string[];
 
   @IsString()
+  @IsNotEmpty({ message: 'displayName must not be empty.' })
   displayName!: string;
 
   @IsOptional()

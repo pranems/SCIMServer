@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ActivityController } from './activity.controller';
 import { PrismaService } from '../prisma/prisma.service';
+import { LoggingService } from '../logging/logging.service';
 import { ActivityParserService } from './activity-parser.service';
 
 describe('ActivityController', () => {
@@ -59,6 +60,26 @@ describe('ActivityController', () => {
     }));
   };
 
+  // ActivityController reads PERSISTENCE_BACKEND in a constructor field initializer
+  // (private readonly isInMemoryBackend = process.env.PERSISTENCE_BACKEND === 'inmemory').
+  // If a developer's shell has PERSISTENCE_BACKEND=inmemory set (common during
+  // E2E debugging), every test silently routes through getActivitiesInMemory()
+  // and bypasses the mocked PrismaService -> misleading "Number of calls: 0"
+  // failures. Pin the env var to 'prisma' here so these unit tests are
+  // hermetic regardless of shell state, and restore the original value after.
+  let originalPersistenceBackend: string | undefined;
+  beforeAll(() => {
+    originalPersistenceBackend = process.env.PERSISTENCE_BACKEND;
+    process.env.PERSISTENCE_BACKEND = 'prisma';
+  });
+  afterAll(() => {
+    if (originalPersistenceBackend === undefined) {
+      delete process.env.PERSISTENCE_BACKEND;
+    } else {
+      process.env.PERSISTENCE_BACKEND = originalPersistenceBackend;
+    }
+  });
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ActivityController],
@@ -77,6 +98,12 @@ describe('ActivityController', () => {
           useValue: {
             parseActivity: jest.fn(),
             isKeepaliveLog: jest.fn(),
+          },
+        },
+        {
+          provide: LoggingService,
+          useValue: {
+            listLogs: jest.fn().mockResolvedValue({ items: [], total: 0 }),
           },
         },
       ],
@@ -350,6 +377,158 @@ describe('ActivityController', () => {
       expect(whereClause).toBeDefined();
       expect(whereClause.AND).toBeDefined();
       expect(Array.isArray(whereClause.AND)).toBe(true);
+    });
+  });
+
+  // ── getActivitySummary - uses count() for all fields ───────────────────────
+
+  describe('getActivitySummary - SQL-level counting', () => {
+    it('should use count() for all summary fields (no findMany)', async () => {
+      // All 4 fields should use count() - no findMany at all
+      (prismaService.requestLog.count as jest.Mock)
+        .mockResolvedValueOnce(100)   // last24Hours
+        .mockResolvedValueOnce(500)   // lastWeek
+        .mockResolvedValueOnce(200)   // userOperations
+        .mockResolvedValueOnce(50);   // groupOperations
+
+      const result = await controller.getActivitySummary();
+
+      expect(result.summary.last24Hours).toBe(100);
+      expect(result.summary.lastWeek).toBe(500);
+      expect(result.summary.operations.users).toBe(200);
+      expect(result.summary.operations.groups).toBe(50);
+
+      // Verify findMany was NOT called (count-only approach)
+      expect(prismaService.requestLog.findMany).not.toHaveBeenCalled();
+
+      // Verify count was called exactly 4 times
+      expect(prismaService.requestLog.count).toHaveBeenCalledTimes(4);
+    });
+
+    it('should exclude admin traffic in all count queries', async () => {
+      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+
+      await controller.getActivitySummary();
+
+      const calls = (prismaService.requestLog.count as jest.Mock).mock.calls;
+      // Every call should contain admin exclusion
+      for (const call of calls) {
+        const where = JSON.stringify(call[0]?.where ?? {});
+        expect(where).toContain('/admin/');
+      }
+    });
+
+    it('should exclude keepalive in user and time-based counts', async () => {
+      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+
+      await controller.getActivitySummary();
+
+      const calls = (prismaService.requestLog.count as jest.Mock).mock.calls;
+      // First 3 calls (24h, 7d, users) should have keepalive exclusion (NOT clause with method=GET)
+      for (let i = 0; i < 3; i++) {
+        const where = JSON.stringify(calls[i][0]?.where ?? {});
+        expect(where).toContain('GET');
+      }
+    });
+
+    it('should not return system operations key', async () => {
+      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await controller.getActivitySummary();
+
+      expect(result.summary.operations).not.toHaveProperty('system');
+    });
+  });
+
+  // ── InMemory fallback paths ───────────────────────────────────────────────
+
+  describe('InMemory backend fallback', () => {
+    let inmemController: ActivityController;
+    let mockLogging: { listLogs: jest.Mock };
+
+    beforeEach(async () => {
+      const savedEnv = process.env.PERSISTENCE_BACKEND;
+      process.env.PERSISTENCE_BACKEND = 'inmemory';
+
+      mockLogging = {
+        listLogs: jest.fn().mockResolvedValue({
+          items: [
+            { id: 'log-1', method: 'POST', url: '/scim/v2/Users', status: 201, createdAt: new Date(), reportableIdentifier: 'u1' },
+          ],
+          total: 1,
+        }),
+      };
+
+      const module = await Test.createTestingModule({
+        controllers: [ActivityController],
+        providers: [
+          { provide: PrismaService, useValue: { requestLog: { findMany: jest.fn(), count: jest.fn() } } },
+          { provide: ActivityParserService, useValue: { parseActivity: jest.fn().mockResolvedValue({ id: 'log-1', type: 'user', severity: 'success', timestamp: new Date(), icon: '👤', message: 'Created', details: '', isKeepalive: false }), isKeepaliveLog: jest.fn() } },
+          { provide: LoggingService, useValue: mockLogging },
+        ],
+      }).compile();
+
+      inmemController = module.get<ActivityController>(ActivityController);
+      process.env.PERSISTENCE_BACKEND = savedEnv;
+    });
+
+    it('should use LoggingService.listLogs for getActivities in inmemory mode', async () => {
+      const result = await inmemController.getActivities('1', '50');
+      expect(mockLogging.listLogs).toHaveBeenCalled();
+      expect(result.activities).toHaveLength(1);
+      expect(result.pagination.total).toBe(1);
+    });
+
+    it('should return zeroed summary for getActivitySummary in inmemory mode', async () => {
+      const result = await inmemController.getActivitySummary();
+      expect(result.summary.last24Hours).toBe(0);
+      expect(result.summary.lastWeek).toBe(0);
+      expect(result.summary.operations).toEqual({ users: 0, groups: 0 });
+    });
+  });
+
+  // ─── Phase D2 - endpointId filter ─────────────────────────────────
+  // The Activity tab on `/endpoints/$id/activity` needs server-side
+  // scoping by endpointId. The Phase 17 RequestLog migration added an
+  // indexed `endpointId` column; this test pins the WHERE behavior so
+  // a future refactor can't silently regress to client-side filtering
+  // (which would defeat the purpose for endpoints with high traffic).
+  describe('getActivities - endpointId filter (Phase D2)', () => {
+    it('passes endpointId into the Prisma WHERE clause when provided', async () => {
+      jest.spyOn(prismaService.requestLog, 'findMany').mockResolvedValue([]);
+      jest.spyOn(prismaService.requestLog, 'count').mockResolvedValue(0);
+
+      await controller.getActivities(
+        '1', '50',
+        undefined, undefined, undefined,
+        undefined,
+        'ep-target-uuid',
+      );
+
+      const findManyCall = jest.mocked(prismaService.requestLog.findMany).mock.calls[0][0];
+      // Walk the AND tree to find the endpointId clause. We don't pin
+      // an exact path so future refactors can move the clause around
+      // as long as the predicate is still expressed.
+      const andClauses = (findManyCall as { where: { AND: unknown[] } }).where.AND;
+      const stringified = JSON.stringify(andClauses);
+      expect(stringified).toContain('"endpointId"');
+      expect(stringified).toContain('"ep-target-uuid"');
+
+      // Same predicate must hit the count() so pagination math matches.
+      const countCall = jest.mocked(prismaService.requestLog.count).mock.calls[0][0];
+      expect(JSON.stringify(countCall)).toContain('"ep-target-uuid"');
+    });
+
+    it('does not add endpointId clause when omitted (back-compat)', async () => {
+      jest.spyOn(prismaService.requestLog, 'findMany').mockResolvedValue([]);
+      jest.spyOn(prismaService.requestLog, 'count').mockResolvedValue(0);
+
+      await controller.getActivities('1', '50');
+
+      const findManyCall = jest.mocked(prismaService.requestLog.findMany).mock.calls[0][0];
+      const stringified = JSON.stringify(findManyCall);
+      // No endpointId predicate when caller passes nothing.
+      expect(stringified).not.toContain('endpointId');
     });
   });
 });

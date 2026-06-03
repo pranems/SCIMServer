@@ -1,0 +1,1584 @@
+/**
+ * Shared SCIM Service Helpers (G17 - Service Deduplication)
+ *
+ * Extracts duplicate private methods from EndpointScimUsersService and
+ * EndpointScimGroupsService into reusable pure functions and a
+ * parameterized SchemaHelpers class.
+ *
+ * @see RFC 7643 §2.1 - Attribute Characteristics
+ * @see RFC 7644 §3.14 - ETag/If-Match
+ */
+
+import { createScimError } from './scim-errors';
+import { SCIM_ERROR_TYPE } from './scim-constants';
+import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
+import {
+  getConfigBoolean,
+  getConfigString,
+  ENDPOINT_CONFIG_FLAGS,
+  type EndpointConfig,
+} from '../../endpoint/endpoint-config.interface';
+import type { ScimSchemaRegistry, ScimSchemaDefinition } from '../discovery/scim-schema-registry';
+import { SchemaValidator } from '../../../domain/validation';
+import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
+import type { ScimLogger } from '../../logging/scim-logger.service';
+import type { LogCategory } from '../../logging/log-levels';
+import type { PatchOperation } from '../../../domain/patch/patch-types';
+import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
+import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
+
+// ─── Repository Error Handling ──────────────────────────────────────────────
+
+/**
+ * Handle a RepositoryError from a write operation: log at ERROR and re-throw
+ * as a SCIM-compliant HttpException.
+ *
+ * This is the central bridge between the domain error boundary (RepositoryError)
+ * and the SCIM error format. All three SCIM services use this for create/update/delete.
+ *
+ * If the error is NOT a RepositoryError (unexpected), it is re-thrown as-is
+ * and will be caught by the GlobalExceptionFilter (Step 1).
+ *
+ * @param error        The caught error from a repository call
+ * @param operation    Human-readable operation description (e.g., 'create user')
+ * @param logger       ScimLogger instance
+ * @param logCategory  LogCategory for the error entry (SCIM_USER, SCIM_GROUP, etc.)
+ * @param context      Additional structured data for the error log
+ */
+export function handleRepositoryError(
+  error: unknown,
+  operation: string,
+  logger: ScimLogger,
+  logCategory: LogCategory,
+  context: Record<string, unknown> = {},
+): never {
+  if (error instanceof RepositoryError) {
+    logger.error(logCategory, `Repository failure: ${operation}`, error.cause ?? error, {
+      operation,
+      errorCode: error.code,
+      ...context,
+    });
+    throw createScimError({
+      status: repositoryErrorToHttpStatus(error.code),
+      scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : undefined,
+      detail: `Failed to ${operation}: ${error.message}`,
+      diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
+    });
+  }
+  // Non-RepositoryError - re-throw for GlobalExceptionFilter
+  throw error;
+}
+
+// ─── Cache Helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Flatten a Parent→Children map into a flat Set of all child names.
+ * Unions all children across all parent keys (ignoring parent context).
+ *
+ * Used by legacy consistency tests to compare cache-built maps
+ * against old flat collectors.
+ */
+export function flattenParentChildMap(map: Map<string, Set<string>>): Set<string> {
+  const flat = new Set<string>();
+  for (const children of map.values()) {
+    for (const child of children) {
+      flat.add(child);
+    }
+  }
+  return flat;
+}
+
+/**
+ * Check if a URN dot-path key represents a sub-attribute entry.
+ * A key is a sub-attr key iff it contains a '.' AFTER the last ':' in the URN.
+ * Handles URNs with dots in version numbers (e.g., `urn:...:2.0:User`).
+ */
+export function isSubAttrKey(key: string): boolean {
+  const lastColon = key.lastIndexOf(':');
+  return key.indexOf('.', lastColon) !== -1;
+}
+
+// ─── Pure Utility Functions ─────────────────────────────────────────────────
+
+/**
+ * Safely parse JSON, returning an empty object on failure.
+ * Logs a console.warn when invalid JSON is encountered (for traceability).
+ */
+export function parseJson<T>(value: string | null | undefined): T {
+  if (!value) {
+    return {} as T;
+  }
+  try {
+    return JSON.parse(value) as T;
+  } catch (e) {
+    console.warn('parseJson: corrupt JSON fallback to {}', (e as Error).message);
+    return {} as T;
+  }
+}
+
+/**
+ * Validate that a required SCIM schema URN is present in the request's schemas[] array.
+ * Case-insensitive comparison per RFC 7643 §3.1.
+ */
+export function ensureSchema(schemas: string[] | undefined, requiredSchema: string): void {
+  const requiredLower = requiredSchema.toLowerCase();
+  if (!schemas || !schemas.some((s) => s.toLowerCase() === requiredLower)) {
+    throw createScimError({
+      status: 400,
+      scimType: 'invalidSyntax',
+      detail: `Missing required schema '${requiredSchema}'.`,
+      diagnostics: { errorCode: 'VALIDATION_REQUIRED' },
+    });
+  }
+}
+
+/**
+ * Phase 7: Pre-write If-Match enforcement (RFC 7644 §3.14).
+ *
+ * When the client sends an If-Match header, the resource's current version-based
+ * ETag must match - otherwise 412 Precondition Failed is thrown BEFORE the write.
+ * When RequireIfMatch is enabled, a missing If-Match header → 428 Precondition Required.
+ */
+export function enforceIfMatch(
+  currentVersion: number,
+  ifMatch?: string,
+  config?: EndpointConfig,
+): void {
+  const requireIfMatch = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
+
+  if (!ifMatch) {
+    if (requireIfMatch) {
+      const currentETag = `W/"v${currentVersion}"`;
+      throw createScimError({
+        status: 428,
+        detail:
+          `If-Match header is required for this operation. Current ETag: ${currentETag}`,
+        diagnostics: { errorCode: 'PRECONDITION_IF_MATCH', triggeredBy: 'RequireIfMatch', currentETag },
+      });
+    }
+    return;
+  }
+
+  const currentETag = `W/"v${currentVersion}"`;
+  assertIfMatch(currentETag, ifMatch);
+}
+
+/**
+ * Parent-context-aware boolean string sanitizer (URN dot-path keys).
+ *
+ * Recursively walks a SCIM payload and coerces string "True"/"False" to native
+ * booleans, using a URN-dot-path→Children Map for precision. This prevents
+ * name-collision false positives (e.g., core `active` is boolean but extension
+ * `active` is string).
+ *
+ * Parent path convention (URN-qualified dot-paths):
+ * - `urn:...:core:2.0:user`           - core schema top-level attributes
+ * - `urn:...:enterprise:2.0:user`     - extension top-level attributes
+ * - `urn:...:core:2.0:user.emails`    - sub-attributes of core complex parent
+ *
+ * At runtime:
+ * - When encountering a key starting with `urn:`, switch parentPath to that URN
+ * - For all other keys, append `.${key.toLowerCase()}` to the current parentPath
+ *
+ * @param obj         - The object to sanitize (mutated in place)
+ * @param boolMap     - URN-dot-path→Children map of boolean attribute names
+ * @param parentPath  - Current URN-qualified parent path (e.g. the coreSchemaUrn)
+ */
+export function sanitizeBooleanStringsByParent(
+  obj: Record<string, unknown>,
+  boolMap: Map<string, Set<string>>,
+  parentPath: string = '',
+): void {
+  const boolChildren = boolMap.get(parentPath);
+
+  for (const [key, value] of Object.entries(obj)) {
+    const keyLower = key.toLowerCase();
+
+    if (Array.isArray(value)) {
+      // Array elements: parent context becomes parentPath.arrayAttrName
+      const childPath = keyLower.startsWith('urn:') ? keyLower : `${parentPath}.${keyLower}`;
+      for (const item of value) {
+        if (typeof item === 'object' && item !== null) {
+          sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, childPath);
+        }
+      }
+    } else if (typeof value === 'object' && value !== null) {
+      // Nested object: URN key → switch to that URN; otherwise append to path
+      const childPath = keyLower.startsWith('urn:') ? keyLower : `${parentPath}.${keyLower}`;
+      sanitizeBooleanStringsByParent(value as Record<string, unknown>, boolMap, childPath);
+    } else if (typeof value === 'string' && boolChildren?.has(keyLower)) {
+      const lower = value.toLowerCase();
+      if (lower === 'true') obj[key] = true;
+      else if (lower === 'false') obj[key] = false;
+    }
+  }
+}
+
+/**
+ * Coerce boolean strings ("True"/"False") inside PATCH operation values
+ * using parent-context-aware URN-dot-path maps.
+ *
+ * Extracted from the identical loop in Users/Groups/Generic PATCH flows.
+ * Walks each operation's value and coerces string booleans to native booleans.
+ *
+ * Handles three value shapes:
+ *  1. Object value (no-path replace): walks recursively via sanitizeBooleanStringsByParent
+ *  2. Array value: walks each element recursively
+ *  3. Scalar string value with path (e.g. path:"active", value:"True"):
+ *     resolves the SCIM path to its parent URN-dot-path and attribute name,
+ *     then coerces if the attribute is boolean-typed in the boolMap.
+ *     This covers standard Entra ID PATCH operations that send boolean
+ *     values as strings (e.g. {"op":"Replace","path":"active","value":"False"}).
+ *
+ * @param operations  The PATCH operations array
+ * @param boolMap     URN-dot-path→Children map of boolean attribute names
+ * @param coreUrnLower  The lowercase core schema URN for root parentPath
+ */
+export function coercePatchOpBooleans(
+  operations: Array<{ op: string; path?: string; value?: unknown }>,
+  boolMap: Map<string, Set<string>>,
+  coreUrnLower: string,
+): void {
+  for (const op of operations) {
+    if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+      sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, coreUrnLower);
+    } else if (Array.isArray(op.value)) {
+      for (const item of op.value) {
+        if (typeof item === 'object' && item !== null) {
+          sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, coreUrnLower);
+        }
+      }
+    } else if (typeof op.value === 'string' && op.path) {
+      // Scalar string value with explicit path - resolve and coerce if boolean
+      const coerced = coerceScalarPatchValue(op.path, op.value, boolMap, coreUrnLower);
+      if (coerced !== undefined) {
+        op.value = coerced;
+      }
+    }
+  }
+}
+
+/**
+ * Resolve a SCIM PATCH path to its parent URN-dot-path and leaf attribute name,
+ * then coerce the scalar string value if the attribute is boolean-typed.
+ *
+ * Path formats handled:
+ *  - "active"                         -> parent=coreUrn, leaf="active"
+ *  - "name.givenName"                 -> parent=coreUrn.name, leaf="givenname"
+ *  - "emails[type eq \"work\"].primary" -> parent=coreUrn.emails, leaf="primary"
+ *  - "urn:...:ext:2.0:User:field"     -> parent=extUrnLower, leaf="field"
+ *  - "urn:...:ext:2.0:User:manager.displayName" -> parent=extUrnLower.manager, leaf="displayname"
+ *
+ * @param path         The SCIM PATCH operation path
+ * @param value        The scalar string value to possibly coerce
+ * @param boolMap      URN-dot-path -> Children map of boolean attribute names
+ * @param coreUrnLower The lowercase core schema URN
+ * @returns true/false if coerced, undefined if not a boolean attribute
+ */
+function coerceScalarPatchValue(
+  path: string,
+  value: string,
+  boolMap: Map<string, Set<string>>,
+  coreUrnLower: string,
+): boolean | undefined {
+  const lower = value.toLowerCase();
+  if (lower !== 'true' && lower !== 'false') return undefined;
+
+  // Strip value filters: emails[type eq "work"].primary -> emails.primary
+  const cleanPath = path.replace(/\[.*?\]/g, '');
+  const cleanLower = cleanPath.toLowerCase();
+
+  let parentPath: string;
+  let leafName: string;
+
+  // Check for extension URN prefix by finding the longest matching URN key in boolMap
+  // Extension paths use ':' after the URN (e.g. urn:...:enterprise:2.0:User:department)
+  if (cleanLower.startsWith('urn:')) {
+    // Collect all URN-based keys from boolMap and find the longest matching prefix.
+    // boolMap keys are either base URNs (e.g. "urn:...:core:2.0:user") or
+    // sub-paths (e.g. "urn:...:core:2.0:user.emails"). Both can match.
+    let matchedUrn: string | undefined;
+    let matchedLen = 0;
+    for (const mapKey of boolMap.keys()) {
+      if (!mapKey.startsWith('urn:')) continue;
+      // Check if the clean path starts with this map key followed by ':' or '.'
+      // This works for both base URNs and dotted sub-paths
+      if (cleanLower.startsWith(mapKey + ':') || cleanLower.startsWith(mapKey + '.')) {
+        if (mapKey.length > matchedLen) {
+          matchedUrn = mapKey;
+          matchedLen = mapKey.length;
+        }
+      }
+    }
+
+    if (!matchedUrn) return undefined;
+
+    // Extract the remainder after the matched URN + separator character
+    const remainder = cleanLower.slice(matchedUrn.length + 1);
+    if (!remainder) return undefined;
+
+    const segments = remainder.split('.');
+    leafName = segments[segments.length - 1];
+    if (segments.length === 1) {
+      parentPath = matchedUrn;
+    } else {
+      parentPath = `${matchedUrn}.${segments.slice(0, -1).join('.')}`;
+    }
+  } else {
+    // Core attribute path: "active", "name.givenName", etc.
+    const segments = cleanLower.split('.');
+    leafName = segments[segments.length - 1];
+    if (segments.length === 1) {
+      parentPath = coreUrnLower;
+    } else {
+      parentPath = `${coreUrnLower}.${segments.slice(0, -1).join('.')}`;
+    }
+  }
+
+  const children = boolMap.get(parentPath);
+  if (children?.has(leafName)) {
+    return lower === 'true';
+  }
+  return undefined;
+}
+
+/**
+ * Strip returned:'never' attributes from a SCIM payload and its extension URN objects.
+ *
+ * Handles: core top-level, core sub-attrs, extension top-level, extension sub-attrs,
+ * and FP-1 empty-extension cleanup. Uses URN-dot-path ByParent map for zero-collision
+ * stripping.
+ *
+ * Extracted from the identical logic in toScimUserResource / toScimGroupResource / toScimResponse.
+ *
+ * @param payload        The rawPayload object (mutated in place)
+ * @param neverByParent  URN-dot-path→Children map of never-returned attrs
+ * @param coreUrnLower   Lowercase core schema URN
+ * @param extensionUrns  Extension URNs to check (original-case)
+ * @returns Array of extension URNs that have visible (non-empty) attributes in the payload
+ */
+export function stripNeverReturnedFromPayload(
+  payload: Record<string, unknown>,
+  neverByParent: Map<string, Set<string>>,
+  coreUrnLower: string,
+  extensionUrns: readonly string[],
+): string[] {
+  // ─── Core top-level + sub-attr stripping ───
+  const coreNever = neverByParent.get(coreUrnLower);
+  if (coreNever) {
+    for (const key of Object.keys(payload)) {
+      if (coreNever.has(key.toLowerCase())) {
+        delete payload[key];
+        continue;
+      }
+      // Sub-attrs within complex/multi-valued parents
+      const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
+      if (subNever && subNever.size > 0) {
+        stripSubAttrs(payload[key], subNever);
+      }
+    }
+  }
+
+  // ─── Extension stripping + visible URN collection ───
+  const visibleExtUrns: string[] = [];
+  for (const urn of extensionUrns) {
+    if (!(urn in payload)) continue;
+    const urnLower = urn.toLowerCase();
+    const extNever = neverByParent.get(urnLower);
+    const extObj = payload[urn];
+    if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+      for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+        if (extNever.has(extKey.toLowerCase())) {
+          delete (extObj as Record<string, unknown>)[extKey];
+          continue;
+        }
+        // Extension sub-attr stripping
+        const extSubNever = neverByParent.get(`${urnLower}.${extKey.toLowerCase()}`);
+        if (extSubNever && extSubNever.size > 0) {
+          stripSubAttrs((extObj as Record<string, unknown>)[extKey], extSubNever);
+        }
+      }
+      // FP-1: If extension is now empty, remove it entirely
+      if (Object.keys(extObj as Record<string, unknown>).length === 0) {
+        delete payload[urn];
+        continue;
+      }
+    }
+    visibleExtUrns.push(urn);
+  }
+  return visibleExtUrns;
+}
+
+/**
+ * Strip sub-attributes from a complex/multi-valued attribute value.
+ * @internal Used by stripNeverReturnedFromPayload.
+ */
+function stripSubAttrs(value: unknown, subNever: Set<string>): void {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    for (const subKey of Object.keys(value as Record<string, unknown>)) {
+      if (subNever.has(subKey.toLowerCase())) {
+        delete (value as Record<string, unknown>)[subKey];
+      }
+    }
+  } else if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === 'object' && item !== null) {
+        for (const subKey of Object.keys(item as Record<string, unknown>)) {
+          if (subNever.has(subKey.toLowerCase())) {
+            delete (item as Record<string, unknown>)[subKey];
+          }
+        }
+      }
+    }
+  }
+}
+
+// ─── ReadOnly Attribute Stripping (RFC 7643 §2.2) ───────────────────────────
+
+/**
+ * Warning URN for readOnly attribute stripping notifications.
+ * Attached to responses when IncludeWarningAboutIgnoredReadOnlyAttribute is enabled.
+ */
+export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
+
+/**
+ * Strip readOnly top-level attributes from a POST/PUT payload.
+ *
+ * Walks core + extension schemas, finds attributes with `mutability: 'readOnly'`,
+ * and deletes matching keys from the payload using case-insensitive matching.
+ *
+ * Note: `id` and `meta` are also handled here (both are readOnly). `externalId` is
+ * readWrite and is never stripped. `schemas` is a reserved structural key and is
+ * also never stripped.
+ *
+ * Sub-attribute stripping (e.g. manager.displayName inside readWrite parent) is
+ * deferred to Phase 2.
+ *
+ * @param payload           - The request body (mutated in place)
+ * @param schemaDefinitions - Core + extension schema definitions
+ * @returns Array of stripped attribute names (for logging/warning)
+ *
+ * @see RFC 7643 §2.2 - readOnly attributes SHALL be ignored by the server
+ */
+export function stripReadOnlyAttributes(
+  payload: Record<string, unknown>,
+  schemaDefinitions: readonly SchemaDefinition[],
+  preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>>; extensionSubAttrs: Map<string, Map<string, Set<string>>> },
+): string[] {
+  const { core, extensions, coreSubAttrs, extensionSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const stripped: string[] = [];
+
+  // Strip core readOnly attributes (case-insensitive)
+  for (const key of Object.keys(payload)) {
+    // Never strip 'schemas' - it's structural, not a user attribute
+    if (key.toLowerCase() === 'schemas') continue;
+
+    if (core.has(key.toLowerCase())) {
+      delete payload[key];
+      stripped.push(key);
+    }
+  }
+
+  // R-MUT-2: Strip readOnly sub-attributes within readWrite core parents
+  for (const [parentLower, subSet] of coreSubAttrs) {
+    const parentKey = Object.keys(payload).find(k => k.toLowerCase() === parentLower);
+    if (!parentKey) continue;
+
+    const parentVal = payload[parentKey];
+    if (parentVal === null || parentVal === undefined) continue;
+
+    // Handle single complex object
+    if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
+      const obj = parentVal as Record<string, unknown>;
+      for (const subKey of Object.keys(obj)) {
+        if (subSet.has(subKey.toLowerCase())) {
+          delete obj[subKey];
+          stripped.push(`${parentKey}.${subKey}`);
+        }
+      }
+    }
+    // Handle multi-valued (array of complex objects)
+    if (Array.isArray(parentVal)) {
+      for (const item of parentVal) {
+        if (typeof item === 'object' && item !== null) {
+          const obj = item as Record<string, unknown>;
+          for (const subKey of Object.keys(obj)) {
+            if (subSet.has(subKey.toLowerCase())) {
+              delete obj[subKey];
+              stripped.push(`${parentKey}[].${subKey}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Strip readOnly attributes inside extension URN blocks
+  for (const [urn, readOnlySet] of extensions) {
+    // Find the extension block in the payload (case-insensitive URN matching)
+    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
+    if (!urnKey) continue;
+
+    const extObj = payload[urnKey];
+    if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
+
+    for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+      if (readOnlySet.has(extKey.toLowerCase())) {
+        delete (extObj as Record<string, unknown>)[extKey];
+        stripped.push(`${urnKey}.${extKey}`);
+      }
+    }
+  }
+
+  // R-MUT-2: Strip readOnly sub-attrs within readWrite extension parents
+  for (const [urn, subMap] of extensionSubAttrs) {
+    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
+    if (!urnKey) continue;
+
+    const extObj = payload[urnKey];
+    if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
+
+    for (const [parentLower, subSet] of subMap) {
+      const parentKey = Object.keys(extObj as Record<string, unknown>).find(k => k.toLowerCase() === parentLower);
+      if (!parentKey) continue;
+
+      const parentVal = (extObj as Record<string, unknown>)[parentKey];
+      if (parentVal === null || parentVal === undefined) continue;
+
+      if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
+        const obj = parentVal as Record<string, unknown>;
+        for (const subKey of Object.keys(obj)) {
+          if (subSet.has(subKey.toLowerCase())) {
+            delete obj[subKey];
+            stripped.push(`${urnKey}.${parentKey}.${subKey}`);
+          }
+        }
+      }
+      if (Array.isArray(parentVal)) {
+        for (const item of parentVal) {
+          if (typeof item === 'object' && item !== null) {
+            const obj = item as Record<string, unknown>;
+            for (const subKey of Object.keys(obj)) {
+              if (subSet.has(subKey.toLowerCase())) {
+                delete obj[subKey];
+                stripped.push(`${urnKey}.${parentKey}[].${subKey}`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return stripped;
+}
+
+/**
+ * Filter PATCH operations that target readOnly attributes.
+ *
+ * Removes operations whose target attribute is `mutability: 'readOnly'`.
+ * Operations targeting `id` are NEVER stripped - they are kept so G8c can
+ * hard-reject them with 400 (id modification must always fail).
+ *
+ * Handles three PATCH operation forms:
+ * 1. Path-based ops (`path: "groups"`) - resolve path → check readOnly
+ * 2. No-path ops with object value - check each key in value object
+ * 3. Extension URN path ops (`path: "urn:...extensionAttr"`)
+ *
+ * @param operations        - Array of PATCH operations (not mutated)
+ * @param schemaDefinitions - Core + extension schema definitions
+ * @returns Object with `filtered` operations (readOnly removed) and `stripped` attribute names
+ */
+export function stripReadOnlyPatchOps(
+  operations: PatchOperation[],
+  schemaDefinitions: readonly SchemaDefinition[],
+  preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>> },
+): { filtered: PatchOperation[]; stripped: string[] } {
+  const { core, extensions, coreSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const stripped: string[] = [];
+  const filtered: PatchOperation[] = [];
+
+  // Build a combined lookup for extension URN resolution
+  const extensionSchemaMap = new Map<string, SchemaDefinition>();
+  for (const schema of schemaDefinitions) {
+    if (!schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      extensionSchemaMap.set(schema.id.toLowerCase(), schema);
+    }
+  }
+
+  for (const op of operations) {
+    if (op.path) {
+      // Path-based operation - resolve the target attribute
+      const targetAttr = resolvePathToAttrName(op.path, extensionSchemaMap);
+
+      // NEVER strip operations targeting 'id' - let G8c hard-reject
+      if (targetAttr.toLowerCase() === 'id') {
+        filtered.push(op);
+        continue;
+      }
+
+      // Check if the target is a readOnly core attribute
+      if (core.has(targetAttr.toLowerCase())) {
+        stripped.push(targetAttr);
+        continue; // Skip this operation
+      }
+
+      // R-MUT-2: Check if path targets a readOnly sub-attr (e.g., "manager.displayName")
+      const cleanPath = op.path.replace(/\[.*?\]/g, '');
+      const dotIdx = cleanPath.indexOf('.');
+      if (dotIdx !== -1) {
+        const parentName = cleanPath.substring(0, dotIdx).toLowerCase();
+        const subName = cleanPath.substring(dotIdx + 1).split('.')[0].toLowerCase();
+        const readOnlySubs = coreSubAttrs.get(parentName);
+        if (readOnlySubs && readOnlySubs.has(subName)) {
+          stripped.push(`${cleanPath.substring(0, dotIdx)}.${cleanPath.substring(dotIdx + 1).split('.')[0]}`);
+          continue;
+        }
+      }
+
+      // Check if the target is a readOnly extension attribute
+      let isReadOnly = false;
+      for (const [urn, readOnlySet] of extensions) {
+        // Extension path: "urn:...:attrName" or just "attrName" in extension block
+        if (op.path.toLowerCase().startsWith(urn.toLowerCase())) {
+          const remainder = op.path.slice(urn.length + 1).replace(/\[.*?\]/g, '').split('.')[0];
+          if (remainder && readOnlySet.has(remainder.toLowerCase())) {
+            stripped.push(`${urn}.${remainder}`);
+            isReadOnly = true;
+            break;
+          }
+        }
+      }
+
+      if (!isReadOnly) {
+        filtered.push(op);
+      }
+    } else if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+      // No-path operation - check each key in the value object
+      const valueObj = { ...(op.value as Record<string, unknown>) };
+      let modified = false;
+
+      for (const key of Object.keys(valueObj)) {
+        // Never strip 'id' - let G8c reject
+        if (key.toLowerCase() === 'id') continue;
+
+        if (core.has(key.toLowerCase())) {
+          delete valueObj[key];
+          stripped.push(key);
+          modified = true;
+          continue;
+        }
+
+        // R-MUT-2: Strip readOnly sub-attrs from complex values in no-path ops
+        const readOnlySubs = coreSubAttrs.get(key.toLowerCase());
+        if (readOnlySubs && typeof valueObj[key] === 'object' && valueObj[key] !== null && !Array.isArray(valueObj[key])) {
+          const subObj = { ...(valueObj[key] as Record<string, unknown>) };
+          for (const subKey of Object.keys(subObj)) {
+            if (readOnlySubs.has(subKey.toLowerCase())) {
+              delete subObj[subKey];
+              stripped.push(`${key}.${subKey}`);
+              modified = true;
+            }
+          }
+          valueObj[key] = subObj;
+        }
+
+        // Check extension URN blocks in no-path value
+        if (key.startsWith('urn:')) {
+          for (const [urn, readOnlySet] of extensions) {
+            if (key.toLowerCase() === urn.toLowerCase()) {
+              const extVal = valueObj[key];
+              if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
+                const extObj = { ...(extVal as Record<string, unknown>) };
+                for (const extKey of Object.keys(extObj)) {
+                  if (readOnlySet.has(extKey.toLowerCase())) {
+                    delete extObj[extKey];
+                    stripped.push(`${key}.${extKey}`);
+                    modified = true;
+                  }
+                }
+                if (Object.keys(extObj).length === 0) {
+                  delete valueObj[key];
+                } else {
+                  valueObj[key] = extObj;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Only include the operation if there are remaining keys
+      if (Object.keys(valueObj).length > 0) {
+        filtered.push(modified ? { ...op, value: valueObj } : op);
+      } else {
+        // All keys were readOnly - entire operation is stripped
+      }
+    } else {
+      // Non-object value or array value - keep as-is
+      filtered.push(op);
+    }
+  }
+
+  return { filtered, stripped };
+}
+
+/**
+ * Resolve a PATCH operation path to the root attribute name.
+ * Strips value filters and sub-attribute paths.
+ * Handles extension URN-prefixed paths.
+ */
+function resolvePathToAttrName(
+  path: string,
+  extensionSchemas: Map<string, SchemaDefinition>,
+): string {
+  // Strip value filters like [value eq "abc"]
+  const clean = path.replace(/\[.*?\]/g, '');
+
+  // Extension URN prefix
+  for (const [urnLower] of extensionSchemas) {
+    if (clean.toLowerCase().startsWith(urnLower + ':') || clean.toLowerCase().startsWith(urnLower + '.')) {
+      const remainder = clean.slice(urnLower.length + 1);
+      return remainder.split('.')[0] || clean;
+    }
+  }
+
+  // Core attribute - first segment
+  return clean.split('.')[0];
+}
+
+// ─── Schema-Aware Helpers (parameterized by core schema URN) ────────────────
+
+/**
+ * Provides parameterized helpers that depend on a SchemaRegistry and a
+ * core schema URN (e.g. SCIM_CORE_USER_SCHEMA or SCIM_CORE_GROUP_SCHEMA).
+ *
+ * Instantiate once per service in the constructor:
+ * ```ts
+ * this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA, endpointContext);
+ * ```
+ */
+export class ScimSchemaHelpers {
+  constructor(
+    private readonly schemaRegistry: ScimSchemaRegistry,
+    private readonly coreSchemaUrn: string,
+    private readonly endpointContextStorage?: EndpointContextStorage,
+  ) {}
+
+  /**
+   * Convert profile schemas (from EndpointProfile) to SchemaDefinition[] suitable
+   * for SchemaValidator calls. Profile schemas carry the full expanded attribute
+   * definitions including custom extensions with their `returned`, `mutability`,
+   * `caseExact`, `uniqueness` characteristics.
+   *
+   * Only includes schemas relevant to this service's resource type:
+   * - The core schema matching this.coreSchemaUrn
+   * - Extension schemas declared on resource types that use this core schema
+   *
+   * Merges profile schemas with global registry schemas. Profile schemas take
+   * precedence when the same schema ID exists in both (profile is more specific).
+   */
+  private getProfileAwareSchemaDefinitions(): SchemaDefinition[] {
+    const profile = this.endpointContextStorage?.getProfile?.();
+    if (!profile?.schemas || profile.schemas.length === 0) {
+      // No profile or no profile schemas - fall back to global registry only
+      return this.getGlobalSchemaDefinitions();
+    }
+
+    // Build the set of schema URNs relevant to this resource type:
+    // core + extensions declared on RTs that use this core schema.
+    const relevantUrns = new Set<string>([this.coreSchemaUrn]);
+    if (profile.resourceTypes) {
+      for (const rt of profile.resourceTypes) {
+        if (rt.schema === this.coreSchemaUrn) {
+          for (const ext of rt.schemaExtensions) {
+            relevantUrns.add(ext.schema);
+          }
+        }
+      }
+    }
+
+    const profileSchemaMap = new Map<string, ScimSchemaDefinition>();
+    for (const ps of profile.schemas) {
+      if (ps.id) profileSchemaMap.set(ps.id, ps);
+    }
+
+    const schemas: SchemaDefinition[] = [];
+    const seenIds = new Set<string>();
+
+    // Include only relevant profile schemas
+    for (const urn of relevantUrns) {
+      const ps = profileSchemaMap.get(urn);
+      if (ps && ps.attributes && Array.isArray(ps.attributes)) {
+        seenIds.add(ps.id);
+        schemas.push({
+          id: ps.id,
+          attributes: ps.attributes as unknown as SchemaAttributeDefinition[],
+          isCoreSchema: ps.id === this.coreSchemaUrn,
+        });
+      }
+    }
+
+    // Fill in any relevant schemas from the global registry not already covered
+    const globalSchemas = this.getGlobalSchemaDefinitions();
+    for (const gs of globalSchemas) {
+      if (!seenIds.has(gs.id) && relevantUrns.has(gs.id)) {
+        schemas.push(gs);
+      }
+    }
+
+    return schemas;
+  }
+
+  /**
+   * Get schema definitions from the global ScimSchemaRegistry only.
+   * This is the original behavior before profile-awareness was added.
+   */
+  private getGlobalSchemaDefinitions(): SchemaDefinition[] {
+    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
+    const extUrns = this.schemaRegistry.getExtensionUrns();
+    for (const urn of extUrns) {
+      const ext = this.schemaRegistry.getSchema(urn);
+      if (ext) schemas.push(ext as SchemaDefinition);
+    }
+    return schemas;
+  }
+
+  /**
+   * Strict Schema Validation - when StrictSchemaValidation is enabled, reject
+   * any request body that contains extension URN keys not listed in the
+   * request's `schemas[]` array or not registered for this endpoint.
+   *
+   * Uses the endpoint's profile resourceTypes to determine registered extensions
+   * (per-endpoint, not global defaults). Falls back to the global schema registry
+   * if no profile is available.
+   *
+   * RFC 7643 §3.1: "The 'schemas' attribute is a REQUIRED attribute and is an
+   * array of Strings containing URIs that are used to indicate the namespaces
+   * of the SCIM schemas."
+   */
+  enforceStrictSchemaValidation(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      return;
+    }
+
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    const declaredLower = new Set(declaredSchemas.map((s) => s.toLowerCase()));
+
+    // Get registered extension URNs from the endpoint's profile (per-endpoint)
+    // Uses precomputed cache when available; falls back to profile scan, then global registry
+    const registeredUrns = this.getExtensionUrns();
+    const registeredLower = new Set(registeredUrns.map((u) => u.toLowerCase()));
+
+    for (const key of Object.keys(dto)) {
+      if (key.startsWith('urn:')) {
+        const keyLower = key.toLowerCase();
+        if (!declaredLower.has(keyLower)) {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidSyntax',
+            detail:
+              `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
+              `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
+          });
+        }
+        if (!registeredLower.has(keyLower)) {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidValue',
+            detail:
+              `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
+              `Registered extensions: [${registeredUrns.join(', ')}].`,
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Phase 8: Attribute-level payload validation against schema definitions.
+   *
+   * When StrictSchemaValidation is enabled, validates:
+   *  - Required attributes are present (create/replace only)
+   *  - Attribute types match schema definitions
+   *  - Mutability constraints (readOnly rejection)
+   *  - Unknown attributes in strict mode
+   *  - Multi-valued / single-valued enforcement
+   *  - Sub-attribute validation for complex types
+   *
+   * G2 fix: Required attribute checks now run unconditionally on create/replace
+   * (RFC 7643 §2.4 "MUST"). Type/unknown validation remains strict-gated.
+   *
+   * @see RFC 7643 §2.1 - Attribute Characteristics
+   */
+  validatePayloadSchema(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config: EndpointConfig | undefined,
+    mode: 'create' | 'replace' | 'patch',
+  ): void {
+    const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+
+    if (!isStrict) {
+      // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
+      // Type/unknown/canonical validation remains strict-gated
+      if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
+      const schemas = this.buildSchemaDefinitions(dto, endpointId);
+      if (schemas.length === 0) return;
+      const cache = this.getSchemaCache(endpointId);
+      const result = SchemaValidator.validateRequired(dto, schemas, mode,
+        cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
+      if (!result.valid) {
+        const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+        throw createScimError({
+          status: 400,
+          scimType: result.errors[0]?.scimType ?? 'invalidValue',
+          detail: `Schema validation failed: ${details}`,
+          diagnostics: {
+            errorCode: 'VALIDATION_SCHEMA',
+            triggeredBy: 'RequiredAttributeCheck',
+            attributePaths: result.errors.map((e) => e.path),
+            activeConfig: { StrictSchemaValidation: false },
+          },
+        });
+      }
+      return;
+    }
+
+    const schemas = this.buildSchemaDefinitions(dto, endpointId);
+    if (schemas.length === 0) return;
+
+    const cache = this.getSchemaCache(endpointId);
+    const result = SchemaValidator.validate(dto, schemas, {
+      strictMode: true,
+      mode,
+    }, cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
+
+    if (!result.valid) {
+      const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: result.errors[0]?.scimType ?? 'invalidValue',
+        detail: `Schema validation failed: ${details}`,
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: result.errors.map((e) => e.path),
+          activeConfig: { StrictSchemaValidation: true },
+        },
+      });
+    }
+  }
+
+  /**
+   * Build schema definitions from the registry for a given payload.
+   * Includes the core schema + any extension URNs declared in schemas[].
+   *
+   * Profile-aware: when a profile is set in context, profile schemas for
+   * declared URNs are used (with full attribute characteristics including
+   * custom extensions). Falls back to global registry for unknown URNs.
+   */
+  buildSchemaDefinitions(
+    dto: Record<string, unknown>,
+    _endpointId: string,
+  ): SchemaDefinition[] {
+    const profile = this.endpointContextStorage?.getProfile?.();
+    const profileSchemaMap = new Map<string, ScimSchemaDefinition>();
+    if (profile?.schemas) {
+      for (const ps of profile.schemas) {
+        if (ps.id) profileSchemaMap.set(ps.id, ps);
+      }
+    }
+
+    const schemas: SchemaDefinition[] = [];
+
+    // Core schema: prefer profile version, fall back to global
+    const profileCore = profileSchemaMap.get(this.coreSchemaUrn);
+    if (profileCore && Array.isArray(profileCore.attributes)) {
+      schemas.push({
+        id: profileCore.id,
+        attributes: profileCore.attributes as unknown as SchemaAttributeDefinition[],
+        isCoreSchema: true,
+      });
+    } else {
+      const globalCore = this.schemaRegistry.getSchema(this.coreSchemaUrn);
+      if (globalCore) schemas.push({ ...globalCore, isCoreSchema: true } as SchemaDefinition);
+    }
+
+    // Extension schemas declared in payload's schemas[]
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    for (const urn of declaredSchemas) {
+      if (urn !== this.coreSchemaUrn) {
+        const profileExt = profileSchemaMap.get(urn);
+        if (profileExt && Array.isArray(profileExt.attributes)) {
+          schemas.push({
+            id: profileExt.id,
+            attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+          });
+        } else {
+          const globalExt = this.schemaRegistry.getSchema(urn);
+          if (globalExt) schemas.push(globalExt as SchemaDefinition);
+        }
+      }
+    }
+
+    return schemas;
+  }
+
+  /**
+   * Get all schema definitions (core + registered extensions) for the endpoint.
+   *
+   * When an EndpointContextStorage is available and has a profile set,
+   * profile schemas are used (they include custom extensions with full
+   * attribute characteristics). Falls back to the global ScimSchemaRegistry.
+   */
+  getSchemaDefinitions(_endpointId?: string): SchemaDefinition[] {
+    return this.getProfileAwareSchemaDefinitions();
+  }
+
+  // ─── Precomputed Cache Accessors (Parent→Children Maps) ───────────
+
+  /**
+   * Get the precomputed SchemaCharacteristicsCache from the endpoint profile.
+   * Falls back to building one from schema definitions if the profile doesn't
+   * have a cache yet (legacy data loaded from DB before cache was introduced).
+   *
+   * @returns SchemaCharacteristicsCache or undefined if no schemas available
+   */
+  private getSchemaCache(endpointId?: string): SchemaCharacteristicsCache | undefined {
+    const profile = this.endpointContextStorage?.getProfile?.();
+    const cacheKey = this.coreSchemaUrn;
+
+    // Check for existing cache for THIS resource type
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey];
+    }
+
+    // Fallback: build cache from schema definitions
+    const schemas = this.getSchemaDefinitions(endpointId);
+    if (schemas.length === 0) return undefined;
+
+    const extensionUrns = this.getExtensionUrns(endpointId);
+    const cache = SchemaValidator.buildCharacteristicsCache(schemas, extensionUrns);
+
+    // Attach to profile for next access within this request
+    if (profile) {
+      if (!profile._schemaCaches) profile._schemaCaches = {};
+      profile._schemaCaches[cacheKey] = cache;
+    }
+
+    return cache;
+  }
+
+  /**
+   * Get the Parent→Children boolean map from the precomputed cache.
+   * Used by sanitizeBooleanStringsByParent() for parent-context-aware coercion.
+   */
+  getBooleansByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.booleansByParent ?? new Map();
+  }
+
+  /**
+   * Get the Parent→Children never-returned map from the precomputed cache.
+   * Includes returned:'never' AND mutability:'writeOnly' attributes.
+   */
+  getNeverReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.neverReturnedByParent ?? new Map();
+  }
+
+  /**
+   * Get unique attributes from the precomputed cache.
+   */
+  getUniqueAttributesCached(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    return this.getSchemaCache(endpointId)?.uniqueAttrs ?? [];
+  }
+
+  /**
+   * Get precomputed attribute definition maps from cache.
+   * Used by services for passing to SchemaValidator.validate/validatePatchOperationValue.
+   */
+  getAttrMaps(endpointId?: string): { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> } | undefined {
+    const cache = this.getSchemaCache(endpointId);
+    return cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined;
+  }
+
+  /**
+   * Coerce boolean-typed string values to native booleans using parent-context-aware maps.
+   *
+   * Gated by AllowAndCoerceBooleanStrings (default: true). Uses the precomputed
+   * booleansByParent cache for zero-recomputation coercion with parent-key precision.
+   */
+  coerceBooleansByParentIfEnabled(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const coerceEnabled = getConfigBoolean(
+      config,
+      ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
+    );
+    if (!coerceEnabled) return;
+
+    const cache = this.getSchemaCache(endpointId);
+    sanitizeBooleanStringsByParent(
+      dto,
+      cache?.booleansByParent ?? new Map(),
+      cache?.coreSchemaUrn ?? this.coreSchemaUrn.toLowerCase(),
+    );
+  }
+
+  /**
+   * Get the returned:'always' ByParent map from the cache.
+   * Used by controllers to pass directly to projection functions.
+   */
+  getAlwaysReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.alwaysReturnedByParent ?? new Map();
+  }
+
+  /**
+   * Get the lowercase core schema URN for this resource type from the cache.
+   * Used as the root parentPath for URN-dot-path cache lookups at runtime.
+   */
+  getCoreSchemaUrnLower(endpointId?: string): string {
+    return this.getSchemaCache(endpointId)?.coreSchemaUrn ?? this.coreSchemaUrn.toLowerCase();
+  }
+
+  /**
+   * Get the returned:'request' ByParent map from the cache.
+   * Used by controllers to pass directly to projection functions.
+   */
+  getRequestReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.requestReturnedByParent ?? new Map();
+  }
+
+  /**
+   * Get attribute names/paths with caseExact:true (R-CASE-1).
+   * Returns Set of lowercase dotted paths (e.g., 'id', 'meta.location').
+   */
+  getCaseExactAttributes(endpointId?: string): Set<string> {
+    return this.getSchemaCache(endpointId)?.caseExactPaths ?? new Set();
+  }
+
+  /**
+   * G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4).
+   *
+   * For each multi-valued complex attribute that has a boolean "primary"
+   * sub-attribute in the schema definition, count entries where primary === true.
+   *
+   * Behavior by mode:
+   * - "passthrough" (default): store as-is but WARN log when >1 primary=true
+   * - "normalize": keep first primary=true, set rest to false + WARN log
+   * - "reject": throw 400 invalidValue if >1 primary=true
+   *
+   * Schema-driven: uses profile-aware schema definitions to detect which
+   * attributes have a primary sub-attribute. Works automatically with custom
+   * resource type extensions.
+   */
+  enforcePrimaryConstraint(
+    payload: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const rawMode = getConfigString(config, ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT);
+    const mode = (rawMode ?? 'passthrough').toLowerCase();
+
+    const schemas = this.getSchemaDefinitions(endpointId);
+    for (const schema of schemas) {
+      for (const attr of schema.attributes) {
+        if (!attr.multiValued || attr.type !== 'complex') continue;
+        const hasPrimarySub = attr.subAttributes?.some(
+          (sa: SchemaAttributeDefinition) => sa.name.toLowerCase() === 'primary' && sa.type === 'boolean',
+        );
+        if (!hasPrimarySub) continue;
+
+        // Core schema attrs live at top level; extension attrs under their URN key
+        const isCoreSchema = 'isCoreSchema' in schema ? (schema as any).isCoreSchema : true;
+        let arr: Record<string, unknown>[] | undefined;
+        if (isCoreSchema) {
+          const val = payload[attr.name];
+          if (Array.isArray(val)) arr = val as Record<string, unknown>[];
+        } else {
+          const extObj = payload[schema.id] as Record<string, unknown> | undefined;
+          if (extObj && typeof extObj === 'object') {
+            const val = extObj[attr.name];
+            if (Array.isArray(val)) arr = val as Record<string, unknown>[];
+          }
+        }
+
+        if (!arr || arr.length < 2) continue;
+
+        let primaryCount = 0;
+        let firstPrimaryIdx = -1;
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i]?.primary === true) {
+            primaryCount++;
+            if (firstPrimaryIdx === -1) firstPrimaryIdx = i;
+          }
+        }
+        if (primaryCount <= 1) continue;
+
+        if (mode === 'reject') {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidValue',
+            detail: `The 'primary' attribute value 'true' MUST appear no more than once `
+              + `in '${attr.name}' (found ${primaryCount}). [RFC 7643 section 2.4]`,
+            diagnostics: {
+              errorCode: 'PRIMARY_CONSTRAINT_VIOLATION',
+              attributePath: attr.name,
+              triggeredBy: 'PrimaryEnforcement',
+              extra: { primaryCount },
+            },
+          });
+        }
+
+        if (mode === 'passthrough') {
+          // Store as-is but warn about the RFC violation
+          console.warn(
+            `[PrimaryEnforcement] Multiple primary=true in '${attr.name}' (found ${primaryCount}). `
+            + `Stored as-is (passthrough mode). [RFC 7643 section 2.4]`,
+          );
+          continue;
+        }
+
+        // mode === 'normalize': keep first, clear rest
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i]?.primary === true && i !== firstPrimaryIdx) {
+            arr[i].primary = false;
+          }
+        }
+        console.warn(
+          `[PrimaryEnforcement] Normalized '${attr.name}': kept index ${firstPrimaryIdx}, `
+          + `cleared ${primaryCount - 1} extra primary=true`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Validate that attribute paths used in a SCIM filter are known to the
+   * schema definitions for this endpoint's resource type.
+   *
+   * Parses the filter string, extracts attribute paths, and validates them
+   * against registered schemas. Throws 400 invalidFilter if any path is
+   * unknown (RFC 7644 §3.4.2.2).
+   */
+  validateFilterPaths(filter: string, endpointId?: string): void {
+    const schemas = this.getSchemaDefinitions(endpointId);
+    if (schemas.length === 0) return;
+
+    let ast;
+    try {
+      ast = parseScimFilter(filter);
+    } catch (err) {
+      // Syntax error already handled by buildUserFilter / buildGroupFilter
+      // Log at TRACE for debugging filter parse failures
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[scim-helpers] Filter parse failed in validateFilterPaths:', (err as Error).message);
+      }
+      return;
+    }
+    const paths = extractFilterPaths(ast);
+    if (paths.length === 0) return;
+
+    const cache = this.getSchemaCache(endpointId);
+    const result = SchemaValidator.validateFilterAttributePaths(paths, schemas,
+      cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined,
+    );
+    if (!result.valid) {
+      const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidFilter',
+        detail: `Filter validation failed: ${details}`,
+        diagnostics: {
+          errorCode: 'VALIDATION_FILTER',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: result.errors.map((e) => e.path),
+          activeConfig: { StrictSchemaValidation: true },
+          filterExpression: filter,
+        },
+      });
+    }
+  }
+
+  /**
+   * Get the extension URNs registered for this endpoint.
+   *
+   * Checks the precomputed cache first (zero-allocation O(1) return).
+   * Falls back to profile.resourceTypes scan, then global registry.
+   *
+   * Note: reads _schemaCaches directly (not via getSchemaCache()) to avoid
+   * circular calls - getSchemaCache() calls getExtensionUrns() during build.
+   */
+  getExtensionUrns(_endpointId?: string): readonly string[] {
+    // Check cache directly - avoid getSchemaCache() to prevent circular call
+    const profile = this.endpointContextStorage?.getProfile?.();
+    const cacheKey = this.coreSchemaUrn;
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey].extensionUrns;
+    }
+
+    // Fallback: compute from profile resourceTypes - only include extensions
+    // for resource types that use THIS service's core schema (not all RTs).
+    if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
+      const urns = new Set<string>();
+      for (const rt of profile.resourceTypes) {
+        if (rt.schema === this.coreSchemaUrn && rt.schemaExtensions) {
+          for (const ext of rt.schemaExtensions) {
+            urns.add(ext.schema);
+          }
+        }
+      }
+      if (urns.size > 0) return [...urns];
+    }
+    // Fallback: global registry defaults (no profile available)
+    return [...this.schemaRegistry.getExtensionUrns()];
+  }
+
+  /**
+   * Strip readOnly attributes from a POST/PUT payload using the endpoint's
+   * registered schema definitions.
+   *
+   * Uses the precomputed cache when available to avoid per-request tree walks.
+   *
+   * @returns Array of stripped attribute names (for logging/warning)
+   */
+  stripReadOnlyAttributesFromPayload(
+    payload: Record<string, unknown>,
+    endpointId?: string,
+  ): string[] {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return stripReadOnlyAttributes(payload, [], cache.readOnlyCollected);
+    }
+    const schemas = this.getSchemaDefinitions(endpointId);
+    return stripReadOnlyAttributes(payload, schemas);
+  }
+
+  /**
+   * Filter PATCH operations targeting readOnly attributes using the endpoint's
+   * registered schema definitions.
+   *
+   * Uses the precomputed cache when available to avoid per-request tree walks.
+   *
+   * @returns Object with filtered operations and stripped attribute names
+   */
+  stripReadOnlyFromPatchOps(
+    operations: PatchOperation[],
+    endpointId?: string,
+  ): { filtered: PatchOperation[]; stripped: string[] } {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return stripReadOnlyPatchOps(operations, [], cache.readOnlyCollected);
+    }
+    const schemas = this.getSchemaDefinitions(endpointId);
+    return stripReadOnlyPatchOps(operations, schemas);
+  }
+
+  /**
+   * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
+   *
+   * Compares the existing resource state with the incoming payload
+   * and rejects changes to attributes declared as immutable.
+   * Only runs when StrictSchemaValidation is enabled.
+   * G1 fix: Immutable enforcement now runs unconditionally (RFC 7643 §2.2 "SHALL NOT").
+   *
+   * @param existingPayload - Reconstructed existing resource payload (caller builds this)
+   * @param incomingDto     - Incoming request payload
+   */
+  checkImmutableAttributes(
+    existingPayload: Record<string, unknown>,
+    incomingDto: Record<string, unknown>,
+    endpointId: string,
+    _config?: EndpointConfig,
+  ): void {
+    // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
+    // Previously gated by StrictSchemaValidation - removed per P4 analysis
+
+    const cache = this.getSchemaCache(endpointId);
+    let result;
+
+    if (cache) {
+      // Use precomputed maps from cache - skip per-call map building
+      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
+        coreAttrMap: cache.coreAttrMap,
+        extensionSchemaMap: cache.extensionSchemaMap,
+      });
+    } else {
+      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      if (schemas.length === 0) return;
+      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+    }
+
+    if (!result.valid) {
+      const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: 'mutability',
+        detail: `Immutable attribute violation: ${details}`,
+        diagnostics: {
+          errorCode: 'VALIDATION_IMMUTABLE',
+          attributePath: result.errors[0]?.path,
+          attributePaths: result.errors.map((e) => e.path),
+        },
+      });
+    }
+  }
+
+  /**
+   * Get custom extension attributes with uniqueness:'server'.
+   *
+   * @see RFC 7643 §2.1 - `uniqueness: 'server'` SHOULD be unique within the endpoint
+   */
+  getUniqueAttributes(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    return this.getSchemaCache(endpointId)?.uniqueAttrs ?? [];
+  }
+}
+
+// ─── Schema-Driven Uniqueness Enforcement (RFC 7643 §2.1) ──────────────────
+
+/**
+ * Extract a value from a SCIM payload for a given schema attribute descriptor.
+ *
+ * For core schema attrs (schemaUrn=null): looks up `payload[attrName]`
+ * For extension attrs: looks up `payload[schemaUrn][attrName]`
+ *
+ * Returns undefined if the attribute is not present in the payload.
+ */
+export function extractPayloadValue(
+  payload: Record<string, unknown>,
+  desc: { schemaUrn: string | null; attrName: string },
+): unknown {
+  if (desc.schemaUrn === null) {
+    // Core attribute - look up at top level (case-insensitive key match)
+    for (const key of Object.keys(payload)) {
+      if (key.toLowerCase() === desc.attrName.toLowerCase()) {
+        return payload[key];
+      }
+    }
+    return undefined;
+  }
+
+  // Extension attribute - find the extension URN block first
+  for (const key of Object.keys(payload)) {
+    if (key.toLowerCase() === desc.schemaUrn.toLowerCase()) {
+      const extBlock = payload[key];
+      if (extBlock && typeof extBlock === 'object') {
+        const block = extBlock as Record<string, unknown>;
+        for (const extKey of Object.keys(block)) {
+          if (extKey.toLowerCase() === desc.attrName.toLowerCase()) {
+            return block[extKey];
+          }
+        }
+      }
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Compare two string values using caseExact semantics.
+ * Returns true if values match.
+ */
+function uniquenessValuesMatch(a: unknown, b: unknown, caseExact: boolean): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') {
+    return a === b;
+  }
+  return caseExact ? a === b : a.toLowerCase() === b.toLowerCase();
+}
+
+/**
+ * Extract a value from a raw JSON payload string (as stored in the DB).
+ */
+function extractFromRawPayload(
+  rawPayload: string | Record<string, unknown>,
+  desc: { schemaUrn: string | null; attrName: string },
+): unknown {
+  let parsed: Record<string, unknown>;
+  if (typeof rawPayload === 'string') {
+    try { parsed = JSON.parse(rawPayload) as Record<string, unknown>; }
+    catch (err) {
+      // Corrupt JSON in rawPayload - log at debug level for observability
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[scim-helpers] extractFromRawPayload: corrupt JSON:', (err as Error).message);
+      }
+      return undefined;
+    }
+  } else {
+    parsed = rawPayload;
+  }
+  return extractPayloadValue(parsed, desc);
+}
+
+/**
+ * Schema-driven uniqueness enforcement for custom extension attributes.
+ *
+ * Scans all schema attributes where `uniqueness === 'server'` (excluding
+ * hardcoded column attrs: userName, externalId, displayName, id), extracts
+ * the incoming value from the payload, and checks all existing resources
+ * in the same endpoint for conflicts.
+ *
+ * Uses the attribute's `caseExact` characteristic to decide comparison mode:
+ * - caseExact: true → exact string comparison
+ * - caseExact: false → case-insensitive comparison
+ *
+ * @param endpointId      The endpoint to scope uniqueness within
+ * @param payload         The incoming SCIM request payload
+ * @param uniqueAttrs     Array of unique attribute descriptors from SchemaValidator.collectUniqueAttributes()
+ * @param existingResources  All existing resources from the repository (as raw records with rawPayload)
+ * @param excludeScimId   Exclude this resource from conflict detection (for PUT/PATCH self-exclusion)
+ *
+ * @throws 409 uniqueness error if a conflict is found
+ */
+export function assertSchemaUniqueness(
+  endpointId: string,
+  payload: Record<string, unknown>,
+  uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>,
+  existingResources: Array<{ scimId: string; rawPayload: string | Record<string, unknown> }>,
+  excludeScimId?: string,
+): void {
+  if (uniqueAttrs.length === 0) return;
+
+  for (const desc of uniqueAttrs) {
+    const incomingValue = extractPayloadValue(payload, desc);
+    if (incomingValue === undefined || incomingValue === null) continue;
+
+    for (const existing of existingResources) {
+      // Skip self (for PUT/PATCH)
+      if (excludeScimId && existing.scimId === excludeScimId) continue;
+
+      const existingValue = extractFromRawPayload(existing.rawPayload, desc);
+      if (existingValue === undefined || existingValue === null) continue;
+
+      if (uniquenessValuesMatch(incomingValue, existingValue, desc.caseExact)) {
+        const attrPath = desc.schemaUrn
+          ? `${desc.schemaUrn}.${desc.attrName}`
+          : desc.attrName;
+        throw createScimError({
+          status: 409,
+          scimType: 'uniqueness',
+          detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
+          diagnostics: {
+            errorCode: 'UNIQUENESS_SCHEMA_ATTR',
+            triggeredBy: 'SchemaUniqueness',
+            conflictingResourceId: existing.scimId,
+            conflictingAttribute: attrPath,
+            incomingValue: String(incomingValue),
+          },
+        });
+      }
+    }
+  }
+}

@@ -35,6 +35,7 @@ export interface ScimGroupResource {
   schemas: [string, ...string[]];
   id: string;
   displayName: string;
+  active?: boolean;
   members?: Array<{
     value: string;
     display?: string;

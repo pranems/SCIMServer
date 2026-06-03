@@ -1,0 +1,373 @@
+{
+  "name": "OpenText-new-May-22-ProxyAddresses-list-ISV-3",
+  "displayName": "OpenText (new - May 22, 2026 - ProxyAddresses list - ISV #3)",
+  "description": "Same as OpenText-new-May-22-ISV-2 except urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox:proxyAddresses is a multi-valued string (list of plain strings like 'SMTP:bjensen@example.com') instead of a multi-valued complex with value/type sub-attributes. All other schemas, resourceTypes, serviceProviderConfig, and settings are identical to ISV-2. Group.displayName uniqueness remains 'server' due to the RFC 7643 \u00a77 tighten-only policy.",
+  "profile": {
+    "schemas": [
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "name": "User",
+        "description": "Customer Portal User Account",
+        "attributes": [
+          {
+            "name": "userName",
+            "type": "string",
+            "multiValued": false,
+            "required": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "server",
+            "description": "unique identifier for a user"
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "multiValued": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "soft delete description later"
+          },
+          {
+            "name": "name",
+            "type": "complex",
+            "multiValued": false,
+            "required": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The components of the users real name",
+            "subAttributes": [
+              {
+                "name": "givenName",
+                "type": "string",
+                "multiValued": false,
+                "required": true,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The given name of the User, or first name in most Western languages(e.g., 'Barbara' given the full name 'Ms. Barbara J Jensen, III')."
+              },
+              {
+                "name": "familyName",
+                "type": "string",
+                "multiValued": false,
+                "required": true,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The family name of the User, or last name in most Western languages(e.g., 'Jensen' given the full name 'Ms. Barbara J Jensen, III')."
+              }
+            ]
+          },
+          {
+            "name": "displayName",
+            "type": "string",
+            "multiValued": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The name of the User, suitable for display to end-users.  The name SHOULD be the full name of the User being described, if known."
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "multiValued": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The user's title, such as 'Vice President.'"
+          },
+          {
+            "name": "emails",
+            "type": "complex",
+            "multiValued": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Email addresses for the user.  The value SHOULD be canonicalized by the service provider, e.g., 'bjensen@example.com' instead of 'bjensen@EXAMPLE.COM'. Canonical type values of 'work', 'home', and 'other'.",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The significant value for the attribute"
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function",
+                "canonicalValues": ["work"]
+              }
+            ]
+          },
+          {
+            "name": "phoneNumbers",
+            "type": "complex",
+            "multiValued": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Phone numbers for the User.  The value SHOULD be canonicalized by the service provider according to the format specified in RFC 3966, e.g., 'tel:+1-201-555-0123'. Canonical type values of 'work', 'home', 'mobile', 'fax', 'pager', and 'other'.",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The significant value for the attribute"
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function",
+                "canonicalValues": ["work", "mobile", "fax"]
+              }
+            ]
+          },
+          {
+            "name": "addresses",
+            "type": "complex",
+            "multiValued": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "A physical mailing address for this User. Canonical type values of 'work', 'home', and 'other'.  This attribute is a complex type with the following sub-attributes.",
+            "subAttributes": [
+              {
+                "name": "streetAddress",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The full street address component, which may include house number, street name, P.O.box, and multi-line extended street address information.This attribute MAY contain newlines."
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the attribute's function",
+                "canonicalValues": ["work"]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A Boolean value indicating the 'primary'  or preferred attribute value for this attribute, The primary attribute value 'true' MUST appear no more than once."
+              },
+              {
+                "name": "country",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The country name component."
+              },
+              {
+                "name": "locality",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The city or locality component."
+              },
+              {
+                "name": "postalCode",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The postalCode component."
+              },
+              {
+                "name": "region",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The state or region component."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "name": "EnterpriseUser",
+        "description": "Customer Portal User Account - Enterprise",
+        "attributes": [
+          {
+            "name": "department",
+            "type": "string",
+            "multiValued": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Identifies the name of a department."
+          }
+        ]
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "name": "Group",
+        "description": "Customer Portal Group Account",
+        "attributes": [
+          {
+            "name": "displayName",
+            "type": "string",
+            "multiValued": false,
+            "required": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "server",
+            "description": "A human-readable name for the Group. REQUIRED. (uniqueness tightened from OpenText 'none' to 'server' to satisfy the SCIMServer RFC 7643 \u00a77 tightening-only policy.)"
+          },
+          {
+            "name": "externalId",
+            "type": "string",
+            "multiValued": false,
+            "caseExact": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "A String that is an identifier for the resource as defined by the provisioning client."
+          },
+          {
+            "name": "members",
+            "type": "complex",
+            "multiValued": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "A list of members of the Group.",
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "immutable",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "Identifier of the member of this Group."
+              },
+              {
+                "name": "$ref",
+                "type": "reference",
+                "multiValued": false,
+                "mutability": "immutable",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "The URI of the corresponding 'User' resource to which the user belongs.",
+                "referenceTypes": ["User"]
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "readOnly",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes."
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "multiValued": false,
+                "mutability": "immutable",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A label indicating the type of resource, e.g., 'User'. Added to satisfy SCIMServer member-resolution which auto-populates this sub-attribute."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox",
+        "name": "MailboxExtensionResource",
+        "description": "OpenText extension schema for mailbox-specific attributes not defined in the SCIM core schema. ISV-3 variant: proxyAddresses is a multi-valued string (list of plain strings) instead of a multi-valued complex.",
+        "attributes": [
+          {
+            "name": "proxyAddresses",
+            "type": "string",
+            "multiValued": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "The known address entities for the resource. Each value SHOULD be prefixed by the address type, e.g., 'SMTP:bjensen@example.com' or 'smtp:bjensen@example.com'. Stored as a flat list of strings (no value/type sub-attributes)."
+          }
+        ]
+      }
+    ],
+    "resourceTypes": [
+      {
+        "id": "User",
+        "name": "User",
+        "endpoint": "/Users",
+        "description": "Customer Portal User Account",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [
+          { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
+          { "schema": "urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox", "required": false }
+        ]
+      },
+      {
+        "id": "Group",
+        "name": "Group",
+        "endpoint": "/Groups",
+        "description": "Customer Portal Group Account",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "schemaExtensions": []
+      }
+    ],
+    "serviceProviderConfig": {
+      "patch": { "supported": true },
+      "bulk": { "supported": false, "maxOperations": 0, "maxPayloadSize": 0 },
+      "filter": { "supported": true, "maxResults": 200 },
+      "changePassword": { "supported": false },
+      "sort": { "supported": false },
+      "etag": { "supported": false },
+      "authenticationSchemes": [
+        {
+          "type": "oauthbearertoken",
+          "name": "OAuth Bearer Token",
+          "description": "OAuth 2.0 Bearer Token Authentication",
+          "specUri": "https://tools.ietf.org/html/rfc6750"
+        }
+      ]
+    },
+    "settings": {
+      "StrictSchemaValidation": true,
+      "VerbosePatchSupported": true,
+      "AllowAndCoerceBooleanStrings": true,
+      "PatchOpAllowRemoveAllMembers": false,
+      "MultiMemberPatchOpForGroupEnabled": true,
+      "PrimaryEnforcement": "normalize",
+      "SchemaDiscoveryEnabled": true
+    }
+  }
+}

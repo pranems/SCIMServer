@@ -1,0 +1,8 @@
+{
+  "acceptedHashes": {
+    "20260223203811_externalid_citext_case_insensitive/migration.sql": "ffa7699111d4310261f4f6effbd2938129ad73eb9e23fbf3420b38b6a1b28adf",
+    "20260225181836_externalid_citext_to_text/migration.sql": "82e8f52ffd50d624b6b54704a9ed0094b11091aa8912fa65be2b443b85b00aa1",
+    "20260313031330_add_endpoint_profile/migration.sql": "e147ac0160281b19005f797b34b4e89a84cfccc97986e8a67963640fe23cd70e",
+    "20260416025138_add_requestlog_perf_indexes/migration.sql": "223308023c15c34d63df9b61ad4af691e48261a7a62f8a2e7434ccb0291a87a6"
+  }
+}

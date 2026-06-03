@@ -1,5 +1,5 @@
 {
-  "description": "GET /scim/admin/log-config/recent — response with filtered log entries",
+  "description": "GET /scim/admin/log-config/recent - response with filtered log entries",
   "count": 3,
   "entries": [
     {

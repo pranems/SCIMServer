@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { resetDatabase } from './helpers/db.helper';
 import {
   scimPost,
   scimGet,
@@ -37,7 +36,6 @@ describe('Edge Cases (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(app);
     resetFixtureCounter();
     endpointId = await createEndpoint(app, token);
     basePath = scimBasePath(endpointId);
@@ -135,7 +133,7 @@ describe('Edge Cases (E2E)', () => {
   describe('Inactive endpoint', () => {
     it('should reject SCIM operations on an inactive endpoint', async () => {
       // Create endpoint, then deactivate it via the admin API
-      const endpoint2 = await createEndpoint(app, token, 'inactive-ep');
+      const endpoint2 = await createEndpoint(app, token);
 
       // Deactivate the endpoint via admin API (PATCH /scim/admin/endpoints/:id)
       await request(app.getHttpServer())
@@ -153,17 +151,41 @@ describe('Edge Cases (E2E)', () => {
   // ───────────── Concurrent Uniqueness ─────────────
 
   describe('Uniqueness enforcement', () => {
-    it('should reject duplicate externalId within same endpoint', async () => {
+    it('should allow duplicate externalId within same endpoint (uniqueness:none)', async () => {
       const user1 = validUser({ externalId: 'dup-ext-id' });
       const user2 = validUser({ externalId: 'dup-ext-id' });
 
       await scimPost(app, `${basePath}/Users`, token, user1).expect(201);
-      await scimPost(app, `${basePath}/Users`, token, user2).expect(409);
+      const res = await scimPost(app, `${basePath}/Users`, token, user2).expect(201);
+      expect(res.body.externalId).toBe('dup-ext-id');
     });
 
     it('should reject case-insensitive duplicate userName', async () => {
       await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'DupUser@test.com' })).expect(201);
       await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'dupuser@test.com' })).expect(409);
+    });
+
+    // R-1 regression guard: concurrent POSTs with the same unique userName must
+    // result in exactly one 201 + one 409, never two 201s and never a raw 500.
+    // Pre-fix, prisma-user.repository.create() did not wrap errors, so a P2002
+    // race-loss returned 500 with raw stack instead of 409 invalidValue.
+    // See docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md R-1.
+    it('R-1: concurrent POST of same userName returns 1x201 + 1x409 (no 500)', async () => {
+      const userName = `race-${Date.now()}@test.com`;
+      const body = validUser({ userName });
+      const [resA, resB] = await Promise.all([
+        scimPost(app, `${basePath}/Users`, token, { ...body }),
+        scimPost(app, `${basePath}/Users`, token, { ...body }),
+      ]);
+      const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+      // Exactly one created, exactly one conflict; no 500 leaked.
+      expect(statuses).toEqual([201, 409]);
+      const conflict = resA.status === 409 ? resA : resB;
+      expect(conflict.body).toMatchObject({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+        status: '409',
+        scimType: 'uniqueness',
+      });
     });
   });
 
@@ -194,8 +216,8 @@ describe('Edge Cases (E2E)', () => {
         Operations: [],
       });
 
-      // Either 200 (no-op) or 400 (strict) — should not crash
-      expect([200, 400]).toContain(res.status);
+      // Server is strict: empty Operations returns 400
+      expect(res.status).toBe(400);
     });
 
     it('should succeed silently when removing non-existent attribute', async () => {
@@ -231,6 +253,82 @@ describe('Edge Cases (E2E)', () => {
       ).expect(200);
 
       expect(res.body.totalResults).toBe(0);
+    });
+
+    // DTO-1 regression guard: oversized filter must be rejected with 400
+    // invalidFilter, not silently parsed (memory DoS) or returning 500.
+    // The cap is enforced inside parseScimFilter (centralized at parser entry).
+    it('DTO-1: should reject filter exceeding 10000 characters with 400 invalidFilter', async () => {
+      const longValue = 'a'.repeat(11000);
+      const longFilter = `userName eq "${longValue}"`;
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=${encodeURIComponent(longFilter)}`,
+        token,
+      );
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+        status: '400',
+      });
+      // Either invalidFilter or invalidValue depending on which layer rejected
+      expect(['invalidFilter', 'invalidValue']).toContain(res.body.scimType);
+    });
+  });
+
+  // ───────────── Group Member Deduplication ─────────────
+
+  describe('Group member deduplication (Tier-0 #5)', () => {
+    // Tier-0 #5: duplicate (groupResourceId, value) rows are blocked at the DB
+    // by @@unique. The service layer dedupes the API input BEFORE reaching the
+    // repo, so the API contract is silent dedup (idempotent add). The DB
+    // constraint is defense-in-depth against direct DB writes / repo bugs.
+    it('should silently dedupe duplicate members on POST', async () => {
+      const userARes = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'mem-a@test.com' })).expect(201);
+      const userBRes = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'mem-b@test.com' })).expect(201);
+      const aId = userARes.body.id;
+      const bId = userBRes.body.id;
+
+      const groupRes = await scimPost(app, `${basePath}/Groups`, token, validGroup({
+        members: [
+          { value: aId, display: 'A' },
+          { value: aId, display: 'A again' },   // duplicate
+          { value: bId, display: 'B' },
+          { value: aId, display: 'A third' },   // another duplicate
+        ],
+      })).expect(201);
+
+      // Exactly 2 unique members, first occurrence wins.
+      expect(groupRes.body.members).toHaveLength(2);
+      const values = (groupRes.body.members as Array<{ value: string; display?: string }>)
+        .map((m) => m.value);
+      expect(values.sort()).toEqual([aId, bId].sort());
+    });
+
+    it('should silently dedupe duplicate members on PUT', async () => {
+      const userRes = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'mem-c@test.com' })).expect(201);
+      const cId = userRes.body.id;
+
+      const groupRes = await scimPost(app, `${basePath}/Groups`, token, validGroup({
+        displayName: 'putdup',
+        members: [{ value: cId }],
+      })).expect(201);
+
+      const putRes = await request(app.getHttpServer())
+        .put(`${basePath}/Groups/${groupRes.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'putdup',
+          members: [
+            { value: cId, display: 'first' },
+            { value: cId, display: 'duplicate' },
+          ],
+        })
+        .expect(200);
+
+      expect(putRes.body.members).toHaveLength(1);
     });
   });
 

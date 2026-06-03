@@ -1,5 +1,5 @@
 /**
- * SCIM 2.0 Filter Parser — RFC 7644 §3.4.2.2
+ * SCIM 2.0 Filter Parser - RFC 7644 §3.4.2.2
  *
  * Implements the full SCIM filter ABNF grammar:
  *   FILTER    = attrExp / logExp / valuePath / *1"not" "(" FILTER ")"
@@ -46,7 +46,7 @@ export interface NotNode {
   filter: FilterNode;
 }
 
-/** Value path expression: attrPath[valFilter] — e.g. emails[type eq "work"] */
+/** Value path expression: attrPath[valFilter] - e.g. emails[type eq "work"] */
 export interface ValuePathNode {
   type: 'valuePath';
   attrPath: string;
@@ -146,10 +146,10 @@ function tokenize(input: string): Token[] {
       while (i < input.length && /[\d.]/.test(input[i])) i++;
       // Verify next char is whitespace, bracket, paren, or EOF (not part of an identifier)
       if (i === numStart + (input[numStart] === '-' ? 1 : 0)) {
-        // No digits found — treat as identifier start below
+        // No digits found - treat as identifier start below
         i = numStart;
       } else if (i < input.length && /[a-zA-Z_:]/.test(input[i])) {
-        // Part of an identifier (e.g., attribute name starting with digits — unlikely but safe)
+        // Part of an identifier (e.g., attribute name starting with digits - unlikely but safe)
         i = numStart;
       } else {
         tokens.push({ type: 'NUMBER', value: input.slice(numStart, i), position: numStart });
@@ -214,13 +214,34 @@ function tokenize(input: string): Token[] {
  *              | attrPath "pr"                   (presence)
  *              | attrPath compareOp compValue    (comparison)
  */
+/**
+ * Maximum nesting depth for filter expressions.
+ * Prevents stack overflow from adversarial deeply-nested filters like
+ * `((((...50+ levels...))))` even within the 10000-char filter length cap.
+ */
+const MAX_FILTER_DEPTH = 50;
+
+/**
+ * Maximum filter string length.
+ * Centralized at the parser so every entry point - GET ?filter=, POST /.search
+ * filter body, profile validation - shares the same cap. Prevents memory DoS
+ * from megabyte-scale filter expressions that would force tokenizer + parser
+ * to walk every byte (worst-case quadratic in some grouping patterns) before
+ * push-down decides anything.
+ *
+ * Closes DTO-1 (DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md and DELIVERY_PLAN.md section 3.2).
+ */
+export const MAX_FILTER_LENGTH = 10000;
+
 class Parser {
   private tokens: Token[];
   private pos: number;
+  private depth: number;
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
     this.pos = 0;
+    this.depth = 0;
   }
 
   parse(): FilterNode {
@@ -231,6 +252,16 @@ class Parser {
       );
     }
     return node;
+  }
+
+  private guardDepth(): void {
+    this.depth++;
+    if (this.depth > MAX_FILTER_DEPTH) {
+      throw new Error(
+        `Filter expression exceeds maximum nesting depth of ${MAX_FILTER_DEPTH}. ` +
+        `Simplify the filter to reduce nesting.`
+      );
+    }
   }
 
   private current(): Token {
@@ -281,18 +312,22 @@ class Parser {
 
     // NOT expression
     if (t.type === 'NOT') {
+      this.guardDepth();
       this.advance();
       this.expect('LPAREN');
       const filter = this.parseOrExpr();
       this.expect('RPAREN');
+      this.depth--;
       return { type: 'not', filter };
     }
 
     // Grouped expression
     if (t.type === 'LPAREN') {
+      this.guardDepth();
       this.advance();
       const filter = this.parseOrExpr();
       this.expect('RPAREN');
+      this.depth--;
       return filter;
     }
 
@@ -307,9 +342,11 @@ class Parser {
 
     // Value path: attrPath "[" filter "]"
     if (this.current().type === 'LBRACKET') {
+      this.guardDepth();
       this.advance(); // consume '['
       const filter = this.parseOrExpr();
       this.expect('RBRACKET');
+      this.depth--;
       return { type: 'valuePath', attrPath, filter };
     }
 
@@ -364,8 +401,30 @@ class Parser {
  * @throws Error with position details for malformed filters
  */
 export function parseScimFilter(filterStr: string): FilterNode {
+  // S-6 (CodeQL js/type-confusion-through-parameter-tampering): Express
+  // parses ?filter=a&filter=b as a string array. Without this guard the
+  // parser would call .length / .trim() / regex on the array - .length
+  // returns the element count (silently bypassing MAX_FILTER_LENGTH) and
+  // .trim() throws a confusing TypeError leaking parser internals. An
+  // attacker controls which branch they hit by varying the parameter
+  // repetition, creating a DoS or filter-bypass primitive. Hard-fail here
+  // so every entry point (GET ?filter=, POST /.search, profile validation)
+  // shares the same single-typed contract.
+  if (typeof filterStr !== 'string') {
+    throw new Error(
+      `Filter expression must be a string, got ${Array.isArray(filterStr) ? 'array' : typeof filterStr}`,
+    );
+  }
   if (!filterStr || !filterStr.trim()) {
     throw new Error('Filter expression cannot be empty');
+  }
+  // DTO-1: cap filter length BEFORE tokenization. The cap protects against
+  // memory and CPU exhaustion from adversarially-large input.
+  if (filterStr.length > MAX_FILTER_LENGTH) {
+    throw new Error(
+      `Filter expression too long (${filterStr.length} chars). ` +
+        `Maximum supported length is ${MAX_FILTER_LENGTH} characters.`,
+    );
   }
   const tokens = tokenize(filterStr.trim());
   const parser = new Parser(tokens);
@@ -382,8 +441,8 @@ export function parseScimFilter(filterStr: string): FilterNode {
  *   - Dotted paths:  "name.givenName" → resource.name.givenName
  *   - URN paths:     "urn:...:User:department" → resource["urn:...:User"].department
  *
- * @param resource — The SCIM resource (plain object)
- * @param attrPath — The attribute path string
+ * @param resource - The SCIM resource (plain object)
+ * @param attrPath - The attribute path string
  * @returns The resolved value, or undefined if not found
  */
 export function resolveAttrPath(resource: Record<string, unknown>, attrPath: string): unknown {
@@ -420,9 +479,10 @@ function resolveSimplePath(obj: Record<string, unknown>, path: string): unknown 
 /**
  * Compare two values according to SCIM comparison rules.
  * String comparisons are case-insensitive by default (caseExact=false per RFC 7643 §2.2).
+ * When caseExact=true, string comparisons are case-sensitive.
  */
-function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown): boolean {
-  // "pr" (presence) — attribute has a non-null, non-empty value
+function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown, caseExact = false): boolean {
+  // "pr" (presence) - attribute has a non-null, non-empty value
   if (op === 'pr') {
     if (actual === undefined || actual === null) return false;
     if (typeof actual === 'string' && actual.length === 0) return false;
@@ -430,9 +490,9 @@ function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown): b
     return true;
   }
 
-  // Normalize strings for case-insensitive comparison (SCIM default)
-  const normActual = typeof actual === 'string' ? actual.toLowerCase() : actual;
-  const normExpected = typeof expected === 'string' ? expected.toLowerCase() : expected;
+  // Normalize strings for case-insensitive comparison (SCIM default), unless caseExact
+  const normActual = typeof actual === 'string' && !caseExact ? actual.toLowerCase() : actual;
+  const normExpected = typeof expected === 'string' && !caseExact ? expected.toLowerCase() : expected;
 
   switch (op) {
     case 'eq':
@@ -491,53 +551,91 @@ function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown): b
 /**
  * Evaluate a parsed SCIM filter AST against a resource object.
  *
- * @param node — The root AST node from parseScimFilter()
- * @param resource — The SCIM resource to test
+ * @param node - The root AST node from parseScimFilter()
+ * @param resource - The SCIM resource to test
+ * @param caseExactAttrs - Optional set of lowercase attribute names/paths that are caseExact:true (R-CASE-1)
  * @returns true if the resource matches the filter
  *
  * @example
  *   const ast = parseScimFilter('userName eq "john" and active eq true');
  *   evaluateFilter(ast, { userName: 'John', active: true }); // → true
  */
-export function evaluateFilter(node: FilterNode, resource: Record<string, unknown>): boolean {
+export function evaluateFilter(
+  node: FilterNode,
+  resource: Record<string, unknown>,
+  caseExactAttrs?: Set<string>,
+): boolean {
   switch (node.type) {
     case 'compare': {
       const actual = resolveAttrPath(resource, node.attrPath);
+      // R-CASE-1: Check if this attribute is caseExact
+      const isCaseExact = caseExactAttrs?.has(node.attrPath.toLowerCase()) ?? false;
       // Multi-valued attributes: match if ANY element matches (RFC 7644 §3.4.2.2)
       if (Array.isArray(actual)) {
         return actual.some(item => {
           if (typeof item === 'object' && item !== null) {
-            // For complex multi-valued (e.g., emails), compare sub-attribute if path is simple
-            // If the comparison is on the array itself (e.g., "emails pr"), check presence
-            return compareValues(node.op, item, node.value);
+            return compareValues(node.op, item, node.value, isCaseExact);
           }
-          return compareValues(node.op, item, node.value);
+          return compareValues(node.op, item, node.value, isCaseExact);
         });
       }
-      return compareValues(node.op, actual, node.value);
+      return compareValues(node.op, actual, node.value, isCaseExact);
     }
 
     case 'logical':
       if (node.op === 'and') {
-        return evaluateFilter(node.left, resource) && evaluateFilter(node.right, resource);
+        return evaluateFilter(node.left, resource, caseExactAttrs) && evaluateFilter(node.right, resource, caseExactAttrs);
       }
-      return evaluateFilter(node.left, resource) || evaluateFilter(node.right, resource);
+      return evaluateFilter(node.left, resource, caseExactAttrs) || evaluateFilter(node.right, resource, caseExactAttrs);
 
     case 'not':
-      return !evaluateFilter(node.filter, resource);
+      return !evaluateFilter(node.filter, resource, caseExactAttrs);
 
     case 'valuePath': {
-      // attrPath[valFilter] — e.g., emails[type eq "work"]
-      // Resolve the multi-valued attribute, filter by sub-expression
       const array = resolveAttrPath(resource, node.attrPath);
       if (!Array.isArray(array)) return false;
       return array.some(item => {
         if (typeof item !== 'object' || item === null) return false;
-        return evaluateFilter(node.filter, item as Record<string, unknown>);
+        return evaluateFilter(node.filter, item as Record<string, unknown>, caseExactAttrs);
       });
     }
 
     default:
       return false;
   }
+}
+
+/**
+ * Extract all attribute paths referenced in a parsed filter AST.
+ *
+ * Used by V32 (filter attribute validation) to collect all attrPath values
+ * from CompareNode and ValuePathNode for schema validation.
+ *
+ * @param node - Root of the parsed filter AST
+ * @returns Array of unique attribute path strings
+ */
+export function extractFilterPaths(node: FilterNode): string[] {
+  const paths = new Set<string>();
+
+  const walk = (n: FilterNode): void => {
+    switch (n.type) {
+      case 'compare':
+        paths.add(n.attrPath);
+        break;
+      case 'valuePath':
+        paths.add(n.attrPath);
+        walk(n.filter);
+        break;
+      case 'logical':
+        walk(n.left);
+        walk(n.right);
+        break;
+      case 'not':
+        walk(n.filter);
+        break;
+    }
+  };
+
+  walk(node);
+  return [...paths];
 }

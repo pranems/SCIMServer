@@ -1,5 +1,8 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScimLogger } from '../logging/scim-logger.service';
+import { LogCategory } from '../logging/log-levels';
+import { isValidUuid } from '../../infrastructure/repositories/prisma/uuid-guard';
 
 export interface ActivitySummary {
   id: string;
@@ -25,7 +28,10 @@ interface ScimPatchOperation {
 
 @Injectable()
 export class ActivityParserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() @Inject(ScimLogger) private readonly logger?: ScimLogger,
+  ) {}
 
   /**
    * Parse a SCIM request log into a human-readable activity summary
@@ -40,6 +46,17 @@ export class ActivityParserService {
     createdAt: string;
     identifier?: string;
   }): Promise<ActivitySummary> {
+    // Guard against malformed log entries - null/undefined method would throw TypeError
+    if (!log.method || !log.url) {
+      return {
+        id: log.id,
+        timestamp: log.createdAt,
+        icon: '⚠️',
+        message: 'Malformed log entry (missing method or url)',
+        type: 'error',
+        severity: 'warning',
+      };
+    }
     const timestamp = log.createdAt;
     const method = log.method.toUpperCase();
     const url = log.url;
@@ -54,7 +71,7 @@ export class ActivityParserService {
         requestData = JSON.parse(log.requestBody);
       }
     } catch (e) {
-      // Ignore parsing errors
+      this.logger?.trace(LogCategory.DATABASE, 'Activity parser: requestBody JSON.parse failed');
     }
 
     try {
@@ -62,7 +79,7 @@ export class ActivityParserService {
         responseData = JSON.parse(log.responseBody);
       }
     } catch (e) {
-      // Ignore parsing errors
+      this.logger?.trace(LogCategory.DATABASE, 'Activity parser: responseBody JSON.parse failed');
     }
 
     // Determine if this is a Users or Groups operation
@@ -635,6 +652,7 @@ export class ActivityParserService {
     try {
       paramsObj = new URLSearchParams(query);
     } catch {
+      this.logger?.trace(LogCategory.DATABASE, 'isGuidBasedFilter: URLSearchParams parse failed');
       return false;
     }
     const rawFilter = paramsObj.get('filter') ?? paramsObj.get('Filter') ?? paramsObj.get('FILTER');
@@ -644,7 +662,7 @@ export class ActivityParserService {
     try {
       decoded = decodeURIComponent(withSpaces);
     } catch {
-      // continue with original string if decoding fails
+      this.logger?.trace(LogCategory.DATABASE, 'isGuidBasedFilter: decodeURIComponent failed');
     }
     const match = decoded.match(/userName\s+eq\s+"?([^"\\]+)"?/i);
     if (!match) return false;
@@ -749,17 +767,24 @@ export class ActivityParserService {
    * Resolve user ID to display name
    */
   private async resolveUserName(userId: string): Promise<string> {
+    // Guard: scimId is @db.Uuid - reject non-UUID identifiers to avoid
+    // PostgreSQL "invalid input syntax for type uuid" errors that
+    // waste pool connections and flood logs.
+    if (!isValidUuid(userId)) {
+      this.logger?.trace(LogCategory.DATABASE, 'resolveUserName: skipped lookup for non-UUID identifier', { userId });
+      return userId;
+    }
     try {
-      const user = await this.prisma.scimUser.findFirst({
-        where: { scimId: userId },
-        select: { userName: true, rawPayload: true },
+      const user = await this.prisma.scimResource.findFirst({
+        where: { scimId: userId, resourceType: 'User' },
+        select: { userName: true, payload: true },
       });
 
       if (user) {
-        // Try to get display name from raw payload first
+        // Try to get display name from payload (JSONB)
         try {
-          if (user.rawPayload && typeof user.rawPayload === 'string') {
-            const payload = JSON.parse(user.rawPayload);
+          const payload = user.payload as Record<string, any> | null;
+          if (payload) {
             if (payload.displayName) return payload.displayName;
             if (payload.name?.formatted) return payload.name.formatted;
             if (payload.name?.givenName && payload.name?.familyName) {
@@ -767,12 +792,12 @@ export class ActivityParserService {
             }
           }
         } catch (e) {
-          // Fall back to userName if payload parsing fails
+          this.logger?.debug(LogCategory.DATABASE, 'resolveUserName: payload parsing failed', { error: (e as Error).message });
         }
-        return user.userName;
+        return user.userName ?? userId;
       }
     } catch (e) {
-      // If lookup fails, return the original ID
+      this.logger?.debug(LogCategory.DATABASE, 'resolveUserName: user lookup failed', { error: (e as Error).message });
     }
     return userId;
   }
@@ -781,9 +806,14 @@ export class ActivityParserService {
    * Resolve group ID to display name
    */
   private async resolveGroupName(groupId: string): Promise<string> {
+    // Guard: scimId is @db.Uuid - skip lookup for non-UUID values.
+    if (!isValidUuid(groupId)) {
+      this.logger?.trace(LogCategory.DATABASE, 'resolveGroupName: skipped lookup for non-UUID identifier', { groupId });
+      return groupId;
+    }
     try {
-      const group = await this.prisma.scimGroup.findFirst({
-        where: { scimId: groupId },
+      const group = await this.prisma.scimResource.findFirst({
+        where: { scimId: groupId, resourceType: 'Group' },
         select: { displayName: true },
       });
 
@@ -791,7 +821,7 @@ export class ActivityParserService {
         return group.displayName;
       }
     } catch (e) {
-      // If lookup fails, return the original ID
+      this.logger?.debug(LogCategory.DATABASE, 'resolveGroupName: group lookup failed', { error: (e as Error).message });
     }
     return groupId;
   }
@@ -885,7 +915,7 @@ export class ActivityParserService {
           }
         }
       } catch (e) {
-        // Ignore parsing errors for individual operations
+        this.logger?.debug(LogCategory.DATABASE, 'parsePatchOperations: op parsing failed', { error: (e as Error).message });
       }
     }
 

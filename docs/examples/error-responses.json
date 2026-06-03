@@ -1,0 +1,56 @@
+{
+  "_comment": "SCIM error response examples (RFC 7644 §3.12)",
+
+  "uniqueness_conflict_409": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "409",
+    "scimType": "uniqueness",
+    "detail": "A user with userName 'jdoe@example.com' already exists in this endpoint."
+  },
+
+  "missing_required_400": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "400",
+    "scimType": "invalidValue",
+    "detail": "Missing required attribute: userName"
+  },
+
+  "invalid_filter_400": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "400",
+    "scimType": "invalidFilter",
+    "detail": "Invalid filter expression: unexpected token at position 5"
+  },
+
+  "not_found_404": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "404",
+    "detail": "Resource b2c3d4e5-f6a7-8901-bcde-f12345678901 not found"
+  },
+
+  "precondition_failed_412": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "412",
+    "scimType": "versionMismatch",
+    "detail": "Resource has been modified. Expected version W/\"1\", current version W/\"3\"."
+  },
+
+  "if_match_required_428": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "428",
+    "detail": "If-Match header is required for this operation (RequireIfMatch is enabled)."
+  },
+
+  "mutability_readOnly_400": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "400",
+    "scimType": "mutability",
+    "detail": "Attribute 'id' is readOnly and cannot be modified."
+  },
+
+  "unsupported_content_type_415": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "status": "415",
+    "detail": "Unsupported Media Type. Expected application/scim+json or application/json."
+  }
+}

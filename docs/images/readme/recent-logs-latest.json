@@ -1,0 +1,105 @@
+{
+  "count": 12,
+  "entries": [
+    {
+      "timestamp": "2026-04-17T10:00:00.100Z",
+      "level": "INFO",
+      "category": "endpoint",
+      "message": "Endpoint created",
+      "data": { "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001", "name": "contoso-prod", "preset": "entra-id" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:00.200Z",
+      "level": "INFO",
+      "category": "config",
+      "message": "Log configuration updated",
+      "data": { "changes": { "globalLevel": { "from": "INFO", "to": "DEBUG" } } }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:01.000Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "-> POST /scim/endpoints/f8e7d6c5-.../Users",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "method": "POST",
+      "path": "/scim/endpoints/f8e7d6c5-1234-5678-abcd-000000000001/Users"
+    },
+    {
+      "timestamp": "2026-04-17T10:00:01.015Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "Creating user",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "userName": "jdoe@contoso.com" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:01.032Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "User created",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "scimId": "b2c3d4e5-2222-3333-4444-555555555555", "userName": "jdoe@contoso.com" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:01.033Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "<- 201 POST /scim/endpoints/f8e7d6c5-.../Users",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "status": 201, "durationMs": 33 }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:05.000Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "-> GET /scim/endpoints/f8e7d6c5-.../Users?filter=userName eq \"jdoe@contoso.com\"",
+      "requestId": "a1b2c3d4-0002-0002-0002-000000000002",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001"
+    },
+    {
+      "timestamp": "2026-04-17T10:00:05.012Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "<- 200 GET /scim/endpoints/f8e7d6c5-.../Users",
+      "requestId": "a1b2c3d4-0002-0002-0002-000000000002",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "status": 200, "durationMs": 12 }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:10.000Z",
+      "level": "DEBUG",
+      "category": "auth",
+      "message": "OAuth 2.0 token validated",
+      "requestId": "a1b2c3d4-0003-0003-0003-000000000003",
+      "data": { "authType": "oauth", "clientId": "entra-provisioning" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:15.000Z",
+      "level": "INFO",
+      "category": "database",
+      "message": "Auto-pruned 142 log entries (retention: 30d)"
+    },
+    {
+      "timestamp": "2026-04-17T10:00:20.000Z",
+      "level": "WARN",
+      "category": "http",
+      "message": "Slow request: 2150ms",
+      "requestId": "a1b2c3d4-0004-0004-0004-000000000004",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "status": 200, "durationMs": 2150 }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:25.000Z",
+      "level": "INFO",
+      "category": "scim.group",
+      "message": "Group created",
+      "requestId": "a1b2c3d4-0005-0005-0005-000000000005",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "scimId": "c3d4e5f6-3333-4444-5555-666666666666", "displayName": "Engineering" }
+    }
+  ]
+}

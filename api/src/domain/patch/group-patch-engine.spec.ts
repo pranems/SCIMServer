@@ -1,0 +1,681 @@
+import { GroupPatchEngine, type GroupPatchState } from './group-patch-engine';
+import type { PatchOperation, GroupMemberPatchConfig, GroupMemberDto } from './patch-types';
+import { PatchError } from './patch-error';
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+const defaultConfig: GroupMemberPatchConfig = {
+  allowMultiMemberAdd: true,
+  allowMultiMemberRemove: true,
+  allowRemoveAllMembers: true,
+};
+
+const strictConfig: GroupMemberPatchConfig = {
+  allowMultiMemberAdd: false,
+  allowMultiMemberRemove: false,
+  allowRemoveAllMembers: false,
+};
+
+function makeMembers(...ids: string[]): GroupMemberDto[] {
+  return ids.map(id => ({ value: id, display: `User ${id}` }));
+}
+
+function makeState(overrides: Partial<GroupPatchState> = {}): GroupPatchState {
+  return {
+    displayName: 'Engineering',
+    externalId: 'grp-001',
+    members: makeMembers('user-1', 'user-2'),
+    rawPayload: {},
+    ...overrides,
+  };
+}
+
+function apply(
+  ops: PatchOperation[],
+  state?: Partial<GroupPatchState>,
+  config?: GroupMemberPatchConfig,
+) {
+  return GroupPatchEngine.apply(ops, makeState(state), config ?? defaultConfig);
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('GroupPatchEngine', () => {
+  // ── Replace operations ─────────────────────────────────────────────
+
+  describe('replace operations', () => {
+    it('should replace displayName via path', () => {
+      const result = apply([{ op: 'replace', path: 'displayName', value: 'Sales' }]);
+      expect(result.displayName).toBe('Sales');
+    });
+
+    it('should replace displayName case-insensitively', () => {
+      const result = apply([{ op: 'replace', path: 'DISPLAYNAME', value: 'Sales' }]);
+      expect(result.displayName).toBe('Sales');
+    });
+
+    it('should replace displayName via no-path string value', () => {
+      const result = apply([{ op: 'replace', value: 'Marketing' }]);
+      expect(result.displayName).toBe('Marketing');
+    });
+
+    it('should replace externalId', () => {
+      const result = apply([{ op: 'replace', path: 'externalId', value: 'ext-999' }]);
+      expect(result.externalId).toBe('ext-999');
+    });
+
+    it('should set externalId to null for non-string value', () => {
+      const result = apply([{ op: 'replace', path: 'externalId', value: 123 }]);
+      expect(result.externalId).toBeNull();
+    });
+
+    it('should replace members array completely', () => {
+      const result = apply([{
+        op: 'replace',
+        path: 'members',
+        value: [{ value: 'user-99' }],
+      }]);
+      expect(result.members).toEqual([{ value: 'user-99' }]);
+    });
+
+    it('should deduplicate members on replace', () => {
+      const result = apply([{
+        op: 'replace',
+        path: 'members',
+        value: [{ value: 'user-1' }, { value: 'user-1' }],
+      }]);
+      expect(result.members).toHaveLength(1);
+    });
+
+    it('should replace multiple fields via no-path object', () => {
+      const result = apply([{
+        op: 'replace',
+        value: {
+          displayName: 'New Name',
+          externalId: 'new-ext',
+          members: [{ value: 'user-5' }],
+        },
+      }]);
+      expect(result.displayName).toBe('New Name');
+      expect(result.externalId).toBe('new-ext');
+      expect(result.members).toEqual([{ value: 'user-5' }]);
+    });
+
+    it('should store extra attributes in rawPayload on no-path replace', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { displayName: 'Test', customField: 'data' },
+      }]);
+      expect(result.payload.customField).toBe('data');
+    });
+
+    it('should throw on non-string displayName replace', () => {
+      expect(() => apply([{ op: 'replace', path: 'displayName', value: 123 }]))
+        .toThrow(PatchError);
+    });
+
+    it('should throw on non-array members replace', () => {
+      expect(() => apply([{ op: 'replace', path: 'members', value: 'bad' }]))
+        .toThrow(PatchError);
+    });
+
+    it('should throw on unsupported path', () => {
+      expect(() => apply([{ op: 'replace', path: 'unknownField', value: 'x' }]))
+        .toThrow(PatchError);
+    });
+
+    it('should throw on no-path non-string non-object value', () => {
+      expect(() => apply([{ op: 'replace', value: 42 }]))
+        .toThrow(PatchError);
+    });
+  });
+
+  // ── Add operations ─────────────────────────────────────────────────
+
+  describe('add operations', () => {
+    it('should add a single member', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'members',
+        value: [{ value: 'user-3' }],
+      }]);
+      expect(result.members).toHaveLength(3);
+      expect(result.members.map(m => m.value)).toContain('user-3');
+    });
+
+    it('should add member without explicit path', () => {
+      const result = apply([{
+        op: 'add',
+        value: [{ value: 'user-4' }],
+      }]);
+      expect(result.members.map(m => m.value)).toContain('user-4');
+    });
+
+    it('should deduplicate when adding existing member', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'members',
+        value: [{ value: 'user-1' }],
+      }]);
+      expect(result.members.filter(m => m.value === 'user-1')).toHaveLength(1);
+    });
+
+    it('should add multiple members when allowed', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'members',
+        value: [{ value: 'user-3' }, { value: 'user-4' }],
+      }], undefined, defaultConfig);
+      expect(result.members).toHaveLength(4);
+    });
+
+    it('should reject multiple members when not allowed', () => {
+      expect(() => apply([{
+        op: 'add',
+        path: 'members',
+        value: [{ value: 'user-3' }, { value: 'user-4' }],
+      }], undefined, strictConfig)).toThrow(PatchError);
+    });
+
+    it('should allow single member add in strict mode', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'members',
+        value: [{ value: 'user-3' }],
+      }], undefined, strictConfig);
+      expect(result.members).toHaveLength(3);
+    });
+
+    it('should wrap non-array value in array', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'members',
+        value: { value: 'user-3' },
+      }]);
+      expect(result.members.map(m => m.value)).toContain('user-3');
+    });
+
+    it('should throw on unsupported add path', () => {
+      expect(() => apply([{ op: 'add', path: 'displayName', value: 'x' }]))
+        .toThrow(PatchError);
+    });
+
+    it('should throw on add without value', () => {
+      expect(() => apply([{ op: 'add', path: 'members' }]))
+        .toThrow(PatchError);
+    });
+  });
+
+  // ── Remove operations ──────────────────────────────────────────────
+
+  describe('remove operations', () => {
+    it('should remove member by value array', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'members',
+        value: [{ value: 'user-1' }],
+      }]);
+      expect(result.members.map(m => m.value)).toEqual(['user-2']);
+    });
+
+    it('should remove member by path filter', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "user-2"]',
+      }]);
+      expect(result.members.map(m => m.value)).toEqual(['user-1']);
+    });
+
+    it('should remove all members when allowed', () => {
+      const result = apply([{ op: 'remove', path: 'members' }]);
+      expect(result.members).toHaveLength(0);
+    });
+
+    it('should reject remove-all when not allowed', () => {
+      expect(() => apply(
+        [{ op: 'remove', path: 'members' }],
+        undefined,
+        strictConfig,
+      )).toThrow(PatchError);
+    });
+
+    it('should remove multiple members via value array when allowed', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'members',
+        value: [{ value: 'user-1' }, { value: 'user-2' }],
+      }]);
+      expect(result.members).toHaveLength(0);
+    });
+
+    it('should reject multi-member remove when not allowed', () => {
+      expect(() => apply([{
+        op: 'remove',
+        path: 'members',
+        value: [{ value: 'user-1' }, { value: 'user-2' }],
+      }], undefined, strictConfig)).toThrow(PatchError);
+    });
+
+    it('should allow single member remove in strict mode', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'members',
+        value: [{ value: 'user-1' }],
+      }], undefined, strictConfig);
+      expect(result.members.map(m => m.value)).toEqual(['user-2']);
+    });
+
+    it('should throw on unsupported remove path', () => {
+      expect(() => apply([{ op: 'remove', path: 'displayName' }]))
+        .toThrow(PatchError);
+    });
+  });
+
+  // ── Multiple operations ────────────────────────────────────────────
+
+  describe('multiple operations', () => {
+    it('should apply mixed operations sequentially', () => {
+      const result = apply([
+        { op: 'replace', path: 'displayName', value: 'Team Alpha' },
+        { op: 'add', path: 'members', value: [{ value: 'user-3' }] },
+        { op: 'remove', path: 'members', value: [{ value: 'user-1' }] },
+      ]);
+      expect(result.displayName).toBe('Team Alpha');
+      expect(result.members.map(m => m.value).sort()).toEqual(['user-2', 'user-3']);
+    });
+
+    it('should replace displayName + externalId then add member', () => {
+      const result = apply([
+        { op: 'replace', value: { displayName: 'New', externalId: 'e2' } },
+        { op: 'add', path: 'members', value: [{ value: 'user-10' }] },
+      ]);
+      expect(result.displayName).toBe('New');
+      expect(result.externalId).toBe('e2');
+      expect(result.members).toHaveLength(3);
+    });
+  });
+
+  // ── Error handling ─────────────────────────────────────────────────
+
+  describe('error handling', () => {
+    it('should throw PatchError for unsupported op', () => {
+      expect(() => apply([{ op: 'invalid' }])).toThrow(PatchError);
+    });
+
+    it('should throw PatchError for member without value property', () => {
+      expect(() => apply([{
+        op: 'add',
+        path: 'members',
+        value: [{ display: 'No Value' }],
+      }])).toThrow(PatchError);
+    });
+  });
+
+  // ── Utility methods ────────────────────────────────────────────────
+
+  describe('toMemberDto', () => {
+    it('should extract value, display, type', () => {
+      const dto = GroupPatchEngine.toMemberDto({ value: 'u1', display: 'U1', type: 'User' });
+      expect(dto).toEqual({ value: 'u1', display: 'U1', type: 'User' });
+    });
+
+    it('should throw on null input', () => {
+      expect(() => GroupPatchEngine.toMemberDto(null)).toThrow(PatchError);
+    });
+
+    it('should throw on missing value', () => {
+      expect(() => GroupPatchEngine.toMemberDto({ display: 'X' })).toThrow(PatchError);
+    });
+  });
+
+  describe('ensureUniqueMembers', () => {
+    it('should keep last duplicate', () => {
+      const result = GroupPatchEngine.ensureUniqueMembers([
+        { value: 'a', display: 'First' },
+        { value: 'b' },
+        { value: 'a', display: 'Second' },
+      ]);
+      expect(result).toHaveLength(2);
+      expect(result.find(m => m.value === 'a')?.display).toBe('Second');
+    });
+  });
+
+  // ── SCIM Validator: Multi-op scenarios ─────────────────────────────────
+
+  describe('SCIM Validator: multi-op scenarios', () => {
+    it('should apply add then remove member in a single patch (add→remove = empty)', () => {
+      const result = apply(
+        [
+          { op: 'add', path: 'members', value: [{ value: 'user-new' }] },
+          { op: 'remove', path: 'members[value eq "user-new"]' },
+        ],
+        { members: [] },
+      );
+      expect(result.members).toHaveLength(0);
+    });
+
+    it('should apply replace displayName via no-path object (Entra-style)', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { displayName: 'EntraReplacedName' },
+      }]);
+      expect(result.displayName).toBe('EntraReplacedName');
+    });
+
+    it('should apply replace externalId via no-path object', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { externalId: 'new-ext-from-entra' },
+      }]);
+      expect(result.externalId).toBe('new-ext-from-entra');
+    });
+
+    it('should apply replace members via path (full member replacement)', () => {
+      const result = apply([{
+        op: 'replace',
+        path: 'members',
+        value: [{ value: 'user-A' }],
+      }], { members: makeMembers('user-1', 'user-2') });
+      expect(result.members).toHaveLength(1);
+      expect(result.members[0].value).toBe('user-A');
+    });
+
+    it('should handle remove member via value filter path', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'members[value eq "user-1"]' }],
+        { members: makeMembers('user-1', 'user-2') },
+      );
+      expect(result.members).toHaveLength(1);
+      expect(result.members[0].value).toBe('user-2');
+    });
+
+    it('should apply combined displayName + externalId replace in single op', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { displayName: 'Combined', externalId: 'ext-combined' },
+      }]);
+      expect(result.displayName).toBe('Combined');
+      expect(result.externalId).toBe('ext-combined');
+    });
+  });
+
+  // ── Custom Extension URN support (BUG-001 fix) ──────────────────────
+
+  describe('extension URN support', () => {
+    const CUSTOM_URN = 'urn:example:custom:2.0:Group';
+    const extConfig: GroupMemberPatchConfig = {
+      ...defaultConfig,
+      extensionUrns: [CUSTOM_URN],
+    };
+
+    it('should replace extension attribute via URN-prefixed path', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${CUSTOM_URN}:customField`, value: 'ext-val' }],
+        makeState(),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBe('ext-val');
+    });
+
+    it('should add extension attribute via URN-prefixed path', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'add', path: `${CUSTOM_URN}:addedField`, value: 123 }],
+        makeState(),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.addedField).toBe(123);
+    });
+
+    it('should remove extension attribute via URN-prefixed path', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'remove', path: `${CUSTOM_URN}:fieldToRemove` }],
+        makeState({ rawPayload: { [CUSTOM_URN]: { fieldToRemove: 'gone', keepMe: 'stay' } } }),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.fieldToRemove).toBeUndefined();
+      expect(ext?.keepMe).toBe('stay');
+    });
+
+    it('should resolve extension URN keys in no-path replace object', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', value: { [`${CUSTOM_URN}:customField`]: 'no-path-val', displayName: 'Updated' } }],
+        makeState(),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBe('no-path-val');
+      expect(result.displayName).toBe('Updated');
+    });
+  });
+
+  // ─── G7: caseExact-aware valuePath matching ─────────────────────────
+
+  describe('G7 - caseExact-aware valuePath matching', () => {
+    it('should match members[value eq "..."] case-insensitively by default (no caseExactPaths)', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "USER-1"]', // uppercase - should still match "user-1"
+      }]);
+      expect(result.members.map(m => m.value)).toEqual(['user-2']);
+    });
+
+    it('should match case-sensitively when value is in caseExactPaths', () => {
+      const configWithCaseExact = {
+        ...defaultConfig,
+        caseExactPaths: new Set(['value']),
+      };
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "USER-1"]', // uppercase - should NOT match "user-1" when caseExact
+      }], undefined, configWithCaseExact);
+      // All members remain because "USER-1" !== "user-1" in case-sensitive mode
+      expect(result.members.map(m => m.value)).toEqual(['user-1', 'user-2']);
+    });
+
+    it('should match case-insensitively when value is NOT in caseExactPaths', () => {
+      const configWithOtherCaseExact = {
+        ...defaultConfig,
+        caseExactPaths: new Set(['display']), // different attr, not 'value'
+      };
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "USER-2"]',
+      }], undefined, configWithOtherCaseExact);
+      expect(result.members.map(m => m.value)).toEqual(['user-1']);
+    });
+  });
+
+  // ── GAP-1: Remove on column-promoted fields (RFC 7644 §3.5.2.2) ──
+
+  describe('remove column-promoted fields', () => {
+    it('should remove externalId - sets to null', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'externalId' }],
+        { externalId: 'grp-ext-001' },
+      );
+      expect(result.externalId).toBeNull();
+    });
+
+    it('should remove externalId case-insensitively', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'ExternalId' }],
+        { externalId: 'grp-ext-001' },
+      );
+      expect(result.externalId).toBeNull();
+    });
+
+    it('should reject remove on displayName with 400 (required attribute)', () => {
+      expect(() =>
+        apply([{ op: 'remove', path: 'displayName' }]),
+      ).toThrow(PatchError);
+      try {
+        apply([{ op: 'remove', path: 'displayName' }]);
+      } catch (e: any) {
+        expect(e.status).toBe(400);
+        expect(e.message).toContain('required');
+      }
+    });
+
+    it('should reject remove on DisplayName case-insensitively', () => {
+      expect(() =>
+        apply([{ op: 'remove', path: 'DisplayName' }]),
+      ).toThrow(PatchError);
+    });
+
+    it('should allow remove externalId then add new externalId via replace', () => {
+      const result = apply([
+        { op: 'remove', path: 'externalId' },
+        { op: 'replace', path: 'externalId', value: 'new-ext' },
+      ], { externalId: 'old-ext' });
+      expect(result.externalId).toBe('new-ext');
+    });
+  });
+
+  // Step G - PATCH null-handling wiring (F2 + F3 + F4 + F5 + F6 + F7)
+  // See docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md
+
+  describe('F2 - explicit-null clear on Group.members', () => {
+    it('should empty members when value is null regardless of flag (RFC 7644 S3.5.2.3 explicit unassign)', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'members', value: null }],
+        undefined,
+        { ...strictConfig, allowRemoveAllMembers: false },
+      );
+      expect(result.members.length).toBe(0);
+    });
+
+    it('should empty members when value is null even with strictConfig (flag governs only ambiguous bare remove)', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'members', value: null }],
+        undefined,
+        strictConfig,
+      );
+      expect(result.members.length).toBe(0);
+    });
+
+    it('should still reject members replace with non-array non-null value', () => {
+      try {
+        apply([{ op: 'replace', path: 'members', value: 'not-an-array' }]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F4 - reject null elements in Group.members array', () => {
+    it('should throw 400 invalidValue when add members value contains null element', () => {
+      try {
+        apply([
+          { op: 'add', path: 'members', value: [{ value: 'user-3' }, null] },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+
+    it('should throw 400 invalidValue when replace members value contains null element', () => {
+      try {
+        apply([
+          { op: 'replace', path: 'members', value: [{ value: 'user-3' }, null] },
+        ]);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('invalidValue');
+      }
+    });
+  });
+
+  describe('F5 - prune empty extension namespaces after PATCH', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Group';
+    const cfg: GroupMemberPatchConfig = { ...defaultConfig, extensionUrns: [URN] };
+
+    it('should remove the extension URN key from payload when last attribute is cleared', () => {
+      const state = makeState({ rawPayload: { [URN]: { tag: 'A' } } });
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:tag`, value: null }],
+        state,
+        cfg,
+      );
+      expect(URN in result.payload).toBe(false);
+    });
+
+    it('should keep the extension URN key when at least one other attribute remains', () => {
+      const state = makeState({ rawPayload: { [URN]: { tag: 'A', color: 'red' } } });
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:tag`, value: null }],
+        state,
+        cfg,
+      );
+      expect(URN in result.payload).toBe(true);
+      const ext = result.payload[URN] as Record<string, unknown>;
+      expect('tag' in ext).toBe(false);
+      expect(ext.color).toBe('red');
+    });
+  });
+
+  describe('F6 - Group extension dotted sub-attribute null clear', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Group';
+    const cfg: GroupMemberPatchConfig = { ...defaultConfig, extensionUrns: [URN] };
+
+    it('should clear only the sub-attribute via dotted path and preserve siblings', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { owner: { value: 'mgr-1', displayName: 'Alice' } } },
+      });
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${URN}:owner.displayName`, value: null }],
+        state,
+        cfg,
+      );
+      const owner = (result.payload[URN] as Record<string, unknown>).owner as Record<string, unknown>;
+      expect('displayName' in owner).toBe(false);
+      expect(owner.value).toBe('mgr-1');
+    });
+  });
+
+  describe('F7 - Group extension valuePath noTarget', () => {
+    const URN = 'urn:test:scim:extension:custom:2.0:Group';
+    const cfg: GroupMemberPatchConfig = { ...defaultConfig, extensionUrns: [URN] };
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (remove)', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { tags: [{ type: 'red', value: 'r' }] } },
+      });
+      try {
+        GroupPatchEngine.apply(
+          [{ op: 'remove', path: `${URN}:tags[type eq "missing"]` }],
+          state,
+          cfg,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+
+    it('should throw 400 noTarget when extension valuePath filter matches zero entries (replace)', () => {
+      const state = makeState({
+        rawPayload: { [URN]: { tags: [{ type: 'red', value: 'r' }] } },
+      });
+      try {
+        GroupPatchEngine.apply(
+          [{ op: 'replace', path: `${URN}:tags[type eq "missing"].value`, value: 'x' }],
+          state,
+          cfg,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.scimType).toBe('noTarget');
+      }
+    });
+  });
+});

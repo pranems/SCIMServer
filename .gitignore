@@ -9,6 +9,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Prisma 7 generated client (re-generated via `npx prisma generate`)
+api/src/generated/
+
 # Environment files
 .env
 .env.local
@@ -37,6 +40,44 @@ Thumbs.db
 logs/
 *.log
 
+# Test results (generated per run)
+test-results/
+
+# Playwright generated outputs (regenerated per run)
+web/playwright-result.json
+web/playwright-report/
+web/test-results/
+
+# Test artifacts (historical JSON snapshots - never commit)
+api/test-artifacts/
+
+# Test output files (generated per run - never commit)
+*-live-output*.txt
+*-live-pipeline*.txt
+*-live-test-output*.txt
+live-test-output.txt
+az-*.txt
+azure-*.txt
+docker-live-*.txt
+himanshu-*.json
+log-level-*.txt
+standalone-live-*.txt
+api/e2e-*.txt
+api/e2e-*.json
+api/test-out*.txt
+api/unit-results*.json
+api/unit-test-output.txt
+api/unit-counts.json
+api/unit-check.json
+api/fix-check.json
+api/pipeline-*.json
+api/failed-tests.txt
+api/groups-test-output.txt
+api/ctx-test.txt
+api/debug-output.txt
+api/fail-detail.txt
+scripts/live-test-docker-output.txt
+
 # Temporary files
 tmp/
 temp/
@@ -45,7 +86,58 @@ temp/
 .azure/
 
 # Docker
-Dockerfile.dockerignore# Version sync: Ensure image contains v0.4.8
+Dockerfile.dockerignore
 
+# Misc docs (local-only / may contain credentials)
 admin.md
 wiki.md
+# Strategic / research thought-exercise docs (kept local, not for commit)
+docs/STRATEGIC_FORWARD_LOOK_2026.md
+docs/STRATEGIC_LATERAL_AND_VISIONARY_2026.md
+api/combo-results.json
+api/ep-spec-results.json
+api/ep-spec2.json
+api/sd-results.json
+api/unit-final.json
+SCIMServer-standalone.zip
+standalone/
+endpoint-creation-output.txt
+
+# Debug/test JSON artifacts (local-only throwaway captures)
+admin-logs.json
+admin-post-logs.json
+create-user-test-action.json
+ep-logs.json
+test-input.json
+trigger-output.json
+user-workflow-def.json
+workflows.json
+
+# Stale API collection exports (superseded by versioned copies)
+docs/insomnia/SCIMServer_v031_*.json
+docs/postman/SCIMServer_v031_*.json
+
+api/.dev-db.tmp
+
+# Local-only deployment secrets + state (NEVER commit - contain DB passwords / ACR creds / tokens)
+.acrname.txt
+.acrcreds.txt
+.pgpass-*.txt
+.oldprod-token.txt
+.prodtok.txt
+.prodvishnuid.txt
+.oldvishnuid.txt
+.prodvishnu-full.json
+.oldvishnu-full.json
+.veritas-carriers.json
+.live-after-recovery-*.log
+prod-app-template.json
+migration.log
+migrate-output.log
+scripts/state/
+scripts/_deploy-*-new-tenant.ps1
+# Root-level ad-hoc scripts written during ops (inspect / recover / verify)
+_*.ps1
+
+# Side-project research workspace (separate from SCIMServer)
+coderush/

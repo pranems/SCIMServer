@@ -17,7 +17,6 @@ if ($env:SCIMSERVER_IMAGETAG -and $env:SCIMSERVER_IMAGETAG.Trim().Length -gt 0) 
 } else {
     $ImageTag = 'latest'
 }
-$persistentEnabled = $true # Legacy flag retained for compatibility but blob snapshot persistence is always enabled now
 
 function New-ScimSecret {
 	$b = New-Object byte[] 32
@@ -149,8 +148,6 @@ if ($interactive) {
 	if (-not [string]::IsNullOrWhiteSpace($jwtInput)) { $JwtSecret = $jwtInput }
 	$oauthInput = Read-Host 'OAuth Client Secret (leave blank to keep generated)'
 	if (-not [string]::IsNullOrWhiteSpace($oauthInput)) { $OauthClientSecret = $oauthInput }
-	# Persistent storage now always enabled via blob snapshots (no user choice)
-	$persistentEnabled = $true
 }
 
 Write-Host "CONFIG:" -ForegroundColor Cyan
@@ -158,7 +155,7 @@ Write-Host "  ResourceGroup : $ResourceGroup" -ForegroundColor White
 Write-Host "  AppName       : $AppName" -ForegroundColor White
 Write-Host "  Location      : $Location" -ForegroundColor White
 Write-Host "  ImageTag      : $ImageTag" -ForegroundColor White
-Write-Host "  Persistence   : Blob snapshots (always on)" -ForegroundColor White
+Write-Host "  Persistence   : PostgreSQL (provisioned automatically or BYO)" -ForegroundColor White
 Write-Host "  Secret        : $ScimSecret" -ForegroundColor Yellow
 Write-Host "  JWT Secret    : $JwtSecret" -ForegroundColor Yellow
 Write-Host "  OAuth Secret  : $OauthClientSecret" -ForegroundColor Yellow
@@ -177,7 +174,7 @@ $rawBase = 'https://raw.githubusercontent.com/pranems/SCIMServer/master'
 $files = @(
     @{ url = "$rawBase/scripts/deploy-azure.ps1"; path = Join-Path $scriptsDir 'deploy-azure.ps1' },
 	@{ url = "$rawBase/infra/networking.bicep"; path = Join-Path $infraDir   'networking.bicep' },
-    @{ url = "$rawBase/infra/blob-storage.bicep"; path = Join-Path $infraDir   'blob-storage.bicep' },
+    @{ url = "$rawBase/infra/postgres.bicep"; path = Join-Path $infraDir   'postgres.bicep' },
     @{ url = "$rawBase/infra/containerapp-env.bicep"; path = Join-Path $infraDir 'containerapp-env.bicep' },
     @{ url = "$rawBase/infra/containerapp.bicep";  path = Join-Path $infraDir   'containerapp.bicep' }
 )
@@ -202,9 +199,9 @@ try { az account show -o none 2>$null } catch { Write-Host 'Not logged in. Run: 
 Write-Host 'Starting deployment...' -ForegroundColor Cyan
 # Prefer pwsh if available, otherwise fall back to current powershell
 if (Get-Command pwsh -ErrorAction SilentlyContinue) {
-	& pwsh -NoLogo -NoProfile -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -EnablePersistentStorage
+	& pwsh -NoLogo -NoProfile -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
 } else {
-	& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -EnablePersistentStorage
+	& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
 }
 if ($LASTEXITCODE -ne 0) { Write-Host "Deployment failed (code $LASTEXITCODE). Shell left open for inspection." -ForegroundColor Red; return }
 
@@ -221,6 +218,9 @@ while (-not $fqdn -and $attempts -lt $maxAttempts) {
 if ($fqdn) {
 	Write-Host "FINAL URL: https://$fqdn" -ForegroundColor Green
 	Write-Host "SCIM Endpoint: https://$fqdn/scim/v2" -ForegroundColor Green
+	Write-Host "Quick Logs (recent): https://$fqdn/scim/admin/log-config/recent?limit=25" -ForegroundColor Green
+	Write-Host "Quick Logs (stream): https://$fqdn/scim/admin/log-config/stream?level=INFO" -ForegroundColor Green
+	Write-Host "Quick Logs (download): https://$fqdn/scim/admin/log-config/download?format=json" -ForegroundColor Green
 } else {
 	Write-Host 'FINAL URL: <unavailable - check portal>' -ForegroundColor Yellow
 }

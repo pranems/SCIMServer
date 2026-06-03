@@ -106,6 +106,7 @@ describe('ScimLogger', () => {
         includeStackTraces: false,
         maxPayloadSizeBytes: 1024,
         format: 'pretty',
+        slowRequestThresholdMs: 3000,
       };
       logger.setConfig(newConfig);
       const config = logger.getConfig();
@@ -378,6 +379,25 @@ describe('ScimLogger', () => {
       const entry = JSON.parse(stdoutSpy.mock.calls[0][0]) as StructuredLogEntry;
       expect(entry.data).toEqual({ name: 'Alice', age: 30 });
     });
+
+    it('should handle circular references in data without crashing', () => {
+      const circular: Record<string, unknown> = { name: 'test' };
+      circular.self = circular; // circular reference
+
+      expect(() => {
+        logger.info(LogCategory.HTTP, 'Circular data', circular);
+      }).not.toThrow();
+    });
+
+    it('should handle circular references in emitJson without crashing', () => {
+      logger.updateConfig({ format: 'json' });
+      const circular: Record<string, unknown> = { name: 'test' };
+      circular.self = circular;
+
+      expect(() => {
+        logger.info(LogCategory.HTTP, 'Circular data', circular);
+      }).not.toThrow();
+    });
   });
 
   // ─── Stack Traces ─────────────────────────────────────────────────
@@ -492,14 +512,14 @@ describe('ScimLogger', () => {
     });
 
     it('should evict oldest entries when buffer is full', () => {
-      // The maxRingBufferSize is 500, let's push 510 entries
-      for (let i = 0; i < 510; i++) {
+      // The maxRingBufferSize is 2000, let's push 2010 entries
+      for (let i = 0; i < 2010; i++) {
         logger.info(LogCategory.HTTP, `entry ${i}`);
       }
 
-      const logs = logger.getRecentLogs({ limit: 510 });
-      // Should have at most 500 entries
-      expect(logs.length).toBeLessThanOrEqual(500);
+      const logs = logger.getRecentLogs({ limit: 2010 });
+      // Should have at most 2000 entries
+      expect(logs.length).toBeLessThanOrEqual(2000);
       // First entry should be entry 10 (0-9 evicted)
       expect(logs[0].message).toBe('entry 10');
     });
@@ -586,6 +606,320 @@ describe('ScimLogger', () => {
       logger.info(LogCategory.HTTP, 'timestamp test');
       const entry = JSON.parse(stdoutSpy.mock.calls[0][0]) as StructuredLogEntry;
       expect(entry.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    });
+  });
+
+  // ─── Live Stream (subscribe) ──────────────────────────────────────
+
+  describe('subscribe', () => {
+    it('should notify subscribers when a log is emitted', () => {
+      const received: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(entry => received.push(entry));
+
+      logger.info(LogCategory.HTTP, 'test entry');
+
+      expect(received).toHaveLength(1);
+      expect(received[0].message).toBe('test entry');
+      expect(received[0].level).toBe('INFO');
+
+      unsub();
+    });
+
+    it('should stop notifying after unsubscribe', () => {
+      const received: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(entry => received.push(entry));
+
+      logger.info(LogCategory.HTTP, 'before unsub');
+      unsub();
+      logger.info(LogCategory.HTTP, 'after unsub');
+
+      expect(received).toHaveLength(1);
+      expect(received[0].message).toBe('before unsub');
+    });
+
+    it('should support multiple subscribers', () => {
+      const received1: StructuredLogEntry[] = [];
+      const received2: StructuredLogEntry[] = [];
+      const unsub1 = logger.subscribe(entry => received1.push(entry));
+      const unsub2 = logger.subscribe(entry => received2.push(entry));
+
+      logger.info(LogCategory.HTTP, 'multi');
+
+      expect(received1).toHaveLength(1);
+      expect(received2).toHaveLength(1);
+
+      unsub1();
+      unsub2();
+    });
+
+    it('should only deliver entries at enabled log levels', () => {
+      logger.setGlobalLevel(LogLevel.WARN);
+      const received: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(entry => received.push(entry));
+
+      logger.debug(LogCategory.HTTP, 'filtered out');
+      logger.warn(LogCategory.HTTP, 'should arrive');
+
+      expect(received).toHaveLength(1);
+      expect(received[0].level).toBe('WARN');
+
+      unsub();
+    });
+  });
+
+  // ─── SCIM Event Stream (Phase J v0.48.1) ──────────────────────────
+  // Separate channel from the log stream so the SSE controller can
+  // forward typed `{type: 'scim.x.y', ...}` payloads without polluting
+  // the log ring buffer or filtering through log-level gates. The
+  // `useSSE` hook on the web side dispatches on the `type` field;
+  // before Phase J the channel did not exist and SCIM mutations never
+  // reached the client.
+  describe('SCIM event stream (subscribeScimEvents / emitScimEvent)', () => {
+    it('notifies SCIM-event subscribers when emitScimEvent is called', () => {
+      const received: Array<{ type: string; [k: string]: unknown }> = [];
+      const unsub = logger.subscribeScimEvents(evt => received.push(evt));
+
+      logger.emitScimEvent('scim.user.created', {
+        endpointId: 'ep-1',
+        scimId: 'u-1',
+        active: true,
+      });
+
+      expect(received).toHaveLength(1);
+      expect(received[0].type).toBe('scim.user.created');
+      expect(received[0].endpointId).toBe('ep-1');
+      expect(received[0].scimId).toBe('u-1');
+      expect(received[0].active).toBe(true);
+
+      unsub();
+    });
+
+    it('stops notifying after unsubscribe', () => {
+      const received: Array<Record<string, unknown>> = [];
+      const unsub = logger.subscribeScimEvents(evt => received.push(evt));
+
+      logger.emitScimEvent('scim.user.created', { endpointId: 'ep-1', scimId: 'u-1' });
+      unsub();
+      logger.emitScimEvent('scim.user.deleted', { endpointId: 'ep-1', scimId: 'u-1' });
+
+      expect(received).toHaveLength(1);
+      expect((received[0] as { type: string }).type).toBe('scim.user.created');
+    });
+
+    it('supports multiple concurrent subscribers (multi-tab SSE consumers)', () => {
+      const a: Array<Record<string, unknown>> = [];
+      const b: Array<Record<string, unknown>> = [];
+      const ua = logger.subscribeScimEvents(evt => a.push(evt));
+      const ub = logger.subscribeScimEvents(evt => b.push(evt));
+
+      logger.emitScimEvent('scim.endpoint.created', { endpointId: 'ep-new' });
+
+      expect(a).toHaveLength(1);
+      expect(b).toHaveLength(1);
+
+      ua();
+      ub();
+    });
+
+    it('SCIM event stream is independent from the log stream', () => {
+      // A subscriber to the log stream MUST NOT receive SCIM events
+      // (would corrupt the log ring buffer downstream consumers).
+      const logEntries: StructuredLogEntry[] = [];
+      const scimEvents: Array<Record<string, unknown>> = [];
+      const unsubLog = logger.subscribe(e => logEntries.push(e));
+      const unsubScim = logger.subscribeScimEvents(e => scimEvents.push(e));
+
+      logger.emitScimEvent('scim.user.created', { endpointId: 'ep-1', scimId: 'u-1' });
+
+      expect(scimEvents).toHaveLength(1);
+      expect(logEntries).toHaveLength(0);
+
+      unsubLog();
+      unsubScim();
+    });
+
+    it('forwarded payload preserves arbitrary fields verbatim (no schema enforcement)', () => {
+      // The bridge sends through whatever the upstream service emitted;
+      // schema constraints belong to the SCIM service, not the bridge.
+      const received: Array<Record<string, unknown>> = [];
+      const unsub = logger.subscribeScimEvents(evt => received.push(evt));
+
+      logger.emitScimEvent('scim.credential.created', {
+        endpointId: 'ep-1',
+        credentialId: 'c-1',
+        credentialType: 'oauth_client',
+        label: 'Production token',
+        // Extra arbitrary field
+        future: { extension: 'reserved' },
+      });
+
+      expect(received[0]).toMatchObject({
+        type: 'scim.credential.created',
+        endpointId: 'ep-1',
+        credentialId: 'c-1',
+        credentialType: 'oauth_client',
+        label: 'Production token',
+        future: { extension: 'reserved' },
+      });
+
+      unsub();
+    });
+  });
+
+  // ─── Enriched Context (Phase B Step 6) ────────────────────────────
+
+  describe('enriched correlation context', () => {
+    it('should include authType in log entries when enriched', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-auth-1' }, () => {
+        logger.enrichContext({ authType: 'oauth', authClientId: 'client-1' });
+        logger.info(LogCategory.AUTH, 'Auth test');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].authType).toBe('oauth');
+      unsub();
+    });
+
+    it('should include resourceType and resourceId when enriched', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-res-1' }, () => {
+        logger.enrichContext({ resourceType: 'User', resourceId: 'usr-123', operation: 'create' });
+        logger.info(LogCategory.SCIM_USER, 'User created');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].resourceType).toBe('User');
+      expect(entries[0].resourceId).toBe('usr-123');
+      expect(entries[0].operation).toBe('create');
+      unsub();
+    });
+
+    it('should include bulkOperationIndex when enriched', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-bulk-1' }, () => {
+        logger.enrichContext({ bulkOperationIndex: 5, bulkId: 'u3' });
+        logger.info(LogCategory.HTTP, 'Bulk op');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].bulkOperationIndex).toBe(5);
+      unsub();
+    });
+
+    it('should accumulate context across multiple enrichContext calls', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-accum-1', endpointId: 'ep-1' }, () => {
+        logger.enrichContext({ authType: 'legacy' });
+        logger.enrichContext({ resourceType: 'Group', operation: 'patch' });
+        logger.info(LogCategory.SCIM_GROUP, 'Group patched');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].requestId).toBe('req-accum-1');
+      expect(entries[0].endpointId).toBe('ep-1');
+      expect(entries[0].authType).toBe('legacy');
+      expect(entries[0].resourceType).toBe('Group');
+      expect(entries[0].operation).toBe('patch');
+      unsub();
+    });
+
+    it('should include enriched context in JSON output', () => {
+      logger.updateConfig({ format: 'json' });
+      logger.runWithContext({ requestId: 'req-json-ctx' }, () => {
+        logger.enrichContext({ authType: 'oauth', resourceType: 'User' });
+        logger.info(LogCategory.SCIM_USER, 'JSON context test');
+      });
+
+      const output = stdoutSpy.mock.calls[0][0] as string;
+      const parsed = JSON.parse(output);
+      expect(parsed.authType).toBe('oauth');
+      expect(parsed.resourceType).toBe('User');
+    });
+
+    it('should not include undefined enriched fields in entries', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-undef' }, () => {
+        // No enrichContext calls - fields should be undefined
+        logger.info(LogCategory.HTTP, 'No enrichment');
+      });
+
+      expect(entries[0].authType).toBeUndefined();
+      expect(entries[0].resourceType).toBeUndefined();
+      expect(entries[0].bulkOperationIndex).toBeUndefined();
+      unsub();
+    });
+  });
+
+  // ─── Configurable thresholds (gap audit) ──────────────────────────
+
+  describe('configurable thresholds', () => {
+    it('getSlowRequestThresholdMs should return default 2000', () => {
+      delete process.env.LOG_SLOW_REQUEST_MS;
+      expect(ScimLogger.getSlowRequestThresholdMs()).toBe(2000);
+    });
+
+    it('getSlowRequestThresholdMs should use LOG_SLOW_REQUEST_MS env var', () => {
+      process.env.LOG_SLOW_REQUEST_MS = '5000';
+      expect(ScimLogger.getSlowRequestThresholdMs()).toBe(5000);
+      delete process.env.LOG_SLOW_REQUEST_MS;
+    });
+
+    it('slowRequestThresholdMs should be runtime-configurable via updateConfig (Step 2.4)', () => {
+      const testLogger = new ScimLogger();
+      // Default is 2000
+      expect(testLogger.getConfig().slowRequestThresholdMs).toBe(2000);
+
+      // Update at runtime
+      testLogger.updateConfig({ slowRequestThresholdMs: 500 });
+      expect(testLogger.getConfig().slowRequestThresholdMs).toBe(500);
+    });
+
+    it('should use LOG_RING_BUFFER_SIZE env var for buffer capacity', () => {
+      process.env.LOG_RING_BUFFER_SIZE = '3';
+      const smallLogger = new ScimLogger();
+      smallLogger.updateConfig({ format: 'json' });
+
+      // Add 5 entries - only last 3 should survive
+      for (let i = 0; i < 5; i++) {
+        smallLogger.info(LogCategory.HTTP, `entry-${i}`);
+      }
+
+      const entries = smallLogger.getRecentLogs({ limit: 10 });
+      expect(entries.length).toBe(3);
+      expect(entries[0].message).toBe('entry-2'); // oldest surviving
+      expect(entries[2].message).toBe('entry-4'); // newest
+
+      delete process.env.LOG_RING_BUFFER_SIZE;
+    });
+  });
+
+  // ─── getRecentLogs combined filters (gap audit) ───────────────────
+
+  describe('combined ring buffer filters', () => {
+    it('should support endpointId + level combined filter', () => {
+      logger.runWithContext({ requestId: 'r1', endpointId: 'ep-combo' }, () => {
+        logger.info(LogCategory.HTTP, 'info entry');
+        logger.warn(LogCategory.HTTP, 'warn entry');
+      });
+      logger.runWithContext({ requestId: 'r2', endpointId: 'ep-other' }, () => {
+        logger.warn(LogCategory.HTTP, 'other endpoint');
+      });
+
+      const entries = logger.getRecentLogs({ endpointId: 'ep-combo', level: LogLevel.WARN });
+      expect(entries.length).toBe(1);
+      expect(entries[0].message).toBe('warn entry');
+      expect(entries[0].endpointId).toBe('ep-combo');
     });
   });
 });

@@ -3,7 +3,7 @@
 > **Document Purpose**: Complete API operation guide for the multi-member PATCH endpoint configuration flags.
 > 
 > **Created**: February 3, 2026  
-> **Last Updated**: February 5, 2026 (v3 - Added Remove flag)
+> **Last Updated**: April 28, 2026 (v0.40.0)
 
 ## Overview
 
@@ -16,6 +16,11 @@ These config flags control whether a single PATCH operation can add or remove mu
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | Controls multi-member **add** operations |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | Controls multi-member **remove** operations |
 | `VerbosePatchSupported` | Enables dot-notation path resolution in PATCH (e.g., `name.givenName`) |
+| `UserSoftDeleteEnabled` | Controls whether PATCH active=false is allowed (DELETE always hard-deletes) |
+| `StrictSchemaValidation` | Reject extension URNs not declared in `schemas[]` or not registered in schema registry |
+| `PatchOpAllowRemoveAllMembers` | Allow removing all members from a group via `path=members` PATCH |
+| `RequireIfMatch` | Require If-Match header on PUT/PATCH/DELETE (428 Precondition Required if missing) |
+| `AllowAndCoerceBooleanStrings` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
 
 ### Flag Values
 
@@ -59,11 +64,16 @@ Content-Type: application/json
 {
   "name": "azure-ad-integration",
   "displayName": "Azure AD Integration",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  "profilePreset": "entra-id",
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+    }
   }
 }
 ```
+
+> **Note:** The `entra-id` preset already sets this flag to `True` by default, so you only need to specify it explicitly if using a different preset.
 
 **Response (201 Created):**
 ```json
@@ -71,8 +81,10 @@ Content-Type: application/json
   "id": "cml73w21n0005tcragsxs6ejq",
   "name": "azure-ad-integration",
   "displayName": "Azure AD Integration",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+    }
   },
   "active": true,
   "scimEndpoint": "/scim/endpoints/cml73w21n0005tcragsxs6ejq",
@@ -460,7 +472,7 @@ A comprehensive test script is available at `scripts/live-test.ps1`:
 
 ```powershell
 # Run the live test
-& c:\path\to\SCIMServer2022\scripts\live-test.ps1
+& c:\path\to\SCIMServer\scripts\live-test.ps1
 ```
 
 This script demonstrates:

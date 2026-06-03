@@ -24,6 +24,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -52,6 +53,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -76,6 +78,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -108,6 +111,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -148,6 +152,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -184,6 +189,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -227,6 +233,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Groups', url: '/scim/Groups' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -267,6 +274,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users/user-123', url: '/scim/Users/user-123' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -308,6 +316,7 @@ describe('ScimContentTypeInterceptor', () => {
       const mockContext = {
         switchToHttp: () => ({
           getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
         }),
       } as unknown as ExecutionContext;
 
@@ -327,6 +336,58 @@ describe('ScimContentTypeInterceptor', () => {
             'Content-Type',
             'application/scim+json; charset=utf-8'
           );
+        },
+        complete: () => done(),
+      });
+    });
+
+    it('should NOT set Content-Type for non-SCIM routes (e.g. /admin)', (done) => {
+      const mockSetHeader = jest.fn();
+      const mockResponse = {
+        headersSent: false,
+        setHeader: mockSetHeader,
+      };
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/admin', url: '/admin' }),
+        }),
+      } as unknown as ExecutionContext;
+
+      const mockCallHandler: CallHandler = {
+        handle: () => of('<html></html>'),
+      };
+
+      interceptor.intercept(mockContext, mockCallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).not.toHaveBeenCalled();
+        },
+        complete: () => done(),
+      });
+    });
+
+    it('should NOT set Content-Type for root route (/)', (done) => {
+      const mockSetHeader = jest.fn();
+      const mockResponse = {
+        headersSent: false,
+        setHeader: mockSetHeader,
+      };
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/', url: '/' }),
+        }),
+      } as unknown as ExecutionContext;
+
+      const mockCallHandler: CallHandler = {
+        handle: () => of('<html></html>'),
+      };
+
+      interceptor.intercept(mockContext, mockCallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).not.toHaveBeenCalled();
         },
         complete: () => done(),
       });

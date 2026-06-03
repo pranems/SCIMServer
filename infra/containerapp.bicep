@@ -19,11 +19,14 @@ param jwtSecret string
 @description('OAuth client secret required when requesting SCIMServer tokens')
 @secure()
 param oauthClientSecret string
+@description('PostgreSQL connection string (e.g. postgresql://user:pass@host:5432/db). Required for Phase 3.')
+@secure()
+param databaseUrl string
 @description('Target port inside container')
 param targetPort int = 8080
 @description('Min replicas')
 param minReplicas int = 1
-@description('Max replicas – keep at 1 while using SQLite (file-based DB cannot be shared across replicas)')
+@description('Max replicas – set to 1 for single-instance deployments; increase to 3+ with a shared PostgreSQL database for HA.')
 param maxReplicas int = 1
 @description('CPU cores per replica (allowed: 0.25,0.5,1,2). Use 1 for reliability if unsure.')
 @allowed([
@@ -35,21 +38,20 @@ param maxReplicas int = 1
 param cpuCores string = '0.5'
 @description('Optional memory per replica')
 param memory string = '1Gi'
-@description('Blob backup storage account name')
-param blobBackupAccountName string
-@description('Blob backup container name')
-param blobBackupContainerName string = 'scimserver-backups'
-@description('GHCR username for pulling container images (optional, only for private packages)')
+@description('CORS allowed origins. Default empty = allow all (S-4 backward compat). Comma-separated for allowlist (e.g. https://app.example.com,https://other.example.com), "false" or "none" to disable CORS entirely. See api/src/security/cors-origin.ts for the full behavior matrix.')
+param corsOrigin string = ''
+@description('Registry username for pulling container images (optional). Works for GHCR private packages OR ACR with admin user enabled.')
 param ghcrUsername string = ''
-@description('GHCR PAT token for pulling container images (optional, only for private packages)')
+@description('Registry password / PAT for pulling container images (optional). Works for GHCR private packages OR ACR with admin user enabled.')
 @secure()
 param ghcrPassword string = ''
+
+// Use registry username+password whenever both are supplied. Falls back to managed identity for non-GHCR registries when no creds are passed.
+var useGhcrCredentials = ghcrUsername != '' && ghcrPassword != ''
 
 resource env 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: environmentName
 }
-
-// (Azure Files mount removed in blob backup mode)
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
@@ -58,15 +60,19 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: env.id
     // workloadProfileName omitted - uses default consumption model
     configuration: {
+      // OPS-5: Multiple revisions mode enables blue/green deployment with
+      // traffic splitting. New revisions deploy at 0% traffic, get smoke-tested,
+      // then traffic is flipped. Old revision stays running for instant rollback.
+      activeRevisionsMode: 'Multiple'
       ingress: {
         external: true
         targetPort: targetPort
         transport: 'auto'
       }
       // Configure registry authentication
-      registries: acrLoginServer == 'ghcr.io' && ghcrUsername != '' ? [
+      registries: useGhcrCredentials ? [
         {
-          server: 'ghcr.io'
+          server: acrLoginServer
           username: ghcrUsername
           passwordSecretRef: 'ghcr-password'
         }
@@ -89,7 +95,11 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'oauth-client-secret'
           value: oauthClientSecret
         }
-      ], ghcrPassword != '' ? [
+        {
+          name: 'database-url'
+          value: databaseUrl
+        }
+      ], useGhcrCredentials ? [
         {
           name: 'ghcr-password'
           value: ghcrPassword
@@ -107,16 +117,26 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'SCIM_SHARED_SECRET', secretRef: 'scim-shared-secret' }
             { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
             { name: 'OAUTH_CLIENT_SECRET', secretRef: 'oauth-client-secret' }
+            { name: 'DATABASE_URL', secretRef: 'database-url' }
+            { name: 'PERSISTENCE_BACKEND', value: 'prisma' }
             { name: 'NODE_ENV', value: 'production' }
             { name: 'PORT', value: string(targetPort) }
-            { name: 'DATABASE_URL', value: 'file:/tmp/local-data/scim.db' }
-            { name: 'BLOB_BACKUP_ACCOUNT', value: blobBackupAccountName }
-            { name: 'BLOB_BACKUP_CONTAINER', value: blobBackupContainerName }
+            // S-4: configurable CORS via parseCorsOrigin in api/src/security/cors-origin.ts
+            { name: 'CORS_ORIGIN', value: corsOrigin }
             // Metadata for in-app "Copy Update Command" (avoids discovery in update script)
             { name: 'SCIM_RG', value: resourceGroup().name }
             { name: 'SCIM_APP', value: appName }
             { name: 'SCIM_REGISTRY', value: acrLoginServer }
             { name: 'SCIM_CURRENT_IMAGE', value: '${acrLoginServer}/${image}' }
+            // ── Production logging defaults ──
+            // DEBUG captures full request lifecycle (→/←) for diagnosis;
+            // bodies are still persisted in RequestLog DB - no need for console payloads.
+            { name: 'LOG_LEVEL', value: 'DEBUG' }
+            { name: 'LOG_FORMAT', value: 'json' }
+            { name: 'LOG_FILE', value: '' }          // disable file logging (ephemeral container disk)
+            { name: 'LOG_RING_BUFFER_SIZE', value: '5000' }
+            { name: 'LOG_RETENTION_DAYS', value: '30' }
+            { name: 'LOG_SLOW_REQUEST_MS', value: '1000' }
           ]
           resources: {
             cpu: json(cpuCores)
@@ -124,9 +144,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           }
           probes: [
             {
+              // Allow up to (10 + 5*30) = 160s for prisma migrate deploy + boot
               type: 'Startup'
               httpGet: {
-                path: '/index.html'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -139,7 +160,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Liveness'
               httpGet: {
-                path: '/index.html'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -150,7 +171,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Readiness'
               httpGet: {
-                path: '/index.html'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -163,10 +184,9 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           volumeMounts: []
         }
       ]
-      // SQLite compromise (CRITICAL): maxReplicas must stay at 1 while using SQLite.
-      // Multiple replicas each get their own isolated .db file → split brain.
-      // PostgreSQL migration: set maxReplicas to 3+ for HA and auto-scaling.
-      // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.3.1
+      // Phase 3 (PostgreSQL): maxReplicas can be increased for HA once DATABASE_URL points to
+      // a shared PostgreSQL instance (e.g. Azure Database for PostgreSQL Flexible Server).
+      // With a single-instance external PG (or managed PG) multiple replicas are safe.
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas

@@ -1,0 +1,41 @@
+# SCIMServer code ownership.
+#
+# Each line is a path pattern followed by one or more GitHub usernames or team
+# names. The LAST matching pattern wins. GitHub auto-requests review from the
+# owners on every PR that touches a matching path. Combined with branch
+# protection on master, ownership becomes a soft enforcement of the standing
+# rule: every change goes through a designated reviewer.
+#
+# Closes OPS-4 (DELIVERY_PLAN.md Week 1 Day 5).
+#
+# When adding a contributor, add them as a NEW owner alongside @pranems on the
+# specific paths they own; do not silently replace.
+
+# Default owner for everything in the repo (catches new top-level files).
+*                                @pranems
+
+# Production code
+/api/                            @pranems
+
+# Web client
+/web/                            @pranems
+
+# Infrastructure (Bicep, deploy scripts, container manifests)
+/infra/                          @pranems
+/scripts/                        @pranems
+/Dockerfile                      @pranems
+/Dockerfile.optimized            @pranems
+/Dockerfile.ultra                @pranems
+/docker-compose.yml              @pranems
+/docker-compose.debug.yml        @pranems
+
+# CI / governance / GitHub config
+/.github/                        @pranems
+
+# Living documentation
+/docs/                           @pranems
+/Session_starter.md              @pranems
+/CHANGELOG.md                    @pranems
+/README.md                       @pranems
+/DEPLOYMENT.md                   @pranems
+/admin.md                        @pranems

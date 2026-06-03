@@ -1,5 +1,5 @@
 {
-  "description": "GET /scim/admin/log-config — response showing runtime log configuration",
+  "description": "GET /scim/admin/log-config - response showing runtime log configuration",
   "globalLevel": "DEBUG",
   "categoryLevels": {
     "scim.patch": "TRACE",
@@ -31,8 +31,10 @@
     "scim.discovery",
     "endpoint",
     "database",
-    "backup",
     "oauth",
+    "scim.bulk",
+    "scim.resource",
+    "config",
     "general"
   ]
 }

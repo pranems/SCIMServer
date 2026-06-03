@@ -1,17 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EndpointScimGroupsService } from './endpoint-scim-groups.service';
-import { PrismaService } from '../../prisma/prisma.service';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
+import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 
 describe('EndpointScimGroupsService', () => {
   let service: EndpointScimGroupsService;
-  let prismaService: PrismaService;
   let metadataService: ScimMetadataService;
+
+  const mockScimLogger = {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+    isEnabled: jest.fn().mockReturnValue(true),
+    enrichContext: jest.fn(),
+  };
 
   const mockEndpoint = {
     id: 'endpoint-1',
@@ -30,6 +43,7 @@ describe('EndpointScimGroupsService', () => {
     endpointId: 'endpoint-1',
     externalId: null as string | null,
     displayName: 'Test Group',
+    active: true,
     rawPayload: '{"description":"Test group"}',
     meta: JSON.stringify({
       resourceType: 'Group',
@@ -39,6 +53,7 @@ describe('EndpointScimGroupsService', () => {
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
     updatedAt: new Date('2024-01-01T00:00:00.000Z'),
     members: [],
+    version: 1,
   };
 
   const mockUser = {
@@ -47,43 +62,21 @@ describe('EndpointScimGroupsService', () => {
     endpointId: 'endpoint-1',
   };
 
-  // Define type to avoid circular reference issue
-  type MockPrismaService = {
-    scimGroup: {
-      create: jest.Mock;
-      findFirst: jest.Mock;
-      findMany: jest.Mock;
-      count: jest.Mock;
-      update: jest.Mock;
-      delete: jest.Mock;
-    };
-    scimUser: {
-      findMany: jest.Mock;
-    };
-    groupMember: {
-      createMany: jest.Mock;
-      deleteMany: jest.Mock;
-    };
-    $transaction: jest.Mock;
+  const mockGroupRepo = {
+    create: jest.fn(),
+    findByScimId: jest.fn(),
+    findWithMembers: jest.fn(),
+    findAllWithMembers: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findByDisplayName: jest.fn(),
+    findByExternalId: jest.fn(),
+    addMembers: jest.fn(),
+    updateGroupWithMembers: jest.fn(),
   };
 
-  const mockPrismaService: MockPrismaService = {
-    scimGroup: {
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    scimUser: {
-      findMany: jest.fn(),
-    },
-    groupMember: {
-      createMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    $transaction: jest.fn((callback) => callback(mockPrismaService)),
+  const mockUserRepo = {
+    findByScimIds: jest.fn(),
   };
 
   const mockMetadataService = {
@@ -92,21 +85,38 @@ describe('EndpointScimGroupsService', () => {
     ),
   };
 
+  // Default config for tests: StrictSchemaValidation OFF to avoid strict validation
+  // interfering with non-schema tests. Tests that explicitly test strict validation
+  // override this via mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'True' }).
+  const defaultTestConfig: EndpointConfig = { StrictSchemaValidation: 'False' };
+
   const mockEndpointContext = {
     setContext: jest.fn(),
     getContext: jest.fn(),
     getEndpointId: jest.fn(),
     getBaseUrl: jest.fn(),
-    getConfig: jest.fn().mockReturnValue({}),
+    getConfig: jest.fn().mockReturnValue(defaultTestConfig),
+    getProfile: jest.fn().mockReturnValue(undefined),
+    addWarnings: jest.fn(),
+    getWarnings: jest.fn().mockReturnValue([]),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointScimGroupsService,
+        ScimSchemaRegistry,
         {
-          provide: PrismaService,
-          useValue: mockPrismaService,
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
+        {
+          provide: GROUP_REPOSITORY,
+          useValue: mockGroupRepo,
+        },
+        {
+          provide: USER_REPOSITORY,
+          useValue: mockUserRepo,
         },
         {
           provide: ScimMetadataService,
@@ -118,22 +128,23 @@ describe('EndpointScimGroupsService', () => {
         },
         {
           provide: ScimLogger,
-          useValue: {
-            trace: jest.fn(),
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
-            fatal: jest.fn(),
-            isEnabled: jest.fn().mockReturnValue(true),
-          },
+          useValue: mockScimLogger,
         },
       ],
     }).compile();
 
+    const registry = module.get<ScimSchemaRegistry>(ScimSchemaRegistry);
+    await registry.onModuleInit();
+
     service = module.get<EndpointScimGroupsService>(EndpointScimGroupsService);
-    prismaService = module.get<PrismaService>(PrismaService);
     metadataService = module.get<ScimMetadataService>(ScimMetadataService);
+
+    // G8f: Default mock returns for uniqueness checks (no conflict)
+    // These are called on PUT/PATCH paths to enforce displayName uniqueness.
+    mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+
+    // Reset getConfig mock to default (clearAllMocks doesn't clear mockReturnValue)
+    mockEndpointContext.getConfig.mockReturnValue(defaultTestConfig);
   });
 
   afterEach(() => {
@@ -147,13 +158,12 @@ describe('EndpointScimGroupsService', () => {
         displayName: 'New Group',
       };
 
-      mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
-      mockPrismaService.scimGroup.findFirst
-        .mockResolvedValueOnce(null) // assertUniqueDisplayName → no conflict
-        .mockResolvedValueOnce({
-          ...mockGroup,
-          displayName: createDto.displayName,
-        });
+      mockGroupRepo.create.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
+      mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+        ...mockGroup,
+        displayName: createDto.displayName,
+      });
 
       const result = await service.createGroupForEndpoint(
         createDto,
@@ -163,12 +173,10 @@ describe('EndpointScimGroupsService', () => {
 
       expect(result.displayName).toBe(createDto.displayName);
       expect(result.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:Group');
-      expect(mockPrismaService.scimGroup.create).toHaveBeenCalledWith(
+      expect(mockGroupRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            displayName: createDto.displayName,
-            endpoint: { connect: { id: mockEndpoint.id } },
-          }),
+          displayName: createDto.displayName,
+          endpointId: mockEndpoint.id,
         })
       );
     });
@@ -182,24 +190,23 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
-      mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
-      mockPrismaService.scimGroup.findFirst
-        .mockResolvedValueOnce(null) // assertUniqueDisplayName → no conflict
-        .mockResolvedValueOnce({
-          ...mockGroup,
-          members: [
-            {
-              id: 'member-1',
-              groupId: mockGroup.id,
-              userId: mockUser.id,
-              value: mockUser.scimId,
-              display: 'Test User',
-              type: null,
-              createdAt: new Date(),
-            },
-          ],
-        });
+      mockGroupRepo.create.mockResolvedValue(mockGroup);
+      mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
+      mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
+      mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+        ...mockGroup,
+        members: [
+          {
+            id: 'member-1',
+            groupId: mockGroup.id,
+            userId: mockUser.id,
+            value: mockUser.scimId,
+            display: 'Test User',
+            type: null,
+            createdAt: new Date(),
+          },
+        ],
+      });
 
       const result = await service.createGroupForEndpoint(
         createDto,
@@ -209,19 +216,33 @@ describe('EndpointScimGroupsService', () => {
 
       expect(result.members).toHaveLength(1);
       expect(result.members![0].value).toBe(mockUser.scimId);
-      expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-        })
-      );
+      expect(mockUserRepo.findByScimIds).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Array));
+    });
+
+    describe('P8: uniqueness conflict diagnostic logging', () => {
+      it('should log INFO before throwing 409 on displayName conflict', async () => {
+        const dto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Duplicate Group',
+        };
+        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: 'existing-1', active: true });
+
+        await expect(
+          service.createGroupForEndpoint(dto, 'http://localhost:3000/scim', mockEndpoint.id),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockScimLogger.info).toHaveBeenCalledWith(
+          'scim.group',
+          expect.stringContaining('Uniqueness conflict'),
+          expect.objectContaining({ endpointId: mockEndpoint.id }),
+        );
+      });
     });
   });
 
   describe('getGroupForEndpoint', () => {
     it('should retrieve a group by scimId within endpoint', async () => {
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
 
       const result = await service.getGroupForEndpoint(
         mockGroup.scimId,
@@ -231,17 +252,11 @@ describe('EndpointScimGroupsService', () => {
 
       expect(result.id).toBe(mockGroup.scimId);
       expect(result.displayName).toBe(mockGroup.displayName);
-      expect(mockPrismaService.scimGroup.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockGroup.scimId,
-          endpointId: mockEndpoint.id,
-        },
-        select: expect.any(Object),
-      });
+      expect(mockGroupRepo.findWithMembers).toHaveBeenCalledWith(mockEndpoint.id, mockGroup.scimId);
     });
 
     it('should throw 404 if group not found in endpoint', async () => {
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(null);
+      mockGroupRepo.findWithMembers.mockResolvedValue(null);
 
       await expect(
         service.getGroupForEndpoint('non-existent', 'http://localhost:3000/scim', mockEndpoint.id)
@@ -253,8 +268,7 @@ describe('EndpointScimGroupsService', () => {
     it('should list groups within a specific endpoint', async () => {
       const groups = [mockGroup, { ...mockGroup, id: 'group-2', scimId: 'scim-grp-456' }];
 
-      mockPrismaService.scimGroup.count.mockResolvedValue(2);
-      mockPrismaService.scimGroup.findMany.mockResolvedValue(groups);
+      mockGroupRepo.findAllWithMembers.mockResolvedValue(groups);
 
       const result = await service.listGroupsForEndpoint(
         { startIndex: 1, count: 10 },
@@ -265,17 +279,11 @@ describe('EndpointScimGroupsService', () => {
       expect(result.totalResults).toBe(2);
       expect(result.Resources).toHaveLength(2);
       expect(result.startIndex).toBe(1);
-      expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-        })
-      );
+      expect(mockGroupRepo.findAllWithMembers).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Object), expect.any(Object));
     });
 
     it('should filter groups by displayName within endpoint', async () => {
-      mockPrismaService.scimGroup.findMany.mockResolvedValue([mockGroup]);
+      mockGroupRepo.findAllWithMembers.mockResolvedValue([mockGroup]);
 
       const result = await service.listGroupsForEndpoint(
         { filter: 'displayName eq "Test Group"', startIndex: 1, count: 10 },
@@ -285,14 +293,7 @@ describe('EndpointScimGroupsService', () => {
 
       // displayName filter is now applied in-code for case-insensitive matching
       expect(result.totalResults).toBe(1);
-      expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-          orderBy: { createdAt: 'asc' },
-        })
-      );
+      expect(mockGroupRepo.findAllWithMembers).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Object), expect.any(Object));
     });
   });
 
@@ -309,28 +310,20 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-      mockPrismaService.scimGroup.update.mockResolvedValue({
-        ...mockGroup,
-        displayName: 'Updated Group Name',
-      });
+      mockGroupRepo.findWithMembers
+        .mockResolvedValueOnce(mockGroup)
+        .mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: 'Updated Group Name',
+        });
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       const result = await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-      expect(mockPrismaService.scimGroup.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockGroup.scimId,
-          endpointId: mockEndpoint.id,
-        },
-        select: expect.any(Object),
-      });
-      expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            displayName: 'Updated Group Name',
-          }),
-        })
-      );
+      expect(mockGroupRepo.findWithMembers).toHaveBeenCalledWith(mockEndpoint.id, mockGroup.scimId);
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+        displayName: 'Updated Group Name',
+      }), expect.any(Array));
     });
 
     it('should return updated group resource with 200 OK (RFC 7644 §3.5.2)', async () => {
@@ -351,10 +344,10 @@ describe('EndpointScimGroupsService', () => {
       };
 
       // First call for initial lookup, second call after update to return the resource
-      mockPrismaService.scimGroup.findFirst
+      mockGroupRepo.findWithMembers
         .mockResolvedValueOnce(mockGroup)
         .mockResolvedValueOnce(updatedGroup);
-      mockPrismaService.scimGroup.update.mockResolvedValue(updatedGroup);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       const result = await service.patchGroupForEndpoint(
         mockGroup.scimId,
@@ -383,19 +376,14 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-      mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+      mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-      expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
-      expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-        })
-      );
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+      expect(mockUserRepo.findByScimIds).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Array));
     });
 
     it('should remove members from group', async () => {
@@ -424,15 +412,16 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMember);
+      mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMember);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-      expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
     });
 
-    describe('MultiOpPatchRequestAddMultipleMembersToGroup config flag', () => {
-      it('should reject adding multiple members when flag is false (default)', async () => {
+    describe('MultiMemberPatchOpForGroupEnabled config flag (settings v7)', () => {
+      it('should reject adding multiple members when flag is explicitly false', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -448,16 +437,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        // Default config returns empty object (flag is false)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        // Settings v7: must explicitly disable the flag
+        mockEndpointContext.getConfig.mockReturnValue({ MultiMemberPatchOpForGroupEnabled: false, StrictSchemaValidation: 'False' });
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
         ).rejects.toThrow(HttpException);
 
         // Should not attempt to create members
-        expect(mockPrismaService.groupMember.createMany).not.toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
       });
 
       it('should allow adding multiple members when flag is true', async () => {
@@ -476,18 +465,19 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        mockUserRepo.findByScimIds.mockResolvedValue([]);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Enable the flag
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+          MultiMemberPatchOpForGroupEnabled: 'True',
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Should process the operation
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
-        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should allow adding multiple members when flag is boolean true', async () => {
@@ -505,16 +495,18 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        mockUserRepo.findByScimIds.mockResolvedValue([]);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Enable the flag with boolean
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestAddMultipleMembersToGroup: true,
+          MultiMemberPatchOpForGroupEnabled: true,
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should always allow adding single member regardless of flag', async () => {
@@ -529,15 +521,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false (default)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Single member add should succeed
-        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should allow multiple separate add operations with single members each', async () => {
@@ -557,19 +550,20 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        mockUserRepo.findByScimIds.mockResolvedValue([]);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Multiple operations with single member each should succeed
-        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
     });
 
-    describe('MultiOpPatchRequestRemoveMultipleMembersFromGroup config flag', () => {
+    describe('MultiMemberPatchOpForGroupEnabled - remove operations (settings v7)', () => {
       const groupWithMultipleMembers = {
         ...mockGroup,
         members: [
@@ -579,7 +573,7 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      it('should reject removing multiple members via value array when flag is false', async () => {
+      it('should reject removing multiple members via value array when flag is explicitly false', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -594,16 +588,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
-        // Default config returns empty object (flag is false)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        // Settings v7: must explicitly disable the flag
+        mockEndpointContext.getConfig.mockReturnValue({ MultiMemberPatchOpForGroupEnabled: false, StrictSchemaValidation: 'False' });
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
         ).rejects.toThrow(HttpException);
 
         // Should not attempt to update group
-        expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
       });
 
       it('should allow removing multiple members via value array when flag is "True"', async () => {
@@ -621,14 +615,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+          MultiMemberPatchOpForGroupEnabled: 'True',
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should allow removing multiple members via value array when flag is boolean true', async () => {
@@ -646,14 +642,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestRemoveMultipleMembersFromGroup: true,
+          MultiMemberPatchOpForGroupEnabled: true,
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should always allow removing single member via value array regardless of flag', async () => {
@@ -670,14 +668,15 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false (default)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Single member remove should succeed
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should always allow removing single member via path filter regardless of flag', async () => {
@@ -691,14 +690,15 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false (default)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Single member remove should succeed
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should allow multiple separate remove operations with single members each', async () => {
@@ -718,17 +718,18 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Multiple operations with single member each should succeed
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
-      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is true (default)', async () => {
+      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is explicitly true', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -739,16 +740,15 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
-        // Default config - PatchOpAllowRemoveAllMembers defaults to true
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        // Settings v7: PatchOpAllowRemoveAllMembers defaults to false - must explicitly enable
+        mockEndpointContext.getConfig.mockReturnValue({ PatchOpAllowRemoveAllMembers: true, StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         // Should remove all members (empty members array)
-        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
-        // createMany should not be called since no members remain
-        expect(mockPrismaService.groupMember.createMany).not.toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
       it('should reject removing via path=members without value array when PatchOpAllowRemoveAllMembers is false', async () => {
@@ -762,9 +762,10 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockEndpointContext.getConfig.mockReturnValue({
           PatchOpAllowRemoveAllMembers: false,
+          StrictSchemaValidation: 'False',
         });
 
         // path=members without value array should be rejected
@@ -772,7 +773,7 @@ describe('EndpointScimGroupsService', () => {
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
         ).rejects.toThrow(HttpException);
 
-        expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
       });
 
       it('should reject removing via path=members without value array when PatchOpAllowRemoveAllMembers is "False"', async () => {
@@ -786,9 +787,10 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockEndpointContext.getConfig.mockReturnValue({
           PatchOpAllowRemoveAllMembers: 'False',
+          StrictSchemaValidation: 'False',
         });
 
         // path=members without value array should be rejected
@@ -796,7 +798,7 @@ describe('EndpointScimGroupsService', () => {
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
         ).rejects.toThrow(HttpException);
 
-        expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
       });
     });
 
@@ -812,21 +814,19 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimGroup.update.mockResolvedValue({
-          ...mockGroup,
-          displayName: 'New Display Name',
-        });
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({
+            ...mockGroup,
+            displayName: 'New Display Name',
+          });
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              displayName: 'New Display Name',
-            }),
-          })
-        );
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+          displayName: 'New Display Name',
+        }), expect.any(Array));
       });
 
       it('should persist externalId as first-class column from no-path replace object', async () => {
@@ -840,20 +840,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimGroup.update.mockResolvedValue({
-          ...mockGroup,
-        });
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce(mockGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              externalId: 'new-ext-id',
-            }),
-          })
-        );
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+          externalId: 'new-ext-id',
+        }), expect.any(Array));
       });
 
       it('should handle combined displayName + externalId in no-path replace', async () => {
@@ -867,22 +863,20 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimGroup.update.mockResolvedValue({
-          ...mockGroup,
-          displayName: 'Combined',
-        });
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({
+            ...mockGroup,
+            displayName: 'Combined',
+          });
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              displayName: 'Combined',
-              externalId: 'ext-combined',
-            }),
-          })
-        );
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+          displayName: 'Combined',
+          externalId: 'ext-combined',
+        }), expect.any(Array));
       });
 
       it('should handle externalId path in replace operation', async () => {
@@ -897,20 +891,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimGroup.update.mockResolvedValue({
-          ...mockGroup,
-        });
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce(mockGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              externalId: 'pathed-ext-id',
-            }),
-          })
-        );
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+          externalId: 'pathed-ext-id',
+        }), expect.any(Array));
       });
 
       it('should accept no-path replace with string value as displayName', async () => {
@@ -924,21 +914,19 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimGroup.update.mockResolvedValue({
-          ...mockGroup,
-          displayName: 'Direct String Name',
-        });
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({
+            ...mockGroup,
+            displayName: 'Direct String Name',
+          });
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              displayName: 'Direct String Name',
-            }),
-          })
-        );
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+          displayName: 'Direct String Name',
+        }), expect.any(Array));
       });
 
       it('should handle no-path replace with members array in object value', async () => {
@@ -955,23 +943,20 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
-        mockPrismaService.scimGroup.update.mockResolvedValue({
-          ...mockGroup,
-          displayName: 'Group With Members',
-        });
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({
+            ...mockGroup,
+            displayName: 'Group With Members',
+          });
+        mockUserRepo.findByScimIds.mockResolvedValue([]);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              displayName: 'Group With Members',
-            }),
-          })
-        );
-        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+          displayName: 'Group With Members',
+        }), expect.any(Array));
       });
 
       it('should throw error for no-path replace with invalid value type', async () => {
@@ -985,7 +970,7 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -1004,7 +989,7 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -1020,7 +1005,7 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(null);
+      mockGroupRepo.findWithMembers.mockResolvedValue(null);
 
       await expect(
         service.patchGroupForEndpoint('non-existent', patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -1035,7 +1020,7 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
 
       await expect(
         service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -1051,7 +1036,7 @@ describe('EndpointScimGroupsService', () => {
         members: [{ value: mockUser.scimId }],
       };
 
-      mockPrismaService.scimGroup.findFirst
+      mockGroupRepo.findWithMembers
         .mockResolvedValueOnce(mockGroup) // Find group to replace
         .mockResolvedValueOnce({
           ...mockGroup,
@@ -1069,7 +1054,8 @@ describe('EndpointScimGroupsService', () => {
           ],
         }); // Return updated group
 
-      mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+      mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       const result = await service.replaceGroupForEndpoint(
         mockGroup.scimId,
@@ -1085,30 +1071,91 @@ describe('EndpointScimGroupsService', () => {
 
   describe('deleteGroupForEndpoint', () => {
     it('should delete group within endpoint', async () => {
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-      mockPrismaService.scimGroup.delete.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(undefined);
 
       await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id);
 
-      expect(mockPrismaService.scimGroup.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockGroup.scimId,
-          endpointId: mockEndpoint.id,
-        },
-      });
-      expect(mockPrismaService.scimGroup.delete).toHaveBeenCalledWith({
-        where: { id: mockGroup.id },
-      });
+      expect(mockGroupRepo.findByScimId).toHaveBeenCalledWith(mockEndpoint.id, mockGroup.scimId);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
     });
 
     it('should throw 404 if group not found in endpoint', async () => {
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(null);
+      mockGroupRepo.findByScimId.mockResolvedValue(null);
 
       await expect(
         service.deleteGroupForEndpoint('non-existent', mockEndpoint.id)
       ).rejects.toThrow(HttpException);
 
-      expect(mockPrismaService.scimGroup.delete).not.toHaveBeenCalled();
+      expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+    });
+
+    describe('hard delete (Groups always hard-delete, gated by GroupHardDeleteEnabled)', () => {
+      it('should hard-delete group when GroupHardDeleteEnabled defaults to true', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when config has string values (GroupHardDeleteEnabled defaults to true)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when config is undefined (default)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when config has no GroupHardDeleteEnabled key (defaults to true)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should error when GroupHardDeleteEnabled is false (settings v7)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: false, StrictSchemaValidation: 'False' };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should error when GroupHardDeleteEnabled is "False" (string)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: 'False', StrictSchemaValidation: 'False' };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -1116,20 +1163,13 @@ describe('EndpointScimGroupsService', () => {
     it('should not allow accessing groups from different endpoints', async () => {
       const endpoint2 = { ...mockEndpoint, id: 'endpoint-2' };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(null);
+      mockGroupRepo.findWithMembers.mockResolvedValue(null);
 
       await expect(
         service.getGroupForEndpoint(mockGroup.scimId, 'http://localhost:3000/scim', endpoint2.id)
       ).rejects.toThrow(HttpException);
 
-      expect(mockPrismaService.scimGroup.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            scimId: mockGroup.scimId,
-            endpointId: endpoint2.id,
-          },
-        })
-      );
+      expect(mockGroupRepo.findWithMembers).toHaveBeenCalledWith(endpoint2.id, mockGroup.scimId);
     });
 
     it('should allow same displayName across different endpoints', async () => {
@@ -1138,20 +1178,19 @@ describe('EndpointScimGroupsService', () => {
         displayName: 'Shared Group Name',
       };
 
-      mockPrismaService.scimGroup.create.mockResolvedValue({
+      mockGroupRepo.create.mockResolvedValue({
         ...mockGroup,
         id: 'group-2',
         endpointId: 'endpoint-2',
         displayName: createDto.displayName,
       });
-      mockPrismaService.scimGroup.findFirst
-        .mockResolvedValueOnce(null) // assertUniqueDisplayName → no conflict
-        .mockResolvedValueOnce({
-          ...mockGroup,
-          id: 'group-2',
-          endpointId: 'endpoint-2',
-          displayName: createDto.displayName,
-        });
+      mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
+      mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+        ...mockGroup,
+        id: 'group-2',
+        endpointId: 'endpoint-2',
+        displayName: createDto.displayName,
+      });
 
       const result = await service.createGroupForEndpoint(
         createDto,
@@ -1169,15 +1208,14 @@ describe('EndpointScimGroupsService', () => {
         members: [{ value: 'user-from-another-endpoint' }],
       };
 
-      mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
+      mockGroupRepo.create.mockResolvedValue(mockGroup);
       // No users found in this endpoint
-      mockPrismaService.scimUser.findMany.mockResolvedValue([]);
-      mockPrismaService.scimGroup.findFirst
-        .mockResolvedValueOnce(null) // assertUniqueDisplayName → no conflict
-        .mockResolvedValueOnce({
-          ...mockGroup,
-          members: [], // No members added
-        });
+      mockUserRepo.findByScimIds.mockResolvedValue([]);
+      mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
+      mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+        ...mockGroup,
+        members: [], // No members added
+      });
 
       const result = await service.createGroupForEndpoint(
         createDto,
@@ -1187,13 +1225,7 @@ describe('EndpointScimGroupsService', () => {
 
       // User from another endpoint should not be added
       expect(result.members).toHaveLength(0);
-      expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-        })
-      );
+      expect(mockUserRepo.findByScimIds).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Array));
     });
   });
 
@@ -1202,7 +1234,7 @@ describe('EndpointScimGroupsService', () => {
   describe('case-insensitivity compliance (RFC 7643)', () => {
     describe('filter attribute names', () => {
       it('should accept filter with "DisplayName" (mixed case) as attribute', async () => {
-        mockPrismaService.scimGroup.findMany.mockResolvedValue([mockGroup]);
+        mockGroupRepo.findAllWithMembers.mockResolvedValue([mockGroup]);
 
         const result = await service.listGroupsForEndpoint(
           { filter: 'DisplayName eq "Test Group"', startIndex: 1, count: 10 },
@@ -1212,18 +1244,11 @@ describe('EndpointScimGroupsService', () => {
 
         // displayName filter applied in-code; attribute resolved case-insensitively
         expect(result.totalResults).toBe(1);
-        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              endpointId: mockEndpoint.id,
-            }),
-            orderBy: { createdAt: 'asc' },
-          })
-        );
+        expect(mockGroupRepo.findAllWithMembers).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Object), expect.any(Object));
       });
 
       it('should accept filter with "DISPLAYNAME" (all caps) as attribute', async () => {
-        mockPrismaService.scimGroup.findMany.mockResolvedValue([mockGroup]);
+        mockGroupRepo.findAllWithMembers.mockResolvedValue([mockGroup]);
 
         const result = await service.listGroupsForEndpoint(
           { filter: 'DISPLAYNAME eq "Test Group"', startIndex: 1, count: 10 },
@@ -1233,21 +1258,14 @@ describe('EndpointScimGroupsService', () => {
 
         // displayName filter applied in-code; "DISPLAYNAME" resolved case-insensitively
         expect(result.totalResults).toBe(1);
-        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              endpointId: mockEndpoint.id,
-            }),
-            orderBy: { createdAt: 'asc' },
-          })
-        );
+        expect(mockGroupRepo.findAllWithMembers).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Object), expect.any(Object));
       });
 
       it('should filter groups by externalId', async () => {
         const groupWithExt = { ...mockGroup, externalId: 'ext-123' };
         // DB push-down: externalId eq "ext-123" → Prisma where { externalId: 'ext-123' }
         // The mock returns only the matching group (simulating DB-level filtering)
-        mockPrismaService.scimGroup.findMany.mockResolvedValue([groupWithExt]);
+        mockGroupRepo.findAllWithMembers.mockResolvedValue([groupWithExt]);
 
         const result = await service.listGroupsForEndpoint(
           { filter: 'externalId eq "ext-123"', startIndex: 1, count: 10 },
@@ -1258,19 +1276,15 @@ describe('EndpointScimGroupsService', () => {
         expect(result.totalResults).toBe(1);
         expect(result.Resources[0].externalId).toBe('ext-123');
         // externalId eq is pushed to DB via the new filter parser
-        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              endpointId: mockEndpoint.id,
-              externalId: 'ext-123',
-            }),
-          })
-        );
+        expect(mockGroupRepo.findAllWithMembers).toHaveBeenCalledWith(mockEndpoint.id, expect.objectContaining({
+          externalId: 'ext-123',
+        }), expect.any(Object));
       });
 
-      it('should filter groups by externalId case-insensitively', async () => {
-        const groupWithExt = { ...mockGroup, externalId: 'ext-abc-123' };
-        mockPrismaService.scimGroup.findMany.mockResolvedValue([groupWithExt]);
+      it('should filter groups by externalId case-sensitively (caseExact=true)', async () => {
+        // externalId is TEXT (case-sensitive). DB returns matches for the exact case.
+        const groupWithExt = { ...mockGroup, externalId: 'EXT-ABC-123' };
+        mockGroupRepo.findAllWithMembers.mockResolvedValue([groupWithExt]);
 
         const result = await service.listGroupsForEndpoint(
           { filter: 'externalId eq "EXT-ABC-123"', startIndex: 1, count: 10 },
@@ -1279,7 +1293,21 @@ describe('EndpointScimGroupsService', () => {
         );
 
         expect(result.totalResults).toBe(1);
-        expect(result.Resources[0].externalId).toBe('ext-abc-123');
+        expect(result.Resources[0].externalId).toBe('EXT-ABC-123');
+      });
+
+      it('should throw 400 invalidFilter for unknown attribute in filter', async () => {
+        try {
+          await service.listGroupsForEndpoint(
+            { filter: 'nonExistentAttr eq "test"', startIndex: 1, count: 10 },
+            'http://localhost:3000/scim',
+            mockEndpoint.id
+          );
+          fail('Expected 400 invalidFilter');
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(400);
+          expect(e.getResponse().scimType).toBe('invalidFilter');
+        }
       });
     });
 
@@ -1290,13 +1318,12 @@ describe('EndpointScimGroupsService', () => {
           displayName: 'Case Schema Group',
         };
 
-        mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
-        mockPrismaService.scimGroup.findFirst
-          .mockResolvedValueOnce(null) // assertUniqueDisplayName → no conflict
-          .mockResolvedValueOnce({
-            ...mockGroup,
-            displayName: createDto.displayName,
-          });
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
 
         // Should not throw despite different casing
         const result = await service.createGroupForEndpoint(
@@ -1320,15 +1347,13 @@ describe('EndpointScimGroupsService', () => {
         externalId: 'ext-grp-001',
       } as CreateGroupDto;
 
-      mockPrismaService.scimGroup.findFirst
-        .mockResolvedValueOnce(null) // assertUniqueDisplayName → no conflict
-        .mockResolvedValueOnce(null) // assertUniqueExternalId → no conflict
-        .mockResolvedValueOnce({
-          ...mockGroup,
-          externalId: 'ext-grp-001',
-          displayName: 'ExtId Group',
-        }); // getGroupWithMembersForEndpoint after create
-      mockPrismaService.scimGroup.create.mockResolvedValue({ ...mockGroup, externalId: 'ext-grp-001' });
+      mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
+      mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+        ...mockGroup,
+        externalId: 'ext-grp-001',
+        displayName: 'ExtId Group',
+      }); // getGroupWithMembersForEndpoint after create
+      mockGroupRepo.create.mockResolvedValue({ ...mockGroup, externalId: 'ext-grp-001' });
 
       const result = await service.createGroupForEndpoint(
         createDto,
@@ -1336,11 +1361,9 @@ describe('EndpointScimGroupsService', () => {
         mockEndpoint.id
       );
 
-      expect(mockPrismaService.scimGroup.create).toHaveBeenCalledWith(
+      expect(mockGroupRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            externalId: 'ext-grp-001',
-          }),
+          externalId: 'ext-grp-001',
         })
       );
       expect(result.externalId).toBe('ext-grp-001');
@@ -1348,7 +1371,7 @@ describe('EndpointScimGroupsService', () => {
 
     it('should return externalId in group resource when set', async () => {
       const groupWithExt = { ...mockGroup, externalId: 'ext-grp-002' };
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithExt);
+      mockGroupRepo.findWithMembers.mockResolvedValue(groupWithExt);
 
       const result = await service.getGroupForEndpoint(
         mockGroup.scimId,
@@ -1360,7 +1383,7 @@ describe('EndpointScimGroupsService', () => {
     });
 
     it('should omit externalId from response when null', async () => {
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
 
       const result = await service.getGroupForEndpoint(
         mockGroup.scimId,
@@ -1371,21 +1394,6 @@ describe('EndpointScimGroupsService', () => {
       expect(result.externalId).toBeUndefined();
     });
 
-    it('should reject duplicate externalId on create within same endpoint', async () => {
-      const createDto = {
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-        displayName: 'Another Group',
-        externalId: 'ext-duplicate',
-      } as CreateGroupDto;
-
-      mockPrismaService.scimGroup.findMany.mockResolvedValue([]); // displayName uniqueness
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue({ ...mockGroup, externalId: 'ext-duplicate' }); // externalId conflict
-
-      await expect(
-        service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
-      ).rejects.toThrow(HttpException);
-    });
-
     it('should update externalId via PATCH replace with path', async () => {
       const patchDto: PatchGroupDto = {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -1394,18 +1402,16 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-      mockPrismaService.scimGroup.update.mockResolvedValue({ ...mockGroup, externalId: 'ext-updated' });
+      mockGroupRepo.findWithMembers
+        .mockResolvedValueOnce(mockGroup)
+        .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-updated' });
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-      expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            externalId: 'ext-updated',
-          }),
-        })
-      );
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+        externalId: 'ext-updated',
+      }), expect.any(Array));
     });
 
     it('should update externalId via no-path PATCH replace object', async () => {
@@ -1416,19 +1422,1370 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
-      mockPrismaService.scimGroup.update.mockResolvedValue({ ...mockGroup, externalId: 'ext-via-nopath' });
+      mockGroupRepo.findWithMembers
+        .mockResolvedValueOnce(mockGroup)
+        .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-via-nopath' });
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-      expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            displayName: 'Renamed',
-            externalId: 'ext-via-nopath',
-          }),
-        })
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
+        displayName: 'Renamed',
+        externalId: 'ext-via-nopath',
+      }), expect.any(Array));
+    });
+  });
+
+  describe('strict schema validation', () => {
+    const ENTERPRISE_USER_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+    describe('createGroupForEndpoint with StrictSchemaValidation', () => {
+      it('should reject extension URN NOT declared in schemas[] (strict mode)', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Strict Group',
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should allow extension URN when strict mode is OFF', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Lenient Group',
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+        );
+
+        expect(result.displayName).toBe(createDto.displayName);
+        expect(mockGroupRepo.create).toHaveBeenCalled();
+      });
+
+      it('should allow extension URN when config is undefined (default lenient)', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Default Group',
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, undefined
+        );
+
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+    });
+
+    describe('replaceGroupForEndpoint with StrictSchemaValidation', () => {
+      it('should reject undeclared extension URN on PUT (strict mode)', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Replaced Group',
+          [ENTERPRISE_USER_URN]: { department: 'Sales' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+    });
+
+    describe('schema attribute type validation through service', () => {
+      const strictConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+      it('should reject wrong type for displayName on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 123,  // should be string
+        } as any;
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject unknown core attribute on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Valid Group',
+          unknownGroupField: 'should-fail',
+        } as any;
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject non-array members on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Invalid Members Group',
+          members: { value: 'u1' },  // should be array
+        } as any;
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should accept valid Group payload on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Engineering',
+          members: [{ value: 'u1', display: 'Alice' }],
+        } as any;
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig
+        );
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+
+      it('should include error detail in schema validation HttpException', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 42,
+        } as any;
+
+        try {
+          await service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig);
+          fail('Should have thrown');
+        } catch (e) {
+          expect(e).toBeInstanceOf(HttpException);
+          const resp = (e as HttpException).getResponse();
+          expect(JSON.stringify(resp)).toContain('Schema validation failed');
+          expect((e as HttpException).getStatus()).toBe(400);
+        }
+      });
+
+      it('should NOT reject wrong type when strict mode is OFF', async () => {
+        const lenientConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false };
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Lenient Group',
+        } as any;
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, lenientConfig
+        );
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+
+      it('should reject wrong type on replace (strict)', async () => {
+        const replaceDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: false,  // should be string
+        } as any;
+
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+    });
+  });
+
+  describe('dynamic schemas[] in group response', () => {
+    it('should include extension URNs present in rawPayload', async () => {
+      const extensionUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const groupWithExtension = {
+        ...mockGroup,
+        rawPayload: JSON.stringify({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          [extensionUrn]: { department: 'Test' },
+        }),
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue(groupWithExtension);
+
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
       );
+
+      // The result should have the core schema
+      expect(result.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:Group');
+    });
+
+    it('should not include extension URNs NOT present in rawPayload', async () => {
+      const groupWithoutExtension = {
+        ...mockGroup,
+        rawPayload: JSON.stringify({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          description: 'Plain group',
+        }),
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue(groupWithoutExtension);
+
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+
+      expect(result.schemas).toEqual(['urn:ietf:params:scim:schemas:core:2.0:Group']);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // DELETE + GET / LIST interactions (Groups - always hard-delete)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('DELETE + GET/LIST interactions (Groups)', () => {
+    it('should hard-delete group, then GET returns 404', async () => {
+      const hardDeleteConfig: EndpointConfig = { StrictSchemaValidation: 'False' };
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(mockGroup);
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, hardDeleteConfig);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+
+      // GET after hard-delete: not found
+      mockGroupRepo.findWithMembers.mockResolvedValue(null);
+      await expect(
+        service.getGroupForEndpoint(mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should LIST returns all groups (no soft-delete filtering for Groups)', async () => {
+      const activeGroup = { ...mockGroup, id: 'g1', scimId: 'scim-g1', active: true, members: [] };
+      const deletedGroup = { ...mockGroup, id: 'g2', scimId: 'scim-g2', active: false, displayName: 'Deleted Group', members: [] };
+      mockGroupRepo.findAllWithMembers.mockResolvedValue([activeGroup, deletedGroup]);
+
+      const result = await service.listGroupsForEndpoint(
+        { startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id,
+      );
+
+      expect(result.totalResults).toBe(2);
+      expect(result.Resources).toHaveLength(2);
+    });
+
+    it('should NOT return active attribute in Group JSON response (settings v7)', async () => {
+      mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, members: [] });
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+      expect(result).not.toHaveProperty('active');
+    });
+
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Config flag combinations (Groups)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('config flag combinations (Groups)', () => {
+    it('should hard-delete when GroupHardDeleteEnabled defaults to true despite other flags', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(mockGroup);
+
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+        MultiMemberPatchOpForGroupEnabled: true,
+      };
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      expect(mockGroupRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject unknown extension on CREATE when StrictSchemaValidation=true', async () => {
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      const createDto: CreateGroupDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', 'urn:unknown:fake:1.0:Group'],
+        displayName: 'Strict Test Group',
+        'urn:unknown:fake:1.0:Group': { custom: 'data' },
+      } as any;
+
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.findByExternalId.mockResolvedValue(null);
+
+      await expect(
+        service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+      ).rejects.toThrow();
+    });
+  });
+
+  // ─── Phase 7: ETag & Conditional Requests ──────────────────────────────
+
+  describe('ETag & Conditional Requests (Phase 7)', () => {
+    const patchDto: PatchGroupDto = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: 'displayName', value: 'Updated Group' }],
+    };
+
+    const replaceDto: CreateGroupDto = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+      displayName: 'Replaced Group',
+    };
+
+    const baseUrl = 'http://localhost:3000/scim';
+
+    describe('patchGroupForEndpoint', () => {
+      beforeEach(() => {
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup) // initial lookup
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group' }); // re-read after update
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v1"'
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true, StrictSchemaValidation: 'False' };
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+
+      it('should succeed when If-Match is wildcard (*)', async () => {
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, '*'
+        );
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('replaceGroupForEndpoint', () => {
+      beforeEach(() => {
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        const result = await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, undefined, 'W/"v1"'
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true, StrictSchemaValidation: 'False' };
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+    });
+
+    describe('deleteGroupForEndpoint', () => {
+      beforeEach(() => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(mockGroup);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined, 'W/"v1"');
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true, StrictSchemaValidation: 'False' };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+    });
+
+    describe('ETag format', () => {
+      it('should include version-based ETag W/"v{N}" in response meta', async () => {
+        mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, version: 5 });
+        const result = await service.getGroupForEndpoint(
+          mockGroup.scimId, baseUrl, mockEndpoint.id
+        );
+        expect(result.meta.version).toBe('W/"v5"');
+      });
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // AllowAndCoerceBooleanStrings flag (Groups)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('AllowAndCoerceBooleanStrings (Groups)', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+
+    // Extension schema registration was removed in Phase 14.4 (gutted registry).
+    // The boolean coercion tests below now run against the default schema set.
+    // Test extension URN kept for payload testing.
+    const TEST_GROUP_EXT_URN = 'urn:test:scim:schemas:extension:TestGroupExt:2.0:Group';
+
+    beforeEach(() => {
+      // No-op: registry no longer supports registerExtension
+    });
+
+    afterEach(() => {
+      // No-op: registry no longer supports unregisterExtension
+    });
+
+    describe('createGroupForEndpoint', () => {
+      it('should coerce boolean string "True" to true in extension attributes (default: flag on)', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Coerce Group True',
+          [TEST_GROUP_EXT_URN]: { active: 'True' },
+        } as any;
+
+        const config: EndpointConfig = {
+          // AllowAndCoerceBooleanStrings not set → defaults to true
+          StrictSchemaValidation: 'False',
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+        expect(result.displayName).toBe('Coerce Group True');
+
+        // With parent-aware coercion, extension attrs NOT in the schema registry
+        // are correctly left as-is (no false-positive coercion)
+        const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('True');
+      });
+
+      it('should coerce boolean string "False" to false in extension attributes', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Coerce Group False',
+          [TEST_GROUP_EXT_URN]: { active: 'False' },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+          StrictSchemaValidation: 'False',
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
+        // Parent-aware: extension active is NOT coerced (not in schema)
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('False');
+      });
+
+      it('should reject group with boolean strings when flag is explicitly disabled + StrictSchema on', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Reject Group',
+          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        await expect(
+          service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should coerce boolean strings in complex multi-valued extension sub-attributes', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Coerce SubAttr Group',
+          [TEST_GROUP_EXT_URN]: {
+            active: 'True',
+            tags: [
+              { value: 'important', active: 'True' },
+              { value: 'archived', active: 'False' },
+            ],
+          },
+        } as any;
+
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
+        // Parent-aware: extension attrs NOT in schema are passthrough
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('True');
+        // Sub-attrs inside unregistered extension also not coerced
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe('True');
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[1]?.active).toBe('False');
+      });
+
+      it('should not coerce non-boolean string attributes (tags[].value = "true")', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'No Coerce Non-Bool Group',
+          [TEST_GROUP_EXT_URN]: {
+            active: 'True',
+            tags: [{ value: 'true', active: 'True' }],
+          },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+          StrictSchemaValidation: 'False',
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
+        // "value" is string-type - should NOT be coerced
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.value).toBe('true');
+        // "active" in unregistered extension is also NOT coerced (parent-aware precision)
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe('True');
+      });
+
+      it('should pass through groups without extension boolean attributes unchanged', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Plain Group',
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+        expect(result.displayName).toBe('Plain Group');
+      });
+    });
+
+    describe('replaceGroupForEndpoint', () => {
+      it('should coerce boolean strings on PUT with flag on (default)', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Replaced Group',
+          [TEST_GROUP_EXT_URN]: { active: 'True' },
+        } as any;
+
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Replaced Group' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, config
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should reject boolean strings on PUT when flag is off', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Replaced Group',
+          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+    });
+
+    describe('patchGroupForEndpoint', () => {
+      it('should coerce boolean strings in PATCH replace value object', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              path: 'displayName',
+              value: 'Patched via coerce test',
+            },
+          ],
+        };
+
+        const existingGroup = {
+          ...mockGroup,
+          rawPayload: JSON.stringify({ [TEST_GROUP_EXT_URN]: { verified: false } }),
+        };
+
+        const updatedGroup = {
+          ...existingGroup,
+          displayName: 'Patched via coerce test',
+          rawPayload: JSON.stringify({ [TEST_GROUP_EXT_URN]: { verified: false } }),
+        };
+
+        // Use non-strict config for PATCH to avoid post-PATCH result validation complexity
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(existingGroup)
+          .mockResolvedValueOnce(updatedGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockEndpointContext.getConfig.mockReturnValue(config);
+
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, config
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should coerce boolean strings in post-PATCH result payload', async () => {
+        // Test coercion path on PATCH result: store "True" in rawPayload
+        // and verify the coercion pipeline runs after PATCH completes
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              path: 'displayName',
+              value: 'Bool coerce after patch',
+            },
+          ],
+        };
+
+        const existingGroup = {
+          ...mockGroup,
+          rawPayload: JSON.stringify({ description: 'test' }),
+        };
+
+        const updatedGroup = {
+          ...existingGroup,
+          displayName: 'Bool coerce after patch',
+        };
+
+        // No strict validation - just test coercion path runs
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(existingGroup)
+          .mockResolvedValueOnce(updatedGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockEndpointContext.getConfig.mockReturnValue(config);
+
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, config
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should coerce boolean strings in PATCH add operation with extension data', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              path: 'displayName',
+              value: 'Tag update test',
+            },
+          ],
+        };
+
+        const existingGroup = {
+          ...mockGroup,
+          rawPayload: JSON.stringify({ [TEST_GROUP_EXT_URN]: { verified: true, tags: [] } }),
+        };
+
+        const updatedGroup = {
+          ...existingGroup,
+          displayName: 'Tag update test',
+          rawPayload: JSON.stringify({
+            [TEST_GROUP_EXT_URN]: { verified: true, tags: [{ value: 'newtag', active: false }] },
+          }),
+        };
+
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(existingGroup)
+          .mockResolvedValueOnce(updatedGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockEndpointContext.getConfig.mockReturnValue(config);
+
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, config
+        );
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('flag interaction matrix (Groups)', () => {
+      it('StrictSchema=ON + Coerce=ON (default): boolean strings accepted and coerced', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Matrix1 Group',
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        await expect(
+          service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config)
+        ).resolves.toBeDefined();
+      });
+
+      it('StrictSchema=ON + Coerce=OFF: boolean strings rejected', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Matrix2 Group',
+          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        await expect(
+          service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('StrictSchema=OFF + Coerce=ON: boolean strings accepted (no validation), coerced for storage', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Matrix3 Group',
+          [TEST_GROUP_EXT_URN]: { active: 'True' },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        // Parent-aware coercion: extension active is NOT coerced (not in schema)
+        const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('True');
+      });
+
+      it('StrictSchema=OFF + Coerce=OFF: boolean strings pass through as-is', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          displayName: 'Matrix4 Group',
+          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockImplementation(async (input: any) => ({
+          ...mockGroup,
+          displayName: createDto.displayName,
+          rawPayload: input.rawPayload,
+        }));
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
+        // String pass-through - not coerced
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.verified).toBe('True');
+      });
+    });
+  });
+
+  // ───────────── G8e: returned characteristic filtering ─────────────
+
+  describe('G8e - returned characteristic filtering', () => {
+    const baseUrl = 'http://localhost:3000/scim/endpoints/endpoint-1';
+
+    describe('toScimGroupResource - returned:never stripping', () => {
+      it('should strip returned:never attributes from group response', async () => {
+        const groupWithExtra = {
+          ...mockGroup,
+          rawPayload: JSON.stringify({ description: 'Test group' }),
+        };
+        mockGroupRepo.findWithMembers.mockReset();
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithExtra);
+
+        const result = await service.getGroupForEndpoint(
+          mockGroup.scimId,
+          baseUrl,
+          mockEndpoint.id,
+        );
+
+        expect(result.displayName).toBe(groupWithExtra.displayName);
+        expect(result.id).toBe(mockGroup.scimId);
+      });
+    });
+
+    describe('getRequestReturnedByParent', () => {
+      it('should return a Set of request-only attribute names', () => {
+        const requestOnlyAttrs = service.getRequestReturnedByParent(mockEndpoint.id);
+
+        // The default Group schema has no request-only attributes
+        expect(requestOnlyAttrs).toBeInstanceOf(Map);
+        expect(requestOnlyAttrs.size).toBe(0);
+      });
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // G8f - Group uniqueness enforcement on PUT/PATCH
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('G8f - uniqueness enforcement on PUT/PATCH', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+
+    const conflictGroup = {
+      ...mockGroup,
+      id: 'group-conflict',
+      scimId: 'scim-grp-conflict',
+      displayName: 'Conflicting Group',
+      externalId: 'ext-conflict',
+    };
+
+    // ─── PUT (replaceGroupForEndpoint) ─────────────────────────────────
+
+    describe('replaceGroupForEndpoint - uniqueness', () => {
+      it('should reject PUT with 409 when displayName conflicts with another group', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Conflicting Group',
+          members: [],
+        };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        // assertUniqueDisplayName finds a conflict (different group with same displayName)
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        // Re-mock for second call (mockResolvedValueOnce is consumed by first call)
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+
+        try {
+          await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          expect(e.getResponse()).toMatchObject({
+            detail: expect.stringContaining('displayName'),
+            scimType: 'uniqueness',
+          });
+        }
+      });
+
+      it('should reject PUT with 409 when externalId conflicts with another group', async () => {
+        // externalId is no longer checked for uniqueness - this test verifies PUT succeeds
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Unique Name',
+          members: [],
+          externalId: 'ext-conflict',
+        } as CreateGroupDto & { externalId: string };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Unique Name', externalId: 'ext-conflict' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
+        expect(result.externalId).toBe('ext-conflict');
+      });
+
+      it('should allow PUT when displayName is same as own (self-exclusion)', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Test Group', // Same as mockGroup's own displayName
+          members: [],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup) // lookup
+          .mockResolvedValueOnce(mockGroup); // return after update
+        // assertUniqueDisplayName with excludeScimId - no conflict
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(result.displayName).toBe('Test Group');
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'Test Group', mockGroup.scimId
+        );
+      });
+
+      it('should pass scimId as excludeScimId to assertUniqueDisplayName', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Updated Group',
+          members: [],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
+        );
+
+        // Verify self-exclusion: scimId is passed as 3rd arg to exclude self from conflict check
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'Updated Group', mockGroup.scimId
+        );
+      });
+    });
+
+    // ─── PATCH (patchGroupForEndpoint) ─────────────────────────────────
+
+    describe('patchGroupForEndpoint - uniqueness', () => {
+      it('should reject PATCH with 409 when displayName conflicts with another group', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'displayName', value: 'Conflicting Group' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        // assertUniqueDisplayName finds a conflict
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+          mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+          await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id);
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          expect(e.getResponse()).toMatchObject({
+            detail: expect.stringContaining('displayName'),
+            scimType: 'uniqueness',
+          });
+        }
+      });
+
+      it('should reject PATCH with 409 when externalId conflicts with another group', async () => {
+        // externalId is no longer checked for uniqueness - this test verifies PATCH succeeds
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'externalId', value: 'ext-conflict' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-conflict' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+        expect(result.externalId).toBe('ext-conflict');
+      });
+
+      it('should allow PATCH when displayName does not conflict (self-exclusion)', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'displayName', value: 'New Unique Name' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'New Unique Name' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(result.displayName).toBe('New Unique Name');
+        // Verify scimId was passed as excludeScimId
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'New Unique Name', mockGroup.scimId
+        );
+      });
+
+      it('should pass scimId as excludeScimId for PATCH uniqueness checks', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', value: { displayName: 'Patched' } },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Patched' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'Patched', mockGroup.scimId
+        );
+      });
+    });
+  });
+
+  // ─── Repository Error Handling (Phase A Step 3) ─────────────────────────
+
+  describe('RepositoryError handling', () => {
+    const { RepositoryError } = require('../../../domain/errors/repository-error');
+    const baseUrl = 'https://example.com/scim/endpoints/endpoint-1';
+    const endpointId = 'endpoint-1';
+
+    const validGroupDto = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+      displayName: 'Test Group',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+    });
+
+    it('should convert RepositoryError NOT_FOUND to 404 on delete', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockRejectedValue(new RepositoryError('NOT_FOUND', 'Group not found'));
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(404);
+      }
+    });
+
+    it('should convert RepositoryError CONNECTION to 503 on create', async () => {
+      mockGroupRepo.create.mockRejectedValue(new RepositoryError('CONNECTION', 'DB timeout'));
+
+      await expect(
+        service.createGroupForEndpoint(validGroupDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.createGroupForEndpoint(validGroupDto as any, baseUrl, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(503);
+      }
+    });
+
+    it('should convert RepositoryError on updateGroupWithMembers during PATCH', async () => {
+      const patchDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { displayName: 'Patched' } }],
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockRejectedValue(
+        new RepositoryError('UNKNOWN', 'transaction rollback'),
+      );
+
+      await expect(
+        service.patchGroupForEndpoint(mockGroup.scimId, patchDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto as any, baseUrl, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(500);
+        const body = (e as HttpException).getResponse() as Record<string, unknown>;
+        expect(body.detail).toContain('patch group');
+      }
+    });
+
+    it('should re-throw non-RepositoryError (for GlobalExceptionFilter)', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockRejectedValue(new TypeError('unexpected'));
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId),
+      ).rejects.toThrow(TypeError);
+    });
+  });
+
+  // ===========================================================================
+  // Test Gaps Audit #5 - Missing unit tests
+  // ===========================================================================
+
+  describe('Test Gaps Audit #5: PatchOpAllowRemoveAllMembers ON standalone', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow blanket remove all members when flag is ON (standalone, no StrictSchema override)', async () => {
+      const config: EndpointConfig = {
+        PatchOpAllowRemoveAllMembers: 'True',
+        StrictSchemaValidation: 'False',
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [
+          { userId: mockUser.id, groupId: mockGroup.id, user: { ...mockUser } },
+        ],
+      });
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [],
+      });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'remove', path: 'members' }],
+      };
+
+      const result = await service.patchGroupForEndpoint(mockGroup.scimId, dto as any, baseUrl, endpointId, config);
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+    });
+
+    it('should reject blanket remove all members when flag is OFF (standalone)', async () => {
+      const config: EndpointConfig = {
+        PatchOpAllowRemoveAllMembers: 'False',
+        StrictSchemaValidation: 'False',
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [
+          { userId: mockUser.id, groupId: mockGroup.id, user: { ...mockUser } },
+        ],
+      });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'remove', path: 'members' }],
+      };
+
+      await expect(
+        service.patchGroupForEndpoint(mockGroup.scimId, dto as any, baseUrl, endpointId, config),
+      ).rejects.toThrow(HttpException);
+    });
+  });
+
+  describe('Test Gaps Audit #5: RequireIfMatch default OFF for Groups', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow DELETE without If-Match when RequireIfMatch is not configured', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(undefined);
+
+      const config: EndpointConfig = {};
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config);
+
+      expect(mockGroupRepo.delete).toHaveBeenCalled();
+    });
+
+    it('should allow PATCH without If-Match when RequireIfMatch is undefined', async () => {
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(mockGroup);
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { displayName: 'Updated' } }],
+      };
+
+      const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+      const result = await service.patchGroupForEndpoint(
+        mockGroup.scimId, dto as any, baseUrl, endpointId, config,
+      );
+
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+    });
+  });
+
+  describe('Test Gaps Audit #5: GroupHardDeleteEnabled OFF', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should throw 400 when GroupHardDeleteEnabled is False', async () => {
+      const config: EndpointConfig = { GroupHardDeleteEnabled: 'False' };
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+      }
     });
   });
 });

@@ -1,0 +1,7 @@
+{
+  "updatedAtUtc": "2026-05-09T08:53:42.4326701Z",
+  "scimSecret": "changeme-scim",
+  "jwtSecret": "changeme-jwt",
+  "oauthClientSecret": "changeme-oauth",
+  "databaseUrl": "postgresql://scimadmin:ScimP0stgres%402026@scimserver-dev-pg.postgres.database.azure.com:5432/scimdb?sslmode=require"
+}

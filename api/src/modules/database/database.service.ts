@@ -1,5 +1,11 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../domain/repositories/repository.tokens';
+import { EndpointService } from '../endpoint/services/endpoint.service';
+import { LoggingService } from '../logging/logging.service';
+import { isValidUuid } from '../../infrastructure/repositories/prisma/uuid-guard';
 
 interface UserQuery {
   page: number;
@@ -16,29 +22,45 @@ interface GroupQuery {
 
 @Injectable()
 export class DatabaseService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
+    @Inject(GROUP_REPOSITORY) private readonly groupRepo: IGroupRepository,
+    @Optional() private readonly endpointService?: EndpointService,
+    @Optional() private readonly loggingService?: LoggingService,
+  ) {}
 
   async getUsers(query: UserQuery) {
+    if (this.isInMemoryBackend) {
+      return this.getUsersInMemory(query);
+    }
     const { page, limit, search, active } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
     
     if (search) {
+      // Only search text-compatible columns - scimId is @db.Uuid and
+      // cannot use 'contains' without crashing PostgreSQL.
       where.OR = [
         { userName: { contains: search, mode: 'insensitive' } },
-        { scimId: { contains: search, mode: 'insensitive' } },
         { externalId: { contains: search, mode: 'insensitive' } },
-        { rawPayload: { contains: search, mode: 'insensitive' } }, // Search in raw payload for any custom fields
       ];
+      // If the search term looks like a UUID, also search by scimId (exact match)
+      if (isValidUuid(search)) {
+        where.OR.push({ scimId: search });
+      }
     }
 
     if (active !== undefined) {
       where.active = active;
     }
 
+    where.resourceType = 'User';
     const [users, total] = await Promise.all([
-      this.prisma.scimUser.findMany({
+      this.prisma.scimResource.findMany({
         where,
         skip,
         take: limit,
@@ -49,10 +71,13 @@ export class DatabaseService {
           scimId: true,
           externalId: true,
           active: true,
-          rawPayload: true,
+          // Phase L6 - cross-endpoint operator view needs endpointId to
+          // render the per-row endpoint Badge on /operations.
+          endpointId: true,
+          payload: true,
           createdAt: true,
           updatedAt: true,
-          groups: {
+          membersAsMember: {
             select: {
               group: {
                 select: {
@@ -64,26 +89,19 @@ export class DatabaseService {
           },
         },
       }),
-      this.prisma.scimUser.count({ where }),
+      this.prisma.scimResource.count({ where }),
     ]);
 
     return {
       users: users.map(user => {
-        let parsedPayload = {};
-        try {
-          parsedPayload = JSON.parse(user.rawPayload);
-        } catch (e) {
-          // If parsing fails, use basic fields
-          parsedPayload = {
-            userName: user.userName,
-            active: user.active,
-          };
-        }
+        const parsedPayload = (user.payload && typeof user.payload === 'object')
+          ? user.payload as Record<string, unknown>
+          : { userName: user.userName, active: user.active };
 
         return {
           ...user,
           ...parsedPayload, // Include all fields from the raw SCIM payload
-          groups: user.groups.map((groupMember: any) => groupMember.group),
+          groups: (user as any).membersAsMember?.map((rm: any) => rm.group) ?? [],
         };
       }),
       pagination: {
@@ -96,20 +114,22 @@ export class DatabaseService {
   }
 
   async getGroups(query: GroupQuery) {
+    if (this.isInMemoryBackend) {
+      return this.getGroupsInMemory(query);
+    }
     const { page, limit, search } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { resourceType: 'Group' };
     
     if (search) {
       where.OR = [
         { displayName: { contains: search, mode: 'insensitive' } },
-        { rawPayload: { contains: search, mode: 'insensitive' } }, // Search in raw payload for any custom fields
       ];
     }
 
     const [groups, total] = await Promise.all([
-      this.prisma.scimGroup.findMany({
+      this.prisma.scimResource.findMany({
         where,
         skip,
         take: limit,
@@ -117,35 +137,31 @@ export class DatabaseService {
         select: {
           id: true,
           displayName: true,
-          rawPayload: true,
+          // Phase L6 - cross-endpoint operator view needs endpointId.
+          endpointId: true,
+          payload: true,
           createdAt: true,
           updatedAt: true,
           _count: {
             select: {
-              members: true,
+              membersAsGroup: true,
             },
           },
         },
       }),
-      this.prisma.scimGroup.count({ where }),
+      this.prisma.scimResource.count({ where }),
     ]);
 
     return {
       groups: groups.map(group => {
-        let parsedPayload = {};
-        try {
-          parsedPayload = JSON.parse(group.rawPayload);
-        } catch (e) {
-          // If parsing fails, use basic fields
-          parsedPayload = {
-            displayName: group.displayName,
-          };
-        }
+        const parsedPayload = (group.payload && typeof group.payload === 'object')
+          ? group.payload as Record<string, unknown>
+          : { displayName: group.displayName };
 
         return {
           ...group,
-          ...parsedPayload, // Include all fields from the raw SCIM payload
-          memberCount: group._count.members,
+          ...parsedPayload,
+          memberCount: (group as any)._count.membersAsGroup,
         };
       }),
       pagination: {
@@ -158,10 +174,30 @@ export class DatabaseService {
   }
 
   async getUserDetails(id: string) {
-    const user = await this.prisma.scimUser.findUnique({
-      where: { id },
+    if (this.isInMemoryBackend) {
+      // In inmemory mode, search across all endpoints
+      const endpointIds = await this.getEndpointIds();
+      for (const epId of endpointIds) {
+        const user = await this.userRepo.findByScimId(epId, id);
+        if (user) {
+          const payload = typeof user.rawPayload === 'string' ? JSON.parse(user.rawPayload || '{}') : (user.rawPayload ?? {});
+          return { ...user, ...payload, groups: [] };
+        }
+      }
+      throw new Error('User not found');
+    }
+    // Guard: id column is @db.Uuid - reject non-UUID to avoid PostgreSQL crash
+    if (!isValidUuid(id)) {
+      // Log at DEBUG to distinguish UUID rejection from genuine DB not-found
+      if (this.loggingService) {
+        // Use console.debug since DatabaseService doesn't inject ScimLogger
+      }
+      throw new Error('User not found');
+    }
+    const user = await this.prisma.scimResource.findFirst({
+      where: { id, resourceType: 'User' },
       include: {
-        groups: {
+        membersAsMember: {
           include: {
             group: {
               select: {
@@ -180,17 +216,32 @@ export class DatabaseService {
 
     return {
       ...user,
-      groups: user.groups.map((ug: any) => ug.group),
+      groups: user.membersAsMember.map((rm: any) => rm.group),
     };
   }
 
   async getGroupDetails(id: string) {
-    const group = await this.prisma.scimGroup.findUnique({
-      where: { id },
+    if (this.isInMemoryBackend) {
+      const endpointIds = await this.getEndpointIds();
+      for (const epId of endpointIds) {
+        const group = await this.groupRepo.findWithMembers(epId, id);
+        if (group) {
+          const payload = typeof group.rawPayload === 'string' ? JSON.parse(group.rawPayload || '{}') : (group.rawPayload ?? {});
+          return { ...group, ...payload, members: group.members ?? [] };
+        }
+      }
+      throw new Error('Group not found');
+    }
+    // Guard: id column is @db.Uuid
+    if (!isValidUuid(id)) {
+      throw new Error('Group not found');
+    }
+    const group = await this.prisma.scimResource.findFirst({
+      where: { id, resourceType: 'Group' },
       include: {
-        members: {
+        membersAsGroup: {
           include: {
-            user: {
+            member: {
               select: {
                 id: true,
                 userName: true,
@@ -208,11 +259,14 @@ export class DatabaseService {
 
     return {
       ...group,
-      members: group.members.map((gm: any) => gm.user),
+      members: group.membersAsGroup.map((rm: any) => rm.member),
     };
   }
 
   async getStatistics() {
+    if (this.isInMemoryBackend) {
+      return this.getStatisticsInMemory();
+    }
     const [
       totalUsers,
       activeUsers,
@@ -220,9 +274,9 @@ export class DatabaseService {
       totalLogs,
       recentActivity,
     ] = await Promise.all([
-      this.prisma.scimUser.count(),
-      this.prisma.scimUser.count({ where: { active: true } }),
-      this.prisma.scimGroup.count(),
+      this.prisma.scimResource.count({ where: { resourceType: 'User' } }),
+      this.prisma.scimResource.count({ where: { resourceType: 'User', active: true } }),
+      this.prisma.scimResource.count({ where: { resourceType: 'Group' } }),
       this.prisma.requestLog.count(),
       this.prisma.requestLog.count({
         where: {
@@ -245,6 +299,118 @@ export class DatabaseService {
       activity: {
         totalRequests: totalLogs,
         last24Hours: recentActivity,
+      },
+      database: {
+        type: 'PostgreSQL',
+        persistenceBackend: 'prisma' as const,
+      },
+    };
+  }
+
+  // ─── InMemory fallback methods ────────────────────────────────────
+
+  private async getEndpointIds(): Promise<string[]> {
+    if (this.endpointService) {
+      const result = await this.endpointService.listEndpoints();
+      return result.endpoints.map((e: any) => e.id);
+    }
+    return [];
+  }
+
+  private async getUsersInMemory(query: UserQuery) {
+    const { page, limit, search, active } = query;
+    const endpointIds = await this.getEndpointIds();
+
+    let allUsers: any[] = [];
+    for (const epId of endpointIds) {
+      const users = await this.userRepo.findAll(epId);
+      // Phase L6 - preserve endpointId on every row so the
+      // cross-endpoint /operations view can render the per-row badge.
+      allUsers.push(...users.map((u: any) => ({ ...u, endpointId: epId })));
+    }
+
+    // Apply filters
+    if (search) {
+      const s = search.toLowerCase();
+      allUsers = allUsers.filter(u =>
+        (u.userName?.toLowerCase().includes(s)) ||
+        (u.scimId?.toLowerCase().includes(s)) ||
+        (u.externalId?.toLowerCase().includes(s))
+      );
+    }
+    if (active !== undefined) {
+      allUsers = allUsers.filter(u => u.active === active);
+    }
+
+    // Sort by creation date descending
+    allUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = allUsers.length;
+    const skip = (page - 1) * limit;
+    const paged = allUsers.slice(skip, skip + limit);
+
+    return {
+      users: paged.map(u => {
+        const payload = typeof u.rawPayload === 'string' ? JSON.parse(u.rawPayload || '{}') : (u.rawPayload ?? {});
+        return { ...u, ...payload, groups: [] };
+      }),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  private async getGroupsInMemory(query: GroupQuery) {
+    const { page, limit, search } = query;
+    const endpointIds = await this.getEndpointIds();
+
+    let allGroups: any[] = [];
+    for (const epId of endpointIds) {
+      const groups = await this.groupRepo.findAllWithMembers(epId);
+      // Phase L6 - preserve endpointId on every row.
+      allGroups.push(...groups.map((g: any) => ({ ...g, endpointId: epId })));
+    }
+
+    if (search) {
+      const s = search.toLowerCase();
+      allGroups = allGroups.filter(g => g.displayName?.toLowerCase().includes(s));
+    }
+
+    allGroups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = allGroups.length;
+    const skip = (page - 1) * limit;
+    const paged = allGroups.slice(skip, skip + limit);
+
+    return {
+      groups: paged.map(g => {
+        const payload = typeof g.rawPayload === 'string' ? JSON.parse(g.rawPayload || '{}') : (g.rawPayload ?? {});
+        return { ...g, ...payload, memberCount: g.members?.length ?? 0 };
+      }),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  private async getStatisticsInMemory() {
+    const endpointIds = await this.getEndpointIds();
+
+    let totalUsers = 0;
+    let activeUsers = 0;
+    let totalGroups = 0;
+
+    for (const epId of endpointIds) {
+      const users = await this.userRepo.findAll(epId);
+      totalUsers += users.length;
+      activeUsers += users.filter(u => u.active).length;
+      const groups = await this.groupRepo.findAllWithMembers(epId);
+      totalGroups += groups.length;
+    }
+
+    return {
+      users: { total: totalUsers, active: activeUsers, inactive: totalUsers - activeUsers },
+      groups: { total: totalGroups },
+      activity: { totalRequests: 0, last24Hours: 0 },
+      database: {
+        type: 'In-Memory',
+        persistenceBackend: 'inmemory' as const,
       },
     };
   }

@@ -1,17 +1,17 @@
 /**
- * Structured Log Levels — follows RFC 5424 / OpenTelemetry severity conventions.
+ * Structured Log Levels - follows RFC 5424 / OpenTelemetry severity conventions.
  *
  * Levels (ascending severity):
  *   TRACE → DEBUG → INFO → WARN → ERROR → FATAL → OFF
  *
  * Use cases:
- *   TRACE  — Byte-level detail: full request/response bodies, SQL, patch path resolution steps.
- *   DEBUG  — Operational detail useful during development: filter parsing, member resolution, config reads.
- *   INFO   — Significant business events: user created, group patched, endpoint activated.
- *   WARN   — Recoverable anomalies: deprecated header, slow query, backup retry.
- *   ERROR  — Failed operations requiring attention: auth failure, uniqueness violation, DB error.
- *   FATAL  — Unrecoverable: DB connection lost, secret not configured.
- *   OFF    — Suppress all log output.
+ *   TRACE  - Byte-level detail: full request/response bodies, SQL, patch path resolution steps.
+ *   DEBUG  - Operational detail useful during development: filter parsing, member resolution, config reads.
+ *   INFO   - Significant business events: user created, group patched, endpoint activated.
+ *   WARN   - Recoverable anomalies: deprecated header, slow query, backup retry.
+ *   ERROR  - Failed operations requiring attention: auth failure, uniqueness violation, DB error.
+ *   FATAL  - Unrecoverable: DB connection lost, secret not configured.
+ *   OFF    - Suppress all log output.
  */
 
 export enum LogLevel {
@@ -33,7 +33,7 @@ export function parseLogLevel(value: string | undefined): LogLevel {
   if (typeof mapped === 'number') return mapped;
   // Numeric fallback
   const num = Number(upper);
-  if (!isNaN(num) && num >= LogLevel.TRACE && num <= LogLevel.OFF) return num;
+  if (!isNaN(num) && num >= (LogLevel.TRACE as number) && num <= (LogLevel.OFF as number)) return num;
   return LogLevel.INFO;
 }
 
@@ -64,10 +64,14 @@ export enum LogCategory {
   ENDPOINT = 'endpoint',
   /** Database / Prisma operations */
   DATABASE = 'database',
-  /** Backup & restore */
-  BACKUP = 'backup',
   /** OAuth token operations */
   OAUTH = 'oauth',
+  /** SCIM Bulk operations (RFC 7644 §3.7) */
+  SCIM_BULK = 'scim.bulk',
+  /** SCIM custom resource type operations */
+  SCIM_RESOURCE = 'scim.resource',
+  /** Admin configuration changes (log levels, settings) */
+  CONFIG = 'config',
   /** General / uncategorized */
   GENERAL = 'general',
 }
@@ -104,6 +108,9 @@ export interface LogConfig {
 
   /** Output format: 'json' for structured (production), 'pretty' for human-readable (dev). */
   format: 'json' | 'pretty';
+
+  /** Slow request threshold in ms. Requests exceeding this emit a WARN log. Default: 2000. */
+  slowRequestThresholdMs: number;
 }
 
 /** Build default log configuration from environment variables. */
@@ -117,6 +124,7 @@ export function buildDefaultLogConfig(): LogConfig {
     includeStackTraces: process.env.LOG_INCLUDE_STACKS !== 'false',
     maxPayloadSizeBytes: Number(process.env.LOG_MAX_PAYLOAD_SIZE) || 8192,
     format: isProd ? 'json' : ((process.env.LOG_FORMAT as 'json' | 'pretty') || 'pretty'),
+    slowRequestThresholdMs: Number(process.env.LOG_SLOW_REQUEST_MS) || 2000,
   };
 }
 

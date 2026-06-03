@@ -2,13 +2,14 @@ import {
   parseScimFilter,
   evaluateFilter,
   resolveAttrPath,
+  extractFilterPaths,
 } from './scim-filter-parser';
 import type { FilterNode, CompareNode, LogicalNode, NotNode, ValuePathNode } from './scim-filter-parser';
 
 // ─── Parser Tests ────────────────────────────────────────────────────────────
 
 describe('ScimFilterParser', () => {
-  describe('parseScimFilter — simple comparisons', () => {
+  describe('parseScimFilter - simple comparisons', () => {
     it('should parse eq with string value', () => {
       const ast = parseScimFilter('userName eq "john"') as CompareNode;
       expect(ast.type).toBe('compare');
@@ -85,7 +86,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — logical expressions', () => {
+  describe('parseScimFilter - logical expressions', () => {
     it('should parse AND', () => {
       const ast = parseScimFilter('userName eq "john" and active eq true') as LogicalNode;
       expect(ast.type).toBe('logical');
@@ -114,7 +115,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — NOT and grouping', () => {
+  describe('parseScimFilter - NOT and grouping', () => {
     it('should parse NOT expression', () => {
       const ast = parseScimFilter('not (active eq false)') as NotNode;
       expect(ast.type).toBe('not');
@@ -134,7 +135,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — value paths', () => {
+  describe('parseScimFilter - value paths', () => {
     it('should parse value path filter', () => {
       const ast = parseScimFilter('emails[type eq "work"]') as ValuePathNode;
       expect(ast.type).toBe('valuePath');
@@ -150,7 +151,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — URN paths', () => {
+  describe('parseScimFilter - URN paths', () => {
     it('should parse URN-prefixed attribute as a single attribute path', () => {
       const ast = parseScimFilter(
         'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department eq "Engineering"'
@@ -161,7 +162,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — error handling', () => {
+  describe('parseScimFilter - error handling', () => {
     it('should throw on empty filter', () => {
       expect(() => parseScimFilter('')).toThrow();
     });
@@ -176,6 +177,52 @@ describe('ScimFilterParser', () => {
 
     it('should throw on unexpected token after valid expression', () => {
       expect(() => parseScimFilter('userName eq "john" extra')).toThrow(/Unexpected/);
+    });
+
+    // DTO-1: filter length cap. Without this guard an attacker can submit a
+    // 1+ MB filter expression, forcing tokenizer + parser to walk every byte
+    // (worst-case quadratic in some grouping patterns) and exhausting memory
+    // before push-down decides anything. Centralized at the parser so every
+    // entry point (GET ?filter=, POST /.search filter, profile validation)
+    // shares the same limit.
+    it('DTO-1: should throw on filter exceeding 10000 characters', () => {
+      const longFilter = 'userName eq "' + 'a'.repeat(10001) + '"';
+      expect(() => parseScimFilter(longFilter)).toThrow(/too long|exceeds maximum length|10000/i);
+    });
+
+    it('DTO-1: should accept filter at exactly 10000 characters', () => {
+      // Build a valid filter that hits the 10000-char limit exactly.
+      // Pattern: `userName eq "...padding..."` - we pad the value.
+      const prefix = 'userName eq "';
+      const suffix = '"';
+      const valueLen = 10000 - prefix.length - suffix.length;
+      const filterAt10000 = prefix + 'a'.repeat(valueLen) + suffix;
+      expect(filterAt10000.length).toBe(10000);
+      expect(() => parseScimFilter(filterAt10000)).not.toThrow();
+    });
+
+    // S-6 (CodeQL: js/type-confusion-through-parameter-tampering): Express
+    // parses ?filter=a&filter=b as ['a','b']. Without an explicit type guard
+    // the parser would call .length / .trim() on the array - .length returns
+    // the element count (passes the cap) and .trim() throws a confusing
+    // TypeError leaking the parser internals. Worse, an attacker controls
+    // whether they hit the .length or .trim() branch by varying repetitions,
+    // creating a DoS or filter-bypass primitive. Hard-fail at entry instead.
+    it('S-6: should reject non-string filter (array from duplicated query param)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => parseScimFilter(['userName eq "a"', 'userName eq "b"'] as any)).toThrow(
+        /must be a string/i,
+      );
+    });
+
+    it('S-6: should reject non-string filter (number)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => parseScimFilter(42 as any)).toThrow(/must be a string/i);
+    });
+
+    it('S-6: should reject non-string filter (object)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => parseScimFilter({ filter: 'x' } as any)).toThrow(/must be a string/i);
     });
   });
 });
@@ -413,6 +460,71 @@ describe('evaluateFilter', () => {
       expect(evaluateFilter(ast, user)).toBe(true);
     });
   });
+
+  // ─── P2 R-CASE-1: caseExact-aware evaluateFilter ─────────────────
+
+  describe('R-CASE-1: caseExact-aware filtering', () => {
+    it('should perform case-sensitive eq when attr is caseExact', () => {
+      const caseExactAttrs = new Set(['id']);
+      const ast = parseScimFilter('id eq "123"');
+      // Exact case match → true
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+      // Wrong case → false (case-sensitive!)
+      const ast2 = parseScimFilter('id eq "ABC"');
+      const resource = { ...user, id: 'abc' };
+      expect(evaluateFilter(ast2, resource, caseExactAttrs)).toBe(false);
+    });
+
+    it('should remain case-insensitive for non-caseExact attrs', () => {
+      const caseExactAttrs = new Set(['id']);
+      const ast = parseScimFilter('userName eq "JOHN.DOE@EXAMPLE.COM"');
+      // userName is NOT caseExact, so case-insensitive match should work
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+    });
+
+    it('should perform case-sensitive co (contains) for caseExact attrs', () => {
+      const caseExactAttrs = new Set(['meta.location']);
+      const ast = parseScimFilter('meta.location co "Users"');
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+      const ast2 = parseScimFilter('meta.location co "users"');
+      // lowercase "users" should NOT match "Users" in the URL when caseExact
+      expect(evaluateFilter(ast2, user, caseExactAttrs)).toBe(false);
+    });
+
+    it('should perform case-sensitive sw (starts with) for caseExact attrs', () => {
+      const caseExactAttrs = new Set(['meta.location']);
+      const ast = parseScimFilter('meta.location sw "https://example"');
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+      const ast2 = parseScimFilter('meta.location sw "HTTPS://EXAMPLE"');
+      expect(evaluateFilter(ast2, user, caseExactAttrs)).toBe(false);
+    });
+
+    it('should remain case-insensitive when no caseExactAttrs provided', () => {
+      // Without caseExactAttrs, all comparisons should be case-insensitive (SCIM default)
+      const ast = parseScimFilter('id eq "ABC"');
+      const resource = { ...user, id: 'abc' };
+      expect(evaluateFilter(ast, resource)).toBe(true);
+    });
+
+    it('should propagate caseExactAttrs through AND/OR logical nodes', () => {
+      const caseExactAttrs = new Set(['id']);
+      const resource = { ...user, id: 'CaseSensitiveId' };
+      // id is caseExact: exact match + userName case-insensitive
+      const ast = parseScimFilter('id eq "CaseSensitiveId" and userName eq "JOHN.DOE@EXAMPLE.COM"');
+      expect(evaluateFilter(ast, resource, caseExactAttrs)).toBe(true);
+      // Wrong case for id → AND fails
+      const ast2 = parseScimFilter('id eq "casesensitiveid" and userName eq "JOHN.DOE@EXAMPLE.COM"');
+      expect(evaluateFilter(ast2, resource, caseExactAttrs)).toBe(false);
+    });
+
+    it('should propagate caseExactAttrs through NOT nodes', () => {
+      const caseExactAttrs = new Set(['id']);
+      const resource = { ...user, id: 'ABC' };
+      // not (id eq "abc") → "abc" ≠ "ABC" case-sensitively → inner is false → NOT makes it true
+      const ast = parseScimFilter('not (id eq "abc")');
+      expect(evaluateFilter(ast, resource, caseExactAttrs)).toBe(true);
+    });
+  });
 });
 
 // ─── resolveAttrPath Tests ───────────────────────────────────────────────────
@@ -447,5 +559,100 @@ describe('resolveAttrPath', () => {
   it('should be case-insensitive for attribute lookup', () => {
     expect(resolveAttrPath(resource, 'USERNAME')).toBe('test');
     expect(resolveAttrPath(resource, 'Name.GivenName')).toBe('Test');
+  });
+});
+
+// ─── V12: Filter Depth Guard ─────────────────────────────────────────────────
+
+describe('ScimFilterParser - depth guard (V12)', () => {
+  it('should parse moderately nested filters without error', () => {
+    // 10 levels of nesting - well within limit
+    const filter = '(' .repeat(10) + 'userName eq "a"' + ')'.repeat(10);
+    const ast = parseScimFilter(filter);
+    expect(ast).toBeDefined();
+  });
+
+  it('should reject filters that exceed MAX_FILTER_DEPTH (50)', () => {
+    // 51 levels of parenthesised nesting
+    const filter = '(' .repeat(51) + 'userName eq "a"' + ')'.repeat(51);
+    expect(() => parseScimFilter(filter)).toThrow(
+      /exceeds maximum nesting depth of 50/,
+    );
+  });
+
+  it('should reject deeply nested parenthesised chains', () => {
+    // Each "not (" increments depth by 1 (guardDepth in NOT branch);
+    // decrement happens after recursion returns. Need > 50 to trigger.
+    let filter = '';
+    for (let i = 0; i < 51; i++) filter += 'not (';
+    filter += 'userName pr';
+    for (let i = 0; i < 51; i++) filter += ')';
+    expect(() => parseScimFilter(filter)).toThrow(
+      /exceeds maximum nesting depth/,
+    );
+  });
+
+  it('should accept exactly 50 levels of nesting', () => {
+    // Exactly at the boundary - should still succeed
+    const filter = '(' .repeat(50) + 'userName eq "a"' + ')'.repeat(50);
+    expect(() => parseScimFilter(filter)).not.toThrow();
+  });
+});
+
+// ─── extractFilterPaths ──────────────────────────────────────────────────────
+
+describe('extractFilterPaths', () => {
+  it('should extract single attribute path from simple filter', () => {
+    const ast = parseScimFilter('userName eq "john"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['userName']);
+  });
+
+  it('should extract multiple attribute paths from logical filter', () => {
+    const ast = parseScimFilter('userName eq "john" and active eq "true"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toContain('userName');
+    expect(paths).toContain('active');
+    expect(paths).toHaveLength(2);
+  });
+
+  it('should deduplicate attribute paths', () => {
+    const ast = parseScimFilter('userName eq "a" or userName sw "b"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['userName']);
+  });
+
+  it('should extract paths from valuePath (bracket) filters', () => {
+    const ast = parseScimFilter('emails[type eq "work"]');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toContain('emails');
+    expect(paths).toContain('type');
+  });
+
+  it('should extract paths from NOT filters', () => {
+    const ast = parseScimFilter('not (userName eq "john")');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toContain('userName');
+  });
+
+  it('should extract paths from presence (pr) filters', () => {
+    const ast = parseScimFilter('title pr');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['title']);
+  });
+
+  it('should extract dotted sub-attribute paths', () => {
+    const ast = parseScimFilter('name.givenName eq "John"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['name.givenName']);
+  });
+
+  it('should extract URN-prefixed paths', () => {
+    const ast = parseScimFilter(
+      'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department eq "Engineering"',
+    );
+    const paths = extractFilterPaths(ast);
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toContain('department');
   });
 });

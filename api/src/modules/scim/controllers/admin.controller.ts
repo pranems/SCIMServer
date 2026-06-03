@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
@@ -9,12 +9,14 @@
   Param,
   NotFoundException,
   Req,
-  Logger
 } from '@nestjs/common';
 import type { Request } from 'express';
+import os from 'node:os';
+import fs from 'node:fs';
 
 import { LoggingService } from '../../logging/logging.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { SCIM_CORE_GROUP_SCHEMA, SCIM_CORE_USER_SCHEMA } from '../common/scim-constants';
 import type { ScimGroupResource, ScimUserResource } from '../common/scim-types';
@@ -29,42 +31,105 @@ interface VersionInfo {
   version: string;
   commit?: string;
   buildTime?: string; // ISO string
+  service: {
+    name: string;
+    environment: string;
+    apiPrefix: string;
+    scimBasePath: string;
+    now: string;
+    startedAt: string;
+    uptimeSeconds: number;
+    timezone: string;
+    utcOffset: string;
+  };
   runtime: {
     node: string;
     platform: string;
+    arch: string;
+    pid: number;
+    hostname: string;
+    cpus: number;
+    containerized: boolean;
+    memory: {
+      rss: number;
+      heapTotal: number;
+      heapUsed: number;
+      external: number;
+      arrayBuffers: number;
+    };
+  };
+  auth: {
+    oauthClientId?: string;
+    oauthClientSecretConfigured: boolean;
+    jwtSecretConfigured: boolean;
+    scimSharedSecretConfigured: boolean;
+  };
+  storage: {
+    databaseUrl?: string;
+    databaseProvider: 'postgresql';
+    persistenceBackend: 'prisma' | 'inmemory';
+    connectionPool?: {
+      maxConnections: number;
+    };
+  };
+  container?: {
+    app: {
+      id?: string;
+      name?: string;
+      image?: string;
+      runtime: string;
+      platform: string;
+    };
+    database?: {
+      host: string;
+      port: number;
+      name: string;
+      provider: string;
+      version?: string;
+    };
   };
   deployment?: {
     resourceGroup?: string;
     containerApp?: string;
     registry?: string;
     currentImage?: string;
-    backupMode?: 'blob' | 'azureFiles' | 'none';
-    blobAccount?: string;
-    blobContainer?: string;
+    migratePhase: string;
   };
 }
 
+const serviceBootTime = new Date();
+
 @Controller('admin')
 export class AdminController {
-  private readonly logger = new Logger(AdminController.name);
+  /** Cached at construction - these values never change during runtime. */
+  private readonly cachedVersion: string;
+  private readonly cachedContainerized: boolean;
+  private readonly cachedContainerId: string | undefined;
+
   constructor(
     private readonly loggingService: LoggingService,
     private readonly prisma: PrismaService,
     private readonly usersService: EndpointScimUsersService,
-    private readonly groupsService: EndpointScimGroupsService
-  ) {}
+    private readonly groupsService: EndpointScimGroupsService,
+    private readonly endpointService: EndpointService,
+  ) {
+    this.cachedVersion = process.env.APP_VERSION || this.readPackageVersion();
+    this.cachedContainerized = this.isContainerized();
+    this.cachedContainerId = this.readContainerId();
+  }
 
   /**
    * Get or create a default endpoint for admin operations.
-   * Uses the first available endpoint, or creates one named "default".
+   * Uses the first available endpoint, or creates one via EndpointService (inmemory-safe).
    */
   private async getDefaultEndpointId(): Promise<string> {
-    const existing = await this.prisma.endpoint.findFirst({ orderBy: { createdAt: 'asc' } });
-    if (existing) return existing.id;
-
-    const created = await this.prisma.endpoint.create({
-      data: { name: 'default', active: true }
-    });
+    // Use EndpointService which handles both inmemory and Prisma backends
+    const result = await this.endpointService.listEndpoints();
+    if (result.endpoints.length > 0) {
+      return result.endpoints[0].id;
+    }
+    // No endpoints exist - create a default one
+    const created = await this.endpointService.createEndpoint({ name: 'default' });
     return created.id;
   }
 
@@ -72,6 +137,16 @@ export class AdminController {
   @HttpCode(204)
   async clearLogs(): Promise<void> {
     await this.loggingService.clearLogs();
+  }
+
+  @Post('logs/prune')
+  async pruneLogs(
+    @Query('retentionDays') retentionDays?: string,
+  ) {
+    const days = retentionDays ? Number(retentionDays)
+      : Number(process.env.LOG_RETENTION_DAYS) || 30;
+    const pruned = await this.loggingService.pruneOldLogs(days);
+    return { pruned };
   }
 
   @Get('logs')
@@ -86,7 +161,13 @@ export class AdminController {
     @Query('until') until?: string,
     @Query('search') search?: string,
     @Query('includeAdmin') includeAdmin?: string,
-    @Query('hideKeepalive') hideKeepalive?: string
+    @Query('hideKeepalive') hideKeepalive?: string,
+    @Query('minDurationMs') minDurationMs?: string,
+    // Phase D5: scope global logs by indexed endpointId column. The
+    // service already accepted this filter; admin controller now
+    // surfaces it so the UI can restrict the global Logs page to a
+    // single endpoint without going through the endpoint-scoped route.
+    @Query('endpointId') endpointId?: string,
   ) {
     return this.loggingService.listLogs({
       page: page ? Number(page) : undefined,
@@ -99,7 +180,9 @@ export class AdminController {
       until: until ? new Date(until) : undefined,
       search: search || undefined,
       includeAdmin: includeAdmin === 'true',
-      hideKeepalive: hideKeepalive === 'true'
+      hideKeepalive: hideKeepalive === 'true',
+      minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
+      endpointId: endpointId || undefined,
     });
   }
 
@@ -218,48 +301,191 @@ export class AdminController {
   @Post('users/:id/delete')
   @HttpCode(204)
   async deleteUser(@Param('id') id: string): Promise<void> {
-    // Search by Prisma PK (id) or SCIM identifier (scimId)
-    const user = await this.prisma.scimUser.findFirst({
-      where: { OR: [{ id }, { scimId: id }] },
-      select: { id: true }
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
+    // Find the user across all endpoints via EndpointService + UsersService
+    const result = await this.endpointService.listEndpoints();
+    for (const ep of result.endpoints) {
+      try {
+        await this.usersService.deleteUserForEndpoint(id, ep.id);
+        return; // Success - user found and deleted
+      } catch {
+        // Not found in this endpoint, try next
+      }
     }
-    await this.prisma.scimUser.delete({ where: { id: user.id } });
+    throw new NotFoundException('User not found');
   }
 
   @Get('version')
   getVersion(): VersionInfo {
     // Prefer explicit env vars injected at build/deploy time
-    const version = process.env.APP_VERSION || this.readPackageVersion();
+    const version = this.cachedVersion;
     const commit = process.env.GIT_COMMIT;
     const buildTime = process.env.BUILD_TIME;
-    const blobAccount = process.env.BLOB_BACKUP_ACCOUNT;
-    const blobContainer = process.env.BLOB_BACKUP_CONTAINER;
-    const backupMode: 'blob' | 'azureFiles' | 'none' = blobAccount ? 'blob' : 'none';
+    const now = new Date();
+    const persistenceBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() as 'prisma' | 'inmemory';
+    const databaseUrl = this.maskSensitiveUrl(process.env.DATABASE_URL);
+    const memory = process.memoryUsage();
+    const apiPrefix = process.env.API_PREFIX ?? 'scim';
 
     // Image tag detection moved to frontend (see web build in Dockerfile)
     const currentImage = undefined;
+
+    // Connection pool max from DATABASE_URL or default
+    const poolMax = persistenceBackend === 'prisma' ? 5 : undefined;
+
+    // Timezone: use TZ env if set, then Intl, then fall back to 'UTC'
+    const ianaTimezone = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const utcOffsetMinutes = -now.getTimezoneOffset();
+    const offsetSign = utcOffsetMinutes >= 0 ? '+' : '-';
+    const absMinutes = Math.abs(utcOffsetMinutes);
+    const offsetHours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+    const offsetMins = String(absMinutes % 60).padStart(2, '0');
+    const utcOffset = `${offsetSign}${offsetHours}:${offsetMins}`;
+
+    // Container info - use cached values (no per-request FS reads)
+    const containerized = this.cachedContainerized;
+    const containerBlock = containerized ? this.buildContainerInfo(databaseUrl) : undefined;
 
     return {
       version,
       commit,
       buildTime,
+      service: {
+        name: 'SCIMServer API',
+        environment: process.env.NODE_ENV ?? 'development',
+        apiPrefix,
+        scimBasePath: `/${apiPrefix}/v2`,
+        now: now.toISOString(),
+        startedAt: serviceBootTime.toISOString(),
+        uptimeSeconds: Number(process.uptime().toFixed(3)),
+        timezone: ianaTimezone,
+        utcOffset
+      },
       runtime: {
         node: process.version,
-        platform: `${process.platform}-${process.arch}`
+        platform: process.platform,
+        arch: process.arch,
+        pid: process.pid,
+        hostname: os.hostname(),
+        cpus: os.cpus().length,
+        containerized,
+        memory: {
+          rss: memory.rss,
+          heapTotal: memory.heapTotal,
+          heapUsed: memory.heapUsed,
+          external: memory.external,
+          arrayBuffers: memory.arrayBuffers
+        }
       },
+      auth: {
+        oauthClientId: process.env.OAUTH_CLIENT_ID,
+        oauthClientSecretConfigured: this.isConfigured(process.env.OAUTH_CLIENT_SECRET),
+        jwtSecretConfigured: this.isConfigured(process.env.JWT_SECRET),
+        scimSharedSecretConfigured: this.isConfigured(process.env.SCIM_SHARED_SECRET)
+      },
+      storage: {
+        databaseUrl,
+        databaseProvider: 'postgresql',
+        persistenceBackend,
+        ...(poolMax ? { connectionPool: { maxConnections: poolMax } } : {})
+      },
+      ...(containerBlock ? { container: containerBlock } : {}),
       deployment: {
         resourceGroup: process.env.SCIM_RG,
         containerApp: process.env.SCIM_APP,
         registry: process.env.SCIM_REGISTRY,
         currentImage,
-        backupMode,
-        blobAccount,
-        blobContainer
+        migratePhase: `Phase 9 - Bulk Operations (v${version})`
       }
     };
+  }
+
+  private isConfigured(value: string | undefined): boolean {
+    return Boolean(value && value.trim().length > 0);
+  }
+
+  private maskSensitiveUrl(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    return value
+      // Mask userinfo in connection strings: postgresql://user:password@host → postgresql://***:***@host
+      .replace(/:\/\/([^:@]+):([^@]+)@/, '://***:***@')
+      .replace(/(token|secret|password)=([^&]+)/gi, '$1=***')
+      .replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, 'Bearer ***');
+  }
+
+  private isContainerized(): boolean {
+    return fs.existsSync('/.dockerenv') || this.isConfigured(process.env.CONTAINER_APP_NAME);
+  }
+
+  /**
+   * Build container metadata block from available Docker / env sources.
+   */
+  private buildContainerInfo(_databaseUrl: string | undefined): NonNullable<VersionInfo['container']> {
+    // Container ID: hostname inside Docker is the short container ID
+    const containerId = this.cachedContainerId;
+    const containerName = process.env.HOSTNAME || undefined;
+
+    // Docker image: injected via DOCKER_IMAGE env or label
+    const image = process.env.DOCKER_IMAGE || process.env.CONTAINER_IMAGE || undefined;
+
+    // Parse database host/port/name from raw DATABASE_URL (not the masked version)
+    let dbInfo: NonNullable<VersionInfo['container']>['database'] | undefined = undefined;
+    const rawDbUrl = process.env.DATABASE_URL;
+    if (rawDbUrl) {
+      try {
+        const url = new URL(rawDbUrl);
+        dbInfo = {
+          host: url.hostname,
+          port: parseInt(url.port, 10) || 5432,
+          name: url.pathname.replace(/^\//, ''),
+          provider: 'PostgreSQL 17',
+          version: process.env.POSTGRES_VERSION || undefined,
+        };
+      } catch {
+        // If URL parsing fails, provide what we can
+        dbInfo = {
+          host: 'unknown',
+          port: 5432,
+          name: 'scimdb',
+          provider: 'PostgreSQL',
+        };
+      }
+    }
+
+    return {
+      app: {
+        id: containerId,
+        name: containerName,
+        image,
+        runtime: `Node.js ${process.version}`,
+        platform: `${process.platform}/${process.arch}`,
+      },
+      ...(dbInfo ? { database: dbInfo } : {}),
+    };
+  }
+
+  /**
+   * Read the Docker container ID from /proc/self/cgroup or hostname.
+   */
+  private readContainerId(): string | undefined {
+    try {
+      // On Linux Docker, /proc/self/cgroup contains the full container ID
+      if (fs.existsSync('/proc/self/cgroup')) {
+        const cgroup = fs.readFileSync('/proc/self/cgroup', 'utf8');
+        const match = cgroup.match(/[0-9a-f]{64}/);
+        if (match) return match[0].substring(0, 12); // short ID
+      }
+      // On Docker Desktop / newer cgroupv2, /proc/self/mountinfo may have it
+      if (fs.existsSync('/proc/self/mountinfo')) {
+        const mountinfo = fs.readFileSync('/proc/self/mountinfo', 'utf8');
+        const match = mountinfo.match(/\/docker\/containers\/([0-9a-f]{64})/);
+        if (match) return match[1].substring(0, 12);
+      }
+    } catch {
+      // Ignore read errors - not every environment has /proc
+    }
+    // Fallback: hostname is the short container ID in Docker
+    const hostname = os.hostname();
+    return /^[0-9a-f]{12}$/.test(hostname) ? hostname : undefined;
   }
 
   private readPackageVersion(): string {

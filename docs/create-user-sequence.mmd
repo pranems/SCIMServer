@@ -1,16 +1,18 @@
 sequenceDiagram
   participant Client
   participant WebServer as main.ts middleware
+  participant ReqLog as RequestLoggingInterceptor
   participant Guard as SharedSecretGuard
   participant OAuthSvc as OAuthService
   participant Controller as EndpointScimUsersController
   participant Validator as ValidationPipe
   participant Service as EndpointScimUsersService
   participant PrismaClient
-  participant Logger as LoggingService
+  participant ScimLogger
 
-  Client->>WebServer: POST /scim/endpoints/{endpointId}/Users (application/scim+json)
+  Client->>WebServer: POST /scim/v2/Users (or /scim/endpoints/{endpointId}/Users)
   WebServer->>WebServer: normalize /scim/v2 -> /scim
+  WebServer->>ReqLog: start request correlation + trace context
   WebServer->>Guard: run canActivate (Authorization header)
   Guard->>OAuthSvc: validate JWT (jwt.verify)
   alt token valid
@@ -33,12 +35,13 @@ sequenceDiagram
     Service->>PrismaClient: check uniqueness (findFirst / where)
     alt unique violation found
       Service-->>Controller: throw ConflictError (mapped to 409)
-      Controller->>Logger: log request + 409
+      Controller->>ScimLogger: emit structured error entry
       Controller-->>Client: 409 Conflict (scimType: 'uniqueness')
     else unique ok
       Service->>PrismaClient: prisma.scimUser.create(...)
       PrismaClient-->>Service: created row
-      Service->>Logger: log request + 201 (store request/response)
+      Service->>ScimLogger: emit create success entry
       Controller-->>Client: 201 Created (SCIM user resource)
     end
   end
+  ReqLog-->>Client: capture response metadata in buffered request logs

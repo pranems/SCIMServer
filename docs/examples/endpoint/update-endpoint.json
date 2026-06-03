@@ -1,8 +1,0 @@
-{
-  "displayName": "ACME Corporation - Updated",
-  "description": "Updated description",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "False"
-  },
-  "active": true
-}

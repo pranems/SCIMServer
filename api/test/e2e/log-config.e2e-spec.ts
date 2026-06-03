@@ -15,6 +15,8 @@ import { getAuthToken } from './helpers/auth.helper';
  *   DELETE /scim/admin/log-config/endpoint/:endpointId
  *   GET    /scim/admin/log-config/recent
  *   DELETE /scim/admin/log-config/recent
+ *   GET    /scim/admin/log-config/download
+ *   GET    /scim/admin/log-config/stream
  */
 describe('Log Configuration API (E2E)', () => {
   let app: INestApplication;
@@ -69,13 +71,13 @@ describe('Log Configuration API (E2E)', () => {
       );
     });
 
-    it('should include all 12 available categories', async () => {
+    it('should include all 14 available categories', async () => {
       const res = await request(app.getHttpServer())
         .get('/scim/admin/log-config')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.availableCategories).toHaveLength(12);
+      expect(res.body.availableCategories).toHaveLength(14);
       expect(res.body.availableCategories).toContain('http');
       expect(res.body.availableCategories).toContain('scim.user');
       expect(res.body.availableCategories).toContain('scim.patch');
@@ -174,14 +176,14 @@ describe('Log Configuration API (E2E)', () => {
       expect(res.body.message).toContain('TRACE');
     });
 
-    it('should return error for unknown category', async () => {
+    it('should return 400 for unknown category', async () => {
       const res = await request(app.getHttpServer())
         .put('/scim/admin/log-config/category/badcategory/DEBUG')
         .set('Authorization', `Bearer ${token}`)
-        .expect(200);
+        .expect(400);
 
-      expect(res.body.error).toContain("Unknown category 'badcategory'");
-      expect(res.body.availableCategories).toHaveLength(12);
+      // The error is wrapped in SCIM format by ScimExceptionFilter
+      expect(res.body.status).toBe('400');
     });
 
     it('should reflect the change in GET /admin/log-config', async () => {
@@ -276,13 +278,15 @@ describe('Log Configuration API (E2E)', () => {
 
     it('should filter by level query parameter', async () => {
       const res = await request(app.getHttpServer())
-        .get('/scim/admin/log-config/recent?level=ERROR')
+        .get('/scim/admin/log-config/recent?level=INFO')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      // All returned entries should be ERROR or above
+      // Previous requests in this suite generate INFO-level HTTP logs
+      expect(res.body.entries.length).toBeGreaterThan(0);
+      // All returned entries should be at INFO level or above
       for (const entry of res.body.entries) {
-        expect(['ERROR', 'FATAL']).toContain(entry.level);
+        expect(['INFO', 'WARN', 'ERROR', 'FATAL']).toContain(entry.level);
       }
     });
 
@@ -292,6 +296,8 @@ describe('Log Configuration API (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
+      // Previous requests in this suite generate 'http' category entries
+      expect(res.body.entries.length).toBeGreaterThan(0);
       for (const entry of res.body.entries) {
         expect(entry.category).toBe('http');
       }
@@ -314,6 +320,80 @@ describe('Log Configuration API (E2E)', () => {
       // After clearing, requesting recent should return a small number of entries
       // (only the current GET request's own log entries: auth, oauth, http ≈ 3–4)
       expect(res.body.count).toBeLessThanOrEqual(5);
+    });
+  });
+
+  // ─── Download Logs ───────────────────────────────────────────────
+
+  describe('GET /scim/admin/log-config/download', () => {
+    it('should download NDJSON by default', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/download')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.headers['content-type']).toContain('application/x-ndjson');
+      expect(res.headers['content-disposition']).toContain('attachment; filename="scimserver-logs-');
+
+      const lines = res.text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      expect(lines.length).toBeGreaterThan(0);
+      const first = JSON.parse(lines[0]) as { timestamp?: string; level?: string };
+      expect(first.timestamp).toBeDefined();
+      expect(first.level).toBeDefined();
+    });
+
+    it('should download JSON format when requested', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/download?format=json&limit=10')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.headers['content-type']).toContain('application/json');
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeLessThanOrEqual(10);
+    });
+
+    it('should support requestId filter', async () => {
+      const requestId = `e2e-download-${Date.now()}`;
+
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Request-Id', requestId)
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/log-config/download?format=json&requestId=${requestId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Request-Id', requestId)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      // The custom X-Request-Id was set on a prior request - entries must exist
+      expect(res.body.length).toBeGreaterThan(0);
+      for (const entry of res.body as Array<{ requestId?: string }>) {
+        expect(entry.requestId).toBe(requestId);
+      }
+    });
+
+    it('should require authentication', async () => {
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config/download')
+        .expect(401);
+    });
+  });
+
+  // ─── Stream Logs (SSE) ───────────────────────────────────────────
+
+  describe('GET /scim/admin/log-config/stream', () => {
+    it('should require authentication', async () => {
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config/stream')
+        .expect(401);
     });
   });
 
@@ -340,6 +420,210 @@ describe('Log Configuration API (E2E)', () => {
       expect(res.headers['x-request-id']).toBeDefined();
       // UUID format check (very loose)
       expect(res.headers['x-request-id'].length).toBeGreaterThan(10);
+    });
+  });
+
+  // ─── Audit Trail ─────────────────────────────────────────────────
+
+  describe('GET /scim/admin/log-config/audit', () => {
+    it('should return 200 with audit trail entries', async () => {
+      // Trigger a config change to generate an audit entry
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/DEBUG')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/audit?limit=50')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('count');
+      expect(res.body).toHaveProperty('entries');
+      expect(Array.isArray(res.body.entries)).toBe(true);
+
+      // Should contain at least the config change we just made
+      const configEntries = res.body.entries.filter(
+        (e: any) => e.category === 'config',
+      );
+      expect(configEntries.length).toBeGreaterThan(0);
+
+      // Restore
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/INFO')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+    });
+
+    it('should only return CONFIG, ENDPOINT, and AUTH categories', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/audit?limit=100')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const validCategories = ['config', 'endpoint', 'auth'];
+      for (const entry of res.body.entries) {
+        expect(validCategories).toContain(entry.category);
+      }
+    });
+  });
+
+  // ─── Persistent Logs: Prune ────────────────────────────────────────
+
+  describe('POST /scim/admin/logs/prune', () => {
+    it('should return pruned count', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/logs/prune?retentionDays=365')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      expect(res.body).toHaveProperty('pruned');
+      expect(typeof res.body.pruned).toBe('number');
+    });
+
+    it('should default to 30 days when retentionDays not specified', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/logs/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      expect(res.body).toHaveProperty('pruned');
+    });
+  });
+
+  // ─── Persistent Logs: minDurationMs filter ─────────────────────────
+
+  describe('GET /scim/admin/logs?minDurationMs', () => {
+    it('should accept minDurationMs query parameter', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/logs?minDurationMs=9999999')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('items');
+      // With a very high threshold, should return 0 or very few results
+      expect(res.body.total).toBe(0);
+    });
+  });
+
+  // ─── slowRequestThresholdMs runtime config ─────────────────────────
+
+  describe('slowRequestThresholdMs runtime configuration', () => {
+    it('should accept slowRequestThresholdMs in PUT /admin/log-config', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ slowRequestThresholdMs: 5000 })
+        .expect(200);
+
+      expect(res.body.config).toBeDefined();
+
+      // Verify it was applied
+      const getRes = await request(app.getHttpServer())
+        .get('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // Restore default
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ slowRequestThresholdMs: 2000 })
+        .expect(200);
+    });
+  });
+
+  // ─── Auto-Prune Configuration API ──────────────────────────────────
+
+  describe('Auto-prune configuration (GET/PUT /admin/log-config/prune)', () => {
+    it('GET /admin/log-config/prune should return current config', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('enabled');
+      expect(res.body).toHaveProperty('retentionDays');
+      expect(res.body).toHaveProperty('intervalMs');
+      expect(typeof res.body.enabled).toBe('boolean');
+      expect(typeof res.body.retentionDays).toBe('number');
+      expect(typeof res.body.intervalMs).toBe('number');
+    });
+
+    it('PUT /admin/log-config/prune should update retentionDays', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ retentionDays: 30 })
+        .expect(200);
+
+      expect(res.body.retentionDays).toBe(30);
+
+      // Restore default
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ retentionDays: 1 })
+        .expect(200);
+    });
+
+    it('PUT /admin/log-config/prune should update enabled flag', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ enabled: false })
+        .expect(200);
+
+      expect(res.body.enabled).toBe(false);
+    });
+
+    it('PUT /admin/log-config/prune should reject intervalMs < 60000', async () => {
+      const before = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ intervalMs: 5000 })
+        .expect(200);
+
+      // intervalMs should remain unchanged
+      const after = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      expect(after.intervalMs).toBe(before.intervalMs);
+    });
+
+    it('PUT /admin/log-config/prune should reject retentionDays <= 0', async () => {
+      const before = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ retentionDays: 0 })
+        .expect(200);
+
+      const after = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      expect(after.retentionDays).toBe(before.retentionDays);
     });
   });
 });

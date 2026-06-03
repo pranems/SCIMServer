@@ -10,7 +10,14 @@ import {
   removeExtensionAttribute,
   addValuePathEntry,
   resolveNoPathValue,
+  mergeComplexAttribute,
+  pruneEmptyExtensions,
+  findInvalidMultiValuedElement,
+  isExtensionValuePath,
+  applyExtensionValuePathUpdate,
+  removeExtensionValuePathEntry,
 } from './scim-patch-path';
+import type { ExtensionPathExpression } from './scim-patch-path';
 
 describe('scim-patch-path utilities', () => {
   // ─── isValuePath ─────────────────────────────────────────────────────
@@ -195,7 +202,7 @@ describe('scim-patch-path utilities', () => {
     it('should parse mixed-case URN and preserve original attribute casing (RFC 7643 §2.1)', () => {
       const result = parseExtensionPath(
         'URN:IETF:PARAMS:SCIM:SCHEMAS:EXTENSION:ENTERPRISE:2.0:USER:Manager'
-      );
+      ) as ExtensionPathExpression | null;
       expect(result).not.toBeNull();
       expect(result!.schemaUrn).toBe('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User');
       expect(result!.attributePath).toBe('Manager');
@@ -204,7 +211,7 @@ describe('scim-patch-path utilities', () => {
     it('should handle all-lowercase URN path', () => {
       const result = parseExtensionPath(
         'urn:ietf:params:scim:schemas:extension:enterprise:2.0:user:department'
-      );
+      ) as ExtensionPathExpression | null;
       expect(result).not.toBeNull();
       expect(result!.attributePath).toBe('department');
     });
@@ -250,6 +257,57 @@ describe('scim-patch-path utilities', () => {
     it('should return false with case-mismatched attribute when value does not match', () => {
       expect(matchesFilter({ Type: 'home' }, 'TYPE', 'eq', 'work')).toBe(false);
     });
+
+    // Boolean-to-string filter matching (AllowAndCoerceBooleanStrings support)
+    it('should match boolean true against string "True" (case-insensitive)', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'True')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'true')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'TRUE')).toBe(true);
+    });
+
+    it('should match boolean false against string "False" (case-insensitive)', () => {
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'False')).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'false')).toBe(true);
+    });
+
+    it('should not match boolean true against string "False"', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'False')).toBe(false);
+    });
+
+    it('should not match boolean false against string "True"', () => {
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'True')).toBe(false);
+    });
+
+    it('should handle boolean in unsupported operator fallback', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'true')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'True')).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'sw', 'false')).toBe(true);
+    });
+
+    // ─── caseExact-aware filtering (RFC 7643 §2.2) ──────────────────
+
+    it('should match case-insensitively when caseExact=false (default)', () => {
+      expect(matchesFilter({ type: 'Work' }, 'type', 'eq', 'work')).toBe(true);
+      expect(matchesFilter({ type: 'work' }, 'type', 'eq', 'WORK')).toBe(true);
+    });
+
+    it('should match case-sensitively when caseExact=true', () => {
+      expect(matchesFilter({ value: 'Work@Example.com' }, 'value', 'eq', 'Work@Example.com', true)).toBe(true);
+    });
+
+    it('should NOT match different-case strings when caseExact=true', () => {
+      expect(matchesFilter({ value: 'Work@Example.com' }, 'value', 'eq', 'work@example.com', true)).toBe(false);
+    });
+
+    it('should still match booleans case-insensitively even when caseExact=true', () => {
+      // Boolean matching is always case-insensitive (True/true/TRUE all match boolean true)
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'True', true)).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'false', true)).toBe(true);
+    });
+
+    it('should match same-case strings when caseExact=true', () => {
+      expect(matchesFilter({ type: 'work' }, 'type', 'eq', 'work', true)).toBe(true);
+    });
   });
 
   // ─── applyValuePathUpdate ────────────────────────────────────────────
@@ -264,8 +322,9 @@ describe('scim-patch-path utilities', () => {
       };
 
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
 
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('new@example.com');
       // Other fields untouched
       expect((result.emails as Record<string, unknown>[])[0].primary).toBe(true);
@@ -273,19 +332,21 @@ describe('scim-patch-path utilities', () => {
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('home@example.com');
     });
 
-    it('should not modify payload when attribute array is missing', () => {
+    it('should report matched=false when attribute array is missing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = { displayName: 'Test' };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      expect(matched).toBe(false);
       expect(result).toEqual({ displayName: 'Test' });
     });
 
-    it('should not modify payload when no element matches the filter', () => {
+    it('should report matched=false when no element matches the filter (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = {
         emails: [{ type: 'home', value: 'home@example.com' }],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      expect(matched).toBe(false);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('home@example.com');
     });
 
@@ -296,7 +357,8 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"]')!;
-      const result = applyValuePathUpdate(payload, parsed, { type: 'work', value: 'replaced@example.com' });
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, { type: 'work', value: 'replaced@example.com' });
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[])[0]).toEqual({
         type: 'work',
         value: 'replaced@example.com',
@@ -310,7 +372,8 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('addresses[type eq "work"].streetAddress')!;
-      const result = applyValuePathUpdate(payload, parsed, '456 New Ave');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, '456 New Ave');
+      expect(matched).toBe(true);
       expect((result.addresses as Record<string, unknown>[])[0].streetAddress).toBe('456 New Ave');
       expect((result.addresses as Record<string, unknown>[])[0].locality).toBe('OldCity');
     });
@@ -320,7 +383,8 @@ describe('scim-patch-path utilities', () => {
         emails: ['not-an-object', { type: 'work', value: 'old@example.com' }],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+      expect(matched).toBe(true);
       expect((result.emails as unknown[])[0]).toBe('not-an-object');
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('new@example.com');
     });
@@ -333,7 +397,8 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = applyValuePathUpdate(payload, parsed, 'updated@example.com');
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'updated@example.com');
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('updated@example.com');
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('second@example.com');
     });
@@ -349,8 +414,9 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"].primary')!;
-      const result = removeValuePathEntry(payload, parsed);
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
       const emails = result.emails as Record<string, unknown>[];
+      expect(matched).toBe(true);
       expect(emails[0]).toEqual({ type: 'work', value: 'work@example.com' });
     });
 
@@ -362,26 +428,38 @@ describe('scim-patch-path utilities', () => {
         ],
       };
       const parsed = parseValuePath('emails[type eq "work"]')!;
-      const result = removeValuePathEntry(payload, parsed);
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(true);
       expect((result.emails as Record<string, unknown>[]).length).toBe(1);
       expect((result.emails as Record<string, unknown>[])[0].type).toBe('home');
     });
 
-    it('should be a no-op when no element matches the filter', () => {
+    it('should report matched=false when sub-attr filter matches nothing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = {
         emails: [{ type: 'home', value: 'home@example.com' }],
       };
       const parsed = parseValuePath('emails[type eq "work"].value')!;
-      const result = removeValuePathEntry(payload, parsed);
-      // Nothing should change
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(false);
       expect((result.emails as Record<string, unknown>[]).length).toBe(1);
       expect((result.emails as Record<string, unknown>[])[0].value).toBe('home@example.com');
     });
 
-    it('should be a no-op when attribute array does not exist', () => {
+    it('should report matched=false when whole-entry filter matches nothing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
+      const payload: Record<string, unknown> = {
+        emails: [{ type: 'home', value: 'home@example.com' }],
+      };
+      const parsed = parseValuePath('emails[type eq "work"]')!;
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(false);
+      expect((result.emails as Record<string, unknown>[]).length).toBe(1);
+    });
+
+    it('should report matched=false when attribute array does not exist (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = { displayName: 'Test' };
       const parsed = parseValuePath('emails[type eq "work"]')!;
-      const result = removeValuePathEntry(payload, parsed);
+      const { matched, payload: result } = removeValuePathEntry(payload, parsed);
+      expect(matched).toBe(false);
       expect(result).toEqual({ displayName: 'Test' });
     });
   });
@@ -395,7 +473,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { department: 'Engineering' },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, { value: 'MGR-123' });
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toEqual({ value: 'MGR-123' });
@@ -404,7 +482,7 @@ describe('scim-patch-path utilities', () => {
 
     it('should create extension object if it does not exist', () => {
       const payload: Record<string, unknown> = {};
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, { value: 'MGR-456' });
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toEqual({ value: 'MGR-456' });
@@ -414,14 +492,14 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'OLD' } },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, { value: 'NEW' });
       expect((result[URN] as Record<string, unknown>).manager).toEqual({ value: 'NEW' });
     });
 
     it('should handle string value (not just objects)', () => {
       const payload: Record<string, unknown> = {};
-      const parsed = parseExtensionPath(`${URN}:department`)!;
+      const parsed = parseExtensionPath(`${URN}:department`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, 'Finance');
       expect((result[URN] as Record<string, unknown>).department).toBe('Finance');
     });
@@ -432,7 +510,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'OLD-MGR' }, department: 'Eng' },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, { value: '' });
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toBeUndefined();
@@ -443,7 +521,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { department: 'Eng' },
       };
-      const parsed = parseExtensionPath(`${URN}:department`)!;
+      const parsed = parseExtensionPath(`${URN}:department`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, '');
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.department).toBeUndefined();
@@ -453,7 +531,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'MGR' } },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, null);
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toBeUndefined();
@@ -463,7 +541,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'MGR' } },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, { value: null });
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toBeUndefined();
@@ -473,7 +551,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'OLD' } },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, { value: 'NEW-MGR' });
       expect((result[URN] as Record<string, unknown>).manager).toEqual({ value: 'NEW-MGR' });
     });
@@ -488,7 +566,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'MGR' }, department: 'Eng' },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = removeExtensionAttribute(payload, parsed);
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toBeUndefined();
@@ -497,7 +575,7 @@ describe('scim-patch-path utilities', () => {
 
     it('should be a no-op when extension object does not exist', () => {
       const payload: Record<string, unknown> = { displayName: 'Test' };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = removeExtensionAttribute(payload, parsed);
       expect(result).toEqual({ displayName: 'Test' });
     });
@@ -506,7 +584,7 @@ describe('scim-patch-path utilities', () => {
       const payload: Record<string, unknown> = {
         [URN]: { manager: { value: 'MGR' } },
       };
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = removeExtensionAttribute(payload, parsed);
       expect(result[URN]).toEqual({});
     });
@@ -584,7 +662,7 @@ describe('scim-patch-path utilities', () => {
 
     it('should wrap string manager value as {value} object', () => {
       const payload: Record<string, unknown> = {};
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, 'MGR-STRING');
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toEqual({ value: 'MGR-STRING' });
@@ -592,7 +670,7 @@ describe('scim-patch-path utilities', () => {
 
     it('should NOT wrap non-manager string attributes', () => {
       const payload: Record<string, unknown> = {};
-      const parsed = parseExtensionPath(`${URN}:department`)!;
+      const parsed = parseExtensionPath(`${URN}:department`) as ExtensionPathExpression;
       const result = applyExtensionUpdate(payload, parsed, 'Engineering');
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.department).toBe('Engineering');
@@ -600,7 +678,7 @@ describe('scim-patch-path utilities', () => {
 
     it('should pass through object manager value unchanged', () => {
       const payload: Record<string, unknown> = {};
-      const parsed = parseExtensionPath(`${URN}:manager`)!;
+      const parsed = parseExtensionPath(`${URN}:manager`) as ExtensionPathExpression;
       const managerObj = { value: 'MGR-001', displayName: 'Bob' };
       const result = applyExtensionUpdate(payload, parsed, managerObj);
       const ext = result[URN] as Record<string, unknown>;
@@ -677,6 +755,500 @@ describe('scim-patch-path utilities', () => {
       });
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toEqual({ value: 'MGR-STRING' });
+    });
+
+    it('should resolve custom extension URN keys when extensionUrns provided', () => {
+      const CUSTOM_URN = 'urn:example:custom:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [`${CUSTOM_URN}:customAttr`]: 'custom-val',
+      }, [CUSTOM_URN]);
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customAttr).toBe('custom-val');
+    });
+
+    it('should store URN keys with dots atomically - not split as dot-notation', () => {
+      const CUSTOM_URN = 'urn:example:custom:2.0:User';
+      const payload: Record<string, unknown> = {};
+      // Without extensionUrns, the URN:attr path is not parsed as an extension path,
+      // but the URN key itself must NOT be split on the dot in "2.0".
+      // The full key "urn:example:custom:2.0:User:customAttr" is stored as-is.
+      const result = resolveNoPathValue(payload, {
+        [`${CUSTOM_URN}:customAttr`]: 'custom-val',
+      });
+      expect(result[`${CUSTOM_URN}:customAttr`]).toBe('custom-val');
+    });
+
+    it('should merge URN extension object into existing extension namespace', () => {
+      const CUSTOM_URN = 'urn:test:scim:extension:hr:2.0:User';
+      const payload: Record<string, unknown> = {
+        [CUSTOM_URN]: { badgeNumber: 'B12345', costCenter: 'Engineering' },
+      };
+      const result = resolveNoPathValue(payload, {
+        [CUSTOM_URN]: { badgeNumber: 'B99999' },
+      });
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext.badgeNumber).toBe('B99999');
+      expect(ext.costCenter).toBe('Engineering');
+    });
+
+    it('should set URN extension object when none exists', () => {
+      const CUSTOM_URN = 'urn:test:scim:extension:hr:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [CUSTOM_URN]: { department: 'Sales' },
+      });
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext.department).toBe('Sales');
+    });
+
+    // F1: complex-merge with null-as-unset (RFC 7644 S3.5.2.3, Entra/Okta interpretation)
+    describe('complex-merge with null-as-unset (F1)', () => {
+      it('should merge a nested complex value into an existing complex parent', () => {
+        const payload: Record<string, unknown> = {
+          name: { givenName: 'Alice', familyName: 'Old', formatted: 'Alice Old' },
+        };
+        const result = resolveNoPathValue(payload, {
+          name: { familyName: 'New' },
+        });
+        const name = result.name as Record<string, unknown>;
+        expect(name.familyName).toBe('New');
+        expect(name.givenName).toBe('Alice');
+        expect(name.formatted).toBe('Alice Old');
+      });
+
+      it('should treat a null sub-value as unset of just that sub-attribute (path-less)', () => {
+        const payload: Record<string, unknown> = {
+          name: { givenName: 'Alice', familyName: 'Old', formatted: 'Alice Old' },
+        };
+        const result = resolveNoPathValue(payload, {
+          name: { familyName: null },
+        });
+        const name = result.name as Record<string, unknown>;
+        expect('familyName' in name).toBe(false);
+        expect(name.givenName).toBe('Alice');
+        expect(name.formatted).toBe('Alice Old');
+      });
+
+      it('should set the value when the existing parent is not yet present', () => {
+        const payload: Record<string, unknown> = {};
+        const result = resolveNoPathValue(payload, {
+          name: { givenName: 'Bob' },
+        });
+        expect(result.name).toEqual({ givenName: 'Bob' });
+      });
+
+      it('should whole-replace when the new value is an array (multi-valued)', () => {
+        const payload: Record<string, unknown> = {
+          emails: [{ type: 'work', value: 'old@e.com' }],
+        };
+        const result = resolveNoPathValue(payload, {
+          emails: [{ type: 'home', value: 'new@e.com' }],
+        });
+        expect(result.emails).toEqual([{ type: 'home', value: 'new@e.com' }]);
+      });
+
+      it('should null-as-unset on extension namespace sub-keys (URN branch parity)', () => {
+        const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+        const payload: Record<string, unknown> = {
+          [URN]: { department: 'Eng', employeeNumber: 'E1' },
+        };
+        const result = resolveNoPathValue(payload, {
+          [URN]: { department: null },
+        });
+        const ext = result[URN] as Record<string, unknown>;
+        expect('department' in ext).toBe(false);
+        expect(ext.employeeNumber).toBe('E1');
+      });
+    });
+  });
+
+  // mergeComplexAttribute (F1 helper)
+
+  describe('mergeComplexAttribute (F1)', () => {
+    it('should merge sub-attributes when both sides are objects', () => {
+      const out = mergeComplexAttribute(
+        { givenName: 'Alice', familyName: 'Old' },
+        { familyName: 'New' },
+      );
+      expect(out).toEqual({ givenName: 'Alice', familyName: 'New' });
+    });
+
+    it('should delete sub-attributes whose incoming value is null', () => {
+      const out = mergeComplexAttribute(
+        { givenName: 'Alice', familyName: 'Old', formatted: 'Alice Old' },
+        { familyName: null, givenName: 'Bob' },
+      );
+      expect(out).toEqual({ givenName: 'Bob', formatted: 'Alice Old' });
+    });
+
+    it('should return incoming as-is when existing is not an object', () => {
+      expect(mergeComplexAttribute(undefined, { a: 1 })).toEqual({ a: 1 });
+      expect(mergeComplexAttribute(null, { a: 1 })).toEqual({ a: 1 });
+      expect(mergeComplexAttribute('str', { a: 1 })).toEqual({ a: 1 });
+    });
+
+    it('should return incoming when incoming is null (whole-attribute unset)', () => {
+      expect(mergeComplexAttribute({ a: 1 }, null)).toBeNull();
+    });
+
+    it('should return incoming when incoming is an array (multi-valued whole-replace)', () => {
+      const arr = [{ x: 1 }];
+      expect(mergeComplexAttribute({ a: 1 }, arr)).toBe(arr);
+    });
+  });
+
+  // pruneEmptyExtensions (F5 helper)
+
+  describe('pruneEmptyExtensions (F5)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const OTHER_URN = 'urn:example:custom:2.0:User';
+
+    it('should remove an extension key whose value is an empty object', () => {
+      const payload: Record<string, unknown> = { displayName: 'Test', [URN]: {} };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(URN in payload).toBe(false);
+      expect(payload.displayName).toBe('Test');
+    });
+
+    it('should keep an extension key that still has at least one sub-attribute', () => {
+      const payload: Record<string, unknown> = { [URN]: { department: 'Eng' } };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(URN in payload).toBe(true);
+    });
+
+    it('should not touch keys not listed in extensionUrns', () => {
+      const payload: Record<string, unknown> = { [OTHER_URN]: {} };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(OTHER_URN in payload).toBe(true);
+    });
+
+    it('should be a no-op on an empty extensionUrns list', () => {
+      const payload: Record<string, unknown> = { [URN]: {} };
+      pruneEmptyExtensions(payload, []);
+      expect(URN in payload).toBe(true);
+    });
+
+    it('should not delete arrays or primitives even if "empty"', () => {
+      const payload: Record<string, unknown> = { [URN]: [] };
+      pruneEmptyExtensions(payload, [URN]);
+      expect(URN in payload).toBe(true);
+    });
+  });
+
+  // findInvalidMultiValuedElement (F4 helper)
+
+  describe('findInvalidMultiValuedElement (F4)', () => {
+    it('should return null for a valid array of objects', () => {
+      expect(findInvalidMultiValuedElement([{ a: 1 }, { b: 2 }])).toBeNull();
+    });
+
+    it('should return null for a valid array of strings (multi-valued string list)', () => {
+      expect(findInvalidMultiValuedElement(['a', 'b'])).toBeNull();
+    });
+
+    it('should return null for an empty array', () => {
+      expect(findInvalidMultiValuedElement([])).toBeNull();
+    });
+
+    it('should return null for non-array input (caller handles separately)', () => {
+      expect(findInvalidMultiValuedElement(null)).toBeNull();
+      expect(findInvalidMultiValuedElement(undefined)).toBeNull();
+      expect(findInvalidMultiValuedElement({ a: 1 })).toBeNull();
+      expect(findInvalidMultiValuedElement('s')).toBeNull();
+    });
+
+    it('should report the first null element', () => {
+      const result = findInvalidMultiValuedElement([{ a: 1 }, null, { b: 2 }]);
+      expect(result).not.toBeNull();
+      expect(result!.index).toBe(1);
+      expect(result!.reason).toContain('null');
+    });
+
+    it('should report the first undefined element', () => {
+      const result = findInvalidMultiValuedElement([{ a: 1 }, undefined]);
+      expect(result).not.toBeNull();
+      expect(result!.index).toBe(1);
+    });
+  });
+
+  // F6: extension dotted path (subAttribute support)
+
+  describe('parseExtensionPath dotted form (F6)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+    it('should split a dotted extension path into attributePath + subAttribute', () => {
+      const result = parseExtensionPath(`${URN}:manager.displayName`);
+      expect(result).toEqual({
+        schemaUrn: URN,
+        attributePath: 'manager',
+        subAttribute: 'displayName',
+      });
+    });
+
+    it('should leave the flat form unchanged (no subAttribute)', () => {
+      const result = parseExtensionPath(`${URN}:manager`);
+      expect(result).toEqual({ schemaUrn: URN, attributePath: 'manager' });
+      expect('subAttribute' in (result ?? {})).toBe(false);
+    });
+
+    it('should preserve original sub-attribute casing (RFC 7643 S2.1 case-insensitive names)', () => {
+      const result = parseExtensionPath(`${URN}:Manager.DisplayName`);
+      expect(result).not.toBeNull();
+      expect((result as { attributePath: string }).attributePath).toBe('Manager');
+      expect((result as { subAttribute?: string }).subAttribute).toBe('DisplayName');
+    });
+  });
+
+  describe('applyExtensionUpdate dotted (F6)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+    it('should set the sub-attribute and preserve other sub-attributes of the complex parent', () => {
+      const payload: Record<string, unknown> = {
+        [URN]: { manager: { value: 'MGR-1', displayName: 'Old Name' } },
+      };
+      const parsed = parseExtensionPath(`${URN}:manager.displayName`) as ExtensionPathExpression;
+      const result = applyExtensionUpdate(payload, parsed, 'New Name');
+      const mgr = (result[URN] as Record<string, unknown>).manager as Record<string, unknown>;
+      expect(mgr.value).toBe('MGR-1');
+      expect(mgr.displayName).toBe('New Name');
+    });
+
+    it('should delete only the sub-attribute when value is null and preserve siblings', () => {
+      const payload: Record<string, unknown> = {
+        [URN]: { manager: { value: 'MGR-1', displayName: 'Old' } },
+      };
+      const parsed = parseExtensionPath(`${URN}:manager.displayName`) as ExtensionPathExpression;
+      const result = applyExtensionUpdate(payload, parsed, null);
+      const mgr = (result[URN] as Record<string, unknown>).manager as Record<string, unknown>;
+      expect('displayName' in mgr).toBe(false);
+      expect(mgr.value).toBe('MGR-1');
+    });
+
+    it('should create the complex parent if it does not exist yet', () => {
+      const payload: Record<string, unknown> = { [URN]: {} };
+      const parsed = parseExtensionPath(`${URN}:manager.displayName`) as ExtensionPathExpression;
+      const result = applyExtensionUpdate(payload, parsed, 'New');
+      const mgr = (result[URN] as Record<string, unknown>).manager as Record<string, unknown>;
+      expect(mgr.displayName).toBe('New');
+    });
+  });
+
+  describe('removeExtensionAttribute dotted (F6)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+    it('should remove just the sub-attribute and keep siblings', () => {
+      const payload: Record<string, unknown> = {
+        [URN]: { manager: { value: 'MGR-1', displayName: 'Name' } },
+      };
+      const parsed = parseExtensionPath(`${URN}:manager.displayName`) as ExtensionPathExpression;
+      const result = removeExtensionAttribute(payload, parsed);
+      const mgr = (result[URN] as Record<string, unknown>).manager as Record<string, unknown>;
+      expect('displayName' in mgr).toBe(false);
+      expect(mgr.value).toBe('MGR-1');
+    });
+
+    it('should be a no-op when the complex parent does not exist', () => {
+      const payload: Record<string, unknown> = { [URN]: {} };
+      const parsed = parseExtensionPath(`${URN}:manager.displayName`) as ExtensionPathExpression;
+      const result = removeExtensionAttribute(payload, parsed);
+      expect(result[URN]).toEqual({});
+    });
+  });
+
+  // F7: extension valuePath
+
+  describe('parseExtensionPath valuePath form (F7)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox';
+
+    it('should parse an extension valuePath without sub-attribute', () => {
+      const result = parseExtensionPath(`${URN}:aliases[type eq "smtp"]`, [URN]);
+      expect(result).not.toBeNull();
+      expect(isExtensionValuePath(result!)).toBe(true);
+      const vp = (result as { valuePath: { attribute: string; filterAttribute: string; filterOperator: string; filterValue: string; subAttribute?: string } }).valuePath;
+      expect(vp.attribute).toBe('aliases');
+      expect(vp.filterAttribute).toBe('type');
+      expect(vp.filterOperator).toBe('eq');
+      expect(vp.filterValue).toBe('smtp');
+      expect(vp.subAttribute).toBeUndefined();
+    });
+
+    it('should parse an extension valuePath with sub-attribute', () => {
+      const result = parseExtensionPath(`${URN}:aliases[type eq "smtp"].value`, [URN]);
+      expect(result).not.toBeNull();
+      expect(isExtensionValuePath(result!)).toBe(true);
+      const vp = (result as { valuePath: { subAttribute?: string } }).valuePath;
+      expect(vp.subAttribute).toBe('value');
+    });
+
+    it('should return null when valuePath inside extension is malformed', () => {
+      const result = parseExtensionPath(`${URN}:aliases[invalid`, [URN]);
+      // Falls back to flat (literal attributePath) - intentional: behavior matches
+      // the pre-F7 behavior for unparseable bracket expressions inside an
+      // extension path; engines treat it as a flat extension attribute.
+      expect(result).not.toBeNull();
+      expect(isExtensionValuePath(result!)).toBe(false);
+    });
+
+    it('isExtensionValuePath returns false for flat/dotted extension paths', () => {
+      const flat = parseExtensionPath(`${URN}:aliases`, [URN]);
+      const dotted = parseExtensionPath(`${URN}:aliases.value`, [URN]);
+      expect(flat).not.toBeNull();
+      expect(dotted).not.toBeNull();
+      expect(isExtensionValuePath(flat!)).toBe(false);
+      expect(isExtensionValuePath(dotted!)).toBe(false);
+    });
+  });
+
+  describe('applyExtensionValuePathUpdate / removeExtensionValuePathEntry (F7)', () => {
+    const URN = 'urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox';
+
+    function seed(): Record<string, unknown> {
+      return {
+        [URN]: {
+          aliases: [
+            { type: 'smtp', value: 'a@x.com' },
+            { type: 'work', value: 'b@x.com' },
+          ],
+        },
+      };
+    }
+
+    it('apply: should update a sub-attribute of the matching extension element', () => {
+      const payload = seed();
+      const parsed = parseExtensionPath(`${URN}:aliases[type eq "smtp"].value`, [URN])!;
+      expect(isExtensionValuePath(parsed)).toBe(true);
+      if (!isExtensionValuePath(parsed)) throw new Error('not a valuePath');
+      const { matched, payload: result } = applyExtensionValuePathUpdate(
+        payload,
+        parsed,
+        'updated@x.com',
+      );
+      expect(matched).toBe(true);
+      const aliases = (result[URN] as Record<string, unknown>).aliases as Record<string, unknown>[];
+      expect(aliases[0].value).toBe('updated@x.com');
+      expect(aliases[1].value).toBe('b@x.com');
+    });
+
+    it('apply: should report matched=false when no extension element matches the filter (RFC 7644 S3.5.2.2 noTarget signal)', () => {
+      const payload = seed();
+      const parsed = parseExtensionPath(`${URN}:aliases[type eq "missing"].value`, [URN])!;
+      if (!isExtensionValuePath(parsed)) throw new Error('not a valuePath');
+      const { matched, payload: result } = applyExtensionValuePathUpdate(
+        payload,
+        parsed,
+        'x',
+      );
+      expect(matched).toBe(false);
+      const aliases = (result[URN] as Record<string, unknown>).aliases as Record<string, unknown>[];
+      expect(aliases.length).toBe(2);
+      expect(aliases[0].value).toBe('a@x.com');
+    });
+
+    it('apply: should report matched=false when the extension namespace does not exist', () => {
+      const payload: Record<string, unknown> = {};
+      const parsed = parseExtensionPath(`${URN}:aliases[type eq "smtp"].value`, [URN])!;
+      if (!isExtensionValuePath(parsed)) throw new Error('not a valuePath');
+      const { matched, payload: result } = applyExtensionValuePathUpdate(
+        payload,
+        parsed,
+        'x',
+      );
+      expect(matched).toBe(false);
+      expect(result).toEqual({});
+    });
+
+    it('remove: should remove the matched element from the extension array', () => {
+      const payload = seed();
+      const parsed = parseExtensionPath(`${URN}:aliases[type eq "smtp"]`, [URN])!;
+      if (!isExtensionValuePath(parsed)) throw new Error('not a valuePath');
+      const { matched, payload: result } = removeExtensionValuePathEntry(
+        payload,
+        parsed,
+      );
+      expect(matched).toBe(true);
+      const aliases = (result[URN] as Record<string, unknown>).aliases as Record<string, unknown>[];
+      expect(aliases.length).toBe(1);
+      expect(aliases[0].type).toBe('work');
+    });
+
+    it('remove: should report matched=false on zero match (noTarget signal)', () => {
+      const payload = seed();
+      const parsed = parseExtensionPath(`${URN}:aliases[type eq "missing"]`, [URN])!;
+      if (!isExtensionValuePath(parsed)) throw new Error('not a valuePath');
+      const { matched, payload: result } = removeExtensionValuePathEntry(
+        payload,
+        parsed,
+      );
+      expect(matched).toBe(false);
+      const aliases = (result[URN] as Record<string, unknown>).aliases as Record<string, unknown>[];
+      expect(aliases.length).toBe(2);
+    });
+  });
+
+  // CWE-1321 / js/remote-property-injection - prototype pollution sink barrier
+  // The engines already gate paths via guardPrototypePollution() at parse-time,
+  // so these cases are unreachable via SCIM PATCH. This block locks the
+  // defense-in-depth barrier at the util layer (CodeQL barrier).
+  describe('safePropertyKey (prototype pollution guard)', () => {
+    const dangerous = ['__proto__', 'constructor', 'prototype'];
+
+    it.each(dangerous)(
+      'applyValuePathUpdate rejects attribute %s as unsafe key',
+      (key) => {
+        expect(() =>
+          applyValuePathUpdate(
+            {},
+            { attribute: key, filterAttribute: 'type', filterOperator: 'eq', filterValue: 'x' },
+            'v',
+          ),
+        ).toThrow(/prototype pollution/i);
+      },
+    );
+
+    it('applyExtensionUpdate rejects __proto__ as attributePath', () => {
+      expect(() =>
+        applyExtensionUpdate(
+          {},
+          { schemaUrn: 'urn:x:y', attributePath: '__proto__' },
+          'v',
+        ),
+      ).toThrow(/prototype pollution/i);
+    });
+
+    it('removeExtensionAttribute rejects constructor as attributePath', () => {
+      expect(() =>
+        removeExtensionAttribute(
+          { 'urn:x:y': { foo: 'bar' } },
+          { schemaUrn: 'urn:x:y', attributePath: 'constructor' },
+        ),
+      ).toThrow(/prototype pollution/i);
+    });
+
+    it('addValuePathEntry rejects prototype as attribute', () => {
+      expect(() =>
+        addValuePathEntry(
+          {},
+          { attribute: 'prototype', filterAttribute: 'type', filterOperator: 'eq', filterValue: 'x' },
+          'v',
+        ),
+      ).toThrow(/prototype pollution/i);
+    });
+
+    it('resolveNoPathValue rejects __proto__ as a top-level key (via JSON.parse own-property)', () => {
+      // Object literal `{__proto__: x}` is a prototype-setter (no own-property),
+      // but JSON.parse produces a real own-property. Realistic attack vector.
+      const obj = JSON.parse('{"__proto__":{"polluted":true}}');
+      expect(() => resolveNoPathValue({}, obj as Record<string, unknown>)).toThrow(/prototype pollution/i);
+    });
+
+    it('safe keys (e.g. displayName, emails) pass through unchanged', () => {
+      const result = applyValuePathUpdate(
+        { emails: [{ type: 'work', value: 'a@b.com' }] },
+        { attribute: 'emails', filterAttribute: 'type', filterOperator: 'eq', filterValue: 'work', subAttribute: 'value' },
+        'new@b.com',
+      );
+      expect(result.matched).toBe(true);
     });
   });
 });

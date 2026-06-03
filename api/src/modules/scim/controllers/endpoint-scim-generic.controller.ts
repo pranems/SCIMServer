@@ -1,0 +1,395 @@
+/**
+ * EndpointScimGenericController - Phase 8b Wildcard SCIM Controller
+ *
+ * Handles SCIM CRUD operations for custom resource types registered via the
+ * Admin API. Routes are matched by a wildcard `:resourceType` param that
+ * must match a registered custom resource type for the endpoint.
+ *
+ * IMPORTANT: This controller must be registered LAST in the NestJS module's
+ * controllers array so that built-in routes (Users, Groups, Schemas, etc.)
+ * take precedence over the wildcard match.
+ *
+ * Routes:
+ *   POST   /endpoints/:endpointId/:resourceType
+ *   GET    /endpoints/:endpointId/:resourceType
+ *   GET    /endpoints/:endpointId/:resourceType/:id
+ *   PUT    /endpoints/:endpointId/:resourceType/:id
+ *   PATCH  /endpoints/:endpointId/:resourceType/:id
+ *   DELETE /endpoints/:endpointId/:resourceType/:id
+ *   POST   /endpoints/:endpointId/:resourceType/.search
+ *
+ * Gated behind the `CustomResourceTypesEnabled` per-endpoint config flag.
+ */
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import {
+  getConfigBoolean,
+  ENDPOINT_CONFIG_FLAGS,
+  type EndpointConfig,
+} from '../../endpoint/endpoint-config.interface';
+import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
+import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
+import { EndpointScimGenericService } from '../services/endpoint-scim-generic.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
+import type { ScimResourceType } from '../discovery/scim-schema-registry';
+import { buildBaseUrl } from '../common/base-url.util';
+
+@Controller('endpoints/:endpointId')
+export class EndpointScimGenericController {
+  constructor(
+    private readonly endpointService: EndpointService,
+    private readonly endpointContext: EndpointContextStorage,
+    private readonly genericService: EndpointScimGenericService,
+  ) {}
+
+  /**
+   * Attach readOnly-stripping warnings to a write response when
+   * IncludeWarningAboutIgnoredReadOnlyAttribute is enabled.
+   */
+  private attachWarnings(result: Record<string, unknown>, config?: EndpointConfig): Record<string, unknown> {
+    const warnings = this.endpointContext.getWarnings();
+    if (warnings.length === 0) return result;
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE)) return result;
+
+    const schemas = [...((result.schemas as string[]) ?? [])];
+    if (!schemas.includes(SCIM_WARNING_URN)) {
+      schemas.push(SCIM_WARNING_URN);
+    }
+
+    return {
+      ...result,
+      schemas,
+      [SCIM_WARNING_URN]: { warnings },
+    };
+  }
+
+  /**
+   * Validate endpoint, check custom resource types flag, and resolve the resource type.
+   */
+  private async resolveContext(
+    endpointId: string,
+    resourceTypePath: string,
+    req: Request,
+  ): Promise<{ baseUrl: string; config: EndpointConfig; resourceType: ScimResourceType }> {
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+
+    if (!endpoint.active) {
+      throw new ForbiddenException(
+        `Endpoint "${endpoint.name}" is inactive. SCIM operations are not allowed.`,
+      );
+    }
+
+    const profile = endpoint.profile;
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
+
+    // Derive custom resource type availability from profile.resourceTypes (D9)
+    const rt = endpoint.profile?.resourceTypes?.find(
+      r => r.endpoint === `/${resourceTypePath}` && r.name !== 'User' && r.name !== 'Group',
+    );
+
+    if (!rt) {
+      throw new NotFoundException(
+        `No custom resource type registered at "/${resourceTypePath}" for this endpoint.`,
+      );
+    }
+
+    return { baseUrl, config, resourceType: rt };
+  }
+
+  // ===== CRUD Endpoints =====
+
+  /**
+   * POST /endpoints/:endpointId/:resourceType
+   * Create a custom resource
+   */
+  @Post(':resourceType')
+  async createResource(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
+  ) {
+    const { baseUrl, config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const result = await this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
+    // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    return this.attachWarnings(projected, config);
+  }
+
+  /**
+   * GET /endpoints/:endpointId/:resourceType
+   * List custom resources
+   */
+  @Get(':resourceType')
+  async listResources(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Req() req: Request,
+    @Query('filter') filter?: string,
+    @Query('startIndex') startIndex?: string,
+    @Query('count') count?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ascending' | 'descending',
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
+  ) {
+    const { baseUrl, config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const result = await this.genericService.listResources(
+      {
+        filter,
+        startIndex: startIndex ? parseInt(startIndex, 10) : undefined,
+        count: count ? parseInt(count, 10) : undefined,
+        sortBy,
+        sortOrder,
+      },
+      baseUrl,
+      endpointId,
+      resourceType,
+      config,
+    );
+
+    // GEN-06: Apply attribute projection on list responses
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    if (attributes || excludedAttributes) {
+            return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          attributes,
+          excludedAttributes,
+          alwaysByParent,
+          requestByParent,
+        ),
+      };
+    }
+    // Even without projection params, strip returned:'request' attrs
+        if (requestByParent.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          undefined,
+          undefined,
+          alwaysByParent,
+          requestByParent,
+        ),
+      };
+    }
+    return result;
+  }
+
+  /**
+   * POST /endpoints/:endpointId/:resourceType/.search
+   * Search custom resources using POST body
+   */
+  @Post(':resourceType/.search')
+  @HttpCode(200)
+  async searchResources(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Body() body: { filter?: string; startIndex?: number; count?: number; sortBy?: string; sortOrder?: 'ascending' | 'descending'; attributes?: string; excludedAttributes?: string },
+    @Req() req: Request,
+  ) {
+    const { baseUrl, config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const result = await this.genericService.listResources(
+      {
+        filter: body.filter,
+        startIndex: body.startIndex,
+        count: body.count,
+        sortBy: body.sortBy,
+        sortOrder: body.sortOrder,
+      },
+      baseUrl,
+      endpointId,
+      resourceType,
+      config,
+    );
+
+    // GEN-07: Apply attribute projection on .search responses
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    if (body.attributes || body.excludedAttributes) {
+            return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          body.attributes,
+          body.excludedAttributes,
+          alwaysByParent,
+          requestByParent,
+        ),
+      };
+    }
+        if (requestByParent.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          undefined,
+          undefined,
+          alwaysByParent,
+          requestByParent,
+        ),
+      };
+    }
+    return result;
+  }
+
+  /**
+   * GET /endpoints/:endpointId/:resourceType/:id
+   * Get a specific custom resource
+   */
+  @Get(':resourceType/:id')
+  async getResource(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
+  ) {
+    const { baseUrl, config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const result = await this.genericService.getResource(id, baseUrl, endpointId, resourceType, config);
+    // GEN-05: Apply attribute projection on single-resource response
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+  }
+
+  /**
+   * PUT /endpoints/:endpointId/:resourceType/:id
+   * Replace a custom resource
+   */
+  @Put(':resourceType/:id')
+  async replaceResource(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
+  ) {
+    const { baseUrl, config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    const result = await this.genericService.replaceResource(
+      id,
+      body,
+      baseUrl,
+      endpointId,
+      resourceType,
+      config,
+      ifMatch,
+    );
+    // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    return this.attachWarnings(projected, config);
+  }
+
+  /**
+   * PATCH /endpoints/:endpointId/:resourceType/:id
+   * Patch a custom resource
+   */
+  @Patch(':resourceType/:id')
+  async patchResource(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
+  ) {
+    const { baseUrl, config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    const result = await this.genericService.patchResource(
+      id,
+      body,
+      baseUrl,
+      endpointId,
+      resourceType,
+      config,
+      ifMatch,
+    );
+    // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    return this.attachWarnings(projected, config);
+  }
+
+  /**
+   * DELETE /endpoints/:endpointId/:resourceType/:id
+   * Delete a custom resource
+   */
+  @Delete(':resourceType/:id')
+  @HttpCode(204)
+  async deleteResource(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceTypePath: string,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<void> {
+    const { config, resourceType } = await this.resolveContext(
+      endpointId,
+      resourceTypePath,
+      req,
+    );
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.genericService.deleteResource(
+      id,
+      endpointId,
+      resourceType,
+      config,
+      ifMatch,
+    );
+  }
+}

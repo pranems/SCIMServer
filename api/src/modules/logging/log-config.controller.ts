@@ -7,8 +7,12 @@ import {
   Param,
   Query,
   HttpCode,
+  HttpException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ScimLogger } from './scim-logger.service';
+import { LoggingService } from './logging.service';
 import {
   LogLevel,
   LogCategory,
@@ -30,7 +34,10 @@ import {
  */
 @Controller('admin/log-config')
 export class LogConfigController {
-  constructor(private readonly scimLogger: ScimLogger) {}
+  constructor(
+    private readonly scimLogger: ScimLogger,
+    private readonly loggingService: LoggingService,
+  ) {}
 
   /**
    * GET /scim/admin/log-config
@@ -76,6 +83,9 @@ export class LogConfigController {
     if (typeof body.maxPayloadSizeBytes === 'number') {
       updates.maxPayloadSizeBytes = body.maxPayloadSizeBytes;
     }
+    if (typeof body.slowRequestThresholdMs === 'number' && body.slowRequestThresholdMs > 0) {
+      updates.slowRequestThresholdMs = body.slowRequestThresholdMs;
+    }
     if (body.format === 'json' || body.format === 'pretty') {
       updates.format = body.format;
     }
@@ -89,7 +99,18 @@ export class LogConfigController {
       updates.categoryLevels = catLevels;
     }
 
+    // Capture before values for audit log
+    const before = this.scimLogger.getConfig();
+    const changeDetails: Record<string, { from: unknown; to: unknown }> = {};
+    for (const key of Object.keys(updates) as Array<keyof LogConfig>) {
+      changeDetails[key] = { from: before[key], to: updates[key] };
+    }
+
     this.scimLogger.updateConfig(updates);
+
+    this.scimLogger.info(LogCategory.CONFIG, 'Log configuration updated', {
+      changes: changeDetails,
+    });
 
     return {
       message: 'Log configuration updated',
@@ -104,6 +125,7 @@ export class LogConfigController {
   @Put('level/:level')
   setGlobalLevel(@Param('level') level: string) {
     this.scimLogger.setGlobalLevel(level);
+    this.scimLogger.info(LogCategory.CONFIG, `Global log level changed to ${level.toUpperCase()}`);
     return {
       message: `Global log level set to ${level.toUpperCase()}`,
       globalLevel: logLevelName(this.scimLogger.getConfig().globalLevel),
@@ -120,12 +142,13 @@ export class LogConfigController {
     @Param('level') level: string,
   ) {
     if (!Object.values(LogCategory).includes(category as LogCategory)) {
-      return {
+      throw new HttpException({
         error: `Unknown category '${category}'`,
         availableCategories: Object.values(LogCategory),
-      };
+      }, 400);
     }
     this.scimLogger.setCategoryLevel(category as LogCategory, level);
+    this.scimLogger.info(LogCategory.CONFIG, `Category '${category}' log level changed to ${level.toUpperCase()}`);
     return {
       message: `Category '${category}' log level set to ${level.toUpperCase()}`,
     };
@@ -141,6 +164,7 @@ export class LogConfigController {
     @Param('level') level: string,
   ) {
     this.scimLogger.setEndpointLevel(endpointId, level);
+    this.scimLogger.info(LogCategory.CONFIG, `Endpoint '${endpointId}' log level changed to ${level.toUpperCase()}`);
     return {
       message: `Endpoint '${endpointId}' log level set to ${level.toUpperCase()}`,
     };
@@ -154,6 +178,7 @@ export class LogConfigController {
   @HttpCode(204)
   clearEndpointLevel(@Param('endpointId') endpointId: string) {
     this.scimLogger.clearEndpointLevel(endpointId);
+    this.scimLogger.info(LogCategory.CONFIG, `Endpoint '${endpointId}' log level override removed`);
   }
 
   /**
@@ -176,10 +201,37 @@ export class LogConfigController {
       requestId: requestId || undefined,
       endpointId: endpointId || undefined,
     });
-    return {
+
+    const response: { count: number; entries: typeof entries; hint?: string } = {
       count: entries.length,
       entries,
     };
+
+    // When filtered by requestId and nothing found, hint the operator to try persistent DB logs
+    if (entries.length === 0 && requestId) {
+      response.hint = `No entries in ring buffer for requestId '${requestId}'. Try persistent logs: GET /scim/admin/logs?search=${requestId}`;
+    }
+
+    return response;
+  }
+
+  /**
+   * GET /scim/admin/log-config/audit
+   * Retrieve audit trail entries (config changes, endpoint CRUD, credential CRUD).
+   * Filters ring buffer to CONFIG, ENDPOINT, and AUTH categories.
+   */
+  @Get('audit')
+  getAuditLog(
+    @Query('limit') limit?: string,
+  ) {
+    const auditCategories = [LogCategory.CONFIG, LogCategory.ENDPOINT, LogCategory.AUTH];
+    const allEntries = this.scimLogger.getRecentLogs({
+      limit: limit ? parseInt(limit, 10) : 200,
+    });
+    const entries = allEntries.filter(e =>
+      auditCategories.includes(e.category as LogCategory),
+    );
+    return { count: entries.length, entries };
   }
 
   /**
@@ -190,5 +242,160 @@ export class LogConfigController {
   @HttpCode(204)
   clearRecentLogs() {
     this.scimLogger.clearRecentLogs();
+  }
+
+  /**
+   * GET /scim/admin/log-config/stream
+   * Server-Sent Events (SSE) endpoint for real-time log tailing.
+   *
+   * Streams log entries as they occur. Supports optional query filters:
+   *   ?level=WARN      - only entries ≥ WARN
+   *   ?category=http   - only entries matching category
+   *   ?endpointId=xxx  - only entries for a specific endpoint
+   *
+   * Usage:
+   *   curl -N https://host/scim/admin/log-config/stream?level=INFO
+   *   EventSource: new EventSource('/scim/admin/log-config/stream')
+   */
+  @Get('stream')
+  streamLogs(
+    @Query('level') level: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('endpointId') endpointId: string | undefined,
+    @Res() res: Response,
+  ) {
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable NGINX buffering
+    res.flushHeaders();
+
+    // Send initial connection event
+    res.write(`event: connected\ndata: ${JSON.stringify({ message: 'Log stream connected', filters: { level: level ?? 'ALL', category: category ?? 'ALL', endpointId: endpointId ?? 'ALL' } })}\n\n`);
+
+    // Parse filter options
+    const minLevel = level ? parseLogLevel(level) : undefined;
+    const filterCategory = category as LogCategory | undefined;
+
+    // Subscribe to live log entries
+    const unsubscribe = this.scimLogger.subscribe((entry) => {
+      // Apply filters
+      if (minLevel !== undefined) {
+        const parsed = LogLevel[entry.level as keyof typeof LogLevel];
+        const entryLevel = typeof parsed === 'number' ? parsed : Number(LogLevel.INFO);
+        if (entryLevel < Number(minLevel)) return;
+      }
+      if (filterCategory && entry.category !== (filterCategory as string)) return;
+      if (endpointId && entry.endpointId !== endpointId) return;
+
+      // Send SSE event
+      res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    });
+
+    // Phase J (v0.48.1): also subscribe to the SCIM mutation event
+    // channel so cross-tab `useSSE` consumers receive typed
+    // `{type: 'scim.x.y', ...}` payloads. SCIM events are NOT subject
+    // to log-level / category filters - they are admin signals, not
+    // diagnostic logs - but we DO honor the endpointId filter so a
+    // tab scoped to one endpoint doesn't get noise from siblings.
+    const unsubscribeScim = this.scimLogger.subscribeScimEvents((event) => {
+      if (endpointId && event.endpointId !== endpointId) return;
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    });
+
+    // Keep-alive ping every 30s to prevent proxy timeouts
+    const keepAlive = setInterval(() => {
+      res.write(`: ping ${new Date().toISOString()}\n\n`);
+    }, 30_000);
+
+    // Cleanup on client disconnect
+    res.on('close', () => {
+      unsubscribe();
+      unsubscribeScim();
+      clearInterval(keepAlive);
+      res.end();
+    });
+  }
+
+  /**
+   * GET /scim/admin/log-config/download
+   * Download recent log entries as a JSON or NDJSON file.
+   *
+   * Query params:
+   *   ?format=ndjson  - Newline-delimited JSON (default)
+   *   ?format=json    - JSON array
+   *   ?limit=500      - Max entries (default: all in ring buffer, max 500)
+   *   ?level=WARN     - Minimum level filter
+   *   ?category=http  - Category filter
+   *
+   * The response is a downloadable file with Content-Disposition header.
+   */
+  @Get('download')
+  downloadLogs(
+    @Query('format') format: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @Query('level') level: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('requestId') requestId: string | undefined,
+    @Query('endpointId') endpointId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const entries = this.scimLogger.getRecentLogs({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      level: level ? parseLogLevel(level) : undefined,
+      category: category as LogCategory | undefined,
+      requestId: requestId || undefined,
+      endpointId: endpointId || undefined,
+    });
+
+    const outputFormat = format === 'json' ? 'json' : 'ndjson';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `scimserver-logs-${timestamp}.${outputFormat}`;
+
+    res.setHeader('Content-Type', outputFormat === 'json' ? 'application/json' : 'application/x-ndjson');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    if (outputFormat === 'json') {
+      res.send(JSON.stringify(entries, null, 2));
+    } else {
+      // NDJSON - one JSON object per line
+      const ndjson = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
+      res.send(ndjson);
+    }
+  }
+
+  // ── Auto-Prune Configuration ──────────────────────────────────────
+
+  /**
+   * GET /scim/admin/log-config/prune
+   * Returns the current auto-prune configuration.
+   */
+  @Get('prune')
+  getAutoPruneConfig() {
+    return this.loggingService.getAutoPruneConfig();
+  }
+
+  /**
+   * PUT /scim/admin/log-config/prune
+   * Update auto-prune configuration at runtime.
+   * Body: { retentionDays?: number, intervalMs?: number, enabled?: boolean }
+   */
+  @Put('prune')
+  updateAutoPruneConfig(@Body() body: Record<string, unknown>) {
+    const config: { retentionDays?: number; intervalMs?: number; enabled?: boolean } = {};
+
+    if (typeof body.retentionDays === 'number' && body.retentionDays > 0) {
+      config.retentionDays = body.retentionDays;
+    }
+    if (typeof body.intervalMs === 'number' && body.intervalMs >= 60_000) {
+      config.intervalMs = body.intervalMs;
+    }
+    if (typeof body.enabled === 'boolean') {
+      config.enabled = body.enabled;
+    }
+
+    this.loggingService.setAutoPruneConfig(config);
+    return this.loggingService.getAutoPruneConfig();
   }
 }

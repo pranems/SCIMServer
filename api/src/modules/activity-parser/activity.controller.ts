@@ -1,12 +1,16 @@
-﻿import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LoggingService } from '../logging/logging.service';
 import { ActivityParserService, ActivitySummary } from './activity-parser.service';
 
 @Controller('admin/activity')
 export class ActivityController {
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityParser: ActivityParserService,
+    private readonly loggingService: LoggingService,
   ) {}
 
   @Get()
@@ -17,9 +21,15 @@ export class ActivityController {
     @Query('severity') severity?: string,
     @Query('search') search?: string,
     @Query('hideKeepalive') hideKeepalive?: string,
+    @Query('endpointId') endpointId?: string,
   ) {
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
+
+    if (this.isInMemoryBackend) {
+      return this.getActivitiesInMemory(pageNum, limitNum, type, severity, search, hideKeepalive === 'true', endpointId);
+    }
+
     const skip = (pageNum - 1) * limitNum;
     const shouldHideKeepalive = hideKeepalive === 'true';
 
@@ -84,6 +94,16 @@ export class ActivityController {
       });
     }
 
+    // Phase D2: per-endpoint scoping. The Activity tab on
+    // /endpoints/$id/activity needs server-side filtering by
+    // endpointId; the indexed `endpointId` column was added in
+    // Phase 17 for exactly this purpose. When the caller omits the
+    // param, the existing global-activity behavior (used by the
+    // legacy ActivityFeed component) is preserved.
+    if (endpointId) {
+      whereConditions.push({ endpointId });
+    }
+
     const where: any = { AND: whereConditions };
 
     // Fetch logs from database
@@ -108,7 +128,9 @@ export class ActivityController {
     ]);
 
     // Parse each log into an activity summary
-    let activities: ActivitySummary[] = await Promise.all(
+    // Parse each log into an activity summary.
+    // Use allSettled to prevent one malformed log from crashing the entire page.
+    const results = await Promise.allSettled(
       logs.map(async log =>
         await this.activityParser.parseActivity({
           id: log.id,
@@ -122,6 +144,9 @@ export class ActivityController {
         })
       )
     );
+    let activities: ActivitySummary[] = results
+      .filter((r): r is PromiseFulfilledResult<ActivitySummary> => r.status === 'fulfilled')
+      .map(r => r.value);
 
     // Apply client-side filters
     if (type) {
@@ -149,57 +174,79 @@ export class ActivityController {
 
   @Get('summary')
   async getActivitySummary() {
+    if (this.isInMemoryBackend) {
+      // InMemory mode: return zeroed summary (no persistent request logs)
+      return {
+        summary: {
+          last24Hours: 0,
+          lastWeek: 0,
+          operations: { users: 0, groups: 0 },
+        },
+      };
+    }
+
     // Get recent activity counts
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const selectFields = {
-      method: true,
-      url: true,
-      status: true,
-      identifier: true as const,
+    // Common exclusion: admin traffic should never count as SCIM operations
+    const notAdmin = { url: { not: { contains: '/admin/' } } };
+
+    // SQL-level keepalive exclusion - Entra keepalive probes are:
+    // method=GET + url contains /Users + identifier IS NULL + status < 400 + url has ?filter=
+    // We EXCLUDE these by using NOT { AND: [all keepalive conditions] }
+    const notKeepalive = {
+      NOT: {
+        AND: [
+          { method: 'GET' },
+          { url: { contains: '/Users' } },
+          { identifier: null },
+          { OR: [{ status: null }, { status: { lt: 400 } }] },
+          { url: { contains: '?filter=' } },
+        ],
+      },
     };
 
-    const [recentDayLogs, recentWeekLogs, userLogs, groupOperations, systemOperations] = await Promise.all([
-      this.prisma.requestLog.findMany({
+    const [last24Hours, lastWeek, userOperations, groupOperations] = await Promise.all([
+      // Last 24h: non-admin, non-keepalive count
+      this.prisma.requestLog.count({
         where: {
           createdAt: { gte: oneDayAgo },
-          url: { not: { contains: '/admin/' } },
+          ...notAdmin,
+          ...notKeepalive,
         },
-        select: selectFields,
       }),
-      this.prisma.requestLog.findMany({
+      // Last 7d: non-admin, non-keepalive count
+      this.prisma.requestLog.count({
         where: {
           createdAt: { gte: oneWeekAgo },
-          url: { not: { contains: '/admin/' } },
+          ...notAdmin,
+          ...notKeepalive,
         },
-        select: selectFields,
       }),
-      this.prisma.requestLog.findMany({
-        where: {
-          url: { contains: '/Users' },
-        },
-        select: selectFields,
-      }),
+      // User operations: last 30 days, non-admin, non-keepalive, URL contains /Users
+      // Bounded to 30 days to avoid full table scans on burstable DB tiers.
       this.prisma.requestLog.count({
         where: {
-          url: { contains: '/Groups' },
+          AND: [
+            { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+            { url: { contains: '/Users' } },
+            notAdmin,
+            notKeepalive,
+          ],
         },
       }),
+      // Group operations: last 30 days, non-admin count (keepalive only targets /Users, not /Groups)
       this.prisma.requestLog.count({
         where: {
-          url: { not: { contains: '/Users' } },
-          AND: { url: { not: { contains: '/Groups' } } },
+          AND: [
+            { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+            { url: { contains: '/Groups' } },
+            notAdmin,
+          ],
         },
       }),
     ]);
-
-    const removeKeepalive = (logs: Array<{ method: string; url: string; status: number | null; identifier: string | null }>) =>
-      logs.filter((log) => !this.activityParser.isKeepaliveLog(log)).length;
-
-    const last24Hours = removeKeepalive(recentDayLogs);
-    const lastWeek = removeKeepalive(recentWeekLogs);
-    const userOperations = removeKeepalive(userLogs);
 
     return {
       summary: {
@@ -208,8 +255,57 @@ export class ActivityController {
         operations: {
           users: userOperations,
           groups: groupOperations,
-          system: systemOperations,
         },
+      },
+    };
+  }
+
+  // ─── InMemory fallback ──────────────────────────────────────────
+
+  private async getActivitiesInMemory(
+    page: number, limit: number,
+    type?: string, severity?: string, search?: string, hideKeepalive?: boolean,
+    endpointId?: string,
+  ) {
+    // Use LoggingService.listLogs which already has inmemory support
+    const logResult = await this.loggingService.listLogs({
+      page,
+      pageSize: limit,
+      urlContains: search || undefined,
+      hideKeepalive,
+      endpointId: endpointId || undefined,
+    });
+
+    const logs = logResult.items ?? [];
+    let activities: ActivitySummary[] = await Promise.all(
+      logs.map(async (log: any) =>
+        await this.activityParser.parseActivity({
+          id: log.id ?? `inmem-${Date.now()}-${Math.random()}`,
+          method: log.method,
+          url: log.url,
+          status: log.status || undefined,
+          requestBody: log.requestBody || undefined,
+          responseBody: log.responseBody || undefined,
+          createdAt: log.createdAt ? new Date(log.createdAt).toISOString() : new Date().toISOString(),
+          identifier: log.reportableIdentifier || undefined,
+        })
+      )
+    );
+
+    if (type) activities = activities.filter(a => a.type === type);
+    if (severity) activities = activities.filter(a => a.severity === severity);
+
+    return {
+      activities,
+      pagination: {
+        page,
+        limit,
+        total: logResult.total ?? logs.length,
+        pages: Math.ceil((logResult.total ?? logs.length) / limit),
+      },
+      filters: {
+        types: ['user', 'group', 'system'],
+        severities: ['info', 'success', 'warning', 'error'],
       },
     };
   }

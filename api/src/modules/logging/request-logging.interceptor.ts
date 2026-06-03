@@ -1,4 +1,4 @@
-﻿import {
+import {
   CallHandler,
   ExecutionContext,
   Injectable,
@@ -11,7 +11,22 @@ import { randomUUID } from 'node:crypto';
 
 import { LoggingService } from './logging.service';
 import { ScimLogger } from './scim-logger.service';
-import { LogLevel, LogCategory } from './log-levels';
+import { LogCategory } from './log-levels';
+
+/**
+ * Metadata stashed on the request object by the interceptor so that
+ * exception filters can call `recordRequest()` with full timing data
+ * and the **actual** response body they build.
+ */
+export interface RequestLoggingMeta {
+  startedAt: number;
+  requestHeaders: Record<string, unknown>;
+  requestBody: unknown;
+  endpointId?: string;
+}
+
+/** Key used to stash RequestLoggingMeta on the Express request object. */
+export const REQUEST_LOGGING_META_KEY = '__scim_logging_meta';
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
@@ -45,8 +60,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
           startTime: startedAt,
         },
         () => {
-          // Log incoming request
-          this.scimLogger.info(LogCategory.HTTP, `→ ${request.method} ${request.originalUrl ?? request.url}`, {
+          // Log incoming request (DEBUG - operational detail, not business event)
+          this.scimLogger.debug(LogCategory.HTTP, `→ ${request.method} ${request.originalUrl ?? request.url}`, {
             userAgent: request.headers['user-agent'] as string,
             contentType: request.headers['content-type'] as string,
             ip: request.ip || request.socket?.remoteAddress,
@@ -59,12 +74,21 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             });
           }
 
+          // Stash timing metadata on request so exception filters can
+          // call recordRequest() with the ACTUAL response body they build.
+          (request as any)[REQUEST_LOGGING_META_KEY] = {
+            startedAt,
+            requestHeaders: { ...request.headers },
+            requestBody: request.body,
+            endpointId,
+          } as RequestLoggingMeta;
+
           next.handle().pipe(
             tap((responseBody: unknown) => {
               const durationMs = Date.now() - startedAt;
 
-              // Structured response log
-              this.scimLogger.info(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${request.originalUrl ?? request.url}`, {
+              // Structured response log (DEBUG - operational detail)
+              this.scimLogger.debug(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${request.originalUrl ?? request.url}`, {
                 status: response.statusCode,
                 durationMs,
               });
@@ -77,7 +101,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
               }
 
               // Log slow requests as warnings
-              if (durationMs > 2000) {
+              if (durationMs > this.scimLogger.getConfig().slowRequestThresholdMs) {
                 this.scimLogger.warn(LogCategory.HTTP, `Slow request: ${durationMs}ms`, {
                   status: response.statusCode,
                   durationMs,
@@ -93,32 +117,15 @@ export class RequestLoggingInterceptor implements NestInterceptor {
                 requestHeaders: { ...request.headers },
                 requestBody: request.body,
                 responseHeaders: response.getHeaders() as Record<string, unknown>,
-                responseBody
+                responseBody,
+                endpointId,
               });
             }),
             catchError((error: unknown) => {
-              const durationMs = Date.now() - startedAt;
-              const status = this.extractStatusCode(error, response);
-
-              // Structured error log
-              this.scimLogger.error(
-                LogCategory.HTTP,
-                `← ${status} ${request.method} ${request.originalUrl ?? request.url}`,
-                error,
-                { status, durationMs },
-              );
-
-              // Persist to database
-              void this.loggingService.recordRequest({
-                method: request.method,
-                url: request.originalUrl ?? request.url,
-                status,
-                durationMs,
-                requestHeaders: { ...request.headers },
-                requestBody: request.body,
-                responseHeaders: response.getHeaders() as Record<string, unknown>,
-                error
-              });
+              // Error DB persistence + logging is handled by the exception
+              // filters (ScimExceptionFilter / GlobalExceptionFilter) which
+              // have access to the ACTUAL response body they build.
+              // The filters read timing metadata from REQUEST_LOGGING_META_KEY.
               throw error;
             })
           ).subscribe(subscriber);
@@ -127,11 +134,4 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     });
   }
 
-  private extractStatusCode(error: unknown, response: Response): number | undefined {
-    if (typeof (error as { status?: number })?.status === 'number') {
-      return (error as { status?: number }).status;
-    }
-
-    return response.statusCode;
-  }
 }

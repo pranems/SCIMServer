@@ -1,0 +1,115 @@
+/**
+ * AppHeader - top navigation bar with title, theme toggle.
+ */
+import React from 'react';
+import {
+  makeStyles,
+  tokens,
+  Text,
+  Button,
+  Tooltip,
+} from '@fluentui/react-components';
+import {
+  WeatherMoon24Regular,
+  WeatherSunny24Regular,
+  Key24Regular,
+  Pulse24Regular,
+} from '@fluentui/react-icons';
+import { HEADER_HEIGHT } from '../design/tokens';
+import { useUIStore } from '../store/ui-store';
+import { clearStoredToken, notifyTokenInvalid } from '../auth/token';
+import { HealthRollup } from './HealthRollup';
+import { NotificationsButton } from './NotificationsButton';
+
+const useStyles = makeStyles({
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: HEADER_HEIGHT,
+    padding: '0 16px',
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
+    flexShrink: 0,
+  },
+  titleArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+});
+
+export const AppHeader: React.FC = () => {
+  const classes = useStyles();
+  const colorScheme = useUIStore((s) => s.colorScheme);
+  const setColorScheme = useUIStore((s) => s.setColorScheme);
+  const toggleLogStream = useUIStore((s) => s.toggleLogStreamDrawer);
+  const logStreamOpen = useUIStore((s) => s.logStreamDrawerOpen);
+
+  const isDark = colorScheme === 'dark' || (colorScheme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+
+  return (
+    <header className={classes.header} data-testid="app-header">
+      <div className={classes.titleArea}>
+        <Text size={500} weight="semibold" style={{ color: 'inherit' }}>
+          SCIMServer
+        </Text>
+        <Text
+          size={200}
+          style={{ color: 'inherit', opacity: 0.85 }}
+          data-testid="app-version"
+        >
+          v{__APP_VERSION__}
+        </Text>
+      </div>
+
+      <div className={classes.actions}>
+        <HealthRollup />
+        <NotificationsButton />
+        <Tooltip
+          content={logStreamOpen ? 'Hide live log stream' : 'Show live log stream'}
+          relationship="label"
+        >
+          <Button
+            appearance={logStreamOpen ? 'primary' : 'subtle'}
+            icon={<Pulse24Regular />}
+            onClick={toggleLogStream}
+            aria-label={logStreamOpen ? 'Hide live log stream' : 'Show live log stream'}
+            aria-pressed={logStreamOpen}
+            data-testid="log-stream-toggle"
+            style={{ color: 'inherit' }}
+          />
+        </Tooltip>
+        <Tooltip content="Change token" relationship="label">
+          <Button
+            appearance="subtle"
+            icon={<Key24Regular />}
+            onClick={() => { clearStoredToken(); notifyTokenInvalid(); }}
+            aria-label="Change token"
+            data-testid="change-token"
+            style={{ color: 'inherit' }}
+          />
+        </Tooltip>
+        <Tooltip
+          content={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          relationship="label"
+        >
+          <Button
+            appearance="subtle"
+            icon={isDark ? <WeatherSunny24Regular /> : <WeatherMoon24Regular />}
+            onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            data-testid="theme-toggle"
+            style={{ color: 'inherit' }}
+          />
+        </Tooltip>
+      </div>
+    </header>
+  );
+};

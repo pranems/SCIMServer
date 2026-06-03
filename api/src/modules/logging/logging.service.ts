@@ -1,7 +1,10 @@
-﻿import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client';
+import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ScimLogger } from './scim-logger.service';
+import { LogCategory } from './log-levels';
 
 export interface CreateRequestLogOptions {
   method: string;
@@ -13,32 +16,121 @@ export interface CreateRequestLogOptions {
   responseHeaders?: Record<string, unknown>;
   responseBody?: unknown;
   error?: unknown;
+  /** SCIM endpoint ID extracted from URL (persisted for indexed endpoint-scoped queries) */
+  endpointId?: string;
 }
 
 @Injectable()
-export class LoggingService implements OnModuleDestroy {
-  private readonly logger = new Logger(LoggingService.name);
+export class LoggingService implements OnModuleDestroy, OnModuleInit {
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
-  // ── Buffered logging to reduce SQLite write contention ──
-  // SQLite compromise (CRITICAL): Per-request logging (2 writes each) competes for the
-  // single SQLite writer lock with SCIM operations. Buffering trades real-time logging
-  // (up to 3s data loss on crash) for reduced lock contention.
-  // PostgreSQL migration: remove buffering, use direct create() per request.
-  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.2
-  private logBuffer: Array<Prisma.RequestLogCreateInput & { _identifier?: string }> = [];
+  // ── Auto-prune configuration ──
+  private autoPruneRetentionDays: number = Number(process.env.LOG_RETENTION_DAYS) || 21;
+  private autoPruneIntervalMs: number = Number(process.env.LOG_PRUNE_INTERVAL_MS) || 60 * 60 * 1000; // default: 1 hour
+  private autoPruneTimer: ReturnType<typeof setInterval> | null = null;
+  private autoPruneEnabled: boolean = (process.env.LOG_AUTO_PRUNE ?? 'true').toLowerCase() !== 'false';
+
+  // ── Buffered logging for performance ──
+  // Buffering trades real-time logging (up to 3s data loss on crash) for reduced
+  // database write overhead. Single batch insert instead of N individual writes.
+  // Originally introduced to mitigate SQLite single-writer contention; retained
+  // for PostgreSQL to reduce connection pool pressure.
+  private logBuffer: Array<Prisma.RequestLogCreateManyInput & { _identifier?: string }> = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
   private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
   private static readonly MAX_BUFFER_SIZE = 50;        // or when 50 entries accumulate
+  private inMemoryLogRows: Array<{
+    id: string;
+    method: string;
+    url: string;
+    endpointId: string | null;
+    status: number | null;
+    durationMs: number | null;
+    createdAt: Date;
+    requestHeaders: string | null;
+    requestBody: string | null;
+    responseHeaders: string | null;
+    responseBody: string | null;
+    errorMessage: string | null;
+    errorStack: string | null;
+    identifier: string | null;
+  }> = [];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: ScimLogger,
+  ) {}
+
+  // ── Auto-prune lifecycle ──
+
+  // eslint-disable-next-line @typescript-eslint/require-await -- NestJS OnModuleInit signature requires Promise<void>
+  async onModuleInit(): Promise<void> {
+    if (this.autoPruneEnabled && !this.isInMemoryBackend) {
+      this.logger.info(LogCategory.DATABASE, `Auto-prune enabled: retention=${this.autoPruneRetentionDays}d, interval=${this.autoPruneIntervalMs}ms`);
+      // Run initial prune after a short delay (don't block startup)
+      setTimeout(() => void this.runAutoPrune(), 5_000);
+      // Schedule recurring prune
+      this.autoPruneTimer = setInterval(() => void this.runAutoPrune(), this.autoPruneIntervalMs);
+    }
+  }
+
+  private async runAutoPrune(): Promise<void> {
+    try {
+      const pruned = await this.pruneOldLogs(this.autoPruneRetentionDays);
+      if (pruned > 0) {
+        this.logger.info(LogCategory.DATABASE, `Auto-pruned ${pruned} log entries (retention: ${this.autoPruneRetentionDays}d)`);
+      }
+    } catch (err) {
+      this.logger.error(LogCategory.DATABASE, `Auto-prune failed: ${(err as Error).message}`);
+    }
+  }
+
+  /** Get current auto-prune configuration */
+  getAutoPruneConfig() {
+    return {
+      enabled: this.autoPruneEnabled,
+      retentionDays: this.autoPruneRetentionDays,
+      intervalMs: this.autoPruneIntervalMs,
+    };
+  }
+
+  /** Update auto-prune configuration at runtime */
+  setAutoPruneConfig(config: { retentionDays?: number; intervalMs?: number; enabled?: boolean }): void {
+    if (config.retentionDays !== undefined && config.retentionDays > 0) {
+      this.autoPruneRetentionDays = config.retentionDays;
+    }
+    if (config.intervalMs !== undefined && config.intervalMs >= 60_000) {
+      this.autoPruneIntervalMs = config.intervalMs;
+    }
+    if (config.enabled !== undefined) {
+      this.autoPruneEnabled = config.enabled;
+    }
+
+    // Restart the timer with new interval
+    if (this.autoPruneTimer) {
+      clearInterval(this.autoPruneTimer);
+      this.autoPruneTimer = null;
+    }
+    if (this.autoPruneEnabled && !this.isInMemoryBackend) {
+      this.autoPruneTimer = setInterval(() => void this.runAutoPrune(), this.autoPruneIntervalMs);
+    }
+
+    this.logger.info(LogCategory.CONFIG, `Auto-prune config updated: enabled=${this.autoPruneEnabled}, retention=${this.autoPruneRetentionDays}d, interval=${this.autoPruneIntervalMs}ms`);
+  }
 
   /**
    * Buffer a request log entry. The entry is written to the DB asynchronously
-   * in batches to avoid per-request SQLite write-lock contention with SCIM
-   * transactions.
+   * in batches to reduce per-request database write overhead.
+   *
+   * Successful GETs to the health endpoint are dropped without ever entering
+   * the buffer: they are pure liveness/readiness pings (k8s, Container Apps
+   * health probe, uptime monitors), produce no diagnostic value, and at
+   * default Container Apps probe cadence accumulate ~12k rows/day per replica.
+   * Failed health checks (status >= 400 or thrown error) ARE still recorded
+   * because they are exactly the cases an operator wants to see.
    */
-  async recordRequest({
+  recordRequest({
     method,
     url,
     status,
@@ -47,8 +139,55 @@ export class LoggingService implements OnModuleDestroy {
     requestBody,
     responseHeaders,
     responseBody,
-    error
-  }: CreateRequestLogOptions): Promise<void> {
+    error,
+    endpointId,
+  }: CreateRequestLogOptions): void {
+    // Skip successful health probes - see method-level docstring.
+    // Matches: GET /health, /scim/health (with optional trailing slash or
+    // sub-path) when status is in [200, 400) and there is no error.
+    if (
+      method === 'GET' &&
+      !error &&
+      typeof status === 'number' && status >= 200 && status < 400 &&
+      /^\/(?:scim\/)?health(?:\/|$|\?)/.test(url)
+    ) {
+      return;
+    }
+
+    if (this.isInMemoryBackend) {
+      const errorMessage = this.extractErrorMessage(error);
+      const errorStack = this.extractErrorStack(error);
+      let identifier: string | undefined;
+      try {
+        const idCandidate = this.deriveReportableIdentifier(url, requestBody, responseBody) ||
+          (/\/scim\/Groups/i.test(url) ? this.deriveGroupDisplayName(
+            this.normalizeObject(requestBody) ?? null,
+            this.normalizeObject(responseBody) ?? null
+          ) : undefined) || this.deriveIdentifierFromUrl(url);
+        if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
+      } catch (e) {
+        this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed (inmemory)', { url, error: (e as Error).message });
+      }
+
+      this.inMemoryLogRows.push({
+        id: randomUUID(),
+        method,
+        url,
+        endpointId: endpointId ?? null,
+        status: status ?? null,
+        durationMs: durationMs ?? null,
+        createdAt: new Date(),
+        requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
+        requestBody: this.stringifyValue(requestBody),
+        responseHeaders: this.stringifyValue(responseHeaders),
+        responseBody: this.stringifyValue(responseBody),
+        errorMessage,
+        errorStack,
+        identifier: identifier ?? null,
+      });
+      return;
+    }
+
     const errorMessage = this.extractErrorMessage(error);
     const errorStack = this.extractErrorStack(error);
     // Compute identifier once (cheap vs later bulk parsing). Works for Users (userName/email/externalId) & Groups (displayName)
@@ -60,9 +199,11 @@ export class LoggingService implements OnModuleDestroy {
           this.normalizeObject(responseBody) ?? null
         ) : undefined) || this.deriveIdentifierFromUrl(url);
       if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
-    } catch {/* swallow */}
+    } catch (e) {
+      this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
+    }
 
-    const data: Prisma.RequestLogCreateInput & { _identifier?: string } = {
+    const data: Prisma.RequestLogCreateManyInput & { _identifier?: string } = {
       method,
       url,
       status: status ?? null,
@@ -74,6 +215,7 @@ export class LoggingService implements OnModuleDestroy {
       errorMessage,
       errorStack,
       _identifier: identifier,
+      endpointId: endpointId ?? null,
     };
 
     this.logBuffer.push(data);
@@ -87,10 +229,14 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   /**
-   * Flush the accumulated log buffer to SQLite in a single batch.
+   * Flush the accumulated log buffer to PostgreSQL in a single batch.
    * Uses createMany for the bulk insert, then a single raw UPDATE for identifiers.
    */
   async flushLogs(): Promise<void> {
+    if (this.isInMemoryBackend) {
+      return;
+    }
+
     if (this.flushInProgress || this.logBuffer.length === 0) return;
     this.flushInProgress = true;
 
@@ -116,49 +262,73 @@ export class LoggingService implements OnModuleDestroy {
       // Single batch insert (1 write instead of N*2 writes)
       await this.prisma.requestLog.createMany({ data: createData });
 
-      // SQLite compromise: createMany doesn't support RETURNING in SQLite.
-      // We fetch the most recent N rows by rowid to correlate batch-inserted records.
-      // PostgreSQL migration: use createMany with RETURNING or createManyAndReturn().
-      // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.4.2
+      // Phase 3 (PostgreSQL): Fetch the most recent N rows by createdAt to correlate
+      // batch-inserted records with their identifiers.
       if (identifiers.length > 0) {
-        // Fetch the last N created rows (ordered by rowid DESC) to correlate
         try {
           const recentRows: Array<{ id: string }> = await this.prisma.$queryRawUnsafe(
-            `SELECT id FROM RequestLog ORDER BY rowid DESC LIMIT ${batch.length}`
+            `SELECT "id" FROM "RequestLog" ORDER BY "createdAt" DESC LIMIT ${batch.length}`
           );
           // recentRows[0] = newest (last in batch), so reverse to align with batch order
           const ordered = [...recentRows].reverse();
           for (const { index, identifier } of identifiers) {
             if (ordered[index]) {
               await this.prisma.$executeRawUnsafe(
-                'UPDATE RequestLog SET identifier = ? WHERE id = ?',
+                `UPDATE "RequestLog" SET "identifier" = $1 WHERE "id" = $2`,
                 identifier,
                 ordered[index].id,
               );
             }
           }
-        } catch {
-          // Best-effort: identifier backfill is non-critical
+        } catch (e) {
+          this.logger.debug(LogCategory.DATABASE, 'Identifier backfill failed (non-critical)', { error: (e as Error).message });
         }
       }
     } catch (persistError) {
-      this.logger.error('Failed to flush request log batch', persistError as Error);
+      this.logger.error(LogCategory.DATABASE, 'Failed to flush request log batch', persistError as Error);
     } finally {
       this.flushInProgress = false;
     }
   }
 
-  /** Flush remaining log entries on application shutdown. */
+  /** Flush remaining log entries and stop timers on application shutdown. */
   async onModuleDestroy(): Promise<void> {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
+    if (this.autoPruneTimer) {
+      clearInterval(this.autoPruneTimer);
+      this.autoPruneTimer = null;
+    }
     await this.flushLogs();
   }
 
   async clearLogs(): Promise<number> {
+    if (this.isInMemoryBackend) {
+      const count = this.inMemoryLogRows.length;
+      this.inMemoryLogRows = [];
+      return count;
+    }
+
     const result = await this.prisma.requestLog.deleteMany();
+    return result.count;
+  }
+
+  /** Delete log entries older than the given number of days. */
+  async pruneOldLogs(retentionDays: number): Promise<number> {
+    if (this.isInMemoryBackend) {
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+      const before = this.inMemoryLogRows.length;
+      this.inMemoryLogRows = this.inMemoryLogRows.filter(r => r.createdAt >= cutoff);
+      return before - this.inMemoryLogRows.length;
+    }
+
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const result = await this.prisma.requestLog.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    this.logger.info(LogCategory.DATABASE, `Pruned ${result.count} log entries older than ${retentionDays} days`);
     return result.count;
   }
 
@@ -174,11 +344,100 @@ export class LoggingService implements OnModuleDestroy {
     search?: string;
     includeAdmin?: boolean;
     hideKeepalive?: boolean;
+    minDurationMs?: number;
+    /** Filter by indexed endpointId column (preferred over urlContains) */
+    endpointId?: string;
   } = {}) {
+    if (this.isInMemoryBackend) {
+      const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
+      const page = Math.max(filters.page ?? 1, 1);
+      const skip = (page - 1) * pageSize;
+      let filtered = [...this.inMemoryLogRows];
+      // Phase D4 in-memory parity fix: previously only endpointId was
+      // applied here, so callers passing minDurationMs / since / until /
+      // method / status / urlContains / hasError got back the full set
+      // (and tests asserting empty results failed). Mirror the Prisma
+      // branch's filter set 1:1.
+      if (filters.endpointId) {
+        filtered = filtered.filter((r) => r.endpointId === filters.endpointId);
+      }
+      if (filters.method) {
+        const m = filters.method.toUpperCase();
+        filtered = filtered.filter((r) => r.method === m);
+      }
+      if (typeof filters.status === 'number') {
+        filtered = filtered.filter((r) => r.status === filters.status);
+      }
+      if (filters.hasError === true) {
+        filtered = filtered.filter((r) => r.errorMessage !== null && r.errorMessage !== undefined);
+      } else if (filters.hasError === false) {
+        filtered = filtered.filter((r) => r.errorMessage === null || r.errorMessage === undefined);
+      }
+      if (filters.urlContains) {
+        const needle = filters.urlContains;
+        filtered = filtered.filter((r) => r.url.includes(needle));
+      }
+      if (filters.since) {
+        const since = filters.since;
+        filtered = filtered.filter((r) => r.createdAt >= since);
+      }
+      if (filters.until) {
+        const until = filters.until;
+        filtered = filtered.filter((r) => r.createdAt <= until);
+      }
+      if (filters.minDurationMs !== undefined && filters.minDurationMs > 0) {
+        const min = filters.minDurationMs;
+        filtered = filtered.filter((r) => (r.durationMs ?? 0) >= min);
+      }
+      if (!filters.includeAdmin) {
+        filtered = filtered.filter(
+          (r) => !r.url.includes('/scim/admin/') && r.url !== '/' && r.url !== '/health',
+        );
+      }
+      if (filters.search) {
+        const s = filters.search;
+        filtered = filtered.filter(
+          (r) =>
+            r.url.includes(s) ||
+            (r.errorMessage ?? '').includes(s) ||
+            (r.requestHeaders ?? '').includes(s) ||
+            (r.responseHeaders ?? '').includes(s) ||
+            (r.requestBody ?? '').includes(s) ||
+            (r.responseBody ?? '').includes(s),
+        );
+      }
+      const records = filtered
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(skip, skip + pageSize);
+
+      const items = records.map((r) => ({
+        id: r.id,
+        method: r.method,
+        url: r.url,
+        status: r.status ?? undefined,
+        durationMs: r.durationMs ?? undefined,
+        createdAt: r.createdAt,
+        errorMessage: r.errorMessage ?? undefined,
+        reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
+      }));
+
+      const total = filtered.length;
+      return {
+        total,
+        page,
+        pageSize,
+        count: items.length,
+        hasNext: skip + items.length < total,
+        hasPrev: page > 1,
+        items,
+      };
+    }
+
     const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
     const page = Math.max(filters.page ?? 1, 1);
 
   const where: Prisma.RequestLogWhereInput = {};
+    if (filters.endpointId) where.endpointId = filters.endpointId;
     if (filters.method) where.method = filters.method.toUpperCase();
     if (typeof filters.status === 'number') where.status = filters.status;
     if (filters.hasError === true) where.errorMessage = { not: null };
@@ -230,6 +489,9 @@ export class LoggingService implements OnModuleDestroy {
       if (filters.since) where.createdAt.gte = filters.since;
       if (filters.until) where.createdAt.lte = filters.until;
     }
+    if (filters.minDurationMs !== undefined && filters.minDurationMs > 0) {
+      where.durationMs = { gte: filters.minDurationMs };
+    }
     if (filters.search) {
       const s = filters.search;
       // Expand search to additional large text columns (stored as JSON strings)
@@ -257,7 +519,7 @@ export class LoggingService implements OnModuleDestroy {
     if (isInvalidDate(filters.since) || isInvalidDate(filters.until)) {
       const sinceStr = filters.since ? String(filters.since) : 'undefined';
       const untilStr = filters.until ? String(filters.until) : 'undefined';
-      this.logger.warn(`Ignoring invalid date filter(s): since='${sinceStr}' until='${untilStr}'`);
+      this.logger.warn(LogCategory.DATABASE, `Ignoring invalid date filter(s): since='${sinceStr}' until='${untilStr}'`);
       if (where.createdAt && Object.keys(where.createdAt as object).length === 0) {
         delete where.createdAt; // remove empty date filter
       }
@@ -296,9 +558,10 @@ export class LoggingService implements OnModuleDestroy {
       ]);
     } catch (err) {
       this.logger.error(
+        LogCategory.DATABASE,
         'requestLog.findMany failed',
         err as Error,
-        JSON.stringify({ where, page, pageSize })
+        { where: JSON.stringify(where), page, pageSize },
       );
       throw err; // rethrow for controller to handle
     }
@@ -310,11 +573,17 @@ export class LoggingService implements OnModuleDestroy {
       if (ids.length) {
         // Unsafe raw only over internal generated IDs (cuid) - controlled
         const rows: Array<{ id: string; identifier: string | null }> = await this.prisma.$queryRawUnsafe(
-          `SELECT id, identifier FROM RequestLog WHERE id IN (${ids})`
+          `SELECT "id", "identifier" FROM "RequestLog" WHERE "id" IN (${ids})`
         );
         for (const row of rows) identifierMap[row.id] = row.identifier;
       }
-    } catch { /* column might not exist yet or query failed */ }
+    } catch (e) {
+      // Best-effort: identifier backfill column may not exist in early migrations
+      this.logger.debug(LogCategory.DATABASE, 'Identifier backfill query failed', {
+        error: (e as Error).message,
+        recordCount: records.length,
+      });
+    }
 
     // Map records with async user resolution
     const items = await Promise.all(
@@ -364,7 +633,124 @@ export class LoggingService implements OnModuleDestroy {
     };
   }
 
+  /**
+   * Phase D4 - Hourly request count series for dashboard charts.
+   *
+   * Returns an array of length `hours` containing per-hour request counts
+   * for the last `hours` hours. `result[0]` is the OLDEST hour (i.e.
+   * `hours-1` complete hours back from the current bucket boundary).
+   * `result[hours-1]` is the CURRENT hour (the bucket containing now).
+   *
+   * Buckets are aligned to hour boundaries via:
+   *   currentBucketStart = floor(now / bucketMs) * bucketMs
+   *   oldestBucketStart  = currentBucketStart - (hours - 1) * bucketMs
+   * So the chart axis is stable (same buckets reappear if you call twice
+   * within the same minute) and the current hour is ALWAYS at index
+   * `hours - 1` regardless of the current minute.
+   *
+   * Filters applied (matches the default `listLogs` filters when
+   * `includeAdmin: false`):
+   *   - excludes `/scim/admin/*` (admin API)
+   *   - excludes `/` and `/health` (root + health probes)
+   *
+   * Performance: indexed range scan on `createdAt`, returns `select { createdAt: true }`
+   * only. For a busy 100 req/min server this is ~144k rows in 24h - still
+   * sub-100ms with the default index. If this becomes a hot path we can
+   * push the bucketing to SQL via $queryRaw + date_trunc.
+   *
+   * @param opts.hours number of hours in the series (default 24, clamped 1..168)
+   * @returns number[] of length `hours`, oldest first
+   */
+  async getRequestSeries(opts: { hours?: number } = {}): Promise<number[]> {
+    const hours = Math.min(Math.max(opts.hours ?? 24, 1), 168);
+    const now = Date.now();
+    const bucketMs = 60 * 60 * 1000;
+    // Bucket alignment: result[hours-1] must be the CURRENT hour bucket.
+    // The current bucket starts at floor(now/bucketMs)*bucketMs. To put it
+    // at index hours-1, the oldest visible bucket starts (hours-1) buckets
+    // earlier. With this layout, any row where
+    //   bucketStart <= row.createdAt < bucketStart + bucketMs
+    // lands at index in [0, hours-1].
+    const currentBucketStart = Math.floor(now / bucketMs) * bucketMs;
+    const oldestBucketStart = currentBucketStart - (hours - 1) * bucketMs;
+    const series = new Array<number>(hours).fill(0);
+
+    const tally = (createdAt: Date): void => {
+      const t = createdAt instanceof Date ? createdAt.getTime() : new Date(createdAt).getTime();
+      if (!Number.isFinite(t)) return;
+      const idx = Math.floor((t - oldestBucketStart) / bucketMs);
+      if (idx >= 0 && idx < hours) series[idx] += 1;
+    };
+
+    const cutoff = new Date(oldestBucketStart);
+
+    if (this.isInMemoryBackend) {
+      for (const row of this.inMemoryLogRows) {
+        if (row.createdAt < cutoff) continue;
+        // Mirror listLogs default exclusions (includeAdmin: false)
+        if (row.url.includes('/scim/admin/')) continue;
+        if (row.url === '/' || row.url === '/health') continue;
+        tally(row.createdAt);
+      }
+      return series;
+    }
+
+    // Postgres: indexed range scan, project createdAt only.
+    try {
+      const rows = await this.prisma.requestLog.findMany({
+        where: {
+          createdAt: { gte: cutoff },
+          AND: [
+            { url: { not: { contains: '/scim/admin/' } } },
+            { url: { not: { equals: '/' } } },
+            { url: { not: { equals: '/health' } } },
+          ],
+        },
+        select: { createdAt: true },
+      });
+      for (const r of rows) tally(r.createdAt);
+    } catch (err) {
+      this.logger.error(
+        LogCategory.DATABASE,
+        `getRequestSeries failed: ${(err as Error).message} - returning zero series`,
+      );
+      // Fall through with zeros - dashboard chart shows flat line, not 500.
+    }
+
+    return series;
+  }
+
   async getLog(id: string) {
+    if (this.isInMemoryBackend) {
+      const row = this.inMemoryLogRows.find((r) => r.id === id);
+      if (!row) return null;
+      const parsedRequest = this.safeParse(row.requestBody ? String(row.requestBody) : null);
+      const parsedResponse = this.safeParse(row.responseBody ? String(row.responseBody) : null);
+      const rid =
+        row.identifier ||
+        this.deriveReportableIdentifier(row.url, parsedRequest, parsedResponse) ||
+        this.deriveGroupDisplayName(
+          parsedRequest as Record<string, unknown> | null,
+          parsedResponse as Record<string, unknown> | null,
+        ) ||
+        this.deriveIdentifierFromUrl(row.url);
+
+      return {
+        id: row.id,
+        method: row.method,
+        url: row.url,
+        status: row.status ?? undefined,
+        durationMs: row.durationMs ?? undefined,
+        createdAt: row.createdAt,
+        requestHeaders: this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null),
+        requestBody: parsedRequest,
+        responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
+        responseBody: parsedResponse,
+        errorMessage: row.errorMessage ?? undefined,
+        reportableIdentifier: rid,
+      };
+    }
+
     const row = await this.prisma.requestLog.findUnique({ where: { id } });
     if (!row) return null;
     // Parse bodies once for identifier + returned payload
@@ -435,6 +821,7 @@ export class LoggingService implements OnModuleDestroy {
       }
       return undefined;
     } catch {
+      this.logger.trace(LogCategory.DATABASE, 'deriveReportableIdentifier failed - returning undefined');
       return undefined;
     }
   }
@@ -454,24 +841,24 @@ export class LoggingService implements OnModuleDestroy {
   private async resolveUserDisplayName(identifier: string): Promise<string | null> {
     try {
       // Try to find user by SCIM ID first
-      let user = await this.prisma.scimUser.findFirst({
-        where: { scimId: identifier },
-        select: { userName: true, rawPayload: true },
+      let user = await this.prisma.scimResource.findFirst({
+        where: { scimId: identifier, resourceType: 'User' },
+        select: { userName: true, payload: true },
       });
 
       // If not found by SCIM ID, try by userName
       if (!user) {
-        user = await this.prisma.scimUser.findFirst({
-          where: { userName: identifier },
-          select: { userName: true, rawPayload: true },
+        user = await this.prisma.scimResource.findFirst({
+          where: { userName: identifier, resourceType: 'User' },
+          select: { userName: true, payload: true },
         });
       }
 
       if (user) {
         // Try to get display name from raw payload first
         try {
-          if (user.rawPayload && typeof user.rawPayload === 'string') {
-            const payload = JSON.parse(user.rawPayload);
+          const payload = user.payload as Record<string, any> | null;
+          if (payload) {
             if (payload.displayName) return payload.displayName;
             if (payload.name?.formatted) return payload.name.formatted;
             if (payload.name?.givenName && payload.name?.familyName) {
@@ -479,12 +866,12 @@ export class LoggingService implements OnModuleDestroy {
             }
           }
         } catch (e) {
-          // Fall back to userName if payload parsing fails
+          this.logger.debug(LogCategory.DATABASE, 'Payload parsing failed in resolveUserDisplayName', { error: (e as Error).message });
         }
         return user.userName;
       }
     } catch (e) {
-      // If lookup fails, return null to use original identifier
+      this.logger.debug(LogCategory.DATABASE, 'User lookup failed in resolveUserDisplayName', { error: (e as Error).message });
     }
     return null;
   }
@@ -507,7 +894,7 @@ export class LoggingService implements OnModuleDestroy {
     if (typeof value === 'object') return value as Record<string, unknown>;
     try {
       return JSON.parse(String(value));
-    } catch { return undefined; }
+    } catch { this.logger.trace(LogCategory.DATABASE, 'normalizeObject JSON.parse failed'); return undefined; }
   }
 
   private safeParse(value: string | null): unknown {
@@ -515,6 +902,7 @@ export class LoggingService implements OnModuleDestroy {
     try {
       return JSON.parse(value);
     } catch {
+      this.logger.trace(LogCategory.DATABASE, 'safeParse JSON.parse failed');
       return undefined;
     }
   }
@@ -527,7 +915,7 @@ export class LoggingService implements OnModuleDestroy {
     try {
       return JSON.stringify(value);
     } catch (error) {
-      this.logger.warn('Failed to stringify log value', error as Error);
+      this.logger.warn(LogCategory.DATABASE, 'Failed to stringify log value', { error: (error as Error).message });
       return null;
     }
   }

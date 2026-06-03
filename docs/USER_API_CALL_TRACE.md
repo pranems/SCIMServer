@@ -1,6 +1,8 @@
-# User API � Annotated Call Trace + Diagrams
+# User API - Annotated Call Trace + Diagrams
 
-This document contains a concrete example payload for `POST /scim/v2/Users`, an end?to?end annotated call trace mapping to controller/service/Prisma actions and the expected DB rows and request log entry. It also includes additional mermaid diagrams showing create, list and get flows including database interactions.
+> Updated: March 1, 2026 · Flow reflects current RequestLoggingInterceptor + ScimLogger behavior
+
+This document contains a concrete example payload for `POST /scim/v2/Users`, an end-to-end annotated call trace mapping to controller/service/Prisma actions and the expected DB rows and request log entry. It also includes additional Mermaid diagrams showing create, list, and get flows including database interactions.
 
 ---
 
@@ -30,8 +32,8 @@ Notes:
 
 ## 2) Annotated call trace (step-by-step)
 
-1. Client ? main middleware (`api/src/main.ts`)
-   - Path normalized: `/scim/v2/Users` ? `/scim/Users`.
+1. Client → main middleware (`api/src/main.ts`)
+  - Path normalized: `/scim/v2/Users` → `/scim/Users`.
    - JSON body parsed with SCIM media type support.
 
 2. Global guard runs: `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`)
@@ -47,20 +49,18 @@ Notes:
    - Resolves `endpointId` from URL param, calls `EndpointScimUsersService.createUserForEndpoint(dto, baseUrl, endpointId)`.
 
 4. Service: `EndpointScimUsersService.createUserForEndpoint` (`api/src/modules/scim/services/endpoint-scim-users.service.ts`)
-   - Normalises attributes, derives `scimId` if not provided, prepares `rawPayload` (stringified request body) and `meta` JSON.
+   - Normalises attributes, derives `scimId` if not provided, prepares `payload` (JSONB) and `meta` JSON.
    - Uniqueness checks using Prisma:
-     - `prisma.scimUser.findUnique({ where: { userName } })` or `findFirst` for `externalId`.
+     - `prisma.scimResource.findFirst({ where: { userName } })` or `findFirst` for `externalId`.
      - If a conflict found, throw an error translated to HTTP 409 with SCIM `scimType: "uniqueness"`.
    - If unique, create user with Prisma:
-     - `prisma.scimUser.create({ data: { scimId, externalId, userName, active, rawPayload, meta } })`
+     - `prisma.scimResource.create({ data: { scimId, externalId, userName, active, payload, ... } })`
    - After create, may write to `RequestLog` via `LoggingService`.
 
-5. Persistence (Prisma / SQLite)
-   - `ScimUser` row inserted into SQLite database file (runtime path: `/tmp/local-data/scim.db`).
+5. Persistence (Prisma / PostgreSQL)
+   - `ScimResource` row inserted into PostgreSQL database (via Prisma ORM, or in-memory store for dev/test).
 
 6. Controller returns SCIM user resource (201 Created) to client.
-
-7. Backup service (out of band) will snapshot DB to Azure Files or blob snapshots on schedule (not in request path).
 
 ---
 
@@ -69,17 +69,20 @@ Notes:
 Prisma model excerpt (see `api/prisma/schema.prisma`):
 
 ```prisma
-model ScimUser {
-  id          String   @id @default(cuid())
-  scimId      String   @unique
-  externalId  String?  @unique
-  userName    String   @unique
-  active      Boolean  @default(true)
-  rawPayload  String
-  meta        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  groups      GroupMember[]
+model ScimResource {
+  id            String   @id @default(uuid()) @db.Uuid
+  endpointId    String   @db.Uuid
+  resourceType  String
+  scimId        String   @db.Uuid
+  externalId    String?  @db.Text
+  userName      String?  @db.Citext
+  displayName   String?  @db.Citext
+  active        Boolean  @default(true)
+  payload       Json     @db.JsonB
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  endpoint      Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 }
 ```
 
@@ -87,22 +90,26 @@ Example inserted row (JSON representation):
 
 ```json
 {
-  "id": "cjld2cj...",
-  "scimId": "user-2025-12-29-0001",
+  "id": "a1b2c3d4-...",
+  "endpointId": "e5f6a7b8-...",
+  "resourceType": "User",
+  "scimId": "b2c3d4e5-...",
   "externalId": "7b39e58e-0000-4000-8000-000000000001",
   "userName": "alice@example.com",
+  "displayName": "Alice Smith",
   "active": true,
-  "rawPayload": "{\"schemas\":[\"urn:ietf:params:scim:schemas:core:2.0:User\"],\"userName\":\"alice@example.com\",...}",
-  "meta": "{\"location\":\"https://<API_BASE>/scim/v2/Users/cjld2cj...\",\"resourceType\":\"User\"}",
-  "createdAt": "2025-12-29T12:34:56.000Z",
-  "updatedAt": "2025-12-29T12:34:56.000Z"
+  "payload": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "alice@example.com", "name": { "givenName": "Alice", "familyName": "Smith" } },
+  "version": 1,
+  "createdAt": "2026-02-18T12:34:56.000Z",
+  "updatedAt": "2026-02-18T12:34:56.000Z"
 }
 ```
 
 Notes:
-- `rawPayload` contains the original request body JSON stringified (used for auditing and reconstitution).
-- `meta` is a JSON string with `location`, `created`, etc., as the SCIM `meta` object (controller/service builds this).
-- `id` is Prisma `cuid()` value.
+- `payload` is a JSONB column containing the full SCIM resource attributes (used for response building and extension data).
+- `userName` and `displayName` are CITEXT columns for case-insensitive uniqueness.
+- `version` is a monotonic integer used for ETag generation (`W/"1"`, `W/"2"`, etc.).
+- `id` is a UUID generated by PostgreSQL.
 
 ---
 
@@ -123,7 +130,7 @@ Prisma `RequestLog` model stores captured request/response for UI debugging. Exa
   "responseBody": "{\"schemas\":[...],\"id\":\"cjld2cj...\",...}",
   "errorMessage": null,
   "identifier": "alice@example.com",
-  "createdAt": "2025-12-29T12:34:56.000Z"
+  "createdAt": "2026-02-18T12:34:56.000Z"
 }
 ```
 
@@ -131,22 +138,24 @@ Prisma `RequestLog` model stores captured request/response for UI debugging. Exa
 
 ## 5) Mermaid diagrams
 
-### Create user � sequence (success & uniqueness collision)
+### Create user - sequence (success & uniqueness collision)
 
 ```mermaid
 sequenceDiagram
   participant Client
   participant WebServer as main.ts middleware
+  participant ReqLog as RequestLoggingInterceptor
   participant Guard as SharedSecretGuard
   participant OAuthSvc as OAuthService
   participant Controller as EndpointScimUsersController
   participant Validator as ValidationPipe
   participant Service as EndpointScimUsersService
   participant PrismaClient
-  participant Logger as LoggingService
+  participant ScimLogger
 
-  Client->>WebServer: POST /scim/endpoints/{endpointId}/Users (application/scim+json)
+  Client->>WebServer: POST /scim/v2/Users (or /scim/endpoints/{endpointId}/Users)
   WebServer->>WebServer: normalize /scim/v2 -> /scim
+  WebServer->>ReqLog: create correlation context
   WebServer->>Guard: run canActivate (Authorization header)
   Guard->>OAuthSvc: validate JWT (jwt.verify)
   alt token valid
@@ -169,39 +178,43 @@ sequenceDiagram
     Service->>PrismaClient: check uniqueness (findFirst / where)
     alt unique violation found
       Service-->>Controller: throw ConflictError (mapped to 409)
-      Controller->>Logger: log request + 409
+      Controller->>ScimLogger: emit structured error entry
       Controller-->>Client: 409 Conflict (scimType: 'uniqueness')
     else unique ok
-      Service->>PrismaClient: prisma.scimUser.create(...)
+      Service->>PrismaClient: prisma.scimResource.create(...)
       PrismaClient-->>Service: created row
-      Service->>Logger: log request + 201 (store request/response)
+      Service->>ScimLogger: emit create success entry
       Controller-->>Client: 201 Created (SCIM user resource)
     end
   end
+  ReqLog-->>Client: persist request metadata (buffered)
 ```
 
-### List & Get user � sequence
+### List & Get user - sequence
 
 ```mermaid
 sequenceDiagram
   participant Client
+  participant ReqLog as RequestLoggingInterceptor
   participant Guard
   participant Controller as EndpointScimUsersController
   participant Service as EndpointScimUsersService
   participant PrismaClient
 
-  Client->>Guard: GET /scim/endpoints/{endpointId}/Users?startIndex=1&count=50
+  Client->>ReqLog: GET /scim/v2/Users?startIndex=1&count=50
+  ReqLog->>Guard: apply auth + correlation checks
   Guard-->>Controller: allow
   Controller->>Service: listUsersForEndpoint(query, baseUrl, endpointId)
-  Service->>PrismaClient: prisma.scimUser.findMany({ skip, take, where, orderBy })
+  Service->>PrismaClient: prisma.scimResource.findMany({ skip, take, where, orderBy })
   PrismaClient-->>Service: rows
   Service-->>Controller: paginated SCIM list
   Controller-->>Client: 200 { Resources: [...], totalResults: N }
 
-  Client->>Guard: GET /scim/endpoints/{endpointId}/Users/:id
+  Client->>ReqLog: GET /scim/v2/Users/:id
+  ReqLog->>Guard: apply auth + correlation checks
   Guard-->>Controller: allow
   Controller->>Service: getUserForEndpoint(id, baseUrl, endpointId)
-  Service->>PrismaClient: prisma.scimUser.findFirst({ where: { scimId, endpointId } })
+  Service->>PrismaClient: prisma.scimResource.findFirst({ where: { scimId, endpointId } })
   alt not found
     Controller-->>Client: 404 Not Found
   else found
@@ -225,12 +238,6 @@ npm run start:dev
 2. Use `curl` (example above) to issue `POST /scim/v2/Users` with an `Authorization` header:
    - Use `SCIM_SHARED_SECRET` value printed/generated by setup, or obtain a JWT via `POST /oauth/token` (client_credentials).
 
-3. Inspect SQLite DB file (runtime path `/tmp/local-data/scim.db` when running in container). For local dev the `DATABASE_URL` may point to `file:./dev.db` depending on environment. Use `npx prisma studio` or `sqlite3` to inspect rows.
+3. Inspect the database. For PostgreSQL use `npx prisma studio` or `psql` to inspect rows. For in-memory mode, use the admin API endpoints (`GET /scim/admin/database/users`).
 
 ---
-
-If you want, I can also:
-- Add this file under `docs/` (done) and create a separate `.mmd` file for diagrams if you prefer a dedicated mermaid file.
-- Produce a small test script (bash/PowerShell) that requests a token, creates a user, and queries the DB locally.
-
-Which next?  

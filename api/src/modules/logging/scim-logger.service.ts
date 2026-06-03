@@ -1,5 +1,6 @@
-import { Injectable, Scope } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
+import { EventEmitter } from 'node:events';
 import {
   LogLevel,
   LogCategory,
@@ -8,9 +9,15 @@ import {
   logLevelName,
   parseLogLevel,
 } from './log-levels';
+import { FileLogTransport } from './file-log-transport';
 
 /**
  * Correlation context attached to every log entry within a single request.
+ * Enriched incrementally by each layer:
+ *   - Interceptor: requestId, method, path, endpointId, startTime
+ *   - Guard: authType, authClientId, authCredentialId
+ *   - Service: resourceType, resourceId, operation
+ *   - BulkProcessor: bulkOperationIndex, bulkId
  */
 export interface CorrelationContext {
   /** Unique request ID (UUID). Propagated from X-Request-Id header or auto-generated. */
@@ -21,12 +28,30 @@ export interface CorrelationContext {
   path?: string;
   /** SCIM endpoint ID (if applicable) */
   endpointId?: string;
-  /** Auth type used for the request */
-  authType?: 'oauth' | 'legacy' | 'public';
-  /** OAuth client_id if authenticated via OAuth */
-  clientId?: string;
   /** Start timestamp for duration tracking */
   startTime?: number;
+
+  // ── Auth layer (set by SharedSecretGuard after authentication) ─────
+  /** Auth type used for the request */
+  authType?: 'oauth' | 'legacy' | 'endpoint_credential' | 'public';
+  /** OAuth client_id if authenticated via OAuth */
+  authClientId?: string;
+  /** Per-endpoint credential ID if authenticated via endpoint credential */
+  authCredentialId?: string;
+
+  // ── Operation layer (set by service method) ────────────────────────
+  /** SCIM resource type being operated on */
+  resourceType?: string;
+  /** SCIM resource ID being operated on */
+  resourceId?: string;
+  /** SCIM operation: create, get, list, patch, put, delete */
+  operation?: string;
+
+  // ── Bulk layer (set by BulkProcessorService) ───────────────────────
+  /** Index of the current operation within a bulk request */
+  bulkOperationIndex?: number;
+  /** Client-assigned bulkId for cross-referencing */
+  bulkId?: string;
 }
 
 /**
@@ -52,6 +77,16 @@ export interface StructuredLogEntry {
   path?: string;
   /** Duration in ms (for timing entries) */
   durationMs?: number;
+  /** Auth type (enriched by guard) */
+  authType?: string;
+  /** SCIM resource type (enriched by service) */
+  resourceType?: string;
+  /** SCIM resource ID (enriched by service) */
+  resourceId?: string;
+  /** SCIM operation (enriched by service) */
+  operation?: string;
+  /** Bulk operation index (enriched by bulk processor) */
+  bulkOperationIndex?: number;
   /** Error information */
   error?: {
     message: string;
@@ -66,7 +101,16 @@ export interface StructuredLogEntry {
 const correlationStorage = new AsyncLocalStorage<CorrelationContext>();
 
 /**
- * ScimLogger — Structured, leveled, correlation-aware logger for SCIMServer.
+ * Access the correlation context from outside the ScimLogger class.
+ * Used by createScimError() to auto-enrich SCIM error responses with
+ * requestId and endpointId without requiring DI injection.
+ */
+export function getCorrelationContext(): CorrelationContext | undefined {
+  return correlationStorage.getStore();
+}
+
+/**
+ * ScimLogger - Structured, leveled, correlation-aware logger for SCIMServer.
  *
  * Features:
  * - RFC 5424-inspired log levels: TRACE → DEBUG → INFO → WARN → ERROR → FATAL
@@ -87,10 +131,106 @@ export class ScimLogger {
 
   /** In-memory ring buffer of recent log entries for admin API access */
   private readonly ringBuffer: StructuredLogEntry[] = [];
-  private readonly maxRingBufferSize = 500;
+  private readonly maxRingBufferSize: number;
+
+  /** Slow request threshold in milliseconds (configurable via LOG_SLOW_REQUEST_MS env var) */
+  static readonly DEFAULT_RING_BUFFER_SIZE = 2000;
+  static readonly DEFAULT_SLOW_REQUEST_MS = 2000;
+
+  /** EventEmitter for real-time log streaming (SSE subscribers) */
+  private readonly emitter = new EventEmitter();
+
+  /**
+   * Phase J (v0.48.1): SEPARATE EventEmitter for SCIM mutation events.
+   *
+   * Kept distinct from the log `emitter` so SCIM events are not subject
+   * to log-level gates (cross-tab UI must always refresh on mutations,
+   * even when the global log level is WARN/ERROR), do not pollute the
+   * log ring buffer, and do not get written to per-endpoint log files.
+   *
+   * The event payload shape is `{ type: 'scim.x.y', ...originalPayload,
+   * timestamp }`. The `type` field is what the web `useSSE` hook
+   * dispatches on.
+   */
+  private readonly scimEventEmitter = new EventEmitter();
+
+  /** File log transport for main + per-endpoint log files */
+  private readonly fileTransport: FileLogTransport;
 
   constructor() {
     this.config = buildDefaultLogConfig();
+    this.maxRingBufferSize = Number(process.env.LOG_RING_BUFFER_SIZE) || ScimLogger.DEFAULT_RING_BUFFER_SIZE;
+    // Allow many SSE subscribers without warning
+    this.emitter.setMaxListeners(50);
+    this.scimEventEmitter.setMaxListeners(50);
+    this.fileTransport = new FileLogTransport();
+  }
+
+  /** Get the configured slow request threshold in ms */
+  static getSlowRequestThresholdMs(): number {
+    return Number(process.env.LOG_SLOW_REQUEST_MS) || ScimLogger.DEFAULT_SLOW_REQUEST_MS;
+  }
+
+  // ─── Live Stream (SSE) ────────────────────────────────────────────
+
+  /**
+   * Subscribe to live log entries. Returns an unsubscribe function.
+   * Used by the SSE /admin/log-config/stream endpoint.
+   */
+  subscribe(listener: (entry: StructuredLogEntry) => void): () => void {
+    this.emitter.on('log', listener);
+    return () => this.emitter.off('log', listener);
+  }
+
+  // ─── SCIM Event Stream (Phase J - v0.48.1) ───────────────────────
+
+  /**
+   * Phase J (v0.48.1): the typed payload shape pushed onto the SCIM
+   * event channel. The `type` field carries the wire-format event name
+   * (`scim.user.created` etc) the web `useSSE` hook dispatches on; the
+   * remaining fields are the original payload emitted by the SCIM
+   * service (`endpointId`, `scimId`, etc).
+   */
+  // Inline alias rather than a separate exported interface so the
+  // ScimEventSseBridge doesn't have to import from logging - the bridge
+  // already knows the wire shape via SCIM_EVENTS.
+  // {type: string, [k: string]: unknown, timestamp: string}
+
+  /**
+   * Subscribe to SCIM mutation events. Returns an unsubscribe function.
+   * Consumed by [log-config.controller.ts](./log-config.controller.ts)
+   * `streamLogs()` so each SSE subscriber gets `{type, endpointId, ...}`
+   * messages alongside log entries.
+   *
+   * @see api/src/modules/stats/scim-event-sse-bridge.service.ts (producer)
+   */
+  subscribeScimEvents(
+    listener: (event: { type: string; timestamp: string; [k: string]: unknown }) => void,
+  ): () => void {
+    this.scimEventEmitter.on('scim-event', listener);
+    return () => this.scimEventEmitter.off('scim-event', listener);
+  }
+
+  /**
+   * Phase J (v0.48.1): broadcast a SCIM mutation event onto the SCIM
+   * event channel. Called exclusively by `ScimEventSseBridge` after
+   * the EventEmitter2 SCIM event has been received - SCIM service code
+   * keeps emitting via EventEmitter2 / SCIM_EVENTS as before.
+   *
+   * The bridge owns all callsites; SCIM services should NEVER call
+   * this directly. Keeping the seam here lets us add SSE-specific
+   * concerns (rate limiting, filtering) without touching every emit
+   * site in the codebase.
+   *
+   * @param type Wire-format event name (must match a SCIM_EVENTS value)
+   * @param payload Original event payload (forwarded verbatim alongside `type`)
+   */
+  emitScimEvent(type: string, payload: Record<string, unknown>): void {
+    this.scimEventEmitter.emit('scim-event', {
+      ...payload,
+      type,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   // ─── Correlation Context ──────────────────────────────────────────
@@ -150,6 +290,18 @@ export class ScimLogger {
     delete this.config.endpointLevels[endpointId];
   }
 
+  // ── File logging (per-endpoint) ───────────────────────────────────
+
+  /** Enable file logging for a specific endpoint. */
+  enableEndpointFileLogging(endpointId: string, endpointName: string): void {
+    this.fileTransport.enableEndpointFile(endpointId, endpointName);
+  }
+
+  /** Disable file logging for a specific endpoint. */
+  disableEndpointFileLogging(endpointId: string): void {
+    this.fileTransport.disableEndpointFile(endpointId);
+  }
+
   // ─── Level-specific methods ───────────────────────────────────────
 
   trace(category: LogCategory, message: string, data?: Record<string, unknown>): void {
@@ -168,12 +320,12 @@ export class ScimLogger {
     this.log(LogLevel.WARN, category, message, data);
   }
 
-  error(category: LogCategory, message: string, error?: Error | unknown, data?: Record<string, unknown>): void {
+  error(category: LogCategory, message: string, error?: unknown, data?: Record<string, unknown>): void {
     const errorData = this.formatError(error);
     this.log(LogLevel.ERROR, category, message, data, errorData);
   }
 
-  fatal(category: LogCategory, message: string, error?: Error | unknown, data?: Record<string, unknown>): void {
+  fatal(category: LogCategory, message: string, error?: unknown, data?: Record<string, unknown>): void {
     const errorData = this.formatError(error);
     this.log(LogLevel.FATAL, category, message, data, errorData);
   }
@@ -194,11 +346,11 @@ export class ScimLogger {
       const minLevel = options.level;
       entries = entries.filter(e => {
         const entryLevel = LogLevel[e.level as keyof typeof LogLevel] ?? LogLevel.INFO;
-        return entryLevel >= minLevel;
+        return (entryLevel as number) >= (minLevel as number);
       });
     }
     if (options?.category) {
-      entries = entries.filter(e => e.category === options.category);
+      entries = entries.filter(e => e.category === (options.category as string));
     }
     if (options?.requestId) {
       entries = entries.filter(e => e.requestId === options.requestId);
@@ -237,6 +389,12 @@ export class ScimLogger {
       endpointId: ctx?.endpointId,
       method: ctx?.method,
       path: ctx?.path,
+      // Enriched context fields (populated by guard/service/bulk processor)
+      authType: ctx?.authType,
+      resourceType: ctx?.resourceType,
+      resourceId: ctx?.resourceId,
+      operation: ctx?.operation,
+      bulkOperationIndex: ctx?.bulkOperationIndex,
     };
 
     if (ctx?.startTime) {
@@ -260,6 +418,12 @@ export class ScimLogger {
       this.ringBuffer.shift();
     }
 
+    // Notify live stream subscribers (SSE)
+    this.emitter.emit('log', entry);
+
+    // Write to log files (main + per-endpoint)
+    this.fileTransport.write(entry);
+
     // Emit to console
     this.emit(level, entry);
   }
@@ -282,7 +446,7 @@ export class ScimLogger {
   }
 
   /** Format an error object for structured output. */
-  private formatError(error: Error | unknown): StructuredLogEntry['error'] | undefined {
+  private formatError(error: unknown): StructuredLogEntry['error'] | undefined {
     if (!error) return undefined;
     if (error instanceof Error) {
       return {
@@ -292,6 +456,26 @@ export class ScimLogger {
       };
     }
     return { message: String(error) };
+  }
+
+  /**
+   * Safe JSON.stringify that handles circular references without crashing.
+   * Falls back to a [Circular] placeholder if serialization fails.
+   */
+  private safeStringify(value: unknown, indent?: number): string {
+    try {
+      return JSON.stringify(value, null, indent);
+    } catch {
+      // Circular reference or other serialization failure - use a replacer
+      const seen = new WeakSet();
+      return JSON.stringify(value, (_key, val) => {
+        if (typeof val === 'object' && val !== null) {
+          if (seen.has(val)) return '[Circular]';
+          seen.add(val);
+        }
+        return val;
+      }, indent);
+    }
   }
 
   /** Sanitize data: truncate large payloads, redact secrets. */
@@ -307,9 +491,13 @@ export class ScimLogger {
       if (typeof value === 'string' && value.length > this.config.maxPayloadSizeBytes) {
         result[key] = value.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated ${value.length - this.config.maxPayloadSizeBytes}B]`;
       } else if (typeof value === 'object' && value !== null) {
-        const serialized = JSON.stringify(value);
+        const serialized = this.safeStringify(value);
         if (serialized.length > this.config.maxPayloadSizeBytes) {
           result[key] = serialized.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated]`;
+        } else if (serialized.includes('[Circular]')) {
+          // Circular reference detected - store the safe-serialized string to prevent
+          // downstream JSON.stringify crashes (e.g., in FileLogTransport).
+          result[key] = serialized;
         } else {
           result[key] = value;
         }
@@ -329,9 +517,9 @@ export class ScimLogger {
     }
   }
 
-  /** JSON structured output — one line per entry, ideal for log aggregation (ELK, Azure Monitor). */
+  /** JSON structured output - one line per entry, ideal for log aggregation (ELK, Azure Monitor). */
   private emitJson(level: LogLevel, entry: StructuredLogEntry): void {
-    const line = JSON.stringify(entry);
+    const line = this.safeStringify(entry);
     switch (level) {
       case LogLevel.TRACE:
       case LogLevel.DEBUG:
@@ -374,9 +562,9 @@ export class ScimLogger {
     if (entry.data && Object.keys(entry.data).length > 0) {
       // For TRACE level show full data, for higher levels show compact
       if (level <= LogLevel.DEBUG) {
-        line += `\n  ${JSON.stringify(entry.data, null, 2).replace(/\n/g, '\n  ')}`;
+        line += `\n  ${this.safeStringify(entry.data, 2).replace(/\n/g, '\n  ')}`;
       } else {
-        const compact = JSON.stringify(entry.data);
+        const compact = this.safeStringify(entry.data);
         if (compact.length <= 200) {
           line += ` | ${compact}`;
         }

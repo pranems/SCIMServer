@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { resetDatabase } from './helpers/db.helper';
 import {
   scimPost,
   scimGet,
@@ -24,13 +23,12 @@ describe('Endpoint Isolation (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(app);
     resetFixtureCounter();
   });
 
   it('should not share users between endpoints', async () => {
-    const endpointA = await createEndpoint(app, token, 'endpoint-a');
-    const endpointB = await createEndpoint(app, token, 'endpoint-b');
+    const endpointA = await createEndpoint(app, token);
+    const endpointB = await createEndpoint(app, token);
 
     // Create user on Endpoint A
     const user = validUser();
@@ -46,8 +44,8 @@ describe('Endpoint Isolation (E2E)', () => {
   });
 
   it('should not share groups between endpoints', async () => {
-    const endpointA = await createEndpoint(app, token, 'endpoint-a');
-    const endpointB = await createEndpoint(app, token, 'endpoint-b');
+    const endpointA = await createEndpoint(app, token);
+    const endpointB = await createEndpoint(app, token);
 
     // Create group on Endpoint A
     await scimPost(app, `${scimBasePath(endpointA)}/Groups`, token, validGroup()).expect(201);
@@ -62,8 +60,8 @@ describe('Endpoint Isolation (E2E)', () => {
   });
 
   it('should allow same userName on different endpoints', async () => {
-    const endpointA = await createEndpoint(app, token, 'endpoint-a');
-    const endpointB = await createEndpoint(app, token, 'endpoint-b');
+    const endpointA = await createEndpoint(app, token);
+    const endpointB = await createEndpoint(app, token);
 
     const user = validUser({ userName: 'shared@example.com' });
 
@@ -73,8 +71,8 @@ describe('Endpoint Isolation (E2E)', () => {
   });
 
   it('should allow same group displayName on different endpoints', async () => {
-    const endpointA = await createEndpoint(app, token, 'endpoint-a');
-    const endpointB = await createEndpoint(app, token, 'endpoint-b');
+    const endpointA = await createEndpoint(app, token);
+    const endpointB = await createEndpoint(app, token);
 
     const group = validGroup({ displayName: 'SharedGroup' });
 
@@ -83,8 +81,8 @@ describe('Endpoint Isolation (E2E)', () => {
   });
 
   it('should not return user from Endpoint A when querying by id on Endpoint B', async () => {
-    const endpointA = await createEndpoint(app, token, 'endpoint-a');
-    const endpointB = await createEndpoint(app, token, 'endpoint-b');
+    const endpointA = await createEndpoint(app, token);
+    const endpointB = await createEndpoint(app, token);
 
     const created = (await scimPost(
       app,

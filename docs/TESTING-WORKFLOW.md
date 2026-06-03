@@ -1,5 +1,8 @@
 # 🧪 Testing Pre-Release Changes
 
+> **Status**: Living workflow guide  
+> **Last Updated**: April 28, 2026
+
 This guide explains how to test new features before releasing them to production users.
 
 ---
@@ -105,14 +108,14 @@ git merge test/collision-ui-improvements
 git push origin master
 
 # Bump version
-# Edit api/package.json and web/package.json: "version": "0.9.1"
+# Edit api/package.json and web/package.json: "version": "0.24.0"
 git add api/package.json web/package.json
-git commit -m "chore: bump version to 0.9.1"
+git commit -m "chore: bump version to 0.24.0"
 git push
 
 # Create release tag (triggers production build with 'latest' tag)
-git tag -a v0.9.1 -m "v0.9.1 - Performance & compliance improvements"
-git push origin v0.9.1
+git tag -a v0.24.0 -m "v0.24.0 - P2 attribute characteristics + compliance"
+git push origin v0.24.0
 
 # Create GitHub Release (triggers update notifications)
 # Go to: https://github.com/pranems/SCIMServer/releases/new
@@ -156,7 +159,7 @@ az containerapp revision deactivate -n scimserver-app -g scimserver-rg --revisio
 
 Or specific version:
 ```powershell
-.\.scripts\test-update.ps1 -TestTag "0.9.1"
+.\.scripts\test-update.ps1 -TestTag "0.10.0"
 ```
 
 ---
@@ -170,8 +173,8 @@ Or specific version:
 **Does NOT tag:** `latest` (no update notifications)
 
 ### `build-and-push.yml` (Production Release)
-**Trigger:** Push tag matching `v*` (e.g., `v0.9.1`)
-**Tags:** `0.9.1`, `0.9`, `latest`
+**Trigger:** Push tag matching `v*` (e.g., `v0.24.0`)
+**Tags:** `0.24.0`, `0.24`, `latest`
 **Purpose:** Official releases
 **Does tag:** `latest` (triggers update notifications)
 
@@ -196,44 +199,64 @@ Or specific version:
 - Random names without prefix (won't trigger test build)
 
 ### Testing Checklist
-- [ ] Lint passes (`cd api && npm run lint`) — 0 errors expected (48 warnings OK)
+- [ ] Lint passes (`cd api && npm run lint`) - 0 errors expected
 - [ ] Backend compiles (`cd api && npm run build`)
 - [ ] Frontend compiles (`cd web && npm run build`)
-- [ ] Unit tests pass (`cd api && npm test`) — 648 unit tests (19 suites)
-- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) — 212 assertions
-- [ ] Live tests pass in verbose mode (`.\scripts\live-test.ps1 -Verbose`) — intercepted API output
+- [ ] Unit tests pass (`cd api && npm test`) - see [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for expected counts
+- [ ] E2E tests pass (`cd api && npm run test:e2e`) - see PROJECT_HEALTH_AND_STATS.md
+- [ ] Unit coverage meets thresholds (`cd api && npm run test:cov`) - branches 75%, functions 90%, lines 80%
+- [ ] E2E coverage report generated (`cd api && npm run test:e2e:cov`) → `coverage-e2e/`
+- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) - see PROJECT_HEALTH_AND_STATS.md
+- [ ] Live tests pass in verbose mode (`.\scripts\live-test.ps1 -Verbose`) - intercepted API output
+- [ ] SCIM Validator passes (`25/25 required + 7 preview`)
 - [ ] Local testing done (if possible)
 - [ ] Test image deployed to Azure
 - [ ] Manual testing in real environment
 - [ ] Logs checked for errors
 - [ ] Database operations verified
 
+### Coverage Commands
+
+```powershell
+# From api/ directory:
+npm run test:cov          # Unit test coverage → coverage/
+npm run test:e2e:cov      # E2E test coverage  → coverage-e2e/
+npm run test:cov:all      # Both unit + E2E coverage
+npm run test:all          # Full pipeline: unit + E2E + live smoke
+```
+
+Coverage thresholds (enforced in `jest.config.ts`):
+- Branches: 75%
+- Functions: 90%
+- Lines: 80%
+- Statements: 80%
+
 ---
 
-## 🧪 Live Test Script — Multi-Environment Usage
+## 🧪 Live Test Script - Multi-Environment Usage
 
-The live test script (`scripts/live-test.ps1`) runs 212+ integration assertions against a running SCIMServer instance. It supports any deployment target via CLI parameters.
+The live test script (`scripts/live-test.ps1`) runs integration assertions against a running SCIMServer instance. It supports any deployment target via CLI parameters.
 
 ### Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `-BaseUrl` | `http://localhost:6000` | Full URL of the running SCIMServer (no trailing slash) |
-| `-ClientId` | `scimserver-client` | OAuth `client_id` — must match the server's `OAUTH_CLIENT_ID` env var |
-| `-ClientSecret` | `changeme-oauth` | OAuth `client_secret` — must match the server's `OAUTH_CLIENT_SECRET` env var |
+| `-ClientId` | `scimserver-client` | OAuth `client_id` - must match the server's `OAUTH_CLIENT_ID` env var |
+| `-ClientSecret` | `changeme-oauth` | OAuth `client_secret` - must match the server's `OAUTH_CLIENT_SECRET` env var |
 | `-Verbose` | off | Print full HTTP request/response bodies for debugging |
 
 ### Scenario 1: Local Development (ts-node-dev)
 
-Start the server from the `api/` directory, then run tests. In dev mode, if `OAUTH_CLIENT_SECRET` is not set, a random secret is auto-generated and printed to the console — copy it into `-ClientSecret`.
+Start the server from the `api/` directory, then run tests. In dev mode, if `OAUTH_CLIENT_SECRET` is not set, a random secret is auto-generated and printed to the console - copy it into `-ClientSecret`.
 
 ```powershell
-# Terminal 1 — start server
+# Terminal 1 - start server
 cd api
 $env:PORT = 6000
 npx ts-node-dev --respawn --transpile-only src/main.ts
 
-# Terminal 2 — run tests (use the auto-generated secret from server output)
+# Terminal 2 - run tests (use the auto-generated secret from server output)
 .\scripts\live-test.ps1
 # Or with a known secret:
 $env:OAUTH_CLIENT_SECRET = "changeme-oauth"   # set on server side
@@ -310,9 +333,9 @@ These env vars on the **server** determine what credentials the live test script
 ---
 
 ### Version Bumping
-- **Patch** (0.9.1 → 0.9.2): Bug fixes, small improvements
-- **Minor** (0.9.1 → 0.10.0): New features, non-breaking changes
-- **Major** (0.9.0 → 1.0.0): Breaking changes, major redesign
+- **Patch** (0.10.0 → 0.10.1): Bug fixes, small improvements
+- **Minor** (0.10.0 → 0.11.0): New features, non-breaking changes
+- **Major** (0.10.0 → 1.0.0): Breaking changes, major redesign
 
 ---
 
@@ -364,4 +387,4 @@ az containerapp revision list -n <app-name> -g <rg> -o table
 
 ---
 
-**Last Updated:** February 2026 | **Version:** 0.9.1
+**Last Updated:** April 2026

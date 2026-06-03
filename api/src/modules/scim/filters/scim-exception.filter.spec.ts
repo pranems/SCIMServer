@@ -1,8 +1,11 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { ScimExceptionFilter } from './scim-exception.filter';
 import { createScimError } from '../common/scim-errors';
-import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
+import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { LoggingService } from '../../logging/logging.service';
+import { REQUEST_LOGGING_META_KEY } from '../../logging/request-logging.interceptor';
+import * as scimLoggerModule from '../../logging/scim-logger.service';
 
 describe('ScimExceptionFilter', () => {
   let filter: ScimExceptionFilter;
@@ -10,8 +13,11 @@ describe('ScimExceptionFilter', () => {
     status: jest.Mock;
     setHeader: jest.Mock;
     json: jest.Mock;
+    getHeaders: jest.Mock;
   };
+  let mockRequest: any;
   let mockHost: any;
+  let mockLoggingService: { recordRequest: jest.Mock };
 
   const mockScimLogger = {
     trace: jest.fn(),
@@ -24,16 +30,34 @@ describe('ScimExceptionFilter', () => {
   };
 
   beforeEach(() => {
-    filter = new ScimExceptionFilter(mockScimLogger as unknown as ScimLogger);
+    mockLoggingService = { recordRequest: jest.fn() };
+    filter = new ScimExceptionFilter(
+      mockScimLogger as unknown as ScimLogger,
+      mockLoggingService as unknown as LoggingService,
+    );
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       setHeader: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
+      getHeaders: jest.fn().mockReturnValue({}),
+    };
+    mockRequest = {
+      originalUrl: '/scim/Users',
+      url: '/scim/Users',
+      method: 'POST',
+      headers: { 'user-agent': 'test' },
+      body: {},
+      [REQUEST_LOGGING_META_KEY]: {
+        startedAt: Date.now() - 50,
+        requestHeaders: { 'user-agent': 'test' },
+        requestBody: {},
+        endpointId: undefined,
+      },
     };
     mockHost = {
       switchToHttp: () => ({
         getResponse: () => mockResponse,
-        getRequest: () => ({}),
+        getRequest: () => mockRequest,
       }),
     };
   });
@@ -161,6 +185,154 @@ describe('ScimExceptionFilter', () => {
 
       const body = mockResponse.json.mock.calls[0][0];
       expect(body.detail).toBe('Not Acceptable');
+    });
+  });
+
+  describe('Diagnostics enrichment (G.4)', () => {
+    let getCtxSpy: jest.SpyInstance;
+
+    afterEach(() => {
+      getCtxSpy?.mockRestore();
+    });
+
+    it('should add diagnostics extension to non-createScimError HttpExceptions when correlation context exists', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-abc',
+        endpointId: 'ep-123',
+      } as any);
+
+      const exception = new HttpException('Not Found', HttpStatus.NOT_FOUND);
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].requestId).toBe('req-abc');
+      expect(body[SCIM_DIAGNOSTICS_URN].endpointId).toBe('ep-123');
+      expect(body[SCIM_DIAGNOSTICS_URN].logsUrl).toBe('/scim/endpoints/ep-123/logs/recent?requestId=req-abc');
+    });
+
+    it('should use admin logsUrl when no endpointId in correlation context', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-xyz',
+      } as any);
+
+      const exception = new HttpException('Bad Request', HttpStatus.BAD_REQUEST);
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].requestId).toBe('req-xyz');
+      expect(body[SCIM_DIAGNOSTICS_URN].logsUrl).toBe('/scim/admin/log-config/recent?requestId=req-xyz');
+    });
+
+    it('should NOT add diagnostics when no correlation context', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue(undefined);
+
+      const exception = new HttpException('Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeUndefined();
+    });
+
+    it('should NOT overwrite existing diagnostics from createScimError', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-222',
+        endpointId: 'ep-333',
+      } as any);
+
+      const exception = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+      });
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      // Diagnostics should come from createScimError, not the filter
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('StrictSchemaValidation');
+    });
+  });
+
+  // ── Error request log persistence ──────────────────────────────────
+
+  describe('error request log persistence', () => {
+    it('should call recordRequest with the exact SCIM error body', () => {
+      const exception = createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: 'Duplicate userName.',
+      });
+
+      filter.catch(exception, mockHost);
+
+      expect(mockLoggingService.recordRequest).toHaveBeenCalledTimes(1);
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.status).toBe(409);
+      expect(call.responseBody).toBeDefined();
+      expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
+      expect(call.responseBody.detail).toBe('Duplicate userName.');
+      expect(call.responseBody.scimType).toBe('uniqueness');
+      expect(call.responseBody.status).toBe('409');
+    });
+
+    it('should include diagnostics URN in the stored responseBody', () => {
+      const getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-persist',
+        endpointId: 'ep-persist',
+      } as any);
+
+      const exception = new HttpException('Not Found', HttpStatus.NOT_FOUND);
+      filter.catch(exception, mockHost);
+
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.responseBody[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(call.responseBody[SCIM_DIAGNOSTICS_URN].requestId).toBe('req-persist');
+
+      getCtxSpy.mockRestore();
+    });
+
+    it('should read timing metadata from request and include durationMs', () => {
+      mockRequest[REQUEST_LOGGING_META_KEY] = {
+        startedAt: Date.now() - 100,
+        requestHeaders: { authorization: 'Bearer test' },
+        requestBody: { userName: 'test@test.com' },
+        endpointId: 'ep-timing',
+      };
+
+      const exception = new HttpException('Bad Request', HttpStatus.BAD_REQUEST);
+      filter.catch(exception, mockHost);
+
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.durationMs).toBeGreaterThanOrEqual(0);
+      expect(call.endpointId).toBe('ep-timing');
+      expect(call.requestBody).toEqual({ userName: 'test@test.com' });
+    });
+
+    it('should NOT call recordRequest for non-SCIM routes', () => {
+      const nonScimHost = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+          getRequest: () => ({ originalUrl: '/admin/dashboard', url: '/admin/dashboard', method: 'GET', headers: {} }),
+        }),
+      };
+
+      const exception = new HttpException('Not Found', HttpStatus.NOT_FOUND);
+      filter.catch(exception, nonScimHost as any);
+
+      expect(mockLoggingService.recordRequest).not.toHaveBeenCalled();
+    });
+
+    it('should pass the error object to recordRequest', () => {
+      const exception = createScimError({
+        status: 500,
+        detail: 'Internal failure',
+      });
+
+      filter.catch(exception, mockHost);
+
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.error).toBe(exception);
     });
   });
 });

@@ -1,8 +1,8 @@
-# 🏗️ SCIM 2.0 RFC Compliance Layer — Comprehensive Technical Reference
+# 🏗️ SCIM 2.0 RFC Compliance Layer - Comprehensive Technical Reference
 
-> **Version:** 2.1  
-> **Date:** February 13, 2026  
-> **Applies to:** SCIMServer2022 API  
+> **Version:** 2.2  
+> **Date:** March 1, 2026  
+> **Applies to:** SCIMServer API  
 > **RFC References:** [RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) (Core Schema), [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644) (Protocol), [RFC 7642](https://datatracker.ietf.org/doc/html/rfc7642) (Concepts)
 
 ---
@@ -61,10 +61,10 @@
                   │                           │                                       │
                   │                           ▼                                       │
                   │  ┌──────────────────────────────────────────────────────────┐     │
-                  │  │                  Data Layer (Prisma + SQLite)             │     │
-                  │  │  ScimUser / ScimGroup tables                             │     │
-                  │  │  • userNameLower column for case-insensitive lookups      │     │
-                  │  │  • rawPayload JSON for flexible schema storage           │     │
+                  │  │                  Data Layer (Prisma + PostgreSQL 17)      │     │
+                  │  │  ScimResource table (CITEXT + JSONB)                     │     │
+                  │  │  • CITEXT columns for case-insensitive lookups            │     │
+                  │  │  • payload JSONB for flexible schema storage              │     │
                   │  └──────────────────────────────────────────────────────────┘     │
                   └──────────────────────────────────────────────────────────────────┘
 ```
@@ -73,12 +73,12 @@
 
 ```
 api/src/modules/scim/
-├── scim.module.ts                          # Module wiring — registers all providers + interceptors
+├── scim.module.ts                          # Module wiring - registers all providers + interceptors
 ├── common/
 │   ├── scim-constants.ts                   # URN schemas, default counts, error types
 │   ├── scim-types.ts                       # TypeScript interfaces (ScimUserResource, etc.)
-│   ├── scim-errors.ts                      # createScimError() — RFC 7644 §3.12
-│   └── scim-attribute-projection.ts        # RFC 7644 §3.4.2.5 — attributes/excludedAttributes
+│   ├── scim-errors.ts                      # createScimError() - RFC 7644 §3.12
+│   └── scim-attribute-projection.ts        # RFC 7644 §3.4.2.5 - attributes/excludedAttributes
 ├── controllers/
 │   ├── endpoint-scim-users.controller.ts   # POST, GET, PUT, PATCH, DELETE /Users + POST /.search
 │   ├── endpoint-scim-groups.controller.ts  # POST, GET, PUT, PATCH, DELETE /Groups + POST /.search
@@ -181,7 +181,7 @@ interface NotNode {
   filter: FilterNode;
 }
 
-/** Value path: attrPath[valFilter] — e.g., emails[type eq "work"] */
+/** Value path: attrPath[valFilter] - e.g., emails[type eq "work"] */
 interface ValuePathNode {
   type: 'valuePath';
   attrPath: string;
@@ -324,9 +324,9 @@ AST:
 | `ge` | Greater or equal | Lexicographic / numeric | |
 | `lt` | Less than | Lexicographic / numeric | |
 | `le` | Less or equal | Lexicographic / numeric | |
-| `pr` | Present | N/A | `emails pr` — true if attribute is non-null/non-empty |
+| `pr` | Present | N/A | `emails pr` - true if attribute is non-null/non-empty |
 
-**Multi-valued attribute handling:** For arrays (e.g., `emails`), the evaluator returns `true` if **any** element matches — per [RFC 7644 §3.4.2.2](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2.2).
+**Multi-valued attribute handling:** For arrays (e.g., `emails`), the evaluator returns `true` if **any** element matches - per [RFC 7644 §3.4.2.2](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2.2).
 
 **Attribute path resolution:**
 - Simple: `userName` → `resource.userName`
@@ -368,7 +368,7 @@ The filter application layer (`apply-scim-filter.ts`) implements a hybrid DB + i
 
 | SCIM Attribute | Prisma Column | Notes |
 |----------------|---------------|-------|
-| `userName` | `userNameLower` | Lowercase for case-insensitive `eq` |
+| `userName` | `userName` | CITEXT column - case-insensitive natively |
 | `externalId` | `externalId` | Direct match |
 | `id` | `scimId` | SCIM resource ID |
 
@@ -379,7 +379,7 @@ The filter application layer (`apply-scim-filter.ts`) implements a hybrid DB + i
 | `externalId` | `externalId` | Direct match |
 | `id` | `scimId` | SCIM resource ID |
 
-> **Why `displayName` is NOT pushed down:** SQLite performs case-sensitive comparisons by default. Since SCIM requires case-insensitive attribute matching (RFC 7643 §2.1), `displayName` filtering is handled in-memory where the evaluator normalizes strings.
+> **All 10 SCIM filter operators are pushed to PostgreSQL** (since Phase 4, v0.12.0). `displayName` is now a derived CITEXT column with full push-down support. The earlier SQLite limitation no longer applies.
 
 ### 3.3 Example: Push-Down vs. In-Memory
 
@@ -387,7 +387,7 @@ The filter application layer (`apply-scim-filter.ts`) implements a hybrid DB + i
 ```http
 GET /scim/endpoints/{id}/Users?filter=userName eq "john@example.com"
 ```
-→ Prisma query: `WHERE userNameLower = 'john@example.com' AND endpointId = '...'`
+→ Prisma query: `WHERE userName = 'john@example.com' AND endpointId = '...'`
 
 **In-memory (complex filter):**
 ```http
@@ -413,9 +413,9 @@ GET /scim/endpoints/{id}/Users?filter=displayName co "test" and active eq true
 
 Per [RFC 7643 §7](https://datatracker.ietf.org/doc/html/rfc7643#section-7), these attributes have `returned: "always"` and **cannot** be excluded:
 
-- **`id`** — The resource identifier
-- **`schemas`** — The schema URN list
-- **`meta`** — Resource metadata (resourceType, created, lastModified, location, version)
+- **`id`** - The resource identifier
+- **`schemas`** - The schema URN list
+- **`meta`** - Resource metadata (resourceType, created, lastModified, location, version)
 
 ### 4.3 Precedence Rule
 
@@ -466,7 +466,7 @@ GET /Users?attributes=name.givenName
   }
 }
 ```
-Note: `name.familyName` is **excluded** — only the requested sub-attribute appears within the `name` object.
+Note: `name.familyName` is **excluded** - only the requested sub-attribute appears within the `name` object.
 
 ### 4.6 Application Points
 
@@ -512,7 +512,7 @@ Content-Type: application/scim+json; charset=utf-8
   ]
 }
 ```
-Note: `emails`, `active`, `name`, `phoneNumbers` are all **omitted** — only the requested attributes plus always-returned ones appear.
+Note: `emails`, `active`, `name`, `phoneNumbers` are all **omitted** - only the requested attributes plus always-returned ones appear.
 
 ---
 
@@ -617,7 +617,7 @@ assertIfMatch(currentVersion, req.headers['if-match']);
 
 ### 5.7 Complete Request/Response Example
 
-**Request — Conditional GET:**
+**Request - Conditional GET:**
 ```http
 GET /scim/endpoints/ep123/Users/86c5eed8-... HTTP/1.1
 Host: localhost:6000
@@ -625,13 +625,13 @@ Authorization: Bearer eyJhbG...
 If-None-Match: W/"2026-02-11T23:53:25.726Z"
 ```
 
-**Response — Not Modified:**
+**Response - Not Modified:**
 ```http
 HTTP/1.1 304 Not Modified
 ETag: W/"2026-02-11T23:53:25.726Z"
 ```
 
-**Response — Modified (stale ETag):**
+**Response - Modified (stale ETag):**
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/scim+json; charset=utf-8
@@ -856,7 +856,7 @@ HTTP/1.1 200 OK
 }
 ```
 
-### 6.6 GET vs. POST /.search — Comparison
+### 6.6 GET vs. POST /.search - Comparison
 
 | Feature | GET /Users | POST /Users/.search |
 |---------|-----------|---------------------|
@@ -1185,8 +1185,8 @@ All operations are applied atomically in a single database transaction.
 |-------|-----------|
 | **Filter tokenizer** | All keywords lowercased (`AND` → `and`, `EQ` → `eq`) |
 | **Filter evaluator** | String comparisons via `.toLowerCase()` |
-| **DB push-down** | `userNameLower` column stores lowercase userName |
-| **Uniqueness checks** | `userName.toLowerCase()` dedup |
+| **DB push-down** | CITEXT columns (`userName`, `displayName`) provide native case-insensitive matching; `externalId` is TEXT (caseExact per RFC 7643 §3.1) |
+| **Uniqueness checks** | CITEXT column-level uniqueness constraints (per endpointId) |
 | **PATCH operations** | Case-insensitive op names (`Replace` → `replace`) |
 | **No-path merge** | Case-insensitive key lookup (`DisplayName` → `displayName`) |
 | **Attribute projection** | Case-insensitive attribute name matching |
@@ -1653,4 +1653,4 @@ HTTP/1.1 200 OK
 
 ---
 
-> **Last verified:** February 2026 — 272/272 live tests passing, 177/177 e2e tests, 648/648 unit tests against `localhost:6000`
+> **Last verified:** March 2026 - All live, E2E, and unit tests passing against `localhost:6000`. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.

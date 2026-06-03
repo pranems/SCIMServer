@@ -1,6 +1,7 @@
 import {
   ENDPOINT_CONFIG_FLAGS,
   getConfigBoolean,
+  getConfigBooleanWithDefault,
   getConfigString,
   validateEndpointConfig,
   DEFAULT_ENDPOINT_CONFIG,
@@ -10,24 +11,17 @@ import {
 describe('endpoint-config.interface', () => {
   describe('ENDPOINT_CONFIG_FLAGS', () => {
     it('should have all expected config flag keys', () => {
-      expect(ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP).toBe(
-        'MultiOpPatchRequestAddMultipleMembersToGroup'
-      );
-      expect(ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP).toBe(
-        'MultiOpPatchRequestRemoveMultipleMembersFromGroup'
-      );
       expect(ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS).toBe(
         'PatchOpAllowRemoveAllMembers'
       );
-      expect(ENDPOINT_CONFIG_FLAGS.EXCLUDE_META).toBe('excludeMeta');
-      expect(ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS).toBe('excludeSchemas');
-      expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN).toBe('customSchemaUrn');
-      expect(ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA).toBe('includeEnterpriseSchema');
-      expect(ENDPOINT_CONFIG_FLAGS.STRICT_MODE).toBe('strictMode');
-      expect(ENDPOINT_CONFIG_FLAGS.LEGACY_MODE).toBe('legacyMode');
-      expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_HEADERS).toBe('customHeaders');
       expect(ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED).toBe('VerbosePatchSupported');
       expect(ENDPOINT_CONFIG_FLAGS.LOG_LEVEL).toBe('logLevel');
+      expect(ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION).toBe('StrictSchemaValidation');
+      expect(ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH).toBe('RequireIfMatch');
+      expect(ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS).toBe('AllowAndCoerceBooleanStrings');
+      expect(ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED).toBe('PerEndpointCredentialsEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE).toBe('IncludeWarningAboutIgnoredReadOnlyAttribute');
+      expect(ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH).toBe('IgnoreReadOnlyAttributesInPatch');
     });
   });
 
@@ -101,14 +95,6 @@ describe('endpoint-config.interface', () => {
       expect(getConfigBoolean(config, 'testKey')).toBe(false);
     });
 
-    it('should work with MultiOpPatchRequestAddMultipleMembersToGroup flag', () => {
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: 'True',
-      };
-      expect(
-        getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP)
-      ).toBe(true);
-    });
   });
 
   describe('getConfigString', () => {
@@ -141,12 +127,12 @@ describe('endpoint-config.interface', () => {
       expect(getConfigString(config, 'testKey')).toBeUndefined();
     });
 
-    it('should work with customSchemaUrn flag', () => {
+    it('should work with custom string flags', () => {
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN]: 'urn:custom:scim',
+        customFlag: 'custom-value',
       };
-      expect(getConfigString(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN)).toBe(
-        'urn:custom:scim'
+      expect(getConfigString(config, 'customFlag')).toBe(
+        'custom-value'
       );
     });
   });
@@ -158,243 +144,6 @@ describe('endpoint-config.interface', () => {
 
     it('should not throw for empty config', () => {
       expect(() => validateEndpointConfig({})).not.toThrow();
-    });
-
-    describe('MultiOpPatchRequestAddMultipleMembersToGroup validation', () => {
-      it('should accept boolean true', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: true })
-        ).not.toThrow();
-      });
-
-      it('should accept boolean false', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: false })
-        ).not.toThrow();
-      });
-
-      it('should accept string "true"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'true' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "True"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'True' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "false"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'false' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "False"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'False' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "1"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: '1' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "0"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: '0' })
-        ).not.toThrow();
-      });
-
-      it('should throw for invalid string "Yes"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'Yes' })
-        ).toThrow(/Invalid value/);
-      });
-
-      it('should throw for invalid string "No"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'No' })
-        ).toThrow(/Invalid value/);
-      });
-
-      it('should throw for invalid string "enabled"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'enabled' })
-        ).toThrow(/Invalid value/);
-      });
-
-      it('should throw for number value', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 123 })
-        ).toThrow(/Invalid type/);
-      });
-
-      it('should throw for object value', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: { enabled: true } })
-        ).toThrow(/Invalid type/);
-      });
-
-      it('should throw for array value', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: ['true'] })
-        ).toThrow(/Invalid type/);
-      });
-
-      it('should include flag name in error message', () => {
-        try {
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid' });
-          fail('Expected error');
-        } catch (e) {
-          expect((e as Error).message).toContain('MultiOpPatchRequestAddMultipleMembersToGroup');
-        }
-      });
-
-      it('should include allowed values in error message', () => {
-        try {
-          validateEndpointConfig({ MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid' });
-          fail('Expected error');
-        } catch (e) {
-          expect((e as Error).message).toContain('Allowed values');
-        }
-      });
-    });
-
-    describe('MultiOpPatchRequestRemoveMultipleMembersFromGroup validation', () => {
-      it('should accept boolean true', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: true })
-        ).not.toThrow();
-      });
-
-      it('should accept boolean false', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: false })
-        ).not.toThrow();
-      });
-
-      it('should accept string "true"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'true' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "True"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "false"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'false' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "False"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'False' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "1"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: '1' })
-        ).not.toThrow();
-      });
-
-      it('should accept string "0"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: '0' })
-        ).not.toThrow();
-      });
-
-      it('should throw for invalid string "Yes"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'Yes' })
-        ).toThrow(/Invalid value/);
-      });
-
-      it('should throw for invalid string "No"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'No' })
-        ).toThrow(/Invalid value/);
-      });
-
-      it('should throw for invalid string "enabled"', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'enabled' })
-        ).toThrow(/Invalid value/);
-      });
-
-      it('should throw for number value', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 123 })
-        ).toThrow(/Invalid type/);
-      });
-
-      it('should throw for object value', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: { enabled: true } })
-        ).toThrow(/Invalid type/);
-      });
-
-      it('should throw for array value', () => {
-        expect(() =>
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: ['true'] })
-        ).toThrow(/Invalid type/);
-      });
-
-      it('should include flag name in error message', () => {
-        try {
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'invalid' });
-          fail('Expected error');
-        } catch (e) {
-          expect((e as Error).message).toContain('MultiOpPatchRequestRemoveMultipleMembersFromGroup');
-        }
-      });
-
-      it('should include allowed values in error message', () => {
-        try {
-          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'invalid' });
-          fail('Expected error');
-        } catch (e) {
-          expect((e as Error).message).toContain('Allowed values');
-        }
-      });
-    });
-
-    describe('Both flags together', () => {
-      it('should accept both flags set to valid values', () => {
-        expect(() =>
-          validateEndpointConfig({
-            MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
-            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
-          })
-        ).not.toThrow();
-      });
-
-      it('should reject if add flag is invalid even if remove flag is valid', () => {
-        expect(() =>
-          validateEndpointConfig({
-            MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid',
-            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
-          })
-        ).toThrow(/MultiOpPatchRequestAddMultipleMembersToGroup/);
-      });
-
-      it('should reject if remove flag is invalid even if add flag is valid', () => {
-        expect(() =>
-          validateEndpointConfig({
-            MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
-            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'invalid',
-          })
-        ).toThrow(/MultiOpPatchRequestRemoveMultipleMembersFromGroup/);
-      });
     });
 
     describe('PatchOpAllowRemoveAllMembers validation', () => {
@@ -710,16 +459,666 @@ describe('endpoint-config.interface', () => {
   });
 
   describe('DEFAULT_ENDPOINT_CONFIG', () => {
-    it('should have expected default values', () => {
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(true);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.EXCLUDE_META]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_MODE]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.LEGACY_MODE]).toBe(false);
+    it('should have expected default values (settings v7)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]).toBe(true);
     });
   });
+
+  describe('StrictSchemaValidation validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "No"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'No' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: { enabled: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ StrictSchemaValidation: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('StrictSchemaValidation');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ StrictSchemaValidation: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('All new flags together', () => {
+    it('should reject invalid AllowAndCoerceBooleanStrings even if others are valid', () => {
+      expect(() =>
+        validateEndpointConfig({
+          AllowAndCoerceBooleanStrings: 'invalid',
+          StrictSchemaValidation: 'True',
+        })
+      ).toThrow(/AllowAndCoerceBooleanStrings/);
+    });
+  });
+
+  describe('getConfigBooleanWithDefault', () => {
+    it('should return defaultValue for undefined config', () => {
+      expect(getConfigBooleanWithDefault(undefined, 'anyKey', true)).toBe(true);
+      expect(getConfigBooleanWithDefault(undefined, 'anyKey', false)).toBe(false);
+    });
+
+    it('should return defaultValue for missing key', () => {
+      const config: EndpointConfig = {};
+      expect(getConfigBooleanWithDefault(config, 'missing', true)).toBe(true);
+      expect(getConfigBooleanWithDefault(config, 'missing', false)).toBe(false);
+    });
+
+    it('should return actual boolean value when present', () => {
+      expect(getConfigBooleanWithDefault({ test: true }, 'test', false)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: false }, 'test', true)).toBe(false);
+    });
+
+    it('should parse string "True" correctly', () => {
+      expect(getConfigBooleanWithDefault({ test: 'True' }, 'test', false)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: 'true' }, 'test', false)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: 'TRUE' }, 'test', false)).toBe(true);
+    });
+
+    it('should parse string "False" correctly', () => {
+      expect(getConfigBooleanWithDefault({ test: 'False' }, 'test', true)).toBe(false);
+      expect(getConfigBooleanWithDefault({ test: 'false' }, 'test', true)).toBe(false);
+      expect(getConfigBooleanWithDefault({ test: 'FALSE' }, 'test', true)).toBe(false);
+    });
+
+    it('should parse string "1" as true', () => {
+      expect(getConfigBooleanWithDefault({ test: '1' }, 'test', false)).toBe(true);
+    });
+
+    it('should parse string "0" as false', () => {
+      expect(getConfigBooleanWithDefault({ test: '0' }, 'test', true)).toBe(false);
+    });
+
+    it('should return defaultValue for non-boolean/non-string value', () => {
+      expect(getConfigBooleanWithDefault({ test: 123 }, 'test', true)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: {} }, 'test', false)).toBe(false);
+    });
+
+    it('should use default=true for AllowAndCoerceBooleanStrings when not set', () => {
+      const config: EndpointConfig = { StrictSchemaValidation: 'True' };
+      expect(getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true)).toBe(true);
+    });
+
+    it('should respect explicit AllowAndCoerceBooleanStrings=False', () => {
+      const config: EndpointConfig = { AllowAndCoerceBooleanStrings: 'False' };
+      expect(getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true)).toBe(false);
+    });
+  });
+
+  describe('AllowAndCoerceBooleanStrings validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('AllowAndCoerceBooleanStrings');
+      }
+    });
+  });
+
+  describe('RequireIfMatch validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "enabled"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'enabled' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: { enabled: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ RequireIfMatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('RequireIfMatch');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ RequireIfMatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('PerEndpointCredentialsEnabled validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: { key: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ PerEndpointCredentialsEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('PerEndpointCredentialsEnabled');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ PerEndpointCredentialsEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('IncludeWarningAboutIgnoredReadOnlyAttribute validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 42 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: {} })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('IncludeWarningAboutIgnoredReadOnlyAttribute');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('IgnoreReadOnlyAttributesInPatch validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: {} })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('IgnoreReadOnlyAttributesInPatch');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('All flags combined validation', () => {
+    it('should accept all active boolean flags set to valid values', () => {
+      expect(() =>
+        validateEndpointConfig({
+          PatchOpAllowRemoveAllMembers: 'False',
+          VerbosePatchSupported: true,
+          StrictSchemaValidation: 'True',
+          RequireIfMatch: 'True',
+          AllowAndCoerceBooleanStrings: 'False',
+          PerEndpointCredentialsEnabled: 'True',
+          IncludeWarningAboutIgnoredReadOnlyAttribute: true,
+          IgnoreReadOnlyAttributesInPatch: 'True',
+          logLevel: 'DEBUG',
+        })
+      ).not.toThrow();
+    });
+
+    it('should validate IgnoreReadOnlyAttributesInPatch independently of StrictSchemaValidation', () => {
+      // IgnoreRO without Strict is valid config (has no runtime effect, but valid)
+      expect(() =>
+        validateEndpointConfig({
+          IgnoreReadOnlyAttributesInPatch: 'True',
+          StrictSchemaValidation: 'False',
+        })
+      ).not.toThrow();
+    });
+  });
+
+  describe('DEFAULT_ENDPOINT_CONFIG', () => {
+    it('should have the correct defaults for all 13 boolean flags (settings v7)', () => {
+      // New flags (settings v7)
+      expect(DEFAULT_ENDPOINT_CONFIG.UserSoftDeleteEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.UserHardDeleteEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.GroupHardDeleteEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiMemberPatchOpForGroupEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.SchemaDiscoveryEnabled).toBe(true);
+      // Changed defaults (settings v7)
+      expect(DEFAULT_ENDPOINT_CONFIG.StrictSchemaValidation).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.PatchOpAllowRemoveAllMembers).toBe(false);
+      // Unchanged flags
+      expect(DEFAULT_ENDPOINT_CONFIG.VerbosePatchSupported).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.RequireIfMatch).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.AllowAndCoerceBooleanStrings).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.PerEndpointCredentialsEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.IncludeWarningAboutIgnoredReadOnlyAttribute).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.IgnoreReadOnlyAttributesInPatch).toBe(false);
+    });
+
+    it('should NOT have removed flags in defaults (settings v7 clean break)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG.SoftDeleteEnabled).toBeUndefined();
+      expect(DEFAULT_ENDPOINT_CONFIG.ReprovisionOnConflictForSoftDeletedResource).toBeUndefined();
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestAddMultipleMembersToGroup).toBeUndefined();
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBeUndefined();
+    });
+
+    it('should not have a logLevel default (undefined by default)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG.logLevel).toBeUndefined();
+    });
+  });
+
+  // ─── Settings v7: New flag constants ──────────────────────────────────
+
+  describe('Settings v7 - new flag constants', () => {
+    it('should have USER_SOFT_DELETE_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED).toBe('UserSoftDeleteEnabled');
+    });
+
+    it('should have USER_HARD_DELETE_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED).toBe('UserHardDeleteEnabled');
+    });
+
+    it('should have GROUP_HARD_DELETE_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED).toBe('GroupHardDeleteEnabled');
+    });
+
+    it('should have MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED).toBe('MultiMemberPatchOpForGroupEnabled');
+    });
+
+    it('should have SCHEMA_DISCOVERY_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED).toBe('SchemaDiscoveryEnabled');
+    });
+
+    it('should validate new boolean flags', () => {
+      expect(() => validateEndpointConfig({ UserSoftDeleteEnabled: true })).not.toThrow();
+      expect(() => validateEndpointConfig({ UserSoftDeleteEnabled: 'True' })).not.toThrow();
+      expect(() => validateEndpointConfig({ UserSoftDeleteEnabled: 'invalid' })).toThrow(/Invalid value/);
+      expect(() => validateEndpointConfig({ UserHardDeleteEnabled: true })).not.toThrow();
+      expect(() => validateEndpointConfig({ UserHardDeleteEnabled: 123 })).toThrow(/Invalid type/);
+      expect(() => validateEndpointConfig({ GroupHardDeleteEnabled: 'False' })).not.toThrow();
+      expect(() => validateEndpointConfig({ MultiMemberPatchOpForGroupEnabled: false })).not.toThrow();
+      expect(() => validateEndpointConfig({ SchemaDiscoveryEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept all new flags together', () => {
+      expect(() => validateEndpointConfig({
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'True',
+        GroupHardDeleteEnabled: 'True',
+        MultiMemberPatchOpForGroupEnabled: 'True',
+        SchemaDiscoveryEnabled: 'True',
+        StrictSchemaValidation: 'True',
+        PatchOpAllowRemoveAllMembers: 'False',
+        VerbosePatchSupported: 'True',
+        AllowAndCoerceBooleanStrings: 'True',
+        RequireIfMatch: 'False',
+        PerEndpointCredentialsEnabled: 'False',
+        IncludeWarningAboutIgnoredReadOnlyAttribute: 'False',
+        IgnoreReadOnlyAttributesInPatch: 'False',
+        logLevel: 'INFO',
+      })).not.toThrow();
+    });
+
+    it('should reject when any one new flag is invalid among valid flags', () => {
+      expect(() => validateEndpointConfig({
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'invalid',
+      })).toThrow(/UserHardDeleteEnabled/);
+    });
+  });
+
+  // ─── Settings v7: Dedicated validation blocks for each new flag ────────
+
+  // Helper: standard 14-test validation battery for a boolean flag
+  function describeBooleanFlagValidation(flagName: string) {
+    describe(`${flagName} validation (settings v7)`, () => {
+      it('should accept boolean true', () => {
+        expect(() => validateEndpointConfig({ [flagName]: true })).not.toThrow();
+      });
+      it('should accept boolean false', () => {
+        expect(() => validateEndpointConfig({ [flagName]: false })).not.toThrow();
+      });
+      it('should accept string "True"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'True' })).not.toThrow();
+      });
+      it('should accept string "true"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'true' })).not.toThrow();
+      });
+      it('should accept string "False"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'False' })).not.toThrow();
+      });
+      it('should accept string "false"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'false' })).not.toThrow();
+      });
+      it('should accept string "1"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: '1' })).not.toThrow();
+      });
+      it('should accept string "0"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: '0' })).not.toThrow();
+      });
+      it('should throw for invalid string "Yes"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'Yes' })).toThrow(/Invalid value/);
+      });
+      it('should throw for invalid string "No"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'No' })).toThrow(/Invalid value/);
+      });
+      it('should throw for number value', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 123 })).toThrow(/Invalid type/);
+      });
+      it('should throw for object value', () => {
+        expect(() => validateEndpointConfig({ [flagName]: { enabled: true } })).toThrow(/Invalid type/);
+      });
+      it('should throw for array value', () => {
+        expect(() => validateEndpointConfig({ [flagName]: ['true'] })).toThrow(/Invalid type/);
+      });
+      it('should include flag name in error message', () => {
+        try {
+          validateEndpointConfig({ [flagName]: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain(flagName);
+        }
+      });
+    });
+  }
+
+  describeBooleanFlagValidation('UserSoftDeleteEnabled');
+  describeBooleanFlagValidation('UserHardDeleteEnabled');
+  describeBooleanFlagValidation('GroupHardDeleteEnabled');
+  describeBooleanFlagValidation('MultiMemberPatchOpForGroupEnabled');
+  describeBooleanFlagValidation('SchemaDiscoveryEnabled');
 });
