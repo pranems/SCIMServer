@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
-> **84 routes** across 19 controllers
+> **86 route handlers** across 20 controllers (includes 2 dashboard analytics routes and the web SPA catch-all)
 
 ---
 
@@ -116,9 +116,9 @@ Authorization: Bearer changeme-scim
 
 ```json
 {
-  "version": "0.40.0",
+  "version": "0.53.0",
   "commit": "a1b2c3d",
-  "buildTime": "2026-04-28T08:00:00.000Z",
+  "buildTime": "2026-06-03T08:00:00.000Z",
   "service": "SCIMServer",
   "runtime": {
     "node": "v24.0.0",
@@ -1629,8 +1629,8 @@ Host: localhost:8080
 ```json
 {
   "message": "OAuth endpoint is working",
-  "timestamp": "2026-04-28T10:00:00.000Z",
-  "version": "0.40.0"
+  "timestamp": "2026-06-03T10:00:00.000Z",
+  "version": "0.53.0"
 }
 ```
 
@@ -1800,3 +1800,6 @@ The `urn:scimserver:api:messages:2.0:Diagnostics` extension is automatically add
 | 81 | GET | `/scim/endpoints/:id/logs/history` | Bearer | EndpointLogController |
 | 82 | POST | `/scim/oauth/token` | Public | OAuthController |
 | 83 | GET | `/scim/oauth/test` | Public | OAuthController |
+| 84 | GET | `/scim/admin/dashboard` | Bearer | DashboardController |
+| 85 | GET | `/scim/admin/endpoints/:endpointId/overview` | Bearer | DashboardController |
+| 86 | GET | `/` | Public | WebController (serves SPA) |

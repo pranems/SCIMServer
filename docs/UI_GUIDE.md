@@ -1,778 +1,320 @@
-# SCIMServer UI Guide - v0.41.0
+# SCIMServer Web Admin UI Guide
 
-> **Status:** Active | **Last Updated:** 2026-05-05 | **Version:** 0.41.0  
-> New Fluent UI v9 is the **default**. Legacy tab-based UI available via `?ui=legacy`.  
-> All screenshots below are from the **live Azure dev deployment** - verified by the smoke test.
+> **Status:** Active | **Last Updated:** 2026-06-03 | **Version:** 0.53.0
+> Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
+> Screenshots below are from the **live customer-facing production** instance (`scimserver-prod.calmsand-...`), verified at v0.53.0.
 
 ---
 
 ## Table of Contents
 
-1. [Quick Start](#1-quick-start)
-2. [Architecture Overview](#2-architecture-overview)
-3. [App Shell Layout](#3-app-shell-layout)
-4. [Dashboard Page](#4-dashboard-page)
-5. [Endpoints Page](#5-endpoints-page)
-6. [Endpoint Detail Page](#6-endpoint-detail-page)
-7. [Global Logs Page](#7-global-logs-page)
-8. [Global Settings Page](#8-global-settings-page)
-9. [Theme System](#9-theme-system)
-10. [Responsive Design](#10-responsive-design)
-11. [Real-Time Updates (SSE)](#11-real-time-updates-sse)
-12. [Legacy UI (?ui=legacy)](#12-legacy-ui-uilegacy)
-13. [Data Flow & Caching](#13-data-flow--caching)
-14. [State Management](#14-state-management)
-15. [Accessibility](#15-accessibility)
-16. [Component Reference](#16-component-reference)
+1. [Overview](#1-overview)
+2. [Accessing the UI](#2-accessing-the-ui)
+3. [Authentication (Token Gate)](#3-authentication-token-gate)
+4. [App Shell & Navigation](#4-app-shell--navigation)
+5. [Dashboard](#5-dashboard)
+6. [Endpoints](#6-endpoints)
+7. [Manual Provisioning](#7-manual-provisioning)
+8. [My Profile (/Me)](#8-my-profile-me)
+9. [Discovery Explorer](#9-discovery-explorer)
+10. [Operations](#10-operations)
+11. [Workbench](#11-workbench)
+12. [Logs](#12-logs)
+13. [Settings](#13-settings)
+14. [Live Log Stream Drawer](#14-live-log-stream-drawer)
+15. [Theme System](#15-theme-system)
+16. [Copy-Everywhere Primitives](#16-copy-everywhere-primitives)
 17. [Screenshot Inventory](#17-screenshot-inventory)
-18. [Test Coverage](#18-test-coverage)
+18. [Known Limitations](#18-known-limitations)
 
 ---
 
-## 1. Quick Start
+## 1. Overview
 
-### Accessing the UI
-
-| Environment | URL | Auth |
-|-------------|-----|------|
-| **Dev** | `https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | Bearer token: `changeme-scim` |
-| **Prod** | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | Bearer token: configured secret |
-| **Local** | `http://localhost:6000` (API) / `http://localhost:5173` (Vite dev) | Bearer token: `local-secret` |
-
-### UI Modes
-
-```
-Default (no query param)  -->  New Fluent UI (AppShell + Sidebar + Pages)
-?ui=legacy                -->  Old tab-based UI (preserved for one release cycle)
-?ui=next                  -->  New Fluent UI (alias, same as default)
-```
-
-### First Visit: Token Dialog
-
-On first visit (no token stored), a Fluent UI dialog prompts for the bearer token:
-
-![Token dialog](screenshots/01-token-dialog.png)
-
-After entering the token and clicking **Save Token**, the dashboard loads:
-
-![Dashboard after login](screenshots/03-dashboard-after-login.png)
-
----
-
-## 2. Architecture Overview
+The Web Admin UI is a React Single-Page Application served by the NestJS backend at the site root (`/`). It is the operator console for the SCIM server: it manages endpoints, inspects discovery documents, provisions resources manually, replays raw SCIM requests, and tails structured logs in real time.
 
 ```mermaid
 flowchart TB
     subgraph Browser["Browser (SPA)"]
-        direction TB
-        App["App.tsx<br/>?ui=legacy switch"]
-        App -->|default| Shell["AppShell<br/>FluentProvider + QueryClient"]
-        App -->|?ui=legacy| Legacy["AppWithTheme<br/>Old tab-based UI"]
-
-        Shell --> Header["AppHeader<br/>Brand bar + theme toggle"]
-        Shell --> Sidebar["AppSidebar<br/>4 nav links + collapse"]
-        Shell --> Router["Pathname Router<br/>/ /endpoints /logs /settings"]
-        Shell --> SSE["SSEProvider<br/>EventSource + cache invalidation"]
-
-        Router --> Dashboard["DashboardPage<br/>KPIs + endpoints + activity"]
-        Router --> Endpoints["EndpointsPage<br/>Card grid + search"]
-        Router --> Detail["EndpointDetailPage<br/>5-tab layout"]
-        Router --> Logs["LogsPage<br/>Global log table"]
-        Router --> Settings["SettingsPage<br/>Version + health"]
-
-        Detail --> UsersTab
-        Detail --> GroupsTab
-        Detail --> LogsTab
-        Detail --> SettingsTab
+        Shell["AppShell<br/>FluentProvider + TanStack Router + Zustand"]
+        Shell --> Header["AppHeader<br/>Brand + 5 header actions"]
+        Shell --> Sidebar["AppSidebar<br/>9 nav links + collapse"]
+        Shell --> SSE["SSE log stream<br/>EventSource"]
+        Shell --> Pages["9 Route Pages"]
+        Pages --> P1["Dashboard"]
+        Pages --> P2["Endpoints + Detail"]
+        Pages --> P3["Manual Provision"]
+        Pages --> P4["My profile (/Me)"]
+        Pages --> P5["Discovery Explorer"]
+        Pages --> P6["Operations"]
+        Pages --> P7["Workbench"]
+        Pages --> P8["Logs"]
+        Pages --> P9["Settings"]
     end
 
     subgraph API["NestJS Backend"]
-        BFF["DashboardController<br/>GET /admin/dashboard"]
-        Stats["StatsProjectionService<br/>In-memory counters"]
-        Events["EventEmitter2<br/>SCIM mutation events"]
-        SCIM["SCIM Services<br/>Users/Groups/Generic"]
+        Admin["Admin controllers<br/>/scim/admin/*"]
+        Scim["SCIM controllers<br/>/scim/v2/* + /scim/endpoints/*"]
     end
 
-    Dashboard -->|useDashboard| BFF
-    Endpoints -->|useEndpoints| API
-    Detail -->|useEndpoint + useEndpointStats| API
-    UsersTab -->|useEndpointUsers| SCIM
-    GroupsTab -->|useEndpointGroups| SCIM
-    SSE -->|EventSource| Events
-    Events --> Stats
-    BFF --> Stats
-
-    style Shell fill:#e0f0ff,stroke:#06a
-    style Legacy fill:#ffe0e0,stroke:#a00
-    style Stats fill:#e0ffe0,stroke:#0a0
+    Pages -->|Bearer token| Admin
+    P7 -->|Bearer token| Scim
 ```
 
-### Technology Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| **Design System** | Fluent UI React v9 | Target audience (Entra admins) uses Microsoft products; zero cognitive friction |
-| **Server State** | TanStack Query v5 | SWR caching, dedup, background refetch, optimistic mutations |
-| **Client State** | Zustand | 1KB, zero boilerplate; only 3 values (theme, sidebar, command palette) |
-| **Real-Time** | SSE (EventSource) | Uni-directional server-push; auto-reconnect with exponential backoff |
-| **Routing** | Pathname-based (inline) | Simple regex matching; TanStack Router available for future type-safe routes |
-| **Build** | Vite 8 + React 19 | HMR, ESM, production build at 485KB (142KB gzipped) |
-| **Testing** | Vitest + Playwright | 233 unit tests + 42 E2E tests with 59 screenshots |
-| **Icons** | @fluentui/react-icons | Consistent with Fluent design system |
+**Tech stack:** React 18, Fluent UI v9, TanStack Router (client-side routing), Zustand (token + UI state), TanStack Query (server cache), Vite build, Vitest + Playwright tests, `size-limit` per-route budgets.
 
 ---
 
-## 3. App Shell Layout
+## 2. Accessing the UI
 
-The app shell provides a consistent three-zone layout across all pages.
+| Environment | URL | Bearer token |
+|-------------|-----|--------------|
+| **Prod (customer-facing)** | `https://scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | configured `SCIM_SHARED_SECRET` |
+| **Prod (parallel)** | `https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | configured `SCIM_SHARED_SECRET` |
+| **Dev** | `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `changeme-scim` |
+| **Local (Docker)** | `http://localhost:8080` | `changeme-scim` |
+| **Local (dev server)** | `http://localhost:4000` (Vite) / API on `6000` | `local-secret` |
 
-```
-+---------------------------------------------------+
-|              AppHeader (48px)                      |
-|  [ SCIMServer ]                    [ Theme Toggle ]|
-+--------+------------------------------------------+
-|        |                                          |
-| Sidebar|           Main Content                   |
-| (240px)|           (flex: 1)                      |
-|  or    |                                          |
-| (48px) |    [ DashboardPage / EndpointsPage /     |
-|        |      EndpointDetailPage / LogsPage /     |
-|        |      SettingsPage ]                      |
-|        |                                          |
-| [Home] |                                          |
-| [Endpt]|                                          |
-| [Logs] |                                          |
-| [Sett] |                                          |
-|        |                                          |
-| [<->]  |                                          |
-+--------+------------------------------------------+
-```
-
-### Screenshots
-
-| State | Screenshot | Description |
-|-------|------------|-------------|
-| Expanded sidebar | ![Expanded](screenshots/21-sidebar-expanded.png) | Full 240px sidebar with text labels + icons |
-| Collapsed sidebar | ![Collapsed](screenshots/22-sidebar-collapsed.png) | Minimal 48px sidebar with icons only + tooltips |
-| Header | ![Header](screenshots/03-dashboard-after-login.png) | Brand-colored header bar with title and theme toggle |
-
-### Sidebar Navigation
-
-| Icon | Label | Route | Active When |
-|------|-------|-------|-------------|
-| Home | Dashboard | `/` | Exact match `/` |
-| Server | Endpoints | `/endpoints` | Starts with `/endpoints` |
-| Document | Logs | `/logs` | Starts with `/logs` |
-| Settings | Settings | `/settings` | Starts with `/settings` |
-
-The active nav item shows `aria-current="page"` and a highlighted background via the `navItemActive` style class.
+The UI is a pure SPA: deep links such as `/discovery` are resolved by the **client-side router**. Loading a SPA path directly from the server (hard refresh on a non-root path) is handled by the SPA fallback; if you see a JSON `404`, navigate from the root and use the sidebar.
 
 ---
 
-## 4. Dashboard Page
+## 3. Authentication (Token Gate)
 
-**Route:** `/` (default)  
-**Data source:** `GET /scim/admin/dashboard` via `useDashboard()` (30s stale time)  
-**DB queries:** 0 for stats (in-memory `StatsProjectionService`), 1 for endpoints, 1 for recent logs
+On first visit (no stored token) a Fluent dialog requests the bearer token. This is the value of the `SCIM_SHARED_SECRET` environment variable on the instance.
 
-### Screenshot: `02-new-ui-dashboard-full.png`
+![Token dialog](screenshots/prod-token-dialog.png)
 
-![Dashboard full](screenshots/04-dashboard-full.png)
+The token is stored in browser local storage and attached as `Authorization: Bearer <token>` to every admin and SCIM request. Re-open the dialog any time from the **key icon** in the header to change or clear the token.
 
-### Layout
-
-```
-+--------------------------------------------------+
-| [ Endpoints: 2 ] [ Users: 50 ] [ Groups: 5 ] [ Healthy ] |  <-- KPI Row
-+--------------------------------------------------+
-| Endpoints                                        |
-| +-------------+  +-------------+                 |
-| | Production  |  | Development |                 |  <-- Endpoint Grid
-| | Active      |  | Active      |                 |
-| | 30 users    |  | 20 users    |                 |
-| | 3 groups    |  | 2 groups    |                 |
-| +-------------+  +-------------+                 |
-+--------------------------------------------------+
-| Recent Activity                                  |
-| POST  /Users      201  42ms                      |  <-- Activity Feed
-| GET   /Users      200  15ms                      |
-| PATCH /Users/abc  200  28ms                      |
-+--------------------------------------------------+
-```
-
-### KPI Cards
-
-| Card | Icon | Data Source | Update Frequency |
-|------|------|-------------|-----------------|
-| Endpoints | Server | `stats.totalEndpoints` | 30s (query stale) + SSE-invalidated |
-| Total Users | People | `stats.totalUsers` | Same |
-| Total Groups | People Team | `stats.totalGroups` | Same |
-| Status | Checkmark Circle | `health.status` | Same |
-
-### Method Badges (Activity Feed)
-
-| Method | Color | Fluent Badge Color |
-|--------|-------|-------------------|
-| GET | Blue | `brand` |
-| POST | Green | `success` |
-| PUT | Orange | `warning` |
-| PATCH | Orange | `warning` |
-| DELETE | Red | `danger` |
-| Other | Gray | `informative` |
+> The Token Gate uses the **global shared secret**. Some pages (notably **My profile**) require a per-endpoint **OAuth JWT** instead, and will explain this inline.
 
 ---
 
-## 5. Endpoints Page
+## 4. App Shell & Navigation
 
-**Route:** `/endpoints`  
-**Data source:** `GET /scim/admin/endpoints` via `useEndpoints()` (30s stale time)
+After authentication the app shell renders: a brand bar, a collapsible sidebar with nine links, and the active page.
 
-### Screenshot: `03-new-ui-endpoints-page.png`
+**Sidebar (9 links):**
 
-![Endpoints page](screenshots/08-endpoints-page.png)
+| Link | Route | Purpose |
+|------|-------|---------|
+| Dashboard | `/` | KPIs, request volume, activity analytics, endpoint grid |
+| Endpoints | `/endpoints` | Endpoint card grid, create, drill into detail |
+| Manual Provision | `/manual-provision` | Create a User/Group through the admin path |
+| My profile | `/me` | SCIM `/Me` self-service (per-endpoint OAuth) |
+| Discovery | `/discovery` | Read-only RFC 7644 §4-§5 discovery, side-by-side diff |
+| Operations | `/operations` | Cross-endpoint operator view of all users/groups |
+| Workbench | `/workbench` | Free-form SCIM request builder + replay |
+| Logs | `/logs` | Global request-log table with filters |
+| Settings | `/settings` | Server info, health, log configuration |
 
-### Features
-- **Search filter**: Client-side filter by `name` or `displayName`
-- **Card grid**: Auto-fill responsive grid (`minmax(320px, 1fr)`)
-- **Each card**: Server icon, name/displayName, active/inactive badge, user/group stat chips
-- **Empty state**: "No endpoints configured." or "No matching endpoints." when filtered
+**Header actions (right side):** environment warning indicator, notifications bell, **pulse icon** (live log stream drawer), **key icon** (token dialog), and the **theme toggle** (light/dark).
 
-### States
-
-| State | Screenshot | Trigger |
-|-------|------------|---------|
-| Loading | Spinner with "Loading endpoints..." | Initial fetch |
-| Error | Error message | API error |
-| Populated | Card grid | Endpoints exist |
-| No match | "No matching endpoints." | Search has no results |
+The sidebar collapses to an icon rail via the chevron at its bottom, persisting the choice across reloads.
 
 ---
 
-## 6. Endpoint Detail Page
+## 5. Dashboard
 
-**Route:** `/endpoints/:id`  
-**Data sources:** `useEndpoint(id)` + `useEndpointStats(id)`
+The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Groups, Status). Below: a 24-hour request-volume sparkline, an **Activity analytics** block (Operations 24h / 7d, User ops 30d, Group ops 30d) with a Users-vs-Groups split bar, and a grid of endpoint summary cards.
 
-### Screenshot: `04-new-ui-endpoint-detail.png`
+![Dashboard](screenshots/prod-01-dashboard.png)
 
-![Endpoint detail](screenshots/31-endpoint-detail-from-card.png)
-
-#### Tab Screenshots
-
-| Tab | Screenshot |
-|-----|------------|
-| Users | ![Users tab](screenshots/32-detail-tab-users.png) |
-| Groups | ![Groups tab](screenshots/32-detail-tab-groups.png) |
-| Logs | ![Logs tab](screenshots/32-detail-tab-logs.png) |
-| Settings | ![Settings tab](screenshots/32-detail-tab-settings.png) |
-
-### Layout
-
-```
-+--------------------------------------------------+
-| Production                          [ Active ]    |  <-- Header: name + badge
-| ID: ep-1  SCIM: /scim/endpoints/ep-1/v2          |  <-- Metadata row
-+--------------------------------------------------+
-| [ Overview ] [ Users ] [ Groups ] [ Logs ] [ Settings ] |  <-- Tab bar
-+--------------------------------------------------+
-|                Tab Content                        |
-+--------------------------------------------------+
-```
-
-### Tabs
-
-| Tab | Component | Data Source | Key Features |
-|-----|-----------|------------|--------------|
-| **Overview** | `OverviewTab` | `useEndpointStats` | 4 KPI cards (Users/Groups/Members/Requests) with counts |
-| **Users** | `UsersTab` | `useEndpointUsers` | Data table: userName, displayName, active badge, created date |
-| **Groups** | `GroupsTab` | `useEndpointGroups` | Data table: displayName, member count badge, created date |
-| **Logs** | `LogsTab` | inline `useQuery` (logs API) | Data table: method badge, URL, status badge, duration, time |
-| **Settings** | `SettingsTab` | `useEndpoint` (cached) | Config cards: General (name, path, status) + Flags (key-value badges) |
-
-### Tab Screenshots
-
-| Tab | Screenshot |
-|-----|------------|
-| Overview | `04a-new-ui-endpoint-overview-tab.png` |
-| Users | `04b-new-ui-endpoint-users-tab.png` |
-| Groups | `04c-new-ui-endpoint-groups-tab.png` |
-| Logs | `04d-new-ui-endpoint-logs-tab.png` |
-| Settings | `04e-new-ui-endpoint-settings-tab.png` |
+| Element | Source endpoint |
+|---------|-----------------|
+| KPI cards | `GET /scim/admin/dashboard` |
+| Request volume | `GET /scim/admin/dashboard` (hourly buckets) |
+| Activity analytics | `GET /scim/admin/activity/summary` |
+| Endpoint grid | `GET /scim/admin/endpoints` |
 
 ---
 
-## 7. Global Logs Page
+## 6. Endpoints
 
-**Route:** `/logs`  
-**Data source:** `GET /scim/admin/logs?pageSize=50&urlContains=...` (10s stale time)
+A searchable card grid of every endpoint. The header shows the total count and a **Create endpoint** button; each card shows the display name, slug, an Active/Inactive badge, and the copyable `/scim/endpoints/{id}` base path.
 
-### Screenshot: `05-new-ui-logs-page.png`
+![Endpoints](screenshots/prod-02-endpoints.png)
 
-![Global logs](screenshots/16-logs-full.png)
+Clicking a card opens the **Endpoint Detail** page with tabs for Users, Groups, Logs, Settings, and Credentials. Creating an endpoint launches a preset picker (the six built-in presets) plus a JSON profile editor.
 
-### Features
-- **URL search**: Server-side filter via `urlContains` query parameter
-- **5-column table**: Method (colored badge), URL (monospace), Status (colored badge), Duration, Time
-- **Empty state**: "No logs found."
-- **Total count**: Displayed in header as "Request Logs (N)"
-
----
-
-## 8. Global Settings Page
-
-**Route:** `/settings`  
-**Data sources:** `useVersion()` (60s stale) + `useHealth()` (10s stale, 30s refetch interval)
-
-### Screenshot: `06-new-ui-settings-page.png`
-
-![Settings page](screenshots/14-settings-full.png)
-
-### Cards
-
-| Card | Fields | Source |
-|------|--------|--------|
-| **Server Info** | Version, Node.js, Platform/Arch, Uptime | `GET /scim/admin/version` |
-| **Health** | Status (green/red), Uptime | `GET /scim/health` |
-| **Storage** | Backend (prisma/inmemory), Provider (postgresql) | `version.storage` |
+| Action | Endpoint |
+|--------|----------|
+| List endpoints | `GET /scim/admin/endpoints` |
+| Create endpoint | `POST /scim/admin/endpoints` |
+| Endpoint detail/overview | `GET /scim/admin/endpoints/{id}/overview` |
+| Per-endpoint credentials | `GET/POST/DELETE /scim/admin/endpoints/{id}/credentials` |
 
 ---
 
-## 9. Theme System
+## 7. Manual Provisioning
 
-### Fluent UI Brand Tokens
+Provision a SCIM User or Group through the admin path without an external IdP. Pick a target endpoint, choose the **User** or **Group** tab, fill the form (User: `userName*`, `externalId`, `displayName`, `givenName`, `familyName`, `email`, `active`), and submit. The created resource appears in the **Result** panel as copyable JSON.
 
-The theme is built on Azure Blue (#0078D4) using Fluent UI's brand ramp system:
+![Manual Provisioning](screenshots/prod-07-manual-provision.png)
 
-| Slot | Hex | Usage |
-|------|-----|-------|
-| 10 | `#020305` | Darkest background |
-| 50 | `#1B3F6C` | Dark accent |
-| 90 | `#0078D4` | **Primary brand color** (Azure blue) |
-| 130 | `#7CB5E4` | Light accent |
-| 160 | `#BFE2F0` | Lightest tint |
-
-### Theme Toggle
-
-The theme toggle button in the header cycles between light and dark modes:
-
-| State | Icon | `aria-label` |
-|-------|------|-------------|
-| Light mode active | Moon | "Switch to dark mode" |
-| Dark mode active | Sun | "Switch to light mode" |
-
-Theme preference is persisted to `localStorage` under key `scim-color-scheme`.
-
-### Screenshots
-
-| Theme | Screenshot | Key Visual Differences |
-|-------|------------|----------------------|
-| Light | ![Light](screenshots/18-theme-light.png) | White backgrounds, dark text, blue brand bar |
-| Dark | ![Dark](screenshots/19-theme-dark.png) | Dark gray backgrounds, light text, darker brand bar |
+| Action | Endpoint |
+|--------|----------|
+| Create user | `POST /scim/endpoints/{id}/Users` |
+| Create group | `POST /scim/endpoints/{id}/Groups` |
 
 ---
 
-## 10. Responsive Design
+## 8. My Profile (/Me)
 
-The UI adapts to three viewport tiers:
+Exercises the SCIM `/Me` self-service endpoint (RFC 7644 §3.11). Pick an endpoint, then the page resolves the caller from the OAuth JWT.
 
-| Tier | Width | Sidebar | Grid Columns | Screenshot |
-|------|-------|---------|-------------|------------|
-| **Desktop** | >= 1024px | Expanded (240px) | 3-4 columns | `01b-new-ui-sidebar-expanded.png` |
-| **Tablet** | 768-1023px | Auto | 2 columns | `08d-new-ui-tablet-dashboard.png` |
-| **Mobile** | < 768px | Collapsed (48px) | 1 column | `08a-new-ui-mobile-dashboard.png` |
+![My profile](screenshots/prod-06-my-profile.png)
 
-### Responsive Screenshots
+> `/Me` requires an **OAuth JWT** whose `sub` claim matches a SCIM User's `userName` on the chosen endpoint. With the global shared-secret token in the Token Gate, every `/Me` call returns `404` - switch to a per-endpoint OAuth credential to use this page.
 
-| Viewport | Page | Screenshot |
-|----------|------|------------|
-| Mobile (375x812) | Dashboard | ![Mobile dashboard](screenshots/26-mobile-dashboard.png) |
-| Mobile (375x812) | Settings | ![Mobile settings](screenshots/27-mobile-settings.png) |
-| Tablet (768x1024) | Dashboard | `08d-new-ui-tablet-dashboard.png` |
+| Action | Endpoint |
+|--------|----------|
+| Read self | `GET /scim/endpoints/{id}/Me` |
+| Replace / patch / delete self | `PUT` / `PATCH` / `DELETE /scim/endpoints/{id}/Me` |
 
 ---
 
-## 11. Real-Time Updates (SSE)
+## 9. Discovery Explorer
 
-The UI subscribes to Server-Sent Events for near-real-time dashboard updates.
+A read-only view of each endpoint's SCIM discovery surfaces (RFC 7644 §4 + §5): `ServiceProviderConfig`, `ResourceTypes`, and `Schemas`. Pick one endpoint to inspect, or two to compare **side-by-side**. The Schemas diff colors each attribute characteristic green (tighten), red (relax), or grey (unchanged) using the same partial order the API's tighten-only validator enforces.
+
+![Discovery Explorer](screenshots/prod-03-discovery.png)
+
+| Action | Endpoint |
+|--------|----------|
+| ServiceProviderConfig | `GET /scim/endpoints/{id}/ServiceProviderConfig` |
+| ResourceTypes | `GET /scim/endpoints/{id}/ResourceTypes` |
+| Schemas | `GET /scim/endpoints/{id}/Schemas` |
+
+---
+
+## 10. Operations
+
+A cross-endpoint operator view of users and groups across **every** endpoint on the server. Three tabs: **All Users**, **All Groups**, **Statistics**. Each row shows the resource, its `active` state, the owning endpoint badge, and the created timestamp. An **Active only** toggle and **Download CSV** export operate on the current page; clicking an endpoint badge jumps to that endpoint's tab pre-filtered.
+
+![Operations](screenshots/prod-04-operations.png)
+
+| Action | Endpoint |
+|--------|----------|
+| All users / groups | `GET /scim/admin/database/users`, `/groups` |
+| Statistics | `GET /scim/admin/database/statistics` |
+
+> **Scalability note:** the Operations grids do not yet offer column sort/filter. Tracked in [strategy/UI_PRESENTATION_BACKLOG.md](strategy/UI_PRESENTATION_BACKLOG.md).
+
+---
+
+## 11. Workbench
+
+A free-form SCIM request builder. Compose a request once (method, path under `/scim/*`, headers, body), optionally pre-fill from an endpoint, then **Send** it and inspect the response. The same request can be copied/exported as **curl**, **TypeScript**, **Insomnia**, or **Postman**, or downloaded as a request `.json`. A **Side-by-side** toggle shows request and response together. The last 50 requests are saved locally as history.
+
+![Workbench](screenshots/prod-05-workbench.png)
+
+| Capability | Detail |
+|------------|--------|
+| Methods | GET, POST, PUT, PATCH, DELETE |
+| Path | any `/scim/*` route (e.g. `/scim/endpoints/<id>/Users`) |
+| Export targets | curl, TypeScript fetch, Insomnia, Postman, raw `.json` |
+| History | last 50 requests, newest first, persisted locally |
+
+---
+
+## 12. Logs
+
+The global request-log table. The header shows the total log count. Filters: **URL contains**, **Endpoint** dropdown, **Status** chips (200, 201, 400, 401, 403, 404, 409, 500), and **Time range** (Last 1 hour / 24 hours / 7 days / 30 days). Each row shows Method, URL (copyable), Status, Duration, and Time.
+
+![Logs](screenshots/prod-08-logs.png)
+
+| Action | Endpoint |
+|--------|----------|
+| List logs | `GET /scim/admin/logs` |
+| Per-endpoint logs | `GET /scim/admin/endpoints/{id}/logs` |
+
+---
+
+## 13. Settings
+
+Server diagnostics and log configuration in one place.
+
+![Settings](screenshots/prod-09-settings.png)
+
+- **Server Info** - version, Node.js version, platform, uptime (each value copyable; "Copy server info as JSON").
+- **Health** - status and uptime from `GET /health`.
+- **Storage** - backend (`prisma`) and provider (`postgresql`).
+- **Log configuration** - global level, format (`pretty`/`json`), include-payloads switch, include-stack-traces switch.
+- **Per-category levels (14)** - one selector per log category (`http`, `auth`, `scim.user`, `scim.group`, `scim.patch`, `scim.filter`, `scim.discovery`, `endpoint`, `database`, `oauth`, `scim.bulk`, `scim.resource`, `config`, `general`). Empty cells inherit the global level.
+- **Thresholds** - max payload size (bytes), slow-request threshold (ms).
+- **Onboarding** - re-launch the first-run onboarding wizard.
+
+| Action | Endpoint |
+|--------|----------|
+| Version / info | `GET /scim/admin/version` |
+| Health | `GET /health` |
+| Log config read/update | `GET/PUT /scim/admin/log-config` |
+
+---
+
+## 14. Live Log Stream Drawer
+
+The **pulse icon** in the header opens a drawer that tails structured log entries in real time via Server-Sent Events (`GET /scim/admin/log-config/stream`). The drawer mirrors the categories and levels configured on the Settings page and is the fastest way to watch a provisioning run as it happens.
 
 ```mermaid
 sequenceDiagram
-    participant Client as Browser (useSSE)
-    participant API as NestJS API
-    participant DB as PostgreSQL
-
-    Note over Client: EventSource connects to<br/>/scim/admin/log-config/stream
-
-    API->>DB: POST /Users (create user)
-    DB-->>API: User created
-    API->>API: EventEmitter2.emit('scim.user.created')
-    API->>API: StatsProjectionService updates counters
-    API-->>Client: SSE: {type: 'scim.user.created', endpointId: 'ep-1'}
-    Client->>Client: queryClient.invalidateQueries(['dashboard'])
-    Client->>Client: queryClient.invalidateQueries(['endpoints', 'ep-1', 'stats'])
-    Note over Client: TanStack Query refetches<br/>dashboard data automatically
-```
-
-### Reconnection Strategy
-
-| Attempt | Delay | Max |
-|---------|-------|-----|
-| 1 | 1s | - |
-| 2 | 2s | - |
-| 3 | 4s | - |
-| 4 | 8s | - |
-| n | min(2^n * 1000, 30000) | 30s |
-
-### Events That Trigger Cache Invalidation
-
-| Event | Caches Invalidated |
-|-------|-------------------|
-| `scim.user.created` | `dashboard`, `endpoints`, `endpoints/:id`, `endpoints/:id/stats` |
-| `scim.user.deleted` | Same |
-| `scim.user.updated` | Same |
-| `scim.group.created` | Same |
-| `scim.group.deleted` | Same |
-| `scim.group.updated` | Same |
-| `scim.resource.created` | Same |
-| `scim.resource.deleted` | Same |
-
----
-
-## 12. Legacy UI (?ui=legacy)
-
-The old tab-based UI is preserved for one release cycle. Access it by appending `?ui=legacy` to any URL.
-
-### Architecture
-
-The legacy UI uses:
-- Plain CSS modules (no design system)
-- Manual `fetch` calls (no TanStack Query)
-- `useState` / `useEffect` for all state management
-- Tab-based navigation (Activity, Database, Logs, Manual)
-- 637-line `App.tsx` god component
-
-### Legacy Screenshots
-
-| View | Screenshot |
-|------|------------|
-| Initial (token modal) | ![Legacy initial](screenshots/28-legacy-initial.png) |
-| After authentication | ![Legacy auth](screenshots/29-legacy-authenticated.png) |
-| Raw logs | `13-legacy-ui-logs.png` |
-| Manual provision | `14-legacy-ui-manual-provision.png` |
-| Light theme | `15a-legacy-ui-light-theme.png` |
-| Dark theme | `15b-legacy-ui-dark-theme.png` |
-| Token modal | `16-legacy-ui-token-modal.png` |
-
-### Migration Timeline
-
-| Phase | What Happens | Flag |
-|-------|-------------|------|
-| v0.41.0 (current) | New UI default, legacy via `?ui=legacy` | Both work |
-| v0.42.0 (next) | `?ui=legacy` removed, old code deleted | New UI only |
-
----
-
-## 13. Data Flow & Caching
-
-### Query Key Factory
-
-```typescript
-queryKeys = {
-  dashboard:   ['dashboard'],
-  health:      ['health'],
-  version:     ['version'],
-  endpoints: {
-    all:       ['endpoints'],
-    detail:    (id) => ['endpoints', id],
-    stats:     (id) => ['endpoints', id, 'stats'],
-  },
-  logs: {
-    all:       (params) => ['logs', params],
-    detail:    (id) => ['logs', id],
-  },
-  users: {
-    byEndpoint: (epId, params) => ['users', epId, params],
-  },
-  groups: {
-    byEndpoint: (epId, params) => ['groups', epId, params],
-  },
-}
-```
-
-### Stale Time Configuration
-
-| Query | Stale Time | Refetch Interval | Rationale |
-|-------|-----------|-----------------|-----------|
-| Dashboard | 30s | - | SSE-invalidated on SCIM mutations |
-| Endpoints | 30s | - | Rarely changes |
-| Endpoint detail | 30s | - | SSE-invalidated |
-| Endpoint stats | 30s | - | SSE-invalidated |
-| Users/Groups | 15s | - | More volatile data |
-| Health | 10s | 30s | Continuous monitoring |
-| Version | 60s | - | Changes only on deploy |
-| Logs | 10s | - | High-frequency writes |
-
-### BFF Aggregation (Dashboard Controller)
-
-`GET /admin/dashboard` aggregates 5 data sources into 1 response:
-
-```
-StatsProjectionService.getGlobalStats()   --> stats {}        // 0 DB queries
-EndpointService.listEndpoints()           --> endpoints []    // 1 DB query
-StatsProjectionService.getEndpointStats() --> per-ep stats    // 0 DB queries (loop)
-LoggingService.listLogs()                 --> recentActivity  // 1 DB query
-process.uptime()                          --> version {}      // 0 DB queries
-
-Total: 2 DB queries (was 5-9 COUNT(*) queries before BFF)
+    participant UI as Log Stream Drawer
+    participant API as NestJS
+    UI->>API: GET /scim/admin/log-config/stream (EventSource)
+    API-->>UI: event: log {category, level, message, requestId}
+    Note over API,UI: server pushes each structured entry as it is emitted
 ```
 
 ---
 
-## 14. State Management
+## 15. Theme System
 
-### Zustand Store (Client-Only)
-
-Only 3 values live in Zustand - everything else is server state via TanStack Query:
-
-| Key | Type | Default | Persisted | Used By |
-|-----|------|---------|-----------|---------|
-| `sidebarCollapsed` | `boolean` | `false` | No | AppSidebar |
-| `commandPaletteOpen` | `boolean` | `false` | No | (Future: CommandPalette) |
-| `colorScheme` | `'light' \| 'dark' \| 'system'` | `'system'` | Yes (`localStorage`) | AppShell, AppHeader |
-
-### Why Not Redux / Context
-
-| Alternative | Why Not |
-|------------|---------|
-| Redux | Overkill for 3 values; boilerplate overhead |
-| React Context | Re-render cascade on any state change |
-| Jotai | Unnecessary atomic granularity for 3 simple booleans |
-| TanStack Query | For server state only; client state doesn't belong there |
+The header theme toggle switches between Fluent **light** and **dark** themes; the choice persists across reloads. All pages, drawers, and dialogs are theme-aware.
 
 ---
 
-## 15. Accessibility
+## 16. Copy-Everywhere Primitives
 
-### ARIA Landmarks
+Per the project's copy-everywhere discipline, every display value, JSON payload, and editable field is built from one of four shared primitives:
 
-| Landmark | Element | Role |
-|----------|---------|------|
-| Navigation | `<nav aria-label="Main navigation">` | `navigation` |
-| Main content | `<main data-testid="app-content">` | `main` |
-| Header | `<header data-testid="app-header">` | `banner` |
+| Primitive | Use |
+|-----------|-----|
+| `CopyableField` | inline single-value display (IDs, URNs, paths) + copy button |
+| `CopyableJsonBlock` | read-only pretty-printed JSON with header copy button |
+| `CopyJsonButton` | section-level "copy this whole thing as JSON" |
+| `EditableField` | editable input with copy + undo + redo + reset affordances |
 
-### Interactive Elements
-
-| Element | `aria-label` | Keyboard |
-|---------|-------------|----------|
-| Sidebar toggle | "Expand sidebar" / "Collapse sidebar" | Click/Enter |
-| Theme toggle | "Switch to light mode" / "Switch to dark mode" | Click/Enter |
-| Active nav item | - | `aria-current="page"` |
-| Tab bar | Fluent `TabList` | Arrow keys to switch tabs |
-
-### Accessibility Screenshots
-
-| Check | Screenshot |
-|-------|------------|
-| ARIA landmarks visible | `30-a11y-landmarks.png` |
-| Light theme contrast | `32a-a11y-contrast-light.png` |
-| Dark theme contrast | `32b-a11y-contrast-dark.png` |
-
----
-
-## 16. Component Reference
-
-### File Inventory
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `layout/AppShell.tsx` | 122 | Root layout + FluentProvider + QueryClient + SSE + router |
-| `layout/AppSidebar.tsx` | 134 | Collapsible nav sidebar with 4 links |
-| `layout/AppHeader.tsx` | 82 | Brand header with title + theme toggle |
-| `pages/DashboardPage.tsx` | 258 | KPI cards + endpoint grid + activity feed |
-| `pages/EndpointsPage.tsx` | 160 | Filterable endpoint card grid |
-| `pages/EndpointDetailPage.tsx` | 243 | 5-tab endpoint detail view |
-| `pages/UsersTab.tsx` | 142 | SCIM user data table |
-| `pages/GroupsTab.tsx` | 100 | SCIM group data table |
-| `pages/LogsTab.tsx` | 130 | Per-endpoint request log table |
-| `pages/SettingsTab.tsx` | 93 | Endpoint config display |
-| `pages/LogsPage.tsx` | 125 | Global request log table with search |
-| `pages/SettingsPage.tsx` | 93 | Server version + health info |
-| `store/ui-store.ts` | 37 | Zustand client state (3 values) |
-| `design/theme.ts` | 55 | Fluent UI light/dark themes |
-| `design/tokens.ts` | 34 | Layout constants + breakpoints |
-| `api/queries.ts` | 170 | TanStack Query hooks + fetchWithAuth |
-| `hooks/useSSE.ts` | 105 | SSE connection + cache invalidation |
-| **Total** | **~2,083** | |
-
-### Dependency Graph
-
-```mermaid
-flowchart TD
-    AppShell --> AppHeader
-    AppShell --> AppSidebar
-    AppShell --> DashboardPage
-    AppShell --> EndpointsPage
-    AppShell --> EndpointDetailPage
-    AppShell --> LogsPage
-    AppShell --> SettingsPage
-    AppShell --> useSSE
-
-    AppSidebar --> ui-store
-    AppHeader --> ui-store
-    AppShell --> ui-store
-    AppShell --> theme
-
-    DashboardPage --> queries
-    EndpointsPage --> queries
-    EndpointDetailPage --> queries
-    EndpointDetailPage --> UsersTab
-    EndpointDetailPage --> GroupsTab
-    EndpointDetailPage --> LogsTab
-    EndpointDetailPage --> SettingsTab
-
-    UsersTab --> queries
-    GroupsTab --> queries
-    LogsTab --> queries
-    SettingsTab --> queries
-    LogsPage --> queries
-    SettingsPage --> queries
-
-    useSSE --> queries
-
-    queries --> fetchWithAuth
-    fetchWithAuth --> token
-
-    style queries fill:#e0f0ff
-    style ui-store fill:#ffe0e0
-    style theme fill:#e0ffe0
-```
+This is why nearly every value in the screenshots above carries a copy icon.
 
 ---
 
 ## 17. Screenshot Inventory
 
-All 59 screenshots are saved to `test-results/ui-screenshots/` on every Playwright run.
+| File | Page | Source |
+|------|------|--------|
+| `prod-token-dialog.png` | Token Gate | prod (calmsand) |
+| `prod-01-dashboard.png` | Dashboard | prod (calmsand) |
+| `prod-02-endpoints.png` | Endpoints | prod (calmsand) |
+| `prod-03-discovery.png` | Discovery Explorer | prod (calmsand) |
+| `prod-04-operations.png` | Operations | prod (calmsand) |
+| `prod-05-workbench.png` | Workbench | prod (calmsand) |
+| `prod-06-my-profile.png` | My profile (/Me) | prod (calmsand) |
+| `prod-07-manual-provision.png` | Manual Provisioning | prod (calmsand) |
+| `prod-08-logs.png` | Logs | prod (calmsand) |
+| `prod-09-settings.png` | Settings | prod (calmsand) |
 
-### New UI Screenshots (01-08)
-
-| # | File | Description |
-|---|------|-------------|
-| 01 | `01-new-ui-app-shell.png` | Full app shell with header + sidebar + dashboard |
-| 01a | `01a-new-ui-header.png` | Header bar close-up |
-| 01b | `01b-new-ui-sidebar-expanded.png` | Sidebar fully expanded (240px) |
-| 01c | `01c-new-ui-sidebar-collapsed.png` | Sidebar collapsed (48px icons only) |
-| 01d | `01d-new-ui-light-theme.png` | Full page in light theme |
-| 01e | `01e-new-ui-dark-theme.png` | Full page in dark theme |
-| 02 | `02-new-ui-dashboard-full.png` | Dashboard with KPIs + endpoints + activity |
-| 02a | `02a-new-ui-dashboard-endpoints.png` | Dashboard endpoint grid section |
-| 03 | `03-new-ui-endpoints-page.png` | Endpoints card grid |
-| 05 | `05-new-ui-logs-page.png` | Global logs page |
-| 06 | `06-new-ui-dashboard-with-version.png` | Dashboard with version info |
-| 07 | `07-nav-sidebar-all-links.png` | All sidebar nav links visible |
-| 08a | `08a-new-ui-mobile-dashboard.png` | Mobile viewport (375px) - dashboard |
-| 08b | `08b-new-ui-mobile-endpoints.png` | Mobile viewport - endpoints |
-| 08c | `08c-new-ui-mobile-settings.png` | Mobile viewport - settings |
-| 08d | `08d-new-ui-tablet-dashboard.png` | Tablet viewport (768px) - dashboard |
-
-### Legacy UI Screenshots (10-16)
-
-| # | File | Description |
-|---|------|-------------|
-| 10 | `10-legacy-ui-full.png` | Full legacy app (activity feed default) |
-| 10a | `10a-legacy-ui-authenticated.png` | After token authentication |
-| 10b | `10b-legacy-ui-nav-state.png` | Tab navigation state |
-| 11 | `11-legacy-ui-activity-view.png` | Activity feed tab |
-| 12 | `12-legacy-ui-database-browser.png` | Database browser tab |
-| 13 | `13-legacy-ui-logs.png` | Raw logs tab |
-| 14 | `14-legacy-ui-manual-provision.png` | Manual provision tab |
-| 15a | `15a-legacy-ui-light-theme.png` | Light theme |
-| 15b | `15b-legacy-ui-dark-theme.png` | Dark theme |
-| 16 | `16-legacy-ui-token-modal.png` | Initial token input modal |
-
-### Comparison Screenshots (20-21)
-
-| # | File | Description |
-|---|------|-------------|
-| 20 | `20-comparison-new-ui-default.png` | New UI default state for side-by-side |
-| 21 | `21-comparison-legacy-ui-default.png` | Legacy UI default state for side-by-side |
-
-### Accessibility Screenshots (30-32)
-
-| # | File | Description |
-|---|------|-------------|
-| 30 | `30-a11y-landmarks.png` | ARIA landmarks verification |
-| 32a | `32a-a11y-contrast-light.png` | Light theme for contrast review |
-| 32b | `32b-a11y-contrast-dark.png` | Dark theme for contrast review |
-
-### Visual Regression Screenshots (40-44)
-
-| # | File | Description |
-|---|------|-------------|
-| 40 | `40-visual-light-dashboard.png` | Dashboard - light theme |
-| 40 | `40-visual-light-endpoints.png` | Endpoints - light theme |
-| 40 | `40-visual-light-logs.png` | Logs - light theme |
-| 40 | `40-visual-light-settings.png` | Settings - light theme |
-| 41 | `41-visual-dark-dashboard.png` | Dashboard - dark theme |
-| 41 | `41-visual-dark-endpoints.png` | Endpoints - dark theme |
-| 41 | `41-visual-dark-logs.png` | Logs - dark theme |
-| 41 | `41-visual-dark-settings.png` | Settings - dark theme |
-| 42a | `42a-visual-sidebar-expanded.png` | Sidebar expanded baseline |
-| 42b | `42b-visual-sidebar-collapsed.png` | Sidebar collapsed baseline |
-| 43 | `43-visual-error-no-auth.png` | Error state (no authentication) |
-| 44 | `44-visual-legacy-default.png` | Legacy UI baseline |
-| 44 | `44-visual-legacy-database.png` | Legacy database tab |
-| 44 | `44-visual-legacy-logs.png` | Legacy logs tab |
-| 44 | `44-visual-legacy-manual.png` | Legacy manual provision tab |
+Historical screenshots (`01-`...`35-`) from earlier UI iterations remain in `docs/screenshots/` for reference.
 
 ---
 
-## 18. Test Coverage
+## 18. Known Limitations
 
-### Test Counts (v0.41.0)
-
-| Level | Count | Framework | Location |
-|-------|-------|-----------|----------|
-| **API unit** | 3,612 | Jest | `api/src/**/*.spec.ts` (95 suites) |
-| **Web unit** | 233 | Vitest | `web/src/**/*.test.{ts,tsx}` (29 files) |
-| **Playwright E2E** | 42 | Playwright | `web/e2e/*.spec.ts` (10 files) |
-| **Live integration** | 867 | PowerShell | `scripts/live-test.ps1` |
-| **Total** | **4,754** | | |
-
-### Playwright E2E Spec Breakdown
-
-| Spec File | Tests | Screenshots | What's Covered |
-|-----------|-------|-------------|----------------|
-| `new-ui.spec.ts` | 14 | 16 | Shell, dashboard, endpoints, detail, logs, settings, nav, responsive |
-| `legacy-ui.spec.ts` | 10 | 16 | Legacy shell, tabs, theme, token, side-by-side |
-| `accessibility.spec.ts` | 5 | 4 | ARIA landmarks, labels, roles, contrast |
-| `visual-snapshots.spec.ts` | 13 | 13 | All pages x2 themes, sidebar states, error, legacy comparison |
-| **Subtotal (new)** | **42** | **49** | |
-| `app-shell.spec.ts` | ~8 | - | Legacy header/footer tests (pre-existing) |
-| `activity-feed.spec.ts` | ~6 | - | Legacy activity feed (pre-existing) |
-| `database-browser.spec.ts` | ~8 | - | Legacy database browser (pre-existing) |
-| `raw-logs.spec.ts` | ~6 | - | Legacy log viewer (pre-existing) |
-| `manual-provision.spec.ts` | ~5 | - | Legacy manual provision (pre-existing) |
-
-### Web Vitest Unit Tests by Component
-
-| Component | Tests | File |
-|-----------|-------|------|
-| AppShell + AppSidebar + AppHeader | 7 | `layout/AppShell.test.tsx` |
-| DashboardPage | 7 | `pages/DashboardPage.test.tsx` |
-| EndpointsPage | 4 | `pages/EndpointsPage.test.tsx` |
-| EndpointDetailPage | 7 | `pages/EndpointDetailPage.test.tsx` |
-| UsersTab | 5 | `pages/UsersTab.test.tsx` |
-| GroupsTab | 4 | `pages/GroupsTab.test.tsx` |
-| LogsTab | 4 | `pages/LogsTab.test.tsx` |
-| SettingsTab | 2 | `pages/SettingsTab.test.tsx` |
-| LogsPage | 3 | `pages/LogsPage.test.tsx` |
-| SettingsPage | 2 | `pages/SettingsPage.test.tsx` |
-| queries + fetchWithAuth | 8 | `api/queries.test.ts` |
-| useSSE | 6 | `hooks/useSSE.test.ts` |
-| **Subtotal (new)** | **59** | |
-| Legacy components | 174 | Various `.test.{ts,tsx}` files |
+- **Data-grid scalability** - Operations, Discovery, Dashboard, and Endpoints grids lack column sort/filter in several places, and some cards are not click-through. Tracked as a dedicated effort in [strategy/UI_PRESENTATION_BACKLOG.md](strategy/UI_PRESENTATION_BACKLOG.md).
+- **My profile** requires a per-endpoint OAuth JWT; it cannot be exercised with the global shared-secret token.
+- The SPA serves all routes client-side; bookmarking a deep link relies on the server SPA fallback.
 
 ---
 
-*This document describes the v0.41.0 UI redesign. The `?ui=legacy` flag will be removed in v0.42.0.*
+> Maintained as a Tier-1 user-facing guide. When the UI changes, refresh the affected screenshots from a live deployment and update the corresponding section.
