@@ -12,3 +12,14 @@ docker-compose*.yml text eol=lf
 *.ps1 text eol=crlf
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# Treat image assets as binary (no line-ending munging, no text diff attempts).
+# Doc screenshots are a curated narrative set under docs/screenshots/, not a
+# per-release re-shoot. Visual-regression baselines live under web/ and are
+# owned by the Playwright gate, never under docs/.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
