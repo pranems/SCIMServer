@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.53.0 - **Updated:** June 2, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 7,277 checks (3,816 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,027 live SCIM + 15 PowerShell)
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
+> 86 API route handlers - 20 controllers - 6 presets - 16 config flags - 7,277 checks (3,816 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,027 live SCIM + 15 PowerShell)
 
 ---
 
@@ -30,7 +30,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 84 routes, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 86 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
@@ -201,9 +201,9 @@
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec - all 84 endpoints, full schemas |
-| Postman Collection | [postman/](postman/) | Importable Postman collection - all 84 endpoints, 14 folders |
-| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace - all 84 endpoints, 14 folders |
+| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec - 75 operations (curated public SCIM + admin subset), full schemas |
+| Postman Collection | [postman/](postman/) | Importable Postman collection - 81 requests across grouped folders |
+| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace - 72 requests (v0.37 export; regenerate for latest routes) |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Extension Examples | [examples/endpoint/](examples/endpoint/) | One-click endpoint+extension combos |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd) | Sequence diagrams |

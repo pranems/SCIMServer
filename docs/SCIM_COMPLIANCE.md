@@ -1,6 +1,6 @@
 # SCIM 2.0 RFC Compliance
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
 > **Source of truth:** [api/src/modules/scim/](../api/src/modules/scim/)  
 > **Status:** 100% compliant with RFC 7643 (Core Schema) and RFC 7644 (Protocol)
 
