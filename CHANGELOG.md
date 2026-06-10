@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.53.1] - 2026-06-10 - Fix: scope post-PATCH strict validation to touched attributes (RFC 7644 §3.5.2)
+
+### Fixed
+
+- **Post-PATCH strict schema validation now only inspects the attributes the PATCH operations actually touched.** Previously a PATCH was re-validated against the ENTIRE merged resource, so a PATCH targeting only an extension attribute (e.g. the OpenText `urn:...:Mailbox:proxyAddresses`) was rejected with `Schema validation failed: emails[0].primary: Unknown sub-attribute 'primary' in complex attribute.` whenever the stored resource carried attribute data (pre-existing `emails[].primary`) that predated a later schema tightening. Per RFC 7644 §3.5.2 a PATCH targets specific attributes; untouched attributes are out of scope. This was a real customer-facing production incident on the calmsand prod endpoint `128f64b5-ffb5-41f2-9ba2-c874f5ea7335`.
+  - Added two pure helpers in [api/src/modules/scim/common/scim-service-helpers.ts](api/src/modules/scim/common/scim-service-helpers.ts): `computeTouchedPatchKeys` (resolves each operation's path - URN-prefixed, sub-attribute, value-filter, simple, or no-path object - to the set of top-level attributes it touches) and `scopePatchPayloadToTouched` (builds a reduced `schemas` + touched-attributes payload for strict post-PATCH validation).
+  - Wired into all three SCIM services (Users, Groups, Generic) so the behavior is identical across the Prisma and InMemory backends.
+  - Pre-merge per-operation validation (`SchemaValidator.validatePatchOperationValue`), `enforcePrimaryConstraint`, and `checkImmutableAttributes` are unchanged and still operate on the full merged payload - a PATCH that itself introduces an invalid sub-attribute on a touched attribute is still correctly rejected. PUT and POST full-payload validation is unaffected.
+  - No data is modified: this is a validation-path change only. Pre-existing stored data is preserved as-is.
+
+### Validation
+
+- API build: PASS.
+- New unit tests for `computeTouchedPatchKeys` + `scopePatchPayloadToTouched` in [api/src/modules/scim/common/scim-service-helpers.spec.ts](api/src/modules/scim/common/scim-service-helpers.spec.ts) (Patch-filtered run: 40 passed).
+- Service unit suites (Users/Groups/Generic): 330 passed across 3 suites.
+- New E2E regression [api/test/e2e/patch-untouched-attribute-validation.e2e-spec.ts](api/test/e2e/patch-untouched-attribute-validation.e2e-spec.ts): 2 passed (proxyAddresses-only PATCH succeeds despite untouched schema-invalid emails[].primary; a PATCH that touches emails with primary is still rejected 400).
+- New live-test section 9z-AL in [scripts/live-test.ps1](scripts/live-test.ps1) covering the same scenario across local/Docker/Azure deployments.
+
 ## [0.53.0] - 2026-06-02 - Phase Q follow-up: Workbench redesign, endpoint wiki, docs, and PostgreSQL parity
 
 ### Added

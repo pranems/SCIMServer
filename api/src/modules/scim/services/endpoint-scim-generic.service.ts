@@ -47,6 +47,7 @@ import {
   enforceIfMatch,
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
+  scopePatchPayloadToTouched,
   stripNeverReturnedFromPayload,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
@@ -647,7 +648,15 @@ export class EndpointScimGenericService {
       // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
       this.enforcePrimaryConstraint(resultPayload, resourceType, endpointId, config);
 
-      this.validatePayloadSchema(resultPayload, resourceType, endpointId, config, 'patch');
+      // Scope strict post-PATCH validation to the attributes this PATCH actually
+      // touched, so pre-existing untouched data cannot fail a PATCH that never
+      // referenced it (RFC 7644 §3.5.2).
+      const patchValidationPayload = scopePatchPayloadToTouched(
+        resultPayload,
+        patchDto.Operations,
+        extensionUrns,
+      );
+      this.validatePayloadSchema(patchValidationPayload, resourceType, endpointId, config, 'patch');
 
       // GEN-02: Immutable attribute enforcement on PATCH result
       this.checkImmutableAttributes(existing, resultPayload, resourceType, endpointId, config);
