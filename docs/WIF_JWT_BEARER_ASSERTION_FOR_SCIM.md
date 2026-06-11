@@ -30,8 +30,9 @@
 - [11. Quality gates and test matrix](#11-quality-gates-and-test-matrix)
 - [12. Error responses and RFC 6749 conformance](#12-error-responses-and-rfc-6749-conformance)
 - [13. Step-by-step implementation plan](#13-step-by-step-implementation-plan)
-- [14. FAQ](#14-faq)
-- [15. References](#15-references)
+- [14. Effort estimates](#14-effort-estimates)
+- [15. FAQ](#15-faq)
+- [16. References](#16-references)
 
 ---
 
@@ -262,6 +263,13 @@ stateDiagram-v2
 | Per-endpoint credential model | [schema.prisma](../api/prisma/schema.prisma) `EndpointCredential` has `credentialType` + `metadata` JSON | A new `wif` `credentialType` storing trust config; **no secret column populated** |
 | Config flags | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts): `boolean | string` only | A `'structured'` flag-type (Pre-Q.A) for the WIF trust object |
 
+> **Verified greenfield note (2026-06-11 source check).** Every prerequisite below the WIF layer is genuinely unbuilt - none is partially present:
+> - **No JWKS / `jose`.** [api/package.json](../api/package.json) declares no `jose`, `jwks-rsa`, or equivalent; there is no `createRemoteJWKSet` or JWKS code anywhere in `api/src`. Q2 starts from zero.
+> - **No form-urlencoded parsing.** The [api/src/main.ts](../api/src/main.ts) bootstrap registers no `urlencoded`/`useBodyParser`, so the token endpoint cannot read the WIF form body today (Q6.1).
+> - **No `client_assertion` path.** Zero matches for `client_assertion` in `api/src`.
+> - **Issuer is HS256-only.** No RS256/ES256 anywhere, so Pre-Q.B is a from-scratch asymmetric-key change.
+> - **`oauth_client` is reserved, not implemented.** [admin-credential.controller.ts](../api/src/modules/scim/controllers/admin-credential.controller.ts) accepts `oauth_client` in its allowlist, but the create path always mints a bcrypt **bearer** token and the DTO carries only `label`/`credentialType`/`expiresAt` (no trust/client config). Q1 is therefore real new work, not a flag flip.
+
 ---
 
 ## 6. Gap analysis
@@ -276,6 +284,7 @@ stateDiagram-v2
 | 6 | Issue a per-endpoint short-lived token | PARTIAL (global issuer exists) | Q1 -> Q6 |
 | 7 | Tenant isolation via `tid` | MISSING | Q6 |
 | 8 | Reciprocal ISV-portal UI (enter 4 values, return 3) | MISSING | Q6 |
+| 9 | Advertise the WIF scheme in per-endpoint `/ServiceProviderConfig` (RFC 7644 section 4) | MISSING (one `oauthbearertoken` scheme today) | Q6 |
 
 ---
 
@@ -297,6 +306,7 @@ flowchart TD
 | Q6.3 | `WifAssertionValidatorService` (reuses Q2 `jose` JWKS client): signature + claims + roles + tenant isolation |
 | Q6.4 | Per-endpoint issuance of a 1-6 h token scoped to the configured `scope` |
 | Q6.5 | Reciprocal CredentialsTab UI: "Federated Identity (WIF)" section + Test Connection |
+| Q6.6 | Advertise the WIF scheme in the endpoint's `/ServiceProviderConfig` when `WifCredentialsEnabled` is on |
 
 ---
 
@@ -369,6 +379,81 @@ flowchart TD
 
 > **Guard fall-through note.** The token issued here is the ISV's own JWT, so the existing OAuth-JWT branch in [shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) validates it on SCIM calls with no new code, provided the issuer/audience match what the guard expects per endpoint.
 
+### 8.6 Per-endpoint enablement and auth coexistence
+
+WIF is **one settings-enabled auth feature among several**, configured **per endpoint** exactly like every other SCIMServer capability. It is **not** a global mode and it does **not** replace the existing auth patterns - an operator turns it on for a specific endpoint by setting the `WifCredentialsEnabled` flag in that endpoint's profile settings (the same `endpoint.profile.settings` config object that holds `PerEndpointCredentialsEnabled`, `StrictSchemaValidation`, and the rest) and attaching a `wif` credential. Endpoints that do not enable it are completely unaffected, and an endpoint may keep its bearer / OAuth / legacy auth working alongside WIF during a migration.
+
+**Each auth pattern keeps its own per-endpoint enabling mechanism:**
+
+| Pattern | Per-endpoint enabling mechanism | Still works when WIF is on? |
+|---|---|---|
+| Per-endpoint bcrypt bearer (G11) | `PerEndpointCredentialsEnabled` flag + a `bearer` credential | Yes - unchanged |
+| OAuth 2.0 JWT (issuer-mode) | The issued token is validated by the OAuth-JWT guard branch | Yes - WIF reuses this branch for its issued token |
+| Legacy global bearer | `SCIM_SHARED_SECRET` (deployment-wide fallback) | Yes - unchanged |
+| **WIF (Pattern 8)** | **`WifCredentialsEnabled` flag + a `wif` credential** | **n/a - this is the feature** |
+
+**The guard's per-endpoint resolution order is additive (no branch is removed):**
+
+```mermaid
+flowchart TD
+    A[SCIM request with Bearer token] --> B{Endpoint has<br/>PerEndpointCredentialsEnabled?}
+    B -- yes --> C[Try per-endpoint bcrypt bearer credentials]
+    B -- no --> D
+    C -- match --> OK[200 authorized]
+    C -- no match --> D[Validate as OAuth JWT]
+    D -- valid --> OK
+    D -- invalid --> E{Matches SCIM_SHARED_SECRET?}
+    E -- yes --> OK
+    E -- no --> FAIL[401 Unauthorized]
+```
+
+> **Where WIF plugs in.** WIF does not add a new SCIM-call branch. It adds a path at the **token endpoint** (gated by `WifCredentialsEnabled` + a `wif` credential) that mints the ISV's own JWT; that JWT is then accepted by the **existing** OAuth-JWT branch above. So enabling WIF on one endpoint changes only how that endpoint obtains a token, never how any other endpoint authenticates.
+
+> **Config-flag discipline.** `WifCredentialsEnabled` is a normal endpoint config flag and MUST satisfy the 10-cell completeness matrix (`endpointConfigFlagAudit`): registry + default (`false`) + validator + enforcement + unit test + E2E test + live test + doc + UI Switch + UI test. Its default is `false`, so existing endpoints are untouched until an operator opts in.
+
+### 8.7 Fitting WIF into the endpoint-creation model
+
+SCIMServer endpoints are created from a **preset** (`profilePreset`, e.g. `entra-id`) or an **inline profile** ([create-endpoint.dto.ts](../api/src/modules/endpoint/dto/create-endpoint.dto.ts)), and every behavioral flag lives in the typed `profile.settings` object ([ProfileSettings in endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts)). WIF must slot into that same model so the API and UI work exactly like every other feature - no special case.
+
+```mermaid
+flowchart TD
+    subgraph Create["Endpoint creation (API or UI)"]
+        A[profilePreset e.g. entra-id<br/>OR inline profile.settings] --> B[profile.settings.WifCredentialsEnabled true]
+    end
+    subgraph Configure["Attach trust (admin credential API)"]
+        B --> C[POST credentials credentialType wif]
+        C --> D[wif trust stored in EndpointCredential.metadata]
+    end
+    subgraph Discover["Per-endpoint discovery"]
+        D --> E[endpoint ServiceProviderConfig advertises the WIF auth scheme]
+    end
+```
+
+**Three source-grounded integration points:**
+
+1. **Flag home is the typed profile settings.** Add `WifCredentialsEnabled?: boolean | string` to [ProfileSettings](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) alongside `PerEndpointCredentialsEnabled`, and to the flag registry in [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts). A preset (for example a future `entra-id-wif`) can pre-enable it; an inline profile can set it at create time. This is the same mechanism as the existing 13 flags, so the create/update endpoint API needs no new shape.
+
+2. **The credential-create gate must become orthogonal.** Today [admin-credential.controller.ts](../api/src/modules/scim/controllers/admin-credential.controller.ts) blocks **all** credential creation unless `PerEndpointCredentialsEnabled` is true. A `wif` credential is a different feature, so the gate must read: allow a `bearer` credential when `PerEndpointCredentialsEnabled` is on, **and** allow a `wif` credential when `WifCredentialsEnabled` is on - independently. The two flags are separate concerns (single-responsibility): an endpoint can run WIF without per-endpoint bearer tokens, or both at once during a migration.
+
+| Requested `credentialType` | Required per-endpoint flag |
+|---|---|
+| `bearer` | `PerEndpointCredentialsEnabled` |
+| `wif` | `WifCredentialsEnabled` |
+
+3. **Enablement must surface in per-endpoint discovery (RFC 7644 section 4).** Every endpoint today advertises exactly one `oauthbearertoken` scheme (from `SCIM_SERVICE_PROVIDER_CONFIG` via [scim-discovery.service.ts](../api/src/modules/scim/discovery/scim-discovery.service.ts)). When `WifCredentialsEnabled` is on, that endpoint's `/ServiceProviderConfig` SHOULD advertise an additional `SpcAuthenticationScheme` describing the WIF token-exchange, so a client can discover it. The profile already supports per-endpoint `authenticationSchemes` ([ServiceProviderConfig in endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts)), so this is a populate-on-enable, not a schema change.
+
+```json
+{
+  "type": "oauth2",
+  "name": "Workload Identity Federation (JWT Bearer Assertion)",
+  "description": "RFC 7523 section 2.2 client authentication: present a signed JWT assertion at the token endpoint to receive a short-lived bearer token.",
+  "specUri": "https://www.rfc-editor.org/rfc/rfc7523",
+  "primary": false
+}
+```
+
+> **Design principle.** WIF adds capability without removing or mutating any existing behavior: a new optional flag in the existing settings object, a new branch in the existing credential-create gate, and an extra entry in the existing discovery list. Endpoints that do not opt in are byte-for-byte unchanged at every layer - config, auth, and discovery.
+
 ---
 
 ## 9. UI design
@@ -391,7 +476,7 @@ flowchart TD
 | Client ID / Token URL / SCIM URL (read-only, copyable) | `CopyableField` |
 | Full trust record (copy as JSON) | `CopyJsonButton` |
 
-- **Gating flag:** a `WifCredentialsEnabled` boolean in the config registry (10-cell completeness per `endpointConfigFlagAudit`).
+- **Gating flag:** a `WifCredentialsEnabled` boolean in the config registry, set **per endpoint** in that endpoint's profile settings (default `false`). The "Federated Identity (WIF)" section renders only when the endpoint has opted in; endpoints without it see no change. 10-cell completeness per `endpointConfigFlagAudit`.
 - **Test Connection UX:** posts a synthetic assertion (or asks the operator to trigger one) and reports each validation step's pass/fail with the specific failing claim.
 - **Coverage:** Playwright spec under `web/e2e/` exercising the WIF panel end-to-end; vitest for the panel's rendered structure and primitive presence by `data-testid`.
 
@@ -514,6 +599,7 @@ Reuse the existing `EndpointCredential.credentialType` + `metadata` JSON columns
 | D2 | Mirror behavior in the InMemory repository | [api/src/infrastructure/repositories/inmemory](../api/src/infrastructure/repositories/inmemory) | unit: InMemory create matches Prisma create | 2.5 + 2.6 parity |
 | D3 | Add the Prisma migration if any enum/constraint changes | [api/prisma](../api/prisma) | n/a | 1.9 prismaMigrationAudit |
 | D4 | Contract test: the `wif` response carries no secret/hash key | E2E + live | E2E: `expect(ALLOWED_KEYS).toContain(key)` over the response | 3a.2 apiContractVerification |
+| D5 | Make the create gate orthogonal: add `'wif'` to the allowlist and permit it when `WifCredentialsEnabled` is on (independent of `PerEndpointCredentialsEnabled`) | [admin-credential.controller.ts](../api/src/modules/scim/controllers/admin-credential.controller.ts) | unit: `wif` create allowed when only `WifCredentialsEnabled` is on; `bearer` still requires `PerEndpointCredentialsEnabled` | 2.1 unit, 3b.4 security |
 
 ### 13.6 Q6.3 - `WifAssertionValidatorService`
 
@@ -534,6 +620,7 @@ On a valid assertion, mint the ISV's own short-lived (1-6 h) token scoped to the
 |---|---|---|---|---|
 | F1 | Issue a per-endpoint token with `issuedTokenTtlSec` + `scope` | [oauth.service.ts](../api/src/oauth/oauth.service.ts) | unit: issued token carries the configured scope + ttl | 2.1 unit |
 | F2 | Wire validator -> issuer in the controller | [oauth.controller.ts](../api/src/oauth/oauth.controller.ts) | E2E: assertion in -> own token out -> token authorizes a SCIM call | 2.2 E2E, 4.x live |
+| F3 | Q6.6: advertise the WIF `SpcAuthenticationScheme` in the endpoint's `/ServiceProviderConfig` when `WifCredentialsEnabled` is on | [scim-discovery.service.ts](../api/src/modules/scim/discovery/scim-discovery.service.ts) | E2E: enabled endpoint advertises both `oauthbearertoken` and the WIF scheme; disabled endpoint advertises only `oauthbearertoken` | 2.2 E2E, 3b.2 auditAgainstRFC |
 
 ### 13.8 Q6.5 - reciprocal CredentialsTab UI
 
@@ -580,7 +667,59 @@ A WIF commit is complete only when the standing **Feature / Bug-Fix Commit Check
 
 ---
 
-## 14. FAQ
+## 14. Effort estimates
+
+> **What this is.** A bottom-up effort estimate in **ideal engineering-days for one developer already fluent in this codebase**, working TDD-first and reusing the existing G11 / OAuth / dual-backend patterns. "Ideal day" = focused build + test time, excluding meetings, context-switching, and review latency. These are effort sizes, not calendar dates; see the calendar note below.
+
+> **Basis (2026-06-11 source check).** The §5 verified-greenfield note governs this estimate: `jose`/JWKS, form-urlencoded parsing, `client_assertion`, asymmetric issuance, and a real per-endpoint OAuth client are all absent today, so Q6 must build its full prerequisite stack. Nothing below is discounted as "already done."
+
+| Phase | Low (days) | High (days) | Primary effort driver |
+|---|---|---|---|
+| Pre-Q.A structured flag type | 1 | 2 | registry + validator + 10-cell flag matrix |
+| Pre-Q.B asymmetric key + JWKS publish | 2 | 3 | key load, `kid`, new JWKS controller, guard verify |
+| Q1 per-endpoint OAuth client | 3 | 4 | model + issuance + dual-backend parity |
+| Q2 external JWKS validator (`jose`) | 3 | 4 | new dep, alg-pinning, cache, fail-closed, SSRF allowlist |
+| Q6.1 form-urlencoded intake | 1 | 2 | body parser + routing + error catalog (section 12) |
+| Q6.2 `wif` persistence (no secret) | 2 | 2 | DTO + parity + no-secret contract test |
+| Q6.3 `WifAssertionValidatorService` | 3 | 4 | security core; heaviest test surface |
+| Q6.4 own-token issuance | 1 | 1 | wiring validator -> issuer |
+| Q6.5 reciprocal CredentialsTab UI | 3 | 4 | UI + vitest + Playwright + flag matrix |
+| **Subtotal (build + unit/E2E)** | **19** | **29** | |
+| Quality-gate overhead (~25%) | 5 | 9 | live-test.ps1 (local/Docker/Azure), Playwright-vs-dev, full pipeline, CHANGELOG/Session/docs, Stage X audits |
+| **Total ideal dev-days** | **~24** | **~38** | roughly 5 to 8 ideal engineering-weeks |
+
+**Critical path and parallelism:**
+
+```mermaid
+flowchart LR
+    PreA[Pre-Q.A 1-2d] --> Q62[Q6.2 2d]
+    PreB[Pre-Q.B 2-3d] --> Q1[Q1 3-4d]
+    PreB --> Q2[Q2 3-4d]
+    Q1 --> Q61[Q6.1 1-2d]
+    Q2 --> Q63[Q6.3 3-4d]
+    Q61 --> Q63
+    Q62 --> Q63
+    Q63 --> Q64[Q6.4 1d]
+    Q64 --> Q65[Q6.5 3-4d]
+```
+
+- Pre-Q.A and Pre-Q.B have no dependency on each other; Q1 and Q2 can run in parallel once Pre-Q.B lands. With two developers the calendar compresses toward roughly 3 to 4 weeks while total effort is unchanged.
+- **Q6.3 is the long pole by risk, not size.** Its code is modest, but the security tests (algorithm confusion, fail-closed on JWKS outage, tenant isolation, JWKS rotation by `kid`) are where estimates slip.
+
+**Confidence and what moves the number:**
+
+| Factor | Effect |
+|---|---|
+| Developer new to the repo | roughly doubles the total |
+| Q4 (Auth-Code) or Q5 (mTLS/DPoP) pulled in | out of scope here; each is its own multi-day effort |
+| Review cycles + CI queue + serialized shared `scimserver-dev` Azure target | extends **calendar** time beyond ideal-days; not sizable from the repo alone |
+| Reusing `jose` defaults rather than hand-rolling JWKS caching | trims Q2 toward the low end |
+
+> **Calendar caveat.** Ideal dev-days are not wall-clock days. The standing multi-stage gate suite (Stages 0-6 plus Stage X audits), the single shared dev Azure environment that must be serialized across concurrent work, and human review latency all stretch calendar delivery. Treat ~24-38 ideal dev-days as the **effort floor**, then apply your team's historical ideal-to-calendar ratio.
+
+---
+
+## 15. FAQ
 
 **Is this RFC 7523 grant-type usage?** No. It is RFC 7523 **section 2.2** (JWT used for **client authentication**), with `grant_type=client_credentials`. The assertion authenticates the client; it is not the grant.
 
@@ -594,7 +733,7 @@ A WIF commit is complete only when the standing **Feature / Bug-Fix Commit Check
 
 ---
 
-## 15. References
+## 16. References
 
 ### Primary (internal + reconciled)
 
