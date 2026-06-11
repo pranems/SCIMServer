@@ -28,8 +28,10 @@
 - [9. UI design](#9-ui-design)
 - [10. Security analysis](#10-security-analysis)
 - [11. Quality gates and test matrix](#11-quality-gates-and-test-matrix)
-- [12. FAQ](#12-faq)
-- [13. References](#13-references)
+- [12. Error responses and RFC 6749 conformance](#12-error-responses-and-rfc-6749-conformance)
+- [13. Step-by-step implementation plan](#13-step-by-step-implementation-plan)
+- [14. FAQ](#14-faq)
+- [15. References](#15-references)
 
 ---
 
@@ -227,6 +229,27 @@ flowchart TD
 - On a JWKS fetch failure with no cached key, **fail closed** (reject the assertion). Never fall back to "no signature check".
 - Use the tenant-scoped OIDC discovery (`/.well-known/openid-configuration` -> `jwks_uri`) rather than hard-coding the keys URL when possible.
 
+**Validation lifecycle (every branch except the final issuance ends at `invalid_client`):**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Received: token request arrives
+    Received --> ClassicPath: no client_assertion
+    Received --> TrustLookup: client_assertion present
+    TrustLookup --> Rejected: no wif trust for endpoint
+    TrustLookup --> KeyResolve: trust found
+    KeyResolve --> Rejected: kid unknown and JWKS unreachable
+    KeyResolve --> SignatureCheck: key resolved
+    SignatureCheck --> Rejected: bad signature or disallowed alg
+    SignatureCheck --> ClaimCheck: signature valid
+    ClaimCheck --> Rejected: iss aud sub tid or time invalid
+    ClaimCheck --> RoleCheck: claims valid
+    RoleCheck --> Rejected: required role missing
+    RoleCheck --> Issued: all checks pass
+    Issued --> [*]: return own short-lived token
+    Rejected --> [*]: 401 invalid_client
+```
+
 ---
 
 ## 5. Current SCIMServer state
@@ -405,7 +428,159 @@ flowchart TD
 
 ---
 
-## 12. FAQ
+## 12. Error responses and RFC 6749 conformance
+
+Every WIF rejection maps to an RFC 6749 section 5.2 error object so Entra (SyncFabric) receives a standards-compliant `{ "error": ..., "error_description": ... }`. The validator MUST stay tight-lipped: the same generic `invalid_client` is returned for a bad signature, a wrong `iss`, or a missing role, while the specific failing claim is logged server-side only. This denies an attacker a claim-by-claim oracle.
+
+| Condition | HTTP | `error` (RFC 6749 5.2) | `error_description` (client-facing, generic) | Server-side log (detailed) |
+|---|---|---|---|---|
+| Wrong `Content-Type`, missing or empty form fields | 400 | `invalid_request` | "Malformed token request" | which field was absent |
+| `client_assertion_type` not the `jwt-bearer` URN | 400 | `invalid_request` | "Unsupported client_assertion_type" | the value received |
+| `grant_type` not `client_credentials` | 400 | `unsupported_grant_type` | "Only client_credentials is supported" | the grant received |
+| Requested `scope` not the configured WIF scope | 400 | `invalid_scope` | "Requested scope is not permitted" | requested vs configured |
+| No `wif` trust configured for the endpoint | 401 | `invalid_client` | "Client authentication failed" | endpoint id, no wif trust |
+| Signature invalid, disallowed alg, or `alg: none` | 401 | `invalid_client` | "Client authentication failed" | alg seen, kid, reason |
+| `iss` / `aud` / `sub` / `tid` mismatch | 401 | `invalid_client` | "Client authentication failed" | which claim, expected vs got |
+| Outside `iat` / `nbf` / `exp` window | 401 | `invalid_client` | "Client authentication failed" | now, nbf, exp, skew applied |
+| Required role missing from `roles` | 401 | `invalid_client` | "Client authentication failed" | required set, granted set |
+| JWKS fetch failed and no cached key (fail closed) | 401 | `invalid_client` | "Client authentication failed" | jwksUri, fetch error |
+
+> **Why `invalid_client` for authorization failures too.** At the token endpoint the only principal is the client itself, so an unmet role is a client-authorization failure, not a resource-scope failure. RFC 6749 section 5.2 has no `forbidden` code for this hop, so `invalid_client` (401) is the conformant choice and the missing role is logged for the operator. The resource-level role checks (on the SCIM calls) are a separate concern handled by the guard.
+
+---
+
+## 13. Step-by-step implementation plan
+
+> This plan is **TDD-first** (Stage 0 of the standing quality gates): write the failing test, make it green with the smallest change, refactor green. Each step names the files it touches, the **RED test** to write first, and the **gate** that must pass before the step is done. Nothing here is implemented yet; this is the ordered recipe.
+
+### 13.1 Build order at a glance
+
+```mermaid
+gantt
+    title Phase Q6 WIF build order (relative units, not calendar dates)
+    dateFormat X
+    axisFormat %s
+    section Prerequisites
+    Pre-Q.A structured flag type         :prea, 0, 2
+    Pre-Q.B asymmetric externalized key  :preb, 0, 3
+    section Q1 Q2 primitives
+    Q1 per-endpoint OAuth client          :q1, after preb, 3
+    Q2 external JWKS validator            :q2, after preb, 3
+    section Q6 WIF
+    Q6.1 form-urlencoded assertion intake :q61, after q1, 2
+    Q6.2 wif credentialType persistence   :q62, after prea, 2
+    Q6.3 WifAssertionValidatorService     :q63, after q2, 3
+    Q6.4 own-token issuance scoped        :q64, after q63, 1
+    Q6.5 reciprocal CredentialsTab UI     :q65, after q64, 3
+```
+
+### 13.2 Pre-Q.A - structured config flag type
+
+The flag registry today is `boolean | string` only. WIF needs a flag whose value is a structured object (the trust record), so the registry must learn a `structured` flag-type with its own validator. Honor the 10-cell completeness matrix (`endpointConfigFlagAudit`): registry + default + validator + enforcement + unit test + E2E test + live test + doc + UI Switch + UI test.
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| A1 | Add a `structured` value-kind to the flag-type union and metadata | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) | unit: a structured flag round-trips through `validateEndpointConfig` | 1.2 build, 2.1 unit |
+| A2 | Add `validateStructuredFlag()` (shape check + reject unknown keys) | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) | unit: malformed structured value -> validation error | 2.1 unit |
+| A3 | Document the new flag-type | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | n/a (doc) | 3c.2 docs audit |
+
+### 13.3 Pre-Q.B - asymmetric, externalized signing key
+
+Today [oauth.service.ts](../api/src/oauth/oauth.service.ts) signs with HS256 using a process-lifetime random secret. For the ISV to publish a JWKS that any client can verify, issuance must move to an **asymmetric** key (RS256/ES256) loaded from configuration, and the public half must be published.
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| B1 | Load an RS256/ES256 private key + `kid` from config; fall back to a generated dev key | [oauth.service.ts](../api/src/oauth/oauth.service.ts) | unit: signed token header carries `alg: RS256` and a `kid` | 2.1 unit |
+| B2 | Publish the public JWKS at a stable path | new `api/src/oauth/jwks.controller.ts` | E2E: fetching the JWKS returns the active `kid` | 2.2 E2E |
+| B3 | Verify issued tokens with the public key in the guard's OAuth branch | [shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) | unit: a token signed by B1 validates; an HS256 token does not | 2.1 unit, 2.5 parity |
+
+### 13.4 Q6.1 - form-urlencoded assertion intake
+
+The token endpoint must parse `application/x-www-form-urlencoded` and accept the `client_assertion` + `client_assertion_type` fields. Today it reads JSON via `@Body()` and requires `client_secret`.
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| C1 | Enable the urlencoded body parser | [api/src/main.ts](../api/src/main.ts) | E2E: a form-urlencoded POST reaches the controller with populated fields | 2.2 E2E |
+| C2 | Extend `TokenRequest` with `client_assertion` + `client_assertion_type`; route assertion requests to the WIF path | [oauth.controller.ts](../api/src/oauth/oauth.controller.ts) | unit: a request with `client_assertion` is dispatched to the validator, not the secret path | 2.1 unit |
+| C3 | Emit RFC 6749 5.2 errors per the section 12 catalog | [oauth.controller.ts](../api/src/oauth/oauth.controller.ts) | unit: malformed body -> `invalid_request`; unknown assertion type -> `invalid_request` | 2.1 unit, 3a.3 error-handling |
+
+### 13.5 Q6.2 - `wif` credentialType persistence (no secret)
+
+Reuse the existing `EndpointCredential.credentialType` + `metadata` JSON columns - no new column, no secret stored. Both the Prisma and InMemory backends must behave identically (`crossBackendParityAudit`).
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| D1 | Accept `credentialType: 'wif'` with a validated trust `metadata` shape | endpoint-credential service + DTO | unit: a `wif` credential persists trust values, no secret/hash field | 2.1 unit |
+| D2 | Mirror behavior in the InMemory repository | [api/src/infrastructure/repositories/inmemory](../api/src/infrastructure/repositories/inmemory) | unit: InMemory create matches Prisma create | 2.5 + 2.6 parity |
+| D3 | Add the Prisma migration if any enum/constraint changes | [api/prisma](../api/prisma) | n/a | 1.9 prismaMigrationAudit |
+| D4 | Contract test: the `wif` response carries no secret/hash key | E2E + live | E2E: `expect(ALLOWED_KEYS).toContain(key)` over the response | 3a.2 apiContractVerification |
+
+### 13.6 Q6.3 - `WifAssertionValidatorService`
+
+A new service that reuses the Q2 `jose` JWKS client to run the full validation lifecycle (the section 4 state diagram): signature + alg-pinning + `iss`/`aud`/`sub`/`tid` + time window + required roles, failing closed on JWKS outage.
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| E1 | Validate signature against the configured JWKS; pin RS256/ES256 | new `api/src/oauth/wif-assertion-validator.service.ts` | unit: good sig passes; `alg: none` + HMAC rejected | 2.1 unit, 3b.4 security |
+| E2 | Validate `iss`/`aud`/`sub`/`tid` + time window | same | unit: each wrong claim -> rejection | 2.1 unit |
+| E3 | Enforce `requiredRoles` subset of `roles` | same | unit: missing role -> rejection | 2.1 unit |
+| E4 | Cache JWKS by `kid`; refetch on unknown `kid`; fail closed on outage | same | unit: unknown `kid` triggers refetch; outage with no cache -> reject | 2.1 unit, 3b.4 security |
+
+### 13.7 Q6.4 - own-token issuance scoped to the configured scope
+
+On a valid assertion, mint the ISV's own short-lived (1-6 h) token scoped to the configured `scope`, using the Pre-Q.B asymmetric key.
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| F1 | Issue a per-endpoint token with `issuedTokenTtlSec` + `scope` | [oauth.service.ts](../api/src/oauth/oauth.service.ts) | unit: issued token carries the configured scope + ttl | 2.1 unit |
+| F2 | Wire validator -> issuer in the controller | [oauth.controller.ts](../api/src/oauth/oauth.controller.ts) | E2E: assertion in -> own token out -> token authorizes a SCIM call | 2.2 E2E, 4.x live |
+
+### 13.8 Q6.5 - reciprocal CredentialsTab UI
+
+A "Federated Identity (WIF)" section in the CredentialsTab, gated by a `WifCredentialsEnabled` flag, mirroring the three-step setup: enter the 4 Entra values, display the 3 ISV return values, run a Test Connection dry-run. All fields go through R9 primitives.
+
+```mermaid
+sequenceDiagram
+    participant A as Admin (browser)
+    participant U as CredentialsTab UI
+    participant API as SCIMServer admin API
+    A->>U: Enter issuer, subject, audience, jwksUri, roles, scope
+    U->>API: POST credentials credentialType wif
+    API-->>U: 201 with Client ID, Token URL, SCIM URL
+    U-->>A: Show the 3 return values, copyable
+    A->>U: Click Test Connection
+    U->>API: Dry-run the assertion validation path
+    API-->>U: Per-step pass or fail with the specific failing claim
+    U-->>A: Render the step-by-step result
+```
+
+| Step | Action | Files | RED test first | Gate |
+|---|---|---|---|---|
+| G1 | Add the gated "Federated Identity (WIF)" section | [CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) | vitest: section renders the 4 `EditableField`s + 3 `CopyableField`s by `data-testid` | 2.3 vitest |
+| G2 | Wire Save -> `wif` credential create; show the 3 return values | [CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) | vitest: save calls the API; return values render | 2.3 vitest |
+| G3 | Test Connection dry-run with per-step result | [CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) | Playwright: full panel flow end-to-end | 5.3 Playwright |
+| G4 | Add the `WifCredentialsEnabled` flag (10-cell matrix) | flag registry + UI Switch | unit + vitest per the matrix | 3b.3 endpointConfigFlagAudit |
+
+### 13.9 Migration and rollout (secret-based endpoint to WIF)
+
+WIF can be adopted without downtime by running both auth modes during a cutover window, then removing the legacy secret.
+
+```mermaid
+flowchart TD
+    M1[Endpoint runs on secret-based auth today] --> M2[Admin adds a wif credential alongside the existing secret]
+    M2 --> M3[Both modes accepted during the cutover window]
+    M3 --> M4[Entra reconfigured to WIF, proven by Test Connection]
+    M4 --> M5[Admin removes the legacy secret credential]
+    M5 --> M6[Endpoint is credential-free]
+```
+
+### 13.10 Definition of done
+
+A WIF commit is complete only when the standing **Feature / Bug-Fix Commit Checklist** is satisfied for the steps it lands: unit + E2E + live tests, a Playwright spec for any `web/` change, the feature doc updated, [INDEX.md](INDEX.md) + [CHANGELOG.md](../CHANGELOG.md) + Session and context files updated, the version bumped, and the response-contract test proving no secret leaks on the `wif` credential.
+
+---
+
+## 14. FAQ
 
 **Is this RFC 7523 grant-type usage?** No. It is RFC 7523 **section 2.2** (JWT used for **client authentication**), with `grant_type=client_credentials`. The assertion authenticates the client; it is not the grant.
 
@@ -419,7 +594,7 @@ flowchart TD
 
 ---
 
-## 13. References
+## 15. References
 
 ### Primary (internal + reconciled)
 
