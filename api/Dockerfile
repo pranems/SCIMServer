@@ -41,7 +41,11 @@ RUN find ./node_modules -name "*.md" -delete 2>/dev/null || true && \
 
 # ── Stage 3: Minimal runtime ────────────────────────────────────────
 FROM node:24-alpine AS runtime
-RUN apk add --no-cache openssl && \
+# `apk upgrade` pulls the latest patched OS packages from the live Alpine repo
+# (the base image lags behind security fixes), e.g. openssl/libcrypto3/libssl3
+# 3.5.7-r0 fixing CVE-2026-45447 (PKCS7_verify use-after-free).
+RUN apk upgrade --no-cache libcrypto3 libssl3 && \
+    apk add --no-cache openssl && \
     addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001
 WORKDIR /app

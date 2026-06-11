@@ -641,7 +641,7 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 
 ## API Reference (Summary)
 
-**84 routes** across 19 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
+**86 route handlers** across 20 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
 
 ### Health & Version
 
@@ -1192,7 +1192,9 @@ curl "http://localhost:8080/scim/admin/logs?page=1&pageSize=50&method=POST&statu
 
 ## Web Admin UI
 
-A React + Vite single-page application served from the root app shell:
+A React + Vite single-page application served from the root app shell. Below is the live dashboard from the production instance:
+
+![SCIMServer dashboard](docs/screenshots/prod-01-dashboard.png)
 
 | Screen | Description |
 |--------|-------------|
@@ -1205,6 +1207,8 @@ A React + Vite single-page application served from the root app shell:
 | **Manual Provisioning & /Me** | Operator forms for users/groups and OAuth `/Me` self-service profile surface |
 
 Access at `http://localhost:8080/` (no separate build step needed - pre-built in Docker image).
+
+See the full walkthrough with per-page screenshots and API endpoint tables in the [Web Admin UI Guide](docs/UI_GUIDE.md).
 
 ---
 
@@ -1415,7 +1419,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 83 endpoints, full request/response examples |
+| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 86 route handlers, full request/response examples |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Quick start - endpoint lifecycle recipes |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md) | Profile system - presets, expansion, validation |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | All 16 configuration flags |

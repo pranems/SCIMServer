@@ -1,6 +1,6 @@
 # Multi-Endpoint Architecture Guide
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
 > **Source of truth:** [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 
 ---
@@ -266,7 +266,7 @@ curl -X PUT /scim/admin/log-config/endpoint/{id}/TRACE
 
 ## Controllers & Routing
 
-All 19 controllers participate in multi-endpoint routing:
+All 20 controllers participate in multi-endpoint routing:
 
 | Controller | Route Prefix | Endpoint-Scoped |
 |-----------|-------------|-----------------|
@@ -286,8 +286,10 @@ All 19 controllers participate in multi-endpoint routing:
 | LogConfigController | `/admin/log-config` | Global |
 | DatabaseController | `/admin/database` | Global |
 | ActivityController | `/admin/activity` | Global |
+| DashboardController | `/admin/dashboard` | Global |
 | HealthController | `/health` | Global |
 | OAuthController | `/oauth` | Global |
+| WebController | `/` | Global (serves SPA) |
 | WebController | `/` | Global |
 
 ---

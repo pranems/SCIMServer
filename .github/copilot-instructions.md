@@ -135,6 +135,16 @@ When working on development projects:
 - NEVER rewrite history on commits that have been pushed
 - Always use `git add -A; git commit -m "<descriptive message>"` for saving progress
 
+## Doc Screenshot Hygiene Rule (CRITICAL - added 2026-06-04)
+
+Origin: 2026-06-04 repo-hygiene audit. `docs/screenshots/` had grown to 48 PNGs (3.19 MB) of which 38 were orphaned (referenced by no live doc) and 35 were re-shot in a single commit. PNGs are binary - git stores a full new blob on every re-capture and that blob lives in `.git` forever, so a frequently re-shot screenshot set is a permanent, compounding history-bloat source. Standing rules:
+
+1. **Curated narrative set only.** `docs/screenshots/` holds a small, stable set of images a human reader needs to understand a doc. Today that is the `prod-*.png` set referenced by [docs/UI_GUIDE.md](docs/UI_GUIDE.md). Do NOT commit a per-release full re-shoot.
+2. **No orphans.** Before committing screenshots, every PNG on disk MUST be referenced by a live `.md`. Delete any image referenced only by a retired/handoff doc (or accept dead links in the retired doc - do not keep the binary alive for it).
+3. **Visual-regression baselines are NOT doc screenshots.** Playwright baselines live under `web/e2e/**/*-snapshots/` and are owned by the Stage 5 visual-regression gate. NEVER place them under `docs/`, and NEVER conflate the two retention rationales.
+4. **Scratch captures are git-ignored.** Ad-hoc / Playwright scratch shots go to `docs/screenshots/scratch/` or `tmp-*.png` (both `.gitignore`d) and must never be added by `git add -A`.
+5. **Optimize keepers.** Keeper PNGs should be size-optimized (oxipng/pngquant) when tooling is available before commit.
+
 ## Schema-Characteristic Test Rule (CRITICAL - RFC 7643 §2.2 + §7)
 
 When writing tests against `/Schemas` attribute definitions (unit, E2E, or live), the test MUST:

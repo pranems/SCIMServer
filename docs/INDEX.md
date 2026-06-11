@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.53.0 - **Updated:** June 2, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 7,277 checks (3,816 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,027 live SCIM + 15 PowerShell)
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
+> 86 API route handlers - 20 controllers - 6 presets - 16 config flags - 7,277 checks (3,816 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,027 live SCIM + 15 PowerShell)
 
 ---
 
@@ -30,7 +30,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 84 routes, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 86 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
@@ -132,7 +132,7 @@
 | [G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md](G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md) | Primary sub-attribute enforcement (RFC 7643 S2.4) - tri-state config |
 | [PATCH_NULL_HANDLING_RFC_COMPLIANCE.md](PATCH_NULL_HANDLING_RFC_COMPLIANCE.md) | **PATCH null-handling RFC compliance (v0.52.3, F1-F9)** - RFC 7644 S3.5.2 null semantics across all 3 engines (User/Group/Generic). F1 mergeComplexAttribute null-as-unset merge for complex parents. F2 explicit-null Group.members clear regardless of `PatchOpAllowRemoveAllMembers` flag (per S3.5.2.2 ex.3). F3 noTarget on zero-match valuePath via `ValuePathOpResult` dispatch. F4 `findInvalidMultiValuedElement` rejects null array elements with `invalidValue`. F5 `pruneEmptyExtensions` removes empty extension URN blocks from payload AND `schemas[]`. F6/F7 `ExtensionPathExpression.subAttribute` + new `ExtensionValuePathExpression` (filter on extension valuePath). F8 GenericPatchEngine inherits F1/F4/F5/F6/F7 for custom resource type parity. F9 `validatePatchOperationValue` null contract documented (RFC 7644 S3.5.2.3 - null at per-op layer is intentional UNASSIGN signal; post-PATCH `validatePayloadSchema` is the authoritative required-cleared check). New 19-case diagnostic `scripts/null-patch-test.ps1`, new E2E spec `api/test/e2e/patch-null-handling.e2e-spec.ts` (20 tests), new live-test section `9z-AK` (22 assertions T01-T18 + F9 + setup). Validated 1027/1027 PASS end-to-end across inmemory + Prisma + dev Azure. |
 | [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint credentials - 3-tier auth chain |
-| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | **Workload Identity Federation (WIF) deep analysis + SCIMServer design** - Entra's secret-less SCIM auth via RFC 7523 §2.2 JWT Bearer Assertion. Distinguishes WIF's two-step token-exchange (Entra assertion -> ISV validates via JWKS -> ISV issues own short-lived token) from direct external-JWT usage. Full protocol flow (sequence + flowchart + ER diagrams), claims table, 3-step admin setup with reciprocal ISV-portal obligation, gap analysis vs current OAuth issuer, proposed Phase Q6 token-exchange sub-phase, backend design (`wif` credentialType + assertion validator + per-endpoint token endpoint), UI design (CredentialsTab "Federated Identity" section using R9 Copyable/Editable primitives + Test Connection), security mitigations (JWKS SSRF, algorithm confusion, tenant isolation), and full per-layer test matrix. |
+| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | **Workload Identity Federation (WIF) deep analysis + SCIMServer design** - Entra's secret-less SCIM auth via RFC 7523 §2.2 JWT Bearer Assertion. Distinguishes WIF's two-step token-exchange (Entra assertion -> ISV validates via JWKS -> ISV issues own short-lived token) from direct external-JWT usage. Full protocol flow (sequence + flowchart + ER diagrams), claims table, 3-step admin setup with reciprocal ISV-portal obligation, gap analysis vs current OAuth issuer, proposed Phase Q6 token-exchange sub-phase, backend design (`wif` credentialType + assertion validator + per-endpoint token endpoint), UI design (CredentialsTab "Federated Identity" section using R9 Copyable/Editable primitives + Test Connection), security mitigations (JWKS SSRF, algorithm confusion, tenant isolation), validation-lifecycle state diagram, RFC 6749 §5.2 error-response catalog, a TDD-first step-by-step implementation plan (build-order gantt + per-step file/test/gate tables + migration flow), and full per-layer test matrix. |
 | [ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md) | ISV auth pattern survey + Phase Q gap plan (Q0-Q6) |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Bulk operations (RFC 7644 S3.7) |
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | /Me endpoint (RFC 7644 S3.11) |
@@ -201,9 +201,9 @@
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec - all 84 endpoints, full schemas |
-| Postman Collection | [postman/](postman/) | Importable Postman collection - all 84 endpoints, 14 folders |
-| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace - all 84 endpoints, 14 folders |
+| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec - 75 operations (curated public SCIM + admin subset), full schemas |
+| Postman Collection | [postman/](postman/) | Importable Postman collection - 81 requests across grouped folders |
+| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace - 72 requests (v0.37 export; regenerate for latest routes) |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Extension Examples | [examples/endpoint/](examples/endpoint/) | One-click endpoint+extension combos |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd) | Sequence diagrams |
