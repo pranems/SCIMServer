@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.53.2] - 2026-06-10 - Fix: stabilize endpoint-detail Overview visual-regression baseline
+
+### Fixed
+
+- **Stage 5 Playwright visual-regression baseline for the endpoint-detail Overview tab is no longer flaky on live dev data.** The `Endpoint detail - Overview tab` snapshot was failing with a 39% pixel diff (vs the 3% budget) on the dev deployment because the Overview tab's live KPI counts and Recent Activity feed are non-deterministic per environment and were not fully masked. The diff grew from 5% to 39% across Playwright's own retry screenshots - a clear live-data-streaming signature, not a layout regression. The backend-only fix `4282dc2` touched zero `web/src/` files, so no product layout change was involved.
+  - Added a stable `data-testid="overview-kpi-row"` to the populated KPI row in [web/src/pages/OverviewTab.tsx](web/src/pages/OverviewTab.tsx) (previously only the loading skeleton row carried a testid, leaving the live-data row unmaskable).
+  - Widened the Overview snapshot `mask` in [web/e2e/visual-regression.spec.ts](web/e2e/visual-regression.spec.ts) to cover `overview-kpi-row`, `overview-activity`, and `overview-activity-empty` - the same wholesale-mask pattern already used by `DASHBOARD_LIVE_SELECTORS`.
+  - Regenerated the `endpoint-detail-overview.png` baseline against the current dev deployment.
+
 ## [0.53.1] - 2026-06-10 - Fix: scope post-PATCH strict validation to touched attributes (RFC 7644 §3.5.2)
 
 ### Fixed

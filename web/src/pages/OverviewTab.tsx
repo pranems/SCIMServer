@@ -155,7 +155,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ endpointId }) => {
   return (
     <div data-testid="tab-overview">
       <Subtitle2 style={{ marginBottom: '12px' }}>Resource Statistics</Subtitle2>
-      <div className={classes.kpiRow}>
+      <div className={classes.kpiRow} data-testid="overview-kpi-row">
         <KpiCard
           icon={<People24Regular />}
           label="Users"
