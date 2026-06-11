@@ -895,12 +895,55 @@
       {
         "id": "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User",
         "name": "MsftTestCustomUser",
-        "description": "Microsoft SCIM Validator custom User extension"
+        "description": "Microsoft SCIM Validator custom User extension",
+        "attributes": [
+          {
+            "name": "secondaryEmail",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "An alternate email address for the user."
+          },
+          {
+            "name": "isContractor",
+            "type": "boolean",
+            "multiValued": false,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "description": "Whether the user is an external contractor."
+          }
+        ]
       },
       {
         "id": "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group",
         "name": "MsftTestCustomGroup",
-        "description": "Microsoft SCIM Validator custom Group extension"
+        "description": "Microsoft SCIM Validator custom Group extension",
+        "attributes": [
+          {
+            "name": "maxMembers",
+            "type": "integer",
+            "multiValued": false,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "description": "The maximum number of members allowed in the group."
+          },
+          {
+            "name": "provisionedAt",
+            "type": "dateTime",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "description": "Timestamp when the group was provisioned."
+          }
+        ]
       },
       {
         "id": "urn:ietf:params:scim:schemas:extension:msfttest:User",

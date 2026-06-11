@@ -33,6 +33,20 @@ async function screenshot(page: any, name: string): Promise<void> {
 
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
 
+// Inject token before every navigation so TokenGate accepts it on first paint.
+// Test 1 explicitly tests the token-dialog flow and needs to RUN WITHOUT the
+// init script so it can clear storage and see the dialog; we gate on testInfo
+// title so test 1 keeps its first-run-from-clean-slate semantics.
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.title.startsWith('1. First visit')) return;
+  await page.addInitScript(
+    ({ key, value }) => {
+      try { window.localStorage.setItem(key, value); } catch {}
+    },
+    { key: 'scimserver.authToken', value: TOKEN },
+  );
+});
+
 test.describe('Smoke Test - Complete User Flows', () => {
 
   test('1. First visit: token dialog appears and works', async ({ page }) => {

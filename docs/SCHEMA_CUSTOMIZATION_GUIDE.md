@@ -1,6 +1,6 @@
 # Schema Customization Guide - Operator Reference
 
-> **Version**: 3.0 · **Date**: April 13, 2026 · **Status**: ✅ Complete (source-verified)  
+> **Version**: 3.1 · **Date**: June 3, 2026 · **Status**: ✅ Complete (source-verified against v0.53.0)  
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types  
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
 

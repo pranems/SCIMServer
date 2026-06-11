@@ -28,6 +28,11 @@ import {
   applyExtensionUpdate,
   removeExtensionAttribute,
   resolveNoPathValue,
+  isExtensionValuePath,
+  applyExtensionValuePathUpdate,
+  removeExtensionValuePathEntry,
+  pruneEmptyExtensions,
+  findInvalidMultiValuedElement,
 } from '../../modules/scim/utils/scim-patch-path';
 
 import { PatchError } from './patch-error';
@@ -98,6 +103,35 @@ export class GroupPatchEngine {
             if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
               const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
               if (extParsed) {
+                if (isExtensionValuePath(extParsed)) {
+                  // F7: extension valuePath add does not raise noTarget (creates on no-match per addValuePathEntry semantics).
+                  // Group's add path here goes through applyExtensionValuePathUpdate which DOES raise noTarget.
+                  // For Group, valuePath-extension add without a prior matching element falls back to engine-level error
+                  // to keep parity with non-extension behavior. We route via applyExtensionValuePathUpdate and translate.
+                  const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
+                  const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
+                  const inner = applyExtensionValuePathUpdate({ ...rawPayload }, extParsed, operation.value, vpCaseExact);
+                  if (!inner.matched) {
+                    throw new PatchError(
+                      400,
+                      `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
+                      'noTarget',
+                    );
+                  }
+                  rawPayload = inner.payload;
+                  break;
+                }
+                // F4: validate multi-valued array elements for add
+                if (Array.isArray(operation.value)) {
+                  const bad = findInvalidMultiValuedElement(operation.value);
+                  if (bad) {
+                    throw new PatchError(
+                      400,
+                      `Multi-valued attribute ${extParsed.schemaUrn}:${extParsed.attributePath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+                      'invalidValue',
+                    );
+                  }
+                }
                 rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
                 break;
               }
@@ -124,6 +158,21 @@ export class GroupPatchEngine {
             if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
               const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
               if (extParsed) {
+                if (isExtensionValuePath(extParsed)) {
+                  // F7: extension valuePath remove -> noTarget on zero-match
+                  const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
+                  const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
+                  const inner = removeExtensionValuePathEntry({ ...rawPayload }, extParsed, vpCaseExact);
+                  if (!inner.matched) {
+                    throw new PatchError(
+                      400,
+                      `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
+                      'noTarget',
+                    );
+                  }
+                  rawPayload = inner.payload;
+                  break;
+                }
                 rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
                 break;
               }
@@ -144,6 +193,12 @@ export class GroupPatchEngine {
       }
     }
 
+    // F5: prune extension namespace keys that became empty after PATCH so the
+    // URN is naturally dropped from schemas[] when the response is projected
+    // (RFC 7643 S3.3: extension is "in use" only when at least one attribute is assigned).
+    if (config.extensionUrns && config.extensionUrns.length > 0) {
+      pruneEmptyExtensions(rawPayload, config.extensionUrns);
+    }
     return { displayName, externalId, payload: rawPayload, members };
   }
 
@@ -218,10 +273,31 @@ export class GroupPatchEngine {
     }
 
     if (path === 'members') {
+      // F2: explicit null -> empty the members array (RFC 7644 S3.5.2.3 explicit unassign).
+      // The PatchOpAllowRemoveAllMembers flag governs only the spec-ambiguous bare
+      // `remove path=members` form (see handleRemove); explicit `replace path=members value=null`
+      // is unambiguous client intent and must always work.
+      if (operation.value === null) {
+        return {
+          displayName: currentDisplayName,
+          externalId: currentExternalId,
+          members: [],
+          rawPayload,
+        };
+      }
       if (!Array.isArray(operation.value)) {
         throw new PatchError(
           400,
-          'Replace operation for members requires an array value.',
+          'Replace operation for members requires an array value (or null to clear).',
+          'invalidValue',
+        );
+      }
+      // F4: reject null elements in the members array
+      const bad = findInvalidMultiValuedElement(operation.value);
+      if (bad) {
+        throw new PatchError(
+          400,
+          `Group members array contains an invalid element at index ${bad.index}: ${bad.reason}.`,
           'invalidValue',
         );
       }
@@ -238,6 +314,31 @@ export class GroupPatchEngine {
     if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
       const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
       if (extParsed) {
+        if (isExtensionValuePath(extParsed)) {
+          // F7: extension valuePath replace -> noTarget on zero-match
+          const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
+          const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
+          const inner = applyExtensionValuePathUpdate({ ...rawPayload }, extParsed, operation.value, vpCaseExact);
+          if (!inner.matched) {
+            throw new PatchError(
+              400,
+              `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
+              'noTarget',
+            );
+          }
+          return { displayName: currentDisplayName, externalId: currentExternalId, members, rawPayload: inner.payload };
+        }
+        // F4: validate multi-valued array elements
+        if (Array.isArray(operation.value)) {
+          const bad = findInvalidMultiValuedElement(operation.value);
+          if (bad) {
+            throw new PatchError(
+              400,
+              `Multi-valued attribute ${extParsed.schemaUrn}:${extParsed.attributePath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+              'invalidValue',
+            );
+          }
+        }
         const updatedPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
         return { displayName: currentDisplayName, externalId: currentExternalId, members, rawPayload: updatedPayload };
       }
@@ -275,6 +376,16 @@ export class GroupPatchEngine {
     }
 
     const value = Array.isArray(operation.value) ? operation.value : [operation.value];
+
+    // F4: reject null/undefined elements (more informative than the per-element toMemberDto check)
+    const bad = findInvalidMultiValuedElement(value);
+    if (bad) {
+      throw new PatchError(
+        400,
+        `Group members array contains an invalid element at index ${bad.index}: ${bad.reason}.`,
+        'invalidValue',
+      );
+    }
 
     if (!allowMultiMemberAdd && value.length > 1) {
       throw new PatchError(

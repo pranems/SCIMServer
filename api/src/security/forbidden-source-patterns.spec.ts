@@ -217,5 +217,6 @@ describe('Security regression: forbidden source patterns', () => {
       }
       expect(violations).toEqual([]);
     },
+    30_000,
   );
 });

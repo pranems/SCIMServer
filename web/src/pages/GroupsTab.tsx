@@ -3,30 +3,40 @@
  *
  * Phase A3: pagination lives in the URL (`?page=N&pageSize=N`) via
  * TanStack Router. State is derived from groupsSearchSchema.
+ *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (table-row shaped; 8 rows above the fold).
+ * Phase G2: empty state migrated from plain Text to EmptyState.
  */
 import React from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Text,
   Badge,
   Button,
-  Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import type { GroupsSearch } from '../routes/search-schemas';
+import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { usePreferencesStore } from '../store/preferences-store';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' },
   th: { textAlign: 'left', padding: '10px 12px', borderBottom: `2px solid ${tokens.colorNeutralStroke1}`, fontWeight: 600, fontSize: '13px', color: tokens.colorNeutralForeground3 },
-  td: { padding: '10px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: '13px' },
+  thDisplayName: { width: '320px' },
+  thMembers: { width: '140px' },
+  thCreated: { width: '160px' },
+  td: { padding: '10px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: '13px', overflow: 'hidden' },
   tr: { ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   center: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' },
   empty: { textAlign: 'center' as const, padding: '32px', color: tokens.colorNeutralForeground3 },
@@ -41,7 +51,10 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const search = useSearch({ strict: false }) as Partial<GroupsSearch>;
   const page = search.page ?? 1;
-  const pageSize = search.pageSize ?? 20;
+  // Phase N4: fall back to the persisted user preference when no URL override is set.
+  const defaultPageSize = usePreferencesStore((s) => s.defaultPageSize);
+  const pageSize = search.pageSize ?? defaultPageSize;
+  const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;
 
@@ -53,12 +66,33 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
     });
   };
 
+  const openDetail = (groupId: string): void => {
+    navigate({
+      to: GROUPS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as GroupsSearch), detail: groupId }),
+    });
+  };
+
+  const closeDetail = (): void => {
+    navigate({
+      to: GROUPS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as GroupsSearch), detail: undefined }),
+    });
+  };
+
   const { data, isLoading, error } = useEndpointGroups(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
+    // G1 - row-shaped skeleton mirrors the final table.
     return (
-      <div className={classes.center} data-testid="groups-loading">
-        <Spinner label="Loading groups..." />
+      <div className={classes.container} data-testid="groups-loading">
+        <LoadingSkeleton
+          count={8}
+          height="40px"
+          data-testid="groups-skeleton"
+        />
       </div>
     );
   }
@@ -75,10 +109,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const total = data?.totalResults ?? 0;
 
   if (total === 0) {
+    // G2 - EmptyState replaces ad-hoc Text. No CTA: group creation
+    // happens via SCIM POST from the IdP, not from the UI.
     return (
-      <div className={classes.empty} data-testid="groups-empty">
-        <Text>No groups provisioned to this endpoint yet.</Text>
-      </div>
+      <EmptyState
+        data-testid="groups-empty"
+        title="No groups in this endpoint"
+        body="Groups are provisioned to this endpoint via SCIM POST /Groups from your identity provider."
+      />
     );
   }
 
@@ -86,20 +124,41 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="groups-tab">
       <div className={classes.header}>
         <Subtitle2>{total} groups</Subtitle2>
+        <ExportSplitButton
+          rows={groups.map((g: any) => ({
+            id: g.id,
+            displayName: g.displayName ?? '',
+            memberCount: Array.isArray(g.members) ? g.members.length : 0,
+            created: g.meta?.created ?? '',
+          }))}
+          filenameBase={`groups-${endpointId}`}
+          columns={['id', 'displayName', 'memberCount', 'created']}
+        />
       </div>
       <table className={classes.table}>
         <thead>
           <tr>
-            <th className={classes.th}>Display Name</th>
-            <th className={classes.th}>Members</th>
-            <th className={classes.th}>Created</th>
+            <th className={mergeClasses(classes.th, classes.thDisplayName)}>Display Name</th>
+            <th className={mergeClasses(classes.th, classes.thMembers)}>Members</th>
+            <th className={mergeClasses(classes.th, classes.thCreated)}>Created</th>
           </tr>
         </thead>
         <tbody>
           {groups.map((group: any) => (
-            <tr key={group.id} className={classes.tr}>
+            <tr
+              key={group.id}
+              className={classes.tr}
+              onClick={() => openDetail(group.id)}
+              style={{ cursor: 'pointer' }}
+              data-testid={`group-row-${group.id}`}
+            >
               <td className={classes.td}>
-                <Text weight="semibold">{group.displayName}</Text>
+                <CopyableField
+                  value={group.displayName}
+                  truncate
+                  maxWidth="320px"
+                  data-testid={`group-displayname-${group.id}`}
+                />
               </td>
               <td className={classes.td}>
                 <Badge appearance="outline">{group.members?.length ?? 0}</Badge>
@@ -122,6 +181,16 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
           <Text>Page {page}</Text>
           <Button appearance="subtle" disabled={startIndex + pageSize > total} onClick={() => goToPage(page + 1)}>Next</Button>
         </div>
+      )}
+
+      {detailId && groups.find((g: any) => g.id === detailId) && (
+        <ResourceDetailDrawer
+          kind="group"
+          endpointId={endpointId}
+          resource={groups.find((g: any) => g.id === detailId)}
+          open
+          onClose={closeDetail}
+        />
       )}
     </div>
   );

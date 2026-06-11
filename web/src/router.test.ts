@@ -26,6 +26,8 @@ describe('router route tree', () => {
     expect(childPaths).toContain('/endpoints');
     expect(childPaths).toContain('/logs');
     expect(childPaths).toContain('/settings');
+    // Phase E3: top-level Manual Provision page.
+    expect(childPaths).toContain('/manual-provision');
   });
 
   it('has the endpoint detail layout with nested tab routes (incl. overview index)', () => {
@@ -42,6 +44,10 @@ describe('router route tree', () => {
     expect(tabPaths).toContain('/endpoints/$endpointId/groups');
     expect(tabPaths).toContain('/endpoints/$endpointId/logs');
     expect(tabPaths).toContain('/endpoints/$endpointId/settings');
+    expect(tabPaths).toContain('/endpoints/$endpointId/activity');
+    expect(tabPaths).toContain('/endpoints/$endpointId/schemas');
+    // Phase E1: per-endpoint Credentials tab.
+    expect(tabPaths).toContain('/endpoints/$endpointId/credentials');
   });
 
   it('starts at the dashboard route by default', () => {

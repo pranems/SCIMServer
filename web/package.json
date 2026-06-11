@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.42.0-beta.3",
+  "version": "0.53.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,15 +9,19 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "size": "size-limit",
+    "size:why": "size-limit --why"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.73.8",
     "@fluentui/react-icons": "^2.0.325",
     "@tanstack/react-query": "^5.100.9",
     "@tanstack/react-router": "^1.169.1",
+    "cmdk": "^1.1.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "recharts": "^3.8.1",
@@ -25,7 +29,10 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@playwright/test": "^1.59.1",
+    "@size-limit/file": "^12.1.0",
+    "@size-limit/preset-app": "^12.1.0",
     "@tanstack/router-devtools": "^1.166.13",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -33,10 +40,176 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.5",
+    "axe-core": "^4.11.4",
     "jsdom": "^29.1.1",
     "msw": "^2.14.3",
+    "size-limit": "^12.1.0",
     "typescript": "6.0.3",
     "vite": "^8.0.10",
     "vitest": "^4.1.5"
-  }
+  },
+  "size-limit": [
+    {
+      "name": "Main entry bundle (gzipped) - Phase O TODO: code-split back under 250 KB",
+      "path": "dist/assets/index-*.js",
+      "limit": "400 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "DashboardPage",
+      "path": "dist/assets/DashboardPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "EndpointsPage",
+      "path": "dist/assets/EndpointsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "EndpointDetailPage",
+      "path": "dist/assets/EndpointDetailPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "OverviewTab",
+      "path": "dist/assets/OverviewTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "UsersTab",
+      "path": "dist/assets/UsersTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "GroupsTab",
+      "path": "dist/assets/GroupsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "ActivityTab",
+      "path": "dist/assets/ActivityTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "SchemasTab",
+      "path": "dist/assets/SchemasTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "CredentialsTab",
+      "path": "dist/assets/CredentialsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "BulkTab",
+      "path": "dist/assets/BulkTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "ResourceTypesTab",
+      "path": "dist/assets/ResourceTypesTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "LogsTab",
+      "path": "dist/assets/LogsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "SettingsTab",
+      "path": "dist/assets/SettingsTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "LogsPage",
+      "path": "dist/assets/LogsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "ManualProvisionPage",
+      "path": "dist/assets/ManualProvisionPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "SettingsPage",
+      "path": "dist/assets/SettingsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "CreateEndpointWizard",
+      "path": "dist/assets/CreateEndpointWizard-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "EditEndpointPage",
+      "path": "dist/assets/EditEndpointPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "MeProfilePage",
+      "path": "dist/assets/MeProfilePage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "DiscoveryExplorerPage",
+      "path": "dist/assets/DiscoveryExplorerPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "OperationsPage",
+      "path": "dist/assets/OperationsPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "WorkbenchPage",
+      "path": "dist/assets/WorkbenchPage-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    }
+  ]
 }

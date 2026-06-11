@@ -12,8 +12,12 @@
 
 export const SCIM_EVENTS = {
   USER_CREATED: 'scim.user.created',
+  /** Phase J (v0.48.1): emitted on PUT/PATCH (non-status-only) updates */
+  USER_UPDATED: 'scim.user.updated',
   USER_DELETED: 'scim.user.deleted',
   GROUP_CREATED: 'scim.group.created',
+  /** Phase J (v0.48.1): emitted on PUT/PATCH (non-status-only) updates */
+  GROUP_UPDATED: 'scim.group.updated',
   GROUP_DELETED: 'scim.group.deleted',
   RESOURCE_CREATED: 'scim.resource.created',
   RESOURCE_DELETED: 'scim.resource.deleted',
@@ -21,6 +25,13 @@ export const SCIM_EVENTS = {
   USER_STATUS_CHANGED: 'scim.user.statusChanged',
   /** Fired on group active status change */
   GROUP_STATUS_CHANGED: 'scim.group.statusChanged',
+  /** Phase J (v0.48.1): per-endpoint credential admin events */
+  CREDENTIAL_CREATED: 'scim.credential.created',
+  CREDENTIAL_REVOKED: 'scim.credential.revoked',
+  /** Phase J (v0.48.1): endpoint admin CRUD events */
+  ENDPOINT_CREATED: 'scim.endpoint.created',
+  ENDPOINT_UPDATED: 'scim.endpoint.updated',
+  ENDPOINT_DELETED: 'scim.endpoint.deleted',
 } as const;
 
 // ---- Payload types -------------------------------------------------------
@@ -43,6 +54,29 @@ export interface ScimStatusChangePayload {
   scimId: string;
   previousActive: boolean;
   newActive: boolean;
+}
+
+/**
+ * Phase J (v0.48.1): payload for per-endpoint credential admin events.
+ * Mirrors the redacted shape returned by the admin credential controller -
+ * NEVER includes the bcrypt hash or the plaintext token (that is exposed
+ * once at create time on the HTTP response only).
+ */
+export interface ScimCredentialEventPayload {
+  endpointId: string;
+  credentialId: string;
+  credentialType?: string;
+  label?: string;
+}
+
+/**
+ * Phase J (v0.48.1): payload for endpoint admin CRUD events.
+ * `endpointId` is the only required field; `name` is included when
+ * available so cross-tab UI can update list rows without a refetch.
+ */
+export interface ScimEndpointEventPayload {
+  endpointId: string;
+  name?: string;
 }
 
 // ---- Snapshot types (returned by StatsProjectionService) ------------------

@@ -1,8 +1,8 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Version**: 0.40.0  
-> **Last Updated**: April 28, 2026
+> **Version**: 0.53.1  
+> **Last Updated**: June 2, 2026
 
 ---
 
@@ -27,7 +27,7 @@
 | **Language** | TypeScript | 5.x |
 | **Framework** | NestJS | 11.x |
 | **ORM** | Prisma | 7.x |
-| **Database** | PostgreSQL 17 | (via Prisma, docker postgres:17-alpine) |
+| **Database** | PostgreSQL 17 | (via Prisma, docker postgres:17, Debian-based to match Azure Flexible Server glibc) |
 | **Frontend** | React | 19.x |
 | **Bundler** | Vite | 7.x |
 | **Auth** | JWT + Bearer token | @nestjs/jwt |

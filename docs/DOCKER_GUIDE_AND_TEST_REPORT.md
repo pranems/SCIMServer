@@ -1,6 +1,6 @@
 # Docker Guide
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
 > **Source of truth:** [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml)
 
 ---
@@ -53,7 +53,7 @@ flowchart LR
             Prisma[Prisma Client]
             React[React UI<br>/admin]
         end
-        subgraph pg [PostgreSQL Container - postgres:17-alpine]
+        subgraph pg [PostgreSQL Container - postgres:17]
             DB[(scimdb)]
         end
     end
@@ -71,7 +71,7 @@ flowchart LR
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim

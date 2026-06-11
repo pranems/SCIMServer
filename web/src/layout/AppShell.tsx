@@ -25,8 +25,15 @@ import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
+import { CommandPalette } from '../components/CommandPalette';
+import { KeyboardShortcutsHelp } from '../components/KeyboardShortcutsHelp';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useNavigate } from '@tanstack/react-router';
 import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
+import { LogStreamDrawer } from './LogStreamDrawer';
+import { NotificationsDrawer } from './NotificationsDrawer';
+import { OnboardingWizard } from './OnboardingWizard';
 import { queryClient } from '../api/query-client';
 
 const useStyles = makeStyles({
@@ -61,6 +68,18 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const classes = useStyles();
   const colorScheme = useUIStore((s) => s.colorScheme);
+  const [paletteOpen, setPaletteOpen] = React.useState(false);
+  const [helpOpen, setHelpOpen] = React.useState(false);
+  const navigate = useNavigate();
+
+  // Phase F2 keyboard shortcuts: g d/e/m/l/s navigate; / opens the
+  // command palette (which doubles as global search); ? opens the
+  // shortcuts help modal.
+  useKeyboardShortcuts({
+    onNavigate: (to) => navigate({ to: to as never }),
+    onFocusSearch: () => setPaletteOpen(true),
+    onShowHelp: () => setHelpOpen(true),
+  });
 
   const isDark =
     colorScheme === 'dark' ||
@@ -75,6 +94,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       <QueryClientProvider client={queryClient}>
         <TokenGate>
           <SSEProvider />
+          <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+          <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
+          <LogStreamDrawer />
+          <NotificationsDrawer />
+          <OnboardingWizard />
           <div className={classes.root} data-testid="app-shell">
             <AppHeader />
             <div className={classes.body}>

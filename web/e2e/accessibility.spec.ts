@@ -10,7 +10,13 @@ import { saveScreenshot } from './fixtures';
 const test = base.extend<{}>({});
 
 test.beforeEach(async ({ page }) => {
-  const token = process.env.E2E_TOKEN || 'local-secret';
+  const token = process.env.E2E_TOKEN || 'changeme-scim';
+  await page.addInitScript(
+    ({ key, value }) => {
+      try { window.localStorage.setItem(key, value); } catch {}
+    },
+    { key: 'scimserver.authToken', value: token },
+  );
   await page.goto('/');
   await page.evaluate((t) => localStorage.setItem('scim_token', t), token);
 });

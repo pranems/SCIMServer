@@ -43,7 +43,12 @@ logs/
 # Test results (generated per run)
 test-results/
 
-# Test artifacts (historical JSON snapshots — never commit)
+# Playwright generated outputs (regenerated per run)
+web/playwright-result.json
+web/playwright-report/
+web/test-results/
+
+# Test artifacts (historical JSON snapshots - never commit)
 api/test-artifacts/
 
 # Test output files (generated per run - never commit)
@@ -86,6 +91,9 @@ Dockerfile.dockerignore
 # Misc docs (local-only / may contain credentials)
 admin.md
 wiki.md
+# Strategic / research thought-exercise docs (kept local, not for commit)
+docs/STRATEGIC_FORWARD_LOOK_2026.md
+docs/STRATEGIC_LATERAL_AND_VISIONARY_2026.md
 api/combo-results.json
 api/ep-spec-results.json
 api/ep-spec2.json
@@ -110,3 +118,33 @@ docs/insomnia/SCIMServer_v031_*.json
 docs/postman/SCIMServer_v031_*.json
 
 api/.dev-db.tmp
+
+# Local-only deployment secrets + state (NEVER commit - contain DB passwords / ACR creds / tokens)
+.acrname.txt
+.acrcreds.txt
+.pgpass-*.txt
+.oldprod-token.txt
+.prodtok.txt
+.prodvishnuid.txt
+.oldvishnuid.txt
+.prodvishnu-full.json
+.oldvishnu-full.json
+.veritas-carriers.json
+.live-after-recovery-*.log
+prod-app-template.json
+migration.log
+migrate-output.log
+scripts/state/
+scripts/_deploy-*-new-tenant.ps1
+# Root-level ad-hoc scripts written during ops (inspect / recover / verify)
+_*.ps1
+
+# Side-project research workspace (separate from SCIMServer)
+coderush/
+
+# Scratch / ad-hoc screenshots captured during ops or Playwright runs.
+# Only the curated docs/screenshots/prod-*.png narrative set is committed;
+# everything else is regenerable and must not be added by `git add -A`.
+docs/screenshots/scratch/
+docs/screenshots/tmp-*.png
+docs/screenshots/*.tmp.png

@@ -2,11 +2,11 @@
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
-[![Version](https://img.shields.io/badge/version-0.38.0-blue)]()
+[![Version](https://img.shields.io/badge/version-0.53.0-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![Tests](https://img.shields.io/badge/tests-5%2C274%20pass-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-7%2C277%20pass-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---
@@ -61,8 +61,8 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 | **Schema Engine** | 6 built-in presets, tighten-only customization, auto-expand from RFC baselines, strict validation |
 | **Observability** | Structured JSON logging, SSE live stream, ring buffer, per-endpoint log isolation, file rotation, auto-prune |
 | **Deployment** | Docker Compose (1 command), Azure Container Apps (1 script), local dev, pre-built GHCR image |
-| **Web UI** | React + Vite admin dashboard - log viewer, database browser, activity feed, manual provisioning |
-| **Testing** | 3,378 unit + 1,074 E2E + ~789 live + 112 ISV = ~5,274 total tests |
+| **Web UI** | React + Vite admin console - dashboard, endpoint CRUD, Workbench, Bulk UI, custom resource types, discovery diff, operations, logs, settings |
+| **Testing** | 3,816 API unit + 1,217 API E2E + 1,068 web vitest + 1,027 live SCIM + 134 Playwright + 15 PowerShell = 7,277 total checks |
 
 ---
 
@@ -270,7 +270,7 @@ Or manually:
 # docker-compose.yml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17
     environment:
       POSTGRES_DB: scimdb
       POSTGRES_USER: scim
@@ -641,7 +641,7 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 
 ## API Reference (Summary)
 
-**83 routes** across 19 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
+**86 route handlers** across 20 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
 
 ### Health & Version
 
@@ -1192,16 +1192,23 @@ curl "http://localhost:8080/scim/admin/logs?page=1&pageSize=50&method=POST&statu
 
 ## Web Admin UI
 
-A React + Vite single-page application served at `/admin`:
+A React + Vite single-page application served from the root app shell. Below is the live dashboard from the production instance:
+
+![SCIMServer dashboard](docs/screenshots/prod-01-dashboard.png)
 
 | Screen | Description |
 |--------|-------------|
-| **Log Viewer** | Real-time log list with filters (method, status, search), detail panel with full request/response |
-| **Database Browser** | Users and Groups tabs with pagination and search, Statistics tab |
-| **Activity Feed** | Parsed provisioning activity timeline with severity and type filters |
-| **Manual Provisioning** | Create users and groups via form UI |
+| **Dashboard** | KPI rollups, endpoint cards, activity analytics, health and notifications chrome |
+| **Endpoints** | Create/edit/delete endpoints, preset picker, settings toggles, credentials, users, groups, bulk, resource types, schemas, logs, activity |
+| **Workbench** | Free-form SCIM request builder with headers editor, path autocomplete, request/response layout toggle, history, curl/fetch/Insomnia/Postman export |
+| **Discovery** | Endpoint-scoped Schemas/ResourceTypes/ServiceProviderConfig viewer with two-endpoint schema diff |
+| **Operations** | Cross-endpoint users/groups/statistics view with export controls |
+| **Logs & Settings** | Structured log viewer, live stream, log config admin, version/runtime cards, preferences, telemetry |
+| **Manual Provisioning & /Me** | Operator forms for users/groups and OAuth `/Me` self-service profile surface |
 
-Access at `http://localhost:8080/admin` (no separate build step needed - pre-built in Docker image).
+Access at `http://localhost:8080/` (no separate build step needed - pre-built in Docker image).
+
+See the full walkthrough with per-page screenshots and API endpoint tables in the [Web Admin UI Guide](docs/UI_GUIDE.md).
 
 ---
 
@@ -1273,13 +1280,13 @@ Access at `http://localhost:8080/admin` (no separate build step needed - pre-bui
                     |   112 ISV Tests   |  Lexmark SCIM Validator
                     +-------------------+
                  +-------------------------+
-                 |   ~789 Live Tests       |  PowerShell, real HTTP
+                 |   1,027 Live Tests     |  PowerShell, real HTTP
                  +-------------------------+
               +-------------------------------+
-              |   1,074 E2E Tests (51 suites) |  Supertest, in-process
+              |   1,217 E2E Tests (63 suites) |  Supertest, in-process
               +-------------------------------+
            +-------------------------------------+
-           |   3,378 Unit Tests (84 suites)      |  Jest, mocked deps
+           |   3,816 Unit Tests (103 suites)      |  Jest, mocked deps
            +-------------------------------------+
 ```
 
@@ -1334,7 +1341,7 @@ pwsh ./full-validation-pipeline.ps1
 | **Extensions** | citext, pgcrypto, pg_trgm | - |
 | **Testing** | Jest | 30.2 |
 | **E2E Testing** | Supertest | 7.2 |
-| **Frontend** | React + Vite | 19 / 7 |
+| **Frontend** | React + Vite | 19 / 8 |
 | **Auth** | Passport JWT, bcrypt | - |
 | **Linting** | ESLint 10, Prettier 3.8 | - |
 | **Container** | Docker (node:24-alpine) | - |
@@ -1363,7 +1370,7 @@ SCIMServer/
 |   |   |   |   +-- dto/          # Request/response DTOs
 |   |   |   |   +-- utils/        # Attribute projection, sort, errors
 |   |   |   +-- endpoint/         # Endpoint CRUD & config management
-|   |   |   +-- database/         # Database browser controller
+|   |   |   +-- database/         # Cross-endpoint operations controller
 |   |   |   +-- logging/          # Structured logging engine
 |   |   |   +-- health/           # Health check
 |   |   |   +-- prisma/           # Prisma service
@@ -1380,16 +1387,16 @@ SCIMServer/
 |   |   |       +-- inmemory/     # In-memory repositories
 |   |   +-- oauth/                # OAuth 2.0 token service
 |   +-- prisma/
-|   |   +-- schema.prisma         # Database schema (5 models)
-|   |   +-- migrations/           # 10 migrations
+|   |   +-- schema.prisma         # Database schema (6 models)
+|   |   +-- migrations/           # 12 migrations
 |   +-- test/
-|       +-- e2e/                  # 51 E2E spec files + helpers
+|       +-- e2e/                  # 63 E2E spec files + helpers
 +-- web/                          # React + Vite frontend
 |   +-- src/
-|   |   +-- components/           # Log viewer, DB browser, activity feed
+|   |   +-- components/           # Shared UI primitives and feature surfaces
 |   +-- e2e/                      # Playwright E2E tests
 +-- scripts/                      # DevOps tooling
-|   +-- live-test.ps1             # ~8,700 lines, ~789 live tests
+|   +-- live-test.ps1             # 1,027 Live SCIM assertions
 |   +-- lexmark-live-test.ps1     # ISV validator tests
 |   +-- deploy-azure.ps1          # Azure deployment script
 |   +-- full-validation-pipeline.ps1
@@ -1412,7 +1419,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 83 endpoints, full request/response examples |
+| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 86 route handlers, full request/response examples |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Quick start - endpoint lifecycle recipes |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md) | Profile system - presets, expansion, validation |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | All 16 configuration flags |

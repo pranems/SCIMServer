@@ -1,6 +1,6 @@
 # SCIM 2.0 Protocol Reference
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
 > Quick reference for SCIM operations with SCIMServer-specific examples
 
 ---

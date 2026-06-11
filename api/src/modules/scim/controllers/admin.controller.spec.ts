@@ -116,6 +116,29 @@ describe('AdminController', () => {
         }),
       );
     });
+
+    // Phase D5 - new endpointId param exposed via /admin/logs.
+    it('should pass endpointId filter to LoggingService (Phase D5)', async () => {
+      await controller.listLogs(
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+        'ep-uuid-123',
+      );
+      expect(mockLoggingService.listLogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpointId: 'ep-uuid-123',
+        }),
+      );
+    });
+
+    it('should pass undefined endpointId when not provided (Phase D5)', async () => {
+      await controller.listLogs();
+      expect(mockLoggingService.listLogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpointId: undefined,
+        }),
+      );
+    });
   });
 
   // ── getLog ─────────────────────────────────────────────────────────

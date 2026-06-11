@@ -40,13 +40,14 @@ param cpuCores string = '0.5'
 param memory string = '1Gi'
 @description('CORS allowed origins. Default empty = allow all (S-4 backward compat). Comma-separated for allowlist (e.g. https://app.example.com,https://other.example.com), "false" or "none" to disable CORS entirely. See api/src/security/cors-origin.ts for the full behavior matrix.')
 param corsOrigin string = ''
-@description('GHCR username for pulling container images (optional, only for private packages)')
+@description('Registry username for pulling container images (optional). Works for GHCR private packages OR ACR with admin user enabled.')
 param ghcrUsername string = ''
-@description('GHCR PAT token for pulling container images (optional, only for private packages)')
+@description('Registry password / PAT for pulling container images (optional). Works for GHCR private packages OR ACR with admin user enabled.')
 @secure()
 param ghcrPassword string = ''
 
-var useGhcrCredentials = acrLoginServer == 'ghcr.io' && ghcrUsername != '' && ghcrPassword != ''
+// Use registry username+password whenever both are supplied. Falls back to managed identity for non-GHCR registries when no creds are passed.
+var useGhcrCredentials = ghcrUsername != '' && ghcrPassword != ''
 
 resource env 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: environmentName
@@ -71,7 +72,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       // Configure registry authentication
       registries: useGhcrCredentials ? [
         {
-          server: 'ghcr.io'
+          server: acrLoginServer
           username: ghcrUsername
           passwordSecretRef: 'ghcr-password'
         }

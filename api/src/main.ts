@@ -9,6 +9,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './modules/app/app.module';
 import { parseCorsOrigin } from './security/cors-origin';
+import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from './security/helmet-config';
+import { applySpaFallback } from './bootstrap/spa-fallback';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -49,6 +51,25 @@ async function bootstrap(): Promise<void> {
     next();
   });
 
+  // Phase N3a (2026-05-18): helmet middleware - locks in the standard
+  // browser-enforced defense-in-depth response headers (CSP, X-Frame-Options,
+  // X-Content-Type-Options, Referrer-Policy, COOP/CORP, Origin-Agent-Cluster,
+  // X-Permitted-Cross-Domain-Policies, X-DNS-Prefetch-Control, X-Download-Options
+  // and, in production only, Strict-Transport-Security). See
+  // api/src/security/helmet-config.ts for the full design rationale and
+  // api/test/e2e/security-headers.e2e-spec.ts for the contract.
+  // Inserted EARLY so the headers are set on every response, including
+  // 401/403/415 short-circuits from guards.
+  app.use(buildHelmetMiddleware(process.env.NODE_ENV));
+
+  // Permissions-Policy is NOT set by helmet by default. Emit the locked-down
+  // value alongside helmet so XSS attempts to use camera/mic/geo/payment are
+  // blocked at the browser layer even if they bypass CSP.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', PERMISSIONS_POLICY_HEADER_VALUE);
+    next();
+  });
+
   // S-4: CORS origin is configurable via the CORS_ORIGIN env var.
   // Unset/empty defaults to `true` (allow-all) to preserve backward
   // compatibility with the previous unconditional `origin: true`.
@@ -69,12 +90,14 @@ async function bootstrap(): Promise<void> {
     index: false, // Don't serve index.html automatically
   });
 
-  // Serve the SPA index.html for all /admin* routes (client-side routing).
-  // Express middleware runs before NestJS routing, bypassing global prefix, guards, and filters.
-  const indexHtmlPath = join(__dirname, '..', 'public', 'index.html');
-  app.use('/admin', (_req: Request, res: Response) => {
-    res.sendFile(indexHtmlPath);
-  });
+  // Serve the SPA index.html for every URL prefix the TanStack Router
+  // owns (/admin legacy, /endpoints, /logs, /settings). Express middleware
+  // runs before NestJS routing, bypassing the global prefix, guards, and
+  // filters - so a deep link or hard refresh on /endpoints/abc/users
+  // returns the SPA shell instead of a NestJS 404. The list lives in
+  // src/bootstrap/spa-fallback.ts and is locked in by
+  // api/test/e2e/spa-fallback.e2e-spec.ts (Phase A5).
+  applySpaFallback(app);
 
   const globalPrefix = process.env.API_PREFIX ?? 'scim'; // still mounting at /scim internally
   app.setGlobalPrefix(globalPrefix, {

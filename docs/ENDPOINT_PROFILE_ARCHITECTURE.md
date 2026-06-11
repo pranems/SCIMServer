@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
+> **Version:** 0.53.0 - **Updated:** June 3, 2026  
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/)
 
 ---
@@ -31,8 +31,8 @@ Every endpoint has a **profile** that fully defines its SCIM behavior. A profile
 
 ```mermaid
 flowchart TD
-    A[Operator Input] -->|profilePreset: 'entra-id'| B[Preset Loader]
-    A -->|profile: {...}| C[Inline Profile]
+    A[Operator Input] -->|"profilePreset: 'entra-id'"| B[Preset Loader]
+    A -->|"profile: {...}"| C[Inline Profile]
     B --> D[Auto-Expand Engine]
     C --> D
     D -->|Expand 'all' attrs<br>Fill from RFC baseline| E[Tighten-Only Validator]

@@ -4,6 +4,11 @@
  * Phase A3: page + urlContains filter are URL-driven via
  * logsSearchSchema. SearchBox typing dispatches a navigate that resets
  * page to 1 (typical filter-input UX).
+ *
+ * Phase G1: loading state migrated from Spinner to LoadingSkeleton
+ * (table-row shaped).
+ * Phase G2: empty state migrated from plain Text to EmptyState
+ * with a contextual "Reset filter" CTA when a filter is active.
  */
 import React from 'react';
 import {
@@ -12,7 +17,6 @@ import {
   Text,
   Badge,
   Button,
-  Spinner,
   SearchBox,
   Caption1,
   Subtitle2,
@@ -21,6 +25,8 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -68,7 +74,9 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const search = useSearch({ strict: false }) as Partial<LogsSearch>;
   const page = search.page ?? 1;
-  const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
+  // Phase N4: fall back to the persisted user preference when no URL override is set.
+  const defaultPageSize = usePreferencesStore((s) => s.defaultPageSize);
+  const pageSize = search.pageSize ?? defaultPageSize;
   const urlContains = search.urlContains ?? '';
   const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointLogs(endpointId, page, urlContains, pageSize);
@@ -96,9 +104,14 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   };
 
   if (isLoading) {
+    // G1 - row-shaped skeleton mirrors the final table.
     return (
-      <div className={classes.center} data-testid="logs-loading">
-        <Spinner label="Loading logs..." />
+      <div className={classes.container} data-testid="logs-loading">
+        <LoadingSkeleton
+          count={8}
+          height="40px"
+          data-testid="logs-tab-skeleton"
+        />
       </div>
     );
   }
@@ -114,10 +127,23 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const logs = data?.items ?? [];
 
   if (logs.length === 0) {
-    return (
-      <div className={classes.empty} data-testid="logs-empty">
-        <Text>No request logs for this endpoint.</Text>
-      </div>
+    // G2 - EmptyState replaces plain Text. CTA appears only when a
+    // filter is active (so the user can recover from over-narrow
+    // input).
+    return urlContains ? (
+      <EmptyState
+        data-testid="logs-tab-empty-filtered"
+        title="No logs match these filters"
+        body={`No request logs contain "${urlContains}".`}
+        actionLabel="Reset filter"
+        onAction={() => updateSearch({ urlContains: '' })}
+      />
+    ) : (
+      <EmptyState
+        data-testid="logs-tab-empty"
+        title="No request logs yet"
+        body="This endpoint has not received any SCIM requests in the visible window."
+      />
     );
   }
 
@@ -125,6 +151,18 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="logs-tab">
       <div className={classes.header}>
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
+        <ExportSplitButton
+          rows={logs.map((l: any) => ({
+            id: l.id,
+            method: l.method ?? '',
+            url: l.url ?? '',
+            status: l.status ?? '',
+            durationMs: l.durationMs ?? '',
+            createdAt: l.createdAt ?? '',
+          }))}
+          filenameBase={`logs-${endpointId}`}
+          columns={['id', 'method', 'url', 'status', 'durationMs', 'createdAt']}
+        />
         <SearchBox
           placeholder="Filter by URL..."
           value={urlContains}
@@ -152,7 +190,13 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
                 </Badge>
               </td>
               <td className={classes.td}>
-                <Caption1 style={{ fontFamily: 'monospace' }}>{log.url}</Caption1>
+                <CopyableField
+                  value={log.url}
+                  truncate
+                  monospace
+                  maxWidth="500px"
+                  data-testid={`log-url-${log.id}`}
+                />
               </td>
               <td className={classes.td}>
                 <Badge appearance="outline" color={log.status >= 400 ? 'danger' : 'success'}>

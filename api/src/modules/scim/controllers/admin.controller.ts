@@ -163,6 +163,11 @@ export class AdminController {
     @Query('includeAdmin') includeAdmin?: string,
     @Query('hideKeepalive') hideKeepalive?: string,
     @Query('minDurationMs') minDurationMs?: string,
+    // Phase D5: scope global logs by indexed endpointId column. The
+    // service already accepted this filter; admin controller now
+    // surfaces it so the UI can restrict the global Logs page to a
+    // single endpoint without going through the endpoint-scoped route.
+    @Query('endpointId') endpointId?: string,
   ) {
     return this.loggingService.listLogs({
       page: page ? Number(page) : undefined,
@@ -177,6 +182,7 @@ export class AdminController {
       includeAdmin: includeAdmin === 'true',
       hideKeepalive: hideKeepalive === 'true',
       minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
+      endpointId: endpointId || undefined,
     });
   }
 
@@ -431,7 +437,7 @@ export class AdminController {
           host: url.hostname,
           port: parseInt(url.port, 10) || 5432,
           name: url.pathname.replace(/^\//, ''),
-          provider: 'PostgreSQL 17-alpine',
+          provider: 'PostgreSQL 17',
           version: process.env.POSTGRES_VERSION || undefined,
         };
       } catch {

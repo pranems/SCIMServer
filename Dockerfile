@@ -81,8 +81,12 @@ RUN find ./node_modules -name "*.md" -delete 2>/dev/null || true && \
 FROM node:26-alpine AS runtime
 WORKDIR /app
 
-# Install runtime essentials and create non-root user in single layer
-RUN apk add --no-cache openssl && \
+# Install runtime essentials and create non-root user in single layer.
+# `apk upgrade` pulls the latest patched OS packages from the live Alpine repo
+# (the base image is built periodically and lags behind security fixes), e.g.
+# openssl/libcrypto3/libssl3 3.5.7-r0 fixing CVE-2026-45447 (PKCS7_verify UAF).
+RUN apk upgrade --no-cache libcrypto3 libssl3 && \
+    apk add --no-cache openssl && \
     rm -rf /var/cache/apk/* && \
     addgroup -g 1001 -S nodejs && \
     adduser -S scim -u 1001

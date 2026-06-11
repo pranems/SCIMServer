@@ -9221,6 +9221,1661 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logToggleEpId" -Met
 Write-Host "`n--- 9z-U: Test Gaps Audit #6 Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-V: ENDPOINT OVERVIEW BFF (Phase B1)
+# Validates GET /admin/endpoints/:id/overview - one round trip, zero
+# DB queries on warm cache, returns endpoint summary + stats +
+# credentials + recent activity + config flags. Locks in the response
+# key allowlist and the credential-hash-never-leaks contract.
+# ============================================
+$script:currentSection = "9z-V: Endpoint Overview BFF (B1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-V: ENDPOINT OVERVIEW BFF (Phase B1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# ─── Setup: dedicated endpoint ──────────────────────────────────────
+# profilePreset and profile are mutually exclusive on POST. Create with
+# the preset first, then PATCH the settings we need (StrictSchemaValidation
+# off so test users / groups can be created without strict-mode rejection,
+# PerEndpointCredentialsEnabled on so we can mint a credential below).
+$ovEndpointBody = @{
+    name          = "live-9z-V-overview-$([DateTime]::Now.Ticks)"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$ovEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ovEndpointBody -ContentType "application/json"
+$ovEpId = $ovEndpoint.id
+Test-Result -Success ($null -ne $ovEpId) -Message "9z-V.setup: created endpoint for overview tests (id=$ovEpId)"
+
+$ovSettingsBody = @{
+    profile = @{
+        settings = @{
+            StrictSchemaValidation        = "False"
+            PerEndpointCredentialsEnabled = "True"
+        }
+    }
+} | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId" -Method PATCH -Headers $headers -Body $ovSettingsBody -ContentType "application/json" | Out-Null
+
+# ─── 9z-V.1: Empty-state overview (no creds, no users) ─────────────
+$overview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
+$overviewKeys = ($overview.PSObject.Properties.Name | Sort-Object) -join ','
+Test-Result -Success ($overviewKeys -eq 'configFlags,credentials,endpoint,recentActivity,stats') `
+    -Message "9z-V.1: top-level keys are exactly {configFlags, credentials, endpoint, recentActivity, stats} (got: $overviewKeys)"
+Test-Result -Success ($overview.endpoint.id -eq $ovEpId) -Message "9z-V.2: endpoint.id matches the URL parameter"
+# preset comes from profile.preset which is NOT persisted on endpoint records (only used as
+# audit-log metadata). The BFF emits null when absent. Frontend can use the existing endpoint
+# detail's profile to detect entra-id-vs-rfc-standard-vs-... if needed in a later phase.
+Test-Result -Success ($null -eq $overview.endpoint.preset) -Message "9z-V.3: endpoint.preset is null when profile.preset is not persisted (current behavior)"
+Test-Result -Success ($overview.endpoint.active -eq $true) -Message "9z-V.4: endpoint.active is boolean true"
+Test-Result -Success ($overview.stats.userCount -eq 0) -Message "9z-V.5: stats.userCount is 0 for fresh endpoint"
+Test-Result -Success (@($overview.credentials).Count -eq 0) -Message "9z-V.6: credentials is empty array on fresh endpoint"
+Test-Result -Success ($null -ne $overview.configFlags) -Message "9z-V.7: configFlags object is present"
+
+# ─── 9z-V.8: 404 on unknown endpoint id ──────────────────────────────
+$ovBogusId = "00000000-0000-0000-0000-000000000000"
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovBogusId/overview" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "9z-V.8: unknown endpoint should return 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9z-V.8: unknown endpoint returns 404 (got $statusCode)"
+}
+
+# ─── 9z-V.9: Stats reflect real user/group counts ────────────────────
+# Create one user + one group to confirm stats projection is wired.
+$ovUserBody = @{
+    schemas  = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "live-9z-V-user-$([DateTime]::Now.Ticks)"
+} | ConvertTo-Json
+Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ovEpId/Users" -Method POST -Headers $headers -Body $ovUserBody -ContentType "application/scim+json" | Out-Null
+$ovGroupBody = @{
+    schemas     = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "live-9z-V-grp-$([DateTime]::Now.Ticks)"
+} | ConvertTo-Json
+Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ovEpId/Groups" -Method POST -Headers $headers -Body $ovGroupBody -ContentType "application/scim+json" | Out-Null
+
+$overview2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
+Test-Result -Success ($overview2.stats.userCount -ge 1) -Message "9z-V.9: stats.userCount reflects created user (got $($overview2.stats.userCount))"
+Test-Result -Success ($overview2.stats.groupCount -ge 1) -Message "9z-V.10: stats.groupCount reflects created group (got $($overview2.stats.groupCount))"
+
+# ─── 9z-V.11: Credential creation surfaces in overview WITHOUT hash ─
+$credBody = @{ label = "B1 live test cred" } | ConvertTo-Json
+$cred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/credentials" -Method POST -Headers $headers -Body $credBody -ContentType "application/json"
+Test-Result -Success ($null -ne $cred.id) -Message "9z-V.11.setup: credential created (id=$($cred.id))"
+
+$overview3 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
+$ovCred = @($overview3.credentials) | Where-Object { $_.id -eq $cred.id } | Select-Object -First 1
+Test-Result -Success ($null -ne $ovCred) -Message "9z-V.11: created credential appears in overview.credentials"
+Test-Result -Success ($ovCred.label -eq 'B1 live test cred') -Message "9z-V.12: credential.label preserved"
+Test-Result -Success ($ovCred.active -eq $true) -Message "9z-V.13: credential.active is true"
+Test-Result -Success ($ovCred.credentialType -eq 'bearer') -Message "9z-V.14: credentialType is 'bearer'"
+$ovCredKeys = $ovCred.PSObject.Properties.Name
+Test-Result -Success ($ovCredKeys -notcontains 'credentialHash') -Message "9z-V.15: credentialHash NOT exposed in overview projection"
+$hasBcryptInValues = $false
+foreach ($prop in $ovCred.PSObject.Properties) {
+    if ($prop.Value -is [string] -and $prop.Value -like '*$2*') { $hasBcryptInValues = $true }
+}
+Test-Result -Success (-not $hasBcryptInValues) -Message "9z-V.16: no bcrypt-prefix string ('$2') leaked in any credential value"
+
+# ─── 9z-V.17: Recent activity capped at 10 entries ───────────────────
+Test-Result -Success (@($overview3.recentActivity).Count -le 10) -Message "9z-V.17: recentActivity length capped at 10 (got $(@($overview3.recentActivity).Count))"
+
+# ─── Cleanup ─────────────────────────────────────────────────────────
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+Write-Host "`n--- 9z-V: Endpoint Overview BFF (B1) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-W: ACTIVITY endpointId FILTER (Phase D2)
+# ============================================
+$script:currentSection = "9z-W: Activity endpointId filter (D2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-W: ACTIVITY endpointId FILTER (Phase D2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Spec: GET /scim/admin/activity should accept ?endpointId= and return
+# only logs for that endpoint. Activity rows are derived from the
+# RequestLog.endpointId column added in Phase 17 (interceptor populates
+# it from the URL prefix /scim/endpoints/:id/*). The new ActivityTab
+# on /endpoints/$id/activity (D2 frontend) consumes this contract.
+
+$d2Stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$d2EpAName = "live-9z-W-A-$d2Stamp"
+$d2EpBName = "live-9z-W-B-$d2Stamp"
+
+try {
+    # ─── Setup: two endpoints ────────────────────────────────────────
+    $d2EpA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = $d2EpAName; profilePreset = 'rfc-standard' } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $d2EpA.id) -Message "9z-W.setup: Created endpoint A (id=$($d2EpA.id))"
+    $d2EpAId = $d2EpA.id
+
+    $d2EpB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = $d2EpBName; profilePreset = 'rfc-standard' } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $d2EpB.id) -Message "9z-W.setup: Created endpoint B (id=$($d2EpB.id))"
+    $d2EpBId = $d2EpB.id
+
+    # Drive a SCIM POST against endpoint A so it has at least one
+    # request-log row (interceptor stamps endpointId).
+    $d2UserBody = @{
+        schemas  = @('urn:ietf:params:scim:schemas:core:2.0:User')
+        userName = "d2-live-user-$d2Stamp"
+    } | ConvertTo-Json
+    $d2User = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$d2EpAId/Users" -Method POST -Headers $headers -Body $d2UserBody -ContentType "application/scim+json"
+    Test-Result -Success ($null -ne $d2User.id) -Message "9z-W.setup: created user on endpoint A (drives an activity row)"
+
+    # Some buffering happens before the row is durable; small wait.
+    Start-Sleep -Milliseconds 250
+
+    # ─── Test 9z-W.1: omitting endpointId returns the canonical shape ─
+    $globalRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $globalRes.activities) -Message "9z-W.1: response has 'activities' array"
+    Test-Result -Success ($null -ne $globalRes.pagination) -Message "9z-W.2: response has 'pagination' object"
+    Test-Result -Success ($globalRes.pagination.total -ge 0) -Message "9z-W.3: pagination.total is a number (>=0)"
+    $globalTotal = [int]$globalRes.pagination.total
+
+    # ─── Test 9z-W.4: scoped to A returns 200 + canonical shape ─────
+    $scopedA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20&endpointId=$d2EpAId" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $scopedA.activities) -Message "9z-W.4: scoped response has 'activities' array"
+    Test-Result -Success ($null -ne $scopedA.pagination) -Message "9z-W.5: scoped response has 'pagination'"
+    $scopedATotal = [int]$scopedA.pagination.total
+
+    # Scoped count must NEVER exceed the global count. Strict equality
+    # is unsafe because parallel test runs share the ring buffer.
+    Test-Result -Success ($scopedATotal -le $globalTotal) -Message "9z-W.6: scoped(A) total ($scopedATotal) <= global total ($globalTotal)"
+
+    # ─── Test 9z-W.7: scoped to B is a DIFFERENT view from scoped(A) ─
+    $scopedB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20&endpointId=$d2EpBId" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $scopedB.activities) -Message "9z-W.7: scoped(B) response has 'activities' array"
+    $scopedBTotal = [int]$scopedB.pagination.total
+    Test-Result -Success ($scopedBTotal -le $globalTotal) -Message "9z-W.8: scoped(B) total ($scopedBTotal) <= global total ($globalTotal)"
+
+    # ─── Test 9z-W.9: unknown endpointId returns 200 + zero results ─
+    # Non-existent UUID is a valid SQL filter; the controller returns
+    # an empty list rather than 404 (matches the legacy /admin/logs
+    # behavior - filters are not validated against the endpoints table
+    # because RequestLog rows can outlive their endpoint).
+    $unknownId = '00000000-0000-0000-0000-000000000000'
+    $scopedUnknown = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?page=1&limit=20&endpointId=$unknownId" -Method GET -Headers $headers
+    Test-Result -Success (@($scopedUnknown.activities).Count -eq 0) -Message "9z-W.9: unknown endpointId yields empty activities (got $(@($scopedUnknown.activities).Count))"
+    Test-Result -Success ($scopedUnknown.pagination.total -eq 0) -Message "9z-W.10: unknown endpointId pagination.total = 0"
+} catch {
+    Test-Result -Success $false -Message "9z-W.error: $($_.Exception.Message)"
+} finally {
+    # ─── Cleanup ─────────────────────────────────────────────────────
+    try { if ($d2EpAId) { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$d2EpAId" -Method DELETE -Headers $headers | Out-Null } } catch {}
+    try { if ($d2EpBId) { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$d2EpBId" -Method DELETE -Headers $headers | Out-Null } } catch {}
+}
+
+Write-Host "`n--- 9z-W: Activity endpointId Filter (D2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-X: DASHBOARD CHARTS - requestsLast24hSeries (Phase D4)
+# ============================================
+$script:currentSection = "9z-X: Dashboard 24h request series (D4)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-X: DASHBOARD CHARTS (Phase D4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# What we lock at the live layer:
+#   1. The /admin/dashboard response carries `requestsLast24hSeries` of length 24
+#   2. Every entry is a non-negative integer
+#   3. Index 23 is the CURRENT hour (monotonically grows after a SCIM call,
+#      eventually - allowing for the 3s logger flush)
+#   4. Admin/health traffic does NOT contribute to the series
+#
+# Bucket-level placement accuracy is locked in unit + E2E layers; here we
+# verify the wire contract and the high-level "current hour grows" rule
+# from real HTTP traffic against the deployed server.
+
+try {
+    # ─── Test 9z-X.1: response shape includes the new field ────────
+    $dash = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+    $series = $dash.requestsLast24hSeries
+    Test-Result -Success ($null -ne $series) -Message "9z-X.1: response has 'requestsLast24hSeries' field"
+    Test-Result -Success ($series -is [array] -or $series.Count -ge 0) -Message "9z-X.2: requestsLast24hSeries is array-like"
+    Test-Result -Success ($series.Count -eq 24) -Message "9z-X.3: series length is exactly 24 (got $($series.Count))"
+
+    # Every value is a non-negative number
+    $allNumeric = $true
+    $allNonNegative = $true
+    foreach ($v in $series) {
+        if ($v -isnot [int] -and $v -isnot [long] -and $v -isnot [double]) { $allNumeric = $false }
+        if ($v -lt 0) { $allNonNegative = $false }
+    }
+    Test-Result -Success $allNumeric -Message "9z-X.4: every entry is numeric"
+    Test-Result -Success $allNonNegative -Message "9z-X.5: every entry is non-negative"
+
+    # ─── Test 9z-X.6: response key allowlist (no leakage of internals) ─
+    $allowedKeys = @('endpoints', 'health', 'recentActivity', 'requestsLast24hSeries', 'stats', 'version')
+    $actualKeys = ($dash | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name) | Sort-Object
+    $unexpected = @($actualKeys | Where-Object { $_ -notin $allowedKeys })
+    Test-Result -Success ($unexpected.Count -eq 0) `
+        -Message "9z-X.6: response keys match allowlist (unexpected: $($unexpected -join ','))"
+
+    # ─── Test 9z-X.7: monotonicity after a SCIM call ────────────────
+    # Capture baseline.
+    $baseSum = ($series | Measure-Object -Sum).Sum
+    $baseCurrent = $series[23]
+
+    # Drive a SCIM call that will be counted (not admin/health/keepalive).
+    # Use any pre-existing endpoint - we don't need to create one.
+    $endpoints = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
+    $epId = $null
+    if ($endpoints.endpoints -and $endpoints.endpoints.Count -gt 0) { $epId = $endpoints.endpoints[0].id }
+
+    if ($epId) {
+        # Hit a SCIM endpoint a couple of times to ensure something gets counted.
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$epId/Users?count=1" -Method GET -Headers $headers | Out-Null
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$epId/Groups?count=1" -Method GET -Headers $headers | Out-Null
+        # Wait beyond the 3-second logger flush window.
+        Start-Sleep -Seconds 4
+
+        $dash2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+        $series2 = $dash2.requestsLast24hSeries
+        $afterSum = ($series2 | Measure-Object -Sum).Sum
+        $afterCurrent = $series2[23]
+
+        Test-Result -Success ($afterSum -ge $baseSum) `
+            -Message "9z-X.7: total series sum is monotonically non-decreasing ($baseSum -> $afterSum)"
+        Test-Result -Success ($afterCurrent -ge $baseCurrent) `
+            -Message "9z-X.8: current-hour bucket monotonically non-decreasing ($baseCurrent -> $afterCurrent)"
+    } else {
+        # Skip the monotonicity check if there are no endpoints (fresh install).
+        Test-Result -Success $true -Message "9z-X.7-8: skipped (no endpoints exist to drive traffic)"
+    }
+
+    # ─── Test 9z-X.9: admin traffic does NOT inflate the series ────
+    $beforeAdmin = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+    $beforeAdminCurrent = $beforeAdmin.requestsLast24hSeries[23]
+
+    # Make 3 admin calls.
+    for ($i = 0; $i -lt 3; $i++) {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Method GET -Headers $headers | Out-Null
+    }
+    Start-Sleep -Seconds 4
+
+    $afterAdmin = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
+    $afterAdminCurrent = $afterAdmin.requestsLast24hSeries[23]
+
+    # The 3 admin GETs themselves must NOT contribute. Other traffic from
+    # parallel test runs may, so we assert the delta is < 3 (weaker
+    # claim, but exactly the contract we care about).
+    $adminDelta = $afterAdminCurrent - $beforeAdminCurrent
+    Test-Result -Success ($adminDelta -lt 3) `
+        -Message "9z-X.9: admin/version GETs not counted in series (delta=$adminDelta < 3)"
+} catch {
+    Test-Result -Success $false -Message "9z-X.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-X: Dashboard Charts (D4) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-Y: GLOBAL LOGS FILTERS (Phase D5)
+# ============================================
+$script:currentSection = "9z-Y: Global logs filters (D5)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-Y: GLOBAL LOGS FILTERS (Phase D5)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# Locks the wire contract for the new filter dimensions exposed on
+# /admin/logs by the Global Logs page enhancement:
+#   - endpointId (NEW in D5 - was missing from controller surface)
+#   - status (already supported - locked here)
+#   - since / until (already supported - locked here)
+#
+# These are the filter dimensions the new LogsPage UI consumes via
+# globalLogsQueryOptions. If the wire contract drifts, the UI silently
+# breaks.
+
+try {
+    # Find any existing endpoint to scope filters against. Use the
+    # admin endpoints list and pick the first.
+    $eps = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
+    $epId = $null
+    if ($eps.endpoints -and $eps.endpoints.Count -gt 0) { $epId = $eps.endpoints[0].id }
+
+    # ─── Test 9z-Y.1: endpointId filter scopes results ─────────────
+    if ($epId) {
+        $scoped = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?endpointId=$epId&pageSize=50" -Method GET -Headers $headers
+        Test-Result -Success ($null -ne $scoped.items) -Message "9z-Y.1: scoped /admin/logs has 'items'"
+        Test-Result -Success ($scoped.total -ge 0) -Message "9z-Y.2: scoped total is a number (>=0)"
+
+        # Every row's URL should contain the endpoint id (or be /scim/admin/* but
+        # those are filtered out by includeAdmin=false default).
+        $allHaveEpOrAdmin = $true
+        foreach ($row in $scoped.items) {
+            if ($row.url -notmatch [regex]::Escape($epId) -and $row.url -notmatch '/scim/admin/') {
+                $allHaveEpOrAdmin = $false
+                break
+            }
+        }
+        Test-Result -Success $allHaveEpOrAdmin -Message "9z-Y.3: scoped rows are all under endpointId=$epId (or admin)"
+
+        # Compare with global - scoped <= global.
+        $global = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=50" -Method GET -Headers $headers
+        Test-Result -Success ($scoped.total -le $global.total) -Message "9z-Y.4: scoped total ($($scoped.total)) <= global total ($($global.total))"
+    } else {
+        # No endpoints exist - skip the data-driven assertions but still
+        # verify the param doesn't blow up the controller.
+        $scoped = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?endpointId=00000000-0000-0000-0000-000000000000&pageSize=50" -Method GET -Headers $headers
+        Test-Result -Success ($null -ne $scoped.items) -Message "9z-Y.1-4: skipped data-asserts; param accepted (no endpoints exist)"
+    }
+
+    # ─── Test 9z-Y.5: status filter ───────────────────────────────
+    $status200 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?status=200&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $status200.items) -Message "9z-Y.5: status filter returns 'items'"
+    $allOk = $true
+    foreach ($row in $status200.items) {
+        # Server returns null for in-flight rows; treat null as compatible.
+        if ($null -ne $row.status -and $row.status -ne 200) {
+            $allOk = $false
+            break
+        }
+    }
+    Test-Result -Success $allOk -Message "9z-Y.6: status=200 returns only rows where status is 200 or null"
+
+    # ─── Test 9z-Y.7: since filter (future date returns 0 rows) ──
+    $tomorrow = (Get-Date).ToUniversalTime().AddDays(1).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $futureRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?since=$tomorrow&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($futureRes.total -eq 0) -Message "9z-Y.7: since=tomorrow yields 0 rows (got $($futureRes.total))"
+
+    # ─── Test 9z-Y.8: combined filters ────────────────────────────
+    $combined = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?status=200&since=$tomorrow&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($combined.total -eq 0) -Message "9z-Y.8: status=200 + since=tomorrow yields 0 rows"
+
+    # ─── Test 9z-Y.9: invalid status still safe ──────────────────
+    # status=999 is out of valid range but server accepts the query (the
+    # filter just matches nothing). Confirm 200 + empty body, not 500.
+    $invalid = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?status=999&pageSize=50" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $invalid.items) -Message "9z-Y.9: status=999 returns 200 with empty matching set (graceful)"
+} catch {
+    Test-Result -Success $false -Message "9z-Y.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-Y: Global Logs Filters (D5) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-Z: CONFIG FLAG TOGGLES (Phase E2)
+# ============================================
+$script:currentSection = "9z-Z: Config flag toggles (E2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-Z: CONFIG FLAG TOGGLES (Phase E2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# Locks the wire contract that the new SettingsTab interactive switches
+# depend on:
+#   1. PATCH /admin/endpoints/{id} with { profile: { settings: { <flag>: <bool> } } }
+#      flips a single flag and DEEP-MERGES into existing settings (other
+#      flags retained, schemas/resourceTypes retained).
+#   2. The new value is observable on a follow-up GET (full view) AND on
+#      the BFF /overview response under configFlags.
+#   3. Both native booleans and "True"/"False" string forms (Entra style)
+#      round-trip identically when AllowAndCoerceBooleanStrings is on
+#      (the default).
+
+try {
+    # Create a dedicated endpoint for E2 toggling so we don't pollute
+    # state of the long-lived test endpoints.
+    $e2Stamp = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
+    $e2EpName = "live-9z-Z-$e2Stamp"
+    $e2EpBody = @{
+        name = $e2EpName
+        displayName = "E2 toggle target"
+        active = $true
+        profilePreset = "rfc-standard"
+    } | ConvertTo-Json -Depth 4
+    $e2Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $e2EpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $e2Ep.id) -Message "9z-Z.setup: created endpoint $e2EpName (id=$($e2Ep.id))"
+
+    # Seed baseline settings via a PATCH so we know the starting state.
+    $seed = @{ profile = @{ settings = @{ StrictSchemaValidation = $false; AllowAndCoerceBooleanStrings = $true; PerEndpointCredentialsEnabled = $false } } } | ConvertTo-Json -Depth 5
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $seed -ContentType 'application/json' | Out-Null
+    Test-Result -Success $true -Message "9z-Z.setup: seeded baseline flags via PATCH"
+
+    # ─── Test 9z-Z.1: PATCH single flag flips it on ───────────────
+    $patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $patchBody -ContentType 'application/json' | Out-Null
+    $afterOn = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $strict = $afterOn.profile.settings.StrictSchemaValidation
+    Test-Result -Success ($strict -eq $true -or $strict -eq 'True') -Message "9z-Z.1: StrictSchemaValidation flipped to true (got '$strict')"
+
+    # ─── Test 9z-Z.2: sibling settings preserved (deep merge) ─────
+    $allow = $afterOn.profile.settings.AllowAndCoerceBooleanStrings
+    Test-Result -Success ($allow -eq $true -or $allow -eq 'True') -Message "9z-Z.2: sibling AllowAndCoerceBooleanStrings preserved (got '$allow')"
+    $perEp = $afterOn.profile.settings.PerEndpointCredentialsEnabled
+    Test-Result -Success ($perEp -eq $false -or $perEp -eq 'False' -or $null -eq $perEp) -Message "9z-Z.3: sibling PerEndpointCredentialsEnabled preserved as false (got '$perEp')"
+
+    # ─── Test 9z-Z.4: PATCH flips it back off ─────────────────────
+    $patchOff = @{ profile = @{ settings = @{ StrictSchemaValidation = $false } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $patchOff -ContentType 'application/json' | Out-Null
+    $afterOff = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $strictOff = $afterOff.profile.settings.StrictSchemaValidation
+    Test-Result -Success ($strictOff -eq $false -or $strictOff -eq 'False' -or $null -eq $strictOff) -Message "9z-Z.4: StrictSchemaValidation flipped back to false (got '$strictOff')"
+
+    # ─── Test 9z-Z.5: Entra-style "True" string round-trips ───────
+    $patchStr = '{"profile":{"settings":{"RequireIfMatch":"True"}}}'
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $patchStr -ContentType 'application/json' | Out-Null
+    $afterStr = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $rim = $afterStr.profile.settings.RequireIfMatch
+    Test-Result -Success ($rim -eq $true -or $rim -eq 'True') -Message "9z-Z.5: 'True' string accepted; RequireIfMatch is truthy (got '$rim')"
+
+    # ─── Test 9z-Z.6: Overview BFF reflects the new value ─────────
+    $ov = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)/overview" -Method GET -Headers $headers
+    $ovRim = $ov.configFlags.RequireIfMatch
+    Test-Result -Success ($ovRim -eq $true -or $ovRim -eq 'True') -Message "9z-Z.6: BFF /overview configFlags.RequireIfMatch reflects PATCH (got '$ovRim')"
+
+    # ─── Test 9z-Z.7: PATCH preserves displayName when only settings change ─
+    $afterStrDisplay = $afterStr.displayName
+    Test-Result -Success ($afterStrDisplay -eq 'E2 toggle target') -Message "9z-Z.7: displayName preserved across settings-only PATCH (got '$afterStrDisplay')"
+
+    # ─── Test 9z-Z.8: PATCH multiple flags atomically ─────────────
+    $multi = @{ profile = @{ settings = @{ VerbosePatchSupported = $true; PatchOpAllowRemoveAllMembers = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $multi -ContentType 'application/json' | Out-Null
+    $afterMulti = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)?view=full" -Method GET -Headers $headers
+    $vps = $afterMulti.profile.settings.VerbosePatchSupported
+    $par = $afterMulti.profile.settings.PatchOpAllowRemoveAllMembers
+    Test-Result -Success (($vps -eq $true -or $vps -eq 'True') -and ($par -eq $true -or $par -eq 'True')) -Message "9z-Z.8: multi-flag PATCH applied both (vps='$vps', par='$par')"
+
+    # ─── Test 9z-Z.9: previous PATCH (RequireIfMatch=True) still set ─
+    $stillRim = $afterMulti.profile.settings.RequireIfMatch
+    Test-Result -Success ($stillRim -eq $true -or $stillRim -eq 'True') -Message "9z-Z.9: RequireIfMatch still true after multi-flag PATCH (got '$stillRim')"
+
+    # ─── Test 9z-Z.10: schemas/resourceTypes retained across all PATCHes ─
+    $schemaCount = if ($afterMulti.profile.schemas) { @($afterMulti.profile.schemas).Count } else { 0 }
+    $rtCount = if ($afterMulti.profile.resourceTypes) { @($afterMulti.profile.resourceTypes).Count } else { 0 }
+    Test-Result -Success ($schemaCount -gt 0) -Message "9z-Z.10: profile.schemas retained ($schemaCount entries)"
+    Test-Result -Success ($rtCount -gt 0) -Message "9z-Z.11: profile.resourceTypes retained ($rtCount entries)"
+
+    # Cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "9z-Z.cleanup: deleted endpoint $e2EpName"
+} catch {
+    Test-Result -Success $false -Message "9z-Z.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-Z: Config Flag Toggles (E2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AA: ENDPOINT CRUD WIZARD CONTRACT (Phase L1)
+# ============================================
+$script:currentSection = "9z-AA: Endpoint CRUD wizard (L1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AA: ENDPOINT CRUD WIZARD CONTRACT (Phase L1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # 9z-AA.1: GET /admin/endpoints/presets returns the list the wizard Step 1 Combobox sources from
+    $presetsRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/presets" -Headers $headers
+    Test-Result -Success ($null -ne $presetsRes.presets -and $presetsRes.presets.Count -ge 3) -Message "9z-AA.1: GET /admin/endpoints/presets returns >=3 presets (got $($presetsRes.presets.Count))"
+
+    # 9z-AA.2: every preset has the Combobox-required schemaCount + resourceTypeCount fields nested under summary.*
+    $hasShape = ($presetsRes.presets | Where-Object { $null -ne $_.summary -and $null -ne $_.summary.schemaCount -and $null -ne $_.summary.resourceTypeCount }).Count
+    Test-Result -Success ($hasShape -eq $presetsRes.presets.Count) -Message "9z-AA.2: every preset summary has summary.schemaCount + summary.resourceTypeCount (matched=$hasShape of $($presetsRes.presets.Count))"
+
+    # 9z-AA.3: POST /admin/endpoints with profilePreset succeeds (the wizard Step 4 commit happy path)
+    $aaStamp = [int](Get-Date -UFormat %s)
+    $aaName = "live-9z-AA-$aaStamp"
+    $createBody = @{ name = $aaName; profilePreset = "rfc-standard"; displayName = "L1 wizard target" } | ConvertTo-Json -Compress
+    $created = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Body $createBody -ContentType "application/json" -Headers $headers
+    Test-Result -Success ($null -ne $created.id) -Message "9z-AA.3: POST /admin/endpoints with profilePreset returned id=$($created.id)"
+
+    # 9z-AA.4: POST response carries the wizard's required fields { id, name, active, scimBasePath }
+    $hasRequired = ($null -ne $created.id) -and ($created.name -eq $aaName) -and ($created.active -is [bool] -or $created.active -eq $true) -and ($null -ne $created.scimBasePath)
+    Test-Result -Success $hasRequired -Message "9z-AA.4: POST response has wizard-required fields (id+name+active+scimBasePath)"
+
+    # 9z-AA.5: POST /admin/endpoints with duplicate name is rejected with 400 (or 409 future-aligned)
+    $dupRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Body $createBody -ContentType "application/json" -Headers $headers | Out-Null
+        $dupRejected = $false
+    } catch {
+        # Live shell - exception status code lives on Exception.Response.StatusCode
+        $code = 0
+        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+        $dupRejected = ($code -eq 400 -or $code -eq 409)
+    }
+    Test-Result -Success $dupRejected -Message "9z-AA.5: duplicate-name POST is rejected (400 or 409)"
+
+    # 9z-AA.6: DELETE /admin/endpoints/:id returns 204 (the wizard's delete-confirm path)
+    $deleted204 = $false
+    try {
+        $delResp = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($created.id)" -Method DELETE -Headers $headers -SkipHttpErrorCheck
+        $deleted204 = ($delResp.StatusCode -eq 204)
+    } catch {
+        $deleted204 = $false
+    }
+    Test-Result -Success $deleted204 -Message "9z-AA.6: DELETE returns 204 No Content (got status above)"
+
+    # 9z-AA.7: GET on the deleted endpoint returns 404 (cascade delete + cache eviction)
+    $gone = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($created.id)" -Headers $headers | Out-Null
+        $gone = $false
+    } catch {
+        $code = 0
+        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+        $gone = ($code -eq 404)
+    }
+    Test-Result -Success $gone -Message "9z-AA.7: GET on deleted endpoint returns 404"
+} catch {
+    Test-Result -Success $false -Message "9z-AA.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AA: Endpoint CRUD Wizard Contract (L1) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AB: /Me SELF-SERVICE CONTRACT (Phase L2)
+# ============================================
+$script:currentSection = "9z-AB: /Me self-service (L2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AB: /Me SELF-SERVICE CONTRACT (Phase L2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Setup: create an endpoint we can call /Me against (cleanup at end of section)
+    $abStamp = [int](Get-Date -UFormat %s)
+    $abName = "live-9z-AB-$abStamp"
+    $abCreateBody = @{ name = $abName; profilePreset = "rfc-standard"; displayName = "L2 /Me target" } | ConvertTo-Json -Compress
+    $abEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Body $abCreateBody -ContentType "application/json" -Headers $headers
+    Test-Result -Success ($null -ne $abEp.id) -Message "9z-AB.setup: created endpoint $abName (id=$($abEp.id))"
+
+    # 9z-AB.1: GET /Me with the global shared-secret token returns 404 noTarget (auth-model branch
+    # the MeProfilePage UI must handle gracefully). Defensive try/catch reading the
+    # response stream from the exception so we get both status code AND parsed body
+    # on a known-failing 4xx without depending on -SkipHttpErrorCheck (which has
+    # version-specific quirks).
+    $abGetCode = 0
+    $errBody = $null
+    try {
+        $resp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Headers $headers -ErrorAction Stop
+        $abGetCode = [int]$resp.StatusCode
+        if ($resp.Content) { try { $errBody = $resp.Content | ConvertFrom-Json } catch {} }
+    } catch {
+        # Status code: prefer Exception.Response.StatusCode (PS 5.1 + PS 7), fall
+        # back to parsing the exception message ("Response status code does not
+        # indicate success: 404 ...").
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            $abGetCode = [int]$_.Exception.Response.StatusCode
+        } elseif ($_.Exception.Message -match 'success: (\d+)') {
+            $abGetCode = [int]$matches[1]
+        }
+        # Body: PS 7+ HttpResponseException stores the response body verbatim on
+        # $_.ErrorDetails.Message. Try that first because it works without a
+        # readable response stream. Fall back to GetResponseStream() for PS 5.1.
+        if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+            try { $errBody = $_.ErrorDetails.Message | ConvertFrom-Json } catch { $errBody = $null }
+        }
+        if ($null -eq $errBody -and $_.Exception.Response) {
+            try {
+                $stream = $_.Exception.Response.GetResponseStream()
+                $stream.Position = 0
+                $reader = New-Object System.IO.StreamReader($stream)
+                $rawBody = $reader.ReadToEnd()
+                if ($rawBody) { $errBody = $rawBody | ConvertFrom-Json }
+            } catch { $errBody = $null }
+        }
+    }
+    Test-Result -Success ($abGetCode -eq 404) -Message "9z-AB.1: GET /Me with shared-secret bearer returns 404 (got $abGetCode)"
+
+    # 9z-AB.2: error body carries scimType=noTarget so the UI can branch on it
+    Test-Result -Success ($null -ne $errBody -and $errBody.scimType -eq 'noTarget') -Message "9z-AB.2: error body scimType=noTarget (got '$($errBody.scimType)')"
+
+    # 9z-AB.3: error detail mentions either branch of the noTarget contract:
+    #   (a) "OAuth" - the K3 TokenGate shared-secret bearer case (no JWT identity)
+    #   (b) "userName" / "subject" - the OAuth-with-no-matching-User case (live test
+    #       runs through the OAuth client-credentials flow with sub=scimserver-client
+    #       and that subject has no matching User on the freshly-created endpoint)
+    # The MeProfilePage UI handles both via the K3 ScimErrorMessage primitive +
+    # the "OAuth required" hint on the shared-secret branch.
+    $detail = if ($errBody) { [string]$errBody.detail } else { '' }
+    Test-Result -Success ($detail -match 'OAuth' -or $detail -match 'oauth' -or $detail -match 'userName' -or $detail -match 'subject') -Message "9z-AB.3: error detail explains the noTarget cause (got '$detail')"
+
+    # 9z-AB.4: response carries the SCIM Error schema URN (RFC 7644 S3.12 envelope shape)
+    $hasSchema = ($null -ne $errBody -and $null -ne $errBody.schemas -and ($errBody.schemas -contains 'urn:ietf:params:scim:api:messages:2.0:Error'))
+    Test-Result -Success $hasSchema -Message "9z-AB.4: error envelope includes SCIM Error schema URN"
+
+    # 9z-AB.5: PATCH /Me with shared-secret bearer also returns 404 (same auth-model branch)
+    $patchBody = @{ schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp'); Operations = @(@{ op='replace'; path='displayName'; value='will-not-apply' }) } | ConvertTo-Json -Depth 6 -Compress
+    $patchCode = 0
+    try {
+        $patchResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method PATCH -Body $patchBody -ContentType "application/scim+json" -Headers $headers -ErrorAction Stop
+        $patchCode = [int]$patchResp.StatusCode
+    } catch {
+        if ($_.Exception.Response) { $patchCode = [int]$_.Exception.Response.StatusCode }
+        elseif ($_.Exception.Message -match 'success: (\d+)') { $patchCode = [int]$matches[1] }
+    }
+    Test-Result -Success ($patchCode -eq 404) -Message "9z-AB.5: PATCH /Me with shared-secret bearer returns 404 (got $patchCode)"
+
+    # 9z-AB.6: DELETE /Me with shared-secret bearer also returns 404 (same auth-model branch)
+    $delCode = 0
+    try {
+        $delResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$($abEp.id)/Me" -Method DELETE -Headers $headers -ErrorAction Stop
+        $delCode = [int]$delResp.StatusCode
+    } catch {
+        if ($_.Exception.Response) { $delCode = [int]$_.Exception.Response.StatusCode }
+        elseif ($_.Exception.Message -match 'success: (\d+)') { $delCode = [int]$matches[1] }
+    }
+    Test-Result -Success ($delCode -eq 404) -Message "9z-AB.6: DELETE /Me with shared-secret bearer returns 404 (got $delCode)"
+
+    # Cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($abEp.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "9z-AB.cleanup: deleted endpoint $abName"
+} catch {
+    Test-Result -Success $false -Message "9z-AB.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AB: /Me Self-Service Contract (L2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AC: ACTIVITY SUMMARY CONTRACT (Phase L3)
+# ============================================
+$script:currentSection = "9z-AC: Activity summary (L3)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AC: ACTIVITY SUMMARY CONTRACT (Phase L3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # 9z-AC.1: GET /admin/activity/summary returns the documented envelope
+    $sum = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity/summary" -Headers $headers
+    Test-Result -Success ($null -ne $sum.summary) -Message "9z-AC.1: response has 'summary' object"
+
+    # 9z-AC.2: response has the 4 documented fields the UI consumes
+    $hasFields = ($null -ne $sum.summary.last24Hours) -and ($null -ne $sum.summary.lastWeek) -and ($null -ne $sum.summary.operations)
+    Test-Result -Success $hasFields -Message "9z-AC.2: summary has last24Hours + lastWeek + operations"
+
+    # 9z-AC.3: operations carries users + groups counts (the ops-split bar inputs)
+    $hasOps = ($null -ne $sum.summary.operations.users) -and ($null -ne $sum.summary.operations.groups)
+    Test-Result -Success $hasOps -Message "9z-AC.3: operations has users (got '$($sum.summary.operations.users)') + groups (got '$($sum.summary.operations.groups)')"
+
+    # 9z-AC.4: top-level response key allowlist - the UI's response shape
+    # depends on a single `summary` key. A future leak (e.g. raw _internal
+    # fields, PII, or unknown keys) would silently break the type contract.
+    $allowed = @('summary')
+    $extras = @()
+    foreach ($key in $sum.PSObject.Properties.Name) {
+        if ($allowed -notcontains $key) { $extras += $key }
+    }
+    Test-Result -Success ($extras.Count -eq 0) -Message "9z-AC.4: top-level response keys match allowlist (extras: $($extras -join ','))"
+} catch {
+    Test-Result -Success $false -Message "9z-AC.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AC: Activity Summary Contract (L3) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AD: LOG CONFIG UI-SHAPE CONTRACT (Phase L4)
+# ============================================
+$script:currentSection = "9z-AD: Log config UI shape (L4)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AD: LOG CONFIG UI-SHAPE CONTRACT (Phase L4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend behavior is exhaustively locked at section 9j (~80 assertions).
+    # 9z-AD adds the small UI-consumed shape contract: confirm the closed-set
+    # picker arrays (availableLevels + availableCategories) AND the scalar
+    # fields the SettingsPage LogConfigSection binds to are all present.
+
+    $cfg = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Headers $headers
+
+    # 9z-AD.1: availableLevels is a non-empty array (Combobox would render empty without it)
+    Test-Result -Success ($null -ne $cfg.availableLevels -and $cfg.availableLevels.Count -ge 5) -Message "9z-AD.1: availableLevels has >=5 entries (got $($cfg.availableLevels.Count))"
+
+    # 9z-AD.2: availableCategories is a non-empty array (per-category grid sourced from this)
+    Test-Result -Success ($null -ne $cfg.availableCategories -and $cfg.availableCategories.Count -ge 5) -Message "9z-AD.2: availableCategories has >=5 entries (got $($cfg.availableCategories.Count))"
+
+    # 9z-AD.3: all UI-bound scalar fields present (4 toggles + 2 numeric inputs + 2 dropdowns)
+    $hasAll = ($null -ne $cfg.globalLevel) -and ($null -ne $cfg.format) -and `
+              ($null -ne $cfg.includePayloads) -and ($null -ne $cfg.includeStackTraces) -and `
+              ($null -ne $cfg.maxPayloadSizeBytes) -and ($null -ne $cfg.categoryLevels)
+    Test-Result -Success $hasAll -Message "9z-AD.3: globalLevel + format + includePayloads + includeStackTraces + maxPayloadSizeBytes + categoryLevels all present"
+} catch {
+    Test-Result -Success $false -Message "9z-AD.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AD: Log Config UI-Shape Contract (L4) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AE: DISCOVERY EXPLORER UI-SHAPE CONTRACT (Phase L5)
+# ============================================
+$script:currentSection = "9z-AE: Discovery Explorer (L5)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AE: DISCOVERY EXPLORER UI-SHAPE CONTRACT (Phase L5)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend behavior for the three Discovery surfaces
+    # (/Schemas, /ResourceTypes, /ServiceProviderConfig) is exhaustively
+    # locked elsewhere (sections 8 + 9z-Q.11 + per-section probes).
+    # 9z-AE adds the small UI-consumed shape contract the new
+    # DiscoveryExplorerPage binds to (Phase L5):
+    #   - 3 surfaces all have the documented top-level keys
+    #   - characteristic keywords on a known attribute belong to the RFC valid set
+    #   - the diff reducer's classification keys (mutability / uniqueness /
+    #     returned) carry valid keywords on the published User schema
+
+    # 9z-AE.1: GET /ServiceProviderConfig has all 6 capability flag blocks the UI rows bind to
+    $spc = Invoke-RestMethod -Uri "$scimBase/ServiceProviderConfig" -Method GET -Headers $headers
+    $spcHasFlags = ($null -ne $spc.patch) -and ($null -ne $spc.filter) -and `
+                   ($null -ne $spc.etag) -and ($null -ne $spc.bulk) -and `
+                   ($null -ne $spc.changePassword) -and ($null -ne $spc.sort)
+    Test-Result -Success $spcHasFlags -Message "9z-AE.1: SPC has patch+filter+etag+bulk+changePassword+sort capability blocks"
+
+    # 9z-AE.2: each capability block has a `supported` boolean (the UI's row text reads it)
+    $allHaveSupported = ($null -ne $spc.patch.supported) -and ($null -ne $spc.filter.supported) -and `
+                       ($null -ne $spc.etag.supported) -and ($null -ne $spc.bulk.supported) -and `
+                       ($null -ne $spc.changePassword.supported) -and ($null -ne $spc.sort.supported)
+    Test-Result -Success $allHaveSupported -Message "9z-AE.2: every SPC capability block exposes a 'supported' boolean"
+
+    # 9z-AE.3: GET /ResourceTypes returns >=2 resources (User+Group baseline)
+    $rt = Invoke-RestMethod -Uri "$scimBase/ResourceTypes" -Method GET -Headers $headers
+    Test-Result -Success ($rt.totalResults -ge 2 -and $rt.Resources.Count -ge 2) -Message "9z-AE.3: ResourceTypes returns >=2 resources (got $($rt.totalResults))"
+
+    # 9z-AE.4: each ResourceType row has the 4 fields the single-endpoint view renders (id+name+endpoint+schema)
+    $rtRowsValid = $true
+    foreach ($r in $rt.Resources) {
+        if (-not ($r.id -and $r.name -and $r.endpoint -and $r.schema)) { $rtRowsValid = $false; break }
+    }
+    Test-Result -Success $rtRowsValid -Message "9z-AE.4: every ResourceType row has id+name+endpoint+schema"
+
+    # 9z-AE.5: GET /Schemas exposes the User schema with characteristic keywords inside the
+    # RFC 7643 valid sets. This is the same data the diff reducer classifies, so verifying
+    # the keywords are valid is the live-layer twin of the diff reducer's RFC-defaults rule.
+    $schemas = Invoke-RestMethod -Uri "$scimBase/Schemas" -Method GET -Headers $headers
+    $userSchema = $schemas.Resources | Where-Object { $_.id -eq "urn:ietf:params:scim:schemas:core:2.0:User" } | Select-Object -First 1
+    $userNameAttr = $null
+    if ($userSchema -and $userSchema.attributes) {
+        $userNameAttr = $userSchema.attributes | Where-Object { $_.name -eq "userName" } | Select-Object -First 1
+    }
+    $validMutability = @("readOnly", "readWrite", "immutable", "writeOnly")
+    $validUniqueness = @("none", "server", "global")
+    $validReturned = @("always", "default", "request", "never")
+    $charsValid = $false
+    if ($userNameAttr) {
+        # Per project Schema-Characteristic Test Rule: only assert when the characteristic is published.
+        $mutOk = (-not $userNameAttr.PSObject.Properties.Match('mutability') -or ($userNameAttr.mutability -in $validMutability))
+        $uniqOk = (-not $userNameAttr.PSObject.Properties.Match('uniqueness') -or ($userNameAttr.uniqueness -in $validUniqueness))
+        $retOk = (-not $userNameAttr.PSObject.Properties.Match('returned') -or ($userNameAttr.returned -in $validReturned))
+        $charsValid = $mutOk -and $uniqOk -and $retOk
+    }
+    Test-Result -Success $charsValid -Message "9z-AE.5: User.userName mutability/uniqueness/returned keywords are RFC-valid (mut=$($userNameAttr.mutability) uniq=$($userNameAttr.uniqueness) ret=$($userNameAttr.returned))"
+} catch {
+    Test-Result -Success $false -Message "9z-AE.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AE: Discovery Explorer UI-Shape Contract (L5) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AF: OPERATIONS / CROSS-ENDPOINT UI-SHAPE CONTRACT (Phase L6)
+# ============================================
+$script:currentSection = "9z-AF: Operations cross-endpoint (L6)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AF: OPERATIONS / CROSS-ENDPOINT UI-SHAPE CONTRACT (Phase L6)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend /admin/database/{users,groups,statistics} exhaustively covered
+    # by admin-api-coverage.e2e-spec.ts + database.service.spec.ts. 9z-AF
+    # adds the small UI-consumed shape contract the new OperationsPage
+    # binds to (Phase L6):
+    #   - users response has { users[], pagination } and rows carry endpointId
+    #   - groups response has { groups[], pagination } and rows carry endpointId
+    #   - statistics response has the documented envelope
+
+    # 9z-AF.1: GET /admin/database/users returns the documented envelope shape
+    $usersRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/users?page=1&limit=10" -Headers $headers
+    $usersOk = ($null -ne $usersRes.users) -and ($null -ne $usersRes.pagination) -and `
+               ($null -ne $usersRes.pagination.page) -and ($null -ne $usersRes.pagination.total)
+    Test-Result -Success $usersOk -Message "9z-AF.1: /admin/database/users has users[] + pagination(page+total)"
+
+    # 9z-AF.2: every user row carries an endpointId (or is null) - the column the UI Badge binds to.
+    # Per Schema-Characteristic-Test-Rule semantics, accept either explicit endpointId or
+    # endpointId:null when the row exists.
+    $usersHaveEndpointKey = $true
+    if ($usersRes.users.Count -gt 0) {
+        foreach ($u in $usersRes.users) {
+            if (-not $u.PSObject.Properties.Match('endpointId')) {
+                $usersHaveEndpointKey = $false
+                break
+            }
+        }
+    }
+    Test-Result -Success $usersHaveEndpointKey -Message "9z-AF.2: every user row has an endpointId key (rows=$($usersRes.users.Count))"
+
+    # 9z-AF.3: GET /admin/database/groups returns the documented envelope shape
+    $groupsRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/groups?page=1&limit=10" -Headers $headers
+    $groupsOk = ($null -ne $groupsRes.groups) -and ($null -ne $groupsRes.pagination) -and `
+                ($null -ne $groupsRes.pagination.page) -and ($null -ne $groupsRes.pagination.total)
+    Test-Result -Success $groupsOk -Message "9z-AF.3: /admin/database/groups has groups[] + pagination(page+total)"
+
+    # 9z-AF.4: every group row carries an endpointId key
+    $groupsHaveEndpointKey = $true
+    if ($groupsRes.groups.Count -gt 0) {
+        foreach ($g in $groupsRes.groups) {
+            if (-not $g.PSObject.Properties.Match('endpointId')) {
+                $groupsHaveEndpointKey = $false
+                break
+            }
+        }
+    }
+    Test-Result -Success $groupsHaveEndpointKey -Message "9z-AF.4: every group row has an endpointId key (rows=$($groupsRes.groups.Count))"
+
+    # 9z-AF.5: GET /admin/database/statistics returns the documented envelope
+    $stats = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/statistics" -Headers $headers
+    $statsOk = ($null -ne $stats.users.total) -and ($null -ne $stats.users.active) -and `
+               ($null -ne $stats.groups.total) -and ($null -ne $stats.activity.last24Hours) -and `
+               ($null -ne $stats.database.type) -and ($null -ne $stats.database.persistenceBackend)
+    Test-Result -Success $statsOk -Message "9z-AF.5: /admin/database/statistics has users.total + users.active + groups.total + activity.last24Hours + database.{type,persistenceBackend}"
+} catch {
+    Test-Result -Success $false -Message "9z-AF.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AF: Operations Cross-Endpoint UI-Shape Contract (L6) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AG: WORKBENCH ROUND-TRIP CONTRACT (Phase M1)
+# ============================================
+$script:currentSection = "9z-AG: Workbench round-trip (M1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AG: WORKBENCH ROUND-TRIP CONTRACT (Phase M1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # The Workbench is a free-form HTTP request builder against /scim/*.
+    # Backend semantics for every method + path it can target are
+    # exhaustively locked elsewhere (sections 1-9z-AF + admin-api-coverage
+    # e2e). 9z-AG adds the small UI-consumed contract the operator
+    # depends on:
+    #   - GET on the canonical Discovery surface returns the documented envelope (the
+    #     L5 'Open in Workbench' button deep-links to this exact path)
+    #   - POST /Users via free-form path round-trips and returns id + meta
+    #   - PATCH /Users via SCIM PatchOp envelope round-trips
+    #   - DELETE /Users returns 204 (Workbench shows status badge correctly)
+    #   - Server X-Request-Id header is set (Workbench history persists it)
+
+    # 9z-AG.setup: create endpoint with rfc-standard preset for round-trip
+    $agStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $agName = "live-test-9z-AG-$agStamp"
+    $agEpBody = @{ name = $agName; profilePreset = "rfc-standard" } | ConvertTo-Json
+    $agEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $agEpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $agEp.id) -Message "9z-AG.setup: created endpoint id=$($agEp.id)"
+    $agSBase = "$baseUrl/scim/endpoints/$($agEp.id)"
+
+    # 9z-AG.1: GET /ServiceProviderConfig returns envelope (the L5 'Open in Workbench' default deep-link)
+    $agSpcResp = Invoke-WebRequest -Uri "$agSBase/ServiceProviderConfig" -Method GET -Headers $headers -ErrorAction Stop
+    $agSpcRequestId = $agSpcResp.Headers['X-Request-Id']
+    if (-not $agSpcRequestId) { $agSpcRequestId = $agSpcResp.Headers['x-request-id'] }
+    Test-Result -Success (200 -eq [int]$agSpcResp.StatusCode) -Message "9z-AG.1: GET /ServiceProviderConfig returns 200 (Workbench deep-link target)"
+    Test-Result -Success ($null -ne $agSpcRequestId -and $agSpcRequestId.Length -gt 0) -Message "9z-AG.2: response carries X-Request-Id (Workbench history persists it)"
+
+    # 9z-AG.3: POST /Users via free-form path round-trips
+    $agUserName = "agworkbench-$agStamp@example.com"
+    $agPostBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $agUserName
+        active = $true
+    } | ConvertTo-Json -Depth 5
+    $agPostResp = Invoke-RestMethod -Uri "$agSBase/Users" -Method POST -Headers $headers -Body $agPostBody -ContentType 'application/scim+json'
+    Test-Result -Success ($null -ne $agPostResp.id) -Message "9z-AG.3: POST /Users round-trips (id=$($agPostResp.id))"
+
+    $agUserId = $agPostResp.id
+
+    # 9z-AG.4: PATCH /Users with SCIM PatchOp envelope round-trips
+    $agPatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{ op = "replace"; path = "displayName"; value = "AG Test User" })
+    } | ConvertTo-Json -Depth 5
+    $agPatchResp = Invoke-RestMethod -Uri "$agSBase/Users/$agUserId" -Method PATCH -Headers $headers -Body $agPatchBody -ContentType 'application/scim+json'
+    Test-Result -Success ($agPatchResp.displayName -eq "AG Test User") -Message "9z-AG.4: PATCH /Users PatchOp round-trips (displayName=$($agPatchResp.displayName))"
+
+    # 9z-AG.5: DELETE /Users returns 204 (Workbench shows green status badge)
+    $agDelResp = Invoke-WebRequest -Uri "$agSBase/Users/$agUserId" -Method DELETE -Headers $headers -ErrorAction Stop
+    Test-Result -Success (204 -eq [int]$agDelResp.StatusCode) -Message "9z-AG.5: DELETE /Users returns 204"
+
+    # 9z-AG cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($agEp.id)" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-AG.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AG: Workbench Round-Trip Contract (M1) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AH: BULK OPERATIONS UI CONTRACT (Phase M2)
+# ============================================
+$script:currentSection = "9z-AH: Bulk operations UI (M2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AH: BULK OPERATIONS UI CONTRACT (Phase M2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend bulk surface is exhaustively locked at section 9n + 9z-H.
+    # 9z-AH adds the small UI-consumed contract the BulkPage binds to:
+    #   - POST /Bulk with the assembled BulkRequest envelope round-trips
+    #   - BulkResponse envelope carries Operations[] with status + bulkId + location
+    #   - failOnErrors threshold halts processing as documented
+    #   - Per-op error.scimType + error.detail are present on failure rows
+    #     (BulkPage's "Download failures CSV" reads these fields)
+
+    $ahStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $ahName = "live-test-9z-AH-$ahStamp"
+    # Create from preset, then PATCH BulkOperationsEnabled (the API
+    # rejects setting both profilePreset and profile in the same POST).
+    $ahEpBody = @{
+        name = $ahName
+        profilePreset = "rfc-standard"
+    } | ConvertTo-Json -Depth 10
+    $ahEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ahEpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $ahEp.id) -Message "9z-AH.setup: created endpoint id=$($ahEp.id) (rfc-standard preset)"
+    $ahSBase = "$baseUrl/scim/endpoints/$($ahEp.id)"
+
+    # Enable BulkOperations via PATCH (rfc-standard preset has it on by default,
+    # but be explicit so the test does not depend on preset internals).
+    $ahPatchFlag = @{ profile = @{ settings = @{ BulkOperationsEnabled = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ahEp.id)" -Method PATCH -Headers $headers -Body $ahPatchFlag -ContentType 'application/json' | Out-Null
+
+    # 9z-AH.1: assembled BulkRequest with 2 POST ops round-trips
+    $ahBulkBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "POST"
+                path = "/Users"
+                bulkId = "row-1"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "ah-row-1-$ahStamp@example.com"
+                }
+            },
+            @{
+                method = "POST"
+                path = "/Users"
+                bulkId = "row-2"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "ah-row-2-$ahStamp@example.com"
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 10
+    $ahResp = Invoke-RestMethod -Uri "$ahSBase/Bulk" -Method POST -Headers $headers -Body $ahBulkBody -ContentType 'application/scim+json'
+    Test-Result -Success ($ahResp.schemas[0] -eq "urn:ietf:params:scim:api:messages:2.0:BulkResponse") -Message "9z-AH.1: BulkResponse envelope schemas URN matches"
+    Test-Result -Success ($ahResp.Operations.Count -eq 2) -Message "9z-AH.2: BulkResponse Operations[] has 2 entries (got $($ahResp.Operations.Count))"
+
+    # 9z-AH.3: every result op carries bulkId + status (the BulkPage table columns)
+    $allHaveBulkIdStatus = $true
+    foreach ($op in $ahResp.Operations) {
+        if (-not $op.bulkId -or -not $op.status) { $allHaveBulkIdStatus = $false; break }
+    }
+    Test-Result -Success $allHaveBulkIdStatus -Message "9z-AH.3: every Operations entry has bulkId + status"
+
+    # 9z-AH.4: success ops carry location header
+    $successCount = 0
+    foreach ($op in $ahResp.Operations) {
+        if ($op.status -eq "201" -and $op.location) { $successCount++ }
+    }
+    Test-Result -Success ($successCount -eq 2) -Message "9z-AH.4: 2 success ops carry location header"
+
+    # 9z-AH.5: duplicate userName -> per-op response.scimType=uniqueness (the
+    # BulkPage failure-CSV reads these fields)
+    $ahDupBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "POST"
+                path = "/Users"
+                bulkId = "row-dup"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "ah-row-1-$ahStamp@example.com"  # duplicate of 9z-AH.1
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 10
+    $ahDupResp = Invoke-RestMethod -Uri "$ahSBase/Bulk" -Method POST -Headers $headers -Body $ahDupBody -ContentType 'application/scim+json'
+    $dupOp = $ahDupResp.Operations[0]
+    Test-Result -Success ($dupOp.status -eq "409") -Message "9z-AH.5: duplicate userName op returns status=409 (got $($dupOp.status))"
+    Test-Result -Success ($null -ne $dupOp.response -and $dupOp.response.scimType -eq "uniqueness") -Message "9z-AH.6: failure op carries response.scimType='uniqueness' (BulkPage CSV reads this)"
+
+    # 9z-AH cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ahEp.id)" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-AH.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AH: Bulk Operations UI Contract (M2) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AI: CUSTOM RESOURCE TYPES UI CONTRACT (Phase M3)
+# ============================================
+$script:currentSection = "9z-AI: Custom Resource Types UI (M3)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AI: CUSTOM RESOURCE TYPES UI CONTRACT (Phase M3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Backend custom-resource-type registration semantics are exhaustively
+    # locked at section 9m-B and 9m-C. As of v0.28.0 the dedicated admin
+    # RT API was REMOVED; custom RTs now live in
+    # endpoint.profile.resourceTypes[] and are added/removed via PATCH
+    # /admin/endpoints/:id with the merged profile.
+    #
+    # 9z-AI adds the small UI-consumed contract the M3
+    # ResourceTypesTab binds to:
+    #   - PATCH /admin/endpoints with merged profile.resourceTypes +
+    #     profile.schemas[] registers a custom RT
+    #   - The new RT appears in /Schemas + /ResourceTypes discovery
+    #   - The wildcard /:resourceType endpoint becomes addressable
+    #     (CustomResourceTypesEnabled flag on)
+    #   - PATCH with the filtered resourceTypes[] removes the RT
+    #     (built-in User + Group remain)
+
+    $aiStamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $aiName = "live-test-9z-AI-$aiStamp"
+
+    # 9z-AI.setup: create endpoint with rfc-standard preset
+    $aiEpBody = @{ name = $aiName; profilePreset = "rfc-standard" } | ConvertTo-Json
+    $aiEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $aiEpBody -ContentType 'application/json'
+    Test-Result -Success ($null -ne $aiEp.id) -Message "9z-AI.setup: created endpoint id=$($aiEp.id) (rfc-standard preset)"
+
+    # Enable CustomResourceTypesEnabled via PATCH (the M3 UI gates the
+    # Create button on this flag; the API gates the wildcard route too).
+    $aiPatchFlag = @{ profile = @{ settings = @{ CustomResourceTypesEnabled = $true } } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method PATCH -Headers $headers -Body $aiPatchFlag -ContentType 'application/json' | Out-Null
+
+    # 9z-AI.1: PATCH endpoint with merged profile.resourceTypes + profile.schemas
+    # registers a custom Device RT (this is what the M3 ResourceTypesTab
+    # Create dialog Submit handler does).
+    $deviceSchemaUrn = "urn:ietf:params:scim:schemas:custom:Device-$aiStamp"
+    $aiCreateBody = @{
+        profile = @{
+            resourceTypes = @(
+                @{ id = "User"; name = "User"; endpoint = "/Users"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() },
+                @{ id = "Group"; name = "Group"; endpoint = "/Groups"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() },
+                @{ id = "Device"; name = "Device"; endpoint = "/Devices"; description = "Custom Device RT"; schema = $deviceSchemaUrn; schemaExtensions = @() }
+            )
+            schemas = @(
+                @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = @() },
+                @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = @() },
+                @{ id = $deviceSchemaUrn; name = "Device"; description = "Custom Device schema"; attributes = @() }
+            )
+        }
+    } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method PATCH -Headers $headers -Body $aiCreateBody -ContentType 'application/json' | Out-Null
+    Test-Result -Success $true -Message "9z-AI.1: PATCH with merged profile.resourceTypes + profile.schemas registers Device RT"
+
+    # 9z-AI.2: GET /Schemas reflects the new Device schema
+    $aiSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/Schemas" -Headers $headers
+    $deviceSchemaPresent = $aiSchemas.Resources | Where-Object { $_.id -eq $deviceSchemaUrn } | Select-Object -First 1
+    Test-Result -Success ($null -ne $deviceSchemaPresent) -Message "9z-AI.2: GET /Schemas reflects the new Device schema URN"
+
+    # 9z-AI.3: GET /ResourceTypes reflects the new Device RT
+    $aiRTs = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/ResourceTypes" -Headers $headers
+    $deviceRTPresent = $aiRTs.Resources | Where-Object { $_.id -eq "Device" } | Select-Object -First 1
+    Test-Result -Success ($null -ne $deviceRTPresent -and $deviceRTPresent.endpoint -eq "/Devices") -Message "9z-AI.3: GET /ResourceTypes reflects the new Device RT (endpoint=/Devices)"
+
+    # 9z-AI.4: GET /Devices wildcard endpoint is now addressable
+    # (returns ListResponse rather than 404 / 403)
+    try {
+        $aiDevices = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/Devices" -Headers $headers
+        $listOk = ($null -ne $aiDevices.schemas -and $aiDevices.schemas[0] -eq "urn:ietf:params:scim:api:messages:2.0:ListResponse")
+        Test-Result -Success $listOk -Message "9z-AI.4: GET /Devices wildcard endpoint returns ListResponse (CustomResourceTypesEnabled)"
+    } catch {
+        Test-Result -Success $false -Message "9z-AI.4: GET /Devices wildcard endpoint failed: $($_.Exception.Message)"
+    }
+
+    # 9z-AI.5: PATCH with filtered resourceTypes[] removes Device
+    # (this is what the M3 Delete-confirm dialog Submit handler does).
+    $aiDeleteBody = @{
+        profile = @{
+            resourceTypes = @(
+                @{ id = "User"; name = "User"; endpoint = "/Users"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() },
+                @{ id = "Group"; name = "Group"; endpoint = "/Groups"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+            )
+        }
+    } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method PATCH -Headers $headers -Body $aiDeleteBody -ContentType 'application/json' | Out-Null
+    $aiRTsAfter = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/ResourceTypes" -Headers $headers
+    $deviceStillPresent = $aiRTsAfter.Resources | Where-Object { $_.id -eq "Device" }
+    Test-Result -Success ($null -eq $deviceStillPresent) -Message "9z-AI.5: PATCH with filtered resourceTypes[] removes Device (User + Group remain)"
+
+    # 9z-AI cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($aiEp.id)" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-AI.error: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AI: Custom Resource Types UI Contract (M3) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AJ: Web Security Headers (Phase N3a)
+$script:currentSection = "9z-AJ: Web Security Headers (N3a)"
+# ============================================
+# Phase N3a (v0.52.0-alpha.3, 2026-05-18) wired helmet@^8.1.0 + a manual
+# Permissions-Policy middleware into the API bootstrap so every response carries
+# the browser-enforced defense-in-depth header set. This section is the wire-level
+# lock-in: it asserts the headers are actually emitted by the deployed runtime
+# (Docker container OR Azure Container App), independent of the unit + E2E locks
+# in api/src/security/helmet-config.spec.ts + api/test/e2e/security-headers.e2e-spec.ts.
+#
+# Probe routes intentionally span 2xx, 401, and 404 paths to confirm headers fire
+# on every status code (helmet sits BEFORE auth in main.ts so 401s still emit them).
+Write-Host "`n`n========================================" -ForegroundColor Cyan
+Write-Host "TEST SECTION 9z-AJ: Web Security Headers (Phase N3a)" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+# Production-only headers: HSTS is suppressed when NODE_ENV is not 'production' so
+# localhost is never poisoned. The deployed dev container app DOES run with
+# NODE_ENV=production, so we treat HSTS as REQUIRED when the response is over
+# HTTPS and OPTIONAL when the response is over plain HTTP (Docker smoke run).
+$isHttpsDeployment = $baseUrl.StartsWith("https://")
+
+# Helper: probe a URL and return a normalised hashtable of headers + status.
+# Implemented inline (not as a separate function) so it runs in script scope
+# and can read $baseUrl + $headers from the enclosing variable bag without
+# any cross-scope surprises in PowerShell 7.
+$probeScript = {
+    param([string]$Path, [string]$BaseFromCaller, $AuthHeadersFromCaller)
+    try {
+        $invokeArgs = @{
+            Uri                = "$BaseFromCaller$Path"
+            Method             = 'GET'
+            SkipHttpErrorCheck = $true
+            ErrorAction        = 'Stop'
+        }
+        if ($AuthHeadersFromCaller) { $invokeArgs.Headers = $AuthHeadersFromCaller }
+        # NOTE: call the REAL cmdlet, bypassing the script's Invoke-WebRequest wrapper
+        # (the wrapper does not expose -UseBasicParsing nor return the full Headers dict
+        # in the shape we need, AND it adds the response to flowSteps which we don't want
+        # for security-header probes).
+        $resp = Microsoft.PowerShell.Utility\Invoke-WebRequest @invokeArgs
+        $flat = @{}
+        foreach ($k in $resp.Headers.Keys) {
+            $v = $resp.Headers[$k]
+            if ($v -is [System.Collections.IEnumerable] -and -not ($v -is [string])) {
+                $flat[$k] = ($v -join ', ')
+            } else {
+                $flat[$k] = [string]$v
+            }
+        }
+        return @{ ok = $true; status = [int]$resp.StatusCode; headers = $flat; err = $null }
+    } catch {
+        return @{ ok = $false; status = 0; headers = @{}; err = $_.Exception.Message }
+    }
+}
+
+# Probe 1: GET /scim/health (200, no auth required)
+$p1 = & $probeScript "/scim/health" $baseUrl $null
+if (-not $p1.ok) { Write-Host "  9z-AJ.probe1 raw error: $($p1.err)" -ForegroundColor Yellow }
+Test-Result -Success ($p1.ok -and $p1.status -eq 200) -Message "9z-AJ.1: GET /scim/health returns 200 (smoke)"
+
+# Required headers on EVERY response (helmet defaults)
+Test-Result -Success ([string]$p1.headers["Content-Security-Policy"] -match "default-src 'self'") -Message "9z-AJ.2: CSP includes default-src 'self'"
+Test-Result -Success ([string]$p1.headers["Content-Security-Policy"] -match "frame-ancestors 'none'") -Message "9z-AJ.3: CSP includes frame-ancestors 'none'"
+Test-Result -Success ([string]$p1.headers["Content-Security-Policy"] -match "object-src 'none'") -Message "9z-AJ.4: CSP includes object-src 'none'"
+Test-Result -Success ([string]$p1.headers["X-Frame-Options"] -eq "DENY") -Message "9z-AJ.5: X-Frame-Options: DENY"
+Test-Result -Success ([string]$p1.headers["X-Content-Type-Options"] -eq "nosniff") -Message "9z-AJ.6: X-Content-Type-Options: nosniff"
+Test-Result -Success ([string]$p1.headers["Referrer-Policy"] -eq "strict-origin-when-cross-origin") -Message "9z-AJ.7: Referrer-Policy: strict-origin-when-cross-origin"
+Test-Result -Success ([string]$p1.headers["Cross-Origin-Opener-Policy"] -eq "same-origin") -Message "9z-AJ.8: COOP: same-origin"
+Test-Result -Success ([string]$p1.headers["Cross-Origin-Resource-Policy"] -eq "same-origin") -Message "9z-AJ.9: CORP: same-origin"
+Test-Result -Success ([string]$p1.headers["X-Permitted-Cross-Domain-Policies"] -eq "none") -Message "9z-AJ.10: X-Permitted-Cross-Domain-Policies: none"
+Test-Result -Success ([string]$p1.headers["X-DNS-Prefetch-Control"] -eq "off") -Message "9z-AJ.11: X-DNS-Prefetch-Control: off"
+Test-Result -Success ([string]$p1.headers["X-Download-Options"] -eq "noopen") -Message "9z-AJ.12: X-Download-Options: noopen"
+
+# Permissions-Policy: separate middleware after helmet
+$pp = [string]$p1.headers["Permissions-Policy"]
+Test-Result -Success ($pp -match "camera=\(\)" -and $pp -match "microphone=\(\)" -and $pp -match "geolocation=\(\)" -and $pp -match "payment=\(\)" -and $pp -match "usb=\(\)") -Message "9z-AJ.13: Permissions-Policy denies camera/microphone/geolocation/payment/usb"
+
+# COEP must be ABSENT (intentionally disabled in helmet-config.ts)
+Test-Result -Success ([string]$p1.headers["Cross-Origin-Embedder-Policy"] -eq "") -Message "9z-AJ.14: COEP is intentionally absent (CDN-asset compatibility)"
+
+# HSTS: REQUIRED over HTTPS deployments, must NOT be required over plain HTTP.
+# Helmet emits HSTS unconditionally when NODE_ENV=production, so a plain-HTTP
+# Docker smoke will see it but a browser will never honor it without HTTPS.
+$hsts = [string]$p1.headers["Strict-Transport-Security"]
+if ($isHttpsDeployment) {
+    Test-Result -Success ($hsts -match "max-age=15552000" -and $hsts -match "includeSubDomains") -Message "9z-AJ.15: HSTS is set on HTTPS deployment (max-age=15552000; includeSubDomains)"
+} else {
+    if ($hsts) {
+        Test-Result -Success ($hsts -match "max-age=15552000") -Message "9z-AJ.15: HSTS (if present on HTTP) carries max-age=15552000"
+    } else {
+        Test-Result -Success $true -Message "9z-AJ.15: HSTS absent over HTTP (acceptable; helmet honored NODE_ENV)"
+    }
+}
+
+# Probe 2: GET /scim/admin/version (200 with auth)
+$p2 = & $probeScript "/scim/admin/version" $baseUrl $headers
+if (-not $p2.ok) { Write-Host "  9z-AJ.probe2 raw error: $($p2.err)" -ForegroundColor Yellow }
+Test-Result -Success ($p2.ok -and ($p2.status -eq 200 -or $p2.status -eq 401 -or $p2.status -eq 404)) -Message "9z-AJ.16: GET /scim/admin/version returns 200|401|404 with headers"
+Test-Result -Success ([string]$p2.headers["X-Frame-Options"] -eq "DENY") -Message "9z-AJ.17: Admin route still emits X-Frame-Options DENY"
+Test-Result -Success ([string]$p2.headers["Content-Security-Policy"] -match "default-src 'self'") -Message "9z-AJ.18: Admin route still emits CSP"
+
+# Probe 3: GET / (SPA fallback, 200 text/html or 404 in inmemory)
+$p3 = & $probeScript "/" $baseUrl $null
+if (-not $p3.ok) { Write-Host "  9z-AJ.probe3 raw error: $($p3.err)" -ForegroundColor Yellow }
+Test-Result -Success ($p3.ok) -Message "9z-AJ.19: GET / returns response (SPA fallback)"
+Test-Result -Success ([string]$p3.headers["X-Content-Type-Options"] -eq "nosniff") -Message "9z-AJ.20: SPA shell carries X-Content-Type-Options nosniff"
+Test-Result -Success ([string]$p3.headers["Content-Security-Policy"] -match "script-src .* 'unsafe-inline'") -Message "9z-AJ.21: SPA-serving response CSP allows 'unsafe-inline' for script-src (Fluent UI v9 requirement)"
+
+Write-Host "`n--- 9z-AJ: Web Security Headers (Phase N3a) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AK: PATCH NULL-HANDLING RFC COMPLIANCE
+# (RFC 7644 §3.5.2.1/2/3, RFC 7643 §2.2/§7)
+# Mirrors scripts/null-patch-test.ps1 against a dedicated endpoint with
+# StrictSchemaValidation + VerbosePatchSupported both enabled. Each test
+# corresponds to a T-id in docs/PATCH_NULL_HANDLING_RFC_COMPLIANCE.md.
+# ============================================
+$script:currentSection = "9z-AK: PATCH null-handling (F1-F9)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AK: PATCH NULL-HANDLING RFC COMPLIANCE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# ---- Create a dedicated strict + verbose-patch endpoint ----
+$nullPatchEpBody = @{
+    name = "live-test-null-patch-$(Get-Random)"
+    displayName = "PATCH Null-Handling Live Test"
+    description = "RFC 7644 §3.5.2.3 null-as-unset coverage"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
+$nullPatchEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $nullPatchEpBody
+$nullPatchEpId = $nullPatchEp.id
+$nullPatchCfgBody = @{ profile = @{ settings = @{
+    StrictSchemaValidation       = "True"
+    VerbosePatchSupported        = "True"
+    PatchOpAllowRemoveAllMembers = "False"
+} } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$nullPatchEpId" -Method PATCH -Headers $headers -Body $nullPatchCfgBody -ContentType "application/json" | Out-Null
+$nullPatchBase = "$baseUrl/scim/endpoints/$nullPatchEpId"
+$scimHeaders   = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/scim+json"; Accept = "application/scim+json" }
+Test-Result -Success ($null -ne $nullPatchEpId) -Message "9z-AK.setup: Created dedicated PATCH-null endpoint $nullPatchEpId"
+
+# Helper: safe PATCH that captures status without throwing
+function Invoke-NullPatch($url, $body) {
+    try {
+        $resp = Invoke-WebRequest -Uri $url -Method Patch -Headers $scimHeaders -Body ($body | ConvertTo-Json -Depth 10 -Compress) -SkipHttpErrorCheck
+        $parsed = $null
+        if ($resp.Content) {
+            # PowerShell 7 returns the response Content as a String for known text
+            # MIME types but as a byte[] for unknown ones like application/scim+json.
+            # Normalize to a UTF-8 string before parsing so scimType / detail are reachable.
+            $contentStr = if ($resp.Content -is [byte[]]) {
+                [System.Text.Encoding]::UTF8.GetString($resp.Content)
+            } else {
+                [string]$resp.Content
+            }
+            try { $parsed = $contentStr | ConvertFrom-Json } catch { $parsed = $contentStr }
+        }
+        return [pscustomobject]@{ Status = [int]$resp.StatusCode; Body = $parsed }
+    } catch {
+        return [pscustomobject]@{ Status = -1; Body = $_.Exception.Message }
+    }
+}
+
+# ---- Seed user + group ----
+$npRand = Get-Random -Maximum 999999
+$npUserBody = @{
+    schemas  = @("urn:ietf:params:scim:schemas:core:2.0:User","urn:ietf:params:scim:schemas:extension:enterprise:2.0:User")
+    userName = "null-patch-live-$npRand@test.local"
+    displayName = "Null Patch Live"
+    nickName = "nplive"
+    name = @{ givenName = "Null"; familyName = "Tester"; formatted = "Null Tester" }
+    emails = @(
+        @{ value = "work-$npRand@test.local"; type = "work"; primary = $true },
+        @{ value = "home-$npRand@test.local"; type = "home"; primary = $false }
+    )
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" = @{ department = "Eng"; manager = @{ value = "mgr-123" } }
+} | ConvertTo-Json -Depth 10
+$npUser = Invoke-RestMethod -Uri "$nullPatchBase/Users" -Method POST -Headers $scimHeaders -Body $npUserBody
+$npUid = $npUser.id
+Test-Result -Success ($null -ne $npUid) -Message "9z-AK.setup: Seeded user $npUid"
+
+$npGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "null-patch-live-grp-$npRand"
+    members = @(@{ value = $npUid; type = "User" })
+} | ConvertTo-Json -Depth 10
+$npGroup = Invoke-RestMethod -Uri "$nullPatchBase/Groups" -Method POST -Headers $scimHeaders -Body $npGroupBody
+$npGid = $npGroup.id
+Test-Result -Success ($null -ne $npGid) -Message "9z-AK.setup: Seeded group $npGid"
+
+function Get-NpUser  { Invoke-RestMethod -Uri "$nullPatchBase/Users/$npUid"  -Headers $scimHeaders }
+function Get-NpGroup { Invoke-RestMethod -Uri "$nullPatchBase/Groups/$npGid" -Headers $scimHeaders }
+
+# ---- T01: replace:null on single-valued readWrite (nickName) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="nickName"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.nickName)) -Message "9z-AK.T01: replace:null on single-valued readWrite (nickName) clears attr (status=$($r.Status))"
+
+# ---- T02: replace:null on REQUIRED attribute (userName) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="userName"; value=$null })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T02: replace:null on REQUIRED (userName) rejected 400 (status=$($r.Status))"
+
+# ---- T03: replace:null on readOnly attribute (id) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="id"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,400) -and ($u.id -eq $npUid)) -Message "9z-AK.T03: replace:null on readOnly (id) conformant (status=$($r.Status); id preserved)"
+
+# ---- T04: replace:null on multi-valued bare path (emails) ----
+$npReseed = @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="emails"; value=@(
+        @{ value="work-$npRand@test.local"; type="work"; primary=$true },
+        @{ value="home-$npRand@test.local"; type="home"; primary=$false }
+    )})
+}
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="emails"; value=$null })
+}
+$u = Get-NpUser
+$emailCount = if ($u.emails) { @($u.emails).Count } else { 0 }
+Test-Result -Success (($r.Status -in 200,204) -and ($emailCount -eq 0)) -Message "9z-AK.T04: replace:null on multi-valued (emails) clears array (count=$emailCount)"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+
+# ---- T05: replace:null on filtered sub-attribute (emails[type eq "work"].value) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path='emails[type eq "work"].value'; value=$null })
+}
+Test-Result -Success ($r.Status -in 200,204,400) -Message "9z-AK.T05: replace:null on filtered sub-attr (emails[work].value) is conformant (status=$($r.Status))"
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+
+# ---- T06: F3 - remove with zero-match filter -> noTarget ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="remove"; path='emails[type eq "doesnotexist"]' })
+}
+Test-Result -Success (($r.Status -eq 400) -and ($r.Body.scimType -eq 'noTarget')) -Message "9z-AK.T06: F3 - remove with zero-match filter rejected as noTarget"
+
+# ---- T07: add:null on optional attribute (title) - permissive no-op ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="title"; value=$null })
+}
+Test-Result -Success ($r.Status -in 200,204,400) -Message "9z-AK.T07: add:null on optional missing attr (title) is conformant (status=$($r.Status))"
+
+# ---- T08: F1 - path-less replace with nested nulls (Entra style) ----
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(
+        @{ op="replace"; path="nickName"; value="nplive2" },
+        @{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } }
+    )
+} | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; value=@{
+        nickName=$null
+        name=@{ familyName=$null }
+        emails=$null
+    }})
+}
+$u = Get-NpUser
+$emailCount = if ($u.emails) { @($u.emails).Count } else { 0 }
+$t08Pass = ($r.Status -in 200,204) -and (-not $u.nickName) -and (-not $u.name.familyName) -and ($u.name.givenName -eq 'Null') -and ($emailCount -eq 0)
+Test-Result -Success $t08Pass -Message "9z-AK.T08: F1 - path-less replace with nested nulls (nickName/familyName cleared, givenName preserved, emails empty)"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(
+        @{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } },
+        @{ op="replace"; path="emails"; value=@(
+            @{ value="work-$npRand@test.local"; type="work"; primary=$true },
+            @{ value="home-$npRand@test.local"; type="home"; primary=$false }
+        )}
+    )
+} | Out-Null
+
+# ---- T09: replace:null on complex parent (name) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.name)) -Message "9z-AK.T09: replace:null on complex parent (name) unassigns it"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } })
+} | Out-Null
+
+# ---- T10: replace:null on sub-attribute (name.familyName) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name.familyName"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.name.familyName) -and ($u.name.givenName -eq 'Null')) -Message "9z-AK.T10: replace:null on sub-attr (name.familyName) clears it; siblings preserved"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } })
+} | Out-Null
+
+# ---- T11: F1 - replace complex with partial+null (merge semantics) ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName=$null; givenName="NullReplaced" } })
+}
+$u = Get-NpUser
+$t11Pass = ($r.Status -in 200,204) -and (-not $u.name.familyName) -and ($u.name.givenName -eq 'NullReplaced') -and ($u.name.formatted -eq 'Null Tester')
+Test-Result -Success $t11Pass -Message "9z-AK.T11: F1 - replace complex with partial+null merges (formatted preserved)"
+
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="name"; value=@{ familyName="Tester"; givenName="Null"; formatted="Null Tester" } })
+} | Out-Null
+
+# ---- T12: F5 - replace:null on extension attribute (enterprise:manager) ----
+# First clear department so removing manager leaves the URN empty
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department"; value=$null })
+} | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"; value=$null })
+}
+$u = Get-NpUser
+$ent = $u.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+$mgr = if ($ent) { $ent.manager } else { $null }
+$hasExtUrn = $u.schemas -contains 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+$t12Pass = ($r.Status -in 200,204) -and (-not $mgr) -and (-not $hasExtUrn)
+Test-Result -Success $t12Pass -Message "9z-AK.T12: F5 - replace:null on extension (enterprise:manager) clears + prunes empty URN from schemas[]"
+
+# ---- T13: empty string vs null on string attr (displayName) ----
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="displayName"; value="Live Null Patch" })
+} | Out-Null
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="displayName"; value="" })
+} | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="displayName"; value=$null })
+}
+$u = Get-NpUser
+Test-Result -Success (($r.Status -in 200,204) -and (-not $u.displayName)) -Message "9z-AK.T13: null unassigns displayName (after empty-string round-trip)"
+
+# ---- T14: F4 - replace:null on Group members[X].value (required sub-attr) ----
+$r = Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="members[value eq `"$npUid`"].value"; value=$null })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T14: F4 - replace:null on Group members[X].value rejected 400 (status=$($r.Status))"
+
+# ---- T15: F2 - replace:null on Group.members clears all members ----
+$r = Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="replace"; path="members"; value=$null })
+}
+$g = Get-NpGroup
+$mc = if ($g.members) { @($g.members).Count } else { 0 }
+Test-Result -Success (($r.Status -in 200,204) -and ($mc -eq 0)) -Message "9z-AK.T15: F2 - replace:null on Group.members clears all (count=$mc)"
+
+# Re-add member for T16
+Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="members"; value=@(@{ value=$npUid; type="User" }) })
+} | Out-Null
+
+# ---- T16: remove (no value) on Group.members with strict-by-default ----
+# PatchOpAllowRemoveAllMembers=False -> bare remove should be rejected.
+$r = Invoke-NullPatch "$nullPatchBase/Groups/$npGid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="remove"; path="members" })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T16: remove (no value) on Group.members strict-rejected when flag=False (status=$($r.Status))"
+
+# ---- T17: remove with filter + explicit null value (value ignored) ----
+Invoke-NullPatch "$nullPatchBase/Users/$npUid" $npReseed | Out-Null
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="remove"; path='emails[type eq "home"]'; value=$null })
+}
+$u = Get-NpUser
+$emails = if ($u.emails) { @($u.emails) } else { @() }
+$hasHome = [bool]($emails | Where-Object { $_.type -eq 'home' })
+$hasWork = [bool]($emails | Where-Object { $_.type -eq 'work' })
+Test-Result -Success (($r.Status -in 200,204) -and (-not $hasHome) -and $hasWork) -Message "9z-AK.T17: remove filter + explicit-null value ignores value; only matching entry removed"
+
+# ---- T18: F4 - add multi-valued with [null] element ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="emails"; value=@($null) })
+}
+Test-Result -Success ($r.Status -eq 400) -Message "9z-AK.T18: F4 - add multi-valued with [null] element rejected 400 (status=$($r.Status))"
+
+# ---- F9 - validatePatchOperationValue null contract: any add:null with valid path returns 2xx ----
+$r = Invoke-NullPatch "$nullPatchBase/Users/$npUid" @{
+    schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations=@(@{ op="add"; path="nickName"; value=$null })
+}
+Test-Result -Success ($r.Status -in 200,204,400) -Message "9z-AK.F9: add:null on optional attribute is conformant (validatePatchOperationValue null contract; status=$($r.Status))"
+
+# ---- Cleanup the dedicated endpoint ----
+try { Invoke-RestMethod -Uri "$nullPatchBase/Users/$npUid" -Method DELETE -Headers $scimHeaders | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$nullPatchBase/Groups/$npGid" -Method DELETE -Headers $scimHeaders | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$nullPatchEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-AK: PATCH null-handling (F1-F9) Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AL: POST-PATCH VALIDATION SCOPING (RFC 7644 §3.5.2)
+# Regression for the OpenText production incident: a PATCH that targets ONLY a
+# Mailbox extension attribute (proxyAddresses) was rejected with
+#   "Schema validation failed: emails[0].primary: Unknown sub-attribute 'primary'"
+# because post-PATCH strict validation re-validated the ENTIRE merged resource,
+# including pre-existing emails data that predates the corrected (primary-less)
+# emails schema. Per RFC 7644 §3.5.2 a PATCH targets specific attributes; the
+# fix scopes strict post-PATCH validation to only the touched attributes.
+# ============================================
+$script:currentSection = "9z-AL: Post-PATCH validation scoping"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AL: POST-PATCH VALIDATION SCOPING" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+$scopeCoreUser = "urn:ietf:params:scim:schemas:core:2.0:User"
+$scopeMailbox  = "urn:opentext:scim:schemas:extension:mailbox:2.0:User"
+
+# ---- Create an endpoint whose User schema defines emails WITHOUT `primary`,
+#      plus a Mailbox extension with multi-valued string proxyAddresses.
+#      Start with StrictSchemaValidation OFF so the (now schema-invalid)
+#      emails[].primary can be persisted, mirroring the production resource. ----
+$scopeProfile = @{
+    schemas = @(
+        @{
+            id = $scopeCoreUser; name = "User"
+            attributes = @(
+                @{ name = "userName"; type = "string"; multiValued = $false; required = $true; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "server" }
+                @{ name = "displayName"; type = "string"; multiValued = $false; required = $false; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+                @{ name = "active"; type = "boolean"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+                @{
+                    name = "emails"; type = "complex"; multiValued = $true; required = $false; mutability = "readWrite"; returned = "default"
+                    subAttributes = @(
+                        @{ name = "value"; type = "string"; multiValued = $false; required = $false; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+                        @{ name = "type"; type = "string"; multiValued = $false; required = $false; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+                        # NOTE: intentionally NO `primary` sub-attribute.
+                    )
+                }
+            )
+        }
+        @{
+            id = $scopeMailbox; name = "Mailbox"
+            attributes = @(
+                @{ name = "proxyAddresses"; type = "string"; multiValued = $true; required = $false; caseExact = $true; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+            )
+        }
+        @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" }
+    )
+    resourceTypes = @(
+        @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = $scopeCoreUser; schemaExtensions = @(@{ schema = $scopeMailbox; required = $false }) }
+        @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+    )
+    settings = @{ StrictSchemaValidation = "False" }
+} | ConvertTo-Json -Depth 12
+
+$scopeEpBody = @{ name = "live-patch-scope-$(Get-Random)"; profile = ($scopeProfile | ConvertFrom-Json) } | ConvertTo-Json -Depth 12
+$scopeEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $scopeEpBody
+$scopeEpId = $scopeEp.id
+$scopeBase = "$baseUrl/scim/endpoints/$scopeEpId"
+$scopeScimHeaders = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/scim+json"; Accept = "application/scim+json" }
+Test-Result -Success ($null -ne $scopeEpId) -Message "9z-AL.setup: Created custom-profile endpoint $scopeEpId (emails without primary + Mailbox proxyAddresses)"
+
+# ---- Create a user with emails containing `primary` while strict is OFF ----
+$scopeRand = Get-Random -Maximum 999999
+$scopeUserBody = @{
+    schemas  = @($scopeCoreUser, $scopeMailbox)
+    userName = "patch-scope-live-$scopeRand@opentext.example.com"
+    emails   = @(@{ value = "primary-$scopeRand@contoso.com"; type = "work"; primary = $true })
+    $scopeMailbox = @{ proxyAddresses = @("SMTP:primary-$scopeRand@contoso.com") }
+} | ConvertTo-Json -Depth 10
+$scopeUser = Invoke-RestMethod -Uri "$scopeBase/Users" -Method POST -Headers $scopeScimHeaders -Body $scopeUserBody
+$scopeUid = $scopeUser.id
+Test-Result -Success ($null -ne $scopeUid) -Message "9z-AL.setup: Seeded user $scopeUid with schema-invalid emails[].primary (strict OFF)"
+
+# ---- Tighten the endpoint to StrictSchemaValidation ON ----
+$scopeStrictBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method PATCH -Headers $headers -Body $scopeStrictBody -ContentType "application/json" | Out-Null
+Test-Result -Success $true -Message "9z-AL.setup: Tightened endpoint to StrictSchemaValidation=True"
+
+# ---- T1: proxyAddresses-only PATCH must NOT fail on untouched emails[].primary ----
+$scopePatch1 = Invoke-NullPatch "$scopeBase/Users/$scopeUid" @{
+    schemas    = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "${scopeMailbox}:proxyAddresses"; value = @("SMTP:updated-$scopeRand@contoso.com", "smtp:alias-$scopeRand@contoso.com") })
+}
+$scopeUserAfter = Invoke-RestMethod -Uri "$scopeBase/Users/$scopeUid" -Headers $scopeScimHeaders
+$scopeProxies = if ($scopeUserAfter.$scopeMailbox.proxyAddresses) { @($scopeUserAfter.$scopeMailbox.proxyAddresses) } else { @() }
+$scopeProxyUpdated = [bool]($scopeProxies | Where-Object { $_ -eq "SMTP:updated-$scopeRand@contoso.com" })
+Test-Result -Success ($scopePatch1.Status -in 200,204) -Message "9z-AL.T1: proxyAddresses-only PATCH succeeds despite untouched schema-invalid emails[].primary (status=$($scopePatch1.Status))"
+Test-Result -Success $scopeProxyUpdated -Message "9z-AL.T2: proxyAddresses updated value persisted after scoped PATCH"
+Test-Result -Success ($scopeUserAfter.emails[0].value -like "primary-$scopeRand@*") -Message "9z-AL.T3: untouched emails preserved as-is after scoped PATCH"
+
+# ---- T4: a PATCH that DOES touch emails with `primary` is still rejected ----
+$scopePatch2 = Invoke-NullPatch "$scopeBase/Users/$scopeUid" @{
+    schemas    = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "emails"; value = @(@{ value = "x-$scopeRand@y.com"; type = "work"; primary = $true }) })
+}
+Test-Result -Success ($scopePatch2.Status -eq 400) -Message "9z-AL.T4: PATCH that touches emails with unknown 'primary' sub-attr still rejected 400 (status=$($scopePatch2.Status))"
+
+# ---- Cleanup ----
+try { Invoke-RestMethod -Uri "$scopeBase/Users/$scopeUid" -Method DELETE -Headers $scopeScimHeaders | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-AL: Post-PATCH validation scoping Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

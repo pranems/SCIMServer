@@ -17,6 +17,8 @@ import {
   enforceIfMatch,
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
+  computeTouchedPatchKeys,
+  scopePatchPayloadToTouched,
   stripNeverReturnedFromPayload,
   ScimSchemaHelpers,
   stripReadOnlyAttributes,
@@ -1594,6 +1596,98 @@ describe('coercePatchOpBooleans', () => {
   });
 });
 
+// ─── computeTouchedPatchKeys / scopePatchPayloadToTouched ───────────────
+
+describe('computeTouchedPatchKeys', () => {
+  const MAILBOX_URN = 'urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox';
+  const ENTERPRISE_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+  const extUrns = [MAILBOX_URN, ENTERPRISE_URN];
+
+  it('maps a URN-prefixed path to the extension URN block', () => {
+    const ops = [{ op: 'replace', path: `${MAILBOX_URN}:proxyAddresses`, value: 'smtp:a@b.com' }];
+    const touched = computeTouchedPatchKeys(ops, extUrns);
+    expect(touched.has(MAILBOX_URN)).toBe(true);
+    expect(touched.has('emails')).toBe(false);
+  });
+
+  it('maps a sub-attribute path to its top-level attribute', () => {
+    const ops = [{ op: 'replace', path: 'name.givenName', value: 'Alice' }];
+    const touched = computeTouchedPatchKeys(ops, extUrns);
+    expect(touched).toEqual(new Set(['name']));
+  });
+
+  it('maps a value-filter path to its top-level attribute', () => {
+    const ops = [{ op: 'replace', path: 'emails[type eq "work"].value', value: 'a@b.com' }];
+    const touched = computeTouchedPatchKeys(ops, extUrns);
+    expect(touched).toEqual(new Set(['emails']));
+  });
+
+  it('maps a simple path to itself', () => {
+    const ops = [{ op: 'replace', path: 'displayName', value: 'Bob' }];
+    const touched = computeTouchedPatchKeys(ops, extUrns);
+    expect(touched).toEqual(new Set(['displayName']));
+  });
+
+  it('uses value object keys for no-path operations', () => {
+    const ops = [{ op: 'add', value: { displayName: 'X', [MAILBOX_URN]: { proxyAddresses: [] } } }];
+    const touched = computeTouchedPatchKeys(ops, extUrns);
+    expect(touched.has('displayName')).toBe(true);
+    expect(touched.has(MAILBOX_URN)).toBe(true);
+  });
+
+  it('matches URN prefix case-insensitively', () => {
+    const ops = [{ op: 'replace', path: `${MAILBOX_URN.toLowerCase()}:proxyAddresses`, value: 'x' }];
+    const touched = computeTouchedPatchKeys(ops, extUrns);
+    expect(touched.has(MAILBOX_URN)).toBe(true);
+  });
+});
+
+describe('scopePatchPayloadToTouched', () => {
+  const MAILBOX_URN = 'urn:ietf:params:scim:schemas:extension:opentext:2.0:Mailbox';
+  const extUrns = [MAILBOX_URN];
+
+  // Reproduces the production incident: a PATCH that only touches proxyAddresses
+  // must NOT carry pre-existing emails into post-PATCH strict validation.
+  it('excludes pre-existing emails when PATCH only touched proxyAddresses', () => {
+    const resultPayload = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', MAILBOX_URN],
+      userName: 'bjensen',
+      emails: [{ value: 'a@b.com', type: 'work', primary: true }],
+      [MAILBOX_URN]: { proxyAddresses: ['smtp:a@b.com'] },
+    };
+    const ops = [{ op: 'replace', path: `${MAILBOX_URN}:proxyAddresses`, value: 'smtp:a@b.com' }];
+    const reduced = scopePatchPayloadToTouched(resultPayload, ops, extUrns);
+
+    expect(reduced.schemas).toBe(resultPayload.schemas);
+    expect(reduced[MAILBOX_URN]).toEqual(resultPayload[MAILBOX_URN]);
+    expect('emails' in reduced).toBe(false);
+    expect('userName' in reduced).toBe(false);
+  });
+
+  it('includes emails when the PATCH actually touched emails', () => {
+    const resultPayload = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      userName: 'bjensen',
+      emails: [{ value: 'a@b.com', type: 'work', primary: true }],
+    };
+    const ops = [{ op: 'replace', path: 'emails[type eq "work"].value', value: 'c@d.com' }];
+    const reduced = scopePatchPayloadToTouched(resultPayload, ops, extUrns);
+    expect('emails' in reduced).toBe(true);
+    expect('userName' in reduced).toBe(false);
+  });
+
+  it('always carries schemas[] for validator schema resolution', () => {
+    const resultPayload = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      displayName: 'X',
+    };
+    const ops = [{ op: 'replace', path: 'displayName', value: 'X' }];
+    const reduced = scopePatchPayloadToTouched(resultPayload, ops, extUrns);
+    expect(reduced.schemas).toEqual(resultPayload.schemas);
+    expect(reduced.displayName).toBe('X');
+  });
+});
+
 // ─── stripNeverReturnedFromPayload ──────────────────────────────────────
 
 describe('stripNeverReturnedFromPayload', () => {
@@ -1809,6 +1903,8 @@ describe('handleRepositoryError', () => {
       handleRepositoryError(repoError, 'create user', mockLogger, 'scim.user' as any);
     } catch (e) {
       expect((e as HttpException).getStatus()).toBe(409);
+      const body = (e as HttpException).getResponse() as Record<string, unknown>;
+      expect(body.scimType).toBe('uniqueness');
     }
   });
 

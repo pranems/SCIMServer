@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { GroupsTab } from './GroupsTab';
 import { renderWithRouter } from '../test/router-test-utils';
 import { groupsSearchSchema } from '../routes/search-schemas';
@@ -16,6 +16,7 @@ vi.mock('../api/queries', async () => {
 });
 
 import { useEndpointGroups } from '../api/queries';
+import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
 function wrap(
   ui: React.ReactElement,
@@ -40,7 +41,12 @@ const mockGroups = {
 };
 
 describe('GroupsTab', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Phase N4: each test starts from default preferences (pageSize=20).
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
+    localStorage.clear();
+  });
 
   it('shows loading state', async () => {
     (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -89,6 +95,56 @@ describe('GroupsTab', () => {
     expect(useEndpointGroups).toHaveBeenCalledWith(
       'ep-1',
       expect.objectContaining({ startIndex: 21, count: 20 }),
+    );
+  });
+
+  // ==========================================================================
+  // Phase N3 - Export button (CSV / JSON / NDJSON) wired into the toolbar
+  // ==========================================================================
+  it('renders ExportSplitButton in the toolbar when groups exist', async () => {
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockGroups, isLoading: false, error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    expect(await screen.findByTestId('export-button')).toBeInTheDocument();
+    expect(screen.getByTestId('export-button')).not.toBeDisabled();
+  });
+
+  it('clicking CSV in the export menu invokes triggerCsvDownload with flattened group rows', async () => {
+    const csvExportModule = await import('../utils/csv-export');
+    const csvSpy = vi.spyOn(csvExportModule, 'triggerCsvDownload').mockImplementation(() => {});
+
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockGroups, isLoading: false, error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    fireEvent.click(await screen.findByTestId('export-button'));
+    fireEvent.click(await screen.findByTestId('export-menu-csv'));
+
+    expect(csvSpy).toHaveBeenCalledTimes(1);
+    const [filename, body] = csvSpy.mock.calls[0];
+    expect(filename).toMatch(/^groups-ep-1-\d{8}T\d{6}Z\.csv$/);
+    expect(body).toContain('id,displayName,memberCount,created');
+    expect(body).toContain('g1,Engineering,2,');
+    expect(body).toContain('g2,Marketing,0,');
+
+    csvSpy.mockRestore();
+  });
+
+  // ==========================================================================
+  // Phase N4 - honor defaultPageSize preference when URL has no ?pageSize
+  // ==========================================================================
+  it('honors preferences-store defaultPageSize when URL has no ?pageSize override', async () => {
+    usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS, defaultPageSize: 50 });
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockGroups, totalResults: 100, itemsPerPage: 50 },
+      isLoading: false, error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    await screen.findByText('Engineering');
+    expect(useEndpointGroups).toHaveBeenCalledWith(
+      'ep-1',
+      expect.objectContaining({ startIndex: 1, count: 50 }),
     );
   });
 });
