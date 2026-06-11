@@ -260,6 +260,91 @@ export function coercePatchOpBooleans(
 }
 
 /**
+ * Compute the set of top-level attribute keys (core attribute names or extension
+ * URNs) that a list of SCIM PATCH operations actually touches.
+ *
+ * Used to scope strict post-PATCH schema validation to the modified attributes
+ * only. A PATCH targets specific attributes (RFC 7644 §3.5.2); untouched
+ * attributes are out of scope for the operation, so re-validating them against a
+ * (possibly since-tightened) schema would spuriously fail a PATCH that never
+ * referenced them - e.g. a `proxyAddresses` PATCH failing because pre-existing
+ * `emails[0].primary` no longer matches a corrected schema.
+ *
+ * Path forms handled:
+ *  - URN-prefixed   "urn:...:Mailbox:proxyAddresses"      -> the extension URN
+ *  - sub-attribute  "name.givenName"                       -> "name"
+ *  - value filter   "emails[type eq \"work\"].value"       -> "emails"
+ *  - simple         "displayName"                          -> "displayName"
+ *  - no path        { displayName: "x", "urn:...": {...} }  -> each value key
+ */
+export function computeTouchedPatchKeys(
+  operations: ReadonlyArray<{ op: string; path?: string; value?: unknown }>,
+  extensionUrns: readonly string[],
+): Set<string> {
+  const touched = new Set<string>();
+  const urnsLower = extensionUrns.map((u) => ({ urn: u, lower: u.toLowerCase() }));
+
+  for (const op of operations) {
+    const path = typeof op.path === 'string' ? op.path.trim() : '';
+    if (path.length > 0) {
+      const pathLower = path.toLowerCase();
+      // URN-prefixed path -> the touched top-level key is the extension URN block.
+      const matchedUrn = urnsLower.find(
+        (u) => pathLower === u.lower || pathLower.startsWith(`${u.lower}:`),
+      );
+      if (matchedUrn) {
+        touched.add(matchedUrn.urn);
+        continue;
+      }
+      // Simple / sub-attr / valuePath -> top-level attribute is the segment
+      // before the first '.' (sub-attr) or '[' (value filter).
+      const firstSegment = path.split(/[.[]/, 1)[0];
+      if (firstSegment) touched.add(firstSegment);
+      continue;
+    }
+    // No-path operation: the value object's keys are the touched attributes/URNs.
+    if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+      for (const key of Object.keys(op.value)) {
+        touched.add(key);
+      }
+    }
+  }
+  return touched;
+}
+
+/**
+ * Build a reduced copy of a post-PATCH result payload containing only `schemas`
+ * plus the top-level attributes the PATCH operations touched.
+ *
+ * Strict post-PATCH schema validation runs against this reduced payload so
+ * untouched, pre-existing attributes are not re-validated. See
+ * {@link computeTouchedPatchKeys} for the rationale (RFC 7644 §3.5.2).
+ */
+export function scopePatchPayloadToTouched(
+  resultPayload: Record<string, unknown>,
+  operations: ReadonlyArray<{ op: string; path?: string; value?: unknown }>,
+  extensionUrns: readonly string[],
+): Record<string, unknown> {
+  const touched = computeTouchedPatchKeys(operations, extensionUrns);
+  const reduced: Record<string, unknown> = {};
+  if ('schemas' in resultPayload) {
+    reduced.schemas = resultPayload.schemas;
+  }
+
+  const actualByLower = new Map<string, string>();
+  for (const key of Object.keys(resultPayload)) {
+    actualByLower.set(key.toLowerCase(), key);
+  }
+  for (const t of touched) {
+    const actual = actualByLower.get(t.toLowerCase());
+    if (actual && actual !== 'schemas') {
+      reduced[actual] = resultPayload[actual];
+    }
+  }
+  return reduced;
+}
+
+/**
  * Resolve a SCIM PATCH path to its parent URN-dot-path and leaf attribute name,
  * then coerce the scalar string value if the attribute is boolean-typed.
  *
