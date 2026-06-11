@@ -141,3 +141,10 @@ _*.ps1
 
 # Side-project research workspace (separate from SCIMServer)
 coderush/
+
+# Scratch / ad-hoc screenshots captured during ops or Playwright runs.
+# Only the curated docs/screenshots/prod-*.png narrative set is committed;
+# everything else is regenerable and must not be added by `git add -A`.
+docs/screenshots/scratch/
+docs/screenshots/tmp-*.png
+docs/screenshots/*.tmp.png

@@ -241,7 +241,12 @@ test.describe('Phase H3 - Visual regression baselines', () => {
       mask: locatorsFor(page, [
         ...ENDPOINT_DETAIL_LIVE_SELECTORS,
         '[data-testid="dashboard-chart"] svg',
+        // Overview tab live-data regions: KPI counts + Recent Activity
+        // (populated card AND empty state) both vary per dev-environment
+        // activity. Mask wholesale - same pattern as DASHBOARD_LIVE_SELECTORS.
+        '[data-testid="overview-kpi-row"]',
         '[data-testid="overview-activity"]',
+        '[data-testid="overview-activity-empty"]',
       ]),
       fullPage: true,
       // Overview tab has live KPI counts + Recent Activity that update per

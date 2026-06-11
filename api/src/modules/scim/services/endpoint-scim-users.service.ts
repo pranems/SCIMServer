@@ -34,6 +34,7 @@ import {
   enforceIfMatch,
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
+  scopePatchPayloadToTouched,
   stripNeverReturnedFromPayload,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
@@ -583,7 +584,16 @@ export class EndpointScimUsersService {
     // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
     this.schemaHelpers.enforcePrimaryConstraint(resultPayload, endpointId, config);
 
-    this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
+    // Scope strict post-PATCH validation to the attributes this PATCH actually
+    // touched, so pre-existing untouched data (e.g. emails stored before this
+    // endpoint's schema was corrected) cannot fail a PATCH that never referenced
+    // it (RFC 7644 §3.5.2).
+    const patchValidationPayload = scopePatchPayloadToTouched(
+      resultPayload,
+      patchDto.Operations,
+      extensionUrns,
+    );
+    this.schemaHelpers.validatePayloadSchema(patchValidationPayload, endpointId, config, 'patch');
 
     // H-2: Immutable attribute enforcement - compare existing state with PATCH result
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), resultPayload, endpointId, config);

@@ -10772,6 +10772,110 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$nullPatchEpId" -Met
 Write-Host "`n--- 9z-AK: PATCH null-handling (F1-F9) Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AL: POST-PATCH VALIDATION SCOPING (RFC 7644 §3.5.2)
+# Regression for the OpenText production incident: a PATCH that targets ONLY a
+# Mailbox extension attribute (proxyAddresses) was rejected with
+#   "Schema validation failed: emails[0].primary: Unknown sub-attribute 'primary'"
+# because post-PATCH strict validation re-validated the ENTIRE merged resource,
+# including pre-existing emails data that predates the corrected (primary-less)
+# emails schema. Per RFC 7644 §3.5.2 a PATCH targets specific attributes; the
+# fix scopes strict post-PATCH validation to only the touched attributes.
+# ============================================
+$script:currentSection = "9z-AL: Post-PATCH validation scoping"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AL: POST-PATCH VALIDATION SCOPING" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+$scopeCoreUser = "urn:ietf:params:scim:schemas:core:2.0:User"
+$scopeMailbox  = "urn:opentext:scim:schemas:extension:mailbox:2.0:User"
+
+# ---- Create an endpoint whose User schema defines emails WITHOUT `primary`,
+#      plus a Mailbox extension with multi-valued string proxyAddresses.
+#      Start with StrictSchemaValidation OFF so the (now schema-invalid)
+#      emails[].primary can be persisted, mirroring the production resource. ----
+$scopeProfile = @{
+    schemas = @(
+        @{
+            id = $scopeCoreUser; name = "User"
+            attributes = @(
+                @{ name = "userName"; type = "string"; multiValued = $false; required = $true; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "server" }
+                @{ name = "displayName"; type = "string"; multiValued = $false; required = $false; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+                @{ name = "active"; type = "boolean"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+                @{
+                    name = "emails"; type = "complex"; multiValued = $true; required = $false; mutability = "readWrite"; returned = "default"
+                    subAttributes = @(
+                        @{ name = "value"; type = "string"; multiValued = $false; required = $false; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+                        @{ name = "type"; type = "string"; multiValued = $false; required = $false; caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+                        # NOTE: intentionally NO `primary` sub-attribute.
+                    )
+                }
+            )
+        }
+        @{
+            id = $scopeMailbox; name = "Mailbox"
+            attributes = @(
+                @{ name = "proxyAddresses"; type = "string"; multiValued = $true; required = $false; caseExact = $true; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+            )
+        }
+        @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" }
+    )
+    resourceTypes = @(
+        @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = $scopeCoreUser; schemaExtensions = @(@{ schema = $scopeMailbox; required = $false }) }
+        @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+    )
+    settings = @{ StrictSchemaValidation = "False" }
+} | ConvertTo-Json -Depth 12
+
+$scopeEpBody = @{ name = "live-patch-scope-$(Get-Random)"; profile = ($scopeProfile | ConvertFrom-Json) } | ConvertTo-Json -Depth 12
+$scopeEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $scopeEpBody
+$scopeEpId = $scopeEp.id
+$scopeBase = "$baseUrl/scim/endpoints/$scopeEpId"
+$scopeScimHeaders = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/scim+json"; Accept = "application/scim+json" }
+Test-Result -Success ($null -ne $scopeEpId) -Message "9z-AL.setup: Created custom-profile endpoint $scopeEpId (emails without primary + Mailbox proxyAddresses)"
+
+# ---- Create a user with emails containing `primary` while strict is OFF ----
+$scopeRand = Get-Random -Maximum 999999
+$scopeUserBody = @{
+    schemas  = @($scopeCoreUser, $scopeMailbox)
+    userName = "patch-scope-live-$scopeRand@opentext.example.com"
+    emails   = @(@{ value = "primary-$scopeRand@contoso.com"; type = "work"; primary = $true })
+    $scopeMailbox = @{ proxyAddresses = @("SMTP:primary-$scopeRand@contoso.com") }
+} | ConvertTo-Json -Depth 10
+$scopeUser = Invoke-RestMethod -Uri "$scopeBase/Users" -Method POST -Headers $scopeScimHeaders -Body $scopeUserBody
+$scopeUid = $scopeUser.id
+Test-Result -Success ($null -ne $scopeUid) -Message "9z-AL.setup: Seeded user $scopeUid with schema-invalid emails[].primary (strict OFF)"
+
+# ---- Tighten the endpoint to StrictSchemaValidation ON ----
+$scopeStrictBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method PATCH -Headers $headers -Body $scopeStrictBody -ContentType "application/json" | Out-Null
+Test-Result -Success $true -Message "9z-AL.setup: Tightened endpoint to StrictSchemaValidation=True"
+
+# ---- T1: proxyAddresses-only PATCH must NOT fail on untouched emails[].primary ----
+$scopePatch1 = Invoke-NullPatch "$scopeBase/Users/$scopeUid" @{
+    schemas    = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "${scopeMailbox}:proxyAddresses"; value = @("SMTP:updated-$scopeRand@contoso.com", "smtp:alias-$scopeRand@contoso.com") })
+}
+$scopeUserAfter = Invoke-RestMethod -Uri "$scopeBase/Users/$scopeUid" -Headers $scopeScimHeaders
+$scopeProxies = if ($scopeUserAfter.$scopeMailbox.proxyAddresses) { @($scopeUserAfter.$scopeMailbox.proxyAddresses) } else { @() }
+$scopeProxyUpdated = [bool]($scopeProxies | Where-Object { $_ -eq "SMTP:updated-$scopeRand@contoso.com" })
+Test-Result -Success ($scopePatch1.Status -in 200,204) -Message "9z-AL.T1: proxyAddresses-only PATCH succeeds despite untouched schema-invalid emails[].primary (status=$($scopePatch1.Status))"
+Test-Result -Success $scopeProxyUpdated -Message "9z-AL.T2: proxyAddresses updated value persisted after scoped PATCH"
+Test-Result -Success ($scopeUserAfter.emails[0].value -like "primary-$scopeRand@*") -Message "9z-AL.T3: untouched emails preserved as-is after scoped PATCH"
+
+# ---- T4: a PATCH that DOES touch emails with `primary` is still rejected ----
+$scopePatch2 = Invoke-NullPatch "$scopeBase/Users/$scopeUid" @{
+    schemas    = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "emails"; value = @(@{ value = "x-$scopeRand@y.com"; type = "work"; primary = $true }) })
+}
+Test-Result -Success ($scopePatch2.Status -eq 400) -Message "9z-AL.T4: PATCH that touches emails with unknown 'primary' sub-attr still rejected 400 (status=$($scopePatch2.Status))"
+
+# ---- Cleanup ----
+try { Invoke-RestMethod -Uri "$scopeBase/Users/$scopeUid" -Method DELETE -Headers $scopeScimHeaders | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-AL: Post-PATCH validation scoping Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

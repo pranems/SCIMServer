@@ -13,6 +13,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected the importable-collection counts in [docs/INDEX.md](docs/INDEX.md): OpenAPI 75 operations, Postman 81 requests, Insomnia 72 requests (v0.37 export).
 - Refreshed stale `v0.40.0`/April version headers to `v0.53.0`/June 3, 2026 across the Tier-1 guides (endpoint lifecycle, Azure deployment, Docker, multi-endpoint, SCIM reference, SCIM compliance, logging, remote debugging, endpoint profile architecture, project health, collision testing, schema customization).
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
+- Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
+
+## [0.53.2] - 2026-06-10 - Fix: stabilize endpoint-detail Overview visual-regression baseline
+
+### Fixed
+
+- **Stage 5 Playwright visual-regression baseline for the endpoint-detail Overview tab is no longer flaky on live dev data.** The `Endpoint detail - Overview tab` snapshot was failing with a 39% pixel diff (vs the 3% budget) on the dev deployment because the Overview tab's live KPI counts and Recent Activity feed are non-deterministic per environment and were not fully masked. The diff grew from 5% to 39% across Playwright's own retry screenshots - a clear live-data-streaming signature, not a layout regression. The backend-only fix `4282dc2` touched zero `web/src/` files, so no product layout change was involved.
+  - Added a stable `data-testid="overview-kpi-row"` to the populated KPI row in [web/src/pages/OverviewTab.tsx](web/src/pages/OverviewTab.tsx) (previously only the loading skeleton row carried a testid, leaving the live-data row unmaskable).
+  - Widened the Overview snapshot `mask` in [web/e2e/visual-regression.spec.ts](web/e2e/visual-regression.spec.ts) to cover `overview-kpi-row`, `overview-activity`, and `overview-activity-empty` - the same wholesale-mask pattern already used by `DASHBOARD_LIVE_SELECTORS`.
+  - The widened mask resolves the drift against the EXISTING committed baseline - no baseline regeneration or PNG binary churn was required. Verified by a full 12/12 visual-regression suite pass against the dev deployment (`E2E_BASE_URL=https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`), plus a no-update single-test re-run, all green.
+
+## [0.53.1] - 2026-06-10 - Fix: scope post-PATCH strict validation to touched attributes (RFC 7644 §3.5.2)
+
+### Fixed
+
+- **Post-PATCH strict schema validation now only inspects the attributes the PATCH operations actually touched.** Previously a PATCH was re-validated against the ENTIRE merged resource, so a PATCH targeting only an extension attribute (e.g. the OpenText `urn:...:Mailbox:proxyAddresses`) was rejected with `Schema validation failed: emails[0].primary: Unknown sub-attribute 'primary' in complex attribute.` whenever the stored resource carried attribute data (pre-existing `emails[].primary`) that predated a later schema tightening. Per RFC 7644 §3.5.2 a PATCH targets specific attributes; untouched attributes are out of scope. This was a real customer-facing production incident on the calmsand prod endpoint `128f64b5-ffb5-41f2-9ba2-c874f5ea7335`.
+  - Added two pure helpers in [api/src/modules/scim/common/scim-service-helpers.ts](api/src/modules/scim/common/scim-service-helpers.ts): `computeTouchedPatchKeys` (resolves each operation's path - URN-prefixed, sub-attribute, value-filter, simple, or no-path object - to the set of top-level attributes it touches) and `scopePatchPayloadToTouched` (builds a reduced `schemas` + touched-attributes payload for strict post-PATCH validation).
+  - Wired into all three SCIM services (Users, Groups, Generic) so the behavior is identical across the Prisma and InMemory backends.
+  - Pre-merge per-operation validation (`SchemaValidator.validatePatchOperationValue`), `enforcePrimaryConstraint`, and `checkImmutableAttributes` are unchanged and still operate on the full merged payload - a PATCH that itself introduces an invalid sub-attribute on a touched attribute is still correctly rejected. PUT and POST full-payload validation is unaffected.
+  - No data is modified: this is a validation-path change only. Pre-existing stored data is preserved as-is.
+
+### Validation
+
+- API build: PASS.
+- New unit tests for `computeTouchedPatchKeys` + `scopePatchPayloadToTouched` in [api/src/modules/scim/common/scim-service-helpers.spec.ts](api/src/modules/scim/common/scim-service-helpers.spec.ts) (Patch-filtered run: 40 passed).
+- Service unit suites (Users/Groups/Generic): 330 passed across 3 suites.
+- New E2E regression [api/test/e2e/patch-untouched-attribute-validation.e2e-spec.ts](api/test/e2e/patch-untouched-attribute-validation.e2e-spec.ts): 2 passed (proxyAddresses-only PATCH succeeds despite untouched schema-invalid emails[].primary; a PATCH that touches emails with primary is still rejected 400).
+- New live-test section 9z-AL in [scripts/live-test.ps1](scripts/live-test.ps1) covering the same scenario across local/Docker/Azure deployments.
 
 ## [0.53.0] - 2026-06-02 - Phase Q follow-up: Workbench redesign, endpoint wiki, docs, and PostgreSQL parity
 
