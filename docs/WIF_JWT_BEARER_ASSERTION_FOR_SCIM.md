@@ -377,6 +377,38 @@ flowchart TD
 
 > **Guard fall-through note.** The token issued here is the ISV's own JWT, so the existing OAuth-JWT branch in [shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) validates it on SCIM calls with no new code, provided the issuer/audience match what the guard expects per endpoint.
 
+### 8.6 Per-endpoint enablement and auth coexistence
+
+WIF is **one settings-enabled auth feature among several**, configured **per endpoint** exactly like every other SCIMServer capability. It is **not** a global mode and it does **not** replace the existing auth patterns - an operator turns it on for a specific endpoint by setting the `WifCredentialsEnabled` flag in that endpoint's profile settings (the same `endpoint.profile.settings` config object that holds `PerEndpointCredentialsEnabled`, `StrictSchemaValidation`, and the rest) and attaching a `wif` credential. Endpoints that do not enable it are completely unaffected, and an endpoint may keep its bearer / OAuth / legacy auth working alongside WIF during a migration.
+
+**Each auth pattern keeps its own per-endpoint enabling mechanism:**
+
+| Pattern | Per-endpoint enabling mechanism | Still works when WIF is on? |
+|---|---|---|
+| Per-endpoint bcrypt bearer (G11) | `PerEndpointCredentialsEnabled` flag + a `bearer` credential | Yes - unchanged |
+| OAuth 2.0 JWT (issuer-mode) | The issued token is validated by the OAuth-JWT guard branch | Yes - WIF reuses this branch for its issued token |
+| Legacy global bearer | `SCIM_SHARED_SECRET` (deployment-wide fallback) | Yes - unchanged |
+| **WIF (Pattern 8)** | **`WifCredentialsEnabled` flag + a `wif` credential** | **n/a - this is the feature** |
+
+**The guard's per-endpoint resolution order is additive (no branch is removed):**
+
+```mermaid
+flowchart TD
+    A[SCIM request with Bearer token] --> B{Endpoint has<br/>PerEndpointCredentialsEnabled?}
+    B -- yes --> C[Try per-endpoint bcrypt bearer credentials]
+    B -- no --> D
+    C -- match --> OK[200 authorized]
+    C -- no match --> D[Validate as OAuth JWT]
+    D -- valid --> OK
+    D -- invalid --> E{Matches SCIM_SHARED_SECRET?}
+    E -- yes --> OK
+    E -- no --> FAIL[401 Unauthorized]
+```
+
+> **Where WIF plugs in.** WIF does not add a new SCIM-call branch. It adds a path at the **token endpoint** (gated by `WifCredentialsEnabled` + a `wif` credential) that mints the ISV's own JWT; that JWT is then accepted by the **existing** OAuth-JWT branch above. So enabling WIF on one endpoint changes only how that endpoint obtains a token, never how any other endpoint authenticates.
+
+> **Config-flag discipline.** `WifCredentialsEnabled` is a normal endpoint config flag and MUST satisfy the 10-cell completeness matrix (`endpointConfigFlagAudit`): registry + default (`false`) + validator + enforcement + unit test + E2E test + live test + doc + UI Switch + UI test. Its default is `false`, so existing endpoints are untouched until an operator opts in.
+
 ---
 
 ## 9. UI design
@@ -399,7 +431,7 @@ flowchart TD
 | Client ID / Token URL / SCIM URL (read-only, copyable) | `CopyableField` |
 | Full trust record (copy as JSON) | `CopyJsonButton` |
 
-- **Gating flag:** a `WifCredentialsEnabled` boolean in the config registry (10-cell completeness per `endpointConfigFlagAudit`).
+- **Gating flag:** a `WifCredentialsEnabled` boolean in the config registry, set **per endpoint** in that endpoint's profile settings (default `false`). The "Federated Identity (WIF)" section renders only when the endpoint has opted in; endpoints without it see no change. 10-cell completeness per `endpointConfigFlagAudit`.
 - **Test Connection UX:** posts a synthetic assertion (or asks the operator to trigger one) and reports each validation step's pass/fail with the specific failing claim.
 - **Coverage:** Playwright spec under `web/e2e/` exercising the WIF panel end-to-end; vitest for the panel's rendered structure and primitive presence by `data-testid`.
 
