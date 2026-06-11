@@ -30,8 +30,9 @@
 - [11. Quality gates and test matrix](#11-quality-gates-and-test-matrix)
 - [12. Error responses and RFC 6749 conformance](#12-error-responses-and-rfc-6749-conformance)
 - [13. Step-by-step implementation plan](#13-step-by-step-implementation-plan)
-- [14. FAQ](#14-faq)
-- [15. References](#15-references)
+- [14. Effort estimates](#14-effort-estimates)
+- [15. FAQ](#15-faq)
+- [16. References](#16-references)
 
 ---
 
@@ -261,6 +262,13 @@ stateDiagram-v2
 | Token endpoint | [oauth.controller.ts](../api/src/oauth/oauth.controller.ts): rejects non-`client_credentials`; reads JSON body via `@Body()` | Accept `client_assertion` + `client_assertion_type`; parse `application/x-www-form-urlencoded` |
 | Per-endpoint credential model | [schema.prisma](../api/prisma/schema.prisma) `EndpointCredential` has `credentialType` + `metadata` JSON | A new `wif` `credentialType` storing trust config; **no secret column populated** |
 | Config flags | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts): `boolean | string` only | A `'structured'` flag-type (Pre-Q.A) for the WIF trust object |
+
+> **Verified greenfield note (2026-06-11 source check).** Every prerequisite below the WIF layer is genuinely unbuilt - none is partially present:
+> - **No JWKS / `jose`.** [api/package.json](../api/package.json) declares no `jose`, `jwks-rsa`, or equivalent; there is no `createRemoteJWKSet` or JWKS code anywhere in `api/src`. Q2 starts from zero.
+> - **No form-urlencoded parsing.** The [api/src/main.ts](../api/src/main.ts) bootstrap registers no `urlencoded`/`useBodyParser`, so the token endpoint cannot read the WIF form body today (Q6.1).
+> - **No `client_assertion` path.** Zero matches for `client_assertion` in `api/src`.
+> - **Issuer is HS256-only.** No RS256/ES256 anywhere, so Pre-Q.B is a from-scratch asymmetric-key change.
+> - **`oauth_client` is reserved, not implemented.** [admin-credential.controller.ts](../api/src/modules/scim/controllers/admin-credential.controller.ts) accepts `oauth_client` in its allowlist, but the create path always mints a bcrypt **bearer** token and the DTO carries only `label`/`credentialType`/`expiresAt` (no trust/client config). Q1 is therefore real new work, not a flag flip.
 
 ---
 
@@ -580,7 +588,59 @@ A WIF commit is complete only when the standing **Feature / Bug-Fix Commit Check
 
 ---
 
-## 14. FAQ
+## 14. Effort estimates
+
+> **What this is.** A bottom-up effort estimate in **ideal engineering-days for one developer already fluent in this codebase**, working TDD-first and reusing the existing G11 / OAuth / dual-backend patterns. "Ideal day" = focused build + test time, excluding meetings, context-switching, and review latency. These are effort sizes, not calendar dates; see the calendar note below.
+
+> **Basis (2026-06-11 source check).** The §5 verified-greenfield note governs this estimate: `jose`/JWKS, form-urlencoded parsing, `client_assertion`, asymmetric issuance, and a real per-endpoint OAuth client are all absent today, so Q6 must build its full prerequisite stack. Nothing below is discounted as "already done."
+
+| Phase | Low (days) | High (days) | Primary effort driver |
+|---|---|---|---|
+| Pre-Q.A structured flag type | 1 | 2 | registry + validator + 10-cell flag matrix |
+| Pre-Q.B asymmetric key + JWKS publish | 2 | 3 | key load, `kid`, new JWKS controller, guard verify |
+| Q1 per-endpoint OAuth client | 3 | 4 | model + issuance + dual-backend parity |
+| Q2 external JWKS validator (`jose`) | 3 | 4 | new dep, alg-pinning, cache, fail-closed, SSRF allowlist |
+| Q6.1 form-urlencoded intake | 1 | 2 | body parser + routing + error catalog (section 12) |
+| Q6.2 `wif` persistence (no secret) | 2 | 2 | DTO + parity + no-secret contract test |
+| Q6.3 `WifAssertionValidatorService` | 3 | 4 | security core; heaviest test surface |
+| Q6.4 own-token issuance | 1 | 1 | wiring validator -> issuer |
+| Q6.5 reciprocal CredentialsTab UI | 3 | 4 | UI + vitest + Playwright + flag matrix |
+| **Subtotal (build + unit/E2E)** | **19** | **29** | |
+| Quality-gate overhead (~25%) | 5 | 9 | live-test.ps1 (local/Docker/Azure), Playwright-vs-dev, full pipeline, CHANGELOG/Session/docs, Stage X audits |
+| **Total ideal dev-days** | **~24** | **~38** | roughly 5 to 8 ideal engineering-weeks |
+
+**Critical path and parallelism:**
+
+```mermaid
+flowchart LR
+    PreA[Pre-Q.A 1-2d] --> Q62[Q6.2 2d]
+    PreB[Pre-Q.B 2-3d] --> Q1[Q1 3-4d]
+    PreB --> Q2[Q2 3-4d]
+    Q1 --> Q61[Q6.1 1-2d]
+    Q2 --> Q63[Q6.3 3-4d]
+    Q61 --> Q63
+    Q62 --> Q63
+    Q63 --> Q64[Q6.4 1d]
+    Q64 --> Q65[Q6.5 3-4d]
+```
+
+- Pre-Q.A and Pre-Q.B have no dependency on each other; Q1 and Q2 can run in parallel once Pre-Q.B lands. With two developers the calendar compresses toward roughly 3 to 4 weeks while total effort is unchanged.
+- **Q6.3 is the long pole by risk, not size.** Its code is modest, but the security tests (algorithm confusion, fail-closed on JWKS outage, tenant isolation, JWKS rotation by `kid`) are where estimates slip.
+
+**Confidence and what moves the number:**
+
+| Factor | Effect |
+|---|---|
+| Developer new to the repo | roughly doubles the total |
+| Q4 (Auth-Code) or Q5 (mTLS/DPoP) pulled in | out of scope here; each is its own multi-day effort |
+| Review cycles + CI queue + serialized shared `scimserver-dev` Azure target | extends **calendar** time beyond ideal-days; not sizable from the repo alone |
+| Reusing `jose` defaults rather than hand-rolling JWKS caching | trims Q2 toward the low end |
+
+> **Calendar caveat.** Ideal dev-days are not wall-clock days. The standing multi-stage gate suite (Stages 0-6 plus Stage X audits), the single shared dev Azure environment that must be serialized across concurrent work, and human review latency all stretch calendar delivery. Treat ~24-38 ideal dev-days as the **effort floor**, then apply your team's historical ideal-to-calendar ratio.
+
+---
+
+## 15. FAQ
 
 **Is this RFC 7523 grant-type usage?** No. It is RFC 7523 **section 2.2** (JWT used for **client authentication**), with `grant_type=client_credentials`. The assertion authenticates the client; it is not the grant.
 
@@ -594,7 +654,7 @@ A WIF commit is complete only when the standing **Feature / Bug-Fix Commit Check
 
 ---
 
-## 15. References
+## 16. References
 
 ### Primary (internal + reconciled)
 
