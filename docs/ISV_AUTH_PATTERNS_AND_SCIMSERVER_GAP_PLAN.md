@@ -247,6 +247,48 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 
 > **Pattern 4 vs Pattern 8 (do not conflate).** Pattern 4 is *direct* external JWT: Entra puts its own JWT on the SCIM call and the ISV verifies it per request, issuing nothing. Pattern 8 (WIF) adds a **token-exchange hop**: the Microsoft JWT is a *client-authentication assertion* presented at the **token endpoint**, and the ISV mints its **own** scoped short-lived token that rides the SCIM calls. WIF reuses Pattern 4's JWKS validator (Q2) but is a separate flow (Q6).
 
+### 3.9 Mixed and coexisting auth methods (the two-axis model)
+
+None of the 8 patterns above is mutually exclusive. "Mixed auth" in a real ISV-plus-IdP integration is not one feature - it is **two independent axes** that meet at SCIM discovery. WIF (Pattern 8) is simply **one more method that an endpoint can enable** alongside the others, not a replacement for them.
+
+- **ISV axis (the SCIM server / SCIMServer):** a single endpoint MAY enable and **accept several auth methods at once**. The shipped fallback chain in [section 1.1](#11-the-auth-fallback-chain-already-shipped) is **additive** - per-endpoint bcrypt bearer, then self-issued OAuth JWT, then legacy `SCIM_SHARED_SECRET` already coexist on the same endpoint, and a request that satisfies any branch is authorized. Each new pattern (Q1 per-endpoint OAuth, Q2 external JWKS, Q6 WIF) adds one more accepted branch; it does not remove the others.
+- **IdP axis (Microsoft Entra and peers):** the IdP selects **exactly one** method per provisioning job. Entra's Provisioning "Admin Credentials" page is single-select - Basic, long-lived bearer token, OAuth client credentials, or WIF - and never sends two auth methods on one job. So "mixed" on the IdP side means different jobs/customers pick different methods, not one job using two.
+- **The bridge is discovery.** RFC 7643 section 5 defines `authenticationSchemes` (on `/ServiceProviderConfig`) as a **multi-valued complex attribute**; the RFC's own example advertises `oauthbearertoken` **and** `httpbasic` together, with `primary:true` on exactly one. So the ISV can **advertise the full set it accepts** while each IdP **picks one** from that set.
+
+```mermaid
+flowchart TD
+    subgraph IdP["IdP axis - picks ONE per job"]
+        I3[OAuth2 client credentials]
+        I4[WIF JWT assertion]
+        I2[Long-lived bearer legacy]
+    end
+    subgraph ISV["ISV axis - endpoint ENABLES and ACCEPTS a SET"]
+        E1[Per-endpoint bearer]
+        E2[OAuth issuer JWT]
+        E3[Legacy shared secret]
+        E4[WIF token exchange]
+    end
+    ISV --> ADV[ServiceProviderConfig.authenticationSchemes advertises the whole enabled set]
+    I3 -. selects one of .-> ADV
+    I4 -. selects one of .-> ADV
+    I2 -. selects one of .-> ADV
+```
+
+**Why this matters operationally - the migration case.** The two axes make a **zero-downtime auth migration** possible: enable BOTH the old and the new method on the endpoint (ISV axis accepts the set), then flip the Entra job from the old method to the new one (IdP axis re-selects), then retire the old method once the job is confirmed green. This is exactly how a customer would move from a long-lived bearer to WIF without a provisioning outage.
+
+**Mapping each SCIMServer-accepted method to its enable mechanism and advertised scheme:**
+
+| SCIMServer accepted method | Enable mechanism | RFC 7643 `authenticationSchemes` `type` to advertise |
+|---|---|---|
+| Legacy global bearer (Pattern 1) | `SCIM_SHARED_SECRET` env (present = on) | `oauthbearertoken` |
+| OAuth issuer-mode JWT (Pattern 2) | global client always present | `oauth2` |
+| Per-endpoint bcrypt bearer (Pattern 3) | `PerEndpointCredentialsEnabled` flag | `oauthbearertoken` |
+| Per-endpoint OAuth client_id/secret (Pattern 5, Q1) | `oauth_client` credential on the endpoint | `oauth2` |
+| External JWKS-validated JWT (Pattern 4, Q2) | per-endpoint `externalAuth` config | `oauth2` |
+| WIF token exchange (Pattern 8, Q6) | `wif` credential / per-endpoint WIF flag | `oauth2` |
+
+> **Design consequence.** Today `/ServiceProviderConfig` advertises a single hard-coded `oauthbearertoken` scheme. To make the ISV axis honest, the advertised `authenticationSchemes` array should be **computed from the set of methods actually enabled on the endpoint** (one entry per enabled method, `primary:true` on the operator's preferred one). This is tracked as an adjacent gap in [section 4.3](#43-adjacent-gaps-not-strictly-auth-but-co-located) and, for the WIF entry specifically, as gap row 9 in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) section 6.
+
 ---
 
 ## 4. Gap Analysis: SCIMServer vs Industry
@@ -288,6 +330,7 @@ These gaps come up in the **same** integration conversation as auth, so it's wor
 | Token-expiry telemetry | Cron emits "credential expiring in 90/60/30/15 days" events; UI surfaces them on the CredentialsTab | Production deployments using per-endpoint credentials | Low (Phase N3 - telemetry) |
 | `WWW-Authenticate` header on 401 | RFC 6750 §3 mandates `WWW-Authenticate: Bearer realm="...", error="invalid_token", error_description="..."` on 401; SCIMServer today returns SCIM error envelope but not the header | RFC compliance + auth-debugging tools | Medium (Q-cleanup) |
 | OAuth metadata discovery | `.well-known/oauth-authorization-server` (RFC 8414) lets clients auto-discover `token_endpoint`, `jwks_uri`, etc. | OAuth 2.1 / OIDC interop | Low (Q-cleanup) |
+| Multi-scheme `authenticationSchemes` advertisement | `/ServiceProviderConfig` advertises **one entry per auth method actually enabled on the endpoint** (RFC 7643 section 5 multi-valued attribute) instead of a single hard-coded `oauthbearertoken`; this is the discovery "bridge" for the two-axis model in [section 3.9](#39-mixed-and-coexisting-auth-methods-the-two-axis-model) | Any client/operator discovering what an endpoint accepts; required for honest WIF advertisement | Medium (ships incrementally with Q1/Q2/Q6) |
 
 ---
 
@@ -624,6 +667,7 @@ The following entries from [.github/copilot-instructions.md](../.github/copilot-
 - **Slack:** [Using the Slack SCIM API - docs.slack.dev](https://docs.slack.dev/admins/scim-api) - "Acquire an OAuth token" + "Restrict API token usage by IP address" + "Using SCIM in an Enterprise organization"
 - **AWS IAM Identity Center:** [Provision users and groups from an external identity provider using SCIM - AWS IAM Identity Center User Guide](https://docs.aws.amazon.com/singlesignon/latest/userguide/provision-automatically.html) - "How to monitor access token expiry"
 - **Zoom:** [Zoom Developer Docs - Users API](https://developers.zoom.us/docs/api/users/) (Zoom's SCIM API is a thin layer on top of Server-to-Server OAuth)
+- **Microsoft Entra WIF (multi-method context):** [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - confirms WIF is one selectable Admin-Credentials method among Basic / bearer / OAuth client credentials / WIF (the IdP axis is single-select). Updated 2026-06-09.
 
 ### 8.3 ISV / consumer docs (MEDIUM confidence - documented from prior knowledge; not re-fetched in this audit)
 
