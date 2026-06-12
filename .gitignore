@@ -145,6 +145,16 @@ coderush/
 # Scratch / ad-hoc screenshots captured during ops or Playwright runs.
 # Only the curated docs/screenshots/prod-*.png narrative set is committed;
 # everything else is regenerable and must not be added by `git add -A`.
+#
+# Deny-by-default: ignore EVERYTHING under docs/screenshots/ and re-include
+# only the curated prod-* narrative set. This makes the wrong outcome
+# impossible - any stray ad-hoc / Playwright capture dropped into this folder
+# is ignored automatically, so it can never be picked up by `git add -A`.
+# To commit a new keeper, name it prod-<NN>-<surface>.png and reference it
+# from a live .md (see the Doc Screenshot Hygiene Rule in copilot-instructions).
+docs/screenshots/*
+!docs/screenshots/prod-*.png
+# Legacy scratch patterns kept explicit for clarity (covered by the wildcard).
 docs/screenshots/scratch/
 docs/screenshots/tmp-*.png
 docs/screenshots/*.tmp.png
