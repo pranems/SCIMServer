@@ -145,6 +145,24 @@ Origin: 2026-06-04 repo-hygiene audit. `docs/screenshots/` had grown to 48 PNGs 
 4. **Scratch captures are git-ignored.** Ad-hoc / Playwright scratch shots go to `docs/screenshots/scratch/` or `tmp-*.png` (both `.gitignore`d) and must never be added by `git add -A`.
 5. **Optimize keepers.** Keeper PNGs should be size-optimized (oxipng/pngquant) when tooling is available before commit.
 
+### Scratch Image Handling (CRITICAL - added 2026-06-12 after a 38-PNG stray-capture recurrence)
+
+Origin: 2026-06-12. A Playwright / ad-hoc capture run dropped 38 numbered PNGs (`01-*.png` ... `35-*.png`, 2.69 MB) straight into `docs/screenshots/`. The pre-existing `.gitignore` only listed `scratch/`, `tmp-*.png`, and `*.tmp.png`, so the stray files were NOT ignored and `git add -A` would have committed all 38 as orphans - the exact bug class Rule 4 above is meant to prevent. The fix makes the wrong outcome structurally impossible:
+
+1. **Deny-by-default allowlist in `.gitignore`.** `docs/screenshots/` is now `docs/screenshots/*` ignored with a single re-include `!docs/screenshots/prod-*.png`. Any capture dropped into that folder is ignored automatically; only a deliberately-named `prod-*` keeper can ever be staged. Do NOT weaken this back to a per-pattern denylist.
+2. **One canonical capture destination.** All ad-hoc / Playwright captures MUST land in `test-results/ui-screenshots/` (the `saveScreenshot()` helper in [web/e2e/fixtures.ts](web/e2e/fixtures.ts) already writes there) or `docs/screenshots/scratch/`. NEVER point a capture run directly at `docs/screenshots/`.
+3. **Promotion is explicit.** To turn a scratch capture into a committed keeper: copy it to `docs/screenshots/prod-<NN>-<surface>.png`, optimize it (Rule 5), AND add a reference from a live `.md` in the SAME commit. A `prod-*` file with no live `.md` reference is still an orphan and is forbidden.
+4. **Audit gate.** [scripts/audit-screenshots.ps1](scripts/audit-screenshots.ps1) fails if any tracked PNG under `docs/screenshots/` is not `prod-*` OR is not referenced by a live `.md`. Run it in Stage 1 (static gates) whenever `docs/screenshots/` or a doc that embeds an image changes.
+
+### UI Guide Refresh Process (CRITICAL - added 2026-06-12)
+
+[docs/UI_GUIDE.md](docs/UI_GUIDE.md) is the human-facing tour of the running app and goes stale when surfaces change or new routes ship without a screenshot. To keep it current without bloating git history:
+
+1. **Reproducible re-shoot.** Use [scripts/capture-ui-guide.ps1](scripts/capture-ui-guide.ps1) to re-capture ONLY the curated `prod-*` surfaces against a live URL at a pinned viewport, optimize them, and overlay the existing keepers. NEVER do an uncurated full re-shoot (Rule 1 of the hygiene rule).
+2. **Provenance.** The capture command + date + target URL are recorded at the top of UI_GUIDE.md so reviewers can tell how stale a shot is and reproduce it.
+3. **Coverage check.** The audit gate (`audit-screenshots.ps1 -CheckRouteCoverage`) flags any top-level route under `web/src/routes/` that UI_GUIDE.md neither screenshots nor explicitly lists as intentionally undocumented - mirroring the existing "every new lazy route needs a size-limit entry" discipline.
+4. **Re-shoot is intentional, never blind.** A re-shoot commit MUST state in its message which surfaces changed and why, and the binary diff MUST be reviewed (per the visual-regression discipline) before the new keepers are committed.
+
 ## Schema-Characteristic Test Rule (CRITICAL - RFC 7643 §2.2 + §7)
 
 When writing tests against `/Schemas` attribute definitions (unit, E2E, or live), the test MUST:
