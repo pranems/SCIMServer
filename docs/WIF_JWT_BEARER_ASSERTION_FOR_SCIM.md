@@ -14,6 +14,8 @@
 
 > **Reconciliation note.** Where the internal doc and the public reference differ, the internal doc is treated as authoritative for **Entra's** behavior (issuer, audience format, role enforcement, deprecation timeline) and the public reference is treated as authoritative for the **wire format** an ISV must implement. They agree on the core: this is RFC 7523 client authentication, not RFC 7523 grant-type usage.
 
+> **Stakeholder decisions folded in (2026-06-12).** A design review with the Entra provisioning owner settled three points that update this doc: (1) **Entra v2 tokens are the only supported format** - the issuer/audience values throughout were switched to the v2 shape and section 4.1 is now a DECIDED record, not an open question. (2) **A second assertion profile is coming: RFC 8693 (OAuth Token Exchange)** alongside today's RFC 7523 (JWT bearer assertion); see [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange). (3) **App-role enforcement is forward-looking** - roles are not currently passed or validated in the assertion; see the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks).
+
 ## Table of contents
 
 - [0. TL;DR](#0-tldr)
@@ -64,7 +66,7 @@ flowchart LR
 | Deprecation context | (n/a) | Username-password, long-lived bearer, and OAuth Auth Code Grant are being **deprecated**; Client Credentials is currently the **only** method offered to new ISVs; WIF is its credential-free replacement |
 | ISV demand | (n/a) | Google, Zoom, and SAP have asked for credential-free onboarding |
 | Audience format | `api://<appid>` | `api://{WorkloadIdentity_appid}/.default` |
-| Authorization | "validate the token" | The ISV **must** enforce **app roles / permissions** carried in the assertion, not just signature |
+| Authorization | "validate the token" | The ISV **must** enforce **app roles / permissions** carried in the assertion, not just signature (**see the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks): roles are not passed/validated today; this is forward-looking**) |
 | Scope | (optional) | The ISV **defines** the scope string it expects (e.g. `zoom-scim-access`) and returns a token scoped to it |
 
 ### 1.1 The problem WIF solves
@@ -101,6 +103,34 @@ flowchart TD
 ```
 
 The Microsoft-signed JWT is a **client-authentication assertion** (RFC 7523 section 2.2). It never rides the SCIM calls. The token that rides the SCIM calls is the ISV's own.
+
+### 1.4 Two assertion profiles: RFC 7523 (jwt-bearer) and RFC 8693 (token-exchange)
+
+WIF is not a single wire shape. Entra is rolling out **two OAuth profiles** for presenting its signed JWT at the ISV token endpoint, and an ISV declares which one it supports at onboarding (recorded in app metadata; a marker in the connectivity config tells Entra which profile to use, so Entra auto-selects the matching request shape). They are **different grant types with different request bodies** - not two versions of one call.
+
+| Aspect | **`jwt-bearer`** (RFC 7523 section 2.2) | **`token-exchange`** (RFC 8693) |
+|---|---|---|
+| Status | **Shipped today** (SAP SuccessFactors is the first ISV) | **Coming** (Google is the example ISV) |
+| `grant_type` | `client_credentials` | `urn:ietf:params:oauth:grant-type:token-exchange` |
+| Entra's JWT is carried as | `client_assertion` (+ `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`) | `subject_token` (+ `subject_token_type=urn:ietf:params:oauth:token-type:jwt`) |
+| Role of the JWT | **Client authentication** - proves who the caller is | **The subject being exchanged** - the token traded for a new one |
+| Other params | `client_id`, `scope` | `subject_token_type` (REQUIRED), optional `resource` / `audience` / `scope` / `requested_token_type` / `actor_token` |
+| Response adds | standard OAuth token response | also `issued_token_type` (REQUIRED) |
+| Semantics | client-auth then mint the ISV token | STS-style exchange; supports impersonation (subject only) vs delegation (subject + actor, composite token carries an `act` claim) |
+
+> **Proposed config naming.** The per-endpoint `wif` trust record (section 8) gains an `assertionProfile` discriminator with exactly these two values - **`jwt-bearer`** and **`token-exchange`** - chosen to be the literal URN tails so the config value self-documents and matches the wire. Display names: **"JWT Bearer Assertion (RFC 7523)"** and **"OAuth Token Exchange (RFC 8693)"**. Simultaneous support of both profiles on one endpoint is technically possible but rare in practice; the common case is one profile per endpoint, fixed at onboarding.
+
+> **The two RFCs compose, they do not compete.** RFC 7523 is a *client-authentication method*; RFC 8693 is a *grant type for exchanging tokens*. RFC 8693 even names RFC 7523 as one way a client may authenticate during a token exchange. Both flows still end identically for the SCIM endpoint: a short-lived ISV-issued bearer token rides the SCIM calls.
+
+```mermaid
+flowchart TD
+    subgraph P7523["jwt-bearer - RFC 7523, today"]
+        A1[Entra JWT as client_assertion] --> A2[grant_type client_credentials] --> A3[ISV validates client auth] --> A4[ISV mints own short-lived token]
+    end
+    subgraph P8693["token-exchange - RFC 8693, upcoming"]
+        B1[Entra JWT as subject_token] --> B2[grant_type token-exchange] --> B3[ISV validates subject_token] --> B4[ISV returns access_token plus issued_token_type]
+    end
+```
 
 ---
 
@@ -154,6 +184,39 @@ Authorization: Bearer <ISV-issued JWT>
 
 > **Precision note.** Entra sends the assertion as form fields, URL-encoded. The `client_assertion_type` value is the literal `urn:ietf:params:oauth:client-assertion-type:jwt-bearer`. An endpoint that reads only JSON bodies (SCIMServer today) will silently see empty fields.
 
+> **Separable token and SCIM endpoints.** The token endpoint and the SCIM endpoint do **not** have to share a host (or even an operator). The public AzureAD reference's SAP SuccessFactors example posts the assertion to `auth.successfactors.example.com` and then calls SCIM at `scim.successfactors.example.com` - two different hosts. The SCIM endpoint simply validates the incoming `Bearer` token regardless of where it was minted; token-issuance and resource-serving are independent responsibilities. SCIMServer's own per-endpoint token URL and SCIM URL (section 3, Step 3) are co-located by default, but the trust model does not require it - an ISV may front the token exchange in one environment and the SCIM resource in another.
+
+### 2.1 The `token-exchange` variant (RFC 8693, upcoming)
+
+The request above is the **`jwt-bearer`** profile ([section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)). The upcoming **`token-exchange`** profile carries the same Microsoft-signed JWT, but as the `subject_token` of an RFC 8693 token exchange rather than as a `client_assertion`:
+
+```http
+POST /endpoints/{id}/oauth/token HTTP/1.1
+Host: isv.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange
+&subject_token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.eyJhdWQiOiJhcGk6...
+&subject_token_type=urn%3Aietf%3Aparams%3Aoauth%3Atoken-type%3Ajwt
+&scope=scimserver-scim-access
+```
+
+The response is a normal OAuth token response **plus** the RFC 8693-required `issued_token_type`:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "access_token": "<ISV-issued JWT>",
+  "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+> **What stays identical.** The JWKS-based signature + `iss`/`aud`/`sub`/`tid`/time-window validation of the Microsoft JWT (section 4) is **the same** for both profiles - only the field name carrying the JWT (`client_assertion` vs `subject_token`) and the `grant_type` differ. The SCIM call that follows is byte-for-byte identical: a `Bearer` token the ISV minted. RFC 8693 also defines `resource`, `audience`, `requested_token_type`, and delegation via `actor_token` (producing a composite token with an `act` claim); none are required for the basic WIF exchange, so they are out of scope until a concrete integration needs them.
+
 ---
 
 ## 3. The three-step admin setup
@@ -169,10 +232,12 @@ flowchart TD
 
 | Value | Example |
 |---|---|
-| Issuer | `https://sts.windows.net/<TenantID>/` |
+| Issuer | `https://login.microsoftonline.com/<TenantID>/v2.0` |
 | Subject | `{WorkloadIdentity_object_id}` |
 | Audience | `api://{WorkloadIdentity_appid}/.default` |
 | JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` |
+
+> **v2 issuer/audience (decided - see [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)).** The **Issuer** is the Entra **v2.0** value (`login.microsoftonline.com/<TenantID>/v2.0`), validated by **exact string match**. The **Audience** shown here is the admin-facing value the operator copies (the App ID URI plus the `/.default` scope suffix); note that the **`aud` claim in the actual token is `api://{appid}`** - the App ID URI **without** `/.default` (the `/.default` is the requested scope, not the token audience). The ISV validates the token `aud` against `api://{appid}`.
 
 **Step 2 - the ISV stores those four values as a per-endpoint trust record. No secret is created.**
 
@@ -190,31 +255,36 @@ flowchart TD
 
 | Claim | Meaning | ISV check |
 |---|---|---|
-| `aud` | `api://{appid}/.default` | Must equal the configured audience |
-| `iss` | `https://sts.windows.net/<TenantID>/` | Must equal the configured issuer |
+| `aud` | `api://{appid}` (App ID URI, **no** `/.default`) | Must equal the configured audience |
+| `iss` | `https://login.microsoftonline.com/<TenantID>/v2.0` | Must equal the configured issuer (**exact string match**) |
 | `sub` | Workload identity object id | Must equal the configured subject |
 | `tid` | Tenant id | Must equal the allowed tenant (isolation) |
 | `oid` | Object id of the calling principal | Logged; used for audit |
-| `appid` | App id of the caller | Cross-checked against `client_id` |
-| `roles` | App roles granted to the workload identity | Must contain every required role |
+| `appid` / `azp` | App id of the caller (`appid` historically; `azp` is the v2 authorized-party claim) | Cross-checked against `client_id` |
+| `roles` | App roles granted to the workload identity | Must contain every required role (**not passed/validated today - see the upcoming-changes note below**) |
+| `ver` | Token version | Is `2.0`; v1 tokens are not supported |
 | `iat` / `nbf` / `exp` | Validity window | Reject outside window (with small clock skew) |
 
-**Example assertion payload (verbatim shape):**
+**Example assertion payload (v2, verbatim shape from the public AzureAD reference):**
 
 ```json
 {
-  "aud": "api://1f2e3d4c-5b6a-7980-1234-567890abcdef/.default",
-  "iss": "https://sts.windows.net/9a8b7c6d-5e4f-3021-abcd-ef1234567890/",
-  "sub": "0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0",
-  "tid": "9a8b7c6d-5e4f-3021-abcd-ef1234567890",
-  "oid": "0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0",
-  "appid": "1f2e3d4c-5b6a-7980-1234-567890abcdef",
-  "roles": ["Scim.Provision"],
-  "iat": 1717372800,
-  "nbf": 1717372800,
-  "exp": 1717376400
+  "aud": "api://b5ba7a93-4452-4522-aeb4-a2b5da870c16",
+  "iss": "https://login.microsoftonline.com/ce5f061f-abe6-4e40-9615-301f87bcb7f0/v2.0",
+  "iat": 1772175916,
+  "nbf": 1772175916,
+  "exp": 1772179816,
+  "appid": "b5ba7a93-4452-4522-aeb4-a2b5da870c16",
+  "appidacr": "2",
+  "idp": "https://login.microsoftonline.com/ce5f061f-abe6-4e40-9615-301f87bcb7f0/v2.0",
+  "oid": "d2f8ee76-c549-45b8-a143-f5b640669704",
+  "sub": "<Sync Fabric Workload Identity 1P app object ID>",
+  "tid": "ce5f061f-abe6-4e40-9615-301f87bcb7f0",
+  "ver": "2.0"
 }
 ```
+
+> **Note the `aud` shape.** In this real v2 example the `aud` is `api://b5ba7a93-...` - the **App ID URI form** `api://{appid}`, **not** the `/.default` scope form and **not** a bare GUID. The `/.default` the admin copied in Step 1 is the requested scope; the token's audience is the App ID URI. There is also no `roles` claim in the documented example, consistent with the upcoming-changes note below.
 
 **Five things the ISV must do:**
 
@@ -223,6 +293,8 @@ flowchart TD
 3. Validate `iss`, `aud`, `sub`, `tid`, and the time window.
 4. Enforce that `roles` contains every required role.
 5. Issue its own short-lived token (1-6 h) scoped to the configured `scope`.
+
+> **Upcoming-changes note - app roles (2026-06-12 stakeholder review).** Step 4 above is **forward-looking, not current behavior.** Per the Entra provisioning owner, **roles are not currently passed in the assertion and are not validated** during provisioning; the documented v2 example token above carries no `roles` claim. Role enforcement is expected to arrive with a planned "1P app method" change (tentatively a few weeks out). Until that lands and is confirmed with a real role-bearing sample token, treat step 4 as **aspirational**: design the validator so role enforcement can be switched on per endpoint, but do not hard-require a `roles` claim that Entra does not yet send. The signature + `iss`/`aud`/`sub`/`tid` + time-window checks (steps 1-3, 5) are the authoritative current contract.
 
 **JWKS rotation and outage rules:**
 
@@ -251,38 +323,30 @@ stateDiagram-v2
     Rejected --> [*]: 401 invalid_client
 ```
 
-### 4.1 OPEN DECISION - v1 vs v2 Entra token format (issuer and audience)
+### 4.1 DECIDED - Entra v2 token format only (issuer and audience)
 
-> **Status: UNDER DISCUSSION with stakeholders. Not yet decided - this subsection records the discrepancy and the choice it forces; it does NOT change the values in section 3 or section 4 above.** The issuer/audience values used throughout this doc are the Entra **v1.0** (`sts.windows.net`) format, taken from the internal design doc and the earlier public reference. A **later** update to the public AzureAD reference (2026-06-09, commit "Update WIF SCIM article for Entra v2 tokens") documents the **v2.0** token format instead. Both formats are real: Entra can emit either, governed by the app registration's `accessTokenAcceptedVersion` / `requestedAccessTokenVersion` manifest setting. Until stakeholders decide, the section 3 Step-1 table and the section 4 claims table keep the v1 values, and this subsection is the authoritative record of the pending change.
+> **Status: DECIDED (2026-06-12 stakeholder review). Entra v2.0 tokens are the only supported format.** Earlier drafts of this doc carried the Entra **v1.0** (`sts.windows.net`) issuer/audience from the internal design doc. The public AzureAD reference was updated 2026-06-09 (commit "Update WIF SCIM article for Entra v2 tokens") to the **v2.0** format, and the Entra provisioning owner confirmed that **v2 is the only format the provisioning service now emits for WIF**. Sections 3 and 4 above have been switched to the v2 values accordingly. Runtime token-version detection is **unnecessary**: the version is fixed by configuration (the resource app's `requestedAccessTokenVersion` / `accessTokenAcceptedVersion` manifest setting), so the ISV does not sniff `ver` per request - it validates against the one configured v2 issuer/audience. The issuer is compared by **exact string match** (an ISV that does a substring or normalized compare can wrongly accept or reject; Entra's own guidance and OIDC require exact-match on `iss`).
 
-**The discrepancy (v1 as documented above vs v2 in the 2026-06-09 reference):**
+**What changed from the retired v1 shape:**
 
-| Claim | v1.0 (this doc, sections 3 and 4) | v2.0 (2026-06-09 reference) | Note |
+| Claim | v1.0 (retired) | v2.0 (authoritative) | Note |
 |---|---|---|---|
-| `iss` | `https://sts.windows.net/<TenantID>/` | `https://login.microsoftonline.com/<TenantID>/v2.0` | Different host **and** a `/v2.0` suffix |
-| `aud` | `api://{appid}/.default` | `{appid}` (bare GUID) | In a v2 token the `aud` is just the **bare `{appid}` GUID**, not the `api://` URI form; `/.default` is the requested **scope**, not the token audience |
-| `ver` | `1.0` | `2.0` | The discriminator claim the validator can branch on |
-| JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | (unchanged) | The keys endpoint is already v2 in both; only `iss`/`aud`/`ver` differ |
+| `iss` | `https://sts.windows.net/<TenantID>/` | `https://login.microsoftonline.com/<TenantID>/v2.0` | Different host **and** a `/v2.0` suffix; validated by **exact string match** |
+| `aud` | `api://{appid}/.default` | `api://{appid}` | The v2 `aud` claim is the **App ID URI** `api://{appid}` - **no** `/.default` suffix (that suffix is the requested *scope*, not the token audience). Confirmed by the concrete example token in the 2026-06-09 reference (`"aud": "api://b5ba7a93-..."`). Note this is the App ID URI form, **not** a bare GUID. |
+| `ver` | `1.0` | `2.0` | Present in the token but used for audit, not branching - version is fixed by config |
+| caller app id | `appid` | `appid` and/or `azp` | v2 tokens may carry the caller app id in `azp` (authorized party); the validator should accept either for the caller-app cross-check |
+| JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | (unchanged) | The keys endpoint is already v2 in both; the v1->v2 change is `iss` + `aud`, **not** the keys path |
 
-**Decision options (to resolve with stakeholders):**
+> **Accuracy correction folded in.** An earlier note in this doc described the v2 `aud` as a *bare `{appid}` GUID*. That is the simplification in the generic Microsoft access-token-claims reference; for **this** WIF flow the documented example token shows `aud` = `api://{appid}` (App ID URI form). The validator must compare the token `aud` against `api://{appid}`, deriving it from the Step-1 admin value by stripping the `/.default` scope suffix (or by storing the App ID URI form directly).
 
-| Option | Behavior | Trade-off |
-|---|---|---|
-| **1. v2-only** | Validate against the v2.0 issuer/audience only | Simplest validator; **rejects** any tenant/app still configured to emit v1 tokens |
-| **2. v1-only** | Keep this doc as-is | Matches the internal design doc; **rejects** the format the latest public reference documents |
-| **3. Both, simultaneously (migration-safe)** | `issuer` and `audience` are **allowlists** holding the v1 **and** v2 strings; validator branches on the `ver` claim and accepts both the v1 `api://{appid}/.default` URI form and the v2 bare `{appid}` GUID form | Maximum interoperability; slightly larger trust config. **Recommended default** |
-| **4. Configurable per endpoint** | A `tokenFormat` field on the WIF trust record accepting `v1`, `v2`, or `both` (default `both`) | Lets a specific integration pin a format if a stakeholder requires it; one extra config field |
+**Implementation impact:** the per-endpoint WIF trust config (section 8) stores a **single** expected issuer and audience (the v2 strings), not an allowlist - there is no v1/v2 dual-accept to maintain. This keeps the validator (section 4, step 3) a straight exact-string comparison. The earlier multi-format option is dropped.
 
-**Implementation impact if option 3 or 4 is chosen:** the per-endpoint WIF trust config (section 8) stores a **set** of accepted issuers + audiences rather than a single string each, and the validator (section 4, step 3) iterates the set. This is a small change to the structured trust object - **not** a new flow. It dovetails with the multi-scheme / coexistence model in [ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md) section 3.9.
+**Sources:**
 
-**Sources for the v2 finding (the ones that differ from the v1 sources cited in sections 3 and 4):**
-
-- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - the public reference, **updated 2026-06-09** (commit message "Update WIF SCIM article for Entra v2 tokens"). This is the source that documents the v2.0 issuer/audience, superseding the v1 shape this doc currently carries.
-- [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - documents the `iss` claim difference: v1.0 `https://sts.windows.net/{tenantid}/` vs v2.0 `https://login.microsoftonline.com/{tenantid}/v2.0`, and the `ver` discriminator.
-- [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference for both token versions (`aud`, `iss`, `ver`, `appid`/`azp`).
-- [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape that produces v2 tokens.
-
-> **Note for the validator design (section 8) when this is decided.** If option 3/4 wins, the `appid` cross-check in section 4 also needs a v2 note: v2.0 tokens carry the caller app id in `azp` (authorized party) rather than `appid` in some flows. The validator should accept either claim for the caller-app cross-check. Confirm against the access-token-claims reference above before implementing.
+- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - the public reference, **updated 2026-06-09** ("Update WIF SCIM article for Entra v2 tokens"); documents the v2.0 issuer/audience and carries the concrete example token whose `aud` is `api://{appid}`.
+- [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - `iss` v1.0 `https://sts.windows.net/{tenantid}/` vs v2.0 `https://login.microsoftonline.com/{tenantid}/v2.0`; the `ver` discriminator; the exact-match `iss` requirement.
+- [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference (`aud`, `iss`, `ver`, `appid`/`azp`).
+- [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape (including the federated-credential case that mirrors WIF in the opposite direction).
 
 ---
 
@@ -318,7 +382,8 @@ stateDiagram-v2
 | 7 | Tenant isolation via `tid` | MISSING | Q6 |
 | 8 | Reciprocal ISV-portal UI (enter 4 values, return 3) | MISSING | Q6 |
 | 9 | Advertise the WIF scheme in per-endpoint `/ServiceProviderConfig` (RFC 7644 section 4) | MISSING (one `oauthbearertoken` scheme today) | Q6 |
-| 10 | Support **both** Entra v1 and v2 issuer/audience formats during migration (or pick one) | OPEN DECISION (see [section 4.1](#41-open-decision---v1-vs-v2-entra-token-format-issuer-and-audience)) | Q6 |
+| 10 | Support Entra v1 and v2 issuer/audience formats | **RESOLVED - v2-only** (see [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)) | Q6 |
+| 11 | Support the `token-exchange` (RFC 8693) profile in addition to `jwt-bearer` (RFC 7523), selected by an `assertionProfile` discriminator on the trust record | Not yet built; design captured in [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange) and [section 2.1](#21-the-token-exchange-variant-rfc-8693-upcoming) | Q6 |
 
 ---
 
@@ -352,7 +417,7 @@ erDiagram
         string id
         string endpointId
         string credentialType "wif"
-        json metadata "expectedIssuer, expectedSubject, expectedAudience, jwksUri, allowedTenantId, requiredRoles, scope, issuedTokenTtlSec"
+        json metadata "assertionProfile, expectedIssuer, expectedSubject, expectedAudience, jwksUri, allowedTenantId, requiredRoles, scope, issuedTokenTtlSec"
     }
 ```
 
@@ -365,17 +430,20 @@ Content-Type: application/json
 {
   "credentialType": "wif",
   "wif": {
-    "expectedIssuer": "https://sts.windows.net/<TenantID>/",
+    "assertionProfile": "jwt-bearer",
+    "expectedIssuer": "https://login.microsoftonline.com/<TenantID>/v2.0",
     "expectedSubject": "{WorkloadIdentity_object_id}",
-    "expectedAudience": "api://{WorkloadIdentity_appid}/.default",
+    "expectedAudience": "api://{WorkloadIdentity_appid}",
     "jwksUri": "https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys",
     "allowedTenantId": "<TenantID>",
-    "requiredRoles": ["Scim.Provision"],
+    "requiredRoles": [],
     "scope": "scimserver-scim-access",
     "issuedTokenTtlSec": 3600
   }
 }
 ```
+
+> **Field notes.** `assertionProfile` selects the wire shape (`jwt-bearer` for RFC 7523 today, `token-exchange` for RFC 8693 upcoming - [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)). `expectedAudience` is the **App ID URI** form `api://{appid}` (what the token's `aud` claim actually contains - [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)), not the `/.default` scope value the admin reads in Step 1. `requiredRoles` defaults to **empty** because roles are not passed/validated today (the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks)); leave it empty until the planned 1P-app-method change lands a role-bearing sample token.
 
 **Token endpoint pseudocode:**
 
@@ -465,7 +533,7 @@ flowchart TD
 
 **Three source-grounded integration points:**
 
-1. **Flag home is the typed profile settings.** Add `WifCredentialsEnabled?: boolean | string` to [ProfileSettings](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) alongside `PerEndpointCredentialsEnabled`, and to the flag registry in [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts). A preset (for example a future `entra-id-wif`) can pre-enable it; an inline profile can set it at create time. This is the same mechanism as the existing 13 flags, so the create/update endpoint API needs no new shape.
+1. **Flag home is the typed profile settings.** Add `WifCredentialsEnabled?: boolean | string` to [ProfileSettings](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) alongside `PerEndpointCredentialsEnabled`, and to the flag registry in [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts). A preset (for example a future `entra-id-wif`) can pre-enable it; an inline profile can set it at create time. This is the same mechanism as the existing 13 flags, so the create/update endpoint API needs no new shape. The `wif` credential's stored trust record (`EndpointCredential.metadata`) carries an **`assertionProfile`** discriminator - `jwt-bearer` (RFC 7523) or `token-exchange` (RFC 8693), per [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange) - that selects which token-endpoint request shape the endpoint accepts. It defaults to `jwt-bearer` (today's shipped profile).
 
 2. **The credential-create gate must become orthogonal.** Today [admin-credential.controller.ts](../api/src/modules/scim/controllers/admin-credential.controller.ts) blocks **all** credential creation unless `PerEndpointCredentialsEnabled` is true. A `wif` credential is a different feature, so the gate must read: allow a `bearer` credential when `PerEndpointCredentialsEnabled` is on, **and** allow a `wif` credential when `WifCredentialsEnabled` is on - independently. The two flags are separate concerns (single-responsibility): an endpoint can run WIF without per-endpoint bearer tokens, or both at once during a migration.
 
@@ -482,6 +550,18 @@ flowchart TD
   "name": "Workload Identity Federation (JWT Bearer Assertion)",
   "description": "RFC 7523 section 2.2 client authentication: present a signed JWT assertion at the token endpoint to receive a short-lived bearer token.",
   "specUri": "https://www.rfc-editor.org/rfc/rfc7523",
+  "primary": false
+}
+```
+
+When the endpoint's `assertionProfile` is `token-exchange`, the advertised scheme instead references RFC 8693:
+
+```json
+{
+  "type": "oauth2",
+  "name": "Workload Identity Federation (OAuth Token Exchange)",
+  "description": "RFC 8693 token exchange: present a signed JWT as subject_token at the token endpoint to receive a short-lived bearer token.",
+  "specUri": "https://www.rfc-editor.org/rfc/rfc8693",
   "primary": false
 }
 ```
@@ -765,6 +845,10 @@ flowchart LR
 
 **What is the issued token's lifetime?** 1-6 hours per the Entra spec; configurable per endpoint via `issuedTokenTtlSec`.
 
+**What are the "two profiles" and which do we build first?** `jwt-bearer` (RFC 7523, Entra's JWT as `client_assertion`, `grant_type=client_credentials`) is shipped today and is the SAP SuccessFactors flow - build it first. `token-exchange` (RFC 8693, Entra's JWT as `subject_token`, `grant_type=token-exchange`) is upcoming (Google's flow). They are selected per endpoint by the `assertionProfile` discriminator; the JWKS validation of Entra's JWT is identical for both. See [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange).
+
+**Are app roles validated today?** No. Roles are not currently passed in the assertion or validated; the role-enforcement requirement is forward-looking and tied to a planned "1P app method" change. Design the validator to switch role enforcement on per endpoint, but do not hard-require a `roles` claim Entra does not yet send. See the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks).
+
 ---
 
 ## 16. References
@@ -779,9 +863,9 @@ flowchart LR
 - [Tutorial: Develop a sample SCIM endpoint](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-build-users-and-groups-endpoints)
 - [AzureAD/SCIMReferenceCode](https://github.com/AzureAD/SCIMReferenceCode)
 
-### v2 token-format finding (2026-06-09; see section 4.1 OPEN DECISION)
+### v2 token-format finding (2026-06-09; see section 4.1 DECIDED)
 
-- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - public reference updated 2026-06-09 ("Update WIF SCIM article for Entra v2 tokens"); documents the v2.0 issuer/audience that differs from the v1 values in sections 3 and 4
+- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - public reference updated 2026-06-09 ("Update WIF SCIM article for Entra v2 tokens"); documents the v2.0 issuer/audience now adopted in sections 3, 4, and 4.1, including the concrete example token whose `aud` is `api://{appid}`
 - [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - `iss` v1.0 `sts.windows.net/{tenantid}/` vs v2.0 `login.microsoftonline.com/{tenantid}/v2.0`; `ver` discriminator
 - [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference for v1.0 and v2.0 (`aud`, `iss`, `ver`, `appid`/`azp`)
 - [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape
@@ -789,7 +873,8 @@ flowchart LR
 ### IETF
 
 - **RFC 7521** - Assertion Framework for OAuth 2.0
-- **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (section 2.2 client authentication)
+- **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (section 2.2 client authentication) - the `jwt-bearer` profile
+- **RFC 8693** - OAuth 2.0 Token Exchange - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Defines `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token`/`subject_token_type`, the required `issued_token_type` response member, and impersonation vs delegation (`actor_token`, `act` claim)
 - **RFC 7519** - JSON Web Token (JWT)
 - **RFC 7517** - JSON Web Key (JWK)
 - **RFC 6749** - The OAuth 2.0 Authorization Framework (section 5.2 error responses)

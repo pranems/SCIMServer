@@ -234,7 +234,7 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 | Used by | FAPI 2.0 financial APIs; some healthcare / govcloud profiles; defense ISVs. Surfaced as a DEFERRED recommendation in [SECURITY_INTAKE_2026-05-17.md](strategy/SECURITY_INTAKE_2026-05-17.md). |
 | **SCIMServer** | **GAP** - no client-cert validation; no DPoP nonce handling. Q5 - low priority at current scale. |
 
-### Pattern 8 - Workload Identity Federation (WIF / JWT Bearer Assertion token exchange)
+### Pattern 8 - Workload Identity Federation (WIF; two profiles: RFC 7523 jwt-bearer + RFC 8693 token-exchange)
 
 | Aspect | Detail |
 |---|---|
@@ -246,6 +246,19 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 | **SCIMServer** | **GAP** - this is the distinct token-**exchange** flow (vs Pattern 4's *direct* JWT verification). The token endpoint rejects anything but plain `client_credentials`, reads JSON not form-urlencoded, has no `client_assertion` field, and has no per-endpoint federated-trust config. Closes in **Q6**; reuses the Q1 (per-endpoint client) + Q2 (external JWKS) primitives. Full analysis + backend + UI design: [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). |
 
 > **Pattern 4 vs Pattern 8 (do not conflate).** Pattern 4 is *direct* external JWT: Entra puts its own JWT on the SCIM call and the ISV verifies it per request, issuing nothing. Pattern 8 (WIF) adds a **token-exchange hop**: the Microsoft JWT is a *client-authentication assertion* presented at the **token endpoint**, and the ISV mints its **own** scoped short-lived token that rides the SCIM calls. WIF reuses Pattern 4's JWKS validator (Q2) but is a separate flow (Q6).
+
+> **Two WIF assertion profiles (8a `jwt-bearer` / 8b `token-exchange`).** Pattern 8 is not one wire shape. Entra is rolling out **two** OAuth profiles for presenting its signed JWT, selected per endpoint by an `assertionProfile` discriminator on the `wif` trust record. The JWKS validation of Entra's JWT is identical for both; only the field carrying the JWT and the `grant_type` differ.
+>
+> | Profile (config value) | RFC | `grant_type` | Entra JWT carried as | Status / example ISV | Display name |
+> |---|---|---|---|---|---|
+> | **`jwt-bearer`** | RFC 7523 §2.2 | `client_credentials` | `client_assertion` (+ `client_assertion_type`) | Shipped (SAP SuccessFactors) | "JWT Bearer Assertion (RFC 7523)" |
+> | **`token-exchange`** | RFC 8693 | `urn:ietf:params:oauth:grant-type:token-exchange` | `subject_token` (+ `subject_token_type`) | Upcoming (Google) | "OAuth Token Exchange (RFC 8693)" |
+>
+> The config values are the literal URN tails so they self-document and match the wire. The two RFCs **compose** rather than compete: RFC 7523 is a client-authentication method, RFC 8693 is an exchange grant type. Full design in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 1.4](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange).
+
+> **Separable token and SCIM endpoints.** WIF's token endpoint and SCIM endpoint need not share a host or operator - the public AzureAD reference's SAP SuccessFactors example uses `auth.successfactors.example.com` for the token exchange and `scim.successfactors.example.com` for SCIM. The SCIM endpoint just validates the incoming bearer regardless of where it was minted; the tenant is identified via the token URL path or `client_id`.
+
+> **v2 token format + roles (decided 2026-06-12).** WIF assertions are validated against the Entra **v2.0** issuer/audience only (`iss=https://login.microsoftonline.com/<TenantID>/v2.0` exact-match; token `aud=api://{appid}`, the App ID URI form without `/.default`). App-role enforcement is **forward-looking**: roles are not passed or validated today and arrive with a planned 1P-app-method change. See [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 4.1](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#41-decided---entra-v2-token-format-only-issuer-and-audience).
 
 ### 3.9 Mixed and coexisting auth methods (the two-axis model)
 
@@ -285,7 +298,7 @@ flowchart TD
 | Per-endpoint bcrypt bearer (Pattern 3) | `PerEndpointCredentialsEnabled` flag | `oauthbearertoken` |
 | Per-endpoint OAuth client_id/secret (Pattern 5, Q1) | `oauth_client` credential on the endpoint | `oauth2` |
 | External JWKS-validated JWT (Pattern 4, Q2) | per-endpoint `externalAuth` config | `oauth2` |
-| WIF token exchange (Pattern 8, Q6) | `wif` credential / per-endpoint WIF flag | `oauth2` |
+| WIF token exchange (Pattern 8, Q6) | `wif` credential / per-endpoint WIF flag (+ `assertionProfile`: `jwt-bearer` for RFC 7523 or `token-exchange` for RFC 8693) | `oauth2` |
 
 > **Design consequence.** Today `/ServiceProviderConfig` advertises a single hard-coded `oauthbearertoken` scheme. To make the ISV axis honest, the advertised `authenticationSchemes` array should be **computed from the set of methods actually enabled on the endpoint** (one entry per enabled method, `primary:true` on the operator's preferred one). This is tracked as an adjacent gap in [section 4.3](#43-adjacent-gaps-not-strictly-auth-but-co-located) and, for the WIF entry specifically, as gap row 9 in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) section 6.
 
@@ -682,7 +695,8 @@ The following entries from [.github/copilot-instructions.md](../.github/copilot-
 - **RFC 7519** - JSON Web Token (JWT)
 - **RFC 7517** - JSON Web Key (JWK)
 - **RFC 7521** - Assertion Framework for OAuth 2.0
-- **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication (the `private_key_jwt` pattern)
+- **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication (the `private_key_jwt` pattern) - WIF Pattern 8 profile `jwt-bearer`
+- **RFC 8693** - OAuth 2.0 Token Exchange (`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token`/`subject_token_type`, required `issued_token_type` response member, impersonation vs delegation) - WIF Pattern 8 profile `token-exchange`; authored by Microsoft with Ping/Yubico/Visa
 - **RFC 7591** - OAuth 2.0 Dynamic Client Registration
 - **RFC 7636** - PKCE (mandatory for OAuth 2.1 public clients)
 - **RFC 7642** - SCIM Definitions, Overview, Concepts, and Requirements
