@@ -251,6 +251,39 @@ stateDiagram-v2
     Rejected --> [*]: 401 invalid_client
 ```
 
+### 4.1 OPEN DECISION - v1 vs v2 Entra token format (issuer and audience)
+
+> **Status: UNDER DISCUSSION with stakeholders. Not yet decided - this subsection records the discrepancy and the choice it forces; it does NOT change the values in section 3 or section 4 above.** The issuer/audience values used throughout this doc are the Entra **v1.0** (`sts.windows.net`) format, taken from the internal design doc and the earlier public reference. A **later** update to the public AzureAD reference (2026-06-09, commit "Update WIF SCIM article for Entra v2 tokens") documents the **v2.0** token format instead. Both formats are real: Entra can emit either, governed by the app registration's `accessTokenAcceptedVersion` / `requestedAccessTokenVersion` manifest setting. Until stakeholders decide, the section 3 Step-1 table and the section 4 claims table keep the v1 values, and this subsection is the authoritative record of the pending change.
+
+**The discrepancy (v1 as documented above vs v2 in the 2026-06-09 reference):**
+
+| Claim | v1.0 (this doc, sections 3 and 4) | v2.0 (2026-06-09 reference) | Note |
+|---|---|---|---|
+| `iss` | `https://sts.windows.net/<TenantID>/` | `https://login.microsoftonline.com/<TenantID>/v2.0` | Different host **and** a `/v2.0` suffix |
+| `aud` | `api://{appid}/.default` | `api://{appid}` | In a v2 token the `aud` is the **bare** app URI; `/.default` is the requested **scope**, not the token audience |
+| `ver` | `1.0` | `2.0` | The discriminator claim the validator can branch on |
+| JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | (unchanged) | The keys endpoint is already v2 in both; only `iss`/`aud`/`ver` differ |
+
+**Decision options (to resolve with stakeholders):**
+
+| Option | Behavior | Trade-off |
+|---|---|---|
+| **1. v2-only** | Validate against the v2.0 issuer/audience only | Simplest validator; **rejects** any tenant/app still configured to emit v1 tokens |
+| **2. v1-only** | Keep this doc as-is | Matches the internal design doc; **rejects** the format the latest public reference documents |
+| **3. Both, simultaneously (migration-safe)** | `issuer` and `audience` are **allowlists** holding the v1 **and** v2 strings; validator branches on the `ver` claim and accepts either bare and `/.default` audience forms | Maximum interoperability; slightly larger trust config. **Recommended default** |
+| **4. Configurable per endpoint** | A `tokenFormat` field on the WIF trust record accepting `v1`, `v2`, or `both` (default `both`) | Lets a specific integration pin a format if a stakeholder requires it; one extra config field |
+
+**Implementation impact if option 3 or 4 is chosen:** the per-endpoint WIF trust config (section 8) stores a **set** of accepted issuers + audiences rather than a single string each, and the validator (section 4, step 3) iterates the set. This is a small change to the structured trust object - **not** a new flow. It dovetails with the multi-scheme / coexistence model in [ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md) section 3.9.
+
+**Sources for the v2 finding (the ones that differ from the v1 sources cited in sections 3 and 4):**
+
+- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - the public reference, **updated 2026-06-09** (commit message "Update WIF SCIM article for Entra v2 tokens"). This is the source that documents the v2.0 issuer/audience, superseding the v1 shape this doc currently carries.
+- [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - documents the `iss` claim difference: v1.0 `https://sts.windows.net/{tenantid}/` vs v2.0 `https://login.microsoftonline.com/{tenantid}/v2.0`, and the `ver` discriminator.
+- [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference for both token versions (`aud`, `iss`, `ver`, `appid`/`azp`).
+- [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape that produces v2 tokens.
+
+> **Note for the validator design (section 8) when this is decided.** If option 3/4 wins, the `appid` cross-check in section 4 also needs a v2 note: v2.0 tokens carry the caller app id in `azp` (authorized party) rather than `appid` in some flows. The validator should accept either claim for the caller-app cross-check. Confirm against the access-token-claims reference above before implementing.
+
 ---
 
 ## 5. Current SCIMServer state
@@ -285,6 +318,7 @@ stateDiagram-v2
 | 7 | Tenant isolation via `tid` | MISSING | Q6 |
 | 8 | Reciprocal ISV-portal UI (enter 4 values, return 3) | MISSING | Q6 |
 | 9 | Advertise the WIF scheme in per-endpoint `/ServiceProviderConfig` (RFC 7644 section 4) | MISSING (one `oauthbearertoken` scheme today) | Q6 |
+| 10 | Support **both** Entra v1 and v2 issuer/audience formats during migration (or pick one) | OPEN DECISION (see [section 4.1](#41-open-decision---v1-vs-v2-entra-token-format-issuer-and-audience)) | Q6 |
 
 ---
 
@@ -744,6 +778,13 @@ flowchart LR
 - [Tutorial: Develop and plan provisioning for a SCIM endpoint](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups)
 - [Tutorial: Develop a sample SCIM endpoint](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-build-users-and-groups-endpoints)
 - [AzureAD/SCIMReferenceCode](https://github.com/AzureAD/SCIMReferenceCode)
+
+### v2 token-format finding (2026-06-09; see section 4.1 OPEN DECISION)
+
+- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - public reference updated 2026-06-09 ("Update WIF SCIM article for Entra v2 tokens"); documents the v2.0 issuer/audience that differs from the v1 values in sections 3 and 4
+- [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - `iss` v1.0 `sts.windows.net/{tenantid}/` vs v2.0 `login.microsoftonline.com/{tenantid}/v2.0`; `ver` discriminator
+- [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference for v1.0 and v2.0 (`aud`, `iss`, `ver`, `appid`/`azp`)
+- [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape
 
 ### IETF
 
