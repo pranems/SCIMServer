@@ -8,9 +8,12 @@
 
 | Source | Type | Status |
 |---|---|---|
-| Internal Entra design doc - "Workload Identity Federation between Entra Provisioning (SyncFabric) and SaaS ISVs" | Microsoft-internal (OneDrive) | ACCESSED (content provided directly; the sign-in wall blocked tool-fetch) |
-| [AzureAD/SCIMReferenceCode/ WIF for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) | Public Microsoft reference | Public mirror of the same trust model |
+| **"Workload Identity Federation between Entra Provisioning (SyncFabric) and SaaS ISVs"** (high-level design) | Microsoft-internal (`.docx`) | ACCESSED + TEXT-EXTRACTED 2026-06-15. **V1-era original** (issuer `sts.windows.net`, example token `"ver": "1.0"`); predates the June v2 switch. Owner: `raali@microsoft.com` (Ramsey Ali) |
+| **"Workload Identity Federation One-Pager"** ("Design Review 1-Pager - Credential Free Authentication") | Microsoft-internal (`.docx`) | ACCESSED + TEXT-EXTRACTED 2026-06-15. Dated **03/13/2026**, owner `raali@microsoft.com`. Describes the **Entra-side** backend (MSI -> sub-identity token -> impersonated-app token -> exchange); see [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend) |
+| [AzureAD/SCIMReferenceCode/ WIF for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) | Public Microsoft reference | Public mirror of the same trust model; **updated 2026-06-09 to the v2 token shape** |
 | [Microsoft Learn - SCIM provisioning tutorial](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups) | Public | Authentication section |
+
+> **Provenance note (2026-06-15).** The two internal `.docx` files above are the **V1-era source design** (both owned by Ramsey Ali, the same owner who ran the 2026-06-12 review that switched the contract to v2). They are the original basis for this analysis; the contract has since moved to **v2-only** ([section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)). Treat the v1 `iss`/`aud`/`ver` values in those files as **historical**, not current. Their lasting value is the **Entra-side** detail the public reference omits (the SyncFabric token-minting chain in [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend) and the customer-identification guidance in [section 15](#15-faq)).
 
 > **Reconciliation note.** Where the internal doc and the public reference differ, the internal doc is treated as authoritative for **Entra's** behavior (issuer, audience format, role enforcement, deprecation timeline) and the public reference is treated as authoritative for the **wire format** an ISV must implement. They agree on the core: this is RFC 7523 client authentication, not RFC 7523 grant-type usage.
 
@@ -288,6 +291,34 @@ These are the two real WIF implementations SCIMServer must interoperate with. Bo
 
 > **Design takeaway for SCIMServer.** The `assertionProfile` discriminator selects the grant type and the field carrying the token, but the **per-profile parameter set is consumer-specific**: SuccessFactors adds `resource`; Google sets `subject_token_type=id_token`, `requested_token_type`, and a pool-URI `audience`. The validator should read the token from `client_assertion` (jwt-bearer) or `subject_token` (token-exchange), validate it against the configured JWKS + claims **identically** for both, and treat `resource` / `audience` / `requested_token_type` / `scope` as profile-specific routing and issuance hints rather than part of the core signature-plus-claims check. The configured `subject_token_type` (and any expected `resource`/`audience`) belongs in the per-endpoint `wif` trust record, not hard-coded.
 
+### 2.3 How Entra mints the assertion (the SyncFabric backend)
+
+Everything above is the **ISV-facing** half. The internal one-pager ([source documents](#source-documents)) describes the **Entra-side** half - how the Provisioning Service (SyncFabric) obtains the signed JWT it presents as `client_assertion` / `subject_token`. SCIMServer never implements this side, but understanding it explains the claim values the ISV validates.
+
+```mermaid
+sequenceDiagram
+    participant M as Prod machine MSI<br/>(pre-existing managed identity)
+    participant ESTS as Entra STS
+    participant WI as Customer-tenant<br/>Workload Identity app
+    participant ISV as ISV token endpoint
+    M->>ESTS: 1. Authenticate with MSI
+    ESTS-->>M: 2. Sub-identity token (good ~24h)
+    M->>ESTS: 3. Exchange for impersonated-app token<br/>as the customer-tenant WI app
+    ESTS-->>M: 4. Impersonated-app token (good ~1h) = the assertion
+    M->>ISV: 5. Present assertion at token endpoint
+    ISV-->>M: ISV access token (1-6h) for SCIM
+```
+
+| Aspect | What the one-pager states |
+|---|---|
+| Starting credential | A **pre-existing MSI** already on SyncFabric's production machines - no new long-lived secret is introduced |
+| New app per customer | The provisioning blade **creates a new application in the customer's tenant** during auth setup; this Workload Identity app is what the ISV establishes trust with (its `appid`/`oid` become the assertion's `aud`/`sub`) and what SyncFabric impersonates |
+| Token chain | MSI auth -> **sub-identity token (~24h)** -> **impersonated-application token (~1h)** = the assertion presented to the ISV |
+| Lifetimes | The impersonated-app token and the ISV access token both expire at **~1h**, so steps 3-5 repeat roughly hourly across a provisioning cycle; the sub-identity token lasts ~24h |
+| Proposed Entra code | A stateless `EntraGeneratedTokenAuthenticationHelperFactory` performs the exchanges; an `EntraGeneratedTokenAuthentication` instance (per ISV connector) caches the current access token and renews it on expiry. It is initialized with the machine MSI id plus the target tenant's application id + object id |
+
+> **Why this matters to the ISV (SCIMServer).** It explains *why* the `sub` is a workload-identity **object id** and the `aud`/`appid` is that same app's **app id**: they identify the per-customer app Entra created and impersonates. It also sets the cadence expectation - a fresh assertion (and so a fresh ISV token request) roughly **every hour**, not per SCIM call. The ISV side is unchanged regardless of how the assertion was minted; this section is context only.
+
 ---
 
 ## 3. The three-step admin setup
@@ -409,6 +440,8 @@ stateDiagram-v2
 | JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/keys` | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | The v2 keys URI adds the `/v2.0/` path segment (both still end in `/keys`). Prefer resolving it from the tenant's v2 OIDC discovery document (`/v2.0/.well-known/openid-configuration` -> `jwks_uri`) rather than hard-coding. Surfaced by the 2026-06-12 design review (corrected from an earlier "unchanged" note). |
 
 > **Accuracy correction (reviewer-corrected 2026-06-12).** An earlier revision of this doc claimed the v2 `aud` was the `api://{appid}` App ID URI form (reading it off the public AzureAD reference example). The Entra provisioning owner corrected this in the design review: the **actual emitted v2 token `aud` is the bare `appid` GUID** (e.g. `b5ba7a93-...`), not the App ID URI form. The validator must compare the token `aud` against the bare `{appid}` GUID - derive it from the Step-1 admin value by stripping both the `api://` prefix and the `/.default` scope suffix (or store the bare GUID directly).
+
+> **Provenance of the `aud` confusion (2026-06-15).** The newly-extracted V1-era internal source ([source documents](#source-documents)) is **internally inconsistent on `aud`**, which is exactly why an explicit reviewer correction was needed. The same one-pager renders it three different ways: the Step-1 admin display shows `Aud = WorkloadIdentity_appid` (**bare GUID**); the token-flow prose shows `Aud = api://{appid}/.default`; and the worked example token shows `"aud": "api://b5ba7a93-..."` (`api://` + GUID, no `/.default`). The bare-GUID Step-1 display corroborates the reviewer's v2 conclusion; the `api://` forms in the same file are the source of the earlier misreading. Net: store/compare the **bare `{appid}` GUID**.
 
 **Implementation impact:** the per-endpoint WIF trust config (section 8) stores a **single** expected issuer and audience (the v2 strings), not an allowlist - there is no v1/v2 dual-accept to maintain. This keeps the validator (section 4, step 3) a straight exact-string comparison. The earlier multi-format option is dropped.
 
@@ -1026,6 +1059,10 @@ flowchart LR
 
 **Are app roles validated today?** No. Roles are not currently passed in the assertion or validated; the role-enforcement requirement is forward-looking and tied to a planned "1P app method" change. Design the validator to switch role enforcement on per endpoint, but do not hard-require a `roles` claim Entra does not yet send. See the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks).
 
+**Which claim identifies the customer who set up the provisioning job?** Per the internal one-pager, the ISV maps an incoming exchange to a customer account by **either** the tenant segment in the token-endpoint URL (`https://isv.com/{tenant}/token-endpoint`) **or** the `client_id` in the request body. SCIMServer already does the former: the per-endpoint path `/endpoints/{id}/oauth/token` carries the endpoint (customer) identity, so the `{id}` segment selects the right `wif` trust record. The `client_id` cross-check ([section 4](#4-the-assertion-claims-validation-jwks)) is the second, body-based signal.
+
+**How does Entra get the assertion in the first place?** A pre-existing MSI on SyncFabric's prod machines acquires a sub-identity token (~24h), exchanges it for an impersonated-application token (~1h) as a per-customer Workload Identity app, and presents that as the assertion. The ISV side is unaffected by this; see [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend).
+
 ---
 
 ## 16. References
@@ -1054,9 +1091,11 @@ flowchart LR
 
 ### IETF
 
-- **RFC 7521** - Assertion Framework for OAuth 2.0
-- **[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (May 2015). WIF uses **section 2.2 client authentication** - the `jwt-bearer` profile. Key normative facts (deep-dive in [section 4.2](#42-rfc-7523-in-depth-the-jwt-bearer-profile)): `client_assertion` MUST carry exactly one JWT; `sub` MUST equal the `client_id`; `iss`/`aud` compared by Simple String Comparison; `exp` mandatory; failure code `invalid_client`; RS256 mandatory-to-implement.
-- **[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - OAuth 2.0 Token Exchange (January 2020) - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Key normative facts (deep-dive in [section 4.3](#43-rfc-8693-in-depth-the-token-exchange-profile)): `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`; REQUIRED `subject_token`/`subject_token_type`; REQUIRED `issued_token_type` response member; optional `resource`/`audience`/`scope`/`requested_token_type`/`actor_token`; impersonation vs delegation (`act`, `may_act`); failure codes `invalid_request`/`invalid_target`; RFC 8693 names RFC 7523 as an allowed client-auth method (the composition point).
+> **Local copies.** The authoritative RFC text is mirrored in-repo under [rfcs/](rfcs/) so the normative source travels with the design, and each load-bearing RFC has a companion plain-language explainer in this repo. Online links point at rfc-editor.org (datatracker.ietf.org returns HTTP 403 to automated fetch).
+
+- **RFC 7521** - Assertion Framework for OAuth 2.0 Client Authentication and Authorization Grants. Local copy: [rfcs/rfc7521.txt](rfcs/rfc7521.txt). The umbrella framework RFC 7523 profiles.
+- **[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (May 2015). WIF uses **section 2.2 client authentication** - the `jwt-bearer` profile. Local copy: [rfcs/rfc7523.txt](rfcs/rfc7523.txt); explainer: [RFC_7523_EXPLAINED.md](RFC_7523_EXPLAINED.md). Key normative facts (deep-dive in [section 4.2](#42-rfc-7523-in-depth-the-jwt-bearer-profile)): `client_assertion` MUST carry exactly one JWT; `sub` MUST equal the `client_id`; `iss`/`aud` compared by Simple String Comparison; `exp` mandatory; failure code `invalid_client`; RS256 mandatory-to-implement.
+- **[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - OAuth 2.0 Token Exchange (January 2020) - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Local copy: [rfcs/rfc8693.txt](rfcs/rfc8693.txt); explainer: [RFC_8693_EXPLAINED.md](RFC_8693_EXPLAINED.md). Key normative facts (deep-dive in [section 4.3](#43-rfc-8693-in-depth-the-token-exchange-profile)): `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`; REQUIRED `subject_token`/`subject_token_type`; REQUIRED `issued_token_type` response member; optional `resource`/`audience`/`scope`/`requested_token_type`/`actor_token`; impersonation vs delegation (`act`, `may_act`); failure codes `invalid_request`/`invalid_target`; RFC 8693 names RFC 7523 as an allowed client-auth method (the composition point).
 - **RFC 7519** - JSON Web Token (JWT)
 - **RFC 7517** - JSON Web Key (JWK)
 - **RFC 6749** - The OAuth 2.0 Authorization Framework (section 5.2 error responses)

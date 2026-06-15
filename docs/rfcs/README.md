@@ -13,6 +13,18 @@
 | [rfc7644.txt](rfc7644.txt) | RFC 7644 | SCIM: Protocol | ~100 | 167 KB |
 | [RFC7643_SCHEMA_EXTRACT.md](RFC7643_SCHEMA_EXTRACT.md) | - | Extracted canonical JSON from RFC 7643 §8.7.1 + §3.1 + §2.2–§2.4 | - | 25 KB |
 
+## OAuth / WIF assertion RFCs (added 2026-06-15)
+
+These back the Workload Identity Federation design ([../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md)). Each load-bearing RFC has a plain-language explainer alongside the verbatim text.
+
+| File | RFC | Title | Role in WIF | Explainer |
+|---|---|---|---|---|
+| [rfc7521.txt](rfc7521.txt) | RFC 7521 | Assertion Framework for OAuth 2.0 Client Authentication and Authorization Grants | The umbrella framework RFC 7523 profiles | - |
+| [rfc7523.txt](rfc7523.txt) | RFC 7523 | JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants | The `jwt-bearer` profile (today's WIF; SuccessFactors) | [../RFC_7523_EXPLAINED.md](../RFC_7523_EXPLAINED.md) |
+| [rfc8693.txt](rfc8693.txt) | RFC 8693 | OAuth 2.0 Token Exchange | The `token-exchange` profile (upcoming WIF; Google) | [../RFC_8693_EXPLAINED.md](../RFC_8693_EXPLAINED.md) |
+
+These are verbatim RFC text - do not edit. All commentary lives in the `*_EXPLAINED.md` docs. Referenced but not mirrored (stable + widely available): RFC 7519 (JWT), RFC 7517 (JWK), RFC 6749 (OAuth 2.0), RFC 7662 (Token Introspection - `act`/`may_act`).
+
 ## Key Sections for Schema Audits
 
 ### RFC 7643 (Core Schema)
