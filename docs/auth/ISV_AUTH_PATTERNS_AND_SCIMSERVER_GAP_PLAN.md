@@ -6,8 +6,8 @@
 > **Source-of-truth rule (operator constraint):** every claim about SCIMServer behavior is grounded in the in-repo source (cited paths + line refs). Every claim about an ISV is grounded in that ISV's official docs (cited URLs). No invented behavior; gaps are flagged with confidence levels.
 > **Companion docs:**
 > - [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the per-endpoint-bearer architecture already shipped
-> - [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) - 6-layer ISV probing methodology
-> - [OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md](OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md) - real ISV walk-through that motivated this audit
+> - [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) - 6-layer ISV probing methodology
+> - [OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md](../OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md) - real ISV walk-through that motivated this audit
 > - [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) - deep analysis of Entra Workload Identity Federation (the credential-free token-exchange method) and the Q6 design it drives
 
 ---
@@ -33,12 +33,12 @@ SCIMServer today supports 3 of the 8 auth patterns commonly seen in ISV SCIM end
 
 | # | Pattern | Status | Evidence |
 |---|---|---|---|
-| 1 | **Long-lived global bearer** (legacy "shared secret") | SHIPPED | [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) lines 70-138 |
-| 2 | **OAuth 2.0 client_credentials** (issuer-mode) | SHIPPED | [api/src/oauth/oauth.service.ts](../api/src/oauth/oauth.service.ts) lines 67-117 + [api/src/oauth/oauth.controller.ts](../api/src/oauth/oauth.controller.ts) |
-| 3 | **Per-endpoint bcrypt-hashed bearer** (multi-tenant) | SHIPPED | [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) lines 105-216 + [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) |
+| 1 | **Long-lived global bearer** (legacy "shared secret") | SHIPPED | [api/src/modules/auth/shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) lines 70-138 |
+| 2 | **OAuth 2.0 client_credentials** (issuer-mode) | SHIPPED | [api/src/oauth/oauth.service.ts](../../api/src/oauth/oauth.service.ts) lines 67-117 + [api/src/oauth/oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) |
+| 3 | **Per-endpoint bcrypt-hashed bearer** (multi-tenant) | SHIPPED | [api/src/modules/auth/shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) lines 105-216 + [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) |
 | 4 | **Externally-issued JWT validation** (Entra-style: verify against IdP JWKS, not issue self) | **GAP** | No JWKS support; OAuth service only validates self-signed HS256 JWTs |
-| 5 | **OAuth 2.0 client_credentials with per-endpoint client_id/secret pairs** (Entra gallery mandate) | **GAP** | Only 1 global client_id/secret pair exists ([oauth.service.ts](../api/src/oauth/oauth.service.ts) line 56) |
-| 6 | **OAuth Authorization-Code + refresh_token** (legacy gallery, AppRiver/OpenText pattern) | **GAP** | Token endpoint explicitly rejects everything except `client_credentials` ([oauth.controller.ts](../api/src/oauth/oauth.controller.ts) line 47) |
+| 5 | **OAuth 2.0 client_credentials with per-endpoint client_id/secret pairs** (Entra gallery mandate) | **GAP** | Only 1 global client_id/secret pair exists ([oauth.service.ts](../../api/src/oauth/oauth.service.ts) line 56) |
+| 6 | **OAuth Authorization-Code + refresh_token** (legacy gallery, AppRiver/OpenText pattern) | **GAP** | Token endpoint explicitly rejects everything except `client_credentials` ([oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) line 47) |
 | 7 | **mTLS / client certificate** + **DPoP sender-constrained tokens** | **GAP** | No client-cert validation; no DPoP nonce handling |
 | 8 | **Workload Identity Federation (WIF)** - Entra presents a signed JWT assertion at the token endpoint; ISV validates via Microsoft JWKS and issues its **own** short-lived token (credential-free) | **GAP** | Token endpoint has no `client_assertion` path, no external-JWKS validation, no per-endpoint federated-trust config. See [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) |
 
@@ -50,7 +50,7 @@ SCIMServer today supports 3 of the 8 auth patterns commonly seen in ISV SCIM end
 |---|---|---|---|---|
 | **Q1** | Per-endpoint OAuth client_id/secret pairs (#5) | Microsoft Entra Gallery onboarding **requires** this (official checklist: "each customer must provide their own Client ID and Client Secret"). Today every customer would share one client secret. Blocks gallery listing. | M | low - extends G11 model |
 | **Q2** | External JWKS-backed JWT validation (#4) | Lets a customer point Entra's "leave Secret Token blank" mode at us (Entra issues its own JWT, we verify the `iss` + `aud` against `sts.windows.net/{tenant}` + JWKS). Currently a 401-only failure mode. | M | low - JWKS clients are battle-tested |
-| **Q3** | SCIMServer as **OAuth client** for probing (probe-direction) | The probing harness from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) §4.4 needs to actually run the auth handshake against ISVs (bearer / client_credentials / authorization_code) before it can run any probe. Today the probe doc is paper-only because we have no client. | L | low - axios + standard libs |
+| **Q3** | SCIMServer as **OAuth client** for probing (probe-direction) | The probing harness from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) §4.4 needs to actually run the auth handshake against ISVs (bearer / client_credentials / authorization_code) before it can run any probe. Today the probe doc is paper-only because we have no client. | L | low - axios + standard libs |
 | **Q4** | Authorization-Code + refresh_token (#6) | Some pre-2026 ISVs still use this; mostly historical. Optional. Ship only if a real ISV mock requires it. | L | medium - state machine + redirect URI infra |
 | **Q5** | mTLS + DPoP (#7) | Cutting-edge security profile; flagged in Stage X.2 [SECURITY_INTAKE_2026-05-17.md](strategy/SECURITY_INTAKE_2026-05-17.md). Defer until an enterprise customer asks. | L | high - requires reverse-proxy cooperation |
 | **Q6** | Workload Identity Federation - JWT Bearer Assertion token exchange (#8) | The strategic credential-free method Entra is rolling out for all new ISV onboarding; reuses Q1 (per-endpoint client) + Q2 (external JWKS validation) and adds the assertion-acceptance path + roles enforcement + reciprocal ISV-portal UI. Full design in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). | M | low - builds on Q1+Q2 primitives |
@@ -63,7 +63,7 @@ The single highest-leverage gap to close first is **Q1 (per-endpoint OAuth clien
 
 ### 1.1 The auth fallback chain (already shipped)
 
-Source: [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts)
+Source: [api/src/modules/auth/shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts)
 
 ```mermaid
 flowchart TD
@@ -89,7 +89,7 @@ flowchart TD
 GET /scim/v2/Users HTTP/1.1
 Authorization: Bearer <SCIM_SHARED_SECRET value>
 ```
-Validated via `safeCompare` (timing-safe). One token globally, configured via env. Auto-generates in dev/test if absent ([shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) lines 76-93).
+Validated via `safeCompare` (timing-safe). One token globally, configured via env. Auto-generates in dev/test if absent ([shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) lines 76-93).
 
 **Pattern 2 - OAuth 2.0 client_credentials:**
 ```http
@@ -101,20 +101,20 @@ Content-Type: application/json
 -> 200
 {"access_token":"<HS256 JWT>","token_type":"Bearer","expires_in":3600,"scope":"scim.read scim.write"}
 ```
-One global client_id/secret pair (`OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` env vars - [oauth.service.ts](../api/src/oauth/oauth.service.ts) lines 39-65). HS256 JWT, self-signed, 1-hour TTL.
+One global client_id/secret pair (`OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` env vars - [oauth.service.ts](../../api/src/oauth/oauth.service.ts) lines 39-65). HS256 JWT, self-signed, 1-hour TTL.
 
 **Pattern 3 - Per-endpoint bearer (G11):**
 ```http
 GET /scim/endpoints/{endpointId}/Users HTTP/1.1
 Authorization: Bearer <one-time-issued plaintext token>
 ```
-Requires `PerEndpointCredentialsEnabled=True` on the endpoint config. Token is bcrypt-hashed at admin-create time; plaintext returned exactly once ([G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) §"Authentication Flow"). UI for managing these is in [web/src/pages/CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx).
+Requires `PerEndpointCredentialsEnabled=True` on the endpoint config. Token is bcrypt-hashed at admin-create time; plaintext returned exactly once ([G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) §"Authentication Flow"). UI for managing these is in [web/src/pages/CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx).
 
 ### 1.3 What the in-repo code explicitly forbids
 
-- **`grant_type` other than `client_credentials`** -> 400 `unsupported_grant_type` ([oauth.controller.ts](../api/src/oauth/oauth.controller.ts) lines 47-55). So `authorization_code`, `refresh_token`, `password`, `urn:ietf:params:oauth:grant-type:jwt-bearer` are all rejected.
-- **`credentialType` other than `bearer`** in admin-create per-endpoint credential -> 400 ([per-endpoint-credentials.e2e-spec.ts](../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) lines 119-129). The schema reserves `oauth_client` as a sibling value but no code path handles it.
-- **Authentication on `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`** is correctly skipped (RFC 7644 §4 mandate; [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) line 49).
+- **`grant_type` other than `client_credentials`** -> 400 `unsupported_grant_type` ([oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) lines 47-55). So `authorization_code`, `refresh_token`, `password`, `urn:ietf:params:oauth:grant-type:jwt-bearer` are all rejected.
+- **`credentialType` other than `bearer`** in admin-create per-endpoint credential -> 400 ([per-endpoint-credentials.e2e-spec.ts](../../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) lines 119-129). The schema reserves `oauth_client` as a sibling value but no code path handles it.
+- **Authentication on `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`** is correctly skipped (RFC 7644 §4 mandate; [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../DISCOVERY_ENDPOINTS_RFC_AUDIT.md) line 49).
 
 ---
 
@@ -166,7 +166,7 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 | Tenant binding | None (server is single-tenant or paths are partitioned externally) |
 | Lifetime | Indefinite; rotated by manual regenerate |
 | Used by | Microsoft Entra "Secret Token" legacy mode, Atlassian Directory key, AWS IIC, every "we don't have OAuth yet" ISV |
-| **SCIMServer** | **SHIPPED** - `SCIM_SHARED_SECRET` env var ([shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) lines 70-138) |
+| **SCIMServer** | **SHIPPED** - `SCIM_SHARED_SECRET` env var ([shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) lines 70-138) |
 
 ### Pattern 2 - OAuth 2.0 client_credentials (issuer mode, SCIMServer issues its own access tokens)
 
@@ -177,7 +177,7 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 | Tenant binding | The `sub` / `client_id` claim in the JWT |
 | Lifetime | Short-lived access token (1 hour typical) + refresh via re-request |
 | Used by | Any SCIMServer-issued-token deployment; mocks an ISV that has its own token endpoint |
-| **SCIMServer** | **SHIPPED** - one global client_id/secret ([oauth.service.ts](../api/src/oauth/oauth.service.ts) lines 39-65). **GAP**: only one client pair globally. |
+| **SCIMServer** | **SHIPPED** - one global client_id/secret ([oauth.service.ts](../../api/src/oauth/oauth.service.ts) lines 39-65). **GAP**: only one client pair globally. |
 
 ### Pattern 3 - Per-endpoint bcrypt-hashed bearer (multi-tenant isolation)
 
@@ -221,7 +221,7 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 | Tenant binding | `sub` claim is the user who consented |
 | Lifetime | Short access token (1 hr) + long refresh token (30+ days), revocable |
 | Used by | Pre-2024 Entra gallery connectors; some AppRiver/OpenText flows; legacy ServiceNow OAuth |
-| **SCIMServer** | **GAP** - explicitly rejected at the token endpoint ([oauth.controller.ts](../api/src/oauth/oauth.controller.ts) line 47). Microsoft has officially deprecated this for **new** gallery connectors, so Q4 is "build only if a real ISV mock requires it." |
+| **SCIMServer** | **GAP** - explicitly rejected at the token endpoint ([oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) line 47). Microsoft has officially deprecated this for **new** gallery connectors, so Q4 is "build only if a real ISV mock requires it." |
 
 ### Pattern 7 - mTLS / DPoP sender-constrained tokens
 
@@ -330,7 +330,7 @@ flowchart TD
 |---|---|---|---|
 | 1 | Per-endpoint client_id/secret pairs (#5) | Entra Gallery onboarding **mandate**; blocks gallery listing | Q1 - extend G11 `credentialType: 'oauth_client'` and wire OAuthService to look up per-endpoint pairs |
 | 2 | External JWKS-backed JWT validation (#4) | Entra's "leave Secret Token blank" mode is the default; not supporting it forces every customer to pre-generate + paste a token | Q2 - add `jwks-rsa` / `jose` library; per-endpoint trust config (`expectedIssuer`, `expectedAudience`, `jwksUri`) |
-| 3 | SCIMServer as OAuth client (probe direction) | The probing methodology in [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) §4.4 is paper-only without this; ships the "probe an ISV" admin route from §13 of that doc | Q3 - add `auth-handler` modules: `BearerAuth`, `OAuthClientCredsAuth`, `OAuthAuthCodeAuth`, `JwtBearerAssertionAuth` |
+| 3 | SCIMServer as OAuth client (probe direction) | The probing methodology in [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) §4.4 is paper-only without this; ships the "probe an ISV" admin route from §13 of that doc | Q3 - add `auth-handler` modules: `BearerAuth`, `OAuthClientCredsAuth`, `OAuthAuthCodeAuth`, `JwtBearerAssertionAuth` |
 | 4 | Authorization-Code + refresh (#6) | Historical; Microsoft has deprecated for new gallery | Q4 - skip unless a real mock requires it |
 | 5 | mTLS + DPoP (#7) | Cutting-edge; no immediate customer ask | Q5 - defer; flagged in Stage X.2 |
 
@@ -355,17 +355,17 @@ These gaps come up in the **same** integration conversation as auth, so it's wor
 
 | Sub-phase | Pattern | Deliverables | Effort | Sequencing |
 |---|---|---|---|---|
-| **Q0** | Standards cleanup (foundation) | (a) Emit `WWW-Authenticate: Bearer realm="scim", error="invalid_token"` on 401; (b) Add `.well-known/oauth-authorization-server` endpoint (RFC 8414); (c) Add `audience` claim to self-issued JWTs (currently absent); (d) Document the existing 3-tier chain in [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md). | S | First; pre-requisite for Q1+ |
+| **Q0** | Standards cleanup (foundation) | (a) Emit `WWW-Authenticate: Bearer realm="scim", error="invalid_token"` on 401; (b) Add `.well-known/oauth-authorization-server` endpoint (RFC 8414); (c) Add `audience` claim to self-issued JWTs (currently absent); (d) Document the existing 3-tier chain in [COMPLETE_API_REFERENCE.md](../COMPLETE_API_REFERENCE.md). | S | First; pre-requisite for Q1+ |
 | **Q1** | Per-endpoint OAuth client_id/secret pairs (Pattern #5) | (a) Extend G11 admin API to accept `credentialType: 'oauth_client'` with auto-generated `clientId` (UUID) + `clientSecret` (random 32 bytes); (b) `OAuthService.generateAccessToken` looks up credentials by endpoint-scoped client_id first, falls back to global; (c) Issued JWTs include `scope` (from credential metadata) and `endpoint_id` claims; (d) `/scim/endpoints/{endpointId}/...` enforces that the bearer's `endpoint_id` claim matches the URL endpointId; (e) Web UI extends CredentialsTab to show "OAuth client" credential type with clientId + endpoint-scoped token endpoint URL. | M | Second; unblocks Entra Gallery listing |
 | **Q2** | External JWKS-backed JWT validation (Pattern #4) | (a) Add per-endpoint `externalAuth` config (`{enabled, issuer, audience, jwksUri, clockSkewSec}`); (b) JWKS client with 1-hour cache + key rotation handling (use `jose` library); (c) Guard fall-through order becomes: per-endpoint credential -> per-endpoint external JWT -> per-endpoint OAuth -> global OAuth -> legacy; (d) Sample config for Microsoft Entra (`issuer: https://sts.windows.net/{tenantId}/`, `jwksUri: https://login.microsoftonline.com/{tenantId}/discovery/v2.0/keys`); (e) Documentation: "How to point Microsoft Entra at SCIMServer with blank Secret Token." | M | Third; closes Entra's preferred path |
-| **Q3** | SCIMServer as OAuth **client** (probe direction) | (a) New module `api/src/probe/auth-handlers/` with classes: `BearerAuthHandler`, `OAuthClientCredsHandler`, `OAuthAuthCodeHandler`, `JwtBearerAssertionHandler`; (b) `POST /admin/probes` accepts `{targetUrl, authMode, authConfig}` and runs the probe-corpus from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) §13; (c) Token caching (per-target, per-config, TTL-aware); (d) Per-probe-run audit log of every auth handshake + every probe-call outcome. | L | Fourth; enables Layer 2-6 probing for real ISVs |
+| **Q3** | SCIMServer as OAuth **client** (probe direction) | (a) New module `api/src/probe/auth-handlers/` with classes: `BearerAuthHandler`, `OAuthClientCredsHandler`, `OAuthAuthCodeHandler`, `JwtBearerAssertionHandler`; (b) `POST /admin/probes` accepts `{targetUrl, authMode, authConfig}` and runs the probe-corpus from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) §13; (c) Token caching (per-target, per-config, TTL-aware); (d) Per-probe-run audit log of every auth handshake + every probe-call outcome. | L | Fourth; enables Layer 2-6 probing for real ISVs |
 | **Q4** | Authorization-Code + refresh_token (Pattern #6) | (a) `/oauth/authorize` endpoint (browser redirect); (b) `grant_type=authorization_code` + `grant_type=refresh_token` accepted at `/oauth/token`; (c) Redirect URI allowlist per endpoint; (d) PKCE (RFC 7636) for public clients. | L | Fifth; gate on real ISV mock requirement |
 | **Q5** | mTLS + DPoP (Pattern #7) | (a) Reverse-proxy passes client cert via `X-Forwarded-Client-Cert` header; guard validates against per-endpoint cert allowlist; (b) DPoP header validation (RFC 9449); (c) `cnf` claim in issued tokens. | L | Defer; gate on enterprise/govcloud customer ask |
-| **Q6** | Workload Identity Federation (Pattern #8) | (a) Accept `client_assertion` at the per-endpoint token endpoint (RFC 7523 §2.2) with form-urlencoded parsing; (b) new `wif` `credentialType` storing per-endpoint federated trust (`expectedIssuer`, `expectedSubject`, `expectedAudience`, `jwksUri`, `allowedTenantId`, `requiredRoles`, `scope`, `issuedTokenTtlSec`) - **no secret stored**; (c) `WifAssertionValidatorService` (reuses Q2 `jose` JWKS client) validates signature + `iss`/`aud`/`sub`/`exp`/`nbf`/`tid` + required roles, then issues a 1-6 h token; (d) reciprocal ISV-portal UI in [web/src/pages/CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) ("Federated Identity (WIF)" section: input the 4 Entra values, display Client ID / Token URL / SCIM URL, **Test Connection** dry-run). Full design: [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). | M | Sixth; depends on Q1 + Q2 + Pre-Q.A + Pre-Q.B |
+| **Q6** | Workload Identity Federation (Pattern #8) | (a) Accept `client_assertion` at the per-endpoint token endpoint (RFC 7523 §2.2) with form-urlencoded parsing; (b) new `wif` `credentialType` storing per-endpoint federated trust (`expectedIssuer`, `expectedSubject`, `expectedAudience`, `jwksUri`, `allowedTenantId`, `requiredRoles`, `scope`, `issuedTokenTtlSec`) - **no secret stored**; (c) `WifAssertionValidatorService` (reuses Q2 `jose` JWKS client) validates signature + `iss`/`aud`/`sub`/`exp`/`nbf`/`tid` + required roles, then issues a 1-6 h token; (d) reciprocal ISV-portal UI in [web/src/pages/CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) ("Federated Identity (WIF)" section: input the 4 Entra values, display Client ID / Token URL / SCIM URL, **Test Connection** dry-run). Full design: [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md). | M | Sixth; depends on Q1 + Q2 + Pre-Q.A + Pre-Q.B |
 
 ### 5.2 Acceptance criteria per sub-phase (TDD discipline)
 
-Per [.github/copilot-instructions.md](../.github/copilot-instructions.md) Stage 0 + Standing Rule "Feature / Bug-Fix Commit Checklist," each sub-phase requires:
+Per [.github/copilot-instructions.md](../../.github/copilot-instructions.md) Stage 0 + Standing Rule "Feature / Bug-Fix Commit Checklist," each sub-phase requires:
 
 | Layer | Q0 | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
 |---|---|---|---|---|---|---|---|
@@ -489,7 +489,7 @@ flowchart TD
 
 #### 6.2.1 Per-endpoint config addition
 
-Extend the endpoint config interface ([api/src/modules/endpoint/endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)):
+Extend the endpoint config interface ([api/src/modules/endpoint/endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts)):
 
 ```ts
 EXTERNAL_AUTH: 'ExternalAuth',  // structured config; see below
@@ -538,7 +538,7 @@ Use `jose` (https://github.com/panva/jose) - the most-vetted Node.js JWT/JWKS li
 
 ### 6.3 Q3 - SCIMServer as OAuth **client** (probe direction)
 
-This is the critical missing piece that turns the paper [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) into a real harness.
+This is the critical missing piece that turns the paper [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) into a real harness.
 
 #### 6.3.1 Module layout
 
@@ -606,7 +606,7 @@ Every probe MUST write a structured log entry to the existing ScimLogger pipelin
 }
 ```
 
-This unlocks the §8 "Probe Harness Vision" deliverable in [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md): a self-service report of "every probe ran against this ISV, with status + reason + duration."
+This unlocks the §8 "Probe Harness Vision" deliverable in [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md): a self-service report of "every probe ran against this ISV, with status + reason + duration."
 
 ---
 
@@ -614,7 +614,7 @@ This unlocks the §8 "Probe Harness Vision" deliverable in [ISV_ENDPOINT_PROBING
 
 ### 7.1 New gates that fire on Phase Q commits
 
-Per [.github/copilot-instructions.md](../.github/copilot-instructions.md) Mandatory Quality Gates:
+Per [.github/copilot-instructions.md](../../.github/copilot-instructions.md) Mandatory Quality Gates:
 
 | Stage | Gate | Phase Q effect |
 |---|---|---|
@@ -639,13 +639,13 @@ Per [.github/copilot-instructions.md](../.github/copilot-instructions.md) Mandat
 
 Before Q1 can land, two foundational items need to ship:
 
-1. **Pre-Q.A - Extend endpoint config flag registry to support structured values.** Currently flags are `boolean | string` ([endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)). Q2's `ExternalAuth` config is an object `{enabled, issuer, audience, jwksUri, algorithms, clockSkewSec, cacheMaxAgeSec}`. Add a third flag-type `'structured'` with a JSON-schema validator. Tests at every layer per the 10-cell matrix in Stage 3b.3 (`endpointConfigFlagAudit`).
+1. **Pre-Q.A - Extend endpoint config flag registry to support structured values.** Currently flags are `boolean | string` ([endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts)). Q2's `ExternalAuth` config is an object `{enabled, issuer, audience, jwksUri, algorithms, clockSkewSec, cacheMaxAgeSec}`. Add a third flag-type `'structured'` with a JSON-schema validator. Tests at every layer per the 10-cell matrix in Stage 3b.3 (`endpointConfigFlagAudit`).
 
-2. **Pre-Q.B - Externalize the JWT signing key.** Today `OAuthService` uses a process-lifetime `crypto.randomBytes(32)` for HS256 ([oauth.service.ts](../api/src/oauth/oauth.service.ts) lines 50-54). For Q1's per-endpoint JWTs to survive a deploy/restart, the signing key must be (a) an env-var-supplied JWK, (b) RS256/ES256 (asymmetric so JWKS publication is meaningful), and (c) rotatable. Ship before Q1 to avoid token-invalidation thrash.
+2. **Pre-Q.B - Externalize the JWT signing key.** Today `OAuthService` uses a process-lifetime `crypto.randomBytes(32)` for HS256 ([oauth.service.ts](../../api/src/oauth/oauth.service.ts) lines 50-54). For Q1's per-endpoint JWTs to survive a deploy/restart, the signing key must be (a) an env-var-supplied JWK, (b) RS256/ES256 (asymmetric so JWKS publication is meaningful), and (c) rotatable. Ship before Q1 to avoid token-invalidation thrash.
 
 ### 7.3 Standing Backlog amendments
 
-The following entries from [.github/copilot-instructions.md](../.github/copilot-instructions.md) Standing Backlog become directly relevant to Phase Q and should be tracked:
+The following entries from [.github/copilot-instructions.md](../../.github/copilot-instructions.md) Standing Backlog become directly relevant to Phase Q and should be tracked:
 
 | Standing-backlog item | Q sub-phase | Why now |
 |---|---|---|
@@ -660,16 +660,16 @@ The following entries from [.github/copilot-instructions.md](../.github/copilot-
 
 ### 8.1 In-repo (authoritative for SCIMServer behavior)
 
-- [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) - the live auth fallback chain
-- [api/src/oauth/oauth.service.ts](../api/src/oauth/oauth.service.ts) - the OAuth issuer; HS256, one global client
-- [api/src/oauth/oauth.controller.ts](../api/src/oauth/oauth.controller.ts) - `/oauth/token` endpoint; rejects non-`client_credentials` grants
-- [api/src/modules/endpoint/endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) - the 14-flag + logLevel registry; only `PerEndpointCredentialsEnabled` is auth-related today
-- [api/test/e2e/per-endpoint-credentials.e2e-spec.ts](../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) - the contract for G11 admin API
-- [web/src/pages/CredentialsTab.tsx](../web/src/pages/CredentialsTab.tsx) - the UI surface to extend for Q1 + Q2
+- [api/src/modules/auth/shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) - the live auth fallback chain
+- [api/src/oauth/oauth.service.ts](../../api/src/oauth/oauth.service.ts) - the OAuth issuer; HS256, one global client
+- [api/src/oauth/oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) - `/oauth/token` endpoint; rejects non-`client_credentials` grants
+- [api/src/modules/endpoint/endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts) - the 14-flag + logLevel registry; only `PerEndpointCredentialsEnabled` is auth-related today
+- [api/test/e2e/per-endpoint-credentials.e2e-spec.ts](../../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) - the contract for G11 admin API
+- [web/src/pages/CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) - the UI surface to extend for Q1 + Q2
 - [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the shipped per-endpoint-bearer architecture
 - [docs/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) - the deep WIF analysis + Q6 backend/UI design this plan references
-- [docs/ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) - the probing methodology that Q3 makes runnable
-- [docs/COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - the API reference to update at every Q sub-phase
+- [docs/ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) - the probing methodology that Q3 makes runnable
+- [docs/COMPLETE_API_REFERENCE.md](../COMPLETE_API_REFERENCE.md) - the API reference to update at every Q sub-phase
 - [docs/strategy/SECURITY_INTAKE_2026-05-17.md](strategy/SECURITY_INTAKE_2026-05-17.md) - Stage X.2 findings that flag DPoP + mTLS
 
 ### 8.2 ISV / consumer docs (HIGH confidence - fetched 2026-05-19)
@@ -714,7 +714,7 @@ The following entries from [.github/copilot-instructions.md](../.github/copilot-
 
 ## Appendix A: Per-Pattern Test Probe Matrix
 
-For each pattern, the live-test must cover the following 8 probes. This is the auth-equivalent of the per-attribute probe matrix in [ISV_ENDPOINT_PROBING_METHODOLOGY.md](ISV_ENDPOINT_PROBING_METHODOLOGY.md) §7.
+For each pattern, the live-test must cover the following 8 probes. This is the auth-equivalent of the per-attribute probe matrix in [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) §7.
 
 | # | Probe | Pattern 1 (bearer) | Pattern 2 (client_creds) | Pattern 3 (per-endpoint bearer) | Pattern 4 (external JWT) | Pattern 5 (per-endpoint OAuth) |
 |---|---|---|---|---|---|---|
@@ -727,4 +727,4 @@ For each pattern, the live-test must cover the following 8 probes. This is the a
 | 7 | Wrong issuer | (n/a) | (n/a) | (n/a) | 401 | 401 |
 | 8 | Cross-endpoint replay (token issued for endpoint A, sent to endpoint B) | (n/a; global) | (n/a; global) | 401 (G11 already enforces) | 401 if issuer scopes to endpoint | 401 (`endpoint_id` claim mismatch) |
 
-These 8 probes per pattern x 5 patterns = 40 live-test assertions to add across Q0-Q2 in [scripts/live-test.ps1](../scripts/live-test.ps1).
+These 8 probes per pattern x 5 patterns = 40 live-test assertions to add across Q0-Q2 in [scripts/live-test.ps1](../../scripts/live-test.ps1).

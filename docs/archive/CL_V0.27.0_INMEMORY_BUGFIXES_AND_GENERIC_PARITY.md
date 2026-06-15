@@ -434,7 +434,7 @@ Pre-existing feature gaps captured by live tests (see §8 table above). These ar
 | [CHANGELOG.md](../CHANGELOG.md) | Full version history |
 | [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) | Custom resource type architecture (context for Bug #2 and #3) |
 | [SCHEMA_LIFECYCLE_AND_REGISTRY.md](SCHEMA_LIFECYCLE_AND_REGISTRY.md) | Schema registry internals (context for Bug #2) |
-| [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint credential architecture (context for Bug #4) |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](../auth/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint credential architecture (context for Bug #4) |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | RequireIfMatch flag reference (context for Fix #1) |
 
 ---

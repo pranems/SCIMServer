@@ -12,7 +12,7 @@
  * Delete row -> confirm FormDialog -> `useDeleteCredential` (optimistic
  * remove from cached overview, rollback on error).
  *
- * Backend already supports CRUD per docs/G11_PER_ENDPOINT_CREDENTIALS.md.
+ * Backend already supports CRUD per docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md.
  * Requires PerEndpointCredentialsEnabled=True on the endpoint - 403
  * surfaces as a friendly explanation banner with link to settings.
  */

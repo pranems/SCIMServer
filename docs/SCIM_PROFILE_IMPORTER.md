@@ -4,7 +4,7 @@
 **Last Updated:** 2026-05-06
 **Source Authority:** This document is the consolidated output of a `deepIdeaEvaluation` run against the latest sources in this workspace.
 **Related code:** [endpoint-profile.types.ts](api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts), [endpoint.service.ts](api/src/modules/endpoint/services/endpoint.service.ts#L327), [endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts)
-**Related docs:** [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md), [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md), [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md), [MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md), [G11_PER_ENDPOINT_CREDENTIALS.md](docs/G11_PER_ENDPOINT_CREDENTIALS.md)
+**Related docs:** [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md), [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md), [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md), [MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md), [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md)
 
 ---
 
@@ -105,7 +105,7 @@ These principles come from the [deepIdeaEvaluation prompt](.github/prompts/deepI
 |---|---|
 | Behavioral fidelity | Differential-test harness against source: $\geq 99\%$ of replayed canonical SCIM transactions produce RFC-equivalent responses on the clone. |
 | Discovery fidelity | `GET /ServiceProviderConfig`, `/Schemas`, `/ResourceTypes` on clone are byte-equal to source after URL / `meta.location` rewriting. |
-| Auth boundary | Source credentials are never persisted; clone uses its own per-endpoint credentials per [G11_PER_ENDPOINT_CREDENTIALS.md](docs/G11_PER_ENDPOINT_CREDENTIALS.md). |
+| Auth boundary | Source credentials are never persisted; clone uses its own per-endpoint credentials per [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md). |
 | Reversibility | Clone deletion is a single `DELETE /admin/endpoints/{id}` call (cascade). |
 | Safety | Zero write operations against the source unless the operator passes the explicit `I_AUTHORIZE_WRITES_ON_SOURCE` consent string. |
 | Time-to-clone | Schema + SPC clone $< 30\text{ s}$; behavior probe $< 10\text{ min}$ for a tenant of 10k users (sampled). |

@@ -304,5 +304,5 @@ Internal post-Phase-C audit (recorded findings F-1 through F-15) closed the foll
 - [PHASE_B_BFF_OVERVIEW_AND_SSE.md](PHASE_B_BFF_OVERVIEW_AND_SSE.md) - Phase B (predecessor)
 - [UI_REDESIGN_REMAINING_GAPS_PLAN.md](UI_REDESIGN_REMAINING_GAPS_PLAN.md) S6 - Phase C plan (parent)
 - [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](UI_REDESIGN_ARCHITECTURE_AND_PLAN.md) S7 / S18 - state management strategy + optimistic mutation rollback pattern
-- [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - Credential backend (consumed by C5 useCreateCredential / useDeleteCredential)
+- [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) - Credential backend (consumed by C5 useCreateCredential / useDeleteCredential)
 - [phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md](phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md) - ETag + RequireIfMatch backend (basis for C5 If-Match support)
