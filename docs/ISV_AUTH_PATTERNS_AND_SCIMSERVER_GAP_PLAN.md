@@ -260,7 +260,7 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 
 > **Separable token and SCIM endpoints.** WIF's token endpoint and SCIM endpoint need not share a host or operator - the public AzureAD reference's SAP SuccessFactors example uses `auth.successfactors.example.com` for the token exchange and `scim.successfactors.example.com` for SCIM. The SCIM endpoint just validates the incoming bearer regardless of where it was minted; the tenant is identified via the token URL path or `client_id`.
 
-> **v2 token format + roles (decided 2026-06-12).** WIF assertions are validated against the Entra **v2.0** issuer/audience only (`iss=https://login.microsoftonline.com/<TenantID>/v2.0` exact-match; token `aud=api://{appid}`, the App ID URI form without `/.default`). App-role enforcement is **forward-looking**: roles are not passed or validated today and arrive with a planned 1P-app-method change. See [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 4.1](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#41-decided---entra-v2-token-format-only-issuer-and-audience).
+> **v2 token format + roles (decided 2026-06-12).** WIF assertions are validated against the Entra **v2.0** issuer/audience only (`iss=https://login.microsoftonline.com/<TenantID>/v2.0` exact-match; token `aud` is the **bare `{appid}` GUID** - reviewer-corrected, **not** the `api://{appid}` App ID URI form and without `/.default`). App-role enforcement is **forward-looking**: roles are not passed or validated today and arrive with a planned 1P-app-method change. See [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 4.1](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#41-decided---entra-v2-token-format-only-issuer-and-audience).
 
 ### 3.9 Mixed and coexisting auth methods (the two-axis model)
 

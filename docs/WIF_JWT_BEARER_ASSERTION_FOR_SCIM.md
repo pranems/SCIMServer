@@ -304,7 +304,7 @@ flowchart TD
 | Audience | `api://{WorkloadIdentity_appid}/.default` |
 | JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` |
 
-> **v2 issuer/audience (decided - see [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)).** The **Issuer** is the Entra **v2.0** value (`login.microsoftonline.com/<TenantID>/v2.0`), validated by **exact string match**. The **Audience** shown here is the admin-facing value the operator copies (the App ID URI plus the `/.default` scope suffix); note that the **`aud` claim in the actual token is `api://{appid}`** - the App ID URI **without** `/.default` (the `/.default` is the requested scope, not the token audience). The ISV validates the token `aud` against `api://{appid}`.
+> **v2 issuer/audience (decided - see [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)).** The **Issuer** is the Entra **v2.0** value (`login.microsoftonline.com/<TenantID>/v2.0`), validated by **exact string match**. The **Audience** shown here is the admin-facing value the operator copies (the App ID URI plus the `/.default` scope suffix); note that the **`aud` claim in the actual token is the bare `appid` GUID** (e.g. `b5ba7a93-...`) - **not** the `api://{appid}` App ID URI form and **not** the `/.default` scope form (the `/.default` is the requested scope, not the token audience). The ISV validates the token `aud` against the bare `{appid}` GUID.
 
 **Step 2 - the ISV stores those four values as a per-endpoint trust record. No secret is created.**
 
@@ -322,7 +322,7 @@ flowchart TD
 
 | Claim | Meaning | ISV check |
 |---|---|---|
-| `aud` | `api://{appid}` (App ID URI, **no** `/.default`) | Must equal the configured audience |
+| `aud` | bare `{appid}` GUID (**not** `api://{appid}`, **not** `/.default`) | Must equal the configured audience |
 | `iss` | `https://login.microsoftonline.com/<TenantID>/v2.0` | Must equal the configured issuer (**exact string match**) |
 | `sub` | Workload identity object id | Must equal the configured subject |
 | `tid` | Tenant id | Must equal the allowed tenant (isolation) |
@@ -332,11 +332,11 @@ flowchart TD
 | `ver` | Token version | Is `2.0`; v1 tokens are not supported |
 | `iat` / `nbf` / `exp` | Validity window | Reject outside window (with small clock skew) |
 
-**Example assertion payload (v2, verbatim shape from the public AzureAD reference):**
+**Example assertion payload (v2; shape from the public AzureAD reference, with the `aud` corrected to the bare `appid` GUID per the 2026-06-12 reviewer note below):**
 
 ```json
 {
-  "aud": "api://b5ba7a93-4452-4522-aeb4-a2b5da870c16",
+  "aud": "b5ba7a93-4452-4522-aeb4-a2b5da870c16",
   "iss": "https://login.microsoftonline.com/ce5f061f-abe6-4e40-9615-301f87bcb7f0/v2.0",
   "iat": 1772175916,
   "nbf": 1772175916,
@@ -351,7 +351,7 @@ flowchart TD
 }
 ```
 
-> **Note the `aud` shape.** In this real v2 example the `aud` is `api://b5ba7a93-...` - the **App ID URI form** `api://{appid}`, **not** the `/.default` scope form and **not** a bare GUID. The `/.default` the admin copied in Step 1 is the requested scope; the token's audience is the App ID URI. There is also no `roles` claim in the documented example, consistent with the upcoming-changes note below.
+> **Note the `aud` shape (reviewer-corrected 2026-06-12).** The actual v2 token `aud` is the **bare `appid` GUID** (`b5ba7a93-...`) - **not** the `api://{appid}` App ID URI form and **not** the `/.default` scope form. The Entra provisioning owner confirmed the emitted token carries the bare `{appid}` GUID; an earlier reading of the public AzureAD reference rendered it as the `api://{appid}` App ID URI form, which is now superseded by the reviewer's authoritative statement (the internal/owner source is authoritative for Entra's actual token shape). The `/.default` the admin copied in Step 1 is the requested scope, not the token audience. There is also no `roles` claim in the documented example, consistent with the upcoming-changes note below.
 
 **Five things the ISV must do:**
 
@@ -399,18 +399,18 @@ stateDiagram-v2
 | Claim | v1.0 (retired) | v2.0 (authoritative) | Note |
 |---|---|---|---|
 | `iss` | `https://sts.windows.net/<TenantID>/` | `https://login.microsoftonline.com/<TenantID>/v2.0` | Different host **and** a `/v2.0` suffix; validated by **exact string match** |
-| `aud` | `api://{appid}/.default` | `api://{appid}` | The v2 `aud` claim is the **App ID URI** `api://{appid}` - **no** `/.default` suffix (that suffix is the requested *scope*, not the token audience). Confirmed by the concrete example token in the 2026-06-09 reference (`"aud": "api://b5ba7a93-..."`). Note this is the App ID URI form, **not** a bare GUID. |
+| `aud` | `api://{appid}/.default` | bare `{appid}` GUID | The v2 `aud` claim is the **bare `appid` GUID** - **not** the `api://{appid}` App ID URI form and **not** the `/.default` scope suffix (that suffix is the requested *scope*, not the token audience). Reviewer-corrected 2026-06-12 (Entra provisioning owner): the emitted v2 token carries the bare `{appid}` GUID. |
 | `ver` | `1.0` | `2.0` | Present in the token but used for audit, not branching - version is fixed by config |
 | caller app id | `appid` | `appid` and/or `azp` | v2 tokens may carry the caller app id in `azp` (authorized party); the validator should accept either for the caller-app cross-check |
 | JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/keys` | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | The v2 keys URI adds the `/v2.0/` path segment (both still end in `/keys`). Prefer resolving it from the tenant's v2 OIDC discovery document (`/v2.0/.well-known/openid-configuration` -> `jwks_uri`) rather than hard-coding. Surfaced by the 2026-06-12 design review (corrected from an earlier "unchanged" note). |
 
-> **Accuracy correction folded in.** An earlier note in this doc described the v2 `aud` as a *bare `{appid}` GUID*. That is the simplification in the generic Microsoft access-token-claims reference; for **this** WIF flow the documented example token shows `aud` = `api://{appid}` (App ID URI form). The validator must compare the token `aud` against `api://{appid}`, deriving it from the Step-1 admin value by stripping the `/.default` scope suffix (or by storing the App ID URI form directly).
+> **Accuracy correction (reviewer-corrected 2026-06-12).** An earlier revision of this doc claimed the v2 `aud` was the `api://{appid}` App ID URI form (reading it off the public AzureAD reference example). The Entra provisioning owner corrected this in the design review: the **actual emitted v2 token `aud` is the bare `appid` GUID** (e.g. `b5ba7a93-...`), not the App ID URI form. The validator must compare the token `aud` against the bare `{appid}` GUID - derive it from the Step-1 admin value by stripping both the `api://` prefix and the `/.default` scope suffix (or store the bare GUID directly).
 
 **Implementation impact:** the per-endpoint WIF trust config (section 8) stores a **single** expected issuer and audience (the v2 strings), not an allowlist - there is no v1/v2 dual-accept to maintain. This keeps the validator (section 4, step 3) a straight exact-string comparison. The earlier multi-format option is dropped.
 
 **Sources:**
 
-- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - the public reference, **updated 2026-06-09** ("Update WIF SCIM article for Entra v2 tokens"); documents the v2.0 issuer/audience and carries the concrete example token whose `aud` is `api://{appid}`.
+- [AzureAD/SCIMReferenceCode - Workload Identity Federation for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) - the public reference, **updated 2026-06-09** ("Update WIF SCIM article for Entra v2 tokens"); documents the v2.0 issuer/audience. Its example token renders `aud` as the `api://{appid}` App ID URI form, but the 2026-06-12 reviewer (Entra provisioning owner) corrected the actual emitted v2 `aud` to the bare `{appid}` GUID - see [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience).
 - [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - `iss` v1.0 `https://sts.windows.net/{tenantid}/` vs v2.0 `https://login.microsoftonline.com/{tenantid}/v2.0`; the `ver` discriminator; the exact-match `iss` requirement.
 - [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference (`aud`, `iss`, `ver`, `appid`/`azp`).
 - [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape (including the federated-credential case that mirrors WIF in the opposite direction).
@@ -436,7 +436,7 @@ The spec is explicit that client authentication via JWT is "orthogonal to and se
 |---|---|---|
 | 1 | MUST contain `iss` (issuer). Absent an application profile, compare by **Simple String Comparison** (RFC 3986 section 6.2.1). | `iss` == configured v2 issuer, exact-match ([section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)) |
 | 2 | MUST contain `sub`. **For client authentication the `sub` MUST be the `client_id`** of the OAuth client. | Entra's `sub` is the workload-identity object id; the ISV validates it against the configured expected subject |
-| 3 | MUST contain `aud` identifying the authorization server; the token-endpoint URL MAY be used. The AS MUST reject any JWT whose audience is not itself. Simple String Comparison. | `aud` == `api://{appid}` (App ID URI form) |
+| 3 | MUST contain `aud` identifying the authorization server; the token-endpoint URL MAY be used. The AS MUST reject any JWT whose audience is not itself. Simple String Comparison. | `aud` == the bare `{appid}` GUID (reviewer-corrected; [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)) |
 | 4 | MUST contain `exp`; reject if expired (small clock skew allowed). MAY reject an `exp` unreasonably far in the future. | time-window check |
 | 5 | MAY contain `nbf`. | enforced if present |
 | 6 | MAY contain `iat`. | logged |
@@ -606,7 +606,7 @@ Content-Type: application/json
     "expectedResource": "urn:sap:identity:application:provider:name:{Resource Name}",
     "expectedIssuer": "https://login.microsoftonline.com/<TenantID>/v2.0",
     "expectedSubject": "{WorkloadIdentity_object_id}",
-    "expectedAudience": "api://{WorkloadIdentity_appid}",
+    "expectedAudience": "{WorkloadIdentity_appid}",
     "jwksUri": "https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys",
     "allowedTenantId": "<TenantID>",
     "requiredRoles": [],
@@ -616,7 +616,7 @@ Content-Type: application/json
 }
 ```
 
-> **Field notes.** `assertionProfile` selects the wire shape (`jwt-bearer` for RFC 7523 today, `token-exchange` for RFC 8693 upcoming - [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)). `subjectTokenType` is the expected `subject_token_type` for the `token-exchange` profile (consumer-defined - Google uses `urn:ietf:params:oauth:token-type:id_token`; `null`/unused for `jwt-bearer`). `expectedResource` holds the consumer-specific `resource` parameter when one is required (SuccessFactors `urn:sap:identity:application:provider:name:{Resource Name}`); leave it null when unused. `expectedAudience` is the **App ID URI** form `api://{appid}` (what the token's `aud` claim actually contains - [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)), not the `/.default` scope value the admin reads in Step 1. `requiredRoles` defaults to **empty** because roles are not passed/validated today (the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks)); leave it empty until the planned 1P-app-method change lands a role-bearing sample token.
+> **Field notes.** `assertionProfile` selects the wire shape (`jwt-bearer` for RFC 7523 today, `token-exchange` for RFC 8693 upcoming - [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)). `subjectTokenType` is the expected `subject_token_type` for the `token-exchange` profile (consumer-defined - Google uses `urn:ietf:params:oauth:token-type:id_token`; `null`/unused for `jwt-bearer`). `expectedResource` holds the consumer-specific `resource` parameter when one is required (SuccessFactors `urn:sap:identity:application:provider:name:{Resource Name}`); leave it null when unused. `expectedAudience` is the **bare `appid` GUID** (what the token's `aud` claim actually contains, reviewer-corrected 2026-06-12 - [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)), **not** the `api://{appid}` App ID URI form and **not** the `/.default` scope value the admin reads in Step 1. `requiredRoles` defaults to **empty** because roles are not passed/validated today (the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks)); leave it empty until the planned 1P-app-method change lands a role-bearing sample token.
 
 **Token endpoint pseudocode:**
 
