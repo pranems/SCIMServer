@@ -132,6 +132,31 @@ flowchart TD
     end
 ```
 
+### 1.5 Design review with Ramsey Ali (2026-06-12) - what was confirmed
+
+This subsection records the points settled in the design review with Ramsey Ali (Entra provisioning owner). The notes below were AI-generated from the meeting and then **checked against this doc and against RFC 7523 / RFC 8693**; two phrasings in the raw notes were inaccurate and are corrected here (flagged inline).
+
+| # | Topic | What was confirmed | Reconciled with |
+|---|---|---|---|
+| 1 | **Pattern 8 is the only supported pattern** | Entra presents its signed JWT as a client assertion (or, upcoming, a subject token), the ISV validates it via the JWKS URI + configured trust values, and then the **ISV** mints its own short-lived token for the SCIM calls. This is the current implementation and the only one to be supported. | [section 1.3](#13-token-exchange-vs-direct-jwt-the-key-distinction), [section 2](#2-the-wire-format) |
+| 2 | **Pattern 4 is not supported and unlikely to be needed** | Pattern 4 = a self-signed token presented **directly** to the SCIM API (no token endpoint), validated per request against a public key from a URL. No customer has asked for it; guidelines follow current customer need, so only Pattern 8 is in scope. | [section 1.3](#13-token-exchange-vs-direct-jwt-the-key-distinction) (the "Pattern 4 - direct external JWT" branch), [section 15 FAQ](#15-faq) |
+| 3 | **Only one config-time validation; provisioning uses the ISV token** | The trust values (issuer, audience, subject, JWKS URL) are stored once at onboarding. The assertion is validated at the token endpoint; subsequent SCIM provisioning calls carry the ISV-issued bearer token, which the SCIM endpoint validates as a normal bearer token. | [section 2](#2-the-wire-format), [section 8 guard fall-through note](#8-backend-design) |
+| 4 | **RFC 7523 today, RFC 8693 in development (Google example)** | Only RFC 7523 is implemented for ISV onboarding now; RFC 8693 support is being built, with Google as the example ISV. The supported RFC is recorded in the **app metadata at onboarding**; a marker in the connectivity config payload tells Entra which RFC-compliant request shape to send, so the customer never specifies it manually. | [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange) |
+| 5 | **Both RFCs on one endpoint: possible but rare** | An ISV endpoint could advertise both RFCs (e.g. for different environments). Technically supportable by Entra, but not currently observed among customers. The common case is one profile per endpoint, fixed at onboarding. | [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange) `assertionProfile` note |
+| 6 | **Token endpoint and SCIM endpoint may be hosted separately** | They can live in different environments or even different parts of a company (SuccessFactors is the example: distinct token host and SCIM host). The SCIM endpoint accepts a valid bearer token regardless of where it was minted; **token validation against the SCIM endpoint is the ISV's responsibility**, and Entra assumes the token from the token endpoint will be accepted. | [section 2 separable-endpoints note](#2-the-wire-format) |
+| 7 | **V2 token format only; exact string comparison** | The team switched from V1 to V2 tokens (different `iss` and `aud`); only V2 is generated and supported. Runtime version detection is unnecessary because the version is fixed by configuration. The issuer is stored and compared by **precise exact-string match** - ISVs may reject a token if the issuer string does not match byte-for-byte. | [section 4.1 DECIDED](#41-decided---entra-v2-token-format-only-issuer-and-audience) |
+| 8 | **The ISV needs only the literal issuer string, not the tenant ID** | The ISV does not have to handle the tenant ID as a separate concept - it stores and matches the literal issuer string (which **contains** the tenant ID). The app is deployed in a specific tenant; storing the issuer URL is sufficient for validation. | [section 4 claims table](#4-the-assertion-claims-validation-jwks) (`iss` / `tid`) - see the reconciliation note below |
+| 9 | **JWKS validation is a generic REST call; no special encryption** | Pulling the signing keys is a generic REST request (no special library required); the JWKS confirms the token is genuinely Microsoft-signed, and validation then checks `iss` / `aud` / `sub` against the trusted configured values. No encryption is required on the incoming body beyond standard TLS. | [section 4](#4-the-assertion-claims-validation-jwks) |
+| 10 | **Roles are not validated today; may matter soon** | Roles are not currently passed in the assertion or validated. This may change with the planned **"1P app method"** (tentatively a few weeks out), which could require role information in the token. Ramsey will give a heads-up if roles become necessary. | [section 4 upcoming-changes note](#4-the-assertion-claims-validation-jwks) |
+
+> **Accuracy correction 1 (who mints the token).** The raw AI notes said in one place that "Entra mints its own short-lived token." That is backwards: Entra **presents** the signed assertion; the **ISV** validates it and mints **its own** short-lived token, which Entra then uses as the `Bearer` on the SCIM calls. The corrected phrasing is used in row 1 above and matches [section 0](#0-tldr) and [section 1.3](#13-token-exchange-vs-direct-jwt-the-key-distinction).
+
+> **Accuracy correction 2 (the JWKS "/keys" remark).** The raw notes said the "JWKS URL format changed to include `/keys`" in the V1->V2 switch. More precisely: both V1 and V2 keys URLs end in `/keys`; what differs is the path segment - the V1 keys URI is `https://login.microsoftonline.com/<TenantID>/discovery/keys` while the **V2** keys URI is `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` (the `/v2.0/` segment is the real delta). The authoritative value for WIF is the V2 form; obtain it from the tenant's V2 OIDC discovery document (`/v2.0/.well-known/openid-configuration` -> `jwks_uri`) rather than hard-coding it. The v1/v2 row in [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience) has been corrected accordingly.
+
+> **Reconciliation (row 8 - issuer vs `tid`).** Ramsey's framing ("the ISV only needs the literal issuer string") and this doc's `tid` check are **compatible, not contradictory**: because the V2 issuer string embeds the tenant GUID and is matched exactly, tenant binding is already enforced by the `iss` comparison. The separate `tid`-claim check in the [section 4 claims table](#4-the-assertion-claims-validation-jwks) is **defense in depth**, not a second piece of configuration the operator must supply - it is derived from the same issuer the admin already stored. An implementation may enforce `tid` explicitly or rely on the exact-match issuer; both satisfy the trust requirement.
+
+**Follow-ups Ramsey owns (from the review):** (a) send RFC 8693 implementation details + examples; (b) provide concrete V2 token strings / request bodies - **partly delivered**, the SuccessFactors + Google bodies in [section 2.2](#22-the-two-shipping-implementations-concrete-request-bodies) are from this; (c) share Microsoft-JWKS validation guidance; (d) confirm any upcoming role-handling change with the 1P app method.
+
 ---
 
 ## 2. The wire format
@@ -377,7 +402,7 @@ stateDiagram-v2
 | `aud` | `api://{appid}/.default` | `api://{appid}` | The v2 `aud` claim is the **App ID URI** `api://{appid}` - **no** `/.default` suffix (that suffix is the requested *scope*, not the token audience). Confirmed by the concrete example token in the 2026-06-09 reference (`"aud": "api://b5ba7a93-..."`). Note this is the App ID URI form, **not** a bare GUID. |
 | `ver` | `1.0` | `2.0` | Present in the token but used for audit, not branching - version is fixed by config |
 | caller app id | `appid` | `appid` and/or `azp` | v2 tokens may carry the caller app id in `azp` (authorized party); the validator should accept either for the caller-app cross-check |
-| JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | (unchanged) | The keys endpoint is already v2 in both; the v1->v2 change is `iss` + `aud`, **not** the keys path |
+| JWKS URL | `https://login.microsoftonline.com/<TenantID>/discovery/keys` | `https://login.microsoftonline.com/<TenantID>/discovery/v2.0/keys` | The v2 keys URI adds the `/v2.0/` path segment (both still end in `/keys`). Prefer resolving it from the tenant's v2 OIDC discovery document (`/v2.0/.well-known/openid-configuration` -> `jwks_uri`) rather than hard-coding. Surfaced by the 2026-06-12 design review (corrected from an earlier "unchanged" note). |
 
 > **Accuracy correction folded in.** An earlier note in this doc described the v2 `aud` as a *bare `{appid}` GUID*. That is the simplification in the generic Microsoft access-token-claims reference; for **this** WIF flow the documented example token shows `aud` = `api://{appid}` (App ID URI form). The validator must compare the token `aud` against `api://{appid}`, deriving it from the Step-1 admin value by stripping the `/.default` scope suffix (or by storing the App ID URI form directly).
 
@@ -389,6 +414,110 @@ stateDiagram-v2
 - [Microsoft Learn - Access tokens in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens) - `iss` v1.0 `https://sts.windows.net/{tenantid}/` vs v2.0 `https://login.microsoftonline.com/{tenantid}/v2.0`; the `ver` discriminator; the exact-match `iss` requirement.
 - [Microsoft Learn - Access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) - claim-by-claim reference (`aud`, `iss`, `ver`, `appid`/`azp`).
 - [Microsoft Learn - Microsoft identity platform and the OAuth 2.0 client credentials flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) - the v2.0 client-credentials request shape (including the federated-credential case that mirrors WIF in the opposite direction).
+
+---
+
+### 4.2 RFC 7523 in depth (the `jwt-bearer` profile)
+
+**[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - "JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and Authorization Grants", Proposed Standard, May 2015 (Jones / Campbell / Mortimore). It is a concrete profile of the assertion framework in [RFC 7521](https://www.rfc-editor.org/rfc/rfc7521).
+
+**Two orthogonal, separable uses - WIF uses only the second:**
+
+| RFC 7523 use | URN | Carried in | Combined with |
+|---|---|---|---|
+| Authorization **grant** (section 2.1) | `urn:ietf:params:oauth:grant-type:jwt-bearer` | the `assertion` form field, as the `grant_type` itself | nothing - it **is** the grant |
+| **Client authentication** (section 2.2) - **this is WIF** | `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` | the `client_assertion` field (+ `client_assertion_type`); MUST NOT carry more than one JWT | some other `grant_type` (for WIF: `client_credentials`) |
+
+The spec is explicit that client authentication via JWT is "orthogonal to and separable from" using a JWT as an authorization grant. **WIF's `jwt-bearer` profile is the section-2.2 client-authentication form**: the Entra-signed JWT proves *who the caller is*, and a separate `grant_type=client_credentials` asks for the token. It is **not** the section-2.1 grant-type form.
+
+**The section-3 JWT processing rules (what the ISV/AS must enforce):**
+
+| # | Rule | WIF mapping |
+|---|---|---|
+| 1 | MUST contain `iss` (issuer). Absent an application profile, compare by **Simple String Comparison** (RFC 3986 section 6.2.1). | `iss` == configured v2 issuer, exact-match ([section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)) |
+| 2 | MUST contain `sub`. **For client authentication the `sub` MUST be the `client_id`** of the OAuth client. | Entra's `sub` is the workload-identity object id; the ISV validates it against the configured expected subject |
+| 3 | MUST contain `aud` identifying the authorization server; the token-endpoint URL MAY be used. The AS MUST reject any JWT whose audience is not itself. Simple String Comparison. | `aud` == `api://{appid}` (App ID URI form) |
+| 4 | MUST contain `exp`; reject if expired (small clock skew allowed). MAY reject an `exp` unreasonably far in the future. | time-window check |
+| 5 | MAY contain `nbf`. | enforced if present |
+| 6 | MAY contain `iat`. | logged |
+| 7 | MAY contain `jti`; the AS MAY reject replays by tracking used `jti` values for the `exp` window. | optional replay defense |
+| 8 | MAY contain other claims. | `tid`, `oid`, `appid`/`azp`, `ver` |
+| 9 | MUST be digitally signed or MAC'd; reject an invalid signature/MAC. | RS256 over the Microsoft JWKS; **never** `alg:none`/HMAC |
+| 10 | MUST reject a JWT that is invalid in any other respect per RFC 7519. | standard JWT validity |
+
+**Error codes (section 3.1 / 3.2):** a bad **grant** JWT returns `invalid_grant`; a bad **client-authentication** JWT returns **`invalid_client`**. Because WIF is the client-authentication form, **`invalid_client`** is the correct failure code (matching [section 12](#12-error-responses-and-rfc-6749-conformance) and the validation lifecycle in [section 4](#4-the-assertion-claims-validation-jwks)).
+
+**Interoperability (section 5):** **RS256 is mandatory-to-implement**, which is exactly the algorithm Entra signs with. The spec lists the values that MUST be agreed out of band - issuer and audience identifiers, the token-endpoint location, the signing key, any one-time-use (`jti`) restriction, and the maximum JWT lifetime - and these are precisely the fields the WIF trust record stores ([section 8](#8-backend-design)). Replay protection (section 6) is **optional**, not mandated.
+
+### 4.3 RFC 8693 in depth (the `token-exchange` profile)
+
+**[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - "OAuth 2.0 Token Exchange", Proposed Standard, January 2020 (Jones & Nadalin of **Microsoft**, Campbell ed. of Ping, Bradley of Yubico, Mortimore of Visa). It defines a lightweight Security Token Service (STS) over OAuth: a client trades one token for another. WIF's upcoming `token-exchange` profile is this grant.
+
+**Request parameters (section 2.1; an extension grant under RFC 6749 section 4.5, `application/x-www-form-urlencoded`):**
+
+| Parameter | Presence | Meaning | WIF / Google use |
+|---|---|---|---|
+| `grant_type` | **REQUIRED** | `urn:ietf:params:oauth:grant-type:token-exchange` | fixed |
+| `subject_token` | **REQUIRED** | the token representing the identity on whose behalf the request is made | **the Entra-signed JWT** |
+| `subject_token_type` | **REQUIRED** | type identifier of `subject_token` | **consumer-defined** - Google sets `...:id_token` |
+| `resource` | OPTIONAL | absolute URI of the target service (no fragment; query allowed); repeatable | unused by Google |
+| `audience` | OPTIONAL | logical name of the target service; repeatable; may combine with `resource` | Google: the workload-identity-pool provider URI |
+| `scope` | OPTIONAL | space-delimited requested scopes | Google: the GCP platform scope |
+| `requested_token_type` | OPTIONAL | the desired **issued** token type | Google: `...:access_token` |
+| `actor_token` | OPTIONAL | the identity of the **acting** party (delegation) | not used by basic WIF |
+| `actor_token_type` | REQUIRED **iff** `actor_token` present, else MUST NOT appear | type of `actor_token` | not used by basic WIF |
+
+Client authentication for the exchange uses the normal OAuth mechanisms, and the spec **explicitly names RFC 7523 `jwt-bearer` as one allowed client-auth method** - this is the formal point at which the two RFCs compose (see [section 4.4](#44-juxtaposition-how-the-two-rfcs-map-onto-wif)). Omitting client authentication lets a compromised `subject_token` be leveraged into other tokens, so client auth lets the AS apply additional authorization checks.
+
+**Response parameters (section 2.2.1; HTTP 200 `application/json`):**
+
+| Member | Presence | Note |
+|---|---|---|
+| `access_token` | **REQUIRED** | carries the issued token; the name is kept "for historical reasons" - the issued token need not actually be an access token |
+| `issued_token_type` | **REQUIRED** | the token-type identifier of what was returned (this is the member WIF's `token-exchange` response adds over a plain OAuth response) |
+| `token_type` | **REQUIRED** | e.g. `Bearer`, or `N_A` when the issued token is not usable as an access token |
+| `expires_in` | RECOMMENDED | lifetime in seconds |
+| `scope` | OPTIONAL if identical to requested, else REQUIRED | granted scope |
+| `refresh_token` | OPTIONAL | typically **not** issued in an exchange |
+
+**Token Type Identifiers (section 3):**
+
+| URI | Meaning |
+|---|---|
+| `urn:ietf:params:oauth:token-type:access_token` | an OAuth access token (format opaque to the client) |
+| `urn:ietf:params:oauth:token-type:refresh_token` | an OAuth refresh token |
+| `urn:ietf:params:oauth:token-type:id_token` | an OpenID Connect ID Token |
+| `urn:ietf:params:oauth:token-type:saml1` / `:saml2` | SAML assertions |
+| `urn:ietf:params:oauth:token-type:jwt` | specifically a JWT (from RFC 7519 section 9) |
+
+The spec calls the `access_token` vs `jwt` distinction "subtle": `access_token` denotes a **delegated authorization decision** (opaque to the client), whereas `jwt` denotes a **format** (a JWT, e.g. for cross-domain use as in RFC 7523). Google's choice of `id_token` for the Entra `subject_token` is therefore a consumer labeling decision, not a format requirement - which is why the validator must read the configured expected `subject_token_type` rather than assume `...:jwt`.
+
+**Impersonation vs delegation (section 1.1) and claims (section 4):** with only a `subject_token`, the exchange is **impersonation** (the issued token's subject *is* the subject; A becomes B). With `subject_token` **plus** `actor_token` it is **delegation** - a composite token whose `act` claim names the acting party, so A retains its own identity while acting for B. The `act` claim may nest for delegation chains, but a consumer MUST base access decisions only on the top-level claims plus the current (outermost) actor; nested `act` entries are informational. The related `may_act` claim states that a party is authorized to act for the subject. **Basic WIF uses impersonation only** - subject token in, ISV token out, no `actor_token` - so delegation/`act`/`may_act` are out of scope until a concrete integration needs them.
+
+**Error codes (section 2.2.2):** an invalid request (or invalid `subject_token`/`actor_token`) returns `invalid_request`; an unsupported or too-broad target returns `invalid_target`. (Note this differs from RFC 7523's `invalid_client`/`invalid_grant`.) The relationship between `resource`, `audience`, and `scope` (section 2.1.1) is a Cartesian product of the requested rights at the named targets; asking for more than a target allows yields `invalid_target`.
+
+### 4.4 Juxtaposition: how the two RFCs map onto WIF
+
+The two RFCs are frequently conflated because both end with the ISV issuing a bearer token. They are different mechanisms doing different jobs, and WIF uses **one specific slice of each**.
+
+| Dimension | RFC 7523 (`jwt-bearer`) - **today** | RFC 8693 (`token-exchange`) - **upcoming** |
+|---|---|---|
+| What the RFC defines | a **client-authentication method** (and, separately, a grant) | a **grant type** for exchanging one token for another |
+| WIF uses | section 2.2 **client authentication** | the **token-exchange grant** |
+| `grant_type` on the wire | `client_credentials` | `urn:ietf:params:oauth:grant-type:token-exchange` |
+| Entra's JWT is carried as | `client_assertion` (+ `client_assertion_type`) | `subject_token` (+ `subject_token_type`) |
+| Role of Entra's JWT | proves **who the caller is** | **the subject being exchanged** for a new token |
+| Token-type declared | `client_assertion_type` = `...:client-assertion-type:jwt-bearer` (fixed) | `subject_token_type` = **consumer-defined** (Google: `...:id_token`) |
+| Required extra response member | none (plain OAuth token response) | **`issued_token_type`** (REQUIRED) |
+| Failure code | **`invalid_client`** (section 3.2) | **`invalid_request`** / **`invalid_target`** (section 2.2.2) |
+| Mandatory signing alg | **RS256** (section 5) | inherits the surrounding OAuth/JWT requirements |
+| Example ISV | **SAP SuccessFactors** | **Google Cloud** |
+
+**The composition point (they cooperate, not compete).** RFC 8693 section 2.1 lists RFC 7523 `jwt-bearer` as a valid way for a client to authenticate **during** a token exchange. So in principle a single request could be an RFC 8693 exchange (`subject_token`) whose **client authentication** is an RFC 7523 `client_assertion`. WIF does not need that combination today, but it explains why the two specs share so much vocabulary.
+
+**The vocabulary that bleeds across (a real interop hazard).** The SuccessFactors `jwt-bearer` body ([section 2.2](#22-the-two-shipping-implementations-concrete-request-bodies)) carries a `resource` parameter - which is **defined by RFC 8693, not RFC 7523**. A `jwt-bearer` request therefore legitimately carries an RFC 8693 parameter. A SCIMServer validator must tolerate `resource` (and `audience`, `requested_token_type`) on either profile and treat them as **issuance/routing hints**, applying the identical JWKS-plus-claims signature check from [section 4](#4-the-assertion-claims-validation-jwks) regardless of which profile presented the JWT.
+
+**What is identical for the SCIM endpoint.** Both profiles end byte-for-byte the same on the SCIM calls: a short-lived ISV-issued `Bearer` token. Only the **token-endpoint** request differs (the field carrying Entra's JWT and the `grant_type`). The signature + `iss`/`aud`/`sub`/`tid`/time-window validation of Entra's JWT is the same for both - which is why the `assertionProfile` discriminator ([section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)) only selects the wire shape, not a second validator.
 
 ---
 
@@ -917,8 +1046,8 @@ flowchart LR
 ### IETF
 
 - **RFC 7521** - Assertion Framework for OAuth 2.0
-- **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (section 2.2 client authentication) - the `jwt-bearer` profile
-- **RFC 8693** - OAuth 2.0 Token Exchange - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Defines `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token`/`subject_token_type`, the required `issued_token_type` response member, and impersonation vs delegation (`actor_token`, `act` claim)
+- **[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (May 2015). WIF uses **section 2.2 client authentication** - the `jwt-bearer` profile. Key normative facts (deep-dive in [section 4.2](#42-rfc-7523-in-depth-the-jwt-bearer-profile)): `client_assertion` MUST carry exactly one JWT; `sub` MUST equal the `client_id`; `iss`/`aud` compared by Simple String Comparison; `exp` mandatory; failure code `invalid_client`; RS256 mandatory-to-implement.
+- **[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - OAuth 2.0 Token Exchange (January 2020) - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Key normative facts (deep-dive in [section 4.3](#43-rfc-8693-in-depth-the-token-exchange-profile)): `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`; REQUIRED `subject_token`/`subject_token_type`; REQUIRED `issued_token_type` response member; optional `resource`/`audience`/`scope`/`requested_token_type`/`actor_token`; impersonation vs delegation (`act`, `may_act`); failure codes `invalid_request`/`invalid_target`; RFC 8693 names RFC 7523 as an allowed client-auth method (the composition point).
 - **RFC 7519** - JSON Web Token (JWT)
 - **RFC 7517** - JSON Web Key (JWK)
 - **RFC 6749** - The OAuth 2.0 Authorization Framework (section 5.2 error responses)

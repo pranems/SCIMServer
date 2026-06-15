@@ -690,15 +690,15 @@ The following entries from [.github/copilot-instructions.md](../.github/copilot-
 - **Salesforce:** SCIM 2.0 at `/services/scim/v2/`; standard Salesforce OAuth 2.0 (web-server, JWT bearer, client_credentials, refresh_token flows). Re-probe before claiming compatibility.
 - **ServiceNow:** SCIM 2.0 via Inbound REST OAuth; instance-scoped URL. Re-probe before claiming compatibility.
 
-### 8.4 IETF specifications (referenced but not re-fetched; IETF blocks tool-fetch with HTTP 403)
+### 8.4 IETF specifications (datatracker.ietf.org returns HTTP 403 to tool-fetch; the canonical text was fetched directly from www.rfc-editor.org)
 
 - **RFC 6749** - The OAuth 2.0 Authorization Framework (defines the 4 grant types)
 - **RFC 6750** - OAuth 2.0 Bearer Token Usage (the `Authorization: Bearer X` wire format)
 - **RFC 7519** - JSON Web Token (JWT)
 - **RFC 7517** - JSON Web Key (JWK)
 - **RFC 7521** - Assertion Framework for OAuth 2.0
-- **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication (the `private_key_jwt` pattern) - WIF Pattern 8 profile `jwt-bearer`
-- **RFC 8693** - OAuth 2.0 Token Exchange (`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token`/`subject_token_type`, required `issued_token_type` response member, impersonation vs delegation) - WIF Pattern 8 profile `token-exchange`; authored by Microsoft with Ping/Yubico/Visa
+- **[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (May 2015). WIF Pattern 8 profile `jwt-bearer` uses **section 2.2 client authentication** (`client_assertion` + `client_assertion_type=...:jwt-bearer`, `sub` MUST equal `client_id`, failure code `invalid_client`, RS256 mandatory-to-implement, issuer/audience compared by Simple String Comparison). Deep-dive in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 4.2](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#42-rfc-7523-in-depth-the-jwt-bearer-profile).
+- **[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - OAuth 2.0 Token Exchange (Jan 2020; `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, REQUIRED `subject_token`/`subject_token_type`, REQUIRED `issued_token_type` response member, optional `resource`/`audience`/`scope`/`requested_token_type`/`actor_token`, impersonation vs delegation via `act`/`may_act`, failure codes `invalid_request`/`invalid_target`) - WIF Pattern 8 profile `token-exchange`; authored by Microsoft (Jones, Nadalin) with Ping/Yubico/Visa. RFC 8693 names RFC 7523 as one allowed client-auth method, so the two **compose**. Deep-dive in [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 4.3](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#43-rfc-8693-in-depth-the-token-exchange-profile).
 - **RFC 7591** - OAuth 2.0 Dynamic Client Registration
 - **RFC 7636** - PKCE (mandatory for OAuth 2.1 public clients)
 - **RFC 7642** - SCIM Definitions, Overview, Concepts, and Requirements
