@@ -14,7 +14,7 @@
 
 > **Reconciliation note.** Where the internal doc and the public reference differ, the internal doc is treated as authoritative for **Entra's** behavior (issuer, audience format, role enforcement, deprecation timeline) and the public reference is treated as authoritative for the **wire format** an ISV must implement. They agree on the core: this is RFC 7523 client authentication, not RFC 7523 grant-type usage.
 
-> **Stakeholder decisions folded in (2026-06-12).** A design review with the Entra provisioning owner settled three points that update this doc: (1) **Entra v2 tokens are the only supported format** - the issuer/audience values throughout were switched to the v2 shape and section 4.1 is now a DECIDED record, not an open question. (2) **A second assertion profile is coming: RFC 8693 (OAuth Token Exchange)** alongside today's RFC 7523 (JWT bearer assertion); see [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange). (3) **App-role enforcement is forward-looking** - roles are not currently passed or validated in the assertion; see the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks).
+> **Stakeholder decisions folded in (2026-06-12).** Design review settled these points that update this doc: (1) **Entra v2 tokens are the only supported format** - the issuer/audience values throughout were switched to the v2 shape and section 4.1 is now a decided, not an open question. (2) **RFC 8693 assertion profile is coming (OAuth Token Exchange)** alongside today's RFC 7523 (JWT bearer assertion); see [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange). (3) **App-role enforcement is forward-looking** - roles are not currently passed or validated in the assertion; see the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks).
 
 ## Table of contents
 
@@ -112,9 +112,9 @@ WIF is not a single wire shape. Entra is rolling out **two OAuth profiles** for 
 |---|---|---|
 | Status | **Shipped today** (SAP SuccessFactors is the first ISV) | **Coming** (Google is the example ISV) |
 | `grant_type` | `client_credentials` | `urn:ietf:params:oauth:grant-type:token-exchange` |
-| Entra's JWT is carried as | `client_assertion` (+ `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`) | `subject_token` (+ `subject_token_type=urn:ietf:params:oauth:token-type:jwt`) |
+| Entra's JWT is carried as | `client_assertion` (+ `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`) | `subject_token` (+ `subject_token_type`; **consumer-defined** - Google uses `urn:ietf:params:oauth:token-type:id_token`) |
 | Role of the JWT | **Client authentication** - proves who the caller is | **The subject being exchanged** - the token traded for a new one |
-| Other params | `client_id`, `scope` | `subject_token_type` (REQUIRED), optional `resource` / `audience` / `scope` / `requested_token_type` / `actor_token` |
+| Other params | `client_id`, `scope`, and (SuccessFactors) a custom `resource` borrowed from RFC 8693 | `requested_token_type`, `audience`, `scope`; optional `resource` / `actor_token`. `subject_token_type` is REQUIRED |
 | Response adds | standard OAuth token response | also `issued_token_type` (REQUIRED) |
 | Semantics | client-auth then mint the ISV token | STS-style exchange; supports impersonation (subject only) vs delegation (subject + actor, composite token carries an `act` claim) |
 
@@ -160,9 +160,10 @@ Host: isv.example.com
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=client_credentials
-&client_id=00000000-0000-0000-0000-000000000000
+&client_id=927cf057-74f6-4400-b22b-94f88b041914
 &client_assertion=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.eyJhdWQiOiJhcGk6...
 &client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer
+&resource=urn%3Asap%3Aidentity%3Aapplication%3Aprovider%3Aname%3A%7BResource+Name%7D
 &scope=scimserver-scim-access
 ```
 
@@ -197,9 +198,11 @@ Content-Type: application/x-www-form-urlencoded
 
 grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange
 &subject_token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.eyJhdWQiOiJhcGk6...
-&subject_token_type=urn%3Aietf%3Aparams%3Aoauth%3Atoken-type%3Ajwt
+&subject_token_type=urn%3Aietf%3Aparams%3Aoauth%3Atoken-type%3Aid_token
 &scope=scimserver-scim-access
 ```
+
+> **The `subject_token_type` is consumer-defined.** The real Google flow sets it to `urn:ietf:params:oauth:token-type:id_token` (the value shown above), not the generic `...:jwt`. A validator must read the configured expected type rather than hard-coding one - see the concrete bodies in [section 2.2](#22-the-two-shipping-implementations-concrete-request-bodies).
 
 The response is a normal OAuth token response **plus** the RFC 8693-required `issued_token_type`:
 
@@ -216,6 +219,45 @@ Content-Type: application/json
 ```
 
 > **What stays identical.** The JWKS-based signature + `iss`/`aud`/`sub`/`tid`/time-window validation of the Microsoft JWT (section 4) is **the same** for both profiles - only the field name carrying the JWT (`client_assertion` vs `subject_token`) and the `grant_type` differ. The SCIM call that follows is byte-for-byte identical: a `Bearer` token the ISV minted. RFC 8693 also defines `resource`, `audience`, `requested_token_type`, and delegation via `actor_token` (producing a composite token with an `act` claim); none are required for the basic WIF exchange, so they are out of scope until a concrete integration needs them.
+
+### 2.2 The two shipping implementations (concrete request bodies)
+
+These are the two real WIF implementations SCIMServer must interoperate with. Both carry the same kind of Entra-signed JWT (an "impersonated application token") but differ in grant type, the field that carries the token, and several consumer-specific parameters. The bodies below are shown as parameter sets; on the wire they are `application/x-www-form-urlencoded`.
+
+**SAP SuccessFactors - `jwt-bearer` (RFC 7523):**
+
+```json
+{
+  "grant_type": "client_credentials",
+  "client_assertion": "{impersonated application token}",
+  "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+  "client_id": "927cf057-74f6-4400-b22b-94f88b041914",
+  "resource": "urn:sap:identity:application:provider:name:{Resource Name}"
+}
+```
+
+- `client_id` is sent alongside the assertion.
+- `resource` is a **custom SuccessFactors parameter** (`urn:sap:identity:application:provider:name:{Resource Name}`). It is **not** part of RFC 7523 - it is borrowed from RFC 8693, which defines `resource` as the target the issued token is for. This is a concrete case of the two RFCs bleeding together: a `jwt-bearer` request carrying an RFC 8693 parameter. A SCIMServer validator for this profile must tolerate (and may use or ignore) a `resource` form field.
+
+**Google Cloud Platform - `token-exchange` (RFC 8693):**
+
+```json
+{
+  "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+  "requested_token_type": "urn:ietf:params:oauth:token-type:access_token",
+  "subject_token": "{impersonated application token}",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
+  "audience": "//iam.googleapis.com/projects/{Project ID}/locations/global/workloadIdentityPools/{Pool ID}/providers/{Provider ID}",
+  "scope": "https://www.googleapis.com/auth/cloud-platform"
+}
+```
+
+- `subject_token_type` is **`urn:ietf:params:oauth:token-type:id_token`** - Google treats the Entra token as an **id_token**, not the generic `...:jwt` type. The expected `subject_token_type` is **consumer-defined**; do not hard-code `:jwt`.
+- `requested_token_type` is **`...:access_token`** - the caller states the desired **output** type (RFC 8693 lets the requester ask for a specific issued-token type).
+- `audience` is the **Google workload-identity-pool provider resource name** (`//iam.googleapis.com/projects/.../providers/...`), the RFC 8693 `audience` parameter naming the logical target.
+- `scope` is the GCP platform scope the issued token should carry.
+
+> **Design takeaway for SCIMServer.** The `assertionProfile` discriminator selects the grant type and the field carrying the token, but the **per-profile parameter set is consumer-specific**: SuccessFactors adds `resource`; Google sets `subject_token_type=id_token`, `requested_token_type`, and a pool-URI `audience`. The validator should read the token from `client_assertion` (jwt-bearer) or `subject_token` (token-exchange), validate it against the configured JWKS + claims **identically** for both, and treat `resource` / `audience` / `requested_token_type` / `scope` as profile-specific routing and issuance hints rather than part of the core signature-plus-claims check. The configured `subject_token_type` (and any expected `resource`/`audience`) belongs in the per-endpoint `wif` trust record, not hard-coded.
 
 ---
 
@@ -417,7 +459,7 @@ erDiagram
         string id
         string endpointId
         string credentialType "wif"
-        json metadata "assertionProfile, expectedIssuer, expectedSubject, expectedAudience, jwksUri, allowedTenantId, requiredRoles, scope, issuedTokenTtlSec"
+        json metadata "assertionProfile, subjectTokenType, expectedResource, expectedIssuer, expectedSubject, expectedAudience, jwksUri, allowedTenantId, requiredRoles, scope, issuedTokenTtlSec"
     }
 ```
 
@@ -431,6 +473,8 @@ Content-Type: application/json
   "credentialType": "wif",
   "wif": {
     "assertionProfile": "jwt-bearer",
+    "subjectTokenType": null,
+    "expectedResource": "urn:sap:identity:application:provider:name:{Resource Name}",
     "expectedIssuer": "https://login.microsoftonline.com/<TenantID>/v2.0",
     "expectedSubject": "{WorkloadIdentity_object_id}",
     "expectedAudience": "api://{WorkloadIdentity_appid}",
@@ -443,7 +487,7 @@ Content-Type: application/json
 }
 ```
 
-> **Field notes.** `assertionProfile` selects the wire shape (`jwt-bearer` for RFC 7523 today, `token-exchange` for RFC 8693 upcoming - [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)). `expectedAudience` is the **App ID URI** form `api://{appid}` (what the token's `aud` claim actually contains - [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)), not the `/.default` scope value the admin reads in Step 1. `requiredRoles` defaults to **empty** because roles are not passed/validated today (the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks)); leave it empty until the planned 1P-app-method change lands a role-bearing sample token.
+> **Field notes.** `assertionProfile` selects the wire shape (`jwt-bearer` for RFC 7523 today, `token-exchange` for RFC 8693 upcoming - [section 1.4](#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange)). `subjectTokenType` is the expected `subject_token_type` for the `token-exchange` profile (consumer-defined - Google uses `urn:ietf:params:oauth:token-type:id_token`; `null`/unused for `jwt-bearer`). `expectedResource` holds the consumer-specific `resource` parameter when one is required (SuccessFactors `urn:sap:identity:application:provider:name:{Resource Name}`); leave it null when unused. `expectedAudience` is the **App ID URI** form `api://{appid}` (what the token's `aud` claim actually contains - [section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)), not the `/.default` scope value the admin reads in Step 1. `requiredRoles` defaults to **empty** because roles are not passed/validated today (the upcoming-changes note in [section 4](#4-the-assertion-claims-validation-jwks)); leave it empty until the planned 1P-app-method change lands a role-bearing sample token.
 
 **Token endpoint pseudocode:**
 
