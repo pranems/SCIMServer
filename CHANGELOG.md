@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.2] - 2026-06-18 - Auth Pre-Q.B: asymmetric (RS256/ES256) signing key + published JWKS
+
+Second step of the reconciled authentication build. Moves the global OAuth issuer off the symmetric HS256 secret onto an asymmetric, externalized signing key and publishes the public JWKS - the prerequisite for per-endpoint issuance (Q1) and WIF own-token issuance (Q6). Feature doc: [docs/auth/ASYMMETRIC_SIGNING_AND_JWKS.md](docs/auth/ASYMMETRIC_SIGNING_AND_JWKS.md).
+
+### Added
+
+- **Asymmetric OAuth token signing (RS256 default, ES256 optional).** New `OAuthSigningKeyService` ([api/src/oauth/oauth-signing-key.service.ts](api/src/oauth/oauth-signing-key.service.ts)) loads an RS256/ES256 key from config (`OAUTH_JWT_PRIVATE_KEY` / `OAUTH_JWT_PUBLIC_KEY` / `OAUTH_JWT_ALG` / `OAUTH_JWT_KID`) or generates an ephemeral dev key, derives a stable `kid` (RFC 7638 thumbprint), and exposes the public JWKS. Every issued token now carries `alg: RS256` + `kid` in its header.
+- **Published JWKS.** New public `GET /scim/oauth/jwks` ([api/src/oauth/jwks.controller.ts](api/src/oauth/jwks.controller.ts)) serves the RFC 7517 key set (cacheable, no private material). The exported `buildJwtModuleOptions` factory ([api/src/oauth/oauth.module.ts](api/src/oauth/oauth.module.ts)) wires the asymmetric keys + `keyid` + algorithm pinning, and is exercised directly by unit tests. New `OAuthSigningModule` shares one signing identity between the signer and the publisher.
+
+### Security
+
+- **Algorithm-confusion defense:** verification pins `verifyOptions.algorithms` to exactly the configured asymmetric algorithm. An HS256 token forged by HMAC-ing the published RSA public key is rejected (locked in by a unit test performing that exact forgery). `JWT_SECRET` is no longer used by the OAuth issuer.
+
+### Validation
+
+- TDD: 9 new unit tests ([oauth-asymmetric.spec.ts](api/src/oauth/oauth-asymmetric.spec.ts), RED via stubs -> GREEN) + 4 new E2E ([oauth-jwks.e2e-spec.ts](api/test/e2e/oauth-jwks.e2e-spec.ts)) + 7 new live assertions (`scripts/live-test.ps1` section 9z-AM).
+- API unit: **3,847 -> 3,856** (104 suites). API E2E (inmemory, full): **1,223 pass** (65 suites). Live (local node, inmemory): **1,041 pass / 0 fail** including 9z-AM. Build 0 err; ESLint 0 err / 464 warnings (under the 465 baseline). The existing `POST /oauth/token` response contract is unchanged (same documented keys).
+- Parity: backend-agnostic (OAuth signing does not touch persistence). Docker + dev-Azure live validation batched to the next integration checkpoint (rationale recorded in the ledger).
+
 ## [0.54.0-alpha.1] - 2026-06-18 - Auth Pre-Q.A: structured config flag-type + validator
 
 First step of the reconciled authentication build ([docs/auth/AUTHENTICATION_ARCHITECTURE.md §13](docs/auth/AUTHENTICATION_ARCHITECTURE.md), tracked in [docs/auth/EXECUTION_LEDGER.md](docs/auth/EXECUTION_LEDGER.md)). Enabling infrastructure only - no runtime behavior change.

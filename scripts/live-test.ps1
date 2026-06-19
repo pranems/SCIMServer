@@ -10876,6 +10876,58 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method 
 Write-Host "`n--- 9z-AL: Post-PATCH validation scoping Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AM: OAuth Asymmetric Signing + JWKS (Pre-Q.B)
+$script:currentSection = "9z-AM: OAuth Asymmetric JWKS (Pre-Q.B)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AM: OAuth Asymmetric Signing + JWKS (Pre-Q.B)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Helper: decode a JWT header segment (base64url -> JSON object)
+function ConvertFrom-JwtHeader {
+    param([string]$Jwt)
+    $seg = $Jwt.Split('.')[0].Replace('-', '+').Replace('_', '/')
+    switch ($seg.Length % 4) { 2 { $seg += '==' } 3 { $seg += '=' } }
+    $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($seg))
+    return ($json | ConvertFrom-Json)
+}
+
+try {
+    # T1: JWKS endpoint is public (no Authorization header) and returns a key set
+    $jwks = Invoke-RestMethod -Uri "$baseUrl/scim/oauth/jwks" -Method GET
+    $jwkCount = if ($jwks.keys) { @($jwks.keys).Count } else { 0 }
+    Test-Result -Success ($jwkCount -ge 1) -Message "9z-AM.T1: GET /oauth/jwks public, returns >=1 key (count=$jwkCount)"
+
+    $jwk = if ($jwkCount -ge 1) { @($jwks.keys)[0] } else { $null }
+
+    # T2: published key carries a non-empty kid
+    Test-Result -Success ($null -ne $jwk -and -not [string]::IsNullOrEmpty($jwk.kid)) -Message "9z-AM.T2: published JWK carries a non-empty kid"
+
+    # T3: published key advertises an asymmetric alg + signature use
+    $jwkAlgOk = ($null -ne $jwk) -and ($jwk.alg -in @('RS256', 'ES256')) -and ($jwk.use -eq 'sig')
+    Test-Result -Success $jwkAlgOk -Message "9z-AM.T3: published JWK alg in {RS256,ES256} and use=sig (alg=$($jwk.alg), use=$($jwk.use))"
+
+    # T4: NO private key material is ever published
+    $noPrivate = ($null -ne $jwk) -and ($null -eq $jwk.d) -and ($null -eq $jwk.p) -and ($null -eq $jwk.q)
+    Test-Result -Success $noPrivate -Message "9z-AM.T4: published JWK carries no private material (d/p/q absent)"
+
+    # T5: the issued access token is asymmetrically signed (NOT HS256)
+    $jwtHeader = ConvertFrom-JwtHeader -Jwt $Token
+    Test-Result -Success ($jwtHeader.alg -in @('RS256', 'ES256')) -Message "9z-AM.T5: issued token header alg is asymmetric (alg=$($jwtHeader.alg))"
+
+    # T6: the issued token kid matches the published JWKS kid (active key is published)
+    Test-Result -Success ($null -ne $jwk -and $jwtHeader.kid -eq $jwk.kid) -Message "9z-AM.T6: issued token kid matches published JWKS kid"
+
+    # T7: the issued token already authorizes SCIM calls (verified via $headers throughout this run)
+    $whoami = Invoke-RestMethod -Uri "$scimBase/Users?count=1" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $whoami) -Message "9z-AM.T7: asymmetric token authorizes a SCIM call (List Users)"
+} catch {
+    Test-Result -Success $false -Message "9z-AM: OAuth Asymmetric JWKS section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AM: OAuth Asymmetric JWKS Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

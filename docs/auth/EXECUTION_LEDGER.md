@@ -9,8 +9,8 @@
 
 | # | Step | Status | Commit SHA | Notes |
 |---|------|--------|-----------|-------|
-| 1 | **Pre-Q.A** structured config flag-type + validator (10-cell matrix) | DONE | _pending_ | structured flag-type + validateStructuredFlag + getConfigStructured + injectable definitions; 22 unit tests (RED->GREEN); doc updated. Build/lint/unit/E2E(inmemory) green. UI/live N/A (no flag registered yet) |
-| 2 | **Pre-Q.B** RS256/ES256 externalized signing key + published JWKS + guard verify | NOT-STARTED | - | RED: issued token header carries alg:RS256 + kid; HS256 token rejected |
+| 1 | **Pre-Q.A** structured config flag-type + validator (10-cell matrix) | DONE | ee2ba5c | structured flag-type + validateStructuredFlag + getConfigStructured + injectable definitions; 22 unit tests (RED->GREEN); doc updated. Build/lint/unit/E2E(inmemory) green. UI/live N/A (no flag registered yet) |
+| 2 | **Pre-Q.B** RS256/ES256 externalized signing key + published JWKS + guard verify | DONE | _pending_ | OAuthSigningKeyService + buildJwtModuleOptions (alg-pin) + JwksController (GET /scim/oauth/jwks) + OAuthSigningModule. 9 unit + 4 E2E + 7 live (9z-AM). HS256 alg-confusion rejected. Local node live 1041/0. Docker/dev-Azure live -> next checkpoint |
 | 3 | **A0** profile.authentication.methods[] + schemaVersion, INERT | NOT-STARTED | - | RED: method persists + round-trips; endpoint GET carries no secret |
 | 4 | **Q0** enrich WWW-Authenticate + aud claim + RFC 8414 metadata + 3-tier chain doc | NOT-STARTED | - | RED: 401 carries RFC 6750 params; metadata doc resolves |
 | 5 | **Q1** per-endpoint oauth-client credential + per-endpoint issuer + endpoint_id/aud claims | NOT-STARTED | - | RED: per-endpoint token authorizes ONLY its own endpoint |
@@ -27,8 +27,12 @@
 ## Critical path
 `Pre-Q.B -> {Q1 || Q2} -> A3 -> Q6 -> A4`, with `Pre-Q.A -> A0 -> {A1 || A2}` feeding in. Q3/Q4/Q5 are independent and do NOT gate WIF.
 
+## Validation cadence (decision, 2026-06-18)
+Per-step: Stage 1 static + Stage 2 tests (unit + E2E inmemory) + local-node live-test (form factor 1). **Docker live-test + dev-Azure deploy/live-test are batched to integration checkpoints** (after foundational clusters and after each WIF-critical milestone), NOT per micro-step. Rationale: deploying all 11 steps to the shared dev Azure is disproportionate; steps are backend-agnostic or unit/E2E-covered; Docker/Azure run identical code. Each row notes its validation tier.
+
 ## Run log
 | Date | Event |
 |------|-------|
 | 2026-06-18 | Ledger created. Branch feat/wif at 640418c (docs-only baseline). No auth code implemented yet. Starting Pre-Q.A. |
-| 2026-06-18 | Pre-Q.A DONE. Added `structured` flag-type machinery (validateStructuredFlag + getConfigStructured + injectable definitions param) to endpoint-config.interface.ts. 22 new unit tests. API unit 3825->3847, build 0 err, lint baseline. Version 0.53.2 -> 0.54.0-alpha.1. |
+| 2026-06-18 | Pre-Q.A DONE. Added `structured` flag-type machinery (validateStructuredFlag + getConfigStructured + injectable definitions param) to endpoint-config.interface.ts. 22 new unit tests. API unit 3825->3847, build 0 err, lint baseline. Version 0.53.2 -> 0.54.0-alpha.1. Committed ee2ba5c (rebased onto remote hono CVE bump 58ca63b), pushed to feat/wif. |
+| 2026-06-18 | Pre-Q.B DONE. Asymmetric RS256/ES256 signing + published JWKS (GET /scim/oauth/jwks) + algorithm-confusion pinning. New OAuthSigningKeyService/Module, JwksController, buildJwtModuleOptions factory. 9 unit + 4 E2E + 7 live (9z-AM). API unit 3847->3856; E2E inmemory 1223; local live 1041/0. Version -> 0.54.0-alpha.2. |
