@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.9] - 2026-06-19 - Auth A3: token-endpoint form intake + self-describing routing cascade
+
+Ninth step of the reconciled authentication build (critical path). Makes the per-endpoint token endpoint accept form-urlencoded bodies and self-route by request shape, with the three-outcome acceptor contract - the seam Q6 plugs the WIF validator into. Feature doc: [docs/auth/TOKEN_ENDPOINT_ROUTING_CASCADE.md](docs/auth/TOKEN_ENDPOINT_ROUTING_CASCADE.md).
+
+### Added
+
+- **Form-urlencoded token intake** ([main.ts](api/src/main.ts) + [app.helper.ts](api/test/e2e/helpers/app.helper.ts)): explicit `express.urlencoded({ extended: true })` parser so the RFC 6749 section 3.2 token-endpoint contract does not depend on the framework default parser. The SCIM content-type middleware ([scim-content-type-validation.middleware.ts](api/src/modules/scim/middleware/scim-content-type-validation.middleware.ts)) now exempts `*/oauth/token` from the `application/scim+json` rule.
+- **Self-describing routing cascade + three-outcome acceptor** ([endpoint-oauth.controller.ts](api/src/modules/scim/controllers/endpoint-oauth.controller.ts)): routes by request shape (no prior `client_id->provider` binding). `client_assertion` present -> WIF assertion path (not the secret path); `client_assertion` AND `client_secret` together -> `invalid_request`; wrong `client_assertion_type` -> `invalid_request`. The WIF path consults an injected `IAssertionTokenProvider` ([assertion-token-provider.ts](api/src/modules/scim/controllers/assertion-token-provider.ts)) and maps its three outcomes (accept -> mint; null/not-mine -> invalid_client; throw/mine-but-invalid-stop -> invalid_client, never silent fall-through). The provider is bound by Q6; until then a `client_assertion` is correctly routed and rejected `invalid_client`.
+
+### Validation
+
+- TDD: 7 unit ([endpoint-oauth.controller.spec.ts](api/src/modules/scim/controllers/endpoint-oauth.controller.spec.ts), RED via missing field/ctor -> GREEN) + 4 E2E ([endpoint-oauth-client.e2e-spec.ts](api/test/e2e/endpoint-oauth-client.e2e-spec.ts) "A3") + 4 live (`scripts/live-test.ps1` section 9z-AS).
+- API unit: **3,915 -> 3,922** (107 suites). Local-node live: **1,085 pass / 0 fail** including 9z-AS. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic. Docker + dev-Azure batched to the next critical-path checkpoint.
+- **Dependency:** picked up `multer 2.1.1 -> 2.2.0` from the master merge (PR #113, HIGH-severity Trivy CRLF fix); `npm ci` run to refresh the tree. Not reverted.
+
 ## [0.54.0-alpha.8] - 2026-06-18 - Auth A2: computed authenticationSchemes discovery
 
 Eighth step of the reconciled authentication build. Makes the per-endpoint /ServiceProviderConfig advertise authenticationSchemes computed from the enabled methods. (The JWKS publication + RFC 8414 metadata that A2 also names shipped in Pre-Q.B + Q0.) Feature doc: [docs/auth/COMPUTED_AUTHENTICATION_SCHEMES.md](docs/auth/COMPUTED_AUTHENTICATION_SCHEMES.md).

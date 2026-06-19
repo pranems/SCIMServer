@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Inject,
+  Optional,
   Param,
   Post,
 } from '@nestjs/common';
@@ -14,11 +15,19 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/rep
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import {
+  ASSERTION_TOKEN_PROVIDER,
+  JWT_BEARER_ASSERTION_TYPE,
+  type IAssertionTokenProvider,
+} from './assertion-token-provider';
 
 interface EndpointTokenRequest {
   grant_type?: string;
   client_id?: string;
   client_secret?: string;
+  /** A3 - WIF client assertion (RFC 7523). Mutually exclusive with client_secret. */
+  client_assertion?: string;
+  client_assertion_type?: string;
   scope?: string;
 }
 
@@ -43,6 +52,8 @@ export class EndpointOAuthController {
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly logger: ScimLogger,
+    @Optional() @Inject(ASSERTION_TOKEN_PROVIDER)
+    private readonly assertionProvider: IAssertionTokenProvider | null = null,
   ) {}
 
   @Public()
@@ -61,11 +72,83 @@ export class EndpointOAuthController {
       );
     }
 
+    // A3 - self-describing routing cascade. The request shape selects the
+    // credential type with no prior binding (grant_type -> field presence).
+    // client_assertion and client_secret are mutually exclusive.
+    const hasAssertion = typeof body.client_assertion === 'string' && body.client_assertion.length > 0;
+    const hasSecret = typeof body.client_secret === 'string' && body.client_secret.length > 0;
+
+    if (hasAssertion && hasSecret) {
+      throw new HttpException(
+        {
+          error: 'invalid_request',
+          error_description: 'client_assertion and client_secret are mutually exclusive.',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (hasAssertion) {
+      return this.handleAssertion(endpointId, body);
+    }
+
+    return this.handleClientSecret(endpointId, body);
+  }
+
+  /** A3 - WIF assertion route: dispatch to the assertion provider (Q6 binds it). */
+  private async handleAssertion(endpointId: string, body: EndpointTokenRequest) {
+    if (body.client_assertion_type !== JWT_BEARER_ASSERTION_TYPE) {
+      throw new HttpException(
+        {
+          error: 'invalid_request',
+          error_description: `Unsupported client_assertion_type. Expected "${JWT_BEARER_ASSERTION_TYPE}".`,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Three-outcome acceptor (architecture section 2.2):
+    //  - provider returns a token  -> accept
+    //  - provider returns null     -> not-mine-continue (no other route here) -> invalid_client
+    //  - provider throws           -> mine-but-invalid-stop -> invalid_client
+    //  - no provider wired (A3)    -> invalid_client until Q6 binds the validator
+    if (!this.assertionProvider) {
+      this.logger.warn(LogCategory.OAUTH, 'client_assertion presented but no WIF provider is configured', { endpointId });
+      throw this.invalidClient();
+    }
+
+    let minted;
+    try {
+      minted = await this.assertionProvider.mintFromAssertion(endpointId, body.client_assertion!);
+    } catch (err) {
+      this.logger.warn(LogCategory.OAUTH, 'WIF assertion validation failed (mine-but-invalid-stop)', {
+        endpointId,
+        reason: (err as Error).message,
+      });
+      throw this.invalidClient();
+    }
+
+    if (!minted) {
+      this.logger.warn(LogCategory.OAUTH, 'No WIF trust configured for endpoint (not-mine)', { endpointId });
+      throw this.invalidClient();
+    }
+
+    this.logger.info(LogCategory.OAUTH, 'Per-endpoint token issued via WIF assertion', { endpointId });
+    return {
+      access_token: minted.accessToken,
+      token_type: 'Bearer',
+      expires_in: minted.expiresIn,
+      scope: minted.scope,
+    };
+  }
+
+  /** Q1 - oauth_client (client_id + client_secret) route. */
+  private async handleClientSecret(endpointId: string, body: EndpointTokenRequest) {
     if (!body.client_id || !body.client_secret) {
       throw new HttpException(
         {
           error: 'invalid_request',
-          error_description: 'client_id and client_secret are required.',
+          error_description: 'client_id and client_secret (or a client_assertion) are required.',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -85,13 +168,7 @@ export class EndpointOAuthController {
         clientId: body.client_id,
         credentialFound: candidate != null,
       });
-      throw new HttpException(
-        {
-          error: 'invalid_client',
-          error_description: 'Invalid per-endpoint client credentials.',
-        },
-        HttpStatus.UNAUTHORIZED,
-      );
+      throw this.invalidClient();
     }
 
     const token = await this.oauthService.generateEndpointAccessToken(
@@ -111,5 +188,15 @@ export class EndpointOAuthController {
       expires_in: token.expiresIn,
       scope: token.scope,
     };
+  }
+
+  private invalidClient(): HttpException {
+    return new HttpException(
+      {
+        error: 'invalid_client',
+        error_description: 'Invalid per-endpoint client credentials.',
+      },
+      HttpStatus.UNAUTHORIZED,
+    );
   }
 }

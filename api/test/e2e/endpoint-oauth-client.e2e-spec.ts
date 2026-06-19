@@ -141,4 +141,57 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       expect(row).not.toHaveProperty('credentialHash');
     }
   });
+
+  // ─── A3: form-urlencoded intake + routing cascade ──────────────────────────
+  describe('A3 routing cascade + form-urlencoded intake', () => {
+    const JWT_BEARER = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+
+    it('accepts a form-urlencoded token request (RFC 6749 section 3.2)', async () => {
+      const { clientId, clientSecret } = await createOauthClient(endpointA);
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret })
+        .expect(201);
+      expect(res.body.token_type).toBe('Bearer');
+      expect(typeof res.body.access_token).toBe('string');
+    });
+
+    it('rejects a body carrying BOTH client_assertion and client_secret (invalid_request)', async () => {
+      const { clientId, clientSecret } = await createOauthClient(endpointA);
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+          client_assertion: 'a.b.c',
+          client_assertion_type: JWT_BEARER,
+        })
+        .expect(400);
+      // The SCIM exception filter wraps the RFC 6749 error into the envelope detail.
+      expect(res.body.detail).toBe('invalid_request');
+    });
+
+    it('rejects a client_assertion with an unsupported assertion type (invalid_request)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_assertion: 'a.b.c', client_assertion_type: 'urn:bogus' })
+        .expect(400);
+      expect(res.body.detail).toBe('invalid_request');
+    });
+
+    it('a client_assertion is routed to the WIF path (invalid_client until Q6 wires the validator)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_assertion: 'a.b.c', client_assertion_type: JWT_BEARER })
+        .expect(401);
+      // Routed to the assertion path (invalid_client), NOT the secret path
+      // (which would be invalid_request for missing client_id/secret).
+      expect(res.body.detail).toBe('invalid_client');
+    });
+  });
 });

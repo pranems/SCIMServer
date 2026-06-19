@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
-import { json } from 'express';
+import { json, urlencoded } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
@@ -86,6 +86,8 @@ export async function createTestApp(): Promise<INestApplication> {
       },
     }),
   );
+  // A3 - mirror the production urlencoded parser for the token endpoints.
+  app.use(urlencoded({ extended: true, limit: '1mb' }));
 
   app.setGlobalPrefix('scim', {
     exclude: ['/', OAUTH_METADATA_PATH],

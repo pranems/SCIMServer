@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
-import { json } from 'express';
+import { json, urlencoded } from 'express';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -120,6 +120,11 @@ async function bootstrap(): Promise<void> {
       }
     })
   );
+  // A3 - the OAuth token endpoints accept application/x-www-form-urlencoded
+  // (RFC 6749 section 3.2: the token endpoint client uses form-encoded body).
+  // Explicitly registered so the contract does not depend on the framework
+  // default parser being enabled.
+  app.use(urlencoded({ extended: true, limit: '1mb' }));
   // S-5: enableImplicitConversion is intentionally enabled.
   // Risk acknowledged and mitigated by mandatory class-validator decorators on
   // every DTO field, the parseSimpleFilter length cap (DTO-1), and a regression

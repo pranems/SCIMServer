@@ -11225,6 +11225,56 @@ try {
 Write-Host "`n--- 9z-AR: Computed authnSchemes Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AS: Token-endpoint form intake + routing cascade (A3)
+$script:currentSection = "9z-AS: Token Routing Cascade (A3)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AS: Token-endpoint form intake + routing cascade (A3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $asEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-a3-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $asId = $asEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$asId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $asCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$asId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "a3-live"
+    } | ConvertTo-Json)
+    $asTokenUrl = "$baseUrl/scim/endpoints/$asId/oauth/token"
+    $asJwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+
+    # T1: form-urlencoded client_secret request succeeds (RFC 6749 s3.2 + A3 intake)
+    $asFormBody = @{ grant_type = "client_credentials"; client_id = $asCred.clientId; client_secret = $asCred.clientSecret }
+    $asFormResp = Invoke-RestMethod -Uri $asTokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body $asFormBody
+    Test-Result -Success ($null -ne $asFormResp.access_token) -Message "9z-AS.T1: form-urlencoded client_secret token request succeeds"
+
+    # T2: both client_assertion + client_secret -> invalid_request (400)
+    $asBoth = $false
+    try { Invoke-RestMethod -Uri $asTokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{ grant_type = "client_credentials"; client_id = $asCred.clientId; client_secret = $asCred.clientSecret; client_assertion = "a.b.c"; client_assertion_type = $asJwtBearer } | Out-Null } catch { $asBoth = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $asBoth -Message "9z-AS.T2: client_assertion + client_secret together rejected 400 (invalid_request)"
+
+    # T3: unsupported client_assertion_type -> invalid_request (400)
+    $asBadType = $false
+    try { Invoke-RestMethod -Uri $asTokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{ grant_type = "client_credentials"; client_assertion = "a.b.c"; client_assertion_type = "urn:bogus" } | Out-Null } catch { $asBadType = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $asBadType -Message "9z-AS.T3: unsupported client_assertion_type rejected 400 (invalid_request)"
+
+    # T4: client_assertion routed to WIF path -> invalid_client (401) until Q6 wires the validator
+    $asWifRouted = $false
+    try { Invoke-RestMethod -Uri $asTokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{ grant_type = "client_credentials"; client_assertion = "a.b.c"; client_assertion_type = $asJwtBearer } | Out-Null } catch { $asWifRouted = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $asWifRouted -Message "9z-AS.T4: client_assertion routed to WIF path -> 401 invalid_client (not the secret path)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$asId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AS: Token Routing Cascade section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AS: Token Routing Cascade Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

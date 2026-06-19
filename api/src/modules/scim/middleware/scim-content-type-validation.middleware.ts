@@ -33,6 +33,13 @@ export class ScimContentTypeValidationMiddleware implements NestMiddleware {
       return next();
     }
 
+    // A3 - the per-endpoint OAuth token endpoint is an OAuth endpoint, not a
+    // SCIM resource endpoint: it accepts application/x-www-form-urlencoded
+    // (RFC 6749 section 3.2). Exempt it from the SCIM media-type rule.
+    if (/\/oauth\/token\/?$/.test(req.path ?? req.url ?? '')) {
+      return next();
+    }
+
     const contentType = (req.headers['content-type'] ?? '').toLowerCase();
 
     // Allow if Content-Type includes an accepted type
