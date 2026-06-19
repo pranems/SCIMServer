@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.6] - 2026-06-18 - Auth Q2: external JWKS validator (jose)
+
+Sixth step of the reconciled authentication build (critical path). Adds the reusable external-JWT signature core that Q6's WIF validator builds on. Closes ISV Pattern 4 (external JWKS-validated JWT). Feature doc: [docs/auth/EXTERNAL_JWKS_VALIDATOR.md](docs/auth/EXTERNAL_JWKS_VALIDATOR.md).
+
+### Added
+
+- **Dependency `jose@^5`** (api): the most-vetted Node JWT/JWKS library. ESM-only; loaded via dynamic `import('jose')` so the CommonJS build emits a runtime import (verified against the compiled `dist/` output on Node 24, not just ts-jest). `jose` carries no security advisory.
+- **`ExternalJwksValidatorService`** ([external-jwks-validator.service.ts](api/src/oauth/external-jwks-validator.service.ts)): `verify(token, jwksUri)` against a remote JWKS with five hard guarantees - (1) algorithm pinning to RS256/ES256 (rejects `alg:none` + HMAC), (2) **SSRF host allowlist** (`JWKS_HOST_ALLOWLIST`, https-only, rejected before any network call), (3) cache-by-URI with bounded max-age (`JWKS_CACHE_MAX_AGE_MS`, default 10 min), (4) refetch-once on unknown `kid` (rotation), (5) **fail closed** on a fetch outage with no usable cache. The `fetch` is injectable (`JWKS_FETCH` token) for hermetic tests.
+
+### Security
+
+- The SSRF host allowlist is the critical anti-SSRF choke point for WIF (architecture section 5.1). A disallowed or non-https `jwksUri` is rejected before any outbound request, so a malicious per-endpoint trust config cannot point the server at an internal metadata endpoint (e.g. `169.254.169.254`). Algorithm pinning closes the alg-confusion / `alg:none` class.
+- `npm audit`: the only High (`form-data`) is a dev-only transitive dependency (empty `--omit=dev` tree), not in any production path; `jose` itself is clean.
+
+### Validation
+
+- TDD: 8 new unit tests ([external-jwks-validator.service.spec.ts](api/src/oauth/external-jwks-validator.service.spec.ts), RED via reject-stub -> GREEN). API unit: **3,878 -> 3,886** (105 suites). Build 0 err; ESLint 0 err / 464 warnings (no new). Compiled `dist/` runtime smoke confirms the dynamic jose import + full RS256 verify work in CommonJS. No HTTP surface yet (the validator is wired + gains E2E/live coverage in Q6).
+
 ## [0.54.0-alpha.5] - 2026-06-18 - Auth Q1: per-endpoint oauth-client credential + per-endpoint token issuer
 
 Fifth step of the reconciled authentication build (first critical-path step). Closes ISV Pattern 5 (Entra Gallery mandate: per-endpoint client_id/client_secret pairs). Feature doc: [docs/auth/PER_ENDPOINT_OAUTH_CLIENT.md](docs/auth/PER_ENDPOINT_OAUTH_CLIENT.md).
