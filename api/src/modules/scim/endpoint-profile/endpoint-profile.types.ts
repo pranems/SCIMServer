@@ -122,6 +122,70 @@ export interface ProfileSettings {
   [key: string]: unknown;
 }
 
+// ─── Authentication model (A0 - inert) ──────────────────────────────────────
+
+/** Which resolver plane consults a method (architecture section 2.1). */
+export type AuthenticationMethodPlane = 'token' | 'resource' | 'both';
+
+/** Lifecycle status of an activated authentication method (architecture section 12.2). */
+export type AuthenticationMethodLifecycle = 'active' | 'deprecated' | 'disabled';
+
+/**
+ * AuthenticationMethod - one activated, configured authentication instance on an
+ * endpoint (architecture sections 1.3 + 5.2).
+ *
+ * **Non-secret by construction.** Class-A relationship/trust config (issuer,
+ * subject, audience, jwksUri, scopes, requiredRoles, ttl, ...) rides `config`;
+ * secret material (private keys, client_secret plaintext) is NEVER stored here -
+ * it is referenced by `credentialRef` and lives in `EndpointCredential`
+ * (architecture section 2.3, the three data classes).
+ *
+ * **INERT in A0:** persisted + round-tripped on the endpoint profile, but not yet
+ * consulted by any token-mint or resource-plane resolver. Consumers arrive in
+ * A1 (admin CRUD), A2 (discovery), A3 (routing), Q1/Q2/Q6 (providers).
+ */
+export interface AuthenticationMethod {
+  /** Stable instance handle (distinct from `type`); the target of enable/disable/rotate. */
+  id: string;
+  /** Registry key naming the behavior/code path (e.g. 'bearer', 'oauth-client', 'wif-7523'). Non-unique. */
+  type: string;
+  /** UI card title / `authenticationScheme.name`. */
+  displayName?: string;
+  /** UI help text / `authenticationScheme.description`. */
+  description?: string;
+  /** `authenticationScheme.specUri`. */
+  specUri?: string;
+  /** Which resolver plane consults this method. */
+  plane?: AuthenticationMethodPlane;
+  /** RFC 8414 `token_endpoint_auth_method` (token-plane only). */
+  tokenEndpointAuthMethod?: string;
+  /** Whether the method participates in resolution (inert in A0). */
+  enabled?: boolean;
+  /** Resource-plane acceptor priority (lower = earlier). */
+  priority?: number;
+  /** Lifecycle status. */
+  lifecycleStatus?: AuthenticationMethodLifecycle;
+  /** Class-A relationship/trust config (non-secret). Secret-looking keys are stripped on expand. */
+  config?: Record<string, unknown>;
+  /** Reference to the `EndpointCredential` holding any secret material (NOT the secret itself). */
+  credentialRef?: string;
+}
+
+/**
+ * profile.authentication - the embedded authentication block (architecture
+ * section 5.2). Rides the existing profile JSONB; introduces no new column.
+ */
+export interface ProfileAuthentication {
+  /** Schema version of this embedded block, enabling blob migration. */
+  schemaVersion: number;
+  /** Activated methods on this endpoint. */
+  methods: AuthenticationMethod[];
+  /** Which method is `primary:true` in discovery (consumed in A2). */
+  defaultMethodId?: string;
+  /** Authorization overlay knobs (roles/scopes); inert until A4. */
+  policy?: Record<string, unknown>;
+}
+
 // ─── EndpointProfile ───────────────────────────────────────────────────────
 
 /**
@@ -147,6 +211,13 @@ export interface EndpointProfile {
 
   /** Project-specific behavioral flags (13 persisted + extensible) */
   settings: ProfileSettings;
+
+  /**
+   * A0 - embedded authentication block (methods + defaultMethodId + policy).
+   * INERT: persisted + round-tripped but not yet consulted by any resolver.
+   * Rides the existing profile JSONB; secret material is never stored here.
+   */
+  authentication?: ProfileAuthentication;
 
   /**
    * Precomputed Parent→Children maps for schema attribute characteristics.
@@ -182,6 +253,8 @@ export interface ShorthandProfileInput {
   resourceTypes?: ScimResourceType[];
   serviceProviderConfig?: Partial<ServiceProviderConfig>;
   settings?: ProfileSettings;
+  /** A0 - inert authentication block; threaded through expansion unchanged (secrets stripped). */
+  authentication?: ProfileAuthentication;
 }
 
 // ─── Preset Metadata ───────────────────────────────────────────────────────

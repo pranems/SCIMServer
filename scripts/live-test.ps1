@@ -10928,6 +10928,65 @@ try {
 Write-Host "`n--- 9z-AM: OAuth Asymmetric JWKS Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AN: Authentication Method Model round-trip (A0, inert)
+$script:currentSection = "9z-AN: Auth Method Model (A0)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AN: Authentication Method Model (A0, inert)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $a0Name = "live-test-authmodel-$(Get-Random)"
+    $a0Body = @{
+        name    = $a0Name
+        profile = @{
+            schemas       = @(@{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = @(@{ name = "userName" }) })
+            resourceTypes = @(@{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() })
+            authentication = @{
+                schemaVersion = 1
+                methods = @(@{
+                    id = "m-1"; type = "wif-7523"; displayName = "WIF"; plane = "token"
+                    config = @{
+                        issuer = "https://login.microsoftonline.com/tid/v2.0"
+                        audience = "appid-guid"
+                        clientSecret = "LIVE-LEAK-SECRET"
+                    }
+                    credentialRef = "cred-1"
+                })
+                defaultMethodId = "m-1"
+            }
+        }
+    } | ConvertTo-Json -Depth 12
+
+    $a0Create = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $a0Body
+    $a0Id = $a0Create.id
+    Test-Result -Success ($null -ne $a0Id) -Message "9z-AN.T1: endpoint with profile.authentication created"
+
+    $a0CreateAuth = $a0Create.profile.authentication
+    Test-Result -Success ($null -ne $a0CreateAuth -and $a0CreateAuth.methods[0].id -eq "m-1" -and $a0CreateAuth.methods[0].type -eq "wif-7523") -Message "9z-AN.T2: create response round-trips authentication.methods[0]"
+    Test-Result -Success ($a0CreateAuth.schemaVersion -eq 1 -and $a0CreateAuth.defaultMethodId -eq "m-1") -Message "9z-AN.T3: schemaVersion + defaultMethodId round-trip"
+
+    # No-secret contract: clientSecret stripped, raw secret absent from response
+    $a0CreateJson = $a0Create | ConvertTo-Json -Depth 12
+    Test-Result -Success ($null -eq $a0CreateAuth.methods[0].config.clientSecret) -Message "9z-AN.T4: secret-looking config key (clientSecret) stripped"
+    Test-Result -Success (-not ($a0CreateJson -match "LIVE-LEAK-SECRET")) -Message "9z-AN.T5: submitted secret value absent from create response"
+    Test-Result -Success ($a0CreateAuth.methods[0].config.issuer -eq "https://login.microsoftonline.com/tid/v2.0") -Message "9z-AN.T6: public config (issuer) preserved"
+
+    # GET round-trip
+    $a0Get = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$a0Id" -Method GET -Headers $headers
+    Test-Result -Success ($a0Get.profile.authentication.methods[0].id -eq "m-1") -Message "9z-AN.T7: GET round-trips authentication.methods[0]"
+    $a0GetJson = $a0Get | ConvertTo-Json -Depth 12
+    Test-Result -Success (-not ($a0GetJson -match "LIVE-LEAK-SECRET")) -Message "9z-AN.T8: submitted secret value absent from GET response"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$a0Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AN: Authentication Method Model section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AN: Authentication Method Model Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

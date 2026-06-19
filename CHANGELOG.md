@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.3] - 2026-06-18 - Auth A0: authentication methods model (inert backbone)
+
+Third step of the reconciled authentication build. Adds the generalized `authenticationMethods[]` data model on the endpoint profile as an INERT backbone - stored + round-tripped but not yet consulted by any resolver - so 1P / roles / scopes / future auth types become config, not rework. Feature doc: [docs/auth/AUTHENTICATION_METHODS_MODEL.md](docs/auth/AUTHENTICATION_METHODS_MODEL.md).
+
+### Added
+
+- **`profile.authentication` model** ([endpoint-profile.types.ts](api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts)): new `AuthenticationMethod` (id, type, displayName, description, specUri, plane, tokenEndpointAuthMethod, enabled, priority, lifecycleStatus, config, credentialRef), `ProfileAuthentication` (schemaVersion, methods, defaultMethodId, policy), and `AuthenticationMethodPlane` / `AuthenticationMethodLifecycle` unions. `authentication?` added to `EndpointProfile` + `ShorthandProfileInput`. Rides the existing profile JSONB - no new column or table.
+- **Expansion threading** ([auto-expand.service.ts](api/src/modules/scim/endpoint-profile/auto-expand.service.ts)): `expandAuthentication` defaults `schemaVersion` (`CURRENT_AUTH_SCHEMA_VERSION = 1`), coerces `methods` to an array, projects each method to its known fields, and is threaded through `expandProfile`. The previous fixed-shape `expandProfile` literal silently dropped unknown keys; now `authentication` survives create + the profile merge (update preservation).
+
+### Security
+
+- **No-secret invariant:** `AuthenticationMethod` has no secret field (secrets ride `credentialRef` -> `EndpointCredential`), and `expandAuthentication` strips any secret-looking `config` key (`secret`/`password`/`passphrase`/`privatekey`/`credentialhash`). A mistakenly-submitted `config.clientSecret` is dropped before persistence and never appears in any response - asserted at unit, E2E, and live layers by submitting a secret and proving its absence everywhere in the response.
+
+### Validation
+
+- TDD: 12 new unit tests (auto-expand A0 block, RED via stub -> GREEN) + 5 new E2E ([endpoint-authentication-model.e2e-spec.ts](api/test/e2e/endpoint-authentication-model.e2e-spec.ts)) + 8 new live assertions (`scripts/live-test.ps1` section 9z-AN).
+- API unit: **3,856 -> 3,866** (104 suites). Endpoint/profile E2E (inmemory): 87 pass (6 suites). Local-node live: **1,049 pass / 0 fail** including 9z-AM + 9z-AN. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic (profile JSONB opaque pass-through in both backends). Docker + dev-Azure live batched to the next integration checkpoint.
+
 ## [0.54.0-alpha.2] - 2026-06-18 - Auth Pre-Q.B: asymmetric (RS256/ES256) signing key + published JWKS
 
 Second step of the reconciled authentication build. Moves the global OAuth issuer off the symmetric HS256 secret onto an asymmetric, externalized signing key and publishes the public JWKS - the prerequisite for per-endpoint issuance (Q1) and WIF own-token issuance (Q6). Feature doc: [docs/auth/ASYMMETRIC_SIGNING_AND_JWKS.md](docs/auth/ASYMMETRIC_SIGNING_AND_JWKS.md).
