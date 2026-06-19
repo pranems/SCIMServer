@@ -306,6 +306,33 @@ Whenever the operator asks to "deploy to dev", "prepare for prod", "run full val
 
 References: [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1) - orchestrator. [.github/prompts/devDeploymentPipeline.prompt.md](.github/prompts/devDeploymentPipeline.prompt.md) - authoritative gate walk. Both are kept in lockstep with this section.
 
+## Execution Issue RCA Ledger (CRITICAL - added 2026-06-19, the concrete artifact behind R7)
+
+Origin: 2026-06-19 operator request after the 11-step WIF authentication build - "create a comprehensive doc ... of all the issues of all types, faced during this whole execution and rca and fix and why that fix. it is important to do this kind of tracking and introspection thoroughly, in every such development additions and items, as these are not probably anticipated in the planning and design and architecture stages and might be because of unforeseen combination of circumstances and factors." The first such ledger is [docs/auth/EXECUTION_ISSUES_AND_RCA.md](docs/auth/EXECUTION_ISSUES_AND_RCA.md) (17 issues across 7 types from the auth build).
+
+**The rule.** Every multi-step build, feature cluster, or significant change MUST produce - or append to - an **execution-issues-and-RCA** doc under `docs/` (co-located with the feature's other docs; e.g. an auth build's ledger lives in `docs/auth/`). It is the companion to the feature's execution/status tracker: the status doc records *what shipped*; the RCA ledger records *what went wrong on the way and what was learned*. This operationalizes R7 (self-improvement) into a durable, reviewable artifact instead of an in-chat afterthought.
+
+**Every issue entry MUST carry, at minimum:**
+1. **Type** - classify it (harness/DI, framework surprise, test correctness, environment drift, security, tooling friction, process/git, or a domain-appropriate taxonomy). Capture EVERY type, including low-severity tooling/shell friction - the friction items are exactly the unforeseen-circumstance class the operator flagged.
+2. **Severity** - High (could have shipped a defect OR produced a false-green gate) / Medium (real correctness issue caught pre-ship, or material recurring friction) / Low (one-off friction).
+3. **Symptom** - the observable failure.
+4. **Root-cause analysis** - the actual mechanism, not the surface error.
+5. **Fix** (or resolution: fixed / adapted / worked-around / convention) and the commit SHA where one exists.
+6. **Why the fix works** - the mechanism by which the fix removes the root cause.
+7. **Prevention** - the gate, test, or convention that stops the next one. Where the prevention is a new standing convention, add it to this file (copilot-instructions.md) in the SAME commit chain.
+
+**Plus a detection-stage escape analysis:** for each issue, record which gate caught it vs the *earliest gate that could have*. A non-zero escape delta is itself a finding (e.g. batching live-tests to a checkpoint defers live-only test-bug discovery by one stage).
+
+**Use the explanatory tools** the repo norms favor: Mermaid distribution charts (by type + severity), a master dashboard table, the escape-analysis table, and a per-step issue-density diagram. Cross-link the feature's status ledger and the relevant per-step feature docs.
+
+**Why this is mandatory and not optional:** these issues never appear in the planning/design/architecture stages because they arise from unforeseen combinations (framework defaults, environment drift between local/Docker/Azure, CLI/shell quirks, optional-DI-token wiring, loose-assertion false-greens). Capturing them is the only mechanism by which the gate set self-densifies over time. Refusing to write the ledger because "the issues were small" is FORBIDDEN for the same reason R7 forbids skipping the self-improvement step - the small, unanticipated frictions are precisely the learning.
+
+**Conventions harvested from the first ledger (apply going forward):**
+- **Optional-DI-token default-provider rule.** Any `@Optional() @Inject(TOKEN)` dependency a test overrides MUST have a default provider registered in its module, or `overrideProvider` is a silent no-op and the test exercises production wiring while appearing to mock it.
+- **Structural-key assertion rule (live-test analog of R1).** Presence/absence-of-key assertions over a serialized payload MUST match the structural key form (`"<key>"`), never a bare substring - a bare-substring gate is simultaneously a false-positive and a false-negative generator (a loose `token` matched the legitimate `issuedTokenTtlSec`).
+- **Author-and-smoke-run-before-batch.** A new `scripts/live-test.ps1` section MUST be run against at least one live node in the same step it is authored, before deferring the rest of the live matrix to a batched checkpoint.
+- **Per-environment auth-value table.** OAuth secret / SCIM shared secret / base URL differ by form factor (Docker compose default `devscimclientsecret`; local node + dev Azure `changeme-oauth`). Pass the matching `-ClientSecret` per target; never assume the runner default fits every environment.
+
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 
 Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:
@@ -320,6 +347,7 @@ Every feature or significant change commit MUST include ALL of the following bef
 7. **Session & Context Updates** - Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts, version, and feature status
 8. **Version Management** - Bump version in `package.json` and all relevant version references
 9. **Response Contract Tests** - Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
+10. **Execution Issue RCA Ledger** (multi-step builds / feature clusters) - Append every issue hit during the work (all types, including tooling/shell friction) to the feature's `docs/.../EXECUTION_ISSUES_AND_RCA.md` with symptom / root-cause / fix / why-the-fix-works / prevention + detection-stage escape analysis. See the "Execution Issue RCA Ledger" standing rule above. For a single-commit spot-fix this collapses to the R7 self-improvement line; for a build it is a dedicated doc.
 
 ## Mandatory Quality Gates (Standing Rule)
 
