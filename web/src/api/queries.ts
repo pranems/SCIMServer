@@ -1361,7 +1361,12 @@ function restoreListSnapshots(
 export function useCreateCredential(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { label?: string; expiresAt?: string }) =>
+    mutationFn: (body: {
+      label?: string;
+      expiresAt?: string;
+      credentialType?: string;
+      wif?: Record<string, unknown>;
+    }) =>
       fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials`, {
         method: 'POST',
         body: JSON.stringify(body),

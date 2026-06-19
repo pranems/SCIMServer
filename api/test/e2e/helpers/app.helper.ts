@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import type { Request, Response, NextFunction } from 'express';
@@ -21,8 +21,13 @@ import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
  * - Sets known auth credentials so test helpers can acquire tokens deterministically
  *
  * Call `app.close()` in your `afterAll()` to shut down cleanly.
+ *
+ * @param customize Optional hook to tweak the testing module before compile
+ *   (e.g. `builder => builder.overrideProvider(JWKS_FETCH).useValue(fetchMock)`).
  */
-export async function createTestApp(): Promise<INestApplication> {
+export async function createTestApp(
+  customize?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<INestApplication> {
   // Read the database URL from the marker file written by global-setup
   const markerPath = path.resolve(__dirname, '..', '.test-db-path');
   const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
@@ -44,9 +49,11 @@ export async function createTestApp(): Promise<INestApplication> {
   process.env.OAUTH_CLIENT_SECRET = 'e2e-client-secret';
   process.env.NODE_ENV = 'test';
 
-  const moduleFixture = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+  const moduleFixture = await (
+    customize
+      ? customize(Test.createTestingModule({ imports: [AppModule] }))
+      : Test.createTestingModule({ imports: [AppModule] })
+  ).compile();
 
   const app = moduleFixture.createNestApplication<NestExpressApplication>();
 

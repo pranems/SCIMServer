@@ -40,6 +40,8 @@ import {
   Copy16Regular,
   Key24Regular,
   Warning24Regular,
+  ShieldKeyhole24Regular,
+  PlugConnected24Regular,
 } from '@fluentui/react-icons';
 import {
   useEndpointOverview,
@@ -51,6 +53,9 @@ import {
   EmptyState,
   FormDialog,
   LoadingSkeleton,
+  EditableField,
+  CopyableField,
+  CopyJsonButton,
 } from '../components/primitives';
 
 const useStyles = makeStyles({
@@ -113,6 +118,64 @@ const useStyles = makeStyles({
   },
 });
 
+const useWifStyles = makeStyles({
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  fieldGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: '12px',
+  },
+  actions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    alignItems: 'center',
+  },
+  returnBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    padding: '12px',
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  returnRow: {
+    display: 'grid',
+    gridTemplateColumns: '160px 1fr',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  testStep: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '13px',
+  },
+  wifRow: {
+    padding: '12px 16px',
+  },
+  wifRowGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr auto auto',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  wifMeta: {
+    color: tokens.colorNeutralForeground3,
+    fontFamily: 'monospace',
+    fontSize: '12px',
+  },
+});
+
 export interface CredentialsTabProps {
   endpointId: string;
 }
@@ -123,6 +186,326 @@ interface CreatedCredential {
   plaintext: string;
   createdAt: string;
 }
+
+// ─── WIF (federated identity) section ──────────────────────────────────
+
+interface WifTrustForm {
+  expectedIssuer: string;
+  expectedSubject: string;
+  expectedAudience: string;
+  jwksUri: string;
+  allowedTenantId: string;
+  requiredRoles: string;
+  scope: string;
+}
+
+const EMPTY_WIF_FORM: WifTrustForm = {
+  expectedIssuer: '',
+  expectedSubject: '',
+  expectedAudience: '',
+  jwksUri: '',
+  allowedTenantId: '',
+  requiredRoles: '',
+  scope: '',
+};
+
+/** A single Test Connection readiness step (client-side dry-run). */
+interface WifTestStep {
+  label: string;
+  ok: boolean;
+}
+
+interface WifCredentialsSectionProps {
+  endpointId: string;
+  enabled: boolean;
+  credentials: EndpointOverviewCredential[];
+  createMutation: ReturnType<typeof useCreateCredential>;
+  deleteMutation: ReturnType<typeof useDeleteCredential>;
+}
+
+/**
+ * Federated Identity (WIF) section (Q6.5). Mirrors the three-step setup:
+ *   1. Enter the Entra trust values (issuer / subject / audience / JWKS /
+ *      tenant + optional required roles + scope).
+ *   2. Save -> create a `wif` credential (all public values, no secret) and
+ *      display the 3 ISV return values (Client ID, Token URL, SCIM URL).
+ *   3. Test Connection -> a client-side readiness dry-run with a per-step
+ *      pass/fail result (the authoritative validation runs server-side at the
+ *      token endpoint when a real assertion is presented).
+ *
+ * All display values go through the R9 primitives (EditableField for inputs,
+ * CopyableField for the return values, CopyJsonButton for the whole trust).
+ */
+const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
+  endpointId,
+  enabled,
+  credentials,
+  createMutation,
+  deleteMutation,
+}) => {
+  const classes = useStyles();
+  const wif = useWifStyles();
+
+  const [form, setForm] = React.useState<WifTrustForm>(EMPTY_WIF_FORM);
+  const [saveError, setSaveError] = React.useState<unknown>(null);
+  const [saved, setSaved] = React.useState<{ id: string } | null>(null);
+  const [testSteps, setTestSteps] = React.useState<WifTestStep[] | null>(null);
+
+  const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
+
+  const setField = (key: keyof WifTrustForm) => (next: string): void => {
+    setForm((prev) => ({ ...prev, [key]: next }));
+  };
+
+  // The non-secret trust payload sent to the API (and shown via Copy as JSON).
+  const trustPayload = React.useMemo(() => {
+    const roles = form.requiredRoles
+      .split(',')
+      .map((r) => r.trim())
+      .filter(Boolean);
+    return {
+      assertionProfile: 'jwt-bearer' as const,
+      expectedIssuer: form.expectedIssuer.trim(),
+      expectedSubject: form.expectedSubject.trim(),
+      expectedAudience: form.expectedAudience.trim(),
+      jwksUri: form.jwksUri.trim(),
+      allowedTenantId: form.allowedTenantId.trim(),
+      ...(roles.length > 0 ? { requiredRoles: roles } : {}),
+      ...(form.scope.trim() ? { scope: form.scope.trim() } : {}),
+    };
+  }, [form]);
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const tokenUrl = `${origin}/scim/endpoints/${endpointId}/oauth/token`;
+  const scimUrl = `${origin}/scim/endpoints/${endpointId}/v2`;
+
+  const requiredOk =
+    trustPayload.expectedIssuer !== '' &&
+    trustPayload.expectedSubject !== '' &&
+    trustPayload.expectedAudience !== '' &&
+    trustPayload.jwksUri !== '' &&
+    trustPayload.allowedTenantId !== '';
+
+  const onSave = (): void => {
+    setSaveError(null);
+    setSaved(null);
+    createMutation.mutate(
+      { credentialType: 'wif', label: 'Federated Identity (WIF)', wif: trustPayload },
+      {
+        onSuccess: (raw) => {
+          const cred = raw as unknown as { id: string };
+          setSaved({ id: cred.id });
+        },
+        onError: (err) => setSaveError(err),
+      },
+    );
+  };
+
+  // Client-side readiness dry-run (the real validation is server-side).
+  const onTestConnection = (): void => {
+    let httpsJwks = false;
+    try {
+      httpsJwks = new URL(trustPayload.jwksUri).protocol === 'https:';
+    } catch {
+      httpsJwks = false;
+    }
+    setTestSteps([
+      { label: 'Issuer provided', ok: trustPayload.expectedIssuer !== '' },
+      { label: 'Subject provided', ok: trustPayload.expectedSubject !== '' },
+      { label: 'Audience provided', ok: trustPayload.expectedAudience !== '' },
+      { label: 'JWKS URI is https', ok: httpsJwks },
+      { label: 'Tenant id provided', ok: trustPayload.allowedTenantId !== '' },
+    ]);
+  };
+
+  return (
+    <Card className={classes.row} data-testid="wif-section">
+      <div className={wif.section}>
+        <div className={wif.sectionHeader}>
+          <ShieldKeyhole24Regular />
+          <Subtitle2>Federated Identity (WIF)</Subtitle2>
+        </div>
+        <Caption1>
+          Trust a signed identity-provider assertion (RFC 7523 jwt-bearer) instead of a shared
+          secret. All values below are public; no secret is stored.
+        </Caption1>
+
+        {!enabled ? (
+          <MessageBar intent="warning" data-testid="wif-flag-disabled-banner">
+            <MessageBarBody>
+              <MessageBarTitle>Federated identity is disabled</MessageBarTitle>
+              Enable <code>WifCredentialsEnabled</code> in the endpoint{' '}
+              <a href={`/endpoints/${endpointId}/settings`}>Settings</a> tab to configure a WIF
+              trust.
+            </MessageBarBody>
+          </MessageBar>
+        ) : (
+          <>
+            <div className={wif.fieldGrid}>
+              <EditableField
+                label="Issuer (iss)"
+                value={form.expectedIssuer}
+                onChange={setField('expectedIssuer')}
+                placeholder="https://login.microsoftonline.com/<tenant>/v2.0"
+                monospace
+                data-testid="wif-field-issuer"
+              />
+              <EditableField
+                label="Subject (sub)"
+                value={form.expectedSubject}
+                onChange={setField('expectedSubject')}
+                placeholder="service-principal object id"
+                monospace
+                data-testid="wif-field-subject"
+              />
+              <EditableField
+                label="Audience (aud)"
+                value={form.expectedAudience}
+                onChange={setField('expectedAudience')}
+                placeholder="api://<your-app-id>"
+                monospace
+                data-testid="wif-field-audience"
+              />
+              <EditableField
+                label="JWKS URI"
+                value={form.jwksUri}
+                onChange={setField('jwksUri')}
+                placeholder="https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys"
+                monospace
+                data-testid="wif-field-jwks"
+              />
+              <EditableField
+                label="Allowed tenant id (tid)"
+                value={form.allowedTenantId}
+                onChange={setField('allowedTenantId')}
+                placeholder="tenant guid"
+                monospace
+                data-testid="wif-field-tenant"
+              />
+              <EditableField
+                label="Required roles (comma-separated, optional)"
+                value={form.requiredRoles}
+                onChange={setField('requiredRoles')}
+                placeholder="Scim.Provision"
+                data-testid="wif-field-roles"
+              />
+              <EditableField
+                label="Issued-token scope (optional)"
+                value={form.scope}
+                onChange={setField('scope')}
+                placeholder="scim.read scim.write"
+                data-testid="wif-field-scope"
+              />
+            </div>
+
+            <div className={wif.actions}>
+              <Button
+                appearance="primary"
+                onClick={onSave}
+                disabled={!requiredOk || createMutation.isPending}
+                data-testid="wif-save-button"
+              >
+                Save WIF trust
+              </Button>
+              <Button
+                icon={<PlugConnected24Regular />}
+                onClick={onTestConnection}
+                data-testid="wif-test-button"
+              >
+                Test Connection
+              </Button>
+              <CopyJsonButton
+                value={trustPayload}
+                label="Copy trust as JSON"
+                data-testid="wif-copy-json"
+              />
+            </div>
+
+            {saveError != null && (
+              <MessageBar intent="error" data-testid="wif-save-error">
+                <MessageBarBody>
+                  <MessageBarTitle>Could not save the WIF trust</MessageBarTitle>
+                  {(saveError as Error).message}
+                </MessageBarBody>
+              </MessageBar>
+            )}
+
+            {saved != null && (
+              <div className={wif.returnBox} data-testid="wif-return-values">
+                <Text weight="semibold">Connection details for your identity provider</Text>
+                <div className={wif.returnRow}>
+                  <Caption1>Client ID</Caption1>
+                  <CopyableField
+                    value={form.expectedSubject || saved.id}
+                    monospace
+                    truncate
+                    data-testid="wif-return-clientid"
+                  />
+                </div>
+                <div className={wif.returnRow}>
+                  <Caption1>Token URL</Caption1>
+                  <CopyableField
+                    value={tokenUrl}
+                    monospace
+                    truncate
+                    data-testid="wif-return-tokenurl"
+                  />
+                </div>
+                <div className={wif.returnRow}>
+                  <Caption1>SCIM URL</Caption1>
+                  <CopyableField
+                    value={scimUrl}
+                    monospace
+                    truncate
+                    data-testid="wif-return-scimurl"
+                  />
+                </div>
+              </div>
+            )}
+
+            {testSteps != null && (
+              <div data-testid="wif-test-result">
+                {testSteps.map((step) => (
+                  <div key={step.label} className={wif.testStep}>
+                    <Badge appearance="filled" color={step.ok ? 'success' : 'danger'}>
+                      {step.ok ? 'PASS' : 'FAIL'}
+                    </Badge>
+                    <Caption1>{step.label}</Caption1>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {wifCredentials.length > 0 && (
+              <div className={classes.list} data-testid="wif-credentials-list">
+                {wifCredentials.map((cred) => (
+                  <Card key={cred.id} className={wif.wifRow} data-testid={`wif-credential-row-${cred.id}`}>
+                    <div className={wif.wifRowGrid}>
+                      <div>
+                        <Subtitle2>{cred.label ?? '(no label)'}</Subtitle2>
+                        <div className={wif.wifMeta}>{cred.id}</div>
+                      </div>
+                      <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
+                        {cred.active ? 'Active' : 'Revoked'}
+                      </Badge>
+                      <Button
+                        appearance="subtle"
+                        icon={<Delete24Regular />}
+                        onClick={() => deleteMutation.mutate(cred.id)}
+                        aria-label={`Revoke WIF credential ${cred.label ?? cred.id}`}
+                        data-testid={`wif-credential-delete-${cred.id}`}
+                      />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
+  );
+};
 
 export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
@@ -237,6 +620,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // We surface the explanatory banner up front when the underlying
   // config flag is off.
   const flagEnabled = Boolean(data?.configFlags?.PerEndpointCredentialsEnabled);
+  const wifEnabled = Boolean(data?.configFlags?.WifCredentialsEnabled);
   const credentials = data?.credentials ?? [];
 
   return (
@@ -310,6 +694,15 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           ))}
         </div>
       )}
+
+      {/* Federated Identity (WIF) section (Q6.5) */}
+      <WifCredentialsSection
+        endpointId={endpointId}
+        enabled={wifEnabled}
+        credentials={credentials}
+        createMutation={createMutation}
+        deleteMutation={deleteMutation}
+      />
 
       {/* Create dialog */}
       <FormDialog

@@ -11275,6 +11275,85 @@ try {
 Write-Host "`n--- 9z-AS: Token Routing Cascade Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT: WIF assertion validate + issue + discovery (Q6)
+$script:currentSection = "9z-AT: WIF validate+issue (Q6)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT: WIF assertion validate + issue + discovery (Q6)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $atEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-q6-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $atId = $atEp.id
+    $atSpcUrl = "$baseUrl/scim/endpoints/$atId/ServiceProviderConfig"
+    $atTokenUrl = "$baseUrl/scim/endpoints/$atId/oauth/token"
+    $atJwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+
+    # T1: WIF scheme NOT advertised before the flag is on
+    $atSpc0 = Invoke-RestMethod -Uri $atSpcUrl -Method GET -Headers $headers
+    $atNames0 = @($atSpc0.authenticationSchemes | ForEach-Object { $_.name })
+    Test-Result -Success (-not ($atNames0 -contains "Workload Identity Federation")) -Message "9z-AT.T1: WIF scheme NOT advertised when WifCredentialsEnabled off"
+
+    # Enable WIF credentials on the endpoint
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$atId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T2: WIF scheme advertised once the flag is on (Q6.6)
+    $atSpc1 = Invoke-RestMethod -Uri $atSpcUrl -Method GET -Headers $headers
+    $atNames1 = @($atSpc1.authenticationSchemes | ForEach-Object { $_.name })
+    Test-Result -Success ($atNames1 -contains "Workload Identity Federation" -and $atNames1 -contains "OAuth Bearer Token") -Message "9z-AT.T2: WIF scheme advertised alongside baseline when flag on"
+
+    # Persist a WIF trust (all public values, no secret)
+    $atWif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$atId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "q6-live"
+        wif = @{
+            assertionProfile = "jwt-bearer"
+            expectedIssuer   = "https://login.microsoftonline.com/tenant-live/v2.0"
+            expectedSubject  = "sp-live"
+            expectedAudience = "api://scimserver-live"
+            jwksUri          = "https://login.microsoftonline.com/tenant-live/discovery/v2.0/keys"
+            allowedTenantId  = "tenant-live"
+            requiredRoles    = @("Scim.Provision")
+            scope            = "scim.read scim.write"
+            issuedTokenTtlSec = 7200
+        }
+    } | ConvertTo-Json -Depth 6)
+    $atWifJson = $atWif | ConvertTo-Json -Depth 8
+    Test-Result -Success ($atWif.credentialType -eq "wif") -Message "9z-AT.T3: wif credential persisted"
+    Test-Result -Success (-not ($atWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AT.T4: wif credential response carries NO secret/hash/token"
+
+    # T5: a structurally-valid but untrusted client_assertion fails closed -> invalid_client (401).
+    # The JWKS host is on no allowlist on the server (or the assertion signature
+    # cannot be verified), so validation rejects; the happy-path mint requires a
+    # reachable trusted JWKS and is covered by the E2E suite with a mocked fetch.
+    $atReject = $false
+    $atFakeAssertion = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImxpdmUifQ.eyJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vdGVuYW50LWxpdmUvdjIuMCJ9.c2ln"
+    try {
+        Invoke-RestMethod -Uri $atTokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_assertion = $atFakeAssertion; client_assertion_type = $atJwtBearer
+        } | Out-Null
+    } catch {
+        $atReject = ($_.Exception.Response.StatusCode.value__ -eq 401)
+    }
+    Test-Result -Success $atReject -Message "9z-AT.T5: untrusted client_assertion fails closed -> 401 invalid_client"
+
+    # T6: revoke the wif credential
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$atId/credentials/$($atWif.id)" -Method DELETE -Headers $headers | Out-Null
+    $atList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$atId/credentials" -Method GET -Headers $headers
+    Test-Result -Success (@($atList | Where-Object { $_.id -eq $atWif.id -and $_.active -eq $true }).Count -eq 0) -Message "9z-AT.T6: wif credential revoked"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$atId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT: WIF validate+issue section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT: WIF validate+issue Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -147,6 +147,12 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     description: 'Validate the bearer token against this endpoint\'s credential set.',
     defaultValue: false,
   },
+  {
+    key: 'WifCredentialsEnabled',
+    label: 'WifCredentialsEnabled',
+    description: 'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',
+    defaultValue: false,
+  },
 ];
 
 // Read-only (non-boolean) flag keys we still want to surface so the

@@ -305,4 +305,113 @@ describe('CredentialsTab', () => {
     expect(mockDeleteMutate).toHaveBeenCalledTimes(1);
     expect(mockDeleteMutate.mock.calls[0][0]).toBe('cred-x');
   });
+
+  // ─── Federated Identity (WIF) section (Q6.5) ───────────────────────
+
+  function wifInput(testId: string): HTMLElement {
+    const root = screen.getByTestId(testId);
+    return root.querySelector('input') ?? root.querySelector('textarea') ?? root;
+  }
+
+  it('shows the WIF disabled banner when WifCredentialsEnabled is off', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('wif-section')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-flag-disabled-banner')).toBeInTheDocument();
+    // Inputs are not rendered while disabled.
+    expect(screen.queryByTestId('wif-field-issuer')).not.toBeInTheDocument();
+  });
+
+  it('renders the 4+ Entra input fields when WIF is enabled (G1)', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { PerEndpointCredentialsEnabled: true, WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('wif-field-issuer')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-field-subject')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-field-audience')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-field-jwks')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-field-tenant')).toBeInTheDocument();
+    // Save is disabled until the required fields are filled.
+    expect(screen.getByTestId('wif-save-button')).toBeDisabled();
+    expect(screen.getByTestId('wif-copy-json')).toBeInTheDocument();
+  });
+
+  it('enables Save once required fields are filled and posts a wif credential (G2)', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    mockCreateMutate.mockImplementation((_body, opts) => {
+      opts?.onSuccess?.({ id: 'wif-cred-1', credentialType: 'wif' });
+    });
+
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://login.microsoftonline.com/t/v2.0' } });
+    fireEvent.change(wifInput('wif-field-subject'), { target: { value: 'sp-obj-id' } });
+    fireEvent.change(wifInput('wif-field-audience'), { target: { value: 'api://app' } });
+    fireEvent.change(wifInput('wif-field-jwks'), { target: { value: 'https://login.microsoftonline.com/t/discovery/v2.0/keys' } });
+    fireEvent.change(wifInput('wif-field-tenant'), { target: { value: 'tenant-guid' } });
+
+    const save = screen.getByTestId('wif-save-button');
+    expect(save).not.toBeDisabled();
+    fireEvent.click(save);
+
+    expect(mockCreateMutate).toHaveBeenCalledTimes(1);
+    const body = mockCreateMutate.mock.calls[0][0];
+    expect(body.credentialType).toBe('wif');
+    expect(body.wif).toMatchObject({
+      assertionProfile: 'jwt-bearer',
+      expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
+      expectedSubject: 'sp-obj-id',
+      expectedAudience: 'api://app',
+      jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
+      allowedTenantId: 'tenant-guid',
+    });
+
+    // The 3 ISV return values render after a successful save (G2).
+    expect(screen.getByTestId('wif-return-values')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-return-clientid')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-return-tokenurl')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-return-scimurl')).toBeInTheDocument();
+  });
+
+  it('Test Connection renders a per-step readiness result (G3 client-side)', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // With empty fields, Test Connection shows FAIL steps (still renders).
+    fireEvent.click(screen.getByTestId('wif-test-button'));
+    const result = screen.getByTestId('wif-test-result');
+    expect(result).toBeInTheDocument();
+    expect(result.textContent).toMatch(/Issuer provided/);
+    expect(result.textContent).toMatch(/JWKS URI is https/);
+  });
+
+  it('lists existing wif credentials with a revoke control', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { WifCredentialsEnabled: true },
+        credentials: [
+          { id: 'wif-1', credentialType: 'wif', label: 'Entra WIF', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    expect(screen.getByTestId('wif-credential-row-wif-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('wif-credential-delete-wif-1'));
+    expect(mockDeleteMutate).toHaveBeenCalledWith('wif-1');
+  });
 });

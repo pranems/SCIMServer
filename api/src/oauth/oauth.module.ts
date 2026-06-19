@@ -7,6 +7,8 @@ import { JwksController } from './jwks.controller';
 import { OAuthMetadataController } from './oauth-metadata.controller';
 import { OAuthSigningKeyService } from './oauth-signing-key.service';
 import { OAuthSigningModule } from './oauth-signing.module';
+import { ExternalJwksValidatorService, JWKS_FETCH } from './external-jwks-validator.service';
+import { WifAssertionValidatorService } from './wif-assertion-validator.service';
 import { OAUTH_ISSUER } from './oauth.constants';
 
 /**
@@ -47,7 +49,16 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
     }),
   ],
   controllers: [OAuthController, JwksController, OAuthMetadataController],
-  providers: [OAuthService],
-  exports: [OAuthService], // Export for use in SCIM authentication
+  providers: [
+    OAuthService,
+    ExternalJwksValidatorService,
+    WifAssertionValidatorService,
+    // Register the JWKS fetch implementation as an injectable so it can be
+    // overridden in tests. The default wraps the platform `fetch` (bound to
+    // globalThis), preserving the production behavior of the `?? globalThis.fetch`
+    // fallback while giving E2E tests a provider to override.
+    { provide: JWKS_FETCH, useFactory: () => globalThis.fetch.bind(globalThis) },
+  ],
+  exports: [OAuthService, ExternalJwksValidatorService, WifAssertionValidatorService], // Export for use in SCIM authentication + WIF
 })
 export class OAuthModule {}

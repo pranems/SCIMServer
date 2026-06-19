@@ -140,40 +140,61 @@ export class OAuthService {
    *
    * Credential validation (matching the per-endpoint `oauth-client` client_id /
    * secret) is the caller's responsibility; this method only issues the token.
+   *
+   * Q6.4 - `options.trustedScope` lets the WIF flow mint with an
+   * admin-configured scope verbatim (the scope is set by the operator on the
+   * `wif` trust, not requested by the caller, so it bypasses the caller-scope
+   * filter). `options.ttlSec` sets the lifetime, clamped to the Entra-spec
+   * 1-6h window.
    */
   generateEndpointAccessToken(
     endpointId: string,
     clientId: string,
     requestedScope?: string,
+    options?: { ttlSec?: number; trustedScope?: string },
   ): Promise<AccessToken> {
     const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
-    const requestedScopes = requestedScope ? requestedScope.split(' ').filter(Boolean) : [];
-    const allowed = requestedScopes.filter((s) => defaultScopes.includes(s));
-    const grantedScopes = allowed.length > 0 ? allowed : defaultScopes;
+
+    let grantedScope: string;
+    if (options?.trustedScope && options.trustedScope.trim().length > 0) {
+      // Admin-configured (WIF) scope - trusted, used verbatim.
+      grantedScope = options.trustedScope.trim();
+    } else {
+      const requestedScopes = requestedScope ? requestedScope.split(' ').filter(Boolean) : [];
+      const allowed = requestedScopes.filter((s) => defaultScopes.includes(s));
+      grantedScope = (allowed.length > 0 ? allowed : defaultScopes).join(' ');
+    }
+
+    // Clamp the lifetime to the Entra WIF 1-6h window; default 1h.
+    const TTL_FLOOR = 3600;
+    const TTL_CEIL = 21600;
+    let expiresIn = TTL_FLOOR;
+    if (typeof options?.ttlSec === 'number' && Number.isFinite(options.ttlSec)) {
+      expiresIn = Math.min(TTL_CEIL, Math.max(TTL_FLOOR, Math.floor(options.ttlSec)));
+    }
 
     const payload = {
       sub: clientId,
       client_id: clientId,
       aud: `${this.audience}:${endpointId}`,
       endpoint_id: endpointId,
-      scope: grantedScopes.join(' '),
+      scope: grantedScope,
       token_type: 'access_token',
     };
 
-    const expiresIn = 3600;
     const accessToken = this.jwtService.sign(payload, { expiresIn: `${expiresIn}s` });
 
     this.logger.info(LogCategory.OAUTH, 'Per-endpoint access token generated', {
       endpointId,
       clientId,
-      scopes: grantedScopes,
+      scopes: grantedScope,
       expiresIn,
     });
 
     return Promise.resolve({
       accessToken,
       expiresIn,
-      scope: grantedScopes.join(' '),
+      scope: grantedScope,
     });
   }
 

@@ -10,6 +10,8 @@ import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
+import { ASSERTION_TOKEN_PROVIDER } from './controllers/assertion-token-provider';
+import { WifAssertionTokenProvider } from './controllers/wif-assertion-token.provider';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -63,6 +65,12 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimGenericService,
     BulkProcessorService,
     EndpointContextStorage,
+    // Q6 - bind the A3 assertion-provider seam to the WIF validate+issue pipeline.
+    WifAssertionTokenProvider,
+    {
+      provide: ASSERTION_TOKEN_PROVIDER,
+      useExisting: WifAssertionTokenProvider,
+    },
     // Exception filters: NestJS applies APP_FILTERs in reverse order (last registered = runs first).
     // GlobalExceptionFilter catches non-HttpException errors (raw Error, TypeError, PrismaError).
     // ScimExceptionFilter catches HttpException and formats as SCIM error.

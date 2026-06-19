@@ -103,4 +103,33 @@ describe('computeAuthenticationSchemes (A2)', () => {
     const result = computeAuthenticationSchemes(BASELINE, auth);
     expect(result.find((s) => s.name === 'Basic')!.type).toBe('httpbasic');
   });
+
+  // ─── Q6.6 - WifCredentialsEnabled flag drives WIF advertisement ───────────
+  describe('Q6.6 WifCredentialsEnabled advertisement', () => {
+    it('advertises a WIF scheme when the flag is on (baseline + WIF)', () => {
+      const result = computeAuthenticationSchemes(BASELINE, undefined, { wifCredentialsEnabled: true });
+      expect(result).toHaveLength(2);
+      const wif = result.find((s) => s.name === 'Workload Identity Federation');
+      expect(wif).toBeDefined();
+      expect(wif!.type).toBe('oauth2');
+      expect(wif!.specUri).toBe('https://www.rfc-editor.org/rfc/rfc7523');
+    });
+
+    it('does NOT advertise a WIF scheme when the flag is off', () => {
+      const result = computeAuthenticationSchemes(BASELINE, undefined, { wifCredentialsEnabled: false });
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('oauthbearertoken');
+    });
+
+    it('does not duplicate WIF when an enabled wif method already advertises it', () => {
+      const auth: ProfileAuthentication = {
+        schemaVersion: 1,
+        methods: [{ id: 'm-1', type: 'wif-7523', displayName: 'WIF' }],
+      };
+      const result = computeAuthenticationSchemes(BASELINE, auth, { wifCredentialsEnabled: true });
+      // baseline + the explicit method scheme only; no second auto WIF scheme.
+      expect(result).toHaveLength(2);
+      expect(result.filter((s) => s.name === 'Workload Identity Federation')).toHaveLength(0);
+    });
+  });
 });

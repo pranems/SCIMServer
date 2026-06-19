@@ -103,6 +103,7 @@ describe('SettingsTab', () => {
     expect(screen.getByRole('switch', { name: /StrictSchemaValidation/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /RequireIfMatch/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /PerEndpointCredentialsEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /WifCredentialsEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /UserSoftDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /UserHardDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /GroupHardDeleteEnabled/i })).toBeInTheDocument();

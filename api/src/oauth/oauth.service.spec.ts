@@ -189,4 +189,56 @@ describe('OAuthService', () => {
       expect(service.hasScope(payload, 'scim.read')).toBe(false);
     });
   });
+
+  describe('generateEndpointAccessToken (Q1 + Q6.4)', () => {
+    it('issues a per-endpoint token with endpoint_id + per-endpoint aud (Q1)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      expect(result.expiresIn).toBe(3600);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'epc_abc',
+          client_id: 'epc_abc',
+          endpoint_id: 'ep-1',
+          aud: 'scimserver-scim-api:ep-1',
+          token_type: 'access_token',
+        }),
+        expect.objectContaining({ expiresIn: '3600s' }),
+      );
+    });
+
+    it('honors a custom issuedTokenTtlSec within the 1-6h window (Q6.4)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 7200 });
+      expect(result.expiresIn).toBe(7200);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ expiresIn: '7200s' }),
+      );
+    });
+
+    it('clamps a ttlSec below the 1h floor up to 3600 (Q6.4)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 60 });
+      expect(result.expiresIn).toBe(3600);
+    });
+
+    it('clamps a ttlSec above the 6h ceiling down to 21600 (Q6.4)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 99999 });
+      expect(result.expiresIn).toBe(21600);
+    });
+
+    it('uses an admin-trusted scope verbatim, bypassing the caller-scope filter (Q6.4 WIF)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        trustedScope: 'scim.provision custom.scope',
+      });
+      expect(result.scope).toBe('scim.provision custom.scope');
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'scim.provision custom.scope' }),
+        expect.any(Object),
+      );
+    });
+
+    it('still filters a caller-requested scope to the allowed default scopes (Q1)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', 'scim.read unknown.scope');
+      expect(result.scope).toBe('scim.read');
+    });
+  });
 });
