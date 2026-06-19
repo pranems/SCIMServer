@@ -56,6 +56,18 @@ pie showData
     "T7 Process/git" : 2
 ```
 
+### 1.5 How this ledger was built (mandatory method, not just for this instance)
+
+An RCA ledger is only as complete as its source. The required method - applied here and binding on every future ledger - is to **reconcile against the full session transcript, never in-context memory or a compaction summary alone.** A long build is summarized mid-flight, and the summary silently drops the earliest steps, so a ledger written from memory is structurally incomplete for exactly the steps furthest from the end.
+
+The scan that produced this doc (and that every future RCA doc must run):
+
+1. **Error/signal frequency pass** over the entire `transcripts/<id>.jsonl` (here: 4,666 lines) for `error TS`, HTTP status codes (`415`/`422`/`401`), `ECONNRESET`/`ENOENT`/`Cannot find module`, `false positive`, `RED`, `rebase`, lint-ceiling bumps, `overrideProvider`, etc.
+2. **Narration-phrase pass** for sentences where a problem was diagnosed (`root cause`, `no-op`, `silently`, `turned out`, `the culprit`, `stale`, `regressed`).
+3. **Classify + dedupe**: map each real hit to an issue entry; discard self-referential search echoes (a scan command that matches its own pattern); record any **verified-and-dismissed non-issue** so a reader knows it was considered.
+
+> **This instance's provenance.** Honest record: the first draft of this doc was written from the compaction summary + in-context memory; the operator then asked "did you go through the entire session history?" The follow-up full-transcript scan found **no missing substantive issue** but corrected one understatement (I-06 lint bumps: "3+" -> ~50 actual) and confirmed one verified-and-dismissed non-issue (the `jose` ESM-only constraint was an anticipated design choice, not a failure - it loaded cleanly in jest on the first RED run). That miss-then-correct is itself logged as the reason the full-transcript method is now mandatory (see [.github/copilot-instructions.md](../../.github/copilot-instructions.md), "Execution Issue RCA Ledger").
+
 ---
 
 ## 2. Master dashboard
