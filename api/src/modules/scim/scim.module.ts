@@ -4,9 +4,11 @@ import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { LoggingModule } from '../logging/logging.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EndpointModule } from '../endpoint/endpoint.module';
+import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -32,13 +34,14 @@ import { EndpointLogController } from './controllers/endpoint-log.controller';
 import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-type-validation.middleware';
 
 @Module({
-  imports: [PrismaModule, LoggingModule, EndpointModule, RepositoryModule.register()],
+  imports: [PrismaModule, LoggingModule, EndpointModule, OAuthModule, RepositoryModule.register()],
   controllers: [
     ServiceProviderConfigController,
     ResourceTypesController,
     SchemasController,
     AdminController,
     AdminCredentialController,
+    EndpointOAuthController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
     EndpointScimBulkController,

@@ -112,22 +112,51 @@ export class SharedSecretGuard implements CanActivate {
 
     // ── OAuth 2.0 JWT token validation ───────────────────────────────
     if (token !== expectedSecret) {
+      this.logger.debug(LogCategory.AUTH, 'Attempting OAuth 2.0 token validation');
+      let payload: Record<string, unknown> | undefined;
       try {
-        this.logger.debug(LogCategory.AUTH, 'Attempting OAuth 2.0 token validation');
-        const payload = await this.oauthService.validateAccessToken(token);
+        payload = await this.oauthService.validateAccessToken(token);
+      } catch (_oauthError) {
+        this.logger.debug(LogCategory.AUTH, 'OAuth 2.0 validation failed, falling back to legacy token');
+        payload = undefined; // fall through to legacy token check
+      }
+
+      if (payload) {
+        // Q1: per-endpoint token scoping. A token carrying an `endpoint_id`
+        // claim is scoped to exactly one endpoint and authorizes ONLY that
+        // endpoint's routes. Presented to a different endpoint (or a route
+        // with no endpoint segment, e.g. global admin), it is
+        // "mine-but-invalid-stop": reject now, never fall through to the
+        // legacy-secret acceptor (downgrade-confusion defense). The check is
+        // OUTSIDE the validate try/catch so the rejection is not swallowed.
+        const tokenEndpointId =
+          typeof payload.endpoint_id === 'string' ? payload.endpoint_id : undefined;
+        if (tokenEndpointId) {
+          const urlEndpointId = this.extractEndpointId(request);
+          if (urlEndpointId !== tokenEndpointId) {
+            this.logger.warn(
+              LogCategory.AUTH,
+              'Per-endpoint OAuth token presented to a route it is not scoped for',
+              { tokenEndpointId, urlEndpointId },
+            );
+            this.reject(
+              response,
+              'OAuth token is scoped to a different endpoint.',
+              'invalid_token',
+            );
+          }
+        }
 
         // Add OAuth payload to request for later use
         request.oauth = payload;
         request.authType = 'oauth';
 
-        this.logger.enrichContext({ authType: 'oauth', authClientId: payload.client_id });
+        this.logger.enrichContext({ authType: 'oauth', authClientId: payload.client_id as string });
         this.logger.info(LogCategory.AUTH, 'OAuth 2.0 authentication successful', {
-          clientId: payload.client_id,
+          clientId: payload.client_id as string,
+          endpointScoped: tokenEndpointId ? true : false,
         });
         return true;
-      } catch (_oauthError) {
-        this.logger.debug(LogCategory.AUTH, 'OAuth 2.0 validation failed, falling back to legacy token');
-        // Fall through to legacy token check
       }
     }
 

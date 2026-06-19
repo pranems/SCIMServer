@@ -181,6 +181,65 @@ describe('SharedSecretGuard', () => {
     });
   });
 
+  describe('per-endpoint OAuth token scoping (Q1)', () => {
+    const EP_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const EP_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+    it('authorizes a per-endpoint token on its own endpoint route', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        sub: 'epc_x', client_id: 'epc_x', scope: 'scim.read', endpoint_id: EP_A,
+      });
+      const { context, request } = createEndpointMockContext(EP_A, 'Bearer ep-token');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('oauth');
+    });
+
+    it('rejects a per-endpoint token presented to a DIFFERENT endpoint', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        sub: 'epc_x', client_id: 'epc_x', scope: 'scim.read', endpoint_id: EP_A,
+      });
+      const { context, response } = createEndpointMockContext(EP_B, 'Bearer ep-token');
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+      // mine-but-invalid-stop: enriched WWW-Authenticate, never fell through to legacy.
+      expect(response.setHeader).toHaveBeenCalledWith(
+        'WWW-Authenticate',
+        expect.stringContaining('error="invalid_token"'),
+      );
+    });
+
+    it('rejects a per-endpoint token on a non-endpoint (global) route', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        sub: 'epc_x', client_id: 'epc_x', scope: 'scim.read', endpoint_id: EP_A,
+      });
+      // createMockContext uses url '/some/path' - no /endpoints/<id>/ segment.
+      const { context } = createMockContext('Bearer ep-token');
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('a per-endpoint token does NOT fall through to the legacy secret on mismatch', async () => {
+      // Even if the token string happened to also be probed as legacy, the
+      // endpoint mismatch must stop first. Here the token is a JWT, not the
+      // shared secret, so legacy would fail anyway; assert the rejection path.
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        sub: 'epc_x', client_id: 'epc_x', endpoint_id: EP_A,
+      });
+      const { context, request } = createEndpointMockContext(EP_B, 'Bearer ep-token');
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+      expect(request.authType).toBeUndefined();
+    });
+
+    it('a GLOBAL token (no endpoint_id) still authorizes any endpoint route', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        sub: 'global', client_id: 'global', scope: 'scim.read',
+      });
+      const { context, request } = createEndpointMockContext(EP_A, 'Bearer global-token');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('oauth');
+    });
+  });
+
   describe('auto-generated secret in dev mode', () => {
     it('should auto-generate secret when SCIM_SHARED_SECRET not configured', async () => {
       const origSecret = process.env.SCIM_SHARED_SECRET;

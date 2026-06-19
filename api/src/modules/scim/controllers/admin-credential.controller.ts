@@ -105,6 +105,49 @@ export class AdminCredentialController {
     // Hash with bcrypt
     const hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
 
+    // Q1: an `oauth_client` credential is a per-endpoint client_id / client_secret
+    // pair used at the per-endpoint token endpoint to mint endpoint-scoped tokens.
+    // The plaintext secret rides `credentialHash` (bcrypt); the public client_id
+    // rides `metadata.clientId`. Both the client_id and the one-time secret are
+    // returned at create; the secret is NEVER stored or returned again.
+    if (credentialType === 'oauth_client') {
+      const clientId = `epc_${crypto.randomBytes(12).toString('hex')}`;
+      const credential = await this.credentialRepo.create({
+        endpointId,
+        credentialType,
+        credentialHash: hash,
+        label: dto.label ?? null,
+        metadata: { clientId },
+        expiresAt,
+      });
+
+      this.logger.info(
+        LogCategory.AUTH,
+        `Created per-endpoint oauth_client credential "${credential.id}" (clientId "${clientId}") for endpoint "${endpointId}"`,
+      );
+
+      const oauthEventPayload: ScimCredentialEventPayload = {
+        endpointId,
+        credentialId: credential.id,
+        credentialType: credential.credentialType,
+        label: credential.label ?? undefined,
+      };
+      this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_CREATED, oauthEventPayload);
+
+      return {
+        id: credential.id,
+        endpointId: credential.endpointId,
+        credentialType: credential.credentialType,
+        label: credential.label,
+        active: credential.active,
+        createdAt: credential.createdAt,
+        expiresAt: credential.expiresAt,
+        clientId,
+        // ⚠️ Secret is returned ONLY here, ONCE. Only its bcrypt hash is stored.
+        clientSecret: plaintext,
+      };
+    }
+
     const credential = await this.credentialRepo.create({
       endpointId,
       credentialType,
@@ -159,6 +202,11 @@ export class AdminCredentialController {
       active: c.active,
       createdAt: c.createdAt,
       expiresAt: c.expiresAt,
+      // Q1: expose the PUBLIC client_id for oauth_client credentials so the UI
+      // can show it. The secret is never stored and never returned in a list.
+      ...(c.credentialType === 'oauth_client' && c.metadata?.clientId
+        ? { clientId: c.metadata.clientId as string }
+        : {}),
       // Hash is NEVER returned in list responses
     }));
   }

@@ -11028,6 +11028,86 @@ try {
 Write-Host "`n--- 9z-AO: OAuth Discovery Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AP: Per-Endpoint OAuth Client + Token Issuer (Q1)
+$script:currentSection = "9z-AP: Per-Endpoint OAuth Client (Q1)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AP: Per-Endpoint OAuth Client + Token Issuer (Q1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+function ConvertFrom-JwtPayloadAP {
+    param([string]$Jwt)
+    $seg = $Jwt.Split('.')[1].Replace('-', '+').Replace('_', '/')
+    switch ($seg.Length % 4) { 2 { $seg += '==' } 3 { $seg += '=' } }
+    $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($seg))
+    return ($json | ConvertFrom-Json)
+}
+
+try {
+    # Create two endpoints with per-endpoint credentials enabled
+    $apEpA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-q1a-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $apEpB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-q1b-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $apIdA = $apEpA.id; $apIdB = $apEpB.id
+    foreach ($id in @($apIdA, $apIdB)) {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$id" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    }
+    Test-Result -Success ($null -ne $apIdA -and $null -ne $apIdB) -Message "9z-AP.T1: created two per-endpoint-credential endpoints"
+
+    # Create an oauth_client credential on endpoint A
+    $apCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "q1-live"
+    } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $apCred.clientId -and $null -ne $apCred.clientSecret -and $null -eq $apCred.token) -Message "9z-AP.T2: oauth_client create returns clientId+clientSecret (no bearer token)"
+
+    # Mint a per-endpoint token at the per-endpoint token endpoint
+    $apTokenResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST -ContentType "application/json" -Body (@{
+        grant_type = "client_credentials"; client_id = $apCred.clientId; client_secret = $apCred.clientSecret
+    } | ConvertTo-Json)
+    $apToken = $apTokenResp.access_token
+    Test-Result -Success ($null -ne $apToken) -Message "9z-AP.T3: per-endpoint token minted"
+
+    $apPayload = ConvertFrom-JwtPayloadAP -Jwt $apToken
+    Test-Result -Success ($apPayload.endpoint_id -eq $apIdA) -Message "9z-AP.T4: token carries endpoint_id claim for endpoint A"
+
+    # The per-endpoint token authorizes endpoint A's SCIM routes
+    $apHeadersA = @{ Authorization = "Bearer $apToken" }
+    $apListA = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$apIdA/Users?count=1" -Headers $apHeadersA -SkipHttpErrorCheck
+    Test-Result -Success ($apListA.StatusCode -eq 200) -Message "9z-AP.T5: per-endpoint token authorizes its OWN endpoint (status=$($apListA.StatusCode))"
+
+    # The per-endpoint token is REJECTED on endpoint B (Q1 scoping)
+    $apListB = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$apIdB/Users?count=1" -Headers $apHeadersA -SkipHttpErrorCheck
+    Test-Result -Success ($apListB.StatusCode -eq 401) -Message "9z-AP.T6: per-endpoint token REJECTED on a different endpoint (status=$($apListB.StatusCode))"
+
+    # Invalid client_secret -> 401
+    $apBadSecret = $false
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST -ContentType "application/json" -Body (@{
+        grant_type = "client_credentials"; client_id = $apCred.clientId; client_secret = "wrong"
+    } | ConvertTo-Json) | Out-Null } catch { $apBadSecret = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $apBadSecret -Message "9z-AP.T7: invalid client_secret rejected with 401"
+
+    # The clientSecret never appears in a credential list response
+    $apCredList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA/credentials" -Method GET -Headers $headers
+    $apListJson = $apCredList | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($apListJson -match 'clientSecret')) -Message "9z-AP.T8: clientSecret absent from credential list response"
+    $apOauthRow = @($apCredList | Where-Object { $_.credentialType -eq 'oauth_client' })[0]
+    Test-Result -Success ($null -ne $apOauthRow.clientId) -Message "9z-AP.T9: public clientId IS exposed in the list for oauth_client rows"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA" -Method DELETE -Headers $headers | Out-Null } catch {}
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdB" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AP: Per-Endpoint OAuth Client section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AP: Per-Endpoint OAuth Client Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

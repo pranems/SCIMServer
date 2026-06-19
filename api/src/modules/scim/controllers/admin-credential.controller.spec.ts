@@ -100,7 +100,7 @@ describe('AdminCredentialController', () => {
 
       expect(result.id).toBeDefined();
       expect(result.token).toBeDefined();
-      expect(result.token.length).toBeGreaterThan(10);
+      expect(result.token!.length).toBeGreaterThan(10);
       expect(result.endpointId).toBe(mockEndpoint.id);
       expect(mockCredentialRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -172,10 +172,31 @@ describe('AdminCredentialController', () => {
         credentialType: 'oauth_client',
       });
 
-      expect(result.token).toBeDefined();
+      // Q1: oauth_client returns a client_id + client_secret pair, NOT a bearer token.
+      expect(result.token).toBeUndefined();
+      expect(result.clientId).toBeDefined();
+      expect(typeof result.clientId).toBe('string');
+      expect(result.clientSecret).toBeDefined();
+      expect(typeof result.clientSecret).toBe('string');
+      expect(result.clientSecret!.length).toBeGreaterThan(10);
       expect(mockCredentialRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ credentialType: 'oauth_client' }),
+        expect.objectContaining({
+          credentialType: 'oauth_client',
+          metadata: expect.objectContaining({ clientId: result.clientId }),
+        }),
       );
+    });
+
+    it('Q1: oauth_client stores only the bcrypt hash of the secret, never the plaintext', async () => {
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'oauth_client',
+      });
+      const createArg = mockCredentialRepo.create.mock.calls[0][0];
+      // The stored hash must not equal the returned plaintext secret.
+      expect(createArg.credentialHash).toBeDefined();
+      expect(createArg.credentialHash).not.toBe(result.clientSecret);
+      // The plaintext secret must not be persisted anywhere in the create input.
+      expect(JSON.stringify(createArg)).not.toContain(result.clientSecret);
     });
 
     it('should throw NotFoundException for non-existent endpoint', async () => {

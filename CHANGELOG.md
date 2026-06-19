@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.5] - 2026-06-18 - Auth Q1: per-endpoint oauth-client credential + per-endpoint token issuer
+
+Fifth step of the reconciled authentication build (first critical-path step). Closes ISV Pattern 5 (Entra Gallery mandate: per-endpoint client_id/client_secret pairs). Feature doc: [docs/auth/PER_ENDPOINT_OAUTH_CLIENT.md](docs/auth/PER_ENDPOINT_OAUTH_CLIENT.md).
+
+### Added
+
+- **`oauth_client` credential** ([admin-credential.controller.ts](api/src/modules/scim/controllers/admin-credential.controller.ts)): `POST /admin/endpoints/:id/credentials` with `credentialType:"oauth_client"` returns a `clientId` (public, `epc_` prefix, rides `metadata.clientId`) + `clientSecret` (one-time plaintext, bcrypt-hashed into `credentialHash`). The list endpoint exposes the public `clientId` but never the secret.
+- **Per-endpoint token issuer** ([endpoint-oauth.controller.ts](api/src/modules/scim/controllers/endpoint-oauth.controller.ts)): `POST /scim/endpoints/:endpointId/oauth/token` authenticates the per-endpoint `client_id`/`client_secret` (bcrypt compare against active `oauth_client` credentials) and mints a token via the new `OAuthService.generateEndpointAccessToken`. The token carries an `endpoint_id` claim + a per-endpoint `aud` (`<global-aud>:<endpointId>`), signed with the Pre-Q.B asymmetric key.
+
+### Security
+
+- **Per-endpoint token scoping** ([shared-secret.guard.ts](api/src/modules/auth/shared-secret.guard.ts)): a token carrying `endpoint_id` authorizes ONLY that endpoint's routes. Presented to a different endpoint (or a non-endpoint route) it is rejected ("mine-but-invalid-stop") with an enriched `WWW-Authenticate`, and crucially does NOT fall through to the legacy-secret acceptor (downgrade-confusion defense - the scoping check is outside the validate try/catch so the rejection is never swallowed). A global token (no `endpoint_id`) is unaffected.
+
+### Validation
+
+- TDD: 4 new unit (oauth service per-endpoint) + 2 new unit (admin-credential oauth_client) + 5 new unit (guard scoping) + 7 new E2E ([endpoint-oauth-client.e2e-spec.ts](api/test/e2e/endpoint-oauth-client.e2e-spec.ts)) + 9 new live (`scripts/live-test.ps1` section 9z-AP).
+- API unit: **3,868 -> 3,878** (104 suites). Full E2E (inmemory): **1,240 pass** (68 suites). Local-node live: **1,067 pass / 0 fail** including 9z-AP. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: `oauth_client` rides the existing EndpointCredential.metadata column - identical in both backends. Docker + dev-Azure live validation batched to the next critical-path checkpoint.
+
 ## [0.54.0-alpha.4] - 2026-06-18 - Auth Q0: WWW-Authenticate enrichment + aud claim + RFC 8414 metadata
 
 Fourth step of the reconciled authentication build. Closes three interop gaps and documents the shipped 3-tier resource-plane chain. Feature doc: [docs/auth/OAUTH_DISCOVERY_AND_BEARER_ERRORS.md](docs/auth/OAUTH_DISCOVERY_AND_BEARER_ERRORS.md).

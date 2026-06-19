@@ -141,6 +141,63 @@ describe('OAuth asymmetric signing (Pre-Q.B)', () => {
     });
   });
 
+  describe('per-endpoint token issuance (Q1)', () => {
+    const ENDPOINT_ID = '11111111-1111-1111-1111-111111111111';
+
+    it('stamps the endpoint_id claim onto a per-endpoint token', async () => {
+      const keys = new OAuthSigningKeyService(makeConfig());
+      const jwt = new JwtService(buildJwtModuleOptions(keys));
+      const oauth = new OAuthService(jwt, makeConfig(), logger);
+
+      const { accessToken } = await oauth.generateEndpointAccessToken(ENDPOINT_ID, 'epc_abc');
+      const payload = decodePayload(accessToken);
+
+      expect(payload.endpoint_id).toBe(ENDPOINT_ID);
+      expect(payload.client_id).toBe('epc_abc');
+      expect(payload.sub).toBe('epc_abc');
+    });
+
+    it('sets a per-endpoint aud claim distinct from the global audience', async () => {
+      const keys = new OAuthSigningKeyService(makeConfig());
+      const jwt = new JwtService(buildJwtModuleOptions(keys));
+      const oauth = new OAuthService(jwt, makeConfig(), logger);
+
+      const global = await oauth.generateAccessToken('test-client', 'test-secret');
+      const perEndpoint = await oauth.generateEndpointAccessToken(ENDPOINT_ID, 'epc_abc');
+
+      const globalAud = decodePayload(global.accessToken).aud as string;
+      const epAud = decodePayload(perEndpoint.accessToken).aud as string;
+
+      expect(epAud).toContain(ENDPOINT_ID);
+      expect(epAud).not.toBe(globalAud);
+    });
+
+    it('signs the per-endpoint token with the asymmetric key (verifiable + alg-pinned)', async () => {
+      const keys = new OAuthSigningKeyService(makeConfig());
+      const jwt = new JwtService(buildJwtModuleOptions(keys));
+      const oauth = new OAuthService(jwt, makeConfig(), logger);
+
+      const { accessToken } = await oauth.generateEndpointAccessToken(ENDPOINT_ID, 'epc_abc');
+      expect(decodeHeader(accessToken).alg).toBe('RS256');
+
+      // The guard validates per-endpoint tokens via the same verify path.
+      const payload = await oauth.validateAccessToken(accessToken);
+      expect(payload.endpoint_id).toBe(ENDPOINT_ID);
+    });
+
+    it('grants a default scope and honors a narrower requested scope', async () => {
+      const keys = new OAuthSigningKeyService(makeConfig());
+      const jwt = new JwtService(buildJwtModuleOptions(keys));
+      const oauth = new OAuthService(jwt, makeConfig(), logger);
+
+      const def = await oauth.generateEndpointAccessToken(ENDPOINT_ID, 'epc_abc');
+      expect(def.scope).toContain('scim.read');
+
+      const narrow = await oauth.generateEndpointAccessToken(ENDPOINT_ID, 'epc_abc', 'scim.read');
+      expect(narrow.scope).toBe('scim.read');
+    });
+  });
+
   describe('verification (B3)', () => {
     it('accepts a token signed by the asymmetric private key', async () => {
       const keys = new OAuthSigningKeyService(makeConfig());
