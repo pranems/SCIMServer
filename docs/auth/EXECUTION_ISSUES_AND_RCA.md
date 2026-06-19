@@ -5,6 +5,8 @@
 > **Why it exists.** None of these issues appear in the planning / design / architecture docs, because they arise from unforeseen combinations of circumstances (framework defaults, environment drift, tooling quirks, test-harness gaps) that the design stage cannot anticipate. Capturing them is how the gate set self-densifies over time - it is the concrete artifact behind the [self-improvement discipline (R7)](../../.github/copilot-instructions.md). This doc is the companion to the [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md) (which tracks *what shipped*); this one tracks *what went wrong on the way and what we learned*.
 >
 > **Provenance / completeness.** This ledger was reconciled against the **full 4,666-line session transcript** of the build (not just in-context recollection): a systematic scan for error/RED/fix/rejection signals across every step, plus a narration-phrase pass (`false positive`, `root cause`, `no-op`, `silently`, etc.). That scan surfaced **no substantive issue not already listed below** - every diagnosed problem in the transcript maps to one of the 17 entries. The early backbone/enabling steps (Pre-Q.A -> A2) genuinely had low issue density because they reused established patterns; the clusters are at Q6 (new external-dependency + test-harness surface) and the final checkpoint (environment drift + the live-only test bug). One verified-and-dismissed non-issue: the `jose` ESM-only constraint (Q2) was an *anticipated design choice* (dynamic `import('jose')`), not a failure - it loaded cleanly in jest on the first RED run.
+>
+> **Method note (now a standing discipline).** This doc was retrofitted at build end, which is why one recurrence count was initially understated (~50x lint-ceiling churn first recorded as "3+"). The standing fix is disciplines **D1 (capture each RCA at fix-confirmation time)** and **D2 (reconcile against the full transcript at build end)** in [docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md#2-maintenance-protocol-the-three-disciplines) - future ledgers are written incrementally so compaction cannot erode fidelity. The generalizable patterns from this build are promoted into that central doc (PA-1, PA-2, PB-1, PC-1, PD-1, PE-1/2/3).
 
 ---
 
@@ -55,18 +57,6 @@ pie showData
     "T6 Tooling friction" : 5
     "T7 Process/git" : 2
 ```
-
-### 1.5 How this ledger was built (mandatory method, not just for this instance)
-
-An RCA ledger is only as complete as its source. The required method - applied here and binding on every future ledger - is to **reconcile against the full session transcript, never in-context memory or a compaction summary alone.** A long build is summarized mid-flight, and the summary silently drops the earliest steps, so a ledger written from memory is structurally incomplete for exactly the steps furthest from the end.
-
-The scan that produced this doc (and that every future RCA doc must run):
-
-1. **Error/signal frequency pass** over the entire `transcripts/<id>.jsonl` (here: 4,666 lines) for `error TS`, HTTP status codes (`415`/`422`/`401`), `ECONNRESET`/`ENOENT`/`Cannot find module`, `false positive`, `RED`, `rebase`, lint-ceiling bumps, `overrideProvider`, etc.
-2. **Narration-phrase pass** for sentences where a problem was diagnosed (`root cause`, `no-op`, `silently`, `turned out`, `the culprit`, `stale`, `regressed`).
-3. **Classify + dedupe**: map each real hit to an issue entry; discard self-referential search echoes (a scan command that matches its own pattern); record any **verified-and-dismissed non-issue** so a reader knows it was considered.
-
-> **This instance's provenance.** Honest record: the first draft of this doc was written from the compaction summary + in-context memory; the operator then asked "did you go through the entire session history?" The follow-up full-transcript scan found **no missing substantive issue** but corrected one understatement (I-06 lint bumps: "3+" -> ~50 actual) and confirmed one verified-and-dismissed non-issue (the `jose` ESM-only constraint was an anticipated design choice, not a failure - it loaded cleanly in jest on the first RED run). That miss-then-correct is itself logged as the reason the full-transcript method is now mandatory (see [.github/copilot-instructions.md](../../.github/copilot-instructions.md), "Execution Issue RCA Ledger").
 
 ---
 
