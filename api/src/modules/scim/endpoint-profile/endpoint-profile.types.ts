@@ -118,6 +118,8 @@ export interface ProfileSettings {
 
   /** Enable per-endpoint log file under logs/endpoints/ */
   logFileEnabled?: boolean | string;
+  /** Enable Workload Identity Federation (WIF) for this endpoint (A1; default false) */
+  WifCredentialsEnabled?: boolean | string;
   /** Allow any additional settings */
   [key: string]: unknown;
 }

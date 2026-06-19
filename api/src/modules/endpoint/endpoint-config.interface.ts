@@ -167,6 +167,15 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see RFC 7643 section 2.4 - Multi-Valued Attributes
    */
   PRIMARY_ENFORCEMENT: 'PrimaryEnforcement',
+
+  /**
+   * When true, enables Workload Identity Federation (WIF) for this endpoint:
+   * a `wif` credential may be attached and the WIF token-mint path is offered.
+   * When false (default), WIF is off and existing endpoints are untouched.
+   * Orthogonal to PerEndpointCredentialsEnabled (the bcrypt-bearer gate).
+   * @see docs/auth/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 8.6
+   */
+  WIF_CREDENTIALS_ENABLED: 'WifCredentialsEnabled',
 } as const;
 
 /**
@@ -374,6 +383,15 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       '"normalize": keeps first primary=true, sets rest to false, logs WARN. ' +
       '"reject": returns 400 invalidValue if >1 primary=true.',
   },
+  WIF_CREDENTIALS_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, enables Workload Identity Federation (WIF) for this endpoint: a wif credential may be ' +
+      'attached and the WIF token-mint path is offered. When false (default), WIF is off and existing ' +
+      'endpoints are untouched. Orthogonal to PerEndpointCredentialsEnabled.',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -401,6 +419,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
+  [ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]?: boolean | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }

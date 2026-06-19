@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.7] - 2026-06-18 - Auth A1: admin authentication-methods API + WifCredentialsEnabled flag + orthogonal gate
+
+Seventh step of the reconciled authentication build. Adds the management surface for the A0 inert authentication model, the `WifCredentialsEnabled` flag (17th endpoint config flag), and the orthogonal credential-create gate. Feature doc: [docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md).
+
+### Added
+
+- **Admin authentication-methods CRUD** ([admin-authentication-method.controller.ts](api/src/modules/scim/controllers/admin-authentication-method.controller.ts)): GET/POST/DELETE `/admin/endpoints/:id/authentication/methods` to manage `profile.authentication.methods[]`. The server assigns method `id`; an unknown `type` is 400; persistence rides the endpoint profile via `EndpointService.updateEndpoint` (so both backends behave identically). `mergeProfilePartial` gained `authentication` block replacement.
+- **`WifCredentialsEnabled` config flag** ([endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts)): boolean, default false; the per-endpoint enabling switch for WIF (the 17th flag). Documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md). The two UI cells of its 10-cell matrix land with the Q6 CredentialsTab WIF section.
+- **`wif` credential type** ([admin-credential.controller.ts](api/src/modules/scim/controllers/admin-credential.controller.ts)): stores only public trust values (issuer/subject/audience/jwksUri/allowedTenantId/...) in `EndpointCredential.metadata` with an empty `credentialHash`; the response carries no secret/hash/token.
+
+### Security
+
+- **Orthogonal create gate**: `wif` credentials are allowed when `WifCredentialsEnabled` is on, independent of `PerEndpointCredentialsEnabled`; `bearer`/`oauth_client` still require `PerEndpointCredentialsEnabled`. The A0 no-secret invariant (secret-looking config keys stripped on save) is enforced on the authentication-methods CRUD too.
+
+### Validation
+
+- TDD: 3 unit (flag) + 4 unit (orthogonal gate) + 7 E2E ([admin-authentication-methods.e2e-spec.ts](api/test/e2e/admin-authentication-methods.e2e-spec.ts)) + 9 live (`scripts/live-test.ps1` section 9z-AQ).
+- API unit: **3,886 -> 3,907** (105 suites). Local-node live: **1,076 pass / 0 fail** including 9z-AQ. Build 0 err; ESLint 0 err / 464 warnings (no new - a transient +1 was fixed). Parity: wif credential rides EndpointCredential.metadata + authentication rides profile JSONB (identical both backends). Docker + dev-Azure batched to the next critical-path checkpoint.
+
 ## [0.54.0-alpha.6] - 2026-06-18 - Auth Q2: external JWKS validator (jose)
 
 Sixth step of the reconciled authentication build (critical path). Adds the reusable external-JWT signature core that Q6's WIF validator builds on. Closes ISV Pattern 4 (external JWKS-validated JWT). Feature doc: [docs/auth/EXTERNAL_JWKS_VALIDATOR.md](docs/auth/EXTERNAL_JWKS_VALIDATOR.md).

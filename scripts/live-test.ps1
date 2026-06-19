@@ -11108,6 +11108,73 @@ try {
 Write-Host "`n--- 9z-AP: Per-Endpoint OAuth Client Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AQ: Admin Authentication-Methods CRUD + orthogonal WIF gate (A1)
+$script:currentSection = "9z-AQ: Auth-Methods CRUD (A1)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AQ: Admin Authentication-Methods CRUD + WIF gate (A1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $aqEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-a1-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $aqId = $aqEp.id
+    $aqMethodsUrl = "$baseUrl/scim/admin/endpoints/$aqId/authentication/methods"
+
+    # Empty list to start
+    $aqList0 = Invoke-RestMethod -Uri $aqMethodsUrl -Method GET -Headers $headers
+    Test-Result -Success (@($aqList0.methods).Count -eq 0) -Message "9z-AQ.T1: authentication methods start empty"
+
+    # Add a method (with a secret-looking config key that must be stripped)
+    $aqAdd = Invoke-RestMethod -Uri $aqMethodsUrl -Method POST -Headers $headers -Body (@{
+        type = "wif-7523"; displayName = "WIF"; plane = "token"
+        config = @{ issuer = "https://idp/v2.0"; clientSecret = "AQ-LEAK" }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($null -ne $aqAdd.id -and $aqAdd.type -eq "wif-7523") -Message "9z-AQ.T2: method added with server-assigned id"
+    $aqAddJson = $aqAdd | ConvertTo-Json -Depth 6
+    Test-Result -Success ($null -eq $aqAdd.config.clientSecret -and -not ($aqAddJson -match "AQ-LEAK")) -Message "9z-AQ.T3: secret-looking config key stripped on add"
+
+    # List reflects the method
+    $aqList1 = Invoke-RestMethod -Uri $aqMethodsUrl -Method GET -Headers $headers
+    Test-Result -Success (@($aqList1.methods | Where-Object { $_.type -eq "wif-7523" }).Count -ge 1) -Message "9z-AQ.T4: list reflects the added method"
+
+    # Unknown type rejected
+    $aqBadType = $false
+    try { Invoke-RestMethod -Uri $aqMethodsUrl -Method POST -Headers $headers -Body (@{ type = "not-real" } | ConvertTo-Json) | Out-Null } catch { $aqBadType = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $aqBadType -Message "9z-AQ.T5: unknown method type rejected 400"
+
+    # Delete by id
+    Invoke-RestMethod -Uri "$aqMethodsUrl/$($aqAdd.id)" -Method DELETE -Headers $headers | Out-Null
+    $aqList2 = Invoke-RestMethod -Uri $aqMethodsUrl -Method GET -Headers $headers
+    Test-Result -Success (@($aqList2.methods | Where-Object { $_.id -eq $aqAdd.id }).Count -eq 0) -Message "9z-AQ.T6: method deleted by id"
+
+    # Orthogonal gate: wif credential rejected until WifCredentialsEnabled is on
+    $aqWifBlocked = $false
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "wif" } | ConvertTo-Json) | Out-Null } catch { $aqWifBlocked = ($_.Exception.Response.StatusCode.value__ -eq 403) }
+    Test-Result -Success $aqWifBlocked -Message "9z-AQ.T7: wif credential blocked (403) when WifCredentialsEnabled off"
+
+    # Enable WifCredentialsEnabled, then a wif credential is allowed and returns NO secret
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $aqWifCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"
+        wif = @{ assertionProfile = "jwt-bearer"; expectedIssuer = "https://idp/v2.0"; expectedSubject = "sub"; expectedAudience = "appid"; jwksUri = "https://login.microsoftonline.com/tid/discovery/v2.0/keys"; allowedTenantId = "tid" }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($aqWifCred.credentialType -eq "wif") -Message "9z-AQ.T8: wif credential allowed when WifCredentialsEnabled on"
+    $aqWifJson = $aqWifCred | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($aqWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AQ.T9: wif credential response carries NO secret/hash/token"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AQ: Auth-Methods CRUD section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AQ: Auth-Methods CRUD Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

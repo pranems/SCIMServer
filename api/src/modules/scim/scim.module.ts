@@ -8,6 +8,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
@@ -41,6 +42,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     SchemasController,
     AdminController,
     AdminCredentialController,
+    AdminAuthenticationMethodController,
     EndpointOAuthController,
     EndpointScimUsersController,
     EndpointScimGroupsController,

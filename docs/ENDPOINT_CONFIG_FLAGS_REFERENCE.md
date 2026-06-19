@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Version:** 0.53.2 - **Updated:** June 18, 2026  
+> **Version:** 0.54.0-alpha.7 - **Updated:** June 18, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 16 flags: 14 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`).  
+> 17 flags: 15 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`).  
 > 4 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `structured` (the last added Pre-Q.A, reserved for the WIF trust object).
 
 ---
@@ -129,6 +129,18 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 14 | [`PerEndpointCredentialsEnabled`](#perendpointcredentialsenabled) | boolean | `false` | Authentication |
 | 15 | [`logLevel`](#loglevel) | string | (global) | Logging |
 | 16 | [`logFileEnabled`](#logfileenabled) | boolean | `true` | Logging |
+| 17 | [`WifCredentialsEnabled`](#wifcredentialsenabled) | boolean | `false` | Authentication |
+
+### WifCredentialsEnabled
+
+When `true`, enables Workload Identity Federation (WIF) for the endpoint: a `wif`
+credential may be attached (via `POST /admin/endpoints/:id/credentials` with
+`credentialType:"wif"`) and the WIF token-mint path is offered. When `false`
+(default), WIF is off and existing endpoints are untouched. **Orthogonal** to
+`PerEndpointCredentialsEnabled` (the bcrypt-bearer gate): a `wif` credential is
+permitted when `WifCredentialsEnabled` is on, independent of the bearer gate,
+and a `bearer` credential still requires `PerEndpointCredentialsEnabled`.
+Added in A1 ([docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](auth/AUTHENTICATION_METHODS_ADMIN_API.md)).
 
 ---
 

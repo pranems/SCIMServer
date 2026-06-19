@@ -1124,6 +1124,22 @@ describe('endpoint-config.interface', () => {
   describeBooleanFlagValidation('GroupHardDeleteEnabled');
   describeBooleanFlagValidation('MultiMemberPatchOpForGroupEnabled');
   describeBooleanFlagValidation('SchemaDiscoveryEnabled');
+  describeBooleanFlagValidation('WifCredentialsEnabled');
+
+  describe('WifCredentialsEnabled flag (A1)', () => {
+    it('is registered with the WifCredentialsEnabled key', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED).toBe('WifCredentialsEnabled');
+    });
+
+    it('defaults to false (existing endpoints untouched until opt-in)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]).toBe(false);
+      expect(getConfigBoolean(undefined, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)).toBe(false);
+    });
+
+    it('reads true when explicitly enabled', () => {
+      expect(getConfigBoolean({ WifCredentialsEnabled: 'True' }, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)).toBe(true);
+    });
+  });
 
   // ─── Pre-Q.A: structured flag-type ──────────────────────────────────────────
   describe('structured flag-type (Pre-Q.A)', () => {

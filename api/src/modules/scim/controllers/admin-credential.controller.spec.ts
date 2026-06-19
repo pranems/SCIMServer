@@ -210,6 +210,78 @@ describe('AdminCredentialController', () => {
     });
   });
 
+  describe('orthogonal create gate (A1)', () => {
+    it('allows a wif credential when only WifCredentialsEnabled is on', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: false } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: 'https://login.microsoftonline.com/tid/v2.0',
+          expectedAudience: 'appid',
+          expectedSubject: 'sub',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          allowedTenantId: 'tid',
+        },
+      } as never);
+
+      expect(result.credentialType).toBe('wif');
+      expect(mockCredentialRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ credentialType: 'wif' }),
+      );
+    });
+
+    it('rejects a wif credential when WifCredentialsEnabled is off', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: false, PerEndpointCredentialsEnabled: true } },
+      });
+
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'wif' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('still requires PerEndpointCredentialsEnabled for a bearer credential', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: false } },
+      });
+
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('the wif response carries NO secret/hash field', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: 'https://idp/v2.0',
+          expectedAudience: 'appid',
+          expectedSubject: 'sub',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          allowedTenantId: 'tid',
+        },
+      } as never);
+
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toMatch(/token|clientSecret|credentialHash|secret/i);
+    });
+  });
+
   describe('listCredentials', () => {
     it('should list credentials without hashes', async () => {
       const result = await controller.listCredentials(mockEndpoint.id);
