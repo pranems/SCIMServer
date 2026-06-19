@@ -24,7 +24,7 @@
 
 ## 1. Summary
 
-E1 ships the per-endpoint **Credentials** tab at `/endpoints/$endpointId/credentials`. It's the first Phase E (Write Operations) sub-phase. Backend is unchanged - the controller already supports CRUD per [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md), and Phase C5 already shipped `useCreateCredential` + `useDeleteCredential` mutation hooks. E1 is purely the page that wires those together.
+E1 ships the per-endpoint **Credentials** tab at `/endpoints/$endpointId/credentials`. It's the first Phase E (Write Operations) sub-phase. Backend is unchanged - the controller already supports CRUD per [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md), and Phase C5 already shipped `useCreateCredential` + `useDeleteCredential` mutation hooks. E1 is purely the page that wires those together.
 
 The tab consumes `useEndpointOverview` (Phase B BFF) so credentials are returned as part of the same round trip the rest of the endpoint UI already needs - zero extra fetch on tab switch.
 
@@ -187,6 +187,6 @@ Backend: zero changes. The credential controller and mutation hooks already ship
 - [PHASE_D5_GLOBAL_LOGS_ENHANCEMENT.md](PHASE_D5_GLOBAL_LOGS_ENHANCEMENT.md) - D5 predecessor
 - [PHASE_C_PRIMITIVES_AND_MUTATIONS.md](PHASE_C_PRIMITIVES_AND_MUTATIONS.md) - FormDialog (C2), EmptyState/LoadingSkeleton (C3), useCreateCredential / useDeleteCredential (C5)
 - [PHASE_B_BFF_OVERVIEW_AND_SSE.md](PHASE_B_BFF_OVERVIEW_AND_SSE.md) - BFF endpoint that returns credentials
-- [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - Backend credential model + 3-tier auth
+- [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) - Backend credential model + 3-tier auth
 - [UI_REDESIGN_REMAINING_GAPS_PLAN.md](UI_REDESIGN_REMAINING_GAPS_PLAN.md) S8.1 - parent spec
 - [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - PerEndpointCredentialsEnabled flag reference

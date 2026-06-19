@@ -13,6 +13,8 @@
 | [rfc7644.txt](rfc7644.txt) | RFC 7644 | SCIM: Protocol | ~100 | 167 KB |
 | [RFC7643_SCHEMA_EXTRACT.md](RFC7643_SCHEMA_EXTRACT.md) | - | Extracted canonical JSON from RFC 7643 §8.7.1 + §3.1 + §2.2–§2.4 | - | 25 KB |
 
+> **OAuth / WIF assertion RFCs** (RFC 7521 / 7523 / 8693) live separately under [../auth/rfcs/](../auth/rfcs/README.md) alongside the Workload Identity Federation design docs they back. This folder holds the SCIM core RFCs only.
+
 ## Key Sections for Schema Audits
 
 ### RFC 7643 (Core Schema)

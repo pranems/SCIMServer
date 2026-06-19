@@ -405,7 +405,7 @@ The largest primitive. See [Section 13](#13-mutation-layer-architecture) for the
 - Lists credentials from `useEndpointOverview(id).credentials`
 - Create button -> `FormDialog` with label + scope inputs -> `useCreateCredential`
 - Delete row -> confirm dialog -> `useDeleteCredential` (optimistic remove)
-- Backend already supports CRUD - see [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md)
+- Backend already supports CRUD - see [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md)
 - Tests: 5 unit + 2 MSW (create flow, delete flow with rollback)
 
 ### 8.2 E2 - Config flag toggles (plan 3.4)

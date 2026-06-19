@@ -218,4 +218,4 @@ to undo a mirror, the safest path is to recreate the dev PG database via
 - [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) - app names, FQDNs, secret names
 - [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) - endpoint isolation model that this script preserves
 - [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - flag catalog used by the shape matrix
-- [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the bearer-credential model that `shape-per-endpoint-creds` exercises
+- [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) - the bearer-credential model that `shape-per-endpoint-creds` exercises

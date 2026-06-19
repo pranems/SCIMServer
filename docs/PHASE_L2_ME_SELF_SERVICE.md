@@ -16,7 +16,7 @@ The gap is sharper than the analysis-doc described because of the auth model:
 - The K3 TokenGate stores a **shared-secret Bearer token** (not OAuth)
 - So the operator's most common token will always return `404 noTarget` from `/Me`
 
-L2 wires the surface AND surfaces the auth-model branch as first-class UX. The page works correctly for OAuth tokens (rare in current dev usage, normal in prod when [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) credentials issue JWTs with `sub`) and degrades gracefully to a "Switch to OAuth" hint for shared-secret tokens.
+L2 wires the surface AND surfaces the auth-model branch as first-class UX. The page works correctly for OAuth tokens (rare in current dev usage, normal in prod when [docs/G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) credentials issue JWTs with `sub`) and degrades gracefully to a "Switch to OAuth" hint for shared-secret tokens.
 
 ---
 
@@ -148,7 +148,7 @@ sequenceDiagram
 
 ## 6. Out of scope
 
-- **OAuth login flow** - L2 assumes the operator already has an OAuth token (issued by [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) flows or external IdP). Wiring an OAuth client-credentials flow into TokenGate is a separate Phase N polish task.
+- **OAuth login flow** - L2 assumes the operator already has an OAuth token (issued by [docs/G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) flows or external IdP). Wiring an OAuth client-credentials flow into TokenGate is a separate Phase N polish task.
 - **Header dropdown widget** - the analysis doc S4.7 mentioned "dropdown beside the bell/theme icons -> My profile". L2 ships the page + sidebar nav; the header widget is deferred to Phase N6 keyboard ergonomics.
 - **Multi-endpoint /Me view** - L2 picks one endpoint at a time. A "show my identity across all endpoints" aggregator is deferred to Phase L6 Operations cross-endpoint view.
 
