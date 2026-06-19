@@ -10987,6 +10987,47 @@ try {
 Write-Host "`n--- 9z-AN: Authentication Method Model Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AO: OAuth Discovery + Bearer Errors (Q0)
+$script:currentSection = "9z-AO: OAuth Discovery (Q0)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AO: OAuth Discovery + Bearer Errors (Q0)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+function ConvertFrom-JwtPayload {
+    param([string]$Jwt)
+    $seg = $Jwt.Split('.')[1].Replace('-', '+').Replace('_', '/')
+    switch ($seg.Length % 4) { 2 { $seg += '==' } 3 { $seg += '=' } }
+    $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($seg))
+    return ($json | ConvertFrom-Json)
+}
+
+try {
+    # RFC 8414 - authorization-server metadata published at the deployment root
+    $meta = Invoke-RestMethod -Uri "$baseUrl/.well-known/oauth-authorization-server" -Method GET
+    Test-Result -Success ($null -ne $meta.issuer -and "$($meta.issuer)".Length -gt 0) -Message "9z-AO.T1: RFC 8414 metadata issuer present (issuer=$($meta.issuer))"
+    Test-Result -Success ("$($meta.token_endpoint)" -like "*/scim/oauth/token") -Message "9z-AO.T2: metadata token_endpoint resolves"
+    Test-Result -Success ("$($meta.jwks_uri)" -like "*/scim/oauth/jwks") -Message "9z-AO.T3: metadata jwks_uri resolves"
+    Test-Result -Success ($meta.grant_types_supported -contains "client_credentials") -Message "9z-AO.T4: metadata advertises client_credentials grant"
+
+    # Token iss matches metadata issuer; token carries an aud claim (Q0)
+    $payload = ConvertFrom-JwtPayload -Jwt $Token
+    Test-Result -Success ($payload.iss -eq $meta.issuer) -Message "9z-AO.T5: token iss matches metadata issuer"
+    Test-Result -Success ($null -ne $payload.aud -and "$($payload.aud)".Length -gt 0) -Message "9z-AO.T6: issued token carries aud claim (aud=$($payload.aud))"
+
+    # RFC 6750 section 3 - invalid bearer -> 401 with enriched WWW-Authenticate
+    $invResp = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Headers @{ Authorization = "Bearer invalid-token-9zAO" } -SkipHttpErrorCheck
+    $wwwAuth = [string]($invResp.Headers['WWW-Authenticate'])
+    Test-Result -Success ($invResp.StatusCode -eq 401) -Message "9z-AO.T7: invalid bearer returns 401 (status=$($invResp.StatusCode))"
+    Test-Result -Success ($wwwAuth -match 'error="invalid_token"') -Message "9z-AO.T8: 401 WWW-Authenticate carries error=invalid_token"
+    Test-Result -Success ($wwwAuth -match 'realm="SCIM"') -Message "9z-AO.T9: 401 WWW-Authenticate carries realm=SCIM"
+} catch {
+    Test-Result -Success $false -Message "9z-AO: OAuth Discovery section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AO: OAuth Discovery Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

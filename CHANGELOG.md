@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.4] - 2026-06-18 - Auth Q0: WWW-Authenticate enrichment + aud claim + RFC 8414 metadata
+
+Fourth step of the reconciled authentication build. Closes three interop gaps and documents the shipped 3-tier resource-plane chain. Feature doc: [docs/auth/OAUTH_DISCOVERY_AND_BEARER_ERRORS.md](docs/auth/OAUTH_DISCOVERY_AND_BEARER_ERRORS.md).
+
+### Added
+
+- **RFC 8414 authorization-server metadata** - new public `GET /.well-known/oauth-authorization-server` ([oauth-metadata.controller.ts](api/src/oauth/oauth-metadata.controller.ts)) served at the deployment root (excluded from the `scim` global prefix in [main.ts](api/src/main.ts)). Advertises `issuer`, `token_endpoint`, `jwks_uri`, `grant_types_supported`, `token_endpoint_auth_methods_supported`, `scopes_supported`. The `issuer` is the shared `OAUTH_ISSUER` constant ([oauth.constants.ts](api/src/oauth/oauth.constants.ts)) the JWT signer also stamps as `iss`, so the metadata is self-consistent with issued tokens.
+- **`aud` claim on issued tokens** ([oauth.service.ts](api/src/oauth/oauth.service.ts)) - default `scimserver-scim-api`, override with `OAUTH_TOKEN_AUDIENCE`. Non-breaking (not yet enforced on verify; per-endpoint audiences arrive in Q1).
+
+### Changed
+
+- **Enriched `WWW-Authenticate` (RFC 6750 section 3)** - the guard's 401 challenge now carries `error="invalid_token"` + `error_description` when a token was presented and rejected, and only `realm="SCIM"` (no error code) when credentials were absent ([shared-secret.guard.ts](api/src/modules/auth/shared-secret.guard.ts)).
+
+### Validation
+
+- TDD: 2 new unit (aud claim, RED -> GREEN) + 5 new E2E ([oauth-discovery.e2e-spec.ts](api/test/e2e/oauth-discovery.e2e-spec.ts)) + 9 new live assertions (`scripts/live-test.ps1` section 9z-AO).
+- API unit: **3,866 -> 3,868** (104 suites). Full E2E (inmemory): **1,233 pass** (67 suites). Local-node live: **1,058 pass / 0 fail** including 9z-AM + 9z-AN + 9z-AO. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic. Docker + dev-Azure live validation: this is the foundational-cluster integration checkpoint (Pre-Q.A -> Q0); run next.
+
 ## [0.54.0-alpha.3] - 2026-06-18 - Auth A0: authentication methods model (inert backbone)
 
 Third step of the reconciled authentication build. Adds the generalized `authenticationMethods[]` data model on the endpoint profile as an INERT backbone - stored + round-tripped but not yet consulted by any resolver - so 1P / roles / scopes / future auth types become config, not rework. Feature doc: [docs/auth/AUTHENTICATION_METHODS_MODEL.md](docs/auth/AUTHENTICATION_METHODS_MODEL.md).

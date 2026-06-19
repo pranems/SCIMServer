@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import { AppModule } from '@app/modules/app/app.module';
 import { applySpaFallback } from '@app/bootstrap/spa-fallback';
 import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from '@app/security/helmet-config';
+import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
 
 /**
  * Bootstraps a full NestJS application for E2E testing.
@@ -87,7 +88,7 @@ export async function createTestApp(): Promise<INestApplication> {
   );
 
   app.setGlobalPrefix('scim', {
-    exclude: ['/'],
+    exclude: ['/', OAUTH_METADATA_PATH],
   });
 
   app.useGlobalPipes(

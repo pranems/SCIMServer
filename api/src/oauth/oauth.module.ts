@@ -4,8 +4,10 @@ import { ConfigModule } from '@nestjs/config';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 import { JwksController } from './jwks.controller';
+import { OAuthMetadataController } from './oauth-metadata.controller';
 import { OAuthSigningKeyService } from './oauth-signing-key.service';
 import { OAuthSigningModule } from './oauth-signing.module';
+import { OAUTH_ISSUER } from './oauth.constants';
 
 /**
  * Build the JwtModule options from the active asymmetric signing key (Pre-Q.B).
@@ -25,11 +27,11 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
     signOptions: {
       algorithm: keys.alg,
       keyid: keys.kid,
-      issuer: 'scimserver-oauth-server',
+      issuer: OAUTH_ISSUER,
     },
     verifyOptions: {
       algorithms: [keys.alg],
-      issuer: 'scimserver-oauth-server',
+      issuer: OAUTH_ISSUER,
     },
   };
 }
@@ -44,7 +46,7 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
       useFactory: (keys: OAuthSigningKeyService) => buildJwtModuleOptions(keys),
     }),
   ],
-  controllers: [OAuthController, JwksController],
+  controllers: [OAuthController, JwksController, OAuthMetadataController],
   providers: [OAuthService],
   exports: [OAuthService], // Export for use in SCIM authentication
 })

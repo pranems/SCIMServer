@@ -6,6 +6,12 @@ import { safeCompare } from '../security/safe-compare';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 
+/**
+ * Default `aud` claim for issued access tokens (Q0). Identifies the SCIM
+ * resource server as the intended audience. Override with OAUTH_TOKEN_AUDIENCE.
+ */
+export const OAUTH_DEFAULT_AUDIENCE = 'scimserver-scim-api';
+
 export interface AccessToken {
   accessToken: string;
   expiresIn: number;
@@ -29,6 +35,7 @@ interface TokenPayload {
 @Injectable()
 export class OAuthService {
   private readonly validClients: Map<string, ClientCredentials>;
+  private readonly audience: string;
 
   constructor(
     private readonly jwtService: JwtService,
@@ -38,6 +45,8 @@ export class OAuthService {
     const defaultClientId = this.config.get<string>('OAUTH_CLIENT_ID') || 'scimserver-client';
     const configuredSecret = this.config.get<string>('OAUTH_CLIENT_SECRET');
     const configuredScopes = this.config.get<string>('OAUTH_CLIENT_SCOPES');
+
+    this.audience = this.config.get<string>('OAUTH_TOKEN_AUDIENCE') || OAUTH_DEFAULT_AUDIENCE;
 
     let clientSecret = configuredSecret;
 
@@ -98,6 +107,7 @@ export class OAuthService {
     const payload = {
       sub: clientId,
       client_id: clientId,
+      aud: this.audience,
       scope: grantedScopes.join(' '),
       token_type: 'access_token'
     };

@@ -36,6 +36,10 @@ function decodeHeader(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf-8'));
 }
 
+function decodePayload(token: string): Record<string, unknown> {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf-8'));
+}
+
 describe('OAuth asymmetric signing (Pre-Q.B)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -104,6 +108,36 @@ describe('OAuth asymmetric signing (Pre-Q.B)', () => {
 
       expect(header.alg).toBe('RS256');
       expect(header.kid).toBe(keys.kid);
+    });
+  });
+
+  describe('issued token claims (Q0)', () => {
+    it('includes an aud claim on the issued token', async () => {
+      const keys = new OAuthSigningKeyService(makeConfig());
+      const jwt = new JwtService(buildJwtModuleOptions(keys));
+      const oauth = new OAuthService(jwt, makeConfig(), logger);
+
+      const { accessToken } = await oauth.generateAccessToken('test-client', 'test-secret');
+      const payload = decodePayload(accessToken);
+
+      expect(payload.aud).toBeDefined();
+      expect(typeof payload.aud).toBe('string');
+      expect((payload.aud as string).length).toBeGreaterThan(0);
+    });
+
+    it('uses a configured OAUTH_TOKEN_AUDIENCE when provided', async () => {
+      const keys = new OAuthSigningKeyService(makeConfig());
+      const jwt = new JwtService(buildJwtModuleOptions(keys));
+      const oauth = new OAuthService(
+        jwt,
+        makeConfig({ OAUTH_TOKEN_AUDIENCE: 'https://scim.example.com' }),
+        logger,
+      );
+
+      const { accessToken } = await oauth.generateAccessToken('test-client', 'test-secret');
+      const payload = decodePayload(accessToken);
+
+      expect(payload.aud).toBe('https://scim.example.com');
     });
   });
 

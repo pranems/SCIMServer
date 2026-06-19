@@ -143,7 +143,7 @@ export class SharedSecretGuard implements CanActivate {
 
     // Both per-endpoint, OAuth, and legacy validation failed
     this.logger.warn(LogCategory.AUTH, 'Authentication failed – per-endpoint, OAuth, and legacy token all invalid');
-    this.reject(response, 'Invalid bearer token.');
+    this.reject(response, 'Invalid bearer token.', 'invalid_token');
   }
 
   // ── Per-endpoint credential helpers ────────────────────────────────
@@ -216,8 +216,21 @@ export class SharedSecretGuard implements CanActivate {
     }
   }
 
-  private reject(response: Response, detail: string): never {
-    response.setHeader('WWW-Authenticate', 'Bearer realm="SCIM"');
+  private reject(
+    response: Response,
+    detail: string,
+    errorCode?: 'invalid_token' | 'invalid_request' | 'insufficient_scope',
+  ): never {
+    // RFC 6750 section 3: a 401 carries a WWW-Authenticate challenge. When a
+    // token was presented but rejected, include error + error_description so
+    // the client learns why. When the request lacked credentials entirely,
+    // advertise only the realm and omit the error code (RFC 6750 section 3).
+    let header = 'Bearer realm="SCIM"';
+    if (errorCode) {
+      const safeDescription = detail.replace(/[\\"]/g, ' ').trim();
+      header += `, error="${errorCode}", error_description="${safeDescription}"`;
+    }
+    response.setHeader('WWW-Authenticate', header);
     throw new UnauthorizedException({
       schemas: [SCIM_ERROR_SCHEMA],
       detail,
