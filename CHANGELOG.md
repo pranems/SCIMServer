@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.8] - 2026-06-18 - Auth A2: computed authenticationSchemes discovery
+
+Eighth step of the reconciled authentication build. Makes the per-endpoint /ServiceProviderConfig advertise authenticationSchemes computed from the enabled methods. (The JWKS publication + RFC 8414 metadata that A2 also names shipped in Pre-Q.B + Q0.) Feature doc: [docs/auth/COMPUTED_AUTHENTICATION_SCHEMES.md](docs/auth/COMPUTED_AUTHENTICATION_SCHEMES.md).
+
+### Added
+
+- **`computeAuthenticationSchemes(baseline, authentication)`** ([authentication-schemes.ts](api/src/modules/scim/discovery/authentication-schemes.ts)): the baseline `oauthbearertoken` scheme is always present; each ENABLED method in `profile.authentication.methods[]` adds a scheme (method `type` mapped to the RFC 7643 section 5 scheme vocabulary - `bearer`/`shared-secret`->`oauthbearertoken`, `httpbasic`->`httpbasic`, everything else->`oauth2`); `primary:true` lands on the `defaultMethodId` scheme (else baseline stays primary; exactly one primary). The baseline is cloned, never mutated.
+- **Wired into discovery** ([scim-discovery.service.ts](api/src/modules/scim/discovery/scim-discovery.service.ts)): `getSpcFromProfile` now computes the schemes from `profile.authentication`. A method-less endpoint is unchanged (baseline only), so existing discovery contracts hold.
+
+### Validation
+
+- TDD: 8 unit ([authentication-schemes.spec.ts](api/src/modules/scim/discovery/authentication-schemes.spec.ts), RED confirmed by a baseline-only stub -> GREEN) + 4 E2E ([computed-authentication-schemes.e2e-spec.ts](api/test/e2e/computed-authentication-schemes.e2e-spec.ts)) + 5 live (`scripts/live-test.ps1` section 9z-AR).
+- API unit: **3,907 -> 3,915** (106 suites). Existing discovery/SPC specs (98) still green. Local-node live: **1,081 pass / 0 fail** including 9z-AR. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic (pure computation over profile data). Docker + dev-Azure batched to the next critical-path checkpoint.
+
 ## [0.54.0-alpha.7] - 2026-06-18 - Auth A1: admin authentication-methods API + WifCredentialsEnabled flag + orthogonal gate
 
 Seventh step of the reconciled authentication build. Adds the management surface for the A0 inert authentication model, the `WifCredentialsEnabled` flag (17th endpoint config flag), and the orthogonal credential-create gate. Feature doc: [docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md).

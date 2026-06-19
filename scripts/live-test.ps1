@@ -11175,6 +11175,56 @@ try {
 Write-Host "`n--- 9z-AQ: Auth-Methods CRUD Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AR: Computed authenticationSchemes (A2)
+$script:currentSection = "9z-AR: Computed authnSchemes (A2)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AR: Computed authenticationSchemes (A2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $arEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-a2-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $arId = $arEp.id
+    $arSpcUrl = "$baseUrl/scim/endpoints/$arId/ServiceProviderConfig"
+    $arMethodsUrl = "$baseUrl/scim/admin/endpoints/$arId/authentication/methods"
+
+    # Method-less endpoint advertises baseline only
+    $arSpc0 = Invoke-RestMethod -Uri $arSpcUrl -Method GET -Headers $headers
+    Test-Result -Success (@($arSpc0.authenticationSchemes).Count -eq 1 -and $arSpc0.authenticationSchemes[0].type -eq "oauthbearertoken") -Message "9z-AR.T1: method-less endpoint advertises only baseline oauthbearertoken"
+
+    # Add an enabled method -> its scheme appears
+    $arMethod = Invoke-RestMethod -Uri $arMethodsUrl -Method POST -Headers $headers -Body (@{
+        type = "wif-7523"; displayName = "WIF"; specUri = "https://www.rfc-editor.org/rfc/rfc7523"
+    } | ConvertTo-Json)
+    $arSpc1 = Invoke-RestMethod -Uri $arSpcUrl -Method GET -Headers $headers
+    $arNames = @($arSpc1.authenticationSchemes | ForEach-Object { $_.name })
+    Test-Result -Success (@($arSpc1.authenticationSchemes).Count -ge 2 -and ($arNames -contains "WIF")) -Message "9z-AR.T2: enabled method adds its scheme alongside baseline"
+    $arWif = @($arSpc1.authenticationSchemes | Where-Object { $_.name -eq "WIF" })[0]
+    Test-Result -Success ($arWif.type -eq "oauth2") -Message "9z-AR.T3: wif-7523 maps to the oauth2 scheme type"
+
+    # Exactly one primary
+    $arPrimaries = @($arSpc1.authenticationSchemes | Where-Object { $_.primary -eq $true })
+    Test-Result -Success (@($arPrimaries).Count -eq 1) -Message "9z-AR.T4: exactly one scheme is primary"
+
+    # defaultMethodId moves primary onto the method scheme
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$arId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ authentication = @{ schemaVersion = 1; methods = @($arMethod); defaultMethodId = $arMethod.id } }
+    } | ConvertTo-Json -Depth 8) | Out-Null
+    $arSpc2 = Invoke-RestMethod -Uri $arSpcUrl -Method GET -Headers $headers
+    $arPrimary2 = @($arSpc2.authenticationSchemes | Where-Object { $_.primary -eq $true })[0]
+    Test-Result -Success ($arPrimary2.name -eq "WIF") -Message "9z-AR.T5: defaultMethodId moves primary onto that method scheme"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$arId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AR: Computed authnSchemes section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AR: Computed authnSchemes Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
