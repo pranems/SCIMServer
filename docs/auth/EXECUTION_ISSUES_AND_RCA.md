@@ -3,6 +3,8 @@
 > **What this is.** A complete, introspective ledger of EVERY issue of EVERY type encountered while executing the reconciled 11-step authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies)), from Pre-Q.A through A4 plus the interstitial security pass and the final 3-form-factor checkpoint. For each issue it records the **symptom**, the **root-cause analysis (RCA)**, the **fix**, **why that fix works**, and the **prevention** (the gate or convention that stops the next one).
 >
 > **Why it exists.** None of these issues appear in the planning / design / architecture docs, because they arise from unforeseen combinations of circumstances (framework defaults, environment drift, tooling quirks, test-harness gaps) that the design stage cannot anticipate. Capturing them is how the gate set self-densifies over time - it is the concrete artifact behind the [self-improvement discipline (R7)](../../.github/copilot-instructions.md). This doc is the companion to the [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md) (which tracks *what shipped*); this one tracks *what went wrong on the way and what we learned*.
+>
+> **Provenance / completeness.** This ledger was reconciled against the **full 4,666-line session transcript** of the build (not just in-context recollection): a systematic scan for error/RED/fix/rejection signals across every step, plus a narration-phrase pass (`false positive`, `root cause`, `no-op`, `silently`, etc.). That scan surfaced **no substantive issue not already listed below** - every diagnosed problem in the transcript maps to one of the 17 entries. The early backbone/enabling steps (Pre-Q.A -> A2) genuinely had low issue density because they reused established patterns; the clusters are at Q6 (new external-dependency + test-harness surface) and the final checkpoint (environment drift + the live-only test bug). One verified-and-dismissed non-issue: the `jose` ESM-only constraint (Q2) was an *anticipated design choice* (dynamic `import('jose')`), not a failure - it loaded cleanly in jest on the first RED run.
 
 ---
 
@@ -150,11 +152,11 @@ The single most useful introspection: did the gate that caught each issue catch 
 
 #### I-06 (Low, recurring) - Unnecessary-type-assertion lint warnings in specs
 
-- **Symptom.** The ESLint warning count crept above the frozen baseline of **464** (to 465/466) on multiple steps, always from `@typescript-eslint/no-unnecessary-type-assertion` (a `as X` cast that TypeScript already infers) or `no-explicit-any` in new spec code.
+- **Symptom.** The ESLint warning count crept above the frozen baseline of **464** (to 465/466) on essentially **every step that added spec code** - a full-transcript scan found the 464-ceiling-bump-and-restore cycle diagnosed ~50 times across the build. The offenders were always `@typescript-eslint/no-unnecessary-type-assertion` (a `as X` cast that TypeScript already infers) or `no-explicit-any` in new spec code.
 - **Root cause.** When writing fast spec scaffolding, casts like `(cfg as Record<string, unknown>).polluted` or `logger.info as jest.Mock` were added defensively but were redundant once the surrounding types were correct.
 - **Fix.** Removed the redundant cast each time; re-ran lint to confirm return to 464.
 - **Why the fix works.** The receiver already accepts the original type, so the assertion changes nothing and the linter is correct to flag it. Removing it is behavior-neutral.
-- **Prevention.** The pre-push hook runs ESLint as a hard gate, so this never reached `main`. The recurrence (3+ times) is the signal: treat the **464 warning ceiling as a ratchet** and lint the *touched files only* before committing, not just at push time.
+- **Prevention.** The pre-push hook runs ESLint as a hard gate, so this never reached `main`. The high recurrence (~50 bump-and-restore cycles) is the signal: treat the **464 warning ceiling as a ratchet** and lint the *touched files only* before committing, not just at push time - the cost of catching it at push is a full re-lint per step.
 
 #### I-07 (Low) - TS cast errors needing `as unknown as`
 
