@@ -1,8 +1,8 @@
 # RFC 7523 Explained - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants
 
-> **What this is.** A plain-language, implementation-focused walkthrough of [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) (Proposed Standard, May 2015; Jones, Campbell, Mortimore). The authoritative text is mirrored in-repo at [rfcs/rfc7523.txt](rfcs/rfc7523.txt). This explainer exists so the SCIMServer team can reason about the **WIF `jwt-bearer` profile** ([WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md)) without re-reading 26 KB of RFC prose each time.
+> **What this is.** A plain-language, implementation-focused walkthrough of [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) (Proposed Standard, May 2015; Jones, Campbell, Mortimore). The authoritative text is mirrored in-repo at [rfc7523.txt](rfc7523.txt). This explainer exists so the SCIMServer team can reason about the **WIF `jwt-bearer` profile** ([WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md)) without re-reading 26 KB of RFC prose each time.
 
-> **Status:** Reference / explainer. Dated 2026-06-15. Grounds [section 4.2](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#42-rfc-7523-in-depth-the-jwt-bearer-profile) of the WIF design doc. No code; analysis only.
+> **Status:** Reference / explainer. Dated 2026-06-15. Grounds [section 4.2](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#42-rfc-7523-in-depth-the-jwt-bearer-profile) of the WIF design doc. No code; analysis only.
 
 > **One-line takeaway.** RFC 7523 defines **two orthogonal, separable** uses of a JWT at the OAuth token endpoint - as an **authorization grant** (section 2.1) and as a **client-authentication credential** (section 2.2). **WIF uses only section 2.2.** The Microsoft-signed JWT proves *who the caller is*; a separate `grant_type` (for WIF, `client_credentials`) asks for the token.
 
@@ -25,7 +25,7 @@
 
 ## 1. Why RFC 7523 exists
 
-OAuth 2.0 ([RFC 6749](https://www.rfc-editor.org/rfc/rfc6749)) lets a client obtain an access token from an authorization server (AS) by presenting an **authorization grant**, and lets a client **authenticate** to the token endpoint. Both points are extensible. The **OAuth Assertion Framework** ([RFC 7521](https://www.rfc-editor.org/rfc/rfc7521), mirrored at [rfcs/rfc7521.txt](rfcs/rfc7521.txt)) is the abstract umbrella for using a *security token* (an "assertion") in those two slots. RFC 7523 is the **concrete JWT profile** of that umbrella - it says exactly how a JWT fills each slot. (Its sibling [RFC 7522](https://www.rfc-editor.org/rfc/rfc7522) does the same for SAML 2.0 assertions.)
+OAuth 2.0 ([RFC 6749](https://www.rfc-editor.org/rfc/rfc6749)) lets a client obtain an access token from an authorization server (AS) by presenting an **authorization grant**, and lets a client **authenticate** to the token endpoint. Both points are extensible. The **OAuth Assertion Framework** ([RFC 7521](https://www.rfc-editor.org/rfc/rfc7521), mirrored at [rfc7521.txt](rfc7521.txt)) is the abstract umbrella for using a *security token* (an "assertion") in those two slots. RFC 7523 is the **concrete JWT profile** of that umbrella - it says exactly how a JWT fills each slot. (Its sibling [RFC 7522](https://www.rfc-editor.org/rfc/rfc7522) does the same for SAML 2.0 assertions.)
 
 The key sentence from the RFC's introduction:
 
@@ -41,9 +41,9 @@ That single sentence is the entire reason WIF is *not* "RFC 7523 grant-type usag
 flowchart TD
     JWT[A signed JWT arrives at the token endpoint]
     JWT --> Q{Which slot?}
-    Q -->|"assertion field<br/>grant_type = ...:jwt-bearer"| G["USE 1: Authorization GRANT<br/>(section 2.1)<br/>the JWT IS the grant"]
-    Q -->|"client_assertion field<br/>+ some other grant_type"| C["USE 2: Client AUTHENTICATION<br/>(section 2.2)<br/>the JWT proves who the client is"]
-    C -->|WIF picks this| W["WIF: grant_type = client_credentials<br/>client_assertion = Entra JWT"]
+    Q -->|assertion field - grant type is jwt-bearer| G[USE 1 - Authorization GRANT<br/>section 2.1<br/>the JWT IS the grant]
+    Q -->|client_assertion field plus another grant type| C[USE 2 - Client AUTHENTICATION<br/>section 2.2<br/>the JWT proves who the client is]
+    C -->|WIF picks this| W[WIF - grant type client_credentials<br/>client_assertion is the Entra JWT]
 ```
 
 | | **Use 1 - Authorization grant** (section 2.1) | **Use 2 - Client authentication** (section 2.2) - **WIF** |
@@ -108,20 +108,18 @@ Section 3 lists the criteria the AS **MUST** validate. This is the heart of the 
 | 10 | Reject a JWT invalid in any other respect per RFC 7519. | MUST | standard JWT structural validity |
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Sig: assertion received
-    Sig --> Reject: bad signature / disallowed alg (rule 9)
-    Sig --> Iss: signature valid
-    Iss --> Reject: iss mismatch (rule 1)
-    Iss --> Sub: iss ok
-    Sub --> Reject: sub != expected client_id (rule 2)
-    Sub --> Aud: sub ok
-    Aud --> Reject: aud is not us (rule 3)
-    Aud --> Time: aud ok
-    Time --> Reject: exp passed / nbf in future (rules 4,5)
-    Time --> Accept: all pass
-    Reject --> [*]: 401 invalid_client
-    Accept --> [*]: mint ISV token
+flowchart TD
+    START[assertion received] --> SIG{signature valid<br/>and alg allowed? rule 9}
+    SIG -->|no| REJ[401 invalid_client]
+    SIG -->|yes| ISS{iss matches configured issuer? rule 1}
+    ISS -->|no| REJ
+    ISS -->|yes| SUB{sub equals expected client_id? rule 2}
+    SUB -->|no| REJ
+    SUB -->|yes| AUD{aud is us? rule 3}
+    AUD -->|no| REJ
+    AUD -->|yes| TIME{within exp and nbf window? rules 4 and 5}
+    TIME -->|no| REJ
+    TIME -->|yes| OK[mint ISV token]
 ```
 
 ---
@@ -167,7 +165,7 @@ Because WIF is the client-authentication form, every WIF assertion-validation fa
 | Section 5 out-of-band values | the stored trust record fields |
 | `invalid_client` failure | the token endpoint's WIF-path error response |
 
-See [WIF section 4.2](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#42-rfc-7523-in-depth-the-jwt-bearer-profile) for the design-level treatment and [WIF section 8](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#8-backend-design) for the backend shape.
+See [WIF section 4.2](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#42-rfc-7523-in-depth-the-jwt-bearer-profile) for the design-level treatment and [WIF section 8](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#8-backend-design) for the backend shape.
 
 ---
 
@@ -186,9 +184,9 @@ See [WIF section 4.2](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#42-rfc-7523-in-depth-
 
 | Spec | Role | Local copy |
 |---|---|---|
-| [RFC 7521](https://www.rfc-editor.org/rfc/rfc7521) | Assertion Framework - the umbrella RFC 7523 profiles | [rfcs/rfc7521.txt](rfcs/rfc7521.txt) |
-| [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) | **this doc** - JWT profile | [rfcs/rfc7523.txt](rfcs/rfc7523.txt) |
-| [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693) | Token Exchange - WIF's *other* profile; composes with RFC 7523 | [rfcs/rfc8693.txt](rfcs/rfc8693.txt), [RFC_8693_EXPLAINED.md](RFC_8693_EXPLAINED.md) |
+| [RFC 7521](https://www.rfc-editor.org/rfc/rfc7521) | Assertion Framework - the umbrella RFC 7523 profiles | [rfc7521.txt](rfc7521.txt) |
+| [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) | **this doc** - JWT profile | [rfc7523.txt](rfc7523.txt) |
+| [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693) | Token Exchange - WIF's *other* profile; composes with RFC 7523 | [rfc8693.txt](rfc8693.txt), [RFC_8693_EXPLAINED.md](RFC_8693_EXPLAINED.md) |
 | [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) | JSON Web Token - the token format | (online) |
 | [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749) | OAuth 2.0 - the framework (section 5.2 errors) | (online) |
-| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | the SCIMServer design that consumes this RFC | in-repo |
+| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | the SCIMServer design that consumes this RFC | in-repo |

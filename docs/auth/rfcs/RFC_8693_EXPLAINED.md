@@ -1,8 +1,8 @@
 # RFC 8693 Explained - OAuth 2.0 Token Exchange
 
-> **What this is.** A plain-language, implementation-focused walkthrough of [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693) (Proposed Standard, January 2020; Jones & Nadalin of **Microsoft**, Campbell ed. of Ping, Bradley of Yubico, Mortimore of Visa). The authoritative text is mirrored in-repo at [rfcs/rfc8693.txt](rfcs/rfc8693.txt). This explainer grounds the **WIF `token-exchange` profile** ([WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md)) - the upcoming profile whose example ISV is Google.
+> **What this is.** A plain-language, implementation-focused walkthrough of [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693) (Proposed Standard, January 2020; Jones & Nadalin of **Microsoft**, Campbell ed. of Ping, Bradley of Yubico, Mortimore of Visa). The authoritative text is mirrored in-repo at [rfc8693.txt](rfc8693.txt). This explainer grounds the **WIF `token-exchange` profile** ([WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md)) - the upcoming profile whose example ISV is Google.
 
-> **Status:** Reference / explainer. Dated 2026-06-15. Grounds [section 4.3](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#43-rfc-8693-in-depth-the-token-exchange-profile) of the WIF design doc. No code; analysis only.
+> **Status:** Reference / explainer. Dated 2026-06-15. Grounds [section 4.3](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#43-rfc-8693-in-depth-the-token-exchange-profile) of the WIF design doc. No code; analysis only.
 
 > **One-line takeaway.** RFC 8693 defines a lightweight **Security Token Service (STS)** over OAuth: a client **trades one token for another** via the extension grant `urn:ietf:params:oauth:grant-type:token-exchange`. In WIF, Entra presents its signed JWT as the **`subject_token`** and the ISV returns its own access token. It **composes with** RFC 7523 (which can be the client-authentication method *during* the exchange), it does not replace it.
 
@@ -31,8 +31,8 @@ OAuth 2.0 issues access tokens to clients, but real deployments often need to **
 
 ```mermaid
 flowchart LR
-    A[Client holds token X] -->|"POST /token grant_type=token-exchange<br/>subject_token = X"| AS[Authorization Server acting as STS]
-    AS -->|"access_token = Y<br/>+ issued_token_type"| A2[Client now holds token Y]
+    A[Client holds token X] -->|POST to token endpoint - subject_token is X| AS[Authorization Server acting as STS]
+    AS -->|returns access_token Y plus issued_token_type| A2[Client now holds token Y]
 ```
 
 For WIF: token X is the Entra-signed JWT (an "impersonated application token"); token Y is the ISV's own short-lived bearer token used on the SCIM calls.
@@ -109,8 +109,8 @@ RFC 8693 distinguishes two relationships, decided by whether an `actor_token` is
 ```mermaid
 flowchart TD
     R{actor_token present?}
-    R -->|No| I["IMPERSONATION<br/>issued token's sub = subject only<br/>the AS cannot tell, downstream, that B is acting as A"]
-    R -->|Yes| D["DELEGATION<br/>composite token carries an 'act' claim<br/>'A, as acted upon by B' is explicit"]
+    R -->|No| I[IMPERSONATION<br/>issued token sub is the subject only<br/>downstream cannot tell B is acting as A]
+    R -->|Yes| D[DELEGATION<br/>composite token carries an act claim<br/>A as acted upon by B is explicit]
 ```
 
 - **`act` (actor) claim** - a JSON object in the issued JWT expressing that **delegation occurred** and naming the acting party. It can nest (`act` inside `act`) to express a chain. The **current** actor is always the top-level `act`.
@@ -151,13 +151,13 @@ The two RFCs are **not** competitors:
 ```mermaid
 flowchart LR
     subgraph Exchange["RFC 8693 - the GRANT"]
-        S[subject_token = Entra JWT] --> EX[grant_type token-exchange]
+        S[subject_token is the Entra JWT] --> EX[grant_type token-exchange]
     end
-    subgraph Auth["RFC 7523 - the CLIENT AUTH (optional, during the exchange)"]
-        CA[client_assertion = a JWT] --> M[authenticates the caller]
+    subgraph Auth["RFC 7523 - the CLIENT AUTH, optional during the exchange"]
+        CA[client_assertion is a JWT] --> M[authenticates the caller]
     end
-    Auth -. "RFC 8693 names RFC 7523<br/>as an allowed client-auth method" .-> Exchange
-    EX --> OUT[ISV issues access_token + issued_token_type]
+    Auth -. RFC 8693 names RFC 7523 as an allowed client-auth method .-> Exchange
+    EX --> OUT[ISV issues access_token plus issued_token_type]
 ```
 
 - **RFC 7523** = a *client-authentication method* (who is calling).
@@ -178,7 +178,7 @@ Both WIF profiles end identically for the SCIM endpoint: a short-lived ISV-issue
 | Response adds | nothing beyond standard token response | **`issued_token_type`** (REQUIRED) |
 | Failure of the JWT | `invalid_client` | `invalid_request` |
 
-> **SuccessFactors is the interesting edge case:** a `jwt-bearer` (RFC 7523) request that **carries an RFC 8693 `resource` parameter**. A robust validator tolerates `resource` on the `jwt-bearer` path and treats it as a routing hint, not part of the signature-plus-claims check. See [WIF section 2.2](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#22-the-two-shipping-implementations-concrete-request-bodies).
+> **SuccessFactors is the interesting edge case:** a `jwt-bearer` (RFC 7523) request that **carries an RFC 8693 `resource` parameter**. A robust validator tolerates `resource` on the `jwt-bearer` path and treats it as a routing hint, not part of the signature-plus-claims check. See [WIF section 2.2](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#22-the-two-shipping-implementations-concrete-request-bodies).
 
 ---
 
@@ -194,7 +194,7 @@ Both WIF profiles end identically for the SCIM endpoint: a short-lived ISV-issue
 | `resource` / `audience` / `requested_token_type` / `scope` | profile-specific routing + issuance hints stored per endpoint, not part of the core check |
 | `invalid_request` / `invalid_target` | the token-exchange-path error responses |
 
-See [WIF section 4.3](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#43-rfc-8693-in-depth-the-token-exchange-profile) and [WIF section 2.1](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#21-the-token-exchange-variant-rfc-8693-upcoming).
+See [WIF section 4.3](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#43-rfc-8693-in-depth-the-token-exchange-profile) and [WIF section 2.1](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#21-the-token-exchange-variant-rfc-8693-upcoming).
 
 ---
 
@@ -214,10 +214,10 @@ See [WIF section 4.3](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#43-rfc-8693-in-depth-
 
 | Spec | Role | Local copy |
 |---|---|---|
-| [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693) | **this doc** - Token Exchange | [rfcs/rfc8693.txt](rfcs/rfc8693.txt) |
-| [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) | JWT client-auth profile; composes with token exchange | [rfcs/rfc7523.txt](rfcs/rfc7523.txt), [RFC_7523_EXPLAINED.md](RFC_7523_EXPLAINED.md) |
-| [RFC 7521](https://www.rfc-editor.org/rfc/rfc7521) | Assertion Framework | [rfcs/rfc7521.txt](rfcs/rfc7521.txt) |
+| [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693) | **this doc** - Token Exchange | [rfc8693.txt](rfc8693.txt) |
+| [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) | JWT client-auth profile; composes with token exchange | [rfc7523.txt](rfc7523.txt), [RFC_7523_EXPLAINED.md](RFC_7523_EXPLAINED.md) |
+| [RFC 7521](https://www.rfc-editor.org/rfc/rfc7521) | Assertion Framework | [rfc7521.txt](rfc7521.txt) |
 | [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) | JSON Web Token - the `...:jwt` type and JWT format | (online) |
 | [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749) | OAuth 2.0 - extension grants (section 4.5), errors (section 5.2) | (online) |
 | [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) | Token Introspection - where `act`/`may_act` also appear | (online) |
-| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | the SCIMServer design that consumes this RFC | in-repo |
+| [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) | the SCIMServer design that consumes this RFC | in-repo |

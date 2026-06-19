@@ -5,6 +5,7 @@
 > **Premise:** SCIMServer's job is to **mock any ISV SCIM endpoint**, **probe any ISV SCIM endpoint**, and (later) act as an **OAuth resource server** that real customers integrate against. The single biggest hidden cost in shipping that to a new ISV is not the SCIM schema work - it's the **auth handshake the ISV expects**, which varies wildly across the industry. This doc inventories the 8 industry-standard patterns (the 7 classic patterns plus Workload Identity Federation), maps them against the in-repo current state, and lays out a phased plan to close the gap.
 > **Source-of-truth rule (operator constraint):** every claim about SCIMServer behavior is grounded in the in-repo source (cited paths + line refs). Every claim about an ISV is grounded in that ISV's official docs (cited URLs). No invented behavior; gaps are flagged with confidence levels.
 > **Companion docs:**
+> - [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) - the **overall authentication architecture** that ties these 8 patterns into one model: the `provider` / `AuthenticationMethod` / `credential` / `authenticationScheme` vocabulary, the two-plane resolver, the four API surfaces, the shared token-mint URL + self-describing runtime routing, persistence placement (`endpoint.profile.authentication.methods[]`), and the lifecycle for adding/retiring auth types. This gap plan schedules the patterns; the architecture doc says how they coexist.
 > - [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the per-endpoint-bearer architecture already shipped
 > - [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) - 6-layer ISV probing methodology
 > - [OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md](../OPENTEXT_ISV_1_VALIDATION_GAP_ANALYSIS.md) - real ISV walk-through that motivated this audit
@@ -61,6 +62,8 @@ The single highest-leverage gap to close first is **Q1 (per-endpoint OAuth clien
 
 ## 1. Current SCIMServer Auth State (in-repo)
 
+> **Canonical current-state: [AUTHENTICATION_ARCHITECTURE.md section 4](AUTHENTICATION_ARCHITECTURE.md#4-current-scimserver-state-source-grounded).** The summary below is retained for this doc's standalone readability; where the two differ, the hub is authoritative (it carries the precise `WWW-Authenticate`-header correction and the verified greenfield-gap grep).
+
 ### 1.1 The auth fallback chain (already shipped)
 
 Source: [api/src/modules/auth/shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts)
@@ -115,6 +118,7 @@ Requires `PerEndpointCredentialsEnabled=True` on the endpoint config. Token is b
 - **`grant_type` other than `client_credentials`** -> 400 `unsupported_grant_type` ([oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) lines 47-55). So `authorization_code`, `refresh_token`, `password`, `urn:ietf:params:oauth:grant-type:jwt-bearer` are all rejected.
 - **`credentialType` other than `bearer`** in admin-create per-endpoint credential -> 400 ([per-endpoint-credentials.e2e-spec.ts](../../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) lines 119-129). The schema reserves `oauth_client` as a sibling value but no code path handles it.
 - **Authentication on `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`** is correctly skipped (RFC 7644 §4 mandate; [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../DISCOVERY_ENDPOINTS_RFC_AUDIT.md) line 49).
+- **HTTP Basic (`httpbasic`) is provably absent.** A grep across `api/src` (verified 2026-06-18) finds zero `Basic ` header parsing and zero `httpbasic` handling - the only "Basic" match is a test-section comment. So HTTP Basic is neither implemented nor advertised today. It is a real RFC 7643 §5 scheme and Entra once offered it (username+password, now deprecated), so it is **addable as one provider** if a non-Entra IdP ever needs it, but it is deliberately not designed - see [AUTHENTICATION_ARCHITECTURE.md section 9.3](AUTHENTICATION_ARCHITECTURE.md#93-deliberately-not-designed).
 
 ---
 
@@ -266,6 +270,8 @@ Distilled from §2 + RFC 7644 §2 (already cited in [G11_PER_ENDPOINT_CREDENTIAL
 
 None of the 8 patterns above is mutually exclusive. "Mixed auth" in a real ISV-plus-IdP integration is not one feature - it is **two independent axes** that meet at SCIM discovery. WIF (Pattern 8) is simply **one more method that an endpoint can enable** alongside the others, not a replacement for them.
 
+> **The full model.** This two-axis observation is the seed of the complete authentication architecture - a **provider registry over a per-endpoint ordered `authenticationMethods[]` set**, resolved on two planes (token-mint dispatch + resource-accept chain), with a lifecycle for adding/retiring types and a self-describing runtime router that needs no prior `client_id`-to-provider binding. The full treatment (vocabulary, naming, persistence placement, the four API surfaces, the routing cascade, coverage, security, observability, and a step-by-step plan with estimates) is in [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md).
+
 - **ISV axis (the SCIM server / SCIMServer):** a single endpoint MAY enable and **accept several auth methods at once**. The shipped fallback chain in [section 1.1](#11-the-auth-fallback-chain-already-shipped) is **additive** - per-endpoint bcrypt bearer, then self-issued OAuth JWT, then legacy `SCIM_SHARED_SECRET` already coexist on the same endpoint, and a request that satisfies any branch is authorized. Each new pattern (Q1 per-endpoint OAuth, Q2 external JWKS, Q6 WIF) adds one more accepted branch; it does not remove the others.
 - **IdP axis (Microsoft Entra and peers):** the IdP selects **exactly one** method per provisioning job. Entra's Provisioning "Admin Credentials" page is single-select - Basic, long-lived bearer token, OAuth client credentials, or WIF - and never sends two auth methods on one job. So "mixed" on the IdP side means different jobs/customers pick different methods, not one job using two.
 - **The bridge is discovery.** RFC 7643 section 5 defines `authenticationSchemes` (on `/ServiceProviderConfig`) as a **multi-valued complex attribute**; the RFC's own example advertises `oauthbearertoken` **and** `httpbasic` together, with `primary:true` on exactly one. So the ISV can **advertise the full set it accepts** while each IdP **picks one** from that set.
@@ -343,7 +349,7 @@ These gaps come up in the **same** integration conversation as auth, so it's wor
 | 429 / Retry-After emission | Server returns `429 Too Many Requests` with a `Retry-After` header when overloaded; Okta + GitHub + Atlassian + Slack consumers all rely on this | Anyone driving SCIMServer at >25 req/sec | Medium (Phase R - rate limiting) |
 | Per-token IP allowlist | Token-creation API accepts `allowedIpRanges: ["1.2.3.0/24", ...]`; guard rejects if `req.ip` not in range | Customers wanting Slack-style hardening | Low (Phase R - rate limiting) |
 | Token-expiry telemetry | Cron emits "credential expiring in 90/60/30/15 days" events; UI surfaces them on the CredentialsTab | Production deployments using per-endpoint credentials | Low (Phase N3 - telemetry) |
-| `WWW-Authenticate` header on 401 | RFC 6750 §3 mandates `WWW-Authenticate: Bearer realm="...", error="invalid_token", error_description="..."` on 401; SCIMServer today returns SCIM error envelope but not the header | RFC compliance + auth-debugging tools | Medium (Q-cleanup) |
+| `WWW-Authenticate` header on 401 | RFC 6750 §3 specifies `WWW-Authenticate: Bearer realm="...", error="invalid_token", error_description="..."` on 401. SCIMServer today **does** emit `WWW-Authenticate: Bearer realm="SCIM"` ([shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) `reject()`) but **without** the `error`/`error_description` params - so the Q0 task is to *enrich* the existing header, not add a missing one | RFC compliance + auth-debugging tools | Medium (Q-cleanup) |
 | OAuth metadata discovery | `.well-known/oauth-authorization-server` (RFC 8414) lets clients auto-discover `token_endpoint`, `jwks_uri`, etc. | OAuth 2.1 / OIDC interop | Low (Q-cleanup) |
 | Multi-scheme `authenticationSchemes` advertisement | `/ServiceProviderConfig` advertises **one entry per auth method actually enabled on the endpoint** (RFC 7643 section 5 multi-valued attribute) instead of a single hard-coded `oauthbearertoken`; this is the discovery "bridge" for the two-axis model in [section 3.9](#39-mixed-and-coexisting-auth-methods-the-two-axis-model) | Any client/operator discovering what an endpoint accepts; required for honest WIF advertisement | Medium (ships incrementally with Q1/Q2/Q6) |
 
@@ -351,11 +357,13 @@ These gaps come up in the **same** integration conversation as auth, so it's wor
 
 ## 5. Phased Implementation Plan (Phase Q)
 
+> **Canonical plan: [AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies).** This section is the original Phase Q *schedule* and remains the authoritative home for the **separable Q3 (probe direction), Q4 (auth-code), and Q5 (mTLS/DPoP) tracks** that the hub plan does not place on the WIF critical path. For the single reconciled cross-doc step order (Pre-Q + the A0-A4 backbone + Q), the numbering map, and the scope-labelled effort totals, see the hub plan and the [auth/README.md numbering-reconciliation table](README.md#numbering-reconciliation). The Q0-Q6 ids here map 1:1 onto the unified step ids there.
+
 ### 5.1 Phase Q sub-phases
 
 | Sub-phase | Pattern | Deliverables | Effort | Sequencing |
 |---|---|---|---|---|
-| **Q0** | Standards cleanup (foundation) | (a) Emit `WWW-Authenticate: Bearer realm="scim", error="invalid_token"` on 401; (b) Add `.well-known/oauth-authorization-server` endpoint (RFC 8414); (c) Add `audience` claim to self-issued JWTs (currently absent); (d) Document the existing 3-tier chain in [COMPLETE_API_REFERENCE.md](../COMPLETE_API_REFERENCE.md). | S | First; pre-requisite for Q1+ |
+| **Q0** | Standards cleanup (foundation) | (a) **Enrich** the already-emitted `WWW-Authenticate: Bearer realm=\"SCIM\"` header with `error=\"invalid_token\"` + `error_description` params (RFC 6750 §3) on 401 (the header exists today via [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) `reject()`, just without the params); (b) Add `.well-known/oauth-authorization-server` endpoint (RFC 8414); (c) Add `audience` claim to self-issued JWTs (currently absent); (d) Document the existing 3-tier chain in [COMPLETE_API_REFERENCE.md](../COMPLETE_API_REFERENCE.md). | S | First; pre-requisite for Q1+ |
 | **Q1** | Per-endpoint OAuth client_id/secret pairs (Pattern #5) | (a) Extend G11 admin API to accept `credentialType: 'oauth_client'` with auto-generated `clientId` (UUID) + `clientSecret` (random 32 bytes); (b) `OAuthService.generateAccessToken` looks up credentials by endpoint-scoped client_id first, falls back to global; (c) Issued JWTs include `scope` (from credential metadata) and `endpoint_id` claims; (d) `/scim/endpoints/{endpointId}/...` enforces that the bearer's `endpoint_id` claim matches the URL endpointId; (e) Web UI extends CredentialsTab to show "OAuth client" credential type with clientId + endpoint-scoped token endpoint URL. | M | Second; unblocks Entra Gallery listing |
 | **Q2** | External JWKS-backed JWT validation (Pattern #4) | (a) Add per-endpoint `externalAuth` config (`{enabled, issuer, audience, jwksUri, clockSkewSec}`); (b) JWKS client with 1-hour cache + key rotation handling (use `jose` library); (c) Guard fall-through order becomes: per-endpoint credential -> per-endpoint external JWT -> per-endpoint OAuth -> global OAuth -> legacy; (d) Sample config for Microsoft Entra (`issuer: https://sts.windows.net/{tenantId}/`, `jwksUri: https://login.microsoftonline.com/{tenantId}/discovery/v2.0/keys`); (e) Documentation: "How to point Microsoft Entra at SCIMServer with blank Secret Token." | M | Third; closes Entra's preferred path |
 | **Q3** | SCIMServer as OAuth **client** (probe direction) | (a) New module `api/src/probe/auth-handlers/` with classes: `BearerAuthHandler`, `OAuthClientCredsHandler`, `OAuthAuthCodeHandler`, `JwtBearerAssertionHandler`; (b) `POST /admin/probes` accepts `{targetUrl, authMode, authConfig}` and runs the probe-corpus from [ISV_ENDPOINT_PROBING_METHODOLOGY.md](../ISV_ENDPOINT_PROBING_METHODOLOGY.md) §13; (c) Token caching (per-target, per-config, TTL-aware); (d) Per-probe-run audit log of every auth handshake + every probe-call outcome. | L | Fourth; enables Layer 2-6 probing for real ISVs |
@@ -657,6 +665,8 @@ The following entries from [.github/copilot-instructions.md](../../.github/copil
 ---
 
 ## 8. References
+
+> **Master reference list: [AUTHENTICATION_ARCHITECTURE.md section 14](AUTHENTICATION_ARCHITECTURE.md#14-references-rfcs-with-sections--sources).** The hub carries the consolidated cluster-wide RFC list (with the exact sections each phase relies on) plus the Microsoft/Entra and in-repo sources. The lists below are this doc's own ISV-pattern sources; the per-RFC explainers and the navigational index live in [auth/README.md](README.md#rfc-explainers-and-authoritative-text).
 
 ### 8.1 In-repo (authoritative for SCIMServer behavior)
 

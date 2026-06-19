@@ -4,16 +4,18 @@
 
 > **Status:** Analysis + design. Dated 2026-06-03. Closes the Pattern 8 gap tracked in [ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md).
 
+> **Companion - the overall authentication architecture.** This document designs **one** mechanism (WIF) in depth. The cross-cutting model - how an endpoint holds **several** authentication methods at once, how new types are added and old ones retired, the `provider` / `AuthenticationMethod` / `credential` / `authenticationScheme` vocabulary, the two-plane resolver, the four API surfaces, the shared token-mint URL + self-describing runtime routing, persistence placement (`endpoint.profile.authentication.methods[]`), and the v1/v2 x 7523/8693 x identity-model axes - lives in [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md). Read that for the system; read this for the WIF mechanism. Where the two overlap, the architecture doc is authoritative for vocabulary and cross-cutting structure, and this doc is authoritative for the WIF wire contract and Entra behavior.
+
 ## Source documents
 
 | Source | Type | Status |
 |---|---|---|
-| **"Workload Identity Federation between Entra Provisioning (SyncFabric) and SaaS ISVs"** (high-level design) | Microsoft-internal (`.docx`) | ACCESSED + TEXT-EXTRACTED 2026-06-15. **V1-era original** (issuer `sts.windows.net`, example token `"ver": "1.0"`); predates the June v2 switch. Owner: `raali@microsoft.com` (Ramsey Ali) |
-| **"Workload Identity Federation One-Pager"** ("Design Review 1-Pager - Credential Free Authentication") | Microsoft-internal (`.docx`) | ACCESSED + TEXT-EXTRACTED 2026-06-15. Dated **03/13/2026**, owner `raali@microsoft.com`. Describes the **Entra-side** backend (MSI -> sub-identity token -> impersonated-app token -> exchange); see [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend) |
+| **"Workload Identity Federation between Entra Provisioning (SyncFabric) and SaaS ISVs"** (high-level design) | Microsoft-internal | Referred. **V1-era original** (issuer `sts.windows.net`, example token `"ver": "1.0"`); predates the June v2 switch. Owner: Ramsey Ali |
+| **"Workload Identity Federation One-Pager"** ("Design Review 1-Pager - Credential Free Authentication") | Microsoft-internal | Referred Dated **03/13/2026**, owner Ramsey Ali. Describes the **Entra-side** backend (MSI -> sub-identity token -> impersonated-app token -> exchange); see [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend) |
 | [AzureAD/SCIMReferenceCode/ WIF for SCIM Provisioning](https://github.com/AzureAD/SCIMReferenceCode/blob/master/Workload-Identity-Federation-for-SCIM-Provisioning.md) | Public Microsoft reference | Public mirror of the same trust model; **updated 2026-06-09 to the v2 token shape** |
 | [Microsoft Learn - SCIM provisioning tutorial](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups) | Public | Authentication section |
 
-> **Provenance note (2026-06-15).** The two internal `.docx` files above are the **V1-era source design** (both owned by Ramsey Ali, the same owner who ran the 2026-06-12 review that switched the contract to v2). They are the original basis for this analysis; the contract has since moved to **v2-only** ([section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)). Treat the v1 `iss`/`aud`/`ver` values in those files as **historical**, not current. Their lasting value is the **Entra-side** detail the public reference omits (the SyncFabric token-minting chain in [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend) and the customer-identification guidance in [section 15](#15-faq)).
+> **Provenance note (2026-06-15).** The two internal documents above are the **V1-era source design**. They are the original basis for this analysis; the contract has since moved to **v2-only** ([section 4.1](#41-decided---entra-v2-token-format-only-issuer-and-audience)). Treat the v1 `iss`/`aud`/`ver` values in those files as **historical**, not current. Their lasting value is the **Entra-side** detail the public reference omits (the SyncFabric token-minting chain in [section 2.3](#23-how-entra-mints-the-assertion-the-syncfabric-backend) and the customer-identification guidance in [section 15](#15-faq)).
 
 > **Reconciliation note.** Where the internal doc and the public reference differ, the internal doc is treated as authoritative for **Entra's** behavior (issuer, audience format, role enforcement, deprecation timeline) and the public reference is treated as authoritative for the **wire format** an ISV must implement. They agree on the core: this is RFC 7523 client authentication, not RFC 7523 grant-type usage.
 
@@ -134,6 +136,18 @@ flowchart TD
         B1[Entra JWT as subject_token] --> B2[grant_type token-exchange] --> B3[ISV validates subject_token] --> B4[ISV returns access_token plus issued_token_type]
     end
 ```
+
+> **How this maps to the authentication architecture.** The cross-cutting model in [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) treats each WIF profile as a distinct `AuthenticationMethod` **`type`** (a separate `AuthenticationProvider` / code path), because the two profiles have genuinely different wire behavior (`grant_type`, the field carrying the JWT, the response shape, the error family - [architecture section 3.2](AUTHENTICATION_ARCHITECTURE.md#32-axis-b-assertion-profile-rfc-7523-vs-rfc-8693)). This doc's `assertionProfile` discriminator **is** that `type` selector, viewed from the WIF-credential angle. The two framings are the same design from two angles:
+
+| This doc (`wif` trust record) | Architecture vocabulary | Provider / code path |
+|---|---|---|
+| `assertionProfile: "jwt-bearer"` | `AuthenticationMethod.type = wif-7523` | RFC 7523 handler (token plane; IANA `private_key_jwt`) |
+| `assertionProfile: "token-exchange"` | `AuthenticationMethod.type = wif-8693` | RFC 8693 handler (token plane) |
+| the `wif` credential record (no secret) | the `credential` backing the method | `EndpointCredential` row, `credentialType: "wif"` |
+| `WifCredentialsEnabled` flag | the per-method enable + the `profile.authentication` block | `endpoint.profile.authentication.methods` list |
+| the advertised WIF `SpcAuthenticationScheme` | the `authenticationScheme` (RFC 7643 section 5 discovery) | computed from the enabled method set |
+
+> **v1 vs v2 is not a `type`.** Token version is **data inside** the trust record (the `trustProfiles` list), not a separate method type, because both versions share one code path (only the `iss`/`aud` strings and JWKS path differ). One `wif` method can therefore accept v1 and v2 at once during a migration. See [architecture section 3.1](AUTHENTICATION_ARCHITECTURE.md#31-axis-a-token-version-v1-vs-v2). The runtime router that picks the right profile and trust record from a self-describing request (no prior `client_id` binding) is specified in [architecture section 8.2](AUTHENTICATION_ARCHITECTURE.md#82-runtime-routing-the-self-describing-cascade-no-prior-binding).
 
 ### 1.5 Design review with Ramsey Ali (2026-06-12) - what was confirmed
 
@@ -407,22 +421,20 @@ flowchart TD
 **Validation lifecycle (every branch except the final issuance ends at `invalid_client`):**
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Received: token request arrives
-    Received --> ClassicPath: no client_assertion
-    Received --> TrustLookup: client_assertion present
-    TrustLookup --> Rejected: no wif trust for endpoint
-    TrustLookup --> KeyResolve: trust found
-    KeyResolve --> Rejected: kid unknown and JWKS unreachable
-    KeyResolve --> SignatureCheck: key resolved
-    SignatureCheck --> Rejected: bad signature or disallowed alg
-    SignatureCheck --> ClaimCheck: signature valid
-    ClaimCheck --> Rejected: iss aud sub tid or time invalid
-    ClaimCheck --> RoleCheck: claims valid
-    RoleCheck --> Rejected: required role missing
-    RoleCheck --> Issued: all checks pass
-    Issued --> [*]: return own short-lived token
-    Rejected --> [*]: 401 invalid_client
+flowchart TD
+    START[token request arrives] --> HAS{client_assertion present?}
+    HAS -->|no| CLASSIC[Existing client_credentials path]
+    HAS -->|yes| TRUST{wif trust for endpoint?}
+    TRUST -->|no| REJ[401 invalid_client]
+    TRUST -->|yes| KEY{kid resolvable - JWKS reachable?}
+    KEY -->|no| REJ
+    KEY -->|yes| SIG{signature valid and alg allowed?}
+    SIG -->|no| REJ
+    SIG -->|yes| CLAIM{iss aud sub tid and time valid?}
+    CLAIM -->|no| REJ
+    CLAIM -->|yes| ROLE{required roles present?}
+    ROLE -->|no| REJ
+    ROLE -->|yes| OK[Issue own short-lived token]
 ```
 
 ### 4.1 DECIDED - Entra v2 token format only (issuer and audience)
@@ -444,6 +456,8 @@ stateDiagram-v2
 > **Provenance of the `aud` confusion (2026-06-15).** The newly-extracted V1-era internal source ([source documents](#source-documents)) is **internally inconsistent on `aud`**, which is exactly why an explicit reviewer correction was needed. The same one-pager renders it three different ways: the Step-1 admin display shows `Aud = WorkloadIdentity_appid` (**bare GUID**); the token-flow prose shows `Aud = api://{appid}/.default`; and the worked example token shows `"aud": "api://b5ba7a93-..."` (`api://` + GUID, no `/.default`). The bare-GUID Step-1 display corroborates the reviewer's v2 conclusion; the `api://` forms in the same file are the source of the earlier misreading. Net: store/compare the **bare `{appid}` GUID**.
 
 **Implementation impact:** the per-endpoint WIF trust config (section 8) stores a **single** expected issuer and audience (the v2 strings), not an allowlist - there is no v1/v2 dual-accept to maintain. This keeps the validator (section 4, step 3) a straight exact-string comparison. The earlier multi-format option is dropped.
+
+> **Scope of this decision (reconciled with [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md)).** "v2-only" governs what **Microsoft Entra's provisioning service emits** for WIF, and it is the correct **secure default** for the WIF trust record above. It does **not** lock SCIMServer-as-a-general-relying-party out of trusting a v1-emitting issuer (a legacy Entra app with `requestedAccessTokenVersion: 1`, or an ISV onboarded before the v2 switch). The architecture doc models that as a **`trustProfiles[]` list inside one `wif-7523` method** - v1 and v2 are the *same code path* differing only in the `iss`/`aud` strings and JWKS path (data, not behavior), so a single method can accept both during a migration. v1 stays **off by default**, gated by a global allowlist and opt-in per endpoint, so this section's secure default is intact; the architecture doc only removes the hard lock-out. See [AUTHENTICATION_ARCHITECTURE.md section 3.1](AUTHENTICATION_ARCHITECTURE.md#31-axis-a-token-version-v1-vs-v2).
 
 **Sources:**
 
@@ -560,6 +574,8 @@ The two RFCs are frequently conflated because both end with the ISV issuing a be
 
 ## 5. Current SCIMServer state
 
+> **Canonical current-state: [AUTHENTICATION_ARCHITECTURE.md section 4](AUTHENTICATION_ARCHITECTURE.md#4-current-scimserver-state-source-grounded).** The Today-vs-WIF-needs table below is the WIF-focused view; the hub section 4 is the authoritative full description of the shipped baseline.
+
 | Layer | Today | WIF needs |
 |---|---|---|
 | Auth fallback | [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts): per-endpoint bcrypt bearer -> OAuth JWT -> legacy `SCIM_SHARED_SECRET` | A new branch that accepts an ISV-issued token minted by the WIF flow |
@@ -628,6 +644,8 @@ erDiagram
         json metadata "assertionProfile, subjectTokenType, expectedResource, expectedIssuer, expectedSubject, expectedAudience, jwksUri, allowedTenantId, requiredRoles, scope, issuedTokenTtlSec"
     }
 ```
+
+> **Architecture alignment (persistence).** The `wif` record below is the **`credential`** in the [authentication architecture](AUTHENTICATION_ARCHITECTURE.md) vocabulary; the `assertionProfile` it carries selects the `AuthenticationMethod.type` (`wif-7523` or `wif-8693`); and the non-secret selection/trust config rides `endpoint.profile.authentication.methods` while the (secret-free) trust values persist in `EndpointCredential.metadata` with `credentialType: "wif"`. **No new table or column is introduced** - the existing profile JSONB plus the existing `EndpointCredential` table carry everything; see [architecture section 6.2](AUTHENTICATION_ARCHITECTURE.md#62-what-the-design-adds-proposed-and-where). The single-`assertionProfile`-per-record shape shown here is the common case; an endpoint that must accept **both** profiles simply holds two `wif` records (two methods, different `id`), exactly as the architecture's `methods` list allows.
 
 **Admin API - register WIF trust (no secret):**
 
@@ -862,6 +880,8 @@ Every WIF rejection maps to an RFC 6749 section 5.2 error object so Entra (SyncF
 
 > This plan is **TDD-first** (Stage 0 of the standing quality gates): write the failing test, make it green with the smallest change, refactor green. Each step names the files it touches, the **RED test** to write first, and the **gate** that must pass before the step is done. Nothing here is implemented yet; this is the ordered recipe.
 
+> **Canonical cross-doc plan: [AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies).** This section is the **detailed per-step recipe for the WIF phases specifically** (Pre-Q, Q1, Q2, Q6) - the files each step touches, its RED test, and its gate. It sits *under* the hub's unified step order, which adds the A0-A4 backbone that makes WIF one method among many. See the [auth/README.md numbering-reconciliation table](README.md#numbering-reconciliation) to map these WIF step ids onto the unified ids.
+
 ### 13.1 Build order at a glance
 
 ```mermaid
@@ -995,6 +1015,8 @@ A WIF commit is complete only when the standing **Feature / Bug-Fix Commit Check
 
 > **What this is.** A bottom-up effort estimate in **ideal engineering-days for one developer already fluent in this codebase**, working TDD-first and reusing the existing G11 / OAuth / dual-backend patterns. "Ideal day" = focused build + test time, excluding meetings, context-switching, and review latency. These are effort sizes, not calendar dates; see the calendar note below.
 
+> **Scope label (reconciles the two totals in this cluster).** The ~24-38 ideal dev-days below cover the **WIF-only slice** (Pre-Q + Q1 + Q2 + Q6, skipping the A-series backbone). The **full architecture superset** that adds the A0-A4 cross-cutting `authenticationMethods[]` model is ~29-44 ideal dev-days in [hub section 13.3](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies). The two numbers are the same work measured at two scopes, not a contradiction - see the [auth/README.md effort table](README.md#effort-scope-labelled-so-the-two-totals-are-not-read-as-contradictory).
+
 > **Basis (2026-06-11 source check).** The §5 verified-greenfield note governs this estimate: `jose`/JWKS, form-urlencoded parsing, `client_assertion`, asymmetric issuance, and a real per-endpoint OAuth client are all absent today, so Q6 must build its full prerequisite stack. Nothing below is discounted as "already done."
 
 | Phase | Low (days) | High (days) | Primary effort driver |
@@ -1067,6 +1089,8 @@ flowchart LR
 
 ## 16. References
 
+> **Master reference list: [AUTHENTICATION_ARCHITECTURE.md section 14](AUTHENTICATION_ARCHITECTURE.md#14-references-rfcs-with-sections--sources).** The hub carries the consolidated cluster-wide RFC + Entra + in-repo source list. The sources below are this doc's WIF-specific primary material (the internal design docs, the v2 token-format finding, the Entra OIDC discovery documents). The per-RFC explainers and the navigational index live in [auth/README.md](README.md#rfc-explainers-and-authoritative-text).
+
 ### Primary (internal + reconciled)
 
 - Internal Entra design doc - "Workload Identity Federation between Entra Provisioning (SyncFabric) and SaaS ISVs"
@@ -1094,8 +1118,8 @@ flowchart LR
 > **Local copies.** The authoritative RFC text is mirrored in-repo under [rfcs/](rfcs/) so the normative source travels with the design, and each load-bearing RFC has a companion plain-language explainer in this repo. Online links point at rfc-editor.org (datatracker.ietf.org returns HTTP 403 to automated fetch).
 
 - **RFC 7521** - Assertion Framework for OAuth 2.0 Client Authentication and Authorization Grants. Local copy: [rfcs/rfc7521.txt](rfcs/rfc7521.txt). The umbrella framework RFC 7523 profiles.
-- **[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (May 2015). WIF uses **section 2.2 client authentication** - the `jwt-bearer` profile. Local copy: [rfcs/rfc7523.txt](rfcs/rfc7523.txt); explainer: [RFC_7523_EXPLAINED.md](RFC_7523_EXPLAINED.md). Key normative facts (deep-dive in [section 4.2](#42-rfc-7523-in-depth-the-jwt-bearer-profile)): `client_assertion` MUST carry exactly one JWT; `sub` MUST equal the `client_id`; `iss`/`aud` compared by Simple String Comparison; `exp` mandatory; failure code `invalid_client`; RS256 mandatory-to-implement.
-- **[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - OAuth 2.0 Token Exchange (January 2020) - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Local copy: [rfcs/rfc8693.txt](rfcs/rfc8693.txt); explainer: [RFC_8693_EXPLAINED.md](RFC_8693_EXPLAINED.md). Key normative facts (deep-dive in [section 4.3](#43-rfc-8693-in-depth-the-token-exchange-profile)): `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`; REQUIRED `subject_token`/`subject_token_type`; REQUIRED `issued_token_type` response member; optional `resource`/`audience`/`scope`/`requested_token_type`/`actor_token`; impersonation vs delegation (`act`, `may_act`); failure codes `invalid_request`/`invalid_target`; RFC 8693 names RFC 7523 as an allowed client-auth method (the composition point).
+- **[RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)** - JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants (May 2015). WIF uses **section 2.2 client authentication** - the `jwt-bearer` profile. Local copy: [rfcs/rfc7523.txt](rfcs/rfc7523.txt); explainer: [RFC_7523_EXPLAINED.md](rfcs/RFC_7523_EXPLAINED.md). Key normative facts (deep-dive in [section 4.2](#42-rfc-7523-in-depth-the-jwt-bearer-profile)): `client_assertion` MUST carry exactly one JWT; `sub` MUST equal the `client_id`; `iss`/`aud` compared by Simple String Comparison; `exp` mandatory; failure code `invalid_client`; RS256 mandatory-to-implement.
+- **[RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)** - OAuth 2.0 Token Exchange (January 2020) - the `token-exchange` profile; authored by Microsoft (Mike Jones, Tony Nadalin) with Ping/Yubico/Visa. Local copy: [rfcs/rfc8693.txt](rfcs/rfc8693.txt); explainer: [RFC_8693_EXPLAINED.md](rfcs/RFC_8693_EXPLAINED.md). Key normative facts (deep-dive in [section 4.3](#43-rfc-8693-in-depth-the-token-exchange-profile)): `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`; REQUIRED `subject_token`/`subject_token_type`; REQUIRED `issued_token_type` response member; optional `resource`/`audience`/`scope`/`requested_token_type`/`actor_token`; impersonation vs delegation (`act`, `may_act`); failure codes `invalid_request`/`invalid_target`; RFC 8693 names RFC 7523 as an allowed client-auth method (the composition point).
 - **RFC 7519** - JSON Web Token (JWT)
 - **RFC 7517** - JSON Web Key (JWK)
 - **RFC 6749** - The OAuth 2.0 Authorization Framework (section 5.2 error responses)
