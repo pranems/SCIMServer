@@ -3,9 +3,12 @@ import {
   getConfigBoolean,
   getConfigBooleanWithDefault,
   getConfigString,
+  getConfigStructured,
   validateEndpointConfig,
+  validateStructuredFlag,
   DEFAULT_ENDPOINT_CONFIG,
   type EndpointConfig,
+  type EndpointConfigFlagDefinition,
 } from './endpoint-config.interface';
 
 describe('endpoint-config.interface', () => {
@@ -1121,4 +1124,171 @@ describe('endpoint-config.interface', () => {
   describeBooleanFlagValidation('GroupHardDeleteEnabled');
   describeBooleanFlagValidation('MultiMemberPatchOpForGroupEnabled');
   describeBooleanFlagValidation('SchemaDiscoveryEnabled');
+
+  // ─── Pre-Q.A: structured flag-type ──────────────────────────────────────────
+  describe('structured flag-type (Pre-Q.A)', () => {
+    // A representative structured-flag definitions map, injected into
+    // validateEndpointConfig so the new branch is exercised through the public API
+    // without registering a production flag before its consumer exists (Q6.2).
+    const structuredDefs: Record<string, EndpointConfigFlagDefinition> = {
+      WIF_TRUST: {
+        key: 'WifTrust',
+        type: 'structured',
+        default: undefined,
+        description: 'Test-only structured flag holding a WIF trust object.',
+        structuredSchema: {
+          allowedKeys: ['issuer', 'audience', 'subject'],
+          requiredKeys: ['issuer'],
+        },
+      },
+    };
+
+    describe('validateStructuredFlag', () => {
+      const schema = {
+        allowedKeys: ['issuer', 'audience', 'subject'],
+        requiredKeys: ['issuer'],
+      };
+
+      it('should not throw when the flag is absent (undefined)', () => {
+        expect(() => validateStructuredFlag({}, 'WifTrust', schema)).not.toThrow();
+      });
+
+      it('should accept a valid object with only allowed keys', () => {
+        expect(() =>
+          validateStructuredFlag(
+            { WifTrust: { issuer: 'https://idp', audience: 'app' } },
+            'WifTrust',
+            schema,
+          ),
+        ).not.toThrow();
+      });
+
+      it('should reject an unknown key', () => {
+        expect(() =>
+          validateStructuredFlag(
+            { WifTrust: { issuer: 'https://idp', bogus: 1 } },
+            'WifTrust',
+            schema,
+          ),
+        ).toThrow(/Unknown key "bogus"/);
+      });
+
+      it('should reject a missing required key', () => {
+        expect(() =>
+          validateStructuredFlag({ WifTrust: { audience: 'app' } }, 'WifTrust', schema),
+        ).toThrow(/required key "issuer"/);
+      });
+
+      it('should reject a string value', () => {
+        expect(() => validateStructuredFlag({ WifTrust: 'nope' }, 'WifTrust', schema)).toThrow(
+          /Invalid type/,
+        );
+      });
+
+      it('should reject a number value', () => {
+        expect(() => validateStructuredFlag({ WifTrust: 5 }, 'WifTrust', schema)).toThrow(
+          /Invalid type/,
+        );
+      });
+
+      it('should reject a boolean value', () => {
+        expect(() => validateStructuredFlag({ WifTrust: true }, 'WifTrust', schema)).toThrow(
+          /Invalid type/,
+        );
+      });
+
+      it('should reject an array value', () => {
+        expect(() => validateStructuredFlag({ WifTrust: [] }, 'WifTrust', schema)).toThrow(
+          /Invalid type/,
+        );
+      });
+
+      it('should reject a null value', () => {
+        expect(() => validateStructuredFlag({ WifTrust: null }, 'WifTrust', schema)).toThrow(
+          /Invalid type/,
+        );
+      });
+
+      it('should accept any object key when no schema is provided', () => {
+        expect(() =>
+          validateStructuredFlag({ WifTrust: { anything: 1 } }, 'WifTrust'),
+        ).not.toThrow();
+      });
+
+      it('should still reject a non-object when no schema is provided', () => {
+        expect(() => validateStructuredFlag({ WifTrust: 'nope' }, 'WifTrust')).toThrow(
+          /Invalid type/,
+        );
+      });
+
+      it('should include the flag name in the error message', () => {
+        try {
+          validateStructuredFlag({ WifTrust: 'nope' }, 'WifTrust', schema);
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain('WifTrust');
+        }
+      });
+    });
+
+    describe('validateEndpointConfig dispatch (structured round-trip)', () => {
+      it('should round-trip a valid structured flag value', () => {
+        expect(() =>
+          validateEndpointConfig(
+            { WifTrust: { issuer: 'https://idp', audience: 'app' } },
+            structuredDefs,
+          ),
+        ).not.toThrow();
+      });
+
+      it('should reject a malformed structured flag value', () => {
+        expect(() =>
+          validateEndpointConfig({ WifTrust: 'not-an-object' }, structuredDefs),
+        ).toThrow(/Invalid type/);
+      });
+
+      it('should reject an unknown key in a structured flag value', () => {
+        expect(() =>
+          validateEndpointConfig(
+            { WifTrust: { issuer: 'https://idp', bogus: true } },
+            structuredDefs,
+          ),
+        ).toThrow(/Unknown key/);
+      });
+
+      it('should default the definitions to the production registry', () => {
+        // Sanity: calling with no definitions arg still validates the real registry.
+        expect(() => validateEndpointConfig({ StrictSchemaValidation: 'nope' })).toThrow(
+          /Invalid value/,
+        );
+      });
+    });
+
+    describe('getConfigStructured', () => {
+      it('should return the object for a structured value', () => {
+        const obj = { issuer: 'https://idp' };
+        expect(getConfigStructured({ WifTrust: obj }, 'WifTrust')).toEqual(obj);
+      });
+
+      it('should return undefined for a missing key', () => {
+        expect(getConfigStructured({}, 'WifTrust')).toBeUndefined();
+      });
+
+      it('should return undefined for an undefined config', () => {
+        expect(getConfigStructured(undefined, 'WifTrust')).toBeUndefined();
+      });
+
+      it('should return undefined for a string value', () => {
+        expect(getConfigStructured({ WifTrust: 'x' }, 'WifTrust')).toBeUndefined();
+      });
+
+      it('should return undefined for an array value', () => {
+        expect(getConfigStructured({ WifTrust: [] }, 'WifTrust')).toBeUndefined();
+      });
+
+      it('should return undefined for a null value', () => {
+        expect(getConfigStructured({ WifTrust: null }, 'WifTrust')).toBeUndefined();
+      });
+    });
+  });
 });

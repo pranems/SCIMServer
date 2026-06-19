@@ -1,14 +1,16 @@
 # Endpoint Configuration Flags Reference
 
-> **Version:** 0.53.0 - **Updated:** June 3, 2026  
+> **Version:** 0.53.2 - **Updated:** June 18, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 16 flags: 14 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`)
+> 16 flags: 14 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`).  
+> 4 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `structured` (the last added Pre-Q.A, reserved for the WIF trust object).
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Flag Value Types](#flag-value-types)
 - [How to Set Flags](#how-to-set-flags)
 - [Flag Reference](#flag-reference)
 - [Preset Defaults](#preset-defaults)
@@ -42,6 +44,28 @@ flowchart LR
     SET --> F6[VerbosePatchSupported]
     SET --> F7[...13 more flags]
 ```
+
+---
+
+## Flag Value Types
+
+Every flag declares a `type` in the registry ([endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) `ENDPOINT_CONFIG_FLAGS_DEFINITIONS`). The validator (`validateEndpointConfig`) dispatches on that type, so adding a flag is a one-line registry entry - validation, defaulting, and discovery wiring follow automatically.
+
+| Type | Accepted values | Reader helper | Validator |
+|---|---|---|---|
+| `boolean` | `true`/`false`, or the strings `"True"`/`"False"`/`"1"`/`"0"` (case-insensitive) | `getConfigBoolean` | `validateBooleanFlag` |
+| `logLevel` | `"TRACE"`..`"OFF"` (case-insensitive) or `0`-`6` | `getConfigString` | `validateLogLevelFlag` |
+| `primaryEnforcement` | `"passthrough"` / `"normalize"` / `"reject"` | `getConfigString` | `validatePrimaryEnforcementFlag` |
+| `structured` | a JSON object, optionally constrained by a `structuredSchema` | `getConfigStructured` | `validateStructuredFlag` |
+
+### The `structured` value-type (Pre-Q.A)
+
+The `structured` type lets a flag carry a nested object value rather than a scalar. It is the enabling machinery for the WIF trust object (Q6.2); no production flag uses it yet. A `structured` flag definition may declare a `structuredSchema`:
+
+- `allowedKeys` - any top-level key not in this list is rejected (`Unknown key "..."`).
+- `requiredKeys` - every entry must be present (`Missing required key "..."`).
+
+A non-object value (string, number, boolean, array, or `null`) is rejected with `Invalid type`. When no `structuredSchema` is declared, any object shape is accepted. Read a structured value with `getConfigStructured(config, key)`, which returns the object or `undefined` for missing/non-object values.
 
 ---
 

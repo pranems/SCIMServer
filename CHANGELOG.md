@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.1] - 2026-06-18 - Auth Pre-Q.A: structured config flag-type + validator
+
+First step of the reconciled authentication build ([docs/auth/AUTHENTICATION_ARCHITECTURE.md §13](docs/auth/AUTHENTICATION_ARCHITECTURE.md), tracked in [docs/auth/EXECUTION_LEDGER.md](docs/auth/EXECUTION_LEDGER.md)). Enabling infrastructure only - no runtime behavior change.
+
+### Added
+
+- **`structured` endpoint-config flag-type** ([api/src/modules/endpoint/endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts)). The flag registry previously understood only `boolean` / `logLevel` / `primaryEnforcement` value-kinds; a flag whose value is a nested object (the upcoming WIF trust record, Q6.2) had no representation. This step teaches the registry + validator a fourth value-kind without registering any production flag yet (the structured flag lands with its consumer).
+  - New `StructuredFlagSchema` interface (`allowedKeys` + optional `requiredKeys`) and an optional `structuredSchema` field on `EndpointConfigFlagDefinition`.
+  - New `validateStructuredFlag(config, flagName, schema?)`: rejects non-object values (`Invalid type`), unknown top-level keys (`Unknown key "..."`), and missing required keys (`Missing required key "..."`); accepts any object shape when no schema is supplied.
+  - New `getConfigStructured(config, key)` reader: returns the object for a plain-object value, `undefined` for missing/primitive/array/null values.
+  - `validateEndpointConfig` gained an optional injectable `definitions` parameter (defaults to the production registry) so a new flag-type can be exercised through the public validator in tests without polluting the registry; it now dispatches the `structured` branch.
+- **Doc:** new "Flag Value Types" section in [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) describing all four value-types and the `structured` schema contract.
+
+### Validation
+
+- TDD: 22 new unit tests in [endpoint-config.interface.spec.ts](api/src/modules/endpoint/endpoint-config.interface.spec.ts) (RED confirmed at assertion level via no-op stubs, then GREEN). Covers `validateStructuredFlag` (valid/unknown-key/missing-required/non-object/null/array/no-schema), `validateEndpointConfig` structured dispatch round-trip, and `getConfigStructured`.
+- API unit: **3,825 -> 3,847** (103 suites, all pass). API build: PASS (0 errors). API ESLint: 0 errors, 4 warnings (baseline, no new `any`). Targeted E2E (config-flags + admin-endpoints-create + profile-flag-combos, inmemory): 48/48 pass.
+- Cross-backend parity: N/A (pure validation utility, no `isInMemoryBackend` branch). UI/live/Playwright: N/A (no registered flag, no runtime/HTTP surface yet; deferred to Q6.2).
+
 ## [0.53.2] - 2026-06-10 - Fix: stabilize endpoint-detail Overview visual-regression baseline
 
 ### Fixed
