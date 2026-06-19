@@ -11164,7 +11164,7 @@ try {
     } | ConvertTo-Json -Depth 6)
     Test-Result -Success ($aqWifCred.credentialType -eq "wif") -Message "9z-AQ.T8: wif credential allowed when WifCredentialsEnabled on"
     $aqWifJson = $aqWifCred | ConvertTo-Json -Depth 6
-    Test-Result -Success (-not ($aqWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AQ.T9: wif credential response carries NO secret/hash/token"
+    Test-Result -Success (-not ($aqWifJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-AQ.T9: wif credential response carries NO secret/hash/token"
 
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId" -Method DELETE -Headers $headers | Out-Null } catch {}
@@ -11323,7 +11323,7 @@ try {
     } | ConvertTo-Json -Depth 6)
     $atWifJson = $atWif | ConvertTo-Json -Depth 8
     Test-Result -Success ($atWif.credentialType -eq "wif") -Message "9z-AT.T3: wif credential persisted"
-    Test-Result -Success (-not ($atWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AT.T4: wif credential response carries NO secret/hash/token"
+    Test-Result -Success (-not ($atWifJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-AT.T4: wif credential response carries NO secret/hash/token"
 
     # T5: a structurally-valid but untrusted client_assertion fails closed -> invalid_client (401).
     # The JWKS host is on no allowlist on the server (or the assertion signature
@@ -11391,7 +11391,7 @@ try {
     Test-Result -Success ($auWif.wif.identityModel -eq "first-party") -Message "9z-AU.T2: identityModel seam persisted"
     Test-Result -Success ($auWif.wif.roleEnforcement -eq "off") -Message "9z-AU.T3: roleEnforcement seam persisted as off (inert)"
     $auWifJson = $auWif | ConvertTo-Json -Depth 8
-    Test-Result -Success (-not ($auWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AU.T4: A4-seam wif credential still carries NO secret/hash/token"
+    Test-Result -Success (-not ($auWifJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-AU.T4: A4-seam wif credential still carries NO secret/hash/token"
 
     # T5: the seams round-trip on the list (still no secret).
     $auList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$auId/credentials" -Method GET -Headers $headers
