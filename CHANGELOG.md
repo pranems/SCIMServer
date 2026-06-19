@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.10] - 2026-06-19 - Security: CWE-1321 prototype-pollution hardening + CodeQL triage
+
+Interstitial security-hardening pass between Auth A3 and Q6. Closes the three real `js/remote-property-injection` CodeQL alerts the A0-A3 auth work surfaced (dynamic writes into objects built from request-shaped input) and dismisses two confirmed `js/user-controlled-bypass` false positives. No behavior change to any SCIM or auth contract; pure defense-in-depth. The multer dev dependency was bumped 2.1.1 -> 2.2.0 upstream (advisory hygiene) and is carried here.
+
+### Security
+
+- **New `isUnsafeObjectKey()` guard** ([safe-object-key.ts](api/src/security/safe-object-key.ts)): single source of truth for the `__proto__` / `constructor` / `prototype` deny-set (CWE-1321). Used by the auth-profile expander so a request-supplied key can never reach an object-write sink.
+- **`auto-expand.service.ts` hardening** (CodeQL 68 + 235): `stripUndefined()` and `stripSecretsFromConfig()` now skip unsafe keys before writing into the result object, so a `JSON.parse`-materialised `__proto__` own-property in an authentication-method `config` (or a shorthand attribute) cannot pollute `Object.prototype`.
+- **`generic-patch-engine.ts` in-sink guard** (CodeQL 184): the extension-URN write and `setNested()` now re-check the `DANGEROUS_KEYS` set immediately before the dynamic assignment, defense-in-depth behind the existing upstream `guardPrototypePollution(path)`.
+- **CodeQL triage**: alerts **236** (admin-authentication-method `KNOWN_METHOD_TYPES` allowlist) and **234** (auto-expand secret-strip content filter) dismissed as false positives - both are allowlist/defense-in-depth filters, not authorization gates; the no-secret guarantee is structural (no secret field on the type, secrets ride the separate `EndpointCredential` table, contract-tested). Alerts **68 / 184 / 235** auto-close on the next scan.
+
+### Validation
+
+- TDD: new [safe-object-key.spec.ts](api/src/security/safe-object-key.spec.ts) (4) + 2 prototype-pollution tests added to [auto-expand.service.spec.ts](api/src/modules/scim/endpoint-profile/auto-expand.service.spec.ts) (RED confirmed `cfg.polluted === true` before the guard; GREEN after) + existing `generic-patch-engine.spec.ts` V19 proto-pollution suite still green.
+- API unit: **3,922 -> 3,928** (108 suites). Build 0 err; ESLint 0 err / 464 warnings (no new). Backend-agnostic; no HTTP-contract change so live/Docker/dev-Azure unaffected (covered by the next critical-path checkpoint).
+
 ## [0.54.0-alpha.9] - 2026-06-19 - Auth A3: token-endpoint form intake + self-describing routing cascade
 
 Ninth step of the reconciled authentication build (critical path). Makes the per-endpoint token endpoint accept form-urlencoded bodies and self-route by request shape, with the three-outcome acceptor contract - the seam Q6 plugs the WIF validator into. Feature doc: [docs/auth/TOKEN_ENDPOINT_ROUTING_CASCADE.md](docs/auth/TOKEN_ENDPOINT_ROUTING_CASCADE.md).

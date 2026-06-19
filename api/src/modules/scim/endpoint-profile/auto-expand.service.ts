@@ -24,6 +24,7 @@ import {
   RFC_REQUIRED_ATTRIBUTES,
   PROJECT_AUTO_INJECT_ATTRIBUTES,
 } from './rfc-baseline';
+import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 // Settings v7: SCIM_CORE_GROUP_SCHEMA import removed (D7 Group active removed)
 
 // ─── Expand a single attribute ──────────────────────────────────────────
@@ -61,6 +62,8 @@ function expandAttribute(
 function stripUndefined(obj: Record<string, any>): Record<string, any> {
   const result: Record<string, any> = {};
   for (const [k, v] of Object.entries(obj)) {
+    // CWE-1321: never write a prototype-polluting key from user input.
+    if (isUnsafeObjectKey(k)) continue;
     if (v !== undefined) result[k] = v;
   }
   return result;
@@ -194,6 +197,8 @@ function isSecretKey(key: string): boolean {
 function stripSecretsFromConfig(config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
+    // CWE-1321: never write a prototype-polluting key from user input.
+    if (isUnsafeObjectKey(key)) continue;
     if (!isSecretKey(key)) out[key] = value;
   }
   return out;
