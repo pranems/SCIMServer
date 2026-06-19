@@ -15,6 +15,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
   let findActiveByEndpoint: jest.Mock;
   let validate: jest.Mock;
   let generateEndpointAccessToken: jest.Mock;
+  let logger: { warn: jest.Mock; info: jest.Mock; debug: jest.Mock; error: jest.Mock };
 
   const wifMetadata = {
     expectedIssuer: 'https://login.microsoftonline.com/tenant-123/v2.0',
@@ -46,6 +47,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     findActiveByEndpoint = jest.fn();
     validate = jest.fn();
     generateEndpointAccessToken = jest.fn();
+    logger = { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -53,7 +55,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: { findActiveByEndpoint } },
         { provide: WifAssertionValidatorService, useValue: { validate } },
         { provide: OAuthService, useValue: { generateEndpointAccessToken } },
-        { provide: ScimLogger, useValue: { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn() } },
+        { provide: ScimLogger, useValue: logger },
       ],
     }).compile();
 
@@ -107,5 +109,40 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
 
     await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).rejects.toThrow();
     expect(generateEndpointAccessToken).not.toHaveBeenCalled();
+  });
+
+  // ─── A4 - shadow authorization telemetry (inert) ───────────────────────────
+  it('still mints the token even when the A4 shadow gate would reject (enforcement OFF)', async () => {
+    const cred = wifCredential();
+    // roleScopeMap maps a role the assertion does NOT carry -> shadow wouldReject.
+    cred.metadata = {
+      ...wifMetadata,
+      roleScopeMap: { 'Some.Other.Role': ['scim.read'] },
+      identityModel: 'first-party',
+    };
+    findActiveByEndpoint.mockResolvedValue([cred]);
+    validate.mockResolvedValue({
+      iss: wifMetadata.expectedIssuer,
+      sub: wifMetadata.expectedSubject,
+      aud: wifMetadata.expectedAudience,
+      tid: 'tenant-123',
+      roles: ['Scim.Provision'],
+    });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    // The token is STILL minted - A4 enforcement is off.
+    expect(result).toEqual({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+    // The shadow decision was emitted as telemetry (wouldReject true, not enforced).
+    const shadowLog = logger.info.mock.calls.find(
+      (c) => typeof c[1] === 'string' && c[1].includes('shadow authorization'),
+    );
+    expect(shadowLog).toBeDefined();
+    expect(shadowLog![2]).toMatchObject({
+      wouldReject: true,
+      enforced: false,
+      identityModel: 'first-party',
+    });
   });
 });

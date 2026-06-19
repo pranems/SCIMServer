@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ExternalJwksValidatorService } from './external-jwks-validator.service';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
+import type { IdentityModel, RoleEnforcementMode } from './wif-shadow-telemetry';
 
 /**
  * The non-secret WIF trust record the validator checks an assertion against.
@@ -18,6 +19,15 @@ export interface WifTrust {
   expectedResource?: string | null;
   scope?: string;
   issuedTokenTtlSec?: number;
+  // ── A4 seams (inert in A4: stored + computed in shadow, never enforced) ──
+  /** per-app vs first-party identity model (telemetry attribution). */
+  identityModel?: IdentityModel;
+  /** Per-endpoint role -> scopes map (future authZ; not enforced in A4). */
+  roleScopeMap?: Record<string, string[]>;
+  /** Catalog subset this endpoint may grant (future authZ; not enforced in A4). */
+  grantedScopes?: string[];
+  /** Role-enforcement posture. A4 ships `off`; `shadow`/`enforce` are seams. */
+  roleEnforcement?: RoleEnforcementMode;
 }
 
 /** The validated assertion claims returned on success. */

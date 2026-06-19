@@ -65,6 +65,11 @@ interface WifTrustInput {
   requiredRoles?: string[];
   scope?: string;
   issuedTokenTtlSec?: number;
+  // ── A4 seams (persisted; computed in shadow telemetry, not enforced) ──
+  identityModel?: 'per-app' | 'first-party';
+  roleScopeMap?: Record<string, string[]>;
+  grantedScopes?: string[];
+  roleEnforcement?: 'off' | 'shadow' | 'enforce';
 }
 
 /** Keys allowed on a WIF trust metadata object (no secret-bearing keys). */
@@ -72,6 +77,8 @@ const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
   'assertionProfile', 'subjectTokenType', 'expectedResource', 'expectedIssuer',
   'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId',
   'requiredRoles', 'scope', 'issuedTokenTtlSec',
+  // A4 seams
+  'identityModel', 'roleScopeMap', 'grantedScopes', 'roleEnforcement',
 ];
 
 /**

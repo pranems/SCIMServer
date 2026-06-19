@@ -10,6 +10,8 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/rep
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { computeShadowDecision } from '../../../oauth/wif-shadow-telemetry';
+import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider } from './assertion-token-provider';
 
 /**
@@ -57,6 +59,12 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       { ttlSec: trust.issuedTokenTtlSec, trustedScope: trust.scope },
     );
 
+    // A4 - shadow authorization telemetry. Compute the future role -> scope gate
+    // WITHOUT enforcing it (roleEnforcement is `off` in A4), so an operator can
+    // see in telemetry whether turning enforcement on would reject/narrow this
+    // live customer BEFORE flipping it. This NEVER changes what was minted above.
+    this.emitShadowTelemetry(endpointId, claims, trust, token);
+
     this.logger.info(LogCategory.AUTH, 'WIF assertion accepted; endpoint token minted', {
       endpointId,
       subject: trust.expectedSubject,
@@ -64,6 +72,39 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     });
 
     return token;
+  }
+
+  /**
+   * A4 - emit the "would-have-rejected" shadow decision as a log line. Inert:
+   * the token has already been minted with the configured scope; this only
+   * records what a future `roleEnforcement` flip would have done.
+   */
+  private emitShadowTelemetry(
+    endpointId: string,
+    claims: { roles?: unknown },
+    trust: WifTrust,
+    token: AccessToken,
+  ): void {
+    const roles = Array.isArray(claims.roles)
+      ? (claims.roles as unknown[]).filter((r): r is string => typeof r === 'string')
+      : [];
+    const decision = computeShadowDecision({
+      roles,
+      roleScopeMap: trust.roleScopeMap,
+      grantedScopes: trust.grantedScopes,
+      configuredScope: token.scope,
+      identityModel: trust.identityModel,
+    });
+    this.logger.info(LogCategory.AUTH, 'WIF shadow authorization decision (not enforced)', {
+      endpointId,
+      identityModel: decision.identityModel,
+      roleEnforcement: trust.roleEnforcement ?? 'off',
+      wouldReject: decision.wouldReject,
+      reason: decision.reason,
+      wouldGrantScopes: decision.wouldGrantScopes,
+      narrows: decision.narrows,
+      enforced: decision.enforced,
+    });
   }
 
   /**
@@ -93,6 +134,28 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       expectedResource: typeof m.expectedResource === 'string' ? m.expectedResource : undefined,
       scope: typeof m.scope === 'string' ? m.scope : undefined,
       issuedTokenTtlSec: typeof m.issuedTokenTtlSec === 'number' ? m.issuedTokenTtlSec : undefined,
+      // A4 seams - read inertly (computed in shadow telemetry, never enforced).
+      identityModel: m.identityModel === 'first-party' ? 'first-party' : 'per-app',
+      roleScopeMap: this.readRoleScopeMap(m.roleScopeMap),
+      grantedScopes: Array.isArray(m.grantedScopes)
+        ? (m.grantedScopes as unknown[]).filter((s): s is string => typeof s === 'string')
+        : undefined,
+      roleEnforcement:
+        m.roleEnforcement === 'shadow' || m.roleEnforcement === 'enforce' ? m.roleEnforcement : 'off',
     };
+  }
+
+  /** Read a `roleScopeMap` (role -> string[] scopes) defensively from metadata. */
+  private readRoleScopeMap(raw: unknown): Record<string, string[]> | undefined {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+    const out: Record<string, string[]> = {};
+    for (const [role, scopes] of Object.entries(raw as Record<string, unknown>)) {
+      // CWE-1321: never write a prototype-polluting key from user input.
+      if (isUnsafeObjectKey(role)) continue;
+      if (Array.isArray(scopes)) {
+        out[role] = scopes.filter((s): s is string => typeof s === 'string');
+      }
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
   }
 }

@@ -11354,6 +11354,60 @@ try {
 Write-Host "`n--- 9z-AT: WIF validate+issue Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
+$script:currentSection = "9z-AU: WIF A4 seams (inert)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $auEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-a4-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $auId = $auEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$auId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: a wif credential carrying the A4 seams (identityModel + roleScopeMap +
+    # grantedScopes + roleEnforcement) is accepted and persists the seams.
+    $auWif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$auId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "a4-live"
+        wif = @{
+            expectedIssuer    = "https://login.microsoftonline.com/tenant-a4/v2.0"
+            expectedSubject   = "sp-a4"
+            expectedAudience  = "api://scimserver-a4"
+            jwksUri           = "https://login.microsoftonline.com/tenant-a4/discovery/v2.0/keys"
+            allowedTenantId   = "tenant-a4"
+            scope             = "scim.read scim.write"
+            identityModel     = "first-party"
+            roleScopeMap      = @{ "Scim.Provision" = @("scim.read", "scim.write") }
+            grantedScopes     = @("scim.read", "scim.write")
+            roleEnforcement   = "off"
+        }
+    } | ConvertTo-Json -Depth 8)
+    Test-Result -Success ($auWif.credentialType -eq "wif") -Message "9z-AU.T1: wif credential with A4 seams accepted"
+    Test-Result -Success ($auWif.wif.identityModel -eq "first-party") -Message "9z-AU.T2: identityModel seam persisted"
+    Test-Result -Success ($auWif.wif.roleEnforcement -eq "off") -Message "9z-AU.T3: roleEnforcement seam persisted as off (inert)"
+    $auWifJson = $auWif | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($auWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AU.T4: A4-seam wif credential still carries NO secret/hash/token"
+
+    # T5: the seams round-trip on the list (still no secret).
+    $auList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$auId/credentials" -Method GET -Headers $headers
+    $auListJson = $auList | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($auListJson -match "credentialHash")) -Message "9z-AU.T5: A4-seam wif credential list carries no hash"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$auId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AU: WIF A4 seams section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AU: WIF A4 seams Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
