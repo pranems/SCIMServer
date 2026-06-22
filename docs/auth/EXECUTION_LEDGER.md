@@ -2,7 +2,7 @@
 
 > **Cross-session source of truth** for the auth build that executes [AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies). Companion detail: [WIF section 13](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#13-step-by-step-implementation-plan), [ISV section 5](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md#5-phased-implementation-plan-phase-q). Numbering map: [README.md](README.md#numbering-reconciliation).
 >
-> **Introspection companion:** this ledger records *what shipped, per step*. The [EXECUTION_ISSUES_AND_RCA.md](EXECUTION_ISSUES_AND_RCA.md) records *what went wrong on the way and what was learned* - every issue of every type with symptom / RCA / fix / why-the-fix-works / prevention + detection-stage escape analysis.
+> **Introspection companions:** this ledger records *what shipped, per step*. The [EXECUTION_ISSUES_AND_RCA.md](EXECUTION_ISSUES_AND_RCA.md) records *what went wrong on the way and what was learned* (issue -> RCA -> fix). The [EXECUTION_DECISIONS_AND_RATIONALE.md](EXECUTION_DECISIONS_AND_RATIONALE.md) records *what was decided and why* (the autonomous judgment calls: question -> options -> choice -> rationale).
 
 **Branch:** `feat/wif`
 **Status legend:** NOT-STARTED | IN-PROGRESS | DONE | BLOCKED | DEFERRED
