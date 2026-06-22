@@ -50,7 +50,9 @@ Even with D1, a long build crosses compaction boundaries. So at the end of a bui
 - Scan it for issue signals: `error TS`, HTTP error codes (`415`, `422`, `401`), `ECONNRESET`/`ENOENT`/`Cannot find module`, `RED`, `false positive`, `root cause`, `no-op`, `silently`, `drift`, `rebase`, lint-ceiling bumps, parity.
 - Every diagnosed problem in the transcript MUST map to a ledger entry. If one does not, add it. Record the reconciliation (method + result) in the ledger's provenance note so a future reader knows the ledger is transcript-verified, not memory-only.
 
-> The first application of D2 (2026-06-19, auth build) found **no missing substantive issue** but did correct an **understated recurrence count** (a lint-ceiling churn the in-context view had pegged at "3+" was actually ~50). That is exactly the fidelity loss D1+D2 exist to catch.
+> **D2 applies to EVERY build-introspection doc, not just the RCA ledger.** The decisions-and-rationale doc, an onboarding write-up, a design retrospective - any doc that claims to summarize "what happened across the build" - is subject to the same memory-skew and MUST be transcript-reconciled before it is declared complete. The signal set differs by doc type: for a **decisions** doc, scan for fork signals (`instead of`, `rather than`, `chose`, `rejected`, `prefer`, `option`, `keep the`, `reuse`) **and** read the early-step source for forks the narration was terse about, because compaction drops the steps furthest from build-end first.
+
+> The first application of D2 (2026-06-19, auth RCA ledger) found **no missing substantive issue** but corrected an **understated recurrence count** (a lint-ceiling churn the in-context view pegged at "3+" was actually ~50). The second (2026-06-22, auth **decisions** ledger) recovered **4 early Pre-Q.B/A1 decisions** a memory-only draft had dropped (33 -> 37). Both are exactly the fidelity loss D1+D2 exist to catch - and the second proved the discipline must cover decisions docs too, not only RCA.
 
 ### D3 - Promote, don't just record
 

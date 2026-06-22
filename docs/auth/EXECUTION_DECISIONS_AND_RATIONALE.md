@@ -10,6 +10,8 @@
 > Some decisions here resolved an issue from the RCA ledger (e.g. how to make `JWKS_FETCH` overridable is the *decision* whose *problem* is RCA I-01). The cross-links call those out, but the lens is different: the RCA doc asks "why did it break?"; this doc asks "given the fork, why this branch?".
 >
 > **Norms.** Carries the standard explanatory tools (Mermaid distribution + dependency diagrams, a master dashboard table, per-decision detail). No decision here was operator-directed - the operator-set constraints (never promote to prod, dev Azure is the ceiling, never force-push/amend-pushed/`--no-verify`, skip Q3/Q4/Q5) are **boundaries**, not decisions, and are listed in Section 7 for completeness.
+>
+> **Provenance / completeness.** This ledger was reconciled against the **full ~5,200-line session transcript** (per discipline D2), not in-context recollection alone. The first draft (33 decisions) was written from memory and skewed toward the steps nearest build-end; the transcript scan recovered **4 early-step decisions** the compaction summary had dropped - all from Pre-Q.B and A1: **DB-8** dev-key auto-generation, **DB-9** RFC 7638 `kid` thumbprint, **DB-10** the A1 orthogonal create-gate, and **DC-7** the `buildJwtModuleOptions` test-factory extraction (now **37 total**). The scan method: a decision-signal phrase pass (`instead of`, `rather than`, `chose`, `rejected`, `prefer`, `option`) plus reading the early-step source for forks the narration was terse about. One class of fork was deliberately **excluded** as not-my-decision: choices the architecture doc already dictated (e.g. "no new column - ride the profile JSONB", architecture section 6.2) are plan-given and listed in Section 7, not claimed here.
 
 ---
 
@@ -41,10 +43,10 @@ Each decision carries a **class** (what kind of fork it was), a **reversibility*
 
 ```mermaid
 pie showData
-    title Decisions by class (33 total)
+    title Decisions by class (37 total)
     "A Scope & sequencing" : 4
-    "B API contract / behavior" : 7
-    "C Test harness & strategy" : 6
+    "B API contract / behavior" : 10
+    "C Test harness & strategy" : 7
     "D Security handling" : 4
     "E UI" : 4
     "F Versioning & git hygiene" : 5
@@ -54,8 +56,8 @@ pie showData
 ```mermaid
 pie showData
     title Decisions by reversibility
-    "Reversible" : 19
-    "Sticky (contract)" : 4
+    "Reversible" : 21
+    "Sticky (contract)" : 6
     "Structural" : 10
 ```
 
@@ -76,12 +78,16 @@ pie showData
 | DB-5 | WIF discovery scheme | Append only when flag ON and no enabled `wif-*` method already advertises it | Sticky | 8fe8b9b |
 | DB-6 | Misconfigured WIF trust metadata | Fail closed (throw -> invalid_client), never silently accept | Structural | 8fe8b9b |
 | DB-7 | Shadow-telemetry placement | Compute + log AFTER the token is minted, never before/inside | Structural | 481bd38 |
+| DB-8 | Dev signing key when none configured (Pre-Q.B) | Auto-generate an ephemeral key + warn; default `RS256` | Reversible | 7baa330 |
+| DB-9 | Signing-key `kid` derivation (Pre-Q.B) | Default to the RFC 7638 JWK thumbprint (stable), allow override | Sticky | 7baa330 |
+| DB-10 | `wif` credential-create gate (A1) | Orthogonal: WIF rides its own `WifCredentialsEnabled`, not `PerEndpointCredentialsEnabled` | Sticky | 4956cb8 |
 | DC-1 | Make `JWKS_FETCH` overridable | Register a behavior-preserving default provider | Structural | 8fe8b9b (RCA I-01) |
 | DC-2 | E2E provider-override seam | Optional `customize(builder)` callback on `createTestApp` | Reversible | 8fe8b9b (RCA I-02) |
 | DC-3 | WIF E2E signature path | Mock the JWKS fetch with a local RSA key; run real `jose` verify | Reversible | 8fe8b9b |
 | DC-4 | Local E2E persistence backend | Default to inmemory; cover Prisma at the Docker checkpoint | Reversible | (RCA I-17) |
 | DC-5 | Shadow-decision testability | Extract `computeShadowDecision` as a pure exported function | Structural | 481bd38 |
 | DC-6 | Live-test section placement | Before `SECTION 10`, sequential ids `9z-AT` / `9z-AU` | Reversible | 8fe8b9b, 481bd38 |
+| DC-7 | Production JWT config under test (Pre-Q.B) | Extract `buildJwtModuleOptions` as an exported factory | Reversible | 7baa330 |
 | DD-1 | CodeQL injection alerts (68/184/235) | Fix in code with a guard | Structural | ab943ab |
 | DD-2 | CodeQL bypass alerts (234/236) | Dismiss as false-positive with written justification | Reversible | (gh api) |
 | DD-3 | Prototype-pollution guard shape | One single-source `isUnsafeObjectKey` helper at every sink | Structural | ab943ab |
@@ -219,6 +225,30 @@ Each entry: the **question** I would have asked -> the **options** -> the **choi
 - **Why.** A4's whole contract is that the shadow gate is **computed but never enforced**. Emitting it strictly after the token is minted makes it structurally impossible for the shadow computation to influence what was issued - the safest possible placement for an intentionally-inert feature. (b)/(c) would create a code path where a future edit could accidentally let the shadow result gate issuance.
 - **Reversibility.** Structural.
 
+#### DB-8 - Dev signing key when none is configured (Pre-Q.B)
+
+- **Question.** "When `OAUTH_JWT_PRIVATE_KEY` is not set, fail to boot, or auto-generate an ephemeral signing key? And what algorithm by default?"
+- **Options.** (a) Auto-generate an ephemeral key at startup with a loud warning, default `RS256` (with `ES256` if `OAUTH_JWT_ALG=ES256`); (b) require the key and throw on boot if absent.
+- **Chose.** (a) - commit `7baa330`.
+- **Why.** This mirrors the **existing** `OAuthService` dev-secret pattern (auto-generate + warn in non-prod), so local dev and tests run with zero key setup while a startup warning makes the ephemerality obvious. Defaulting to `RS256` matches the most widely-supported verifier. Hard-failing (b) would block every local run and CI lane on env setup for no security gain in dev. The warning + the published JWKS make the trade-off visible; production sets the key for stable cross-restart verification.
+- **Reversibility.** Reversible (a dev-only fallback; production behavior is unchanged when the key is set).
+
+#### DB-9 - Signing-key `kid` derivation (Pre-Q.B)
+
+- **Question.** "What `kid` does the JWKS/token header carry - a random value, a configured string, or one derived from the key?"
+- **Options.** (a) Default to the **RFC 7638 JWK thumbprint** (a stable hash of the key's required members), allow `OAUTH_JWT_KID` override; (b) a random per-boot `kid`; (c) require an explicit configured `kid`.
+- **Chose.** (a) - commit `7baa330`.
+- **Why.** A thumbprint `kid` is **stable for a given key**, so a verifier caching keys by `kid` stays valid across restarts as long as the key is unchanged - exactly the JWKS-rotation contract `jose` expects. A random per-boot `kid` (b) would needlessly invalidate verifier caches every restart; requiring config (c) adds setup friction with no benefit over the derived default. The override preserves operator control.
+- **Reversibility.** Sticky (the `kid` is published in the JWKS and stamped in every token header; verifiers may key their cache on it).
+
+#### DB-10 - `wif` credential-create gate (A1)
+
+- **Question.** "Should creating a `wif` credential require the existing `PerEndpointCredentialsEnabled` flag, or its own flag?"
+- **Options.** (a) Orthogonal - WIF rides a dedicated `WifCredentialsEnabled` flag, independent of the bcrypt-bearer gate; (b) reuse `PerEndpointCredentialsEnabled` for both.
+- **Chose.** (a) - commit `4956cb8`.
+- **Why.** WIF and per-endpoint bcrypt bearers are **independent capabilities** an operator may want one of without the other (e.g. enable federated identity without opening generic per-endpoint bearer creation). Coupling them (b) would force an operator to enable bearer credentials just to use WIF, widening the surface unnecessarily. Two orthogonal flags express the two capabilities precisely; the RED test that proved it (a `wif` create rejected by the bearer gate before the fix) locks the orthogonality.
+- **Reversibility.** Sticky (the gating flag an operator configures is a behavior contract).
+
 ### Class C - Test harness & strategy
 
 #### DC-1 - Make `JWKS_FETCH` overridable in tests
@@ -268,6 +298,14 @@ Each entry: the **question** I would have asked -> the **options** -> the **choi
 - **Chose.** (a).
 - **Why.** It matches the established convention already in `live-test.ps1` (new sections precede the delete/cleanup section, with sequential `9z-A*` ids and dedicated resources cleaned up in-section), so the file stays predictable and the final cleanup still runs last.
 - **Reversibility.** Reversible.
+
+#### DC-7 - Production JWT config under test (Pre-Q.B)
+
+- **Question.** "The `JwtModule` is configured inline in the OAuth module. How do I get the **production** signing config (algorithm pin, `kid`, issuer) under test rather than re-deriving it in the spec?"
+- **Options.** (a) Extract the config as an exported `buildJwtModuleOptions(keys)` factory the module and the unit test both call; (b) test against a hand-rolled config in the spec; (c) only test through E2E.
+- **Chose.** (a) - commit `7baa330`.
+- **Why.** Extracting the factory means the test exercises the **exact** object the module ships (the algorithm allowlist that is the alg-confusion defense), so a regression in the production config fails a fast unit test - not just an E2E. A spec-local config (b) tests a copy that can silently drift from production; E2E-only (c) is slow and gives a coarse signal for a security-critical config. The existing OAuth specs already mock `JwtService`, so they stay insulated.
+- **Reversibility.** Reversible (an exported helper; no contract change).
 
 ### Class D - Security handling
 
@@ -445,6 +483,12 @@ These were constraints the operator set; I did not choose them, I worked within 
 - **Q3 / Q4 / Q5 DEFERRED** - skipped unless explicitly requested.
 - **Run autonomously; 3 fix attempts then mark BLOCKED** - the error-handling envelope I operated in.
 - **Do not revert the multer 2.1.1 -> 2.2.0 bump** that landed via a parallel `master` merge.
+
+And these were **plan-given** (dictated by the architecture/design docs, not chosen by me during execution):
+
+- **Persistence: "no new column"** - `profile.authentication` and the WIF trust ride the existing profile JSONB + `EndpointCredential` table ([architecture section 6.2](AUTHENTICATION_ARCHITECTURE.md)). I implemented it; I did not decide it.
+- **A0/A4 ship inert** - the "model/seams first, enforcement later" staging is the plan's backbone strategy; the *tactical* call DA-4 (ship A4 now vs defer the step) was mine, but the inert-first pattern was given.
+- **The 11-step sequence + critical path** - `Pre-Q.B -> {Q1 || Q2} -> A3 -> Q6 -> A4` came from the reconciled plan; DA-1/DA-3 are my choices *within* it.
 
 ---
 
