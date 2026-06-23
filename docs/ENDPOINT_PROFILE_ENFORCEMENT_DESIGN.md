@@ -21,6 +21,8 @@
 - [6. Design Question: Why a Resolver At All?](#6-design-question-why-a-resolver-at-all)
 - [7. Design Principles & Alternatives Considered](#7-design-principles--alternatives-considered)
 - [8. Phase 1 Design - Minimal Safe Enforcement](#8-phase-1-design---minimal-safe-enforcement)
+  - [8.4 Typed resolution - settings are not just booleans](#84-typed-resolution---settings-are-not-just-booleans)
+  - [8.5 Hierarchical (dependent) settings and runtime enforcement](#85-hierarchical-dependent-settings-and-runtime-enforcement)
 - [9. Phase 2 Design - Settings-Only Model](#9-phase-2-design---settings-only-model)
 - [10. Data Flow Across Layers](#10-data-flow-across-layers)
 - [11. Persistence Model](#11-persistence-model)
@@ -431,6 +433,23 @@ export function resolveNumericLimit(
   const v = profile?.serviceProviderConfig ? spcPath(profile.serviceProviderConfig) : undefined;
   return typeof v === 'number' && v > 0 ? v : defaultValue;
 }
+
+// Settings are NOT all booleans. The registry already declares four value-types
+// (boolean | logLevel | primaryEnforcement | structured); the resolver mirrors
+// that dispatch so enum / string / structured settings resolve with the same
+// precedence and the OpenFeature "never throw, fall back to default" rule
+// (OpenFeature spec 1.4.10). Example: PrimaryEnforcement is a tri-state enum.
+export function resolveEnumSetting<T extends string>(
+  profile: EndpointProfile | undefined,
+  settingKey: string,
+  allowed: readonly T[],
+  defaultValue: T,
+): T {
+  const raw = getConfigString(profile?.settings as EndpointConfig | undefined, settingKey);
+  const lower = raw?.toLowerCase();
+  if (lower && (allowed as readonly string[]).includes(lower)) return lower as T;
+  return defaultValue; // missing OR invalid -> documented default, never throw
+}
 ```
 
 Per-gap enforcement points and behavior:
@@ -442,7 +461,9 @@ Per-gap enforcement points and behavior:
 | 4 patch | Users/Groups/Me PATCH | `... spc.patch.supported ...` | **501 notImplemented** |
 | 5 changePassword | Users/Me create/replace/patch | `... spc.changePassword.supported ...` | `password` write present -> **400 mutability** |
 | 6 filter.maxResults | Users/Groups list service | `resolveNumericLimit(p, spc=>spc.filter.maxResults, MAX_COUNT)` | clamp `count` to per-endpoint value |
-| 7 bulk limits | Bulk controller | `resolveNumericLimit(p, spc=>spc.bulk.maxOperations, BULK_MAX_OPERATIONS)` and `...maxPayloadSize...` | **413 tooLarge** / **400** per per-endpoint value || 10 etag | ETag interceptor + `enforceIfMatch` | `resolveBooleanCapability(p, spc=>spc.etag.supported, undefined, true)` | skip `ETag`/`If-None-Match`/`If-Match`; **`RequireIfMatch` ignored** (guarded by `etag.supported`) |
+| 7 bulk limits | Bulk controller | `resolveNumericLimit(p, spc=>spc.bulk.maxOperations, BULK_MAX_OPERATIONS)` and `...maxPayloadSize...` | **413 tooLarge** / **400** per per-endpoint value |
+| 10 etag | ETag interceptor + `enforceIfMatch` | `resolveBooleanCapability(p, spc=>spc.etag.supported, undefined, true)` | skip `ETag`/`If-None-Match`/`If-Match`; **`RequireIfMatch` ignored** (guarded by `etag.supported`) |
+
 ```mermaid
 flowchart TD
     REQ["GET /Users?filter=..."] --> CAP["resolveBooleanCapability(profile,\n spc.filter.supported, settings, default=true)"]
@@ -462,6 +483,95 @@ The two live prods ship profiles where capabilities are explicitly set (presets 
 `serviceProviderConfig`), so the SPC branch resolves first and behavior matches the advertised contract.
 Fail-open only affects endpoints/tests with **no** profile or **no** `resourceTypes`, which by definition
 have nothing to enforce and were never the bug.
+
+### 8.4 Typed resolution - settings are not just booleans
+
+A capability/behavior setting can be a boolean, an enum, a number, or a structured object. The registry
+**already** models this: every flag declares a `type` from
+`'boolean' | 'logLevel' | 'primaryEnforcement' | 'structured'`, validated by a type-dispatched
+`validateEndpointConfig` and read by typed getters (`getConfigBoolean` / `getConfigString` /
+`getConfigStructured`). This mirrors the industry standard - the OpenFeature spec defines exactly four
+typed flag kinds (**boolean / number / string / structure**), each with a typed default and a
+"never throw, return the default on a bad value" rule.
+
+The resolver therefore has **one resolver per value-type**, not one for booleans only. Each follows the
+same `SPC -> settings -> default` precedence and never throws:
+
+| Value-type | Registry `type` | Reader | Resolver | Example setting | Allowed values |
+|---|---|---|---|---|---|
+| Boolean | `boolean` | `getConfigBoolean` | `resolveBooleanCapability` | `BulkSupported`, `RequireIfMatch` | `true`/`false` (+ `"True"`/`"1"`...) |
+| Enum (string) | `primaryEnforcement` | `getConfigString` | `resolveEnumSetting` | **`PrimaryEnforcement`** | `passthrough` / `normalize` / `reject` |
+| Enum (level) | `logLevel` | `getConfigString` | `resolveEnumSetting` | `logLevel` | `TRACE`..`OFF` or `0`-`6` |
+| Number | `number` (Phase 2) | `getConfigNumber` (Phase 2) | `resolveNumericLimit` | `FilterMaxResults`, `BulkMaxOperations` | integer `>= 1` |
+| Structured | `structured` | `getConfigStructured` | `resolveStructuredSetting` | WIF trust object (reserved) | object matching `structuredSchema` |
+
+**Worked example - `PrimaryEnforcement` (the multi-valued case).** It is a tri-state enum
+(`passthrough` default / `normalize` / `reject`) that governs duplicate-`primary` handling on
+multi-valued complex attributes (RFC 7643 §2.4). It is **not** a capability gap (it is a behavior tuner),
+but it is the canonical proof that the resolver must handle non-booleans:
+
+```ts
+type PrimaryMode = 'passthrough' | 'normalize' | 'reject';
+const mode = resolveEnumSetting<PrimaryMode>(
+  profile, ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT,
+  ['passthrough', 'normalize', 'reject'], 'passthrough',
+);
+// mode drives: passthrough -> store + WARN; normalize -> keep first primary + WARN; reject -> 400 invalidValue
+```
+
+A boolean-only resolver would silently mis-handle `PrimaryEnforcement`, `logLevel`, and the future
+structured flags. Modeling resolution by value-type is what makes the system correct for **all** settings,
+not just on/off ones.
+
+### 8.5 Hierarchical (dependent) settings and runtime enforcement
+
+Some settings only make sense when a parent capability is on. The clearest case is Gap 10:
+`RequireIfMatch` is meaningless when `etag.supported = false`. The same shape recurs:
+`FilterMaxResults` under `FilterSupported`, the four PATCH tuners under `PatchSupported`. This is exactly
+the **prerequisite flag** pattern: a dependent flag serves its parent-defined "off" behavior unless the
+prerequisite is satisfied (LaunchDarkly prerequisites; OpenFeature provider **short-circuit**).
+
+**Design - declare the dependency, enforce by short-circuit.** A flag definition gains an optional
+`dependsOn` (the parent flag key). Resolution evaluates the parent first; if the parent is off, the child
+**short-circuits to its documented inert value** and is never consulted further:
+
+```ts
+export function resolveDependentSetting<T>(
+  profile: EndpointProfile | undefined,
+  parentKey: string,            // e.g. EtagSupported
+  resolveChild: () => T,        // e.g. resolveBooleanCapability(... RequireIfMatch ...)
+  inertValue: T,                // value when parent is off (e.g. false)
+): T {
+  const parentOn = resolveBooleanCapability(profile, spcForKey(parentKey), parentKey, defaultFor(parentKey));
+  if (!parentOn) return inertValue;   // short-circuit: child is inert
+  return resolveChild();
+}
+```
+
+```mermaid
+flowchart TD
+    REQ["PUT /Users/{id} (no If-Match)"] --> P["resolve parent: EtagSupported"]
+    P --> PC{"parent on?"}
+    PC -- no --> INERT["RequireIfMatch -> inert (false)\nno 428; write proceeds"]
+    PC -- yes --> CH["resolve child: RequireIfMatch"]
+    CH --> CD{"required?"}
+    CD -- yes --> R428["428 Precondition Required"]
+    CD -- no --> OK["validate If-Match if present; write"]
+```
+
+**Two enforcement layers (defence in depth):**
+
+1. **Resolution-time (runtime, authoritative):** the short-circuit above guarantees an inert child can
+   never take effect, regardless of what is stored. This is the rule that actually protects the request.
+2. **Validation-time (authoring, advisory):** when an operator sets a child while its parent is off,
+   `validateEndpointConfig` emits a **WARNING** (not a hard error) so the misconfiguration is visible at
+   write time without breaking back-compat. Hard-rejecting would break existing stored profiles, so the
+   warning + runtime short-circuit pair is preferred (same rationale as the fail-open principle).
+
+**Dependency is data, not code.** The parent links live in the registry (`dependsOn`), so the audit in
+[§13](#13-test-strategy) can walk every flag and assert: (a) a declared parent exists, (b) the child has a
+defined inert value, and (c) parent-off makes the child inert at runtime. No dependency is expressed by
+ad-hoc `if` branches scattered across services.
 
 ---
 
@@ -495,19 +605,26 @@ the permanent cure for the entire bug class in [§4](#4-full-gap-inventory).
 
 ### 9.2 New flag taxonomy (tiers)
 
-Phase 2 introduces dependent flags, which the current independent-flag registry does not model:
+Phase 2 introduces dependent + multi-valued flags, which the current independent-flag registry does not
+fully model. Each flag carries a **value-type** (today `boolean | logLevel | primaryEnforcement |
+structured`; Phase 2 adds `number`) and an optional **`dependsOn`** parent key:
 
-| Tier | Flags | Parent | Meaning |
-|---|---|---|---|
-| B - capability master switches | `PatchSupported`, `BulkSupported`, `FilterSupported`, `SortSupported`, `EtagSupported`, `ChangePasswordSupported` | none | whether the capability exists at all (projected into SPC `*.supported`) |
-| C - parameters | `BulkMaxOperations`, `BulkMaxPayloadSize`, `FilterMaxResults` | the matching Tier-B flag | only meaningful when the parent is on (projected into SPC `*.maxX`) |
-| D - existing behavior tuners | `VerbosePatchSupported`, `IgnoreReadOnlyAttributesInPatch`, `MultiMemberPatchOpForGroupEnabled`, `PatchOpAllowRemoveAllMembers` | `PatchSupported` | refine behavior; only run when PATCH is supported |
-| D | `RequireIfMatch` | `EtagSupported` | only meaningful when ETag is supported (see Gap 10 in [§4](#4-full-gap-inventory)); demanding `If-Match` with ETag off is incoherent and must be guarded |
+| Tier | Flags | Value-type | `dependsOn` | Meaning |
+|---|---|---|---|---|
+| B - capability master switches | `PatchSupported`, `BulkSupported`, `FilterSupported`, `SortSupported`, `EtagSupported`, `ChangePasswordSupported` | boolean | none | whether the capability exists at all (projected into SPC `*.supported`) |
+| C - parameters | `BulkMaxOperations`, `BulkMaxPayloadSize`, `FilterMaxResults` | number | matching Tier-B flag | only meaningful when the parent is on (projected into SPC `*.maxX`); inert value = the global default |
+| D - behavior tuners (boolean) | `VerbosePatchSupported`, `IgnoreReadOnlyAttributesInPatch`, `MultiMemberPatchOpForGroupEnabled`, `PatchOpAllowRemoveAllMembers` | boolean | `PatchSupported` | refine behavior; only run when PATCH is supported; inert value = `false`/no-op |
+| D - behavior tuners (boolean) | `RequireIfMatch` | boolean | `EtagSupported` | only meaningful when ETag is supported (Gap 10 in [§4](#4-full-gap-inventory)); inert value = `false` |
+| D - behavior tuners (enum) | `PrimaryEnforcement` | primaryEnforcement (enum) | none (independent) | tri-state `passthrough`/`normalize`/`reject`; the multi-valued proof that resolution is type-aware, not boolean-only |
+| (cross-cutting) | `logLevel` | logLevel (enum) | none | per-endpoint log level; enum value resolved via `resolveEnumSetting` |
+
+Note two distinct axes: **value-type** (how a setting is read/validated/resolved - [§8.4](#84-typed-resolution---settings-are-not-just-booleans)) and **dependency** (whether a parent must be on - [§8.5](#85-hierarchical-dependent-settings-and-runtime-enforcement)). A flag can be enum-typed and independent (`PrimaryEnforcement`), boolean and dependent (`RequireIfMatch`), or number and dependent (`FilterMaxResults`).
 
 ### 9.3 New value type
 
-Tier-C limits are integers. The registry today supports `boolean | logLevel | primaryEnforcement`.
-Phase 2 adds a `number` flag type with a validator, reader (`getConfigNumber`), and the full 10-cell
+Tier-C limits are integers. The registry today supports `boolean | logLevel | primaryEnforcement |
+structured`. Phase 2 adds a `number` flag type with a validator, reader (`getConfigNumber`), and the full
+10-cell
 endpoint-config-flag audit (registry / default / validator / enforcement / unit / e2e / live / doc /
 UI Switch-or-Input / UI test).
 
@@ -881,6 +998,19 @@ Following the design-doc norm of explicitly addressing cross-cutting concerns (c
 - **RFC 7644 §4** - ServiceProviderConfig is the description of what the server does (the basis for
   Phase 2's "project SPC from settings").
 
+### 16.1 External references (config / flag patterns)
+
+- **OpenFeature Specification §1.3-1.4** - typed flag evaluation across **boolean / number / string /
+  structure**, each with a typed default and the "never throw, return default on bad value" rule
+  (basis for [§8.4](#84-typed-resolution---settings-are-not-just-booleans)).
+  <https://openfeature.dev/specification/sections/flag-evaluation>
+- **OpenFeature provider lifecycle - short-circuit** - evaluation short-circuits to the default when a
+  prerequisite/provider is not ready; the model adapted for parent-off dependent settings in
+  [§8.5](#85-hierarchical-dependent-settings-and-runtime-enforcement).
+- **LaunchDarkly prerequisite flags** - a dependent flag serves its off-variation unless the prerequisite
+  is met; the product precedent for the `dependsOn` short-circuit.
+  <https://launchdarkly.com/docs/home/flags/prerequisites>
+
 ---
 
 ## 17. Open Questions & Decisions Log
@@ -899,6 +1029,9 @@ Following the design-doc norm of explicitly addressing cross-cutting concerns (c
 | D10 | Parity harness | **Add it + a Stage-3 audit prompt** | The self-improvement that closes the systemic blind spot |
 | D11 | Is `etag.supported` enforced today? | **No - it is Gap 10** | The interceptor always emits `ETag` and `enforceIfMatch` runs regardless; latent only because `meta.version` is always generated |
 | D12 | Should `RequireIfMatch` be guarded by `etag.supported`? | **Yes - Tier D depends on Tier B** | Requiring `If-Match` for a versioning system the endpoint claims not to support is incoherent; guard it in Phase 1 enforcement and model the dependency in Phase 2 |
+| D13 | Are settings only booleans? | **No - resolve by value-type** | Registry already declares 4 types (`boolean`/`logLevel`/`primaryEnforcement`/`structured`); resolver has one path per type (`resolveBooleanCapability` / `resolveEnumSetting` / `resolveNumericLimit` / `resolveStructuredSetting`), mirroring OpenFeature's boolean/number/string/structure typed evaluation. `PrimaryEnforcement` (tri-state enum) is the worked example |
+| D14 | How are dependent settings enforced at runtime? | **Short-circuit on the parent** | A `dependsOn` registry link + `resolveDependentSetting` returns the child's inert value when the parent is off (prerequisite-flag / OpenFeature short-circuit pattern). Validation-time emits a WARNING; runtime is authoritative |
+| D15 | Reject or warn when a child is set with parent off? | **Warn, not reject** | Hard-reject would break existing stored profiles; warning + runtime short-circuit matches the fail-open principle |
 
 ---
 
