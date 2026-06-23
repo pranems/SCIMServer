@@ -258,7 +258,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config);
+    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId, config);
 
@@ -321,7 +321,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config);
+    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
@@ -392,7 +392,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config);
+    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     try {
       await this.userRepo.delete(user.id);
