@@ -8,12 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Documentation
-
 - Corrected the API surface count across all user-facing docs from the stale "84 routes / 19 controllers" to the source-verified **86 route handlers across 20 controllers** (the earlier figure omitted `DashboardController`'s 2 analytics routes and `WebController`'s SPA catch-all). Updated [README.md](README.md), [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) (header + 3 new route-table rows), [docs/INDEX.md](docs/INDEX.md), and [docs/MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md) (controller table).
 - Corrected the importable-collection counts in [docs/INDEX.md](docs/INDEX.md): OpenAPI 75 operations, Postman 81 requests, Insomnia 72 requests (v0.37 export).
 - Refreshed stale `v0.40.0`/April version headers to `v0.53.0`/June 3, 2026 across the Tier-1 guides (endpoint lifecycle, Azure deployment, Docker, multi-endpoint, SCIM reference, SCIM compliance, logging, remote debugging, endpoint profile architecture, project health, collision testing, schema customization).
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
+
+## [0.53.3] - 2026-06-23 - Fix: enforce endpoint profile (resource types + capabilities) at runtime
+
+Closes the **advertise-but-don't-enforce** bug class: the discovery endpoints (`/ResourceTypes`, `/ServiceProviderConfig`) faithfully project the endpoint profile, but the built-in CRUD + capability layers only partially consulted it, so an endpoint could advertise one thing and do another. Reported instance: a **user-only** endpoint (no `Group` resource type) still served the entire Group CRUD surface on customer-facing prod. Full design: [docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md). Branched off the v0.53.2 prod tag (not master) so prod gets only this targeted fix (decision D16).
+
+### Added
+
+- **Two shared, pure resolvers** that both discovery and enforcement consult so "advertised == enforced" is structural: `resolveResourceType` ([api/src/modules/scim/common/resource-type-resolver.ts](api/src/modules/scim/common/resource-type-resolver.ts)) and the capability resolver family `resolveBooleanCapability` / `resolveNumericLimit` / `resolveDependentBoolean` ([api/src/modules/scim/common/capability-resolver.ts](api/src/modules/scim/common/capability-resolver.ts)). Precedence **stored SPC -> settings -> registry default**; never throws (OpenFeature typed-evaluation rule).
+- **Capability enforcement helpers** ([api/src/modules/scim/common/capability-enforcement.ts](api/src/modules/scim/common/capability-enforcement.ts)) shared by Users/Groups/Me so each rejection's status/`scimType`/`errorCode` is defined once.
+- **Discovery-vs-enforcement parity harness** ([api/test/e2e/discovery-enforcement-parity.e2e-spec.ts](api/test/e2e/discovery-enforcement-parity.e2e-spec.ts)) - for every built-in preset, asserts that any resource type NOT in `/ResourceTypes` is rejected by CRUD. This single suite would have caught the reported bug and catches the next preset that narrows its types.
+
+### Fixed (10 enforcement gaps)
+
+- **Gap 1 - resource types (the reported bug):** built-in Users/Groups/Me controllers now return **404 `noTarget`** (`RESOURCE_TYPE_NOT_SUPPORTED`) when the endpoint profile does not declare that resource type. A user-only endpoint now rejects all Group CRUD.
+- **Gap 9 - bulk re-check:** the bulk processor re-checks resource types per sub-operation, so a `/Groups` op on a user-only endpoint yields a per-op 404 inside the envelope.
+- **Gap 2/3 - filter/sort:** `?filter=` / `sortBy` are rejected with **403** when `serviceProviderConfig.filter.supported` / `sort.supported` is explicitly `false`.
+- **Gap 4 - patch:** PATCH is rejected with **501 `notImplemented`** when `patch.supported` is `false`.
+- **Gap 5 - changePassword:** a **PATCH** that changes a password is rejected with **400 `mutability`** when `changePassword.supported` is `false`. Scoped to the change-password flow only - an initial password at create/replace is governed by the `password` writeOnly attribute and remains allowed (decision D19, prevents an Entra ID/Okta provisioning regression).
+- **Gap 6 - filter.maxResults:** the Users/Groups list services clamp `count` to the per-endpoint `filter.maxResults` instead of the global `MAX_COUNT`.
+- **Gap 7 - bulk limits:** the bulk controller enforces per-endpoint `bulk.maxOperations` (**413**) and `bulk.maxPayloadSize` instead of global constants.
+- **Gap 10 - etag:** the ETag interceptor and `enforceIfMatch` skip ETag emission / `If-Match` enforcement when `etag.supported` is `false`; `RequireIfMatch` is guarded by `etag.supported` (a dependent setting is inert when its parent capability is off).
+- **Express auto-ETag disabled** app-wide (`app.set('etag', false)`) so the SCIM `meta.version` weak ETag (RFC 7644 §3.14) is the only ETag source (decision D20).
+
+All enforcement is **fail-open**: a capability is enforced only when explicitly set to `false`, and resource-type gating only triggers when the profile declares `resourceTypes` (decision D17). Endpoints from full presets (entra-id, rfc-standard, minimal) and legacy/partial-profile endpoints are unchanged.
+
+### Tests
+
+- API unit: **3,816 -> 3,884** (+68; resolver/enforcement/controller/interceptor/service specs).
+- API E2E: added `profile-enforcement-gaps.e2e-spec` (13) + `discovery-enforcement-parity.e2e-spec` (7); full suite green on both InMemory (1,239) and Prisma backends.
 
 ## [0.53.2] - 2026-06-10 - Fix: stabilize endpoint-detail Overview visual-regression baseline
 
