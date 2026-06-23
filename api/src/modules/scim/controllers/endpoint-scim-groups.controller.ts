@@ -16,6 +16,8 @@ import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
+import { createScimError } from '../common/scim-errors';
+import { resolveResourceType } from '../common/resource-type-resolver';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateGroupDto } from '../dto/create-group.dto';
@@ -73,6 +75,19 @@ export class EndpointScimGroupsController {
     }
 
     const profile = endpoint.profile;
+
+    // Gap 1: enforce the profile's resourceTypes for built-in CRUD (RFC 7643 §6).
+    // Fail-open when resourceTypes is absent/empty; reject when Group is not declared.
+    const { supported } = resolveResourceType(profile, { name: 'Group', endpointPath: '/Groups' });
+    if (!supported) {
+      throw createScimError({
+        status: 404,
+        scimType: 'noTarget',
+        detail: `Resource type "Group" is not supported by endpoint "${endpoint.name}".`,
+        diagnostics: { errorCode: 'RESOURCE_TYPE_NOT_SUPPORTED', operation: 'group' },
+      });
+    }
+
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });

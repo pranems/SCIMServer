@@ -39,6 +39,7 @@ import { PatchUserDto } from '../dto/patch-user.dto';
 import { applyAttributeProjection } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 import { createScimError } from '../common/scim-errors';
+import { resolveResourceType } from '../common/resource-type-resolver';
 
 /** Extended request interface matching SharedSecretGuard output. */
 interface AuthenticatedRequest extends Request {
@@ -80,6 +81,19 @@ export class ScimMeController {
     }
 
     const profile = endpoint.profile;
+
+    // Gap 1: /Me is an alias for the User resource; enforce the profile's
+    // resourceTypes (RFC 7643 §6). Fail-open when resourceTypes is absent/empty.
+    const { supported } = resolveResourceType(profile, { name: 'User', endpointPath: '/Users' });
+    if (!supported) {
+      throw createScimError({
+        status: 404,
+        scimType: 'noTarget',
+        detail: `Resource type "User" is not supported by endpoint "${endpoint.name}".`,
+        diagnostics: { errorCode: 'RESOURCE_TYPE_NOT_SUPPORTED', operation: 'user' },
+      });
+    }
+
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });

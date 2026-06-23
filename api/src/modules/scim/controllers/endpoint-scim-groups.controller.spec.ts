@@ -447,7 +447,86 @@ describe('EndpointScimGroupsController', () => {
     });
   });
 
-  // ───────────── G8e: returned characteristic filtering ─────────────
+  // ───────────── Gap 1: resource-type gating (RFC 7643 §6) ─────────────
+
+  describe('Resource-type gating (user-only endpoint rejects Groups)', () => {
+    const userOnlyEndpoint = {
+      ...mockEndpoint,
+      name: 'user-only-ep',
+      profile: {
+        schemas: [],
+        resourceTypes: [
+          { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+        ],
+        serviceProviderConfig: {},
+        settings: {},
+      },
+    };
+
+    it('createGroup should throw 404 noTarget when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.createGroup('endpoint-1', { schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: 'x' } as any, mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+
+      expect(mockGroupsService.createGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('getGroup should throw 404 when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.getGroup('endpoint-1', 'group-123', mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+
+      expect(mockGroupsService.getGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('listGroups should throw 404 when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('deleteGroup should throw 404 when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.deleteGroup('endpoint-1', 'group-123', mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+
+      expect(mockGroupsService.deleteGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('createGroup should succeed when Group IS in the profile', async () => {
+      const bothEndpoint = {
+        ...mockEndpoint,
+        profile: {
+          schemas: [],
+          resourceTypes: [
+            { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+            { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [] },
+          ],
+          serviceProviderConfig: {},
+          settings: {},
+        },
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(bothEndpoint);
+      mockGroupsService.createGroupForEndpoint.mockResolvedValue({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], id: 'g1', displayName: 'x', members: [], meta: {},
+      });
+
+      await expect(
+        controller.createGroup('endpoint-1', { schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: 'x' } as any, mockRequest)
+      ).resolves.toBeDefined();
+
+      expect(mockGroupsService.createGroupForEndpoint).toHaveBeenCalled();
+    });
+  });
+
 
   describe('G8e - returned:request attribute filtering', () => {
     it('POST createGroup should strip returned:request attributes from response', async () => {

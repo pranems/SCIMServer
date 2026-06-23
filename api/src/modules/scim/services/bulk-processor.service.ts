@@ -17,7 +17,9 @@ import { HttpException } from '@nestjs/common';
 import { EndpointScimUsersService } from './endpoint-scim-users.service';
 import { EndpointScimGroupsService } from './endpoint-scim-groups.service';
 import { createScimError } from '../common/scim-errors';
+import { resolveResourceType } from '../common/resource-type-resolver';
 import { SCIM_ERROR_SCHEMA, SCIM_ERROR_TYPE } from '../common/scim-constants';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import type {
   BulkOperationDto,
@@ -61,6 +63,7 @@ export class BulkProcessorService {
     private readonly usersService: EndpointScimUsersService,
     private readonly groupsService: EndpointScimGroupsService,
     private readonly logger: ScimLogger,
+    private readonly endpointContext: EndpointContextStorage,
   ) {}
 
   /**
@@ -159,6 +162,23 @@ export class BulkProcessorService {
 
     // Validate method + path consistency
     this.validateMethodPathConsistency(method, resourceType, resourceId);
+
+    // Gap 9: re-check the profile's resourceTypes per sub-operation, so a bulk
+    // envelope reports its own 404 for a resource type this endpoint does not
+    // serve (RFC 7643 §6). Fail-open when no profile/resourceTypes is set.
+    const profile = this.endpointContext.getProfile();
+    if (resourceType === 'Users' || resourceType === 'Groups') {
+      const rtName = resourceType === 'Users' ? 'User' : 'Group';
+      const { supported } = resolveResourceType(profile, { name: rtName, endpointPath: `/${resourceType}` });
+      if (!supported) {
+        throw createScimError({
+          status: 404,
+          scimType: SCIM_ERROR_TYPE.NO_TARGET,
+          detail: `Resource type "${rtName}" is not supported by this endpoint.`,
+          diagnostics: { errorCode: 'RESOURCE_TYPE_NOT_SUPPORTED', operation: rtName.toLowerCase() },
+        });
+      }
+    }
 
     switch (resourceType) {
       case 'Users':
