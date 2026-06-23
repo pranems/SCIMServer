@@ -201,8 +201,7 @@ export class ScimMeController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string,
   ) {
-    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
-    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);

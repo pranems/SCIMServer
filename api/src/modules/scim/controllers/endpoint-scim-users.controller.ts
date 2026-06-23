@@ -109,8 +109,7 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
-    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
@@ -271,8 +270,7 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
-    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
