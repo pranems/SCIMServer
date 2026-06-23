@@ -18,6 +18,8 @@ import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '..
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { createScimError } from '../common/scim-errors';
 import { resolveResourceType } from '../common/resource-type-resolver';
+import { enforcePatchSupported, enforceFilterSupported, enforceSortSupported } from '../common/capability-enforcement';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateGroupDto } from '../dto/create-group.dto';
@@ -67,7 +69,7 @@ export class EndpointScimGroupsController {
   private async validateAndSetContext(
     endpointId: string,
     req: Request
-  ): Promise<{ baseUrl: string; config: EndpointConfig }> {
+  ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined }> {
     const endpoint = await this.endpointService.getEndpoint(endpointId);
 
     if (!endpoint.active) {
@@ -92,7 +94,7 @@ export class EndpointScimGroupsController {
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
-    return { baseUrl, config };
+    return { baseUrl, config, profile };
   }
 
   // ===== Groups Endpoints =====
@@ -134,7 +136,9 @@ export class EndpointScimGroupsController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceFilterSupported(profile, filter);
+    enforceSortSupported(profile, sortBy);
     const result = await this.groupsService.listGroupsForEndpoint(
       {
         filter,
@@ -189,7 +193,9 @@ export class EndpointScimGroupsController {
     @Body() dto: SearchRequestDto,
     @Req() req: Request
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceFilterSupported(profile, dto.filter);
+    enforceSortSupported(profile, dto.sortBy);
     const result = await this.groupsService.listGroupsForEndpoint(
       {
         filter: dto.filter,
@@ -288,7 +294,8 @@ export class EndpointScimGroupsController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforcePatchSupported(profile);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)

@@ -527,6 +527,60 @@ describe('EndpointScimGroupsController', () => {
     });
   });
 
+  // ───────────── Gaps 2/3/4: capability gating ─────────────
+
+  describe('Capability gating (filter/sort/patch)', () => {
+    function epWithSpc(spc: Record<string, unknown>) {
+      return {
+        ...mockEndpoint,
+        profile: {
+          schemas: [],
+          resourceTypes: [
+            { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [] },
+          ],
+          serviceProviderConfig: spc,
+          settings: {},
+        },
+      };
+    }
+
+    it('listGroups throws 403 when filter.supported=false and a filter is supplied', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ filter: { supported: false } }));
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest, 'displayName eq "x"')
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('listGroups succeeds when filter.supported=false but no filter is supplied', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ filter: { supported: false } }));
+      mockGroupsService.listGroupsForEndpoint.mockResolvedValue({ schemas: [], totalResults: 0, Resources: [] });
+      await expect(controller.listGroups('endpoint-1', mockRequest)).resolves.toBeDefined();
+    });
+
+    it('listGroups throws 403 when sort.supported=false and sortBy is supplied', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ sort: { supported: false } }));
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest, undefined, undefined, undefined, 'displayName')
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('updateGroup throws 501 when patch.supported=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ patch: { supported: false } }));
+      await expect(
+        controller.updateGroup('endpoint-1', 'g1', { schemas: [], Operations: [] } as any, mockRequest)
+      ).rejects.toMatchObject({ status: 501 });
+      expect(mockGroupsService.patchGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('updateGroup succeeds when patch.supported=true', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ patch: { supported: true } }));
+      mockGroupsService.patchGroupForEndpoint.mockResolvedValue({ schemas: [], id: 'g1', displayName: 'x', members: [], meta: {} });
+      await expect(
+        controller.updateGroup('endpoint-1', 'g1', { schemas: [], Operations: [] } as any, mockRequest)
+      ).resolves.toBeDefined();
+    });
+  });
+
 
   describe('G8e - returned:request attribute filtering', () => {
     it('POST createGroup should strip returned:request attributes from response', async () => {

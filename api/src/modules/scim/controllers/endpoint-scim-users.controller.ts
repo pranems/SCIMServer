@@ -18,6 +18,8 @@ import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '..
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { createScimError } from '../common/scim-errors';
 import { resolveResourceType } from '../common/resource-type-resolver';
+import { enforcePatchSupported, enforceFilterSupported, enforceSortSupported, enforceChangePasswordSupported, hasPasswordWrite } from '../common/capability-enforcement';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -67,7 +69,7 @@ export class EndpointScimUsersController {
   private async validateAndSetContext(
     endpointId: string,
     req: Request
-  ): Promise<{ baseUrl: string; config: EndpointConfig }> {
+  ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined }> {
     const endpoint = await this.endpointService.getEndpoint(endpointId);
 
     if (!endpoint.active) {
@@ -92,7 +94,7 @@ export class EndpointScimUsersController {
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
-    return { baseUrl, config };
+    return { baseUrl, config, profile };
   }
 
   /**
@@ -107,7 +109,8 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
     const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
@@ -132,7 +135,9 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceFilterSupported(profile, filter);
+    enforceSortSupported(profile, sortBy);
     const result = await this.usersService.listUsersForEndpoint(
       {
         filter,
@@ -188,7 +193,9 @@ export class EndpointScimUsersController {
     @Body() dto: SearchRequestDto,
     @Req() req: Request
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceFilterSupported(profile, dto.filter);
+    enforceSortSupported(profile, dto.sortBy);
     const result = await this.usersService.listUsersForEndpoint(
       {
         filter: dto.filter,
@@ -264,7 +271,8 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
@@ -287,7 +295,9 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforcePatchSupported(profile);
+    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
