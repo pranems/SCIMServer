@@ -137,11 +137,12 @@ sequenceDiagram
 
 ## 3. The PatchOp envelope
 
-```json
+```jsonc
+// Schematic shape (placeholders) - see the worked examples below for literal payloads.
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
   "Operations": [
-    { "op": "add|replace|remove", "path": "<optional>", "value": <varies> }
+    { "op": "add|replace|remove", "path": "<optional>", "value": "<varies>" }
   ]
 }
 ```
@@ -287,38 +288,72 @@ Engine: [user-patch-engine.ts](../api/src/domain/patch/user-patch-engine.ts). Di
 
 Replace a single-valued attribute:
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "title", "value": "Senior Engineer" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "replace", "path": "title", "value": "Senior Engineer" }
+  ]
+}
 ```
 
 Update a work email value via value-path (works regardless of VerbosePatch):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "emails[type eq \"work\"].value", "value": "ada@example.com" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "replace", "path": "emails[type eq \"work\"].value", "value": "ada@example.com" }
+  ]
+}
 ```
 
 Disable a user (Entra deprovision):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "active", "value": false } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "replace", "path": "active", "value": false }
+  ]
+}
 ```
 
 No-path multi-attribute merge (preserves untouched attributes):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "value": { "displayName": "Ada Lovelace", "title": "Engineer" } } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "displayName": "Ada Lovelace",
+        "title": "Engineer"
+      }
+    }
+  ]
+}
 ```
 
 Update a sub-attribute the RFC-portable way (no flag needed):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "name", "value": { "familyName": "Lovelace" } } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "path": "name",
+      "value": { "familyName": "Lovelace" }
+    }
+  ]
+}
 ```
 
 Same change, dot-notation (requires `VerbosePatchSupported: true` to nest on Users):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "name.familyName", "value": "Lovelace" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "replace", "path": "name.familyName", "value": "Lovelace" }
+  ]
+}
 ```
 
 ---
@@ -331,22 +366,45 @@ Engine: [group-patch-engine.ts](../api/src/domain/patch/group-patch-engine.ts). 
 
 Add members (multi-member needs `MultiMemberPatchOpForGroupEnabled`, default on):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "add", "path": "members",
-    "value": [ { "value": "user-id-1" }, { "value": "user-id-2" } ] } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "add",
+      "path": "members",
+      "value": [
+        { "value": "user-id-1" },
+        { "value": "user-id-2" }
+      ]
+    }
+  ]
+}
 ```
 
 Remove one member by value-path filter:
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "remove", "path": "members[value eq \"user-id-1\"]" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "remove", "path": "members[value eq \"user-id-1\"]" }
+  ]
+}
 ```
 
 Replace the entire member list:
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "members",
-    "value": [ { "value": "user-id-3" } ] } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "path": "members",
+      "value": [
+        { "value": "user-id-3" }
+      ]
+    }
+  ]
+}
 ```
 
 Clear all members:
@@ -359,8 +417,12 @@ Clear all members:
 
 Rename the group:
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "path": "displayName", "value": "Engineering" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "replace", "path": "displayName", "value": "Engineering" }
+  ]
+}
 ```
 
 `remove displayName` -> 400 (required for Group, RFC 7643 §4.2). Member entries with `value:null` are rejected 400 (F4). Duplicate members are de-duplicated.
@@ -373,26 +435,48 @@ Extension attributes live under a schema URN namespace (for example the enterpri
 
 Set an enterprise attribute (granular path form):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace",
-    "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department",
-    "value": "Research" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department",
+      "value": "Research"
+    }
+  ]
+}
 ```
 
 Set a manager (Entra reference-attribute pattern):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "add",
-    "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager",
-    "value": "00aa00aa-bb11-cc22-dd33-44ee44ee44ee" } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "add",
+      "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager",
+      "value": "00aa00aa-bb11-cc22-dd33-44ee44ee44ee"
+    }
+  ]
+}
 ```
 
 No-path merge into an extension namespace (Entra also sends this shape):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "value": {
-    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": { "department": "Research", "costCenter": null }
-  } } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+          "department": "Research",
+          "costCenter": null
+        }
+      }
+    }
+  ]
+}
 ```
 
 Behavior notes:
@@ -414,18 +498,30 @@ Key differences from Users/Groups:
 
 Examples (resourceType `Devices`):
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
   "Operations": [
     { "op": "replace", "path": "displayName", "value": "Lab Printer 2" },
     { "op": "add", "path": "location.building", "value": "B12" },
     { "op": "remove", "path": "tags[value eq \"retired\"]" }
-  ] }
+  ]
+}
 ```
 
 No-path merge works identically:
 ```json
-{ "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [ { "op": "replace", "value": { "status": "active", "owner": "team-iam" } } ] }
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "status": "active",
+        "owner": "team-iam"
+      }
+    }
+  ]
+}
 ```
 
 ---
