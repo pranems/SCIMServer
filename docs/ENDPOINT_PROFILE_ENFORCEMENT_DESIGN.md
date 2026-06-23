@@ -34,11 +34,11 @@
 
 An endpoint's **profile** is the single document that declares what a SCIM endpoint is: its `schemas`, its `resourceTypes`, its `serviceProviderConfig` (capabilities), and its `settings` (behavioral flags). The **discovery** endpoints (`/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`) faithfully project this profile. The **CRUD and capability** layers, however, only partially consult it.
 
-The result is a class of bugs we call **advertise-but-don't-enforce**: discovery says one thing, runtime does another. The reported instance is that a **user-only** endpoint (no `Group` resource type) still serves the entire Group CRUD surface. A full audit found **9 gaps** of the same shape.
+The result is a class of bugs we call **advertise-but-don't-enforce**: discovery says one thing, runtime does another. The reported instance is that a **user-only** endpoint (no `Group` resource type) still serves the entire Group CRUD surface. A full audit found **10 gaps** of the same shape.
 
 This document specifies:
 
-- **Phase 1 (v0.53.3, this branch):** a minimal, low-risk fix that makes the runtime honor the profile for all 9 gaps, with **no storage change and no migration**. It introduces two shared resolvers - one for resource types, one for capabilities - that both discovery and enforcement consult, so the two layers cannot drift.
+- **Phase 1 (v0.53.3, this branch):** a minimal, low-risk fix that makes the runtime honor the profile for all 10 gaps, with **no storage change and no migration**. It introduces two shared resolvers - one for resource types, one for capabilities - that both discovery and enforcement consult, so the two layers cannot drift.
 - **Phase 2 (v0.54+, separate branch):** an architectural simplification where `serviceProviderConfig` is no longer stored in the profile but is **computed** from `settings`. This collapses the dual source of truth into one and is the permanent cure for the bug class.
 
 ---
@@ -152,12 +152,21 @@ Every row is "advertised in discovery, not enforced at runtime." Status codes fo
 | 7 | `bulk.maxOperations` / `maxPayloadSize` | Yes | **No** (global consts) | 413 `tooLarge` / 400 per the per-endpoint value | 7644 §3.7 |
 | 8 | `bulk.supported` | Yes | **Yes** (the only one) | 403 on `/Bulk` | 7644 §3.7 |
 | 9 | bulk dispatch re-check of `resourceTypes` | n/a | **No** | per-op 404 inside the bulk envelope | 7643 §6 |
+| 10 | `etag.supported` | Yes | **No** | omit `ETag` header + `If-None-Match`/`If-Match` handling; reject `RequireIfMatch` when off | 7644 §3.14 |
 
 Notes:
 - Gap 8 is the precedent we follow: `bulk.supported` is read straight from the stored profile in
   [endpoint-scim-bulk.controller.ts](../api/src/modules/scim/controllers/endpoint-scim-bulk.controller.ts).
 - Gap 9 is mitigated today only because the user-only presets ship `bulk.supported = false`; it would
   surface the moment bulk is enabled on a single-resource-type endpoint.
+- Gap 10: the ETag interceptor always emits `ETag` headers, and `enforceIfMatch` honors `RequireIfMatch`
+  regardless of `etag.supported`. See [scim-etag.interceptor.ts](../api/src/modules/scim/interceptors/scim-etag.interceptor.ts)
+  and [scim-service-helpers.ts](../api/src/modules/scim/common/scim-service-helpers.ts) (`enforceIfMatch`).
+  Latent today because `meta.version` is always generated, so no shipped endpoint sets
+  `etag.supported = false`. The **`RequireIfMatch` setting (Tier D) must be guarded by `etag.supported`
+  (Tier B)**: demanding `If-Match` for a versioning system the endpoint claims not to support is
+  incoherent. This is the concrete reason the Phase 2 taxonomy models parent -> child flag dependencies
+  (see [§9.2](#92-new-flag-taxonomy-tiers)).
 
 ---
 
@@ -323,7 +332,7 @@ flowchart LR
     S -- yes --> SVC["groupsService.createGroupForEndpoint(...)"]
 ```
 
-### 8.2 Capability resolver (Gaps 2-7)
+### 8.2 Capability resolver (Gaps 2-7, 10)
 
 A pure module, e.g. `api/src/modules/scim/common/capability-resolver.ts`, with precedence
 **SPC -> settings -> registry default**:
@@ -366,8 +375,7 @@ Per-gap enforcement points and behavior:
 | 4 patch | Users/Groups/Me PATCH | `... spc.patch.supported ...` | **501 notImplemented** |
 | 5 changePassword | Users/Me create/replace/patch | `... spc.changePassword.supported ...` | `password` write present -> **400 mutability** |
 | 6 filter.maxResults | Users/Groups list service | `resolveNumericLimit(p, spc=>spc.filter.maxResults, MAX_COUNT)` | clamp `count` to per-endpoint value |
-| 7 bulk limits | Bulk controller | `resolveNumericLimit(p, spc=>spc.bulk.maxOperations, BULK_MAX_OPERATIONS)` and `...maxPayloadSize...` | **413 tooLarge** / **400** per per-endpoint value |
-
+| 7 bulk limits | Bulk controller | `resolveNumericLimit(p, spc=>spc.bulk.maxOperations, BULK_MAX_OPERATIONS)` and `...maxPayloadSize...` | **413 tooLarge** / **400** per per-endpoint value || 10 etag | ETag interceptor + `enforceIfMatch` | `resolveBooleanCapability(p, spc=>spc.etag.supported, undefined, true)` | skip `ETag`/`If-None-Match`/`If-Match`; **`RequireIfMatch` ignored** (guarded by `etag.supported`) |
 ```mermaid
 flowchart TD
     REQ["GET /Users?filter=..."] --> CAP["resolveBooleanCapability(profile,\n spc.filter.supported, settings, default=true)"]
@@ -427,7 +435,7 @@ Phase 2 introduces dependent flags, which the current independent-flag registry 
 | B - capability master switches | `PatchSupported`, `BulkSupported`, `FilterSupported`, `SortSupported`, `EtagSupported`, `ChangePasswordSupported` | none | whether the capability exists at all (projected into SPC `*.supported`) |
 | C - parameters | `BulkMaxOperations`, `BulkMaxPayloadSize`, `FilterMaxResults` | the matching Tier-B flag | only meaningful when the parent is on (projected into SPC `*.maxX`) |
 | D - existing behavior tuners | `VerbosePatchSupported`, `IgnoreReadOnlyAttributesInPatch`, `MultiMemberPatchOpForGroupEnabled`, `PatchOpAllowRemoveAllMembers` | `PatchSupported` | refine behavior; only run when PATCH is supported |
-| D | `RequireIfMatch` | `EtagSupported` | only meaningful when ETag is supported |
+| D | `RequireIfMatch` | `EtagSupported` | only meaningful when ETag is supported (see Gap 10 in [§4](#4-full-gap-inventory)); demanding `If-Match` with ETag off is incoherent and must be guarded |
 
 ### 9.3 New value type
 
@@ -645,19 +653,19 @@ flowchart TD
     ASSERT -- yes --> PASS["PASS"]
 ```
 
-This single suite would have caught all 9 gaps at once and catches the next one. It is paired with a new
+This single suite would have caught all 10 gaps at once and catches the next one. It is paired with a new
 Stage-3 audit prompt (`discoveryEnforcementParityAudit`) added to the quality-gate doc so the discipline
 is operationalized, not just a one-off test.
 
 ### 13.3 Coverage matrix (target)
 
-| Layer | Gap 1 | Gap 2 | Gap 3 | Gap 4 | Gap 5 | Gap 6 | Gap 7 | Gap 9 | Parity |
-|---|---|---|---|---|---|---|---|---|---|
-| Resolver unit | yes | yes | yes | yes | yes | yes | yes | yes | n/a |
-| Controller unit | yes | yes | yes | yes | yes | - | yes | yes | n/a |
-| Service unit | - | - | - | - | - | yes | - | - | n/a |
-| E2E | yes | yes | yes | yes | yes | yes | yes | yes | yes |
-| Live (ps1) | yes | yes | yes | yes | yes | yes | yes | yes | - |
+| Layer | Gap 1 | Gap 2 | Gap 3 | Gap 4 | Gap 5 | Gap 6 | Gap 7 | Gap 9 | Gap 10 | Parity |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Resolver unit | yes | yes | yes | yes | yes | yes | yes | yes | yes | n/a |
+| Controller unit | yes | yes | yes | yes | yes | - | yes | yes | yes | n/a |
+| Service unit | - | - | - | - | - | yes | - | - | - | n/a |
+| E2E | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| Live (ps1) | yes | yes | yes | yes | yes | yes | yes | yes | yes | - |
 
 ---
 
@@ -694,7 +702,9 @@ unaffected.
 - **RFC 7644 §3.5.2** - PATCH; `patch.supported` governs availability (501 when unsupported).
 - **RFC 7644 §3.7** - Bulk; `bulk.supported`, `maxOperations`, `maxPayloadSize`.
 - **RFC 7644 §3.12 / Table 9** - Error response shape and `scimType` keywords
-  (`noTarget`, `invalidValue`, `mutability`, `tooLarge`, `notImplemented`).
+  (`noTarget`, `invalidValue`, `mutability`, `tooLarge`, `notImplemented`, `versionMismatch`).
+- **RFC 7644 §3.14** - ETag / `If-Match` / `If-None-Match` concurrency control; `etag.supported`
+  governs availability. `RequireIfMatch` (428 on missing `If-Match`) only applies when ETag is supported.
 - **RFC 7644 §4** - ServiceProviderConfig is the description of what the server does (the basis for
   Phase 2's "project SPC from settings").
 
@@ -714,6 +724,8 @@ unaffected.
 | D8 | Status code for unsupported filter/sort | **403 forbidden** | Capability explicitly disabled by the provider |
 | D9 | Version | **v0.53.3** | Keep the fix on the prod line, cleanly promotable |
 | D10 | Parity harness | **Add it + a Stage-3 audit prompt** | The self-improvement that closes the systemic blind spot |
+| D11 | Is `etag.supported` enforced today? | **No - it is Gap 10** | The interceptor always emits `ETag` and `enforceIfMatch` runs regardless; latent only because `meta.version` is always generated |
+| D12 | Should `RequireIfMatch` be guarded by `etag.supported`? | **Yes - Tier D depends on Tier B** | Requiring `If-Match` for a versioning system the endpoint claims not to support is incoherent; guard it in Phase 1 enforcement and model the dependency in Phase 2 |
 
 ---
 
