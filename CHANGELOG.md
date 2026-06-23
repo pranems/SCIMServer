@@ -15,6 +15,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.54.0-alpha.8] - 2026-06-18 - Auth A2: computed authenticationSchemes discovery
+
+Eighth step of the reconciled authentication build. Makes the per-endpoint /ServiceProviderConfig advertise authenticationSchemes computed from the enabled methods. (The JWKS publication + RFC 8414 metadata that A2 also names shipped in Pre-Q.B + Q0.) Feature doc: [docs/auth/COMPUTED_AUTHENTICATION_SCHEMES.md](docs/auth/COMPUTED_AUTHENTICATION_SCHEMES.md).
+
+### Added
+
+- **`computeAuthenticationSchemes(baseline, authentication)`** ([authentication-schemes.ts](api/src/modules/scim/discovery/authentication-schemes.ts)): the baseline `oauthbearertoken` scheme is always present; each ENABLED method in `profile.authentication.methods[]` adds a scheme (method `type` mapped to the RFC 7643 section 5 scheme vocabulary - `bearer`/`shared-secret`->`oauthbearertoken`, `httpbasic`->`httpbasic`, everything else->`oauth2`); `primary:true` lands on the `defaultMethodId` scheme (else baseline stays primary; exactly one primary). The baseline is cloned, never mutated.
+- **Wired into discovery** ([scim-discovery.service.ts](api/src/modules/scim/discovery/scim-discovery.service.ts)): `getSpcFromProfile` now computes the schemes from `profile.authentication`. A method-less endpoint is unchanged (baseline only), so existing discovery contracts hold.
+
+### Validation
+
+- TDD: 8 unit ([authentication-schemes.spec.ts](api/src/modules/scim/discovery/authentication-schemes.spec.ts), RED confirmed by a baseline-only stub -> GREEN) + 4 E2E ([computed-authentication-schemes.e2e-spec.ts](api/test/e2e/computed-authentication-schemes.e2e-spec.ts)) + 5 live (`scripts/live-test.ps1` section 9z-AR).
+- API unit: **3,907 -> 3,915** (106 suites). Existing discovery/SPC specs (98) still green. Local-node live: **1,081 pass / 0 fail** including 9z-AR. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic (pure computation over profile data). Docker + dev-Azure batched to the next critical-path checkpoint.
+
+## [0.54.0-alpha.7] - 2026-06-18 - Auth A1: admin authentication-methods API + WifCredentialsEnabled flag + orthogonal gate
+
+Seventh step of the reconciled authentication build. Adds the management surface for the A0 inert authentication model, the `WifCredentialsEnabled` flag (17th endpoint config flag), and the orthogonal credential-create gate. Feature doc: [docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md).
+
+### Added
+
+- **Admin authentication-methods CRUD** ([admin-authentication-method.controller.ts](api/src/modules/scim/controllers/admin-authentication-method.controller.ts)): GET/POST/DELETE `/admin/endpoints/:id/authentication/methods` to manage `profile.authentication.methods[]`. The server assigns method `id`; an unknown `type` is 400; persistence rides the endpoint profile via `EndpointService.updateEndpoint` (so both backends behave identically). `mergeProfilePartial` gained `authentication` block replacement.
+- **`WifCredentialsEnabled` config flag** ([endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts)): boolean, default false; the per-endpoint enabling switch for WIF (the 17th flag). Documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md). The two UI cells of its 10-cell matrix land with the Q6 CredentialsTab WIF section.
+- **`wif` credential type** ([admin-credential.controller.ts](api/src/modules/scim/controllers/admin-credential.controller.ts)): stores only public trust values (issuer/subject/audience/jwksUri/allowedTenantId/...) in `EndpointCredential.metadata` with an empty `credentialHash`; the response carries no secret/hash/token.
+
+### Security
+
+- **Orthogonal create gate**: `wif` credentials are allowed when `WifCredentialsEnabled` is on, independent of `PerEndpointCredentialsEnabled`; `bearer`/`oauth_client` still require `PerEndpointCredentialsEnabled`. The A0 no-secret invariant (secret-looking config keys stripped on save) is enforced on the authentication-methods CRUD too.
+
+### Validation
+
+- TDD: 3 unit (flag) + 4 unit (orthogonal gate) + 7 E2E ([admin-authentication-methods.e2e-spec.ts](api/test/e2e/admin-authentication-methods.e2e-spec.ts)) + 9 live (`scripts/live-test.ps1` section 9z-AQ).
+- API unit: **3,886 -> 3,907** (105 suites). Local-node live: **1,076 pass / 0 fail** including 9z-AQ. Build 0 err; ESLint 0 err / 464 warnings (no new - a transient +1 was fixed). Parity: wif credential rides EndpointCredential.metadata + authentication rides profile JSONB (identical both backends). Docker + dev-Azure batched to the next critical-path checkpoint.
+
+## [0.54.0-alpha.6] - 2026-06-18 - Auth Q2: external JWKS validator (jose)
+
+Sixth step of the reconciled authentication build (critical path). Adds the reusable external-JWT signature core that Q6's WIF validator builds on. Closes ISV Pattern 4 (external JWKS-validated JWT). Feature doc: [docs/auth/EXTERNAL_JWKS_VALIDATOR.md](docs/auth/EXTERNAL_JWKS_VALIDATOR.md).
+
+### Added
+
+- **Dependency `jose@^5`** (api): the most-vetted Node JWT/JWKS library. ESM-only; loaded via dynamic `import('jose')` so the CommonJS build emits a runtime import (verified against the compiled `dist/` output on Node 24, not just ts-jest). `jose` carries no security advisory.
+- **`ExternalJwksValidatorService`** ([external-jwks-validator.service.ts](api/src/oauth/external-jwks-validator.service.ts)): `verify(token, jwksUri)` against a remote JWKS with five hard guarantees - (1) algorithm pinning to RS256/ES256 (rejects `alg:none` + HMAC), (2) **SSRF host allowlist** (`JWKS_HOST_ALLOWLIST`, https-only, rejected before any network call), (3) cache-by-URI with bounded max-age (`JWKS_CACHE_MAX_AGE_MS`, default 10 min), (4) refetch-once on unknown `kid` (rotation), (5) **fail closed** on a fetch outage with no usable cache. The `fetch` is injectable (`JWKS_FETCH` token) for hermetic tests.
+
+### Security
+
+- The SSRF host allowlist is the critical anti-SSRF choke point for WIF (architecture section 5.1). A disallowed or non-https `jwksUri` is rejected before any outbound request, so a malicious per-endpoint trust config cannot point the server at an internal metadata endpoint (e.g. `169.254.169.254`). Algorithm pinning closes the alg-confusion / `alg:none` class.
+- `npm audit`: the only High (`form-data`) is a dev-only transitive dependency (empty `--omit=dev` tree), not in any production path; `jose` itself is clean.
+
+### Validation
+
+- TDD: 8 new unit tests ([external-jwks-validator.service.spec.ts](api/src/oauth/external-jwks-validator.service.spec.ts), RED via reject-stub -> GREEN). API unit: **3,878 -> 3,886** (105 suites). Build 0 err; ESLint 0 err / 464 warnings (no new). Compiled `dist/` runtime smoke confirms the dynamic jose import + full RS256 verify work in CommonJS. No HTTP surface yet (the validator is wired + gains E2E/live coverage in Q6).
+
+## [0.54.0-alpha.5] - 2026-06-18 - Auth Q1: per-endpoint oauth-client credential + per-endpoint token issuer
+
+Fifth step of the reconciled authentication build (first critical-path step). Closes ISV Pattern 5 (Entra Gallery mandate: per-endpoint client_id/client_secret pairs). Feature doc: [docs/auth/PER_ENDPOINT_OAUTH_CLIENT.md](docs/auth/PER_ENDPOINT_OAUTH_CLIENT.md).
+
+### Added
+
+- **`oauth_client` credential** ([admin-credential.controller.ts](api/src/modules/scim/controllers/admin-credential.controller.ts)): `POST /admin/endpoints/:id/credentials` with `credentialType:"oauth_client"` returns a `clientId` (public, `epc_` prefix, rides `metadata.clientId`) + `clientSecret` (one-time plaintext, bcrypt-hashed into `credentialHash`). The list endpoint exposes the public `clientId` but never the secret.
+- **Per-endpoint token issuer** ([endpoint-oauth.controller.ts](api/src/modules/scim/controllers/endpoint-oauth.controller.ts)): `POST /scim/endpoints/:endpointId/oauth/token` authenticates the per-endpoint `client_id`/`client_secret` (bcrypt compare against active `oauth_client` credentials) and mints a token via the new `OAuthService.generateEndpointAccessToken`. The token carries an `endpoint_id` claim + a per-endpoint `aud` (`<global-aud>:<endpointId>`), signed with the Pre-Q.B asymmetric key.
+
+### Security
+
+- **Per-endpoint token scoping** ([shared-secret.guard.ts](api/src/modules/auth/shared-secret.guard.ts)): a token carrying `endpoint_id` authorizes ONLY that endpoint's routes. Presented to a different endpoint (or a non-endpoint route) it is rejected ("mine-but-invalid-stop") with an enriched `WWW-Authenticate`, and crucially does NOT fall through to the legacy-secret acceptor (downgrade-confusion defense - the scoping check is outside the validate try/catch so the rejection is never swallowed). A global token (no `endpoint_id`) is unaffected.
+
+### Validation
+
+- TDD: 4 new unit (oauth service per-endpoint) + 2 new unit (admin-credential oauth_client) + 5 new unit (guard scoping) + 7 new E2E ([endpoint-oauth-client.e2e-spec.ts](api/test/e2e/endpoint-oauth-client.e2e-spec.ts)) + 9 new live (`scripts/live-test.ps1` section 9z-AP).
+- API unit: **3,868 -> 3,878** (104 suites). Full E2E (inmemory): **1,240 pass** (68 suites). Local-node live: **1,067 pass / 0 fail** including 9z-AP. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: `oauth_client` rides the existing EndpointCredential.metadata column - identical in both backends. Docker + dev-Azure live validation batched to the next critical-path checkpoint.
+
+## [0.54.0-alpha.4] - 2026-06-18 - Auth Q0: WWW-Authenticate enrichment + aud claim + RFC 8414 metadata
+
+Fourth step of the reconciled authentication build. Closes three interop gaps and documents the shipped 3-tier resource-plane chain. Feature doc: [docs/auth/OAUTH_DISCOVERY_AND_BEARER_ERRORS.md](docs/auth/OAUTH_DISCOVERY_AND_BEARER_ERRORS.md).
+
+### Added
+
+- **RFC 8414 authorization-server metadata** - new public `GET /.well-known/oauth-authorization-server` ([oauth-metadata.controller.ts](api/src/oauth/oauth-metadata.controller.ts)) served at the deployment root (excluded from the `scim` global prefix in [main.ts](api/src/main.ts)). Advertises `issuer`, `token_endpoint`, `jwks_uri`, `grant_types_supported`, `token_endpoint_auth_methods_supported`, `scopes_supported`. The `issuer` is the shared `OAUTH_ISSUER` constant ([oauth.constants.ts](api/src/oauth/oauth.constants.ts)) the JWT signer also stamps as `iss`, so the metadata is self-consistent with issued tokens.
+- **`aud` claim on issued tokens** ([oauth.service.ts](api/src/oauth/oauth.service.ts)) - default `scimserver-scim-api`, override with `OAUTH_TOKEN_AUDIENCE`. Non-breaking (not yet enforced on verify; per-endpoint audiences arrive in Q1).
+
+### Changed
+
+- **Enriched `WWW-Authenticate` (RFC 6750 section 3)** - the guard's 401 challenge now carries `error="invalid_token"` + `error_description` when a token was presented and rejected, and only `realm="SCIM"` (no error code) when credentials were absent ([shared-secret.guard.ts](api/src/modules/auth/shared-secret.guard.ts)).
+
+### Validation
+
+- TDD: 2 new unit (aud claim, RED -> GREEN) + 5 new E2E ([oauth-discovery.e2e-spec.ts](api/test/e2e/oauth-discovery.e2e-spec.ts)) + 9 new live assertions (`scripts/live-test.ps1` section 9z-AO).
+- API unit: **3,866 -> 3,868** (104 suites). Full E2E (inmemory): **1,233 pass** (67 suites). Local-node live: **1,058 pass / 0 fail** including 9z-AM + 9z-AN + 9z-AO. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic. Docker + dev-Azure live validation: this is the foundational-cluster integration checkpoint (Pre-Q.A -> Q0); run next.
+
+## [0.54.0-alpha.3] - 2026-06-18 - Auth A0: authentication methods model (inert backbone)
+
+Third step of the reconciled authentication build. Adds the generalized `authenticationMethods[]` data model on the endpoint profile as an INERT backbone - stored + round-tripped but not yet consulted by any resolver - so 1P / roles / scopes / future auth types become config, not rework. Feature doc: [docs/auth/AUTHENTICATION_METHODS_MODEL.md](docs/auth/AUTHENTICATION_METHODS_MODEL.md).
+
+### Added
+
+- **`profile.authentication` model** ([endpoint-profile.types.ts](api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts)): new `AuthenticationMethod` (id, type, displayName, description, specUri, plane, tokenEndpointAuthMethod, enabled, priority, lifecycleStatus, config, credentialRef), `ProfileAuthentication` (schemaVersion, methods, defaultMethodId, policy), and `AuthenticationMethodPlane` / `AuthenticationMethodLifecycle` unions. `authentication?` added to `EndpointProfile` + `ShorthandProfileInput`. Rides the existing profile JSONB - no new column or table.
+- **Expansion threading** ([auto-expand.service.ts](api/src/modules/scim/endpoint-profile/auto-expand.service.ts)): `expandAuthentication` defaults `schemaVersion` (`CURRENT_AUTH_SCHEMA_VERSION = 1`), coerces `methods` to an array, projects each method to its known fields, and is threaded through `expandProfile`. The previous fixed-shape `expandProfile` literal silently dropped unknown keys; now `authentication` survives create + the profile merge (update preservation).
+
+### Security
+
+- **No-secret invariant:** `AuthenticationMethod` has no secret field (secrets ride `credentialRef` -> `EndpointCredential`), and `expandAuthentication` strips any secret-looking `config` key (`secret`/`password`/`passphrase`/`privatekey`/`credentialhash`). A mistakenly-submitted `config.clientSecret` is dropped before persistence and never appears in any response - asserted at unit, E2E, and live layers by submitting a secret and proving its absence everywhere in the response.
+
+### Validation
+
+- TDD: 12 new unit tests (auto-expand A0 block, RED via stub -> GREEN) + 5 new E2E ([endpoint-authentication-model.e2e-spec.ts](api/test/e2e/endpoint-authentication-model.e2e-spec.ts)) + 8 new live assertions (`scripts/live-test.ps1` section 9z-AN).
+- API unit: **3,856 -> 3,866** (104 suites). Endpoint/profile E2E (inmemory): 87 pass (6 suites). Local-node live: **1,049 pass / 0 fail** including 9z-AM + 9z-AN. Build 0 err; ESLint 0 err / 464 warnings (no new). Parity: backend-agnostic (profile JSONB opaque pass-through in both backends). Docker + dev-Azure live batched to the next integration checkpoint.
+
+## [0.54.0-alpha.2] - 2026-06-18 - Auth Pre-Q.B: asymmetric (RS256/ES256) signing key + published JWKS
+
+Second step of the reconciled authentication build. Moves the global OAuth issuer off the symmetric HS256 secret onto an asymmetric, externalized signing key and publishes the public JWKS - the prerequisite for per-endpoint issuance (Q1) and WIF own-token issuance (Q6). Feature doc: [docs/auth/ASYMMETRIC_SIGNING_AND_JWKS.md](docs/auth/ASYMMETRIC_SIGNING_AND_JWKS.md).
+
+### Added
+
+- **Asymmetric OAuth token signing (RS256 default, ES256 optional).** New `OAuthSigningKeyService` ([api/src/oauth/oauth-signing-key.service.ts](api/src/oauth/oauth-signing-key.service.ts)) loads an RS256/ES256 key from config (`OAUTH_JWT_PRIVATE_KEY` / `OAUTH_JWT_PUBLIC_KEY` / `OAUTH_JWT_ALG` / `OAUTH_JWT_KID`) or generates an ephemeral dev key, derives a stable `kid` (RFC 7638 thumbprint), and exposes the public JWKS. Every issued token now carries `alg: RS256` + `kid` in its header.
+- **Published JWKS.** New public `GET /scim/oauth/jwks` ([api/src/oauth/jwks.controller.ts](api/src/oauth/jwks.controller.ts)) serves the RFC 7517 key set (cacheable, no private material). The exported `buildJwtModuleOptions` factory ([api/src/oauth/oauth.module.ts](api/src/oauth/oauth.module.ts)) wires the asymmetric keys + `keyid` + algorithm pinning, and is exercised directly by unit tests. New `OAuthSigningModule` shares one signing identity between the signer and the publisher.
+
+### Security
+
+- **Algorithm-confusion defense:** verification pins `verifyOptions.algorithms` to exactly the configured asymmetric algorithm. An HS256 token forged by HMAC-ing the published RSA public key is rejected (locked in by a unit test performing that exact forgery). `JWT_SECRET` is no longer used by the OAuth issuer.
+
+### Validation
+
+- TDD: 9 new unit tests ([oauth-asymmetric.spec.ts](api/src/oauth/oauth-asymmetric.spec.ts), RED via stubs -> GREEN) + 4 new E2E ([oauth-jwks.e2e-spec.ts](api/test/e2e/oauth-jwks.e2e-spec.ts)) + 7 new live assertions (`scripts/live-test.ps1` section 9z-AM).
+- API unit: **3,847 -> 3,856** (104 suites). API E2E (inmemory, full): **1,223 pass** (65 suites). Live (local node, inmemory): **1,041 pass / 0 fail** including 9z-AM. Build 0 err; ESLint 0 err / 464 warnings (under the 465 baseline). The existing `POST /oauth/token` response contract is unchanged (same documented keys).
+- Parity: backend-agnostic (OAuth signing does not touch persistence). Docker + dev-Azure live validation batched to the next integration checkpoint (rationale recorded in the ledger).
+
+## [0.54.0-alpha.1] - 2026-06-18 - Auth Pre-Q.A: structured config flag-type + validator
+
+First step of the reconciled authentication build ([docs/auth/AUTHENTICATION_ARCHITECTURE.md §13](docs/auth/AUTHENTICATION_ARCHITECTURE.md), tracked in [docs/auth/EXECUTION_LEDGER.md](docs/auth/EXECUTION_LEDGER.md)). Enabling infrastructure only - no runtime behavior change.
+
+### Added
+
+- **`structured` endpoint-config flag-type** ([api/src/modules/endpoint/endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts)). The flag registry previously understood only `boolean` / `logLevel` / `primaryEnforcement` value-kinds; a flag whose value is a nested object (the upcoming WIF trust record, Q6.2) had no representation. This step teaches the registry + validator a fourth value-kind without registering any production flag yet (the structured flag lands with its consumer).
+  - New `StructuredFlagSchema` interface (`allowedKeys` + optional `requiredKeys`) and an optional `structuredSchema` field on `EndpointConfigFlagDefinition`.
+  - New `validateStructuredFlag(config, flagName, schema?)`: rejects non-object values (`Invalid type`), unknown top-level keys (`Unknown key "..."`), and missing required keys (`Missing required key "..."`); accepts any object shape when no schema is supplied.
+  - New `getConfigStructured(config, key)` reader: returns the object for a plain-object value, `undefined` for missing/primitive/array/null values.
+  - `validateEndpointConfig` gained an optional injectable `definitions` parameter (defaults to the production registry) so a new flag-type can be exercised through the public validator in tests without polluting the registry; it now dispatches the `structured` branch.
+- **Doc:** new "Flag Value Types" section in [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) describing all four value-types and the `structured` schema contract.
+
+### Validation
+
+- TDD: 22 new unit tests in [endpoint-config.interface.spec.ts](api/src/modules/endpoint/endpoint-config.interface.spec.ts) (RED confirmed at assertion level via no-op stubs, then GREEN). Covers `validateStructuredFlag` (valid/unknown-key/missing-required/non-object/null/array/no-schema), `validateEndpointConfig` structured dispatch round-trip, and `getConfigStructured`.
+- API unit: **3,825 -> 3,847** (103 suites, all pass). API build: PASS (0 errors). API ESLint: 0 errors, 4 warnings (baseline, no new `any`). Targeted E2E (config-flags + admin-endpoints-create + profile-flag-combos, inmemory): 48/48 pass.
+- Cross-backend parity: N/A (pure validation utility, no `isInMemoryBackend` branch). UI/live/Playwright: N/A (no registered flag, no runtime/HTTP surface yet; deferred to Q6.2).
+
 ## [0.53.2] - 2026-06-10 - Fix: stabilize endpoint-detail Overview visual-regression baseline
 
 ### Fixed

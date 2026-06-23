@@ -349,10 +349,12 @@ Verified facts:
 |---|---|
 | **HTTP Basic** auth | zero `Basic ` header parsing, zero `httpbasic` - the only "Basic" hit is a test-section comment. **Provably absent.** |
 | `client_assertion` path | zero matches |
-| `jose` / JWKS / `createRemoteJWKSet` | not in [api/package.json](../../api/package.json) or `api/src` |
+| `jose` / `createRemoteJWKSet` external-JWKS *validator* | not in [api/package.json](../../api/package.json) or `api/src` (still Q2). **JWKS *publication* now SHIPPED (Pre-Q.B)** at `GET /scim/oauth/jwks`. |
 | form-urlencoded body parsing on the token endpoint | [api/src/main.ts](../../api/src/main.ts) registers no `urlencoded` parser |
-| RS256/ES256 asymmetric issuance | HS256 only |
-| `aud` claim on issued tokens | absent from `generateAccessToken` payload |
+| RS256/ES256 asymmetric issuance | ~~HS256 only~~ **SHIPPED (Pre-Q.B)** - RS256 default / ES256 optional, `kid` in header, alg-pinned verify. |
+| `aud` claim on issued tokens | absent from `generateAccessToken` payload (still Q0/Q1) |
+
+> **Progress note (Pre-Q.B, [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)).** Two gaps above are closed: the OAuth issuer now signs asymmetrically (RS256/ES256) and publishes its public JWKS. See [ASYMMETRIC_SIGNING_AND_JWKS.md](ASYMMETRIC_SIGNING_AND_JWKS.md). The remaining items (external-JWKS *validator* via `jose`, form-urlencoded intake, `aud` claim, `client_assertion`) are still scheduled under Q0/Q1/Q2/A3/Q6.
 
 ---
 

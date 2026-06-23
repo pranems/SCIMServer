@@ -6,6 +6,12 @@ import { safeCompare } from '../security/safe-compare';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 
+/**
+ * Default `aud` claim for issued access tokens (Q0). Identifies the SCIM
+ * resource server as the intended audience. Override with OAUTH_TOKEN_AUDIENCE.
+ */
+export const OAUTH_DEFAULT_AUDIENCE = 'scimserver-scim-api';
+
 export interface AccessToken {
   accessToken: string;
   expiresIn: number;
@@ -29,6 +35,7 @@ interface TokenPayload {
 @Injectable()
 export class OAuthService {
   private readonly validClients: Map<string, ClientCredentials>;
+  private readonly audience: string;
 
   constructor(
     private readonly jwtService: JwtService,
@@ -38,6 +45,8 @@ export class OAuthService {
     const defaultClientId = this.config.get<string>('OAUTH_CLIENT_ID') || 'scimserver-client';
     const configuredSecret = this.config.get<string>('OAUTH_CLIENT_SECRET');
     const configuredScopes = this.config.get<string>('OAUTH_CLIENT_SCOPES');
+
+    this.audience = this.config.get<string>('OAUTH_TOKEN_AUDIENCE') || OAUTH_DEFAULT_AUDIENCE;
 
     let clientSecret = configuredSecret;
 
@@ -98,6 +107,7 @@ export class OAuthService {
     const payload = {
       sub: clientId,
       client_id: clientId,
+      aud: this.audience,
       scope: grantedScopes.join(' '),
       token_type: 'access_token'
     };
@@ -116,6 +126,54 @@ export class OAuthService {
       accessToken,
       expiresIn,
       scope: grantedScopes.join(' ')
+    });
+  }
+
+  /**
+   * Mint a per-endpoint access token (Q1).
+   *
+   * The token carries an `endpoint_id` claim that scopes it to a single
+   * endpoint: the resource guard authorizes it ONLY for requests to that
+   * endpoint's routes (a token presented to a different endpoint is rejected,
+   * never falling through to a broader acceptor). The `aud` claim is a
+   * per-endpoint value so downstream consumers can also assert the audience.
+   *
+   * Credential validation (matching the per-endpoint `oauth-client` client_id /
+   * secret) is the caller's responsibility; this method only issues the token.
+   */
+  generateEndpointAccessToken(
+    endpointId: string,
+    clientId: string,
+    requestedScope?: string,
+  ): Promise<AccessToken> {
+    const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
+    const requestedScopes = requestedScope ? requestedScope.split(' ').filter(Boolean) : [];
+    const allowed = requestedScopes.filter((s) => defaultScopes.includes(s));
+    const grantedScopes = allowed.length > 0 ? allowed : defaultScopes;
+
+    const payload = {
+      sub: clientId,
+      client_id: clientId,
+      aud: `${this.audience}:${endpointId}`,
+      endpoint_id: endpointId,
+      scope: grantedScopes.join(' '),
+      token_type: 'access_token',
+    };
+
+    const expiresIn = 3600;
+    const accessToken = this.jwtService.sign(payload, { expiresIn: `${expiresIn}s` });
+
+    this.logger.info(LogCategory.OAUTH, 'Per-endpoint access token generated', {
+      endpointId,
+      clientId,
+      scopes: grantedScopes,
+      expiresIn,
+    });
+
+    return Promise.resolve({
+      accessToken,
+      expiresIn,
+      scope: grantedScopes.join(' '),
     });
   }
 

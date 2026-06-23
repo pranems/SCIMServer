@@ -167,6 +167,15 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see RFC 7643 section 2.4 - Multi-Valued Attributes
    */
   PRIMARY_ENFORCEMENT: 'PrimaryEnforcement',
+
+  /**
+   * When true, enables Workload Identity Federation (WIF) for this endpoint:
+   * a `wif` credential may be attached and the WIF token-mint path is offered.
+   * When false (default), WIF is off and existing endpoints are untouched.
+   * Orthogonal to PerEndpointCredentialsEnabled (the bcrypt-bearer gate).
+   * @see docs/auth/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 8.6
+   */
+  WIF_CREDENTIALS_ENABLED: 'WifCredentialsEnabled',
 } as const;
 
 /**
@@ -177,7 +186,17 @@ export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPO
 // ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
-type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement';
+type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'structured';
+
+/**
+ * Shape contract for a `structured` config flag value (Pre-Q.A).
+ * `allowedKeys` rejects unknown top-level keys; `requiredKeys` (a subset of
+ * `allowedKeys`) must all be present. Omit the schema to accept any object shape.
+ */
+export interface StructuredFlagSchema {
+  readonly allowedKeys: readonly string[];
+  readonly requiredKeys?: readonly string[];
+}
 
 /** Metadata for a single endpoint config flag. */
 export interface EndpointConfigFlagDefinition {
@@ -189,6 +208,11 @@ export interface EndpointConfigFlagDefinition {
   readonly default: boolean | undefined;
   /** Human-readable description. */
   readonly description: string;
+  /**
+   * For `structured` flags only: the shape contract validated by
+   * {@link validateStructuredFlag}. Ignored for other flag types.
+   */
+  readonly structuredSchema?: StructuredFlagSchema;
 }
 
 /**
@@ -359,6 +383,15 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       '"normalize": keeps first primary=true, sets rest to false, logs WARN. ' +
       '"reject": returns 400 invalidValue if >1 primary=true.',
   },
+  WIF_CREDENTIALS_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, enables Workload Identity Federation (WIF) for this endpoint: a wif credential may be ' +
+      'attached and the WIF token-mint path is offered. When false (default), WIF is off and existing ' +
+      'endpoints are untouched. Orthogonal to PerEndpointCredentialsEnabled.',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -386,6 +419,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
+  [ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]?: boolean | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -464,6 +498,22 @@ export function getConfigString(config: EndpointConfig | undefined, key: string)
   if (!config) return undefined;
   const value = config[key];
   if (typeof value === 'string') return value;
+  return undefined;
+}
+
+/**
+ * Get a structured (object-valued) config flag. Returns the object when the
+ * value is a plain object, otherwise undefined (missing, primitive, or array).
+ */
+export function getConfigStructured(
+  config: EndpointConfig | undefined,
+  key: string,
+): Record<string, unknown> | undefined {
+  if (!config) return undefined;
+  const value = config[key];
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
   return undefined;
 }
 
@@ -550,22 +600,76 @@ function validatePrimaryEnforcementFlag(config: Record<string, any>, flagName: s
 }
 
 /**
+ * Validate a `structured` (object-valued) config flag against its shape contract.
+ *
+ * - Absent value: passes.
+ * - Non-object (primitive, null, or array): throws "Invalid type".
+ * - With a schema: rejects any key not in `allowedKeys` ("Unknown key"), and
+ *   requires every `requiredKeys` entry to be present ("Missing required key").
+ * - Without a schema: any object shape is accepted.
+ */
+export function validateStructuredFlag(
+  config: Record<string, unknown>,
+  flagName: string,
+  schema?: StructuredFlagSchema,
+): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    const got = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected a structured object, got ${got}.`,
+    );
+  }
+
+  if (schema) {
+    const allowed = new Set(schema.allowedKeys);
+    for (const key of Object.keys(value)) {
+      if (!allowed.has(key)) {
+        throw new Error(
+          `Unknown key "${key}" in config flag "${flagName}". ` +
+          `Allowed keys: ${schema.allowedKeys.map((k) => `"${k}"`).join(', ')}.`,
+        );
+      }
+    }
+    if (schema.requiredKeys) {
+      for (const req of schema.requiredKeys) {
+        if (!(req in (value as Record<string, unknown>))) {
+          throw new Error(
+            `Missing required key "${req}" in config flag "${flagName}".`,
+          );
+        }
+      }
+    }
+  }
+}
+
+/**
  * Validate endpoint configuration.
  * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS - no manual flag list to maintain.
  *
  * @param config - The endpoint configuration to validate
+ * @param definitions - The flag-definition registry to validate against
+ *   (defaults to the production registry; injectable for testing new flag types)
  * @throws Error if validation fails
  */
-export function validateEndpointConfig(config: Record<string, any> | undefined): void {
+export function validateEndpointConfig(
+  config: Record<string, any> | undefined,
+  definitions: Record<string, EndpointConfigFlagDefinition> = ENDPOINT_CONFIG_FLAGS_DEFINITIONS,
+): void {
   if (!config) return;
 
-  for (const def of Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS)) {
+  for (const def of Object.values(definitions)) {
     if (def.type === 'boolean') {
       validateBooleanFlag(config, def.key);
     } else if (def.type === 'logLevel') {
       validateLogLevelFlag(config, def.key);
     } else if (def.type === 'primaryEnforcement') {
       validatePrimaryEnforcementFlag(config, def.key);
+    } else if (def.type === 'structured') {
+      validateStructuredFlag(config, def.key, def.structuredSchema);
     }
   }
 }

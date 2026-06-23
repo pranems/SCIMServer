@@ -4,7 +4,7 @@
  * Tests shorthand → full expansion, "all" shorthand, auto-inject of
  * required attributes, project defaults, and Group active.
  */
-import { expandProfile } from './auto-expand.service';
+import { expandProfile, expandAuthentication, CURRENT_AUTH_SCHEMA_VERSION } from './auto-expand.service';
 import {
   SCIM_CORE_USER_SCHEMA,
   SCIM_CORE_GROUP_SCHEMA,
@@ -332,6 +332,124 @@ describe('auto-expand.service', () => {
       const msft = result.schemas.find(s => s.id === 'urn:msfttest:custom:2.0:User')!;
       expect(msft.name).toBe('MsftTest');
       expect(msft.attributes).toEqual([]);
+    });
+  });
+
+  // ─── A0: authentication model expansion (inert) ─────────────────────
+  describe('authentication model (A0)', () => {
+    const baseInput: ShorthandProfileInput = {
+      schemas: [{ id: SCIM_CORE_USER_SCHEMA, name: 'User', attributes: [{ name: 'userName' }] }],
+      resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: SCIM_CORE_USER_SCHEMA, schemaExtensions: [] }],
+    };
+
+    describe('expandProfile threading', () => {
+      it('omits authentication when the input has none (backward compatible)', () => {
+        const result = expandProfile(baseInput);
+        expect(result.authentication).toBeUndefined();
+      });
+
+      it('threads authentication through when provided', () => {
+        const result = expandProfile({
+          ...baseInput,
+          authentication: {
+            schemaVersion: 1,
+            methods: [{ id: 'm-1', type: 'bearer', displayName: 'Per-Endpoint Bearer' }],
+          },
+        });
+        expect(result.authentication).toBeDefined();
+        expect(result.authentication!.methods).toHaveLength(1);
+        expect(result.authentication!.methods[0].id).toBe('m-1');
+        expect(result.authentication!.methods[0].type).toBe('bearer');
+      });
+
+      it('defaults schemaVersion when omitted in the threaded block', () => {
+        const result = expandProfile({
+          ...baseInput,
+          authentication: { methods: [] } as never,
+        });
+        expect(result.authentication!.schemaVersion).toBe(CURRENT_AUTH_SCHEMA_VERSION);
+      });
+    });
+
+    describe('expandAuthentication', () => {
+      it('defaults schemaVersion to the current version when omitted', () => {
+        const out = expandAuthentication({ methods: [] } as never);
+        expect(out.schemaVersion).toBe(CURRENT_AUTH_SCHEMA_VERSION);
+      });
+
+      it('preserves an explicit schemaVersion', () => {
+        const out = expandAuthentication({ schemaVersion: 2, methods: [] });
+        expect(out.schemaVersion).toBe(2);
+      });
+
+      it('coerces a missing methods array to []', () => {
+        const out = expandAuthentication({ schemaVersion: 1 } as never);
+        expect(Array.isArray(out.methods)).toBe(true);
+        expect(out.methods).toHaveLength(0);
+      });
+
+      it('preserves known method fields', () => {
+        const out = expandAuthentication({
+          schemaVersion: 1,
+          methods: [{
+            id: 'm-7f3a', type: 'wif-7523', displayName: 'WIF', description: 'desc',
+            specUri: 'https://rfc/7523', plane: 'token', tokenEndpointAuthMethod: 'private_key_jwt',
+            enabled: true, priority: 10, lifecycleStatus: 'active',
+            config: { issuer: 'https://idp', audience: 'app' }, credentialRef: 'cred-1',
+          }],
+        });
+        const m = out.methods[0];
+        expect(m.id).toBe('m-7f3a');
+        expect(m.type).toBe('wif-7523');
+        expect(m.displayName).toBe('WIF');
+        expect(m.plane).toBe('token');
+        expect(m.tokenEndpointAuthMethod).toBe('private_key_jwt');
+        expect(m.enabled).toBe(true);
+        expect(m.priority).toBe(10);
+        expect(m.lifecycleStatus).toBe('active');
+        expect(m.config).toEqual({ issuer: 'https://idp', audience: 'app' });
+        expect(m.credentialRef).toBe('cred-1');
+      });
+
+      it('strips secret-looking keys from method.config (no-secret invariant)', () => {
+        const out = expandAuthentication({
+          schemaVersion: 1,
+          methods: [{
+            id: 'm-1', type: 'oauth-client',
+            config: {
+              issuer: 'https://idp', jwksUri: 'https://idp/jwks',
+              clientSecret: 'SHOULD-NOT-PERSIST', client_secret: 'SHOULD-NOT-PERSIST',
+              privateKey: 'SHOULD-NOT-PERSIST', credentialHash: 'SHOULD-NOT-PERSIST',
+              password: 'SHOULD-NOT-PERSIST', passphrase: 'SHOULD-NOT-PERSIST',
+            },
+          }],
+        });
+        const cfg = out.methods[0].config!;
+        expect(cfg.issuer).toBe('https://idp');
+        expect(cfg.jwksUri).toBe('https://idp/jwks');
+        expect(cfg.clientSecret).toBeUndefined();
+        expect(cfg.client_secret).toBeUndefined();
+        expect(cfg.privateKey).toBeUndefined();
+        expect(cfg.credentialHash).toBeUndefined();
+        expect(cfg.password).toBeUndefined();
+        expect(cfg.passphrase).toBeUndefined();
+      });
+
+      it('drops unexpected secret-looking top-level method keys', () => {
+        const out = expandAuthentication({
+          schemaVersion: 1,
+          methods: [{ id: 'm-1', type: 'bearer', clientSecret: 'LEAK' } as never],
+        });
+        expect((out.methods[0] as unknown as Record<string, unknown>).clientSecret).toBeUndefined();
+      });
+
+      it('preserves defaultMethodId and policy when present', () => {
+        const out = expandAuthentication({
+          schemaVersion: 1, methods: [], defaultMethodId: 'm-1', policy: { roleEnforcement: 'off' },
+        });
+        expect(out.defaultMethodId).toBe('m-1');
+        expect(out.policy).toEqual({ roleEnforcement: 'off' });
+      });
     });
   });
 });

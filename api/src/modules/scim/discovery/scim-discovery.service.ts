@@ -7,6 +7,7 @@ import {
 import { createScimError } from '../common/scim-errors';
 import { ScimSchemaRegistry } from './scim-schema-registry';
 import { SCIM_SERVICE_PROVIDER_CONFIG } from './scim-schemas.constants';
+import { computeAuthenticationSchemes } from './authentication-schemes';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 /**
@@ -142,16 +143,23 @@ export class ScimDiscoveryService {
 
   /** Serve SPC directly from the endpoint's stored profile */
   getSpcFromProfile(profile?: EndpointProfile) {
+    // A2 - the advertised authenticationSchemes are COMPUTED from the endpoint's
+    // enabled authentication methods (baseline oauthbearertoken always present;
+    // each enabled method adds its scheme; primary on defaultMethodId).
+    const authenticationSchemes = computeAuthenticationSchemes(
+      SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
+      profile?.authentication,
+    );
     if (profile?.serviceProviderConfig) {
       return {
         ...SCIM_SERVICE_PROVIDER_CONFIG,
         ...profile.serviceProviderConfig,
         meta: SCIM_SERVICE_PROVIDER_CONFIG.meta,
         schemas: SCIM_SERVICE_PROVIDER_CONFIG.schemas,
-        authenticationSchemes: SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
+        authenticationSchemes,
       };
     }
-    return SCIM_SERVICE_PROVIDER_CONFIG;
+    return { ...SCIM_SERVICE_PROVIDER_CONFIG, authenticationSchemes };
   }
 
   // ─── Dynamic schemas[] helper ───────────────────────────────────────────

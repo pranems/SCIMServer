@@ -100,7 +100,7 @@ describe('AdminCredentialController', () => {
 
       expect(result.id).toBeDefined();
       expect(result.token).toBeDefined();
-      expect(result.token.length).toBeGreaterThan(10);
+      expect(result.token!.length).toBeGreaterThan(10);
       expect(result.endpointId).toBe(mockEndpoint.id);
       expect(mockCredentialRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -172,10 +172,31 @@ describe('AdminCredentialController', () => {
         credentialType: 'oauth_client',
       });
 
-      expect(result.token).toBeDefined();
+      // Q1: oauth_client returns a client_id + client_secret pair, NOT a bearer token.
+      expect(result.token).toBeUndefined();
+      expect(result.clientId).toBeDefined();
+      expect(typeof result.clientId).toBe('string');
+      expect(result.clientSecret).toBeDefined();
+      expect(typeof result.clientSecret).toBe('string');
+      expect(result.clientSecret!.length).toBeGreaterThan(10);
       expect(mockCredentialRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ credentialType: 'oauth_client' }),
+        expect.objectContaining({
+          credentialType: 'oauth_client',
+          metadata: expect.objectContaining({ clientId: result.clientId }),
+        }),
       );
+    });
+
+    it('Q1: oauth_client stores only the bcrypt hash of the secret, never the plaintext', async () => {
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'oauth_client',
+      });
+      const createArg = mockCredentialRepo.create.mock.calls[0][0];
+      // The stored hash must not equal the returned plaintext secret.
+      expect(createArg.credentialHash).toBeDefined();
+      expect(createArg.credentialHash).not.toBe(result.clientSecret);
+      // The plaintext secret must not be persisted anywhere in the create input.
+      expect(JSON.stringify(createArg)).not.toContain(result.clientSecret);
     });
 
     it('should throw NotFoundException for non-existent endpoint', async () => {
@@ -186,6 +207,78 @@ describe('AdminCredentialController', () => {
       await expect(
         controller.createCredential('bad-id', {}),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('orthogonal create gate (A1)', () => {
+    it('allows a wif credential when only WifCredentialsEnabled is on', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: false } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: 'https://login.microsoftonline.com/tid/v2.0',
+          expectedAudience: 'appid',
+          expectedSubject: 'sub',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          allowedTenantId: 'tid',
+        },
+      } as never);
+
+      expect(result.credentialType).toBe('wif');
+      expect(mockCredentialRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ credentialType: 'wif' }),
+      );
+    });
+
+    it('rejects a wif credential when WifCredentialsEnabled is off', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: false, PerEndpointCredentialsEnabled: true } },
+      });
+
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'wif' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('still requires PerEndpointCredentialsEnabled for a bearer credential', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: false } },
+      });
+
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('the wif response carries NO secret/hash field', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: 'https://idp/v2.0',
+          expectedAudience: 'appid',
+          expectedSubject: 'sub',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          allowedTenantId: 'tid',
+        },
+      } as never);
+
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toMatch(/token|clientSecret|credentialHash|secret/i);
     });
   });
 

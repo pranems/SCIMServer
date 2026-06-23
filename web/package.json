@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.53.2",
+  "version": "0.54.0-alpha.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.1",
-    "@fluentui/react-icons": "^2.0.329",
+    "@fluentui/react-icons": "^2.0.330",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "^1.170.15",
     "cmdk": "^1.1.1",

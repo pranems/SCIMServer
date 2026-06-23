@@ -1,6 +1,6 @@
 {
   "name": "scimserver-api",
-  "version": "0.53.2",
+  "version": "0.54.0-alpha.8",
   "description": "SCIMServer backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",
@@ -51,6 +51,7 @@
     "class-validator": "^0.15.1",
     "dotenv": "^17.2.4",
     "helmet": "^8.2.0",
+    "jose": "^5.10.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.21.0",
@@ -67,7 +68,7 @@
     "@types/supertest": "^7.2.0",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
-    "eslint": "^10.4.1",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.3.0",
     "prettier": "^3.8.4",
@@ -85,7 +86,7 @@
     "defu": "6.1.5",
     "effect": "3.20.0",
     "hono": "4.12.25",
-    "multer": "2.1.1",
+    "multer": "2.2.0",
     "path-to-regexp": "8.4.0",
     "picomatch": "4.0.4"
   }
