@@ -12,12 +12,14 @@
 ## Table of Contents
 
 - [1. Executive Summary](#1-executive-summary)
+  - [1.1 Goals](#11-goals)
+  - [1.2 Non-Goals](#12-non-goals)
 - [2. The Reported Bug](#2-the-reported-bug)
 - [3. Root Cause: Dual Source of Truth](#3-root-cause-dual-source-of-truth)
 - [4. Full Gap Inventory](#4-full-gap-inventory)
 - [5. Why The Test Suite Missed It](#5-why-the-test-suite-missed-it)
 - [6. Design Question: Why a Resolver At All?](#6-design-question-why-a-resolver-at-all)
-- [7. Design Principles](#7-design-principles)
+- [7. Design Principles & Alternatives Considered](#7-design-principles--alternatives-considered)
 - [8. Phase 1 Design - Minimal Safe Enforcement](#8-phase-1-design---minimal-safe-enforcement)
 - [9. Phase 2 Design - Settings-Only Model](#9-phase-2-design---settings-only-model)
 - [10. Data Flow Across Layers](#10-data-flow-across-layers)
@@ -25,8 +27,9 @@
 - [12. Request / Response Examples](#12-request--response-examples)
 - [13. Test Strategy](#13-test-strategy)
 - [14. Rollout & Versioning](#14-rollout--versioning)
-- [15. RFC References](#15-rfc-references)
-- [16. Open Questions & Decisions Log](#16-open-questions--decisions-log)
+- [15. Cross-Cutting Concerns](#15-cross-cutting-concerns)
+- [16. RFC References](#16-rfc-references)
+- [17. Open Questions & Decisions Log](#17-open-questions--decisions-log)
 
 ---
 
@@ -40,6 +43,27 @@ This document specifies:
 
 - **Phase 1 (v0.53.3, this branch):** a minimal, low-risk fix that makes the runtime honor the profile for all 10 gaps, with **no storage change and no migration**. It introduces two shared resolvers - one for resource types, one for capabilities - that both discovery and enforcement consult, so the two layers cannot drift.
 - **Phase 2 (v0.54+, separate branch):** an architectural simplification where `serviceProviderConfig` is no longer stored in the profile but is **computed** from `settings`. This collapses the dual source of truth into one and is the permanent cure for the bug class.
+
+### 1.1 Goals
+
+- Make every endpoint's **runtime behavior match its advertised discovery contract** (`/ResourceTypes`,
+  `/ServiceProviderConfig`, `/Schemas`) for all 10 gaps.
+- Fix the reported user-only-endpoint Group bug on the customer-facing prod line **safely** (no storage
+  change, no migration, cleanly promotable as v0.53.3).
+- Make "advertised == enforced" **structural** (shared resolvers) rather than a convention humans must
+  remember, and add a regression harness so the bug class cannot silently return.
+- Keep the change **forward-compatible** with the Phase 2 settings-only model.
+
+### 1.2 Non-Goals
+
+- **Not** changing the persistence shape or running a data migration in Phase 1 (that is Phase 2).
+- **Not** adding new `settings` flags in Phase 1 (the resolver reads the existing stored SPC).
+- **Not** enforcing constraints on **legacy / partial-profile** endpoints (fail-open by design - see
+  principle 3 in [§7](#7-design-principles--alternatives-considered)).
+- **Not** collapsing `serviceProviderConfig` into `settings` yet, and **not** building the dependent-flag
+  UI - both are explicitly Phase 2.
+- **Not** altering authentication, schema attribute validation, or PATCH semantics beyond gating whether
+  the capability/resource type is served at all.
 
 ---
 
@@ -248,7 +272,7 @@ consult.
 
 ---
 
-## 7. Design Principles
+## 7. Design Principles & Alternatives Considered
 
 1. **Single source of truth.** The profile decides what an endpoint is. Discovery and enforcement read
    the same resolvers over the same profile.
@@ -266,6 +290,49 @@ consult.
    400) with a SCIM error body and a diagnostics extension.
 6. **Forward-compatible.** Phase 1 code becomes Phase 2 code by deleting the SPC branch of the resolver -
    no rework.
+
+### 7.1 Alternatives Considered (with pros / cons)
+
+The sections below record the options weighed for each significant decision, the trade-offs of each, and
+why the selected option wins given the goals in [§1.1](#11-goals). Decisions are summarized in
+[§17](#17-open-questions--decisions-log).
+
+**A. Governance model - where does "is this capability on?" come from?**
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **A1. SPC/profile-driven resolver (chosen for Phase 1)** | No new flags; reads the value discovery already serves; smallest prod blast radius; matches the `bulk.supported` precedent | Keeps SPC in storage (the dual-source-of-truth stays until Phase 2) | **Chosen** - unblocks prod safely now, forward-compatible |
+| A2. New per-capability `settings` flags now | Uniform with the 17-flag system; UI-ready | 6+ new flags x full 10-cell audit; needs a `number` type; bigger surface + slower; still leaves SPC as a second source | Deferred to Phase 2 |
+| A3. Full settings-only collapse now | Permanent cure (one source) | Storage migration on a customer prod + write-path shim + UI in one risky drop | Deferred to Phase 2 (own design) |
+
+**B. Status code for an unsupported resource type (Gap 1/9)**
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **404 noTarget (chosen)** | The route effectively does not exist for this endpoint; matches the generic controller's existing behavior; hides nothing extra | A client could read 404 as "wrong id" vs "type unsupported" (mitigated by the diagnostics `errorCode`) | **Chosen** |
+| 403 forbidden | Signals "exists but blocked" | Implies the route exists, leaking surface; wrong for a type the endpoint does not model | Rejected |
+| 501 notImplemented | Honest "not implemented here" | Conflicts with RFC usage for *capabilities*; resource types are existence, not capability | Rejected |
+
+**C. Unsupported `filter` / `sort` (Gap 2/3) - reject or silently ignore?**
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **403 forbidden (chosen)** | Loud + honest; the client learns the endpoint cannot filter; matches `*.supported=false` semantics | A lenient client that always appends `?filter=` would now error | **Chosen** - advertised contract says unsupported |
+| Silently ignore the param + return full list | Maximally lenient | Dangerous: client thinks it filtered but got everything; data-leak / wrong-sync risk | Rejected |
+
+**D. Behavior when the profile is absent / partial (fail-open vs fail-closed)**
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **Fail-open (chosen)** | Min blast radius on prod; legacy + no-profile mocks keep working; only endpoints that **explicitly** declare a constraint are affected | A truly empty profile enforces nothing (acceptable - it advertises nothing) | **Chosen** |
+| Fail-closed | Strict RFC posture | Would break legacy endpoints + many existing unit mocks that omit `profile` | Rejected for Phase 1 |
+
+**E. Phasing**
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **Phase 1 minimal now + Phase 2 refactor later (chosen)** | Unblocks the colleague immediately; each phase independently reviewable; resolver is reused, not rewritten | The dual source of truth lives a bit longer | **Chosen** |
+| One big settings-only PR | One-and-done | High risk on customer prod; large review; slower to unblock | Rejected |
 
 ---
 
@@ -504,6 +571,35 @@ The discovery layer reads the **same** `profile.resourceTypes` and (via `resolve
 capability values, so `GET /ResourceTypes`, `GET /ServiceProviderConfig`, and the enforcement decisions
 above are guaranteed consistent.
 
+### 10.1 Request call trace (sequence)
+
+The sequence below traces a single `POST /Groups` on a user-only endpoint end-to-end, showing the
+resolver decision point and the rejection path (the canonical repo call-trace device, cf.
+[USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md)).
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Ctl as EndpointScimGroupsController
+    participant Svc as EndpointService
+    participant Res as resolveResourceType (pure)
+    participant GSvc as EndpointScimGroupsService
+    participant Repo as IGroupRepository
+
+    Client->>Ctl: POST /endpoints/{id}/Groups
+    Ctl->>Svc: getEndpoint(id)
+    Svc-->>Ctl: endpoint { active, profile }
+    Ctl->>Ctl: active? (else 403)
+    Ctl->>Res: resolveResourceType(profile, {name:'Group'})
+    Res-->>Ctl: { supported: false }
+    Note over Ctl: profile.resourceTypes = [User] -> Group absent
+    Ctl-->>Client: 404 noTarget (RESOURCE_TYPE_NOT_SUPPORTED)
+    Note over GSvc,Repo: service + repository never reached
+```
+
+For a supported type the `supported: true` branch continues into `GSvc.createGroupForEndpoint(...)` and
+the repository, exactly as today.
+
 ---
 
 ## 11. Persistence Model
@@ -543,9 +639,11 @@ because `resourceTypes` lookups are array scans over a tiny list.
 
 ## 12. Request / Response Examples
 
-### 12.1 Gap 1 - Group CRUD on a user-only endpoint (after fix)
+### 12.1 Gap 1 - Group CRUD on a user-only endpoint (before vs after)
 
-Request:
+The same request, on the same endpoint, before and after the fix:
+
+Request (unchanged):
 
 ```http
 POST /scim/endpoints/3dbe8e5c-.../Groups HTTP/1.1
@@ -555,7 +653,21 @@ Content-Type: application/scim+json
 { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "x" }
 ```
 
-Response:
+**Before (today - the bug):** the Group is created on an endpoint that does not model Groups.
+
+```http
+HTTP/1.1 201 Created
+Content-Type: application/scim+json
+
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "id": "97c3fe15-5482-427a-a074-c799feabdb93",
+  "displayName": "x",
+  "meta": { "resourceType": "Group", "version": "W/\"v1\"" }
+}
+```
+
+**After (fixed):** the route behaves as if it does not exist for this endpoint.
 
 ```http
 HTTP/1.1 404 Not Found
@@ -667,6 +779,21 @@ is operationalized, not just a one-off test.
 | E2E | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | Live (ps1) | yes | yes | yes | yes | yes | yes | yes | yes | yes | - |
 
+### 13.4 Concrete test-count tables (filled at implementation)
+
+Following the house convention (cf. [G8E_RETURNED_CHARACTERISTIC_FILTERING.md](G8E_RETURNED_CHARACTERISTIC_FILTERING.md)),
+each gap's commit fills a per-layer count table; the totals roll up into [CHANGELOG.md](../CHANGELOG.md).
+The structure (counts are `TBD` until each gap is implemented under TDD):
+
+| Layer | File | New | Description |
+|---|---|---|---|
+| Unit (resolver) | `resource-type-resolver.spec.ts` | TBD | fail-open, name/endpoint match, User+Group absence |
+| Unit (resolver) | `capability-resolver.spec.ts` | TBD | SPC->settings->default precedence, numeric clamp |
+| Unit (controller) | `endpoint-scim-{users,groups}.controller.spec.ts` | TBD | 404/403/501 per gap with a profile that declares the constraint |
+| E2E | `discovery-enforcement-parity.e2e-spec.ts` | TBD | advertised == enforced for every preset (the harness) |
+| E2E | `profile-enforcement-gaps.e2e-spec.ts` | TBD | one block per gap, RFC status + scimType + diagnostics + key allowlist |
+| Live | `scripts/live-test.ps1` (new section) | TBD | per gap, runnable local + Docker + Azure dev |
+
 ---
 
 ## 14. Rollout & Versioning
@@ -691,7 +818,53 @@ unaffected.
 
 ---
 
-## 15. RFC References
+## 15. Cross-Cutting Concerns
+
+Following the design-doc norm of explicitly addressing cross-cutting concerns (cf.
+[CROSS_CUTTING_CONCERN_AUDIT.md](CROSS_CUTTING_CONCERN_AUDIT.md)):
+
+### 15.1 Security
+
+- **Reduced surface, not increased.** Every change *removes* a reachable operation (404/403/501) on
+  endpoints that never advertised it; it never opens a new path. Net attack surface goes down.
+- **No information leak.** A 404 for an unsupported resource type reveals only what discovery already
+  advertises publicly (RFC 7644 §4 discovery is unauthenticated). The diagnostics `errorCode` carries no
+  PII and no resource data.
+- **Auth ordering unchanged.** Enforcement runs **after** the existing auth guard and the `active` check,
+  so an unauthenticated caller still gets 401 first - the resolver never runs for them.
+
+### 15.2 Privacy
+
+- No new PII is read, logged, or returned. Rejections log only `endpointId`, resource-type name, and
+  `requestId` (already standard correlation fields).
+
+### 15.3 Observability
+
+- Each rejection emits a structured WARN/INFO log via `ScimLogger` with the `errorCode`
+  (`RESOURCE_TYPE_NOT_SUPPORTED` / `CAPABILITY_NOT_SUPPORTED`) and `requestId`, so the smart-error
+  explainer and the per-endpoint log stream surface it. The 404/403 path is already covered by the
+  global exception filter's level mapping (404 -> DEBUG, other 4xx -> INFO).
+
+### 15.4 Backward compatibility
+
+- The fail-open rule (principle 3) guarantees legacy and partial-profile endpoints are unaffected.
+  Endpoints from full presets (entra-id, rfc-standard, minimal) declare both User and Group and all
+  capabilities, so their behavior is unchanged. Only endpoints that **explicitly** narrow themselves
+  (e.g., user-only) change behavior - which is the intended correction.
+
+### 15.5 Performance
+
+- The resolvers are in-memory array scans over a tiny list (<= a handful of resource types / a fixed set
+  of capabilities) already loaded in the endpoint profile. No new DB query, no measurable latency impact.
+
+### 15.6 Cross-backend parity
+
+- Enforcement lives in the controller/service layer above the repository, so it is identical for the
+  Prisma and InMemory backends. The Stage 2.5 `crossBackendParityAudit` applies.
+
+---
+
+## 16. RFC References
 
 - **RFC 7643 §6** - ResourceType definitions. An endpoint serves a resource type iff it declares it.
 - **RFC 7643 §7** - Schema definitions and characteristics.
@@ -710,7 +883,7 @@ unaffected.
 
 ---
 
-## 16. Open Questions & Decisions Log
+## 17. Open Questions & Decisions Log
 
 | # | Question | Decision | Rationale |
 |---|---|---|---|
