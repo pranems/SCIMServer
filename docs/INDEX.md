@@ -37,9 +37,11 @@
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
 | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) | Multi-endpoint architecture, data isolation, tenant provisioning |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | **Profile system** - creation flow, 6 presets, auto-expand, tighten-only validation, schema cache |
+| [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md) | **Profile enforcement design** - the advertise-but-don't-enforce bug class (10 gaps), shared resource-type + capability resolvers, Phase 1 minimal fix (v0.53.3) + Phase 2 settings-only model, data flows, RFC status mapping, parity harness |
 | [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | Profile configuration design (Phase 13) - decisions, types, flows |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Operator guide - custom extensions, resource types, profile-based |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | PATCH validation architecture + immutable enforcement |
+| [PATCH_OPERATIONS_COMPLETE_GUIDE.md](PATCH_OPERATIONS_COMPLETE_GUIDE.md) | **Complete PATCH behavior guide** - every option, mode, setting, path form (5 RFC shapes), and verb across Users, Groups, custom extensions, and custom resource types. Transport contract (URLs, request/response headers, status codes, ETag/If-Match), the PatchOp envelope, the `VerbosePatchSupported` dot-notation gate, the readOnly strip-vs-reject matrix, member-clear forms, null semantics, persistence (promoted columns + JSONB + meta.version bump), scimType error table, live-verified request/response examples, and a per-resource behavior matrix |
 | [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | Structured logging - ring buffer, SSE, file rotation, auto-prune |
 | [WEB_UI_FLOWS_AND_BEHAVIORS.md](WEB_UI_FLOWS_AND_BEHAVIORS.md) | Web UI - 5 screens, data source matrix, Mermaid diagrams |
 | [UI_GUIDE.md](UI_GUIDE.md) | **v0.41.0 UI Guide** - Fluent UI pages, screenshots (59), components, data flow, SSE, accessibility, theme system, legacy UI |
