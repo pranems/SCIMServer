@@ -37,6 +37,13 @@
     Use the device-code login flow for the required interactive user sign-in
     (instead of the default browser popup).
 
+.PARAMETER UseCurrentSession
+    Bootstrap the SP from the az login that is ALREADY active, instead of forcing a
+    fresh isolated-profile login. Use this when you are already signed in to the
+    target tenant (e.g. both subscriptions show under `az account list`). Avoids any
+    new browser prompt. The active account must be a user that can select the target
+    subscription.
+
 .PARAMETER Force
     Skip the interactive "type CREATE to proceed" confirmation. Use in automation
     only when you are sure.
@@ -53,6 +60,10 @@
     pwsh scripts/setup-deploy-sp.ps1                 # both tenants
 
 .EXAMPLE
+    # Already signed into both tenants - create both SPs with no new login
+    pwsh scripts/setup-deploy-sp.ps1 -UseCurrentSession
+
+.EXAMPLE
     pwsh scripts/setup-deploy-sp.ps1 -Name anandsa -Rotate
 #>
 [CmdletBinding()]
@@ -63,6 +74,7 @@ param(
     [string]$Role = 'Contributor',
     [switch]$Rotate,
     [switch]$DeviceCode,
+    [switch]$UseCurrentSession,
     [switch]$Force
 )
 
@@ -99,10 +111,27 @@ function New-DeploySp {
         return
     }
 
-    # Must sign in as a USER to create an app registration (an SP cannot by default).
-    $acct = Connect-ScimUser -Entry $Entry -DeviceCode:$DeviceCode
+    # Sign in as a USER to create an app registration (an SP cannot by default).
+    # -UseCurrentSession reuses whatever az profile is already active (no fresh login)
+    # as long as it is a user account that can reach the target tenant's subscription.
+    if ($UseCurrentSession) {
+        az account set --subscription $Entry.Subscription 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: current session cannot select subscription '$($Entry.Subscription)'." -ForegroundColor Red
+            Write-Host "       Drop -UseCurrentSession to do an interactive login for $($Entry.Key), or run" -ForegroundColor Yellow
+            Write-Host "       'az login --tenant $($Entry.Tenant)' first." -ForegroundColor Yellow
+            return
+        }
+        $acct = az account show -o json 2>$null | ConvertFrom-Json
+    } else {
+        $acct = Connect-ScimUser -Entry $Entry -DeviceCode:$DeviceCode
+    }
     if (-not $acct) {
         Write-Host "ERROR: could not sign in to $($Entry.Name) as a user; skipping." -ForegroundColor Red
+        return
+    }
+    if ($acct.tenantId -ne $Entry.Tenant) {
+        Write-Host "ERROR: active tenant is '$($acct.tenantId)', expected '$($Entry.Tenant)' for $($Entry.Key)." -ForegroundColor Red
         return
     }
     if ($acct.user.type -ne 'user') {
