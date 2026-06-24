@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
 > **Version:** 0.53.0 - **Updated:** June 3, 2026  
-> 86 API route handlers - 20 controllers - 6 presets - 16 config flags - 7,277 checks (3,816 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,027 live SCIM + 15 PowerShell)
+> 86 API route handlers - 20 controllers - 6 presets - 16 config flags - 7,335 checks (3,874 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,047 live SCIM + 15 PowerShell)
 
 ---
 
@@ -37,7 +37,7 @@
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
 | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) | Multi-endpoint architecture, data isolation, tenant provisioning |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | **Profile system** - creation flow, 6 presets, auto-expand, tighten-only validation, schema cache |
-| [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md) | **Profile enforcement design** - the advertise-but-don't-enforce bug class (10 gaps), shared resource-type + capability resolvers, Phase 1 minimal fix (v0.53.3) + Phase 2 settings-only model, data flows, RFC status mapping, parity harness |
+| [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md) | **Profile enforcement design** - the advertise-but-don't-enforce bug class (10 gaps; 9 enforced + Gap 5 documented non-enforced), shared resource-type + capability resolvers, Phase 1 fix shipped v0.53.3 + Phase 2 settings-only model, data flows, RFC status mapping, parity harness |
 | [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | Profile configuration design (Phase 13) - decisions, types, flows |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Operator guide - custom extensions, resource types, profile-based |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | PATCH validation architecture + immutable enforcement |
