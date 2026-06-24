@@ -97,9 +97,9 @@ describe('Profile-enforcement gaps (E2E)', () => {
     });
   });
 
-  // ─── Gaps 2-5: capability gating ──────────────────────────────────────────
+  // ─── Gaps 2-4: capability gating ──────────────────────────────────────────
 
-  describe('Gaps 2-5: capability gating', () => {
+  describe('Gaps 2-4: capability gating', () => {
     it('Gap 2: filter.supported=false -> 403 on ?filter=', async () => {
       const endpointId = await createUserOnlyEndpoint(app, token);
       await patchSpc(app, token, endpointId, { filter: { supported: false } });
@@ -129,11 +129,12 @@ describe('Profile-enforcement gaps (E2E)', () => {
       expect(res.body.scimType).toBe('notImplemented');
     });
 
-    it('Gap 5: changePassword.supported=false -> 400 on PATCH password change', async () => {
+    it('Gap 5 (not enforced): changePassword.supported=false still allows a PATCH password change', async () => {
+      // changePassword.supported is advertised metadata only; password is a
+      // writeOnly attribute whose writability is governed by its mutability,
+      // not by this flag. Enforcing it would break Entra/Okta password flows.
       const endpointId = await createUserOnlyEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
-      // Initial password at create is allowed (provisioning); only a later
-      // PATCH that changes the password is governed by changePassword.supported.
       const user = (await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: `pw-${Date.now()}@x.io`, password: 'Initial123!',
       }).expect(201)).body;
@@ -141,8 +142,9 @@ describe('Profile-enforcement gaps (E2E)', () => {
       const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         Operations: [{ op: 'replace', path: 'password', value: 'Changed456!' }],
-      }).expect(400);
-      expect(res.body.scimType).toBe('mutability');
+      }).expect(200);
+      // password is stripped from the response (writeOnly)
+      expect(res.body.password).toBeUndefined();
     });
   });
 

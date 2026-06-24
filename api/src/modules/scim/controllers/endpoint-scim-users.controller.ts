@@ -18,7 +18,7 @@ import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '..
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { createScimError } from '../common/scim-errors';
 import { resolveResourceType } from '../common/resource-type-resolver';
-import { enforcePatchSupported, enforceFilterSupported, enforceSortSupported, enforceChangePasswordSupported, hasPasswordWrite } from '../common/capability-enforcement';
+import { enforcePatchSupported, enforceFilterSupported, enforceSortSupported } from '../common/capability-enforcement';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
@@ -295,7 +295,6 @@ export class EndpointScimUsersController {
   ) {
     const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
     enforcePatchSupported(profile);
-    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)

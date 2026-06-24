@@ -173,7 +173,7 @@ Every row is "advertised in discovery, not enforced at runtime." Status codes fo
 | 2 | `filter.supported` | Yes | **No** | 403 `forbidden` when `?filter=` used; or ignore filter | 7644 §3.4.2.2 |
 | 3 | `sort.supported` | Yes | **No** | 403 when `sortBy` used; or ignore sort | 7644 §3.4.2.3 |
 | 4 | `patch.supported` | Yes | **No** | 501 `notImplemented` on PATCH | 7644 §3.5.2 |
-| 5 | `changePassword.supported` | Yes | **No** | 400 `mutability` / strip `password` writes | 7643 §7.6 |
+| 5 | `changePassword.supported` | Yes | **No (intentional)** | not enforced - see note | 7643 §7.6 |
 | 6 | `filter.maxResults` | Yes | **No** (global `MAX_COUNT=200`) | clamp `count` to the per-endpoint value | 7644 §3.4.2.4 |
 | 7 | `bulk.maxOperations` / `maxPayloadSize` | Yes | **No** (global consts) | 413 `tooLarge` / 400 per the per-endpoint value | 7644 §3.7 |
 | 8 | `bulk.supported` | Yes | **Yes** (the only one) | 403 on `/Bulk` | 7644 §3.7 |
@@ -1035,7 +1035,7 @@ Following the design-doc norm of explicitly addressing cross-cutting concerns (c
 | D16 | Phase 1 release base | **Branch off prod tag `58ca63b` (v0.53.2), not master** | Customer prod gets only the targeted fix, not unreleased v0.54 work; cleanly promotable |
 | D17 | Capability enforcement default | **Permissive (`true`) - enforce only an explicit `false`** | Bounds prod blast radius to endpoints that deliberately narrow themselves; legacy/full-preset endpoints unchanged |
 | D18 | Enforcement layer | **Controller layer for capability gates; service layer for the `count` clamp** | HTTP status semantics (403/501/400/404) belong at the HTTP boundary; the page-size clamp is a list-shaping concern in the service. `/Me` mirrors the Users controller |
-| D19 | Gap 5 scope (`changePassword.supported`) | **Enforce on PATCH password-change only, NOT initial POST/PUT password** | Setting an initial password during provisioning is governed by the `password` writeOnly attribute (RFC 7643 §7.6); `changePassword` (RFC 7644 §3.5.2.2) governs changing an existing password. Enforcing at create would break Entra ID/Okta provisioning (a real regression caught by the e2e suite) |
+| D19 | Gap 5 scope (`changePassword.supported`) | **Not enforced - advertised metadata only** | This server has no distinct change-password operation to gate; `password` is a `writeOnly` attribute (RFC 7643 §7.6) whose writability is governed by its mutability (already handled: accepted on write, stripped from responses). Blocking password writes on this flag breaks standard Entra ID/Okta provisioning (initial password) AND password-reset (PATCH password) - both caught as regressions (e2e `returned-characteristic`/`p2` at create; live-test `9l.5` at PATCH). The flag stays advertised in discovery but is not a blockable operation here |
 | D20 | Express auto-ETag | **Disabled app-wide (`app.set('etag', false)`)** | SCIM defines a `meta.version` weak ETag (RFC 7644 §3.14) set by `ScimEtagInterceptor`. Express's content-hash ETag is meaningless for SCIM versioning, leaks onto list/error responses, and would re-add an ETag on `etag.supported=false` endpoints (Gap 10). The SCIM ETag remains the only ETag source |
 
 ---

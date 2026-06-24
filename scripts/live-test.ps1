@@ -10876,6 +10876,127 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method 
 Write-Host "`n--- 9z-AL: Post-PATCH validation scoping Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AM: Profile Enforcement Gaps (v0.53.3)
+# Verifies the runtime honors what discovery advertises:
+#   Gap 1  - user-only endpoint rejects Group CRUD with 404
+#   Gap 2/3/4 - filter/sort/patch disabled in SPC are enforced (403/403/501)
+#   Gap 6  - per-endpoint filter.maxResults clamps the page size
+#   Gap 10 - etag.supported=false omits the ETag header
+# ============================================
+$script:currentSection = "9z-AM: Profile Enforcement Gaps"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AM: PROFILE ENFORCEMENT GAPS" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+$pegHeaders = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/scim+json"; Accept = "application/scim+json" }
+
+# Helper: safe SCIM request (any method) that captures status + parsed body without throwing
+function Invoke-NullPatchGeneric($url, $method, $body) {
+    try {
+        $params = @{ Uri = $url; Method = $method; Headers = $pegHeaders; SkipHttpErrorCheck = $true }
+        if ($null -ne $body) { $params.Body = ($body | ConvertTo-Json -Depth 10 -Compress) }
+        $resp = Invoke-WebRequest @params
+        $parsed = $null
+        if ($resp.Content) {
+            $contentStr = if ($resp.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
+            try { $parsed = $contentStr | ConvertFrom-Json } catch { $parsed = $contentStr }
+        }
+        return [pscustomobject]@{ Status = [int]$resp.StatusCode; Body = $parsed }
+    } catch {
+        return [pscustomobject]@{ Status = -1; Body = $_.Exception.Message }
+    }
+}
+
+# ---- Gap 1: user-only endpoint rejects Group CRUD ----
+Write-Host "`n--- 9z-AM Gap 1: user-only endpoint rejects Group CRUD ---" -ForegroundColor Cyan
+$pegUserOnlyBody = @{ name = "live-peg-useronly-$(Get-Random)"; profilePreset = "user-only" } | ConvertTo-Json
+$pegUserOnlyEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegUserOnlyBody
+$pegUoId = $pegUserOnlyEp.id
+$pegUoBase = "$baseUrl/scim/endpoints/$pegUoId"
+Test-Result -Success ($null -ne $pegUoId) -Message "9z-AM.setup: created user-only endpoint $pegUoId"
+
+$pegGroupPost = Invoke-NullPatchGeneric "$pegUoBase/Groups" "POST" @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group"); displayName = "x" }
+Test-Result -Success ($pegGroupPost.Status -eq 404) -Message "9z-AM.1: POST /Groups on user-only endpoint -> 404 (status=$($pegGroupPost.Status))"
+Test-Result -Success ($pegGroupPost.Body.scimType -eq "noTarget") -Message "9z-AM.2: 404 scimType is noTarget"
+Test-Result -Success ($pegGroupPost.Body.'urn:scimserver:api:messages:2.0:Diagnostics'.errorCode -eq "RESOURCE_TYPE_NOT_SUPPORTED") -Message "9z-AM.3: diagnostics errorCode RESOURCE_TYPE_NOT_SUPPORTED"
+
+$pegGroupGet = Invoke-NullPatchGeneric "$pegUoBase/Groups" "GET" $null
+Test-Result -Success ($pegGroupGet.Status -eq 404) -Message "9z-AM.4: GET /Groups on user-only endpoint -> 404 (status=$($pegGroupGet.Status))"
+
+# User CRUD still works on the same endpoint
+$pegUoUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "peg-uo-$(Get-Random)@x.io" } | ConvertTo-Json
+$pegUoUser = Invoke-RestMethod -Uri "$pegUoBase/Users" -Method POST -Headers $pegHeaders -Body $pegUoUserBody
+Test-Result -Success ($null -ne $pegUoUser.id) -Message "9z-AM.5: User CRUD still works on the user-only endpoint"
+
+# ---- Gaps 2/3/4: capability gating (uses a rfc-standard endpoint we narrow via PATCH) ----
+Write-Host "`n--- 9z-AM Gaps 2/3/4: capability gating ---" -ForegroundColor Cyan
+$pegCapBody = @{ name = "live-peg-cap-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$pegCapEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegCapBody
+$pegCapId = $pegCapEp.id
+$pegCapBase = "$baseUrl/scim/endpoints/$pegCapId"
+
+# Seed a user before narrowing capabilities
+$pegCapUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "peg-cap-$(Get-Random)@x.io" } | ConvertTo-Json
+$pegCapUser = Invoke-RestMethod -Uri "$pegCapBase/Users" -Method POST -Headers $pegHeaders -Body $pegCapUserBody
+
+# Gap 4: patch.supported=false -> 501
+$pegPatchOff = @{ profile = @{ serviceProviderConfig = @{ patch = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegCapId" -Method PATCH -Headers $headers -Body $pegPatchOff | Out-Null
+$pegPatchTry = Invoke-NullPatchGeneric "$pegCapBase/Users/$($pegCapUser.id)" "PATCH" @{ schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp"); Operations = @(@{ op = "replace"; path = "displayName"; value = "y" }) }
+Test-Result -Success ($pegPatchTry.Status -eq 501) -Message "9z-AM.6: PATCH with patch.supported=false -> 501 (status=$($pegPatchTry.Status))"
+
+# Gap 2: filter.supported=false -> 403
+$pegFilterOff = @{ profile = @{ serviceProviderConfig = @{ filter = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegCapId" -Method PATCH -Headers $headers -Body $pegFilterOff | Out-Null
+$pegFilterTry = Invoke-NullPatchGeneric "$pegCapBase/Users?filter=userName%20eq%20%22x%22" "GET" $null
+Test-Result -Success ($pegFilterTry.Status -eq 403) -Message "9z-AM.7: GET ?filter= with filter.supported=false -> 403 (status=$($pegFilterTry.Status))"
+
+# Gap 3: sort.supported=false -> 403
+$pegSortOff = @{ profile = @{ serviceProviderConfig = @{ sort = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegCapId" -Method PATCH -Headers $headers -Body $pegSortOff | Out-Null
+$pegSortTry = Invoke-NullPatchGeneric "$pegCapBase/Users?sortBy=userName" "GET" $null
+Test-Result -Success ($pegSortTry.Status -eq 403) -Message "9z-AM.8: GET ?sortBy= with sort.supported=false -> 403 (status=$($pegSortTry.Status))"
+
+# ---- Gap 6: per-endpoint filter.maxResults clamps page size ----
+Write-Host "`n--- 9z-AM Gap 6: filter.maxResults clamp ---" -ForegroundColor Cyan
+$pegMrBody = @{ name = "live-peg-maxresults-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$pegMrEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegMrBody
+$pegMrId = $pegMrEp.id
+$pegMrBase = "$baseUrl/scim/endpoints/$pegMrId"
+for ($i = 0; $i -lt 4; $i++) {
+    $b = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "peg-mr-$i-$(Get-Random)@x.io" } | ConvertTo-Json
+    Invoke-RestMethod -Uri "$pegMrBase/Users" -Method POST -Headers $pegHeaders -Body $b | Out-Null
+}
+$pegMrSet = @{ profile = @{ serviceProviderConfig = @{ filter = @{ supported = $true; maxResults = 2 } } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegMrId" -Method PATCH -Headers $headers -Body $pegMrSet | Out-Null
+$pegMrList = Invoke-RestMethod -Uri "$pegMrBase/Users?count=100" -Method GET -Headers $pegHeaders
+Test-Result -Success (@($pegMrList.Resources).Count -le 2) -Message "9z-AM.9: filter.maxResults=2 clamps page size to <=2 (returned=$(@($pegMrList.Resources).Count))"
+Test-Result -Success ($pegMrList.totalResults -ge 4) -Message "9z-AM.10: totalResults still reflects full count (>=4)"
+
+# ---- Gap 10: etag.supported=false omits the ETag header ----
+Write-Host "`n--- 9z-AM Gap 10: etag.supported ---" -ForegroundColor Cyan
+$pegEtBody = @{ name = "live-peg-etag-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$pegEtEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegEtBody
+$pegEtId = $pegEtEp.id
+$pegEtBase = "$baseUrl/scim/endpoints/$pegEtId"
+$pegEtUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "peg-et-$(Get-Random)@x.io" } | ConvertTo-Json
+$pegEtUser = Invoke-RestMethod -Uri "$pegEtBase/Users" -Method POST -Headers $pegHeaders -Body $pegEtUserBody
+# Default (etag.supported=true) -> ETag header present
+$pegEtOn = Invoke-WebRequest -Uri "$pegEtBase/Users/$($pegEtUser.id)" -Method GET -Headers $pegHeaders -SkipHttpErrorCheck
+Test-Result -Success ($null -ne $pegEtOn.Headers['ETag']) -Message "9z-AM.11: ETag header present when etag.supported=true (default)"
+# Narrow to etag.supported=false -> ETag header absent
+$pegEtOff = @{ profile = @{ serviceProviderConfig = @{ etag = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegEtId" -Method PATCH -Headers $headers -Body $pegEtOff | Out-Null
+$pegEtOffResp = Invoke-WebRequest -Uri "$pegEtBase/Users/$($pegEtUser.id)" -Method GET -Headers $pegHeaders -SkipHttpErrorCheck
+Test-Result -Success ($null -eq $pegEtOffResp.Headers['ETag']) -Message "9z-AM.12: ETag header absent when etag.supported=false"
+
+# ---- Cleanup ----
+foreach ($epId in @($pegUoId, $pegCapId, $pegMrId, $pegEtId)) {
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$epId" -Method DELETE -Headers $headers | Out-Null } catch {}
+}
+Write-Host "`n--- 9z-AM: Profile Enforcement Gaps Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

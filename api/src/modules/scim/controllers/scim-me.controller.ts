@@ -40,7 +40,7 @@ import { applyAttributeProjection } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 import { createScimError } from '../common/scim-errors';
 import { resolveResourceType } from '../common/resource-type-resolver';
-import { enforcePatchSupported, enforceChangePasswordSupported, hasPasswordWrite } from '../common/capability-enforcement';
+import { enforcePatchSupported } from '../common/capability-enforcement';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 /** Extended request interface matching SharedSecretGuard output. */
@@ -226,7 +226,6 @@ export class ScimMeController {
   ) {
     const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
     enforcePatchSupported(profile);
-    enforceChangePasswordSupported(profile, hasPasswordWrite(dto as unknown as Record<string, unknown>));
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);

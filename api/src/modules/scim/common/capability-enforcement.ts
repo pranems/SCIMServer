@@ -10,8 +10,16 @@
  * This bounds the prod blast radius to endpoints that deliberately narrow
  * themselves (the design's principle 3).
  *
+ * Note: `changePassword.supported` is intentionally NOT enforced. This server
+ * has no distinct "change-password operation" to gate - `password` is a
+ * `writeOnly` attribute (RFC 7643 §7.6) whose writability is governed by its
+ * mutability (already handled: accepted on write, stripped from responses).
+ * Blocking password writes on `changePassword.supported=false` would break
+ * standard Entra ID / Okta provisioning (initial password) and password-reset
+ * (PATCH password) flows. See design doc decision D19.
+ *
  * @see docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.2
- * @see RFC 7644 §3.4.2.2 (filter), §3.4.2.3 (sort), §3.5.2 (patch), §3.5.2.2 (changePassword)
+ * @see RFC 7644 §3.4.2.2 (filter), §3.4.2.3 (sort), §3.5.2 (patch)
  */
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { resolveBooleanCapability } from './capability-resolver';
@@ -54,39 +62,4 @@ export function enforceSortSupported(profile: EndpointProfile | undefined, sortB
       diagnostics: { errorCode: 'CAPABILITY_NOT_SUPPORTED', triggeredBy: 'sort.supported' },
     });
   }
-}
-
-/** Gap 5: reject a password write with 400 when changePassword.supported is explicitly false. */
-export function enforceChangePasswordSupported(profile: EndpointProfile | undefined, hasPassword: boolean): void {
-  if (!hasPassword) return; // no password in payload -> nothing to enforce
-  const supported = resolveBooleanCapability(profile, (s) => s.changePassword?.supported, undefined, true);
-  if (!supported) {
-    throw createScimError({
-      status: 400,
-      scimType: 'mutability',
-      detail: 'Password changes are not supported by this endpoint (serviceProviderConfig.changePassword.supported = false).',
-      diagnostics: { errorCode: 'CAPABILITY_NOT_SUPPORTED', triggeredBy: 'changePassword.supported', attributePath: 'password' },
-    });
-  }
-}
-
-/**
- * Whether a write payload contains a password: a non-empty top-level `password`
- * field (POST/PUT) or a PATCH operation targeting password (path contains
- * "password" or a value object with a `password` key). Shared by the Users and
- * Me controllers so Gap 5 detection is defined once.
- */
-export function hasPasswordWrite(body: Record<string, unknown> | undefined): boolean {
-  if (!body) return false;
-  if (typeof body.password === 'string' && body.password.length > 0) return true;
-  const ops = body.Operations;
-  if (Array.isArray(ops)) {
-    return ops.some((op) => {
-      const o = op as { path?: string; value?: unknown };
-      if (typeof o.path === 'string' && o.path.toLowerCase().includes('password')) return true;
-      if (o.value && typeof o.value === 'object' && 'password' in (o.value as Record<string, unknown>)) return true;
-      return false;
-    });
-  }
-  return false;
 }

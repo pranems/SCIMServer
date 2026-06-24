@@ -13,8 +13,6 @@ import {
   enforcePatchSupported,
   enforceFilterSupported,
   enforceSortSupported,
-  enforceChangePasswordSupported,
-  hasPasswordWrite,
 } from './capability-enforcement';
 import type { EndpointProfile, ServiceProviderConfig } from '../endpoint-profile/endpoint-profile.types';
 
@@ -67,41 +65,5 @@ describe('enforceSortSupported (Gap 3)', () => {
   });
   it('does not throw when sort.supported is true', () => {
     expect(status(() => enforceSortSupported(profile({ sort: { supported: true } }), 'userName'))).toBeUndefined();
-  });
-});
-
-describe('enforceChangePasswordSupported (Gap 5)', () => {
-  it('throws 400 when a password is present and changePassword.supported is false', () => {
-    expect(status(() => enforceChangePasswordSupported(profile({ changePassword: { supported: false } }), true))).toBe(400);
-  });
-  it('does not throw when no password is present', () => {
-    expect(status(() => enforceChangePasswordSupported(profile({ changePassword: { supported: false } }), false))).toBeUndefined();
-  });
-  it('fail-open: does not throw when changePassword is not explicitly set', () => {
-    expect(status(() => enforceChangePasswordSupported(profile({}), true))).toBeUndefined();
-  });
-});
-
-describe('hasPasswordWrite', () => {
-  it('detects a top-level password field', () => {
-    expect(hasPasswordWrite({ userName: 'a', password: 'secret' })).toBe(true);
-  });
-  it('ignores an empty password field', () => {
-    expect(hasPasswordWrite({ userName: 'a', password: '' })).toBe(false);
-  });
-  it('returns false when there is no password', () => {
-    expect(hasPasswordWrite({ userName: 'a' })).toBe(false);
-  });
-  it('detects a PATCH operation targeting password by path', () => {
-    expect(hasPasswordWrite({ Operations: [{ op: 'replace', path: 'password', value: 'x' }] })).toBe(true);
-  });
-  it('detects a PATCH operation with a password key in the value object', () => {
-    expect(hasPasswordWrite({ Operations: [{ op: 'replace', value: { password: 'x' } }] })).toBe(true);
-  });
-  it('returns false for a PATCH with no password operation', () => {
-    expect(hasPasswordWrite({ Operations: [{ op: 'replace', path: 'displayName', value: 'x' }] })).toBe(false);
-  });
-  it('returns false for undefined body', () => {
-    expect(hasPasswordWrite(undefined)).toBe(false);
   });
 });
