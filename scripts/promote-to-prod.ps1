@@ -442,26 +442,60 @@ Write-Host "🚀 Step 3: TRUE blue/green deployment..." -ForegroundColor Cyan
 # real serving revision.) We pick the highest-weight ACTIVE revision from the
 # live traffic table; only if none has weight (fresh single-revision app) do we
 # fall back to latestReadyRevisionName.
+# Resilience (added 2026-06-24 after a calmsand promote aborted on a transient
+# empty `az` result even though the traffic table was perfectly valid): every
+# `az` query below is retried up to 4 times. We also handle the
+# `latestRevision:true` traffic-row shape (calmsand auto-routes to newest, so its
+# weighted row may carry no explicit revisionName) by resolving the highest-weight
+# ACTIVE revision directly from the revision list.
 $blueRevision = $null
-try {
-    $trafficRows = az containerapp ingress traffic show --name $ProdAppName --resource-group $ProdResourceGroup -o json 2>$null | ConvertFrom-Json
-    $activeRevNames = az containerapp revision list --name $ProdAppName --resource-group $ProdResourceGroup --query "[?properties.active].name" -o json 2>$null | ConvertFrom-Json
-    $topServing = $trafficRows |
-        Where-Object { $_.weight -gt 0 -and $activeRevNames -contains $_.revisionName } |
-        Sort-Object -Property weight -Descending |
-        Select-Object -First 1
-    if ($topServing -and $topServing.revisionName) {
-        $blueRevision = $topServing.revisionName
-        Write-Host "   Blue = highest-traffic ACTIVE revision: $blueRevision ($($topServing.weight)%)" -ForegroundColor Gray
+for ($blueAttempt = 1; $blueAttempt -le 4 -and [string]::IsNullOrWhiteSpace($blueRevision); $blueAttempt++) {
+    if ($blueAttempt -gt 1) {
+        Write-Host "   (blue-resolution retry $blueAttempt/4 after transient empty az result)" -ForegroundColor DarkYellow
+        Start-Sleep -Seconds 5
     }
-} catch { }
-if ([string]::IsNullOrWhiteSpace($blueRevision)) {
-    $blueRevision = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
-        --query "properties.latestReadyRevisionName" --output tsv 2>$null
-    Write-Host "   Blue = latestReadyRevisionName fallback: $blueRevision" -ForegroundColor Gray
+    try {
+        $trafficRows = az containerapp ingress traffic show --name $ProdAppName --resource-group $ProdResourceGroup -o json 2>$null | ConvertFrom-Json
+        $activeRevNames = az containerapp revision list --name $ProdAppName --resource-group $ProdResourceGroup --query "[?properties.active].name" -o json 2>$null | ConvertFrom-Json
+        # Case 1: explicit-named weighted row that is also active (labeled/proudbush shape).
+        $topServing = $trafficRows |
+            Where-Object { $_.weight -gt 0 -and $_.revisionName -and ($activeRevNames -contains $_.revisionName) } |
+            Sort-Object -Property weight -Descending |
+            Select-Object -First 1
+        if ($topServing -and $topServing.revisionName) {
+            $blueRevision = $topServing.revisionName
+            Write-Host "   Blue = highest-traffic ACTIVE named revision: $blueRevision ($($topServing.weight)%)" -ForegroundColor Gray
+        }
+        # Case 2: weighted `latestRevision:true` row with no explicit revisionName
+        # (calmsand auto-route shape). Resolve the highest-weight ACTIVE revision directly.
+        if ([string]::IsNullOrWhiteSpace($blueRevision)) {
+            $latestRow = $trafficRows | Where-Object { $_.latestRevision -eq $true -and $_.weight -gt 0 } | Select-Object -First 1
+            if ($latestRow) {
+                $topActive = az containerapp revision list --name $ProdAppName --resource-group $ProdResourceGroup `
+                    --query "[?properties.active] | sort_by(@, &properties.trafficWeight)[-1].name" -o tsv 2>$null
+                if (-not [string]::IsNullOrWhiteSpace($topActive)) {
+                    $blueRevision = $topActive.Trim()
+                    Write-Host "   Blue = highest-weight ACTIVE revision (latestRevision auto-route shape): $blueRevision" -ForegroundColor Gray
+                }
+            }
+        }
+    } catch {
+        Write-Host "   (blue-resolution attempt $blueAttempt threw: $($_.Exception.Message))" -ForegroundColor DarkYellow
+    }
+    # Fallback within the retry loop: latestReadyRevisionName (also transient-prone).
+    if ([string]::IsNullOrWhiteSpace($blueRevision)) {
+        $latestReady = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
+            --query "properties.latestReadyRevisionName" --output tsv 2>$null
+        if (-not [string]::IsNullOrWhiteSpace($latestReady)) {
+            $blueRevision = $latestReady.Trim()
+            Write-Host "   Blue = latestReadyRevisionName fallback: $blueRevision" -ForegroundColor Gray
+        }
+    }
 }
 if ([string]::IsNullOrWhiteSpace($blueRevision)) {
-    Write-Host "❌ Could not resolve current (blue) revision name." -ForegroundColor Red
+    Write-Host "❌ Could not resolve current (blue) revision name after 4 attempts." -ForegroundColor Red
+    Write-Host "   Inspect: az containerapp ingress traffic show -n $ProdAppName -g $ProdResourceGroup -o json" -ForegroundColor Yellow
+    Write-Host "   And:     az containerapp revision list -n $ProdAppName -g $ProdResourceGroup -o table" -ForegroundColor Yellow
     exit 1
 }
 # Safety: confirm the chosen blue is ACTIVE before we pin traffic to it.
