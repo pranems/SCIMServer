@@ -479,6 +479,12 @@ az containerapp ingress traffic set --name $ProdAppName --resource-group $ProdRe
 # 3f. Label green so it gets a stable private soak URL.
 az containerapp revision label add --name $ProdAppName --resource-group $ProdResourceGroup `
     --revision $greenRevision --label green --yes --output none 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    # Non-fatal here (Step 4b re-asserts routing authoritatively), but surface it:
+    # a silently-failed label move is exactly what lets verification hit the
+    # PRIOR revision through a stale 'green' label.
+    Write-Host "   ⚠️  'green' label add returned non-zero; Step 4b will verify routing." -ForegroundColor Yellow
+}
 $envSuffix = $prodFqdn -replace "^$([regex]::Escape($ProdAppName))\.", ''
 $greenFqdn = "$ProdAppName---green.$envSuffix"
 Write-Host "   Green soak URL: https://$greenFqdn" -ForegroundColor Gray
@@ -518,6 +524,41 @@ function Invoke-GreenRollback {
 
 if (-not $greenHealthy) {
     Invoke-GreenRollback -Reason "green did not become healthy within $($maxAttempts * $delaySeconds)s"
+    exit 1
+}
+
+# --- Step 4b: Confirm the green soak URL actually routes to the NEW green
+# revision, not a stale 'green' label still pointing at the PRIOR revision.
+# The /scim/health probe in Step 4 passes for ANY healthy revision, so without
+# this assertion a lagging or failed label move would run the entire Step 5
+# verification against the OLD image. That produces a confusing failure (a
+# version-specific Playwright/contract assertion fails) or, worse, a false
+# PASS that promotes nothing new. We assert the served runtime.hostname carries
+# this promotion's green revision suffix, retrying to absorb label-propagation
+# delay. (Root-caused 2026-06-24: a same-day second blue/green left the prior
+# green-labelled revision in place; verification ran against v0.53.3 while green
+# was v0.53.4 and the new UI spec correctly flagged the mismatch.)
+Write-Host ""
+Write-Host "🔎 Step 4b: Confirming green URL routes to the new revision ($greenRevision)..." -ForegroundColor Cyan
+$greenTokenBody = '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"' + $ProdClientSecret + '"}'
+$routedToGreen = $false
+for ($i = 1; $i -le 12; $i++) {
+    try {
+        $gTok = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/oauth/token" -Method Post -Body $greenTokenBody -ContentType 'application/json' -TimeoutSec 15).access_token
+        $gVer = Invoke-RestMethod -Uri "https://$greenFqdn/scim/admin/version" -Headers @{ Authorization = "Bearer $gTok" } -TimeoutSec 15
+        if ($gVer.runtime.hostname -match [regex]::Escape($greenSuffix)) {
+            Write-Host "   ✅ Green URL routes to $($gVer.runtime.hostname) (v$($gVer.version))" -ForegroundColor Green
+            $routedToGreen = $true
+            break
+        }
+        Write-Host "   Waiting for 'green' label to route to $greenSuffix (currently $($gVer.runtime.hostname))... ($i/12)" -ForegroundColor Gray
+    } catch {
+        Write-Host "   Waiting for green version endpoint... ($i/12)" -ForegroundColor Gray
+    }
+    Start-Sleep -Seconds 10
+}
+if (-not $routedToGreen) {
+    Invoke-GreenRollback -Reason "green soak URL never routed to the new revision $greenRevision (stale/lagging 'green' label). Verification was NOT run against the new image; refusing to promote."
     exit 1
 }
 
