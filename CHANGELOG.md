@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recreated [docs/UI_GUIDE.md](docs/UI_GUIDE.md) for the current 9-page Fluent UI admin with fresh production screenshots.
 - Deep freshness re-audit pass (verify-only, no doc edits required): confirmed all living reference/context/architecture docs already current at v0.53.0 (86 routes / 20 controllers, 14 log categories, 6 presets, bulk 1000/1048576, Prisma `profile Json`). Independently re-measured the INDEX test-count line by running the full unit suite (`npx jest` -> **3,816/3,816 across 103 suites**), confirming the figure was correct and that the gitignored `api/pipeline-unit.json` / `api/pipeline-e2e.json` artifacts (3,735 / 1,197) are stale and not authoritative. Format-migration sweeps all clean (no `"config":` format, no `maxOperations:100`, no phantom `backup` category, 0 case-sensitive PascalCase mutability). Residual `84`/`82`/`19` counts confirmed to remain only in frozen dated snapshot docs and were correctly left untouched.
 
+## [0.53.4] - 2026-06-24 - Fix: admin UI tolerates profile-enforced resource types (no fatal page)
+
+Follow-up to v0.53.3. The runtime enforcement was correct, but the **admin UI** had not been taught about it: the endpoint detail page rendered the Groups tab unconditionally, and the Groups route loader eagerly prefetched `GET /Groups`. On a **user-only** endpoint that call now returns `404 noTarget` (`RESOURCE_TYPE_NOT_SUPPORTED`), and the unhandled loader rejection tripped the route error boundary - replacing the whole endpoint detail surface with **"Something went wrong / Resource type \"Group\" is not supported by endpoint ..."**. Reported on customer-facing prod at `/endpoints/3dbe8e5c-.../users`. This is a pure web-layer fix; no API behavior changed.
+
+### Fixed
+
+- **Resource-type tab gating:** [web/src/pages/EndpointDetailPage.tsx](web/src/pages/EndpointDetailPage.tsx) now hides the **Users** or **Groups** tab when the endpoint profile does not declare that resource type, so the operator can never navigate into a tab the server would 404. Gating uses the new client resolver and is **fail-open** (absent/empty `resourceTypes` shows all tabs) - an exact mirror of the server's `resolveResourceType`.
+- **Resilient tab loaders:** the Users and Groups route loaders ([web/src/routes/endpoints.$endpointId.users.tsx](web/src/routes/endpoints.$endpointId.users.tsx), [web/src/routes/endpoints.$endpointId.groups.tsx](web/src/routes/endpoints.$endpointId.groups.tsx)) now treat the SCIM list prefetch as **best-effort** (swallow errors), so a stale deep-link / refresh onto an unsupported tab renders a contained empty state instead of the fatal route boundary.
+- **Friendly unsupported state:** [web/src/pages/GroupsTab.tsx](web/src/pages/GroupsTab.tsx) and [web/src/pages/UsersTab.tsx](web/src/pages/UsersTab.tsx) detect the resource-type-unsupported 404 and render an explanatory `EmptyState` ("Groups are not supported by this endpoint ...") rather than a generic failure.
+
+### Added
+
+- **Client mirror of the server resolver:** [web/src/api/endpoint-capabilities.ts](web/src/api/endpoint-capabilities.ts) exports `endpointSupportsResourceType` (fail-open, matches `resolveResourceType` exactly) and `isResourceTypeUnsupportedError` (classifies the 404 via the diagnostics `errorCode` with a `noTarget` + detail-phrase fallback).
+
+### Tests
+
+- **Web vitest +13** (1,073 -> **1,086**): new [web/src/api/endpoint-capabilities.test.ts](web/src/api/endpoint-capabilities.test.ts) (fail-open + match-by-name/endpoint + error classification), tab-gating cases in [web/src/pages/EndpointDetailPage.test.tsx](web/src/pages/EndpointDetailPage.test.tsx), and the unsupported-state case in [web/src/pages/GroupsTab.test.tsx](web/src/pages/GroupsTab.test.tsx).
+- **Playwright regression spec:** new [web/e2e/profile-enforcement-ui.spec.ts](web/e2e/profile-enforcement-ui.spec.ts) creates a throwaway user-only endpoint, asserts the Groups tab is hidden, the fatal boundary never appears on `/users`, and a direct load of `/groups` renders the contained empty state - then deletes the endpoint. Reproduces the prod report as a browser-level regression guard.
+
+### Why a gate missed it
+
+Every v0.53.3 gate was **API-scoped** (jest unit, jest e2e, live-test 9z-AM, discovery-vs-enforcement parity). The Playwright suite ran but had **no spec that drove the admin UI against a user-only endpoint**, so the UI's eager `GET /Groups` was never exercised against the new 404. The new Playwright spec closes that exact gap; see [docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md) "UI enforcement parity" for the standing rule.
+
 ## [0.53.3] - 2026-06-23 - Fix: enforce endpoint profile (resource types + capabilities) at runtime
 
 Closes the **advertise-but-don't-enforce** bug class: the discovery endpoints (`/ResourceTypes`, `/ServiceProviderConfig`) faithfully project the endpoint profile, but the built-in CRUD + capability layers only partially consulted it, so an endpoint could advertise one thing and do another. Reported instance: a **user-only** endpoint (no `Group` resource type) still served the entire Group CRUD surface on customer-facing prod. Full design: [docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md). Branched off the v0.53.2 prod tag (not master) so prod gets only this targeted fix (decision D16).

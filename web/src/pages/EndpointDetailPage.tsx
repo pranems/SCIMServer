@@ -35,6 +35,7 @@ import {
 import { Edit24Regular, Delete24Regular } from '@fluentui/react-icons';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEndpoint } from '../api/queries';
+import { endpointSupportsResourceType } from '../api/endpoint-capabilities';
 import { CopyableField, LoadingSkeleton } from '../components/primitives';
 import { DeleteEndpointDialog } from '../components/endpoint/DeleteEndpointDialog';
 
@@ -125,6 +126,20 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
       </div>
     );
   }
+
+  // Profile-enforcement (v0.53.3): the SCIM CRUD layer 404s a resource
+  // type the endpoint profile does not declare. Hide the matching tab so
+  // the operator never navigates into a tab that would fatally error.
+  // Fail-open mirrors the server resolver - absent/empty resourceTypes
+  // means "serves everything", so legacy endpoints show all tabs.
+  const supportsUsers = endpointSupportsResourceType(endpoint.profile, {
+    name: 'User',
+    endpointPath: '/Users',
+  });
+  const supportsGroups = endpointSupportsResourceType(endpoint.profile, {
+    name: 'Group',
+    endpointPath: '/Groups',
+  });
 
   const handleTabSelect = (next: TabValue): void => {
     if (next === 'overview') {
@@ -244,8 +259,8 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         onTabSelect={(_, d) => handleTabSelect(d.value as TabValue)}
       >
         <Tab value="overview">Overview</Tab>
-        <Tab value="users">Users</Tab>
-        <Tab value="groups">Groups</Tab>
+        {supportsUsers && <Tab value="users" data-testid="endpoint-tab-users">Users</Tab>}
+        {supportsGroups && <Tab value="groups" data-testid="endpoint-tab-groups">Groups</Tab>}
         <Tab value="activity">Activity</Tab>
         <Tab value="bulk">Bulk</Tab>
         <Tab value="resource-types">Resource types</Tab>

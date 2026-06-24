@@ -16,6 +16,7 @@ vi.mock('../api/queries', async () => {
 });
 
 import { useEndpointGroups } from '../api/queries';
+import { ScimApiError } from '../api/scim-error';
 import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
 function wrap(
@@ -62,6 +63,29 @@ describe('GroupsTab', () => {
     });
     wrap(<GroupsTab endpointId="ep-1" />);
     expect(await screen.findByTestId('groups-error')).toBeInTheDocument();
+  });
+
+  // v0.53.4 regression guard: a user-only endpoint 404s /Groups. The tab
+  // must render a contained, explanatory empty state (not the generic
+  // failure, and never the fatal route boundary) when a stale deep-link
+  // or refresh lands here.
+  it('shows a friendly "Groups not supported" state for a resource-type-unsupported 404', async () => {
+    const err = new ScimApiError({
+      status: 404,
+      scimType: 'noTarget',
+      detail: 'Resource type "Group" is not supported by endpoint "x".',
+      rawBody: {
+        'urn:ietf:params:scim:api:messages:2.0:Diagnostics': {
+          errorCode: 'RESOURCE_TYPE_NOT_SUPPORTED',
+        },
+      },
+    });
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: undefined, isLoading: false, error: err,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+    expect(await screen.findByTestId('groups-unsupported')).toBeInTheDocument();
+    expect(screen.queryByTestId('groups-error')).not.toBeInTheDocument();
   });
 
   it('renders group table with display names and member counts', async () => {
