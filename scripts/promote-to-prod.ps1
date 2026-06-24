@@ -542,7 +542,7 @@ Write-Host ""
 Write-Host "🔎 Step 4b: Confirming green URL routes to the new revision ($greenRevision)..." -ForegroundColor Cyan
 $greenTokenBody = '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"' + $ProdClientSecret + '"}'
 $routedToGreen = $false
-for ($i = 1; $i -le 12; $i++) {
+for ($i = 1; $i -le 30; $i++) {
     try {
         $gTok = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/oauth/token" -Method Post -Body $greenTokenBody -ContentType 'application/json' -TimeoutSec 15).access_token
         $gVer = Invoke-RestMethod -Uri "https://$greenFqdn/scim/admin/version" -Headers @{ Authorization = "Bearer $gTok" } -TimeoutSec 15
@@ -551,9 +551,9 @@ for ($i = 1; $i -le 12; $i++) {
             $routedToGreen = $true
             break
         }
-        Write-Host "   Waiting for 'green' label to route to $greenSuffix (currently $($gVer.runtime.hostname))... ($i/12)" -ForegroundColor Gray
+        Write-Host "   Waiting for 'green' label to route to $greenSuffix (currently $($gVer.runtime.hostname))... ($i/30)" -ForegroundColor Gray
     } catch {
-        Write-Host "   Waiting for green version endpoint... ($i/12)" -ForegroundColor Gray
+        Write-Host "   Waiting for green version endpoint... ($i/30)" -ForegroundColor Gray
     }
     Start-Sleep -Seconds 10
 }
