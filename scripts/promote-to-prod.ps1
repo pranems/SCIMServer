@@ -596,6 +596,30 @@ if (-not $routedToGreen) {
     exit 1
 }
 
+# --- Step 4c: Assert the green-served VERSION matches the promoted tag.
+# Routing to the right revision is necessary but not sufficient: the image
+# behind that revision can still be the wrong build. (Root-caused 2026-06-24:
+# the GHCR publish workflow builds from the REMOTE branch ref, but the ACR
+# image is built+pushed from the LOCAL working tree. When a version-bump commit
+# was not pushed before the GHCR build ran, the GHCR ':0.53.4' tag actually
+# contained v0.53.3 code - dev (ACR) was correct while both prods (GHCR) were
+# stale. The revision routed correctly but served the wrong version.) When the
+# promoted -ImageTag is a semver, we require the served version to equal it.
+if ($ImageTag -match '^\d+\.\d+\.\d+') {
+    $servedVersion = $null
+    try {
+        $gTok2 = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/oauth/token" -Method Post -Body $greenTokenBody -ContentType 'application/json' -TimeoutSec 15).access_token
+        $servedVersion = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/admin/version" -Headers @{ Authorization = "Bearer $gTok2" } -TimeoutSec 15).version
+    } catch { }
+    if ($servedVersion -ne $ImageTag) {
+        Invoke-GreenRollback -Reason "green serves version '$servedVersion' but promoted tag is '$ImageTag'. The image behind the green revision is the WRONG build (likely a registry tag built from a stale ref). Refusing to promote a mislabeled image."
+        exit 1
+    }
+    Write-Host "   ✅ Green serves the expected version v$servedVersion (matches -ImageTag $ImageTag)" -ForegroundColor Green
+} else {
+    Write-Host "   (ImageTag '$ImageTag' is not a semver; skipping version-match assertion)" -ForegroundColor DarkGray
+}
+
 # --- Step 5: Full verification cycle against green soak URL ---
 if ($RunVerification) {
     Write-Host ""
