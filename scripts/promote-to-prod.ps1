@@ -431,11 +431,45 @@ if (-not $BlueGreen) {
 # =========================================================================
 Write-Host "🚀 Step 3: TRUE blue/green deployment..." -ForegroundColor Cyan
 
-# 3a. Identify the current (blue) revision serving traffic.
-$blueRevision = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
-    --query "properties.latestReadyRevisionName" --output tsv 2>$null
+# 3a. Identify the current (blue) revision ACTUALLY SERVING traffic.
+# CRITICAL: blue MUST be the active revision with the most traffic, NOT
+# `latestReadyRevisionName`. After a prior aborted blue/green attempt the
+# latest-created revision can be a deactivated green - selecting it as blue
+# and pinning 100% traffic to a deactivated revision leaves the ingress with
+# nowhere to route and 404s the public FQDN. (Root-caused 2026-06-24: a second
+# same-day attempt picked a deactivated v0.53.4 revision as "blue", pinned
+# traffic to it, and briefly 404'd proudbush until traffic was restored to the
+# real serving revision.) We pick the highest-weight ACTIVE revision from the
+# live traffic table; only if none has weight (fresh single-revision app) do we
+# fall back to latestReadyRevisionName.
+$blueRevision = $null
+try {
+    $trafficRows = az containerapp ingress traffic show --name $ProdAppName --resource-group $ProdResourceGroup -o json 2>$null | ConvertFrom-Json
+    $activeRevNames = az containerapp revision list --name $ProdAppName --resource-group $ProdResourceGroup --query "[?properties.active].name" -o json 2>$null | ConvertFrom-Json
+    $topServing = $trafficRows |
+        Where-Object { $_.weight -gt 0 -and $activeRevNames -contains $_.revisionName } |
+        Sort-Object -Property weight -Descending |
+        Select-Object -First 1
+    if ($topServing -and $topServing.revisionName) {
+        $blueRevision = $topServing.revisionName
+        Write-Host "   Blue = highest-traffic ACTIVE revision: $blueRevision ($($topServing.weight)%)" -ForegroundColor Gray
+    }
+} catch { }
+if ([string]::IsNullOrWhiteSpace($blueRevision)) {
+    $blueRevision = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
+        --query "properties.latestReadyRevisionName" --output tsv 2>$null
+    Write-Host "   Blue = latestReadyRevisionName fallback: $blueRevision" -ForegroundColor Gray
+}
 if ([string]::IsNullOrWhiteSpace($blueRevision)) {
     Write-Host "❌ Could not resolve current (blue) revision name." -ForegroundColor Red
+    exit 1
+}
+# Safety: confirm the chosen blue is ACTIVE before we pin traffic to it.
+$blueActive = az containerapp revision show --name $ProdAppName --resource-group $ProdResourceGroup `
+    --revision $blueRevision --query "properties.active" -o tsv 2>$null
+if ($blueActive -ne 'true') {
+    Write-Host "❌ Selected blue revision '$blueRevision' is not active (active=$blueActive). Refusing to pin traffic to a dead revision." -ForegroundColor Red
+    Write-Host "   Inspect: az containerapp revision list -n $ProdAppName -g $ProdResourceGroup -o table" -ForegroundColor Yellow
     exit 1
 }
 Write-Host "   Blue (current) revision: $blueRevision" -ForegroundColor Gray
