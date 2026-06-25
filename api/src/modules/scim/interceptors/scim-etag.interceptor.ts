@@ -20,9 +20,13 @@ import {
 import { Observable, map } from 'rxjs';
 import type { Request, Response } from 'express';
 import { createScimError } from '../common/scim-errors';
+import { resolveBooleanCapability } from '../common/capability-resolver';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 
 @Injectable()
 export class ScimEtagInterceptor implements NestInterceptor {
+  constructor(private readonly endpointContext: EndpointContextStorage) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const httpCtx = context.switchToHttp();
     const req = httpCtx.getRequest<Request>();
@@ -35,6 +39,17 @@ export class ScimEtagInterceptor implements NestInterceptor {
         const body = data as Record<string, unknown>;
         const meta = body.meta as Record<string, unknown> | undefined;
         const etag = meta?.version as string | undefined;
+
+        // Gap 10: only emit ETag / honor If-None-Match when etag.supported is on.
+        // Fail-open default (true) keeps current behavior when the profile is
+        // absent or does not set etag.supported.
+        const etagSupported = resolveBooleanCapability(
+          this.endpointContext.getProfile?.(),
+          (s) => s.etag?.supported,
+          undefined,
+          true,
+        );
+        if (!etagSupported) return data;
 
         // ─── Set ETag header on single-resource responses ───
         if (etag) {

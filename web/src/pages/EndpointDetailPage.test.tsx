@@ -164,4 +164,52 @@ describe('EndpointDetailPage', () => {
     await screen.findByTestId('endpoint-detail-page');
     expect(screen.getByTestId('endpoint-scim-base-path-copy-button')).toBeInTheDocument();
   });
+
+  // ─── v0.53.4 - resource-type tab gating ─────────────────────────────
+  // Regression guard: the v0.53.3 profile enforcement made /Groups 404 on
+  // a user-only endpoint, and the UI surfaced it as a fatal "Something
+  // went wrong" page. The detail page must hide a tab the endpoint does
+  // not serve so the operator never navigates into it.
+  describe('resource-type tab gating', () => {
+    const userOnlyEndpoint: EndpointResponse = {
+      ...mockEndpoint,
+      profile: { resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users' }] },
+    };
+    const groupOnlyEndpoint: EndpointResponse = {
+      ...mockEndpoint,
+      profile: { resourceTypes: [{ id: 'Group', name: 'Group', endpoint: '/Groups' }] },
+    };
+
+    it('hides the Groups tab for a user-only endpoint', async () => {
+      (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: userOnlyEndpoint, isLoading: false, error: null,
+      });
+      renderDetail('/endpoints/ep-1/users');
+      await screen.findByTestId('endpoint-detail-page');
+      expect(screen.getByRole('tab', { name: /users/i })).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /groups/i })).not.toBeInTheDocument();
+    });
+
+    it('hides the Users tab for a group-only endpoint', async () => {
+      (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: groupOnlyEndpoint, isLoading: false, error: null,
+      });
+      renderDetail('/endpoints/ep-1/groups');
+      await screen.findByTestId('endpoint-detail-page');
+      expect(screen.getByRole('tab', { name: /groups/i })).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /users/i })).not.toBeInTheDocument();
+    });
+
+    it('shows both tabs (fail-open) when the profile declares no resourceTypes', async () => {
+      (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: { ...mockEndpoint, profile: { settings: {} } },
+        isLoading: false,
+        error: null,
+      });
+      renderDetail();
+      await screen.findByTestId('endpoint-detail-page');
+      expect(screen.getByRole('tab', { name: /users/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /groups/i })).toBeInTheDocument();
+    });
+  });
 });

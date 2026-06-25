@@ -12,6 +12,7 @@
 import { createScimError } from './scim-errors';
 import { SCIM_ERROR_TYPE } from './scim-constants';
 import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
+import { resolveBooleanCapability } from './capability-resolver';
 import {
   getConfigBoolean,
   getConfigString,
@@ -19,6 +20,7 @@ import {
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
 import type { ScimSchemaRegistry, ScimSchemaDefinition } from '../discovery/scim-schema-registry';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { SchemaValidator } from '../../../domain/validation';
 import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
 import type { ScimLogger } from '../../logging/scim-logger.service';
@@ -144,7 +146,17 @@ export function enforceIfMatch(
   currentVersion: number,
   ifMatch?: string,
   config?: EndpointConfig,
+  profile?: EndpointProfile,
 ): void {
+  // Gap 10: ETag/If-Match is meaningful only when etag.supported is on. When an
+  // endpoint explicitly sets serviceProviderConfig.etag.supported = false,
+  // versioning is inert: RequireIfMatch does not apply (no 428) and a supplied
+  // If-Match is not validated. Fail-open default (true) keeps current behavior.
+  const etagSupported = resolveBooleanCapability(profile, (s) => s.etag?.supported, undefined, true);
+  if (!etagSupported) {
+    return;
+  }
+
   const requireIfMatch = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
 
   if (!ifMatch) {
