@@ -16,6 +16,10 @@ import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
+import { createScimError } from '../common/scim-errors';
+import { resolveResourceType } from '../common/resource-type-resolver';
+import { enforcePatchSupported, enforceFilterSupported, enforceSortSupported } from '../common/capability-enforcement';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -65,7 +69,7 @@ export class EndpointScimUsersController {
   private async validateAndSetContext(
     endpointId: string,
     req: Request
-  ): Promise<{ baseUrl: string; config: EndpointConfig }> {
+  ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined }> {
     const endpoint = await this.endpointService.getEndpoint(endpointId);
 
     if (!endpoint.active) {
@@ -73,11 +77,24 @@ export class EndpointScimUsersController {
     }
 
     const profile = endpoint.profile;
+
+    // Gap 1: enforce the profile's resourceTypes for built-in CRUD (RFC 7643 §6).
+    // Fail-open when resourceTypes is absent/empty; reject when User is not declared.
+    const { supported } = resolveResourceType(profile, { name: 'User', endpointPath: '/Users' });
+    if (!supported) {
+      throw createScimError({
+        status: 404,
+        scimType: 'noTarget',
+        detail: `Resource type "User" is not supported by endpoint "${endpoint.name}".`,
+        diagnostics: { errorCode: 'RESOURCE_TYPE_NOT_SUPPORTED', operation: 'user' },
+      });
+    }
+
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
-    return { baseUrl, config };
+    return { baseUrl, config, profile };
   }
 
   /**
@@ -117,7 +134,9 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceFilterSupported(profile, filter);
+    enforceSortSupported(profile, sortBy);
     const result = await this.usersService.listUsersForEndpoint(
       {
         filter,
@@ -173,7 +192,9 @@ export class EndpointScimUsersController {
     @Body() dto: SearchRequestDto,
     @Req() req: Request
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforceFilterSupported(profile, dto.filter);
+    enforceSortSupported(profile, dto.sortBy);
     const result = await this.usersService.listUsersForEndpoint(
       {
         filter: dto.filter,
@@ -272,7 +293,8 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforcePatchSupported(profile);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)

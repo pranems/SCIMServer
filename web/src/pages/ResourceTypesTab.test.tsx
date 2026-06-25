@@ -73,6 +73,25 @@ function endpointWithFlag(flagOn: boolean, customRts: Array<Record<string, unkno
   };
 }
 
+// A user-only endpoint declares ONLY the User resource type (the real
+// SelfServ-Entra-OnlyUser-NoGroup shape). The tab must still show User in the
+// inventory even when the custom-RT flag is off, and must NOT show Group.
+function endpointUserOnly(flagOn = false) {
+  return {
+    id: 'ep-1',
+    name: 'user-only',
+    displayName: 'User Only',
+    active: true,
+    profile: {
+      settings: { CustomResourceTypesEnabled: flagOn ? 'True' : 'False' },
+      schemas: [{ id: SCHEMA_USER, name: 'User', attributes: [] }],
+      resourceTypes: [
+        { id: 'User', name: 'User', endpoint: '/Users', schema: SCHEMA_USER, schemaExtensions: [] },
+      ],
+    },
+  };
+}
+
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -115,16 +134,41 @@ describe('ResourceTypesTab (Phase M3)', () => {
     renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
     expect(screen.getByTestId('resource-types-disabled-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('resource-types-create-button')).not.toBeInTheDocument();
+    // The inventory is STILL shown so the operator sees the current valid types.
+    expect(screen.getByTestId('resource-types-inventory')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-User')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-Group')).toBeInTheDocument();
+  });
+
+  it('flag OFF still shows the current resource types of a user-only endpoint (User only, no Group)', () => {
+    mockUseEndpoint.mockReturnValue({
+      data: endpointUserOnly(false),
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    expect(screen.getByTestId('resource-types-disabled-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-inventory')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-User')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-User-kind').textContent).toContain('built-in');
+    expect(screen.queryByTestId('resource-types-row-Group')).not.toBeInTheDocument();
+    // No delete affordance while the flag is off.
+    expect(screen.queryByTestId('resource-types-row-User-delete')).not.toBeInTheDocument();
   });
 
   // ─── 3-5. List rendering ──────────────────────────────────────────
 
-  it('shows EmptyState when no custom RTs exist (built-ins are excluded from the list)', () => {
+  it('always shows the inventory (built-in User and Group rows) plus a no-custom hint when flag on with no custom RTs', () => {
     renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    expect(screen.getByTestId('resource-types-inventory')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-User')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-Group')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-User-kind').textContent).toContain('built-in');
     expect(screen.getByTestId('resource-types-empty')).toBeInTheDocument();
   });
 
-  it('lists custom RTs (User and Group are filtered out)', () => {
+  it('lists built-in and custom RTs in one inventory (built-ins tagged built-in, custom tagged custom + deletable)', () => {
     mockUseEndpoint.mockReturnValue({
       data: endpointWithFlag(true, [
         { id: 'Device', name: 'Device', endpoint: '/Devices', schema: SCHEMA_DEVICE, schemaExtensions: [] },
@@ -135,11 +179,17 @@ describe('ResourceTypesTab (Phase M3)', () => {
       error: null,
     });
     renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    // Built-ins AND custom are all present in the single inventory.
+    expect(screen.getByTestId('resource-types-row-User')).toBeInTheDocument();
+    expect(screen.getByTestId('resource-types-row-Group')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-row-Device')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-row-Sensor')).toBeInTheDocument();
-    // Built-ins NOT in the list.
-    expect(screen.queryByTestId('resource-types-row-User')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('resource-types-row-Group')).not.toBeInTheDocument();
+    // Kind badges.
+    expect(screen.getByTestId('resource-types-row-User-kind').textContent).toContain('built-in');
+    expect(screen.getByTestId('resource-types-row-Device-kind').textContent).toContain('custom');
+    // Custom rows are deletable; built-in rows are not.
+    expect(screen.getByTestId('resource-types-row-Device-delete')).toBeInTheDocument();
+    expect(screen.queryByTestId('resource-types-row-User-delete')).not.toBeInTheDocument();
     // Row content includes endpoint + schema.
     const deviceRow = screen.getByTestId('resource-types-row-Device');
     expect(deviceRow.textContent).toContain('/Devices');

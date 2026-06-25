@@ -32,16 +32,23 @@ export const groupsTabRoute = createRoute({
     pageSize: search.pageSize,
     filter: search.filter,
   }),
-  loader: ({ context, params, deps }) => {
+  loader: async ({ context, params, deps }) => {
     // Phase N4: fall back to the persisted user preference when the URL
     // has no explicit `?pageSize`.
     const pageSize = deps.pageSize ?? usePreferencesStore.getState().defaultPageSize;
-    return context.queryClient.ensureQueryData(
-      endpointGroupsQueryOptions(params.endpointId, {
-        startIndex: (deps.page - 1) * pageSize + 1,
-        count: pageSize,
-        filter: deps.filter,
-      }),
-    );
+    try {
+      return await context.queryClient.ensureQueryData(
+        endpointGroupsQueryOptions(params.endpointId, {
+          startIndex: (deps.page - 1) * pageSize + 1,
+          count: pageSize,
+          filter: deps.filter,
+        }),
+      );
+    } catch {
+      // Best-effort prefetch only. A resource-type-unsupported 404 (v0.53.3
+      // profile enforcement) or any transient error must NOT trip the route
+      // error boundary - GroupsTab renders a contained empty/error state.
+      return undefined;
+    }
   },
 });

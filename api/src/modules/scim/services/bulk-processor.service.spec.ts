@@ -37,6 +37,7 @@ describe('BulkProcessorService', () => {
   let mockUsersService: Record<string, jest.Mock>;
   let mockGroupsService: Record<string, jest.Mock>;
   let mockLogger: any;
+  let mockEndpointContext: { getProfile: jest.Mock };
   const config: EndpointConfig = {};
   const baseUrl = 'http://localhost:3000/scim/endpoints/ep1';
   const endpointId = 'ep1';
@@ -69,10 +70,15 @@ describe('BulkProcessorService', () => {
       isEnabled: jest.fn().mockReturnValue(true),
     };
 
+    mockEndpointContext = {
+      getProfile: jest.fn().mockReturnValue(undefined),
+    };
+
     service = new BulkProcessorService(
       mockUsersService as unknown as EndpointScimUsersService,
       mockGroupsService as unknown as EndpointScimGroupsService,
       mockLogger,
+      mockEndpointContext as unknown as import('../../endpoint/endpoint-context.storage').EndpointContextStorage,
     );
   });
 
@@ -274,6 +280,41 @@ describe('BulkProcessorService', () => {
       const result = await service.process(endpointId, ops, baseUrl, config);
       expect(result.Operations[0].status).toBe('400');
       expect(result.Operations[0].response?.detail).toContain('Unsupported resource type');
+    });
+  });
+
+  // ─── Gap 9: per-op resource-type gating inside a bulk envelope ─────────────
+
+  describe('Resource-type gating (Gap 9)', () => {
+    const userOnlyProfile = {
+      schemas: [],
+      resourceTypes: [
+        { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+      ],
+      serviceProviderConfig: {},
+      settings: {},
+    };
+
+    it('should return per-op 404 for a Group op when only User is in the profile', async () => {
+      mockEndpointContext.getProfile.mockReturnValue(userOnlyProfile);
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Groups', bulkId: 'g1', data: { displayName: 'x' } },
+      ];
+
+      const result = await service.process(endpointId, ops, baseUrl, config);
+      expect(result.Operations[0].status).toBe('404');
+      expect(mockGroupsService.createGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('should still process a User op on a user-only profile', async () => {
+      mockEndpointContext.getProfile.mockReturnValue(userOnlyProfile);
+      mockUsersService.createUserForEndpoint!.mockResolvedValue({ id: 'u1', userName: 'a', meta: { version: 'W/"v1"' } } as any);
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', bulkId: 'u1', data: { userName: 'a' } },
+      ];
+
+      const result = await service.process(endpointId, ops, baseUrl, config);
+      expect(result.Operations[0].status).toBe('201');
     });
   });
 

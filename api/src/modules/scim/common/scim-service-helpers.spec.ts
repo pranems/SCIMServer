@@ -153,6 +153,25 @@ describe('enforceIfMatch', () => {
     const config = { RequireIfMatch: 'false' } as any;
     expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
   });
+
+  // Gap 10: etag.supported guards RequireIfMatch (RFC 7644 §3.14)
+  it('should NOT throw 428 when etag.supported is false even with RequireIfMatch true', () => {
+    const config = { RequireIfMatch: 'true' } as any;
+    const profile = { serviceProviderConfig: { etag: { supported: false } } } as any;
+    expect(() => enforceIfMatch(3, undefined, config, profile)).not.toThrow();
+  });
+
+  it('should NOT validate a stale If-Match when etag.supported is false', () => {
+    const profile = { serviceProviderConfig: { etag: { supported: false } } } as any;
+    // stale If-Match (v2 vs current v3) would normally 412, but etag is off -> inert
+    expect(() => enforceIfMatch(3, 'W/"v2"', {} as any, profile)).not.toThrow();
+  });
+
+  it('should still throw 428 when etag.supported is true and RequireIfMatch true', () => {
+    const config = { RequireIfMatch: 'true' } as any;
+    const profile = { serviceProviderConfig: { etag: { supported: true } } } as any;
+    expect(() => enforceIfMatch(3, undefined, config, profile)).toThrow();
+  });
 });
 
 // ─── ScimSchemaHelpers ──────────────────────────────────────────────────────
