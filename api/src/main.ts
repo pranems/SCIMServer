@@ -23,6 +23,13 @@ async function bootstrap(): Promise<void> {
   // rather than the internal HTTP connection between the proxy and the container.
   app.set('trust proxy', true);
 
+  // Disable Express's automatic content-hash ETag. SCIM defines its own
+  // meta.version-based weak ETag (RFC 7644 §3.14), set by ScimEtagInterceptor.
+  // The Express content hash is meaningless for SCIM versioning, is applied to
+  // list/error/discovery responses where it does not belong, and (Gap 10) would
+  // re-add an ETag header on resources whose endpoint sets etag.supported=false.
+  app.set('etag', false);
+
   // Enable NestJS lifecycle hooks so OnModuleDestroy (e.g. Prisma $disconnect) fires on SIGTERM/SIGINT
   app.enableShutdownHooks();
 

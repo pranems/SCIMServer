@@ -39,6 +39,9 @@ import { PatchUserDto } from '../dto/patch-user.dto';
 import { applyAttributeProjection } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 import { createScimError } from '../common/scim-errors';
+import { resolveResourceType } from '../common/resource-type-resolver';
+import { enforcePatchSupported } from '../common/capability-enforcement';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 /** Extended request interface matching SharedSecretGuard output. */
 interface AuthenticatedRequest extends Request {
@@ -70,7 +73,7 @@ export class ScimMeController {
   private async validateAndSetContext(
     endpointId: string,
     req: Request,
-  ): Promise<{ baseUrl: string; config: EndpointConfig }> {
+  ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined }> {
     const endpoint = await this.endpointService.getEndpoint(endpointId);
 
     if (!endpoint.active) {
@@ -80,11 +83,24 @@ export class ScimMeController {
     }
 
     const profile = endpoint.profile;
+
+    // Gap 1: /Me is an alias for the User resource; enforce the profile's
+    // resourceTypes (RFC 7643 §6). Fail-open when resourceTypes is absent/empty.
+    const { supported } = resolveResourceType(profile, { name: 'User', endpointPath: '/Users' });
+    if (!supported) {
+      throw createScimError({
+        status: 404,
+        scimType: 'noTarget',
+        detail: `Resource type "User" is not supported by endpoint "${endpoint.name}".`,
+        diagnostics: { errorCode: 'RESOURCE_TYPE_NOT_SUPPORTED', operation: 'user' },
+      });
+    }
+
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
-    return { baseUrl, config };
+    return { baseUrl, config, profile };
   }
 
   /**
@@ -208,7 +224,8 @@ export class ScimMeController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string,
   ) {
-    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    enforcePatchSupported(profile);
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);

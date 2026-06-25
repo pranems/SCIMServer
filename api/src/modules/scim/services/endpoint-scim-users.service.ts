@@ -40,6 +40,7 @@ import {
   assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
+import { resolveNumericLimit } from '../common/capability-resolver';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListUsersParams {
@@ -175,8 +176,11 @@ export class EndpointScimUsersService {
     _config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimUserResource>> {
     this.logger.enrichContext({ resourceType: 'User', operation: 'list' });
-    if (count > MAX_COUNT) {
-      count = MAX_COUNT;
+    // Gap 6: clamp to the per-endpoint filter.maxResults (RFC 7644 §3.4.2.4),
+    // falling back to the global MAX_COUNT when the profile does not set it.
+    const maxResults = resolveNumericLimit(this.endpointContext.getProfile?.(), (s) => s.filter?.maxResults, MAX_COUNT);
+    if (count > maxResults) {
+      count = maxResults;
     }
 
     this.logger.info(LogCategory.SCIM_USER, 'List users', { filter, startIndex, count, endpointId });
@@ -215,7 +219,7 @@ export class EndpointScimUsersService {
 
     const totalResults = resources.length;
     const skip = Math.max(startIndex - 1, 0);
-    const take = Math.max(Math.min(count, MAX_COUNT), 0);
+    const take = Math.max(Math.min(count, maxResults), 0);
     const paginatedResources = resources.slice(skip, skip + take);
 
     this.logger.debug(LogCategory.SCIM_USER, 'List users result', { totalResults, returned: paginatedResources.length, endpointId });
@@ -254,7 +258,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config);
+    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId, config);
 
@@ -317,7 +321,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config);
+    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
@@ -388,7 +392,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config);
+    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     try {
       await this.userRepo.delete(user.id);

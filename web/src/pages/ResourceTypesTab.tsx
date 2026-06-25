@@ -17,9 +17,13 @@
  * that powers SettingsTab) to avoid a parallel hook surface.
  *
  * Gating: `CustomResourceTypesEnabled` config flag controls whether
- * the wildcard SCIM controller answers /:resourceType requests.
- * When the flag is off, the tab shows a feature-disabled panel
- * pointing at SettingsTab.
+ * the wildcard SCIM controller answers /:resourceType requests, i.e.
+ * whether the operator can register CUSTOM types. The tab always shows
+ * a read-only inventory of the endpoint's current resource types
+ * (built-in User/Group and any custom ones) regardless of the flag, so
+ * a user-only endpoint still shows its supported User type. When the
+ * flag is off, the create/delete affordances are hidden and an info
+ * panel points at SettingsTab to enable custom registration.
  *
  * @see docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md
  * @see docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md
@@ -29,6 +33,7 @@ import {
   makeStyles,
   tokens,
   Card,
+  Badge,
   Subtitle1,
   Caption1,
   Text,
@@ -45,7 +50,7 @@ import {
   CubeTree24Regular,
 } from '@fluentui/react-icons';
 import { useEndpoint, useUpdateEndpointConfig } from '../api/queries';
-import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { LoadingSkeleton } from '../components/primitives';
 import { FormDialog } from '../components/primitives/FormDialog';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 
@@ -82,14 +87,17 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
     gap: '8px',
   },
-  rtRow: {
+  invRow: {
     display: 'grid',
-    gridTemplateColumns: '180px 160px 1fr auto',
+    gridTemplateColumns: '150px 90px 150px 1fr auto',
     columnGap: '12px',
     padding: '8px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
     alignItems: 'center',
     fontSize: tokens.fontSizeBase300,
+  },
+  flagHint: {
+    color: tokens.colorNeutralForeground3,
   },
   monoCell: {
     fontFamily: tokens.fontFamilyMonospace,
@@ -103,6 +111,20 @@ const useStyles = makeStyles({
 function isCustomRt(rt: { name?: string }): boolean {
   return !!rt.name && !RESERVED_NAMES.has(rt.name);
 }
+
+function isBuiltInRt(rt: { name?: string }): boolean {
+  return !!rt.name && RESERVED_NAMES.has(rt.name);
+}
+
+// Fail-open default: when the profile declares no resourceTypes the endpoint
+// still serves the built-in User + Group (mirrors the server resolver in
+// api/src/modules/scim/common/resource-type-resolver.ts). We surface those so
+// the tab always shows the endpoint's current valid resource types - even when
+// the CustomResourceTypesEnabled flag is off.
+const DEFAULT_BUILTIN_RTS: ResourceType[] = [
+  { id: 'User', name: 'User', endpoint: '/Users', schema: 'urn:ietf:params:scim:schemas:core:2.0:User' },
+  { id: 'Group', name: 'Group', endpoint: '/Groups', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group' },
+];
 
 export interface ResourceTypesTabProps {
   endpointId: string;
@@ -140,7 +162,11 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
   }, [profile]);
 
   const allRts: ResourceType[] = profile?.resourceTypes ?? [];
-  const customRts = allRts.filter(isCustomRt);
+  // The inventory shown to the operator: declared types when present, else the
+  // fail-open built-ins. customRts (used by the create/delete management UI) is
+  // derived from the same inventory so a user-only endpoint shows User only.
+  const inventory: ResourceType[] = allRts.length > 0 ? allRts : DEFAULT_BUILTIN_RTS;
+  const customRts = inventory.filter(isCustomRt);
 
   // ─── Validation for the Create form ────────────────────────────────
 
@@ -254,77 +280,92 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
     );
   }
 
-  if (!flagOn) {
-    return (
-      <div className={classes.page} data-testid="resource-types-tab">
-        <Card className={classes.disabledPanel} data-testid="resource-types-disabled-panel">
-          <MessageBar intent="info">
-            <MessageBarBody>
-              <MessageBarTitle>Custom resource types are disabled</MessageBarTitle>
-              The `CustomResourceTypesEnabled` config flag is off on this endpoint. Enable it from the
-              Settings tab to register custom resource types beyond the built-in User and Group.
-            </MessageBarBody>
-          </MessageBar>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className={classes.page} data-testid="resource-types-tab">
       <div className={classes.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <CubeTree24Regular />
-          <Subtitle1>Custom resource types</Subtitle1>
+          <Subtitle1>Resource types</Subtitle1>
         </div>
-        <Button
-          appearance="primary"
-          icon={<Add24Regular />}
-          onClick={handleCreateOpen}
-          data-testid="resource-types-create-button"
-        >
-          Create resource type
-        </Button>
+        {flagOn && (
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            onClick={handleCreateOpen}
+            data-testid="resource-types-create-button"
+          >
+            Create resource type
+          </Button>
+        )}
       </div>
       <Caption1>
-        Register custom SCIM resource types beyond the built-in User and Group. Each registration
-        adds a new schema URN and exposes a wildcard SCIM endpoint at
+        The resource types this endpoint currently serves. Built-in User and Group are listed
+        unless the profile narrows them; custom types add a schema URN and expose a wildcard SCIM
+        endpoint at
         <code style={{ marginLeft: '4px' }}>/scim/endpoints/{endpointId}/&lt;Endpoint&gt;</code>.
       </Caption1>
 
-      {customRts.length === 0 ? (
-        <EmptyState
-          icon={<CubeTree24Regular />}
-          title="No custom resource types yet"
-          body="The endpoint exposes only the built-in User and Group. Click 'Create resource type' to register one."
-          data-testid="resource-types-empty"
-        />
-      ) : (
-        <Card style={{ padding: 0 }}>
-          <div className={classes.rtRow} style={{ background: tokens.colorNeutralBackground2, fontWeight: 600 }}>
-            <Caption1>name</Caption1>
-            <Caption1>endpoint</Caption1>
-            <Caption1>schema</Caption1>
-            <span />
-          </div>
-          {customRts.map((rt) => (
+      {/* Always-visible inventory of the endpoint's current resource types. */}
+      <Card style={{ padding: 0 }} data-testid="resource-types-inventory">
+        <div className={classes.invRow} style={{ background: tokens.colorNeutralBackground2, fontWeight: 600 }}>
+          <Caption1>name</Caption1>
+          <Caption1>kind</Caption1>
+          <Caption1>endpoint</Caption1>
+          <Caption1>schema</Caption1>
+          <span />
+        </div>
+        {inventory.map((rt) => {
+          const builtIn = isBuiltInRt(rt);
+          return (
             <div
               key={rt.name}
-              className={classes.rtRow}
+              className={classes.invRow}
               data-testid={`resource-types-row-${rt.name}`}
             >
               <Text weight="semibold">{rt.name}</Text>
+              <Badge
+                appearance="outline"
+                color={builtIn ? 'informative' : 'brand'}
+                data-testid={`resource-types-row-${rt.name}-kind`}
+              >
+                {builtIn ? 'built-in' : 'custom'}
+              </Badge>
               <Text className={classes.monoCell}>{rt.endpoint}</Text>
               <Text className={classes.monoCell}>{rt.schema}</Text>
-              <Button
-                appearance="subtle"
-                icon={<Delete24Regular />}
-                onClick={() => handleDeleteOpen(rt)}
-                data-testid={`resource-types-row-${rt.name}-delete`}
-                title={`Delete ${rt.name}`}
-              />
+              {!builtIn && flagOn ? (
+                <Button
+                  appearance="subtle"
+                  icon={<Delete24Regular />}
+                  onClick={() => handleDeleteOpen(rt)}
+                  data-testid={`resource-types-row-${rt.name}-delete`}
+                  title={`Delete ${rt.name}`}
+                />
+              ) : (
+                <span />
+              )}
             </div>
-          ))}
+          );
+        })}
+      </Card>
+
+      {flagOn && customRts.length === 0 && (
+        <Caption1 className={classes.flagHint} data-testid="resource-types-empty">
+          No custom resource types registered yet. Use &quot;Create resource type&quot; to add one
+          beyond the built-in User and Group.
+        </Caption1>
+      )}
+
+      {!flagOn && (
+        <Card className={classes.disabledPanel} data-testid="resource-types-disabled-panel">
+          <MessageBar intent="info">
+            <MessageBarBody>
+              <MessageBarTitle>Custom resource types are disabled</MessageBarTitle>
+              The endpoint still serves the resource types listed above. The
+              {' '}
+              <code>CustomResourceTypesEnabled</code> config flag is off, so you cannot register
+              custom types beyond the built-in User and Group yet. Turn it on from the Settings tab.
+            </MessageBarBody>
+          </MessageBar>
         </Card>
       )}
 

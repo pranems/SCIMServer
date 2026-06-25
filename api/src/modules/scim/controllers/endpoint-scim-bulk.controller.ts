@@ -22,8 +22,9 @@ import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage'
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { BulkProcessorService } from '../services/bulk-processor.service';
-import { BulkRequestDto, SCIM_BULK_REQUEST_SCHEMA, BULK_MAX_PAYLOAD_SIZE } from '../dto/bulk-request.dto';
+import { BulkRequestDto, SCIM_BULK_REQUEST_SCHEMA, BULK_MAX_PAYLOAD_SIZE, BULK_MAX_OPERATIONS } from '../dto/bulk-request.dto';
 import { createScimError } from '../common/scim-errors';
+import { resolveNumericLimit } from '../common/capability-resolver';
 import { SCIM_ERROR_TYPE } from '../common/scim-constants';
 import { buildBaseUrl } from '../common/base-url.util';
 import type { BulkResponse } from '../dto/bulk-request.dto';
@@ -102,12 +103,22 @@ export class EndpointScimBulkController {
 
     // ── Payload size guard (approximate - based on content-length) ─────
     const contentLength = parseInt(req.headers['content-length'] ?? '0', 10);
-    if (contentLength > BULK_MAX_PAYLOAD_SIZE) {
+    const maxOperations = resolveNumericLimit(endpoint.profile, (s) => s.bulk?.maxOperations, BULK_MAX_OPERATIONS);
+    if (Array.isArray(dto.Operations) && dto.Operations.length > maxOperations) {
       throw createScimError({
         status: 413,
-        detail: `Bulk request payload (${contentLength} bytes) exceeds maximum allowed size (${BULK_MAX_PAYLOAD_SIZE} bytes).`,
+        detail: `Bulk request has ${dto.Operations.length} operations, exceeding the endpoint maximum of ${maxOperations}.`,
         scimType: SCIM_ERROR_TYPE.TOO_LARGE,
-        diagnostics: { errorCode: 'BULK_PAYLOAD_TOO_LARGE' },
+        diagnostics: { errorCode: 'BULK_TOO_MANY_OPERATIONS', triggeredBy: 'bulk.maxOperations' },
+      });
+    }
+    const maxPayloadSize = resolveNumericLimit(endpoint.profile, (s) => s.bulk?.maxPayloadSize, BULK_MAX_PAYLOAD_SIZE);
+    if (contentLength > maxPayloadSize) {
+      throw createScimError({
+        status: 413,
+        detail: `Bulk request payload (${contentLength} bytes) exceeds maximum allowed size (${maxPayloadSize} bytes).`,
+        scimType: SCIM_ERROR_TYPE.TOO_LARGE,
+        diagnostics: { errorCode: 'BULK_PAYLOAD_TOO_LARGE', triggeredBy: 'bulk.maxPayloadSize' },
       });
     }
 

@@ -4,13 +4,54 @@ import { of } from 'rxjs';
 
 describe('ScimEtagInterceptor', () => {
   let interceptor: ScimEtagInterceptor;
+  let mockEndpointContext: { getProfile: jest.Mock };
 
   beforeEach(() => {
-    interceptor = new ScimEtagInterceptor();
+    mockEndpointContext = { getProfile: jest.fn().mockReturnValue(undefined) };
+    interceptor = new ScimEtagInterceptor(mockEndpointContext as any);
   });
 
   it('should be defined', () => {
     expect(interceptor).toBeDefined();
+  });
+
+  // ─── Gap 10: etag.supported gating ──────────────────────────────────────────
+
+  describe('etag.supported gating (Gap 10)', () => {
+    function ctx(method: string, headers: Record<string, unknown> = {}) {
+      const mockSetHeader = jest.fn();
+      const mockStatus = jest.fn();
+      const mockResponse = { setHeader: mockSetHeader, status: mockStatus };
+      const mockRequest = { method, headers };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => mockRequest, getResponse: () => mockResponse }),
+      } as unknown as ExecutionContext;
+      return { context, mockSetHeader, mockStatus };
+    }
+
+    it('does NOT set ETag header when etag.supported is false', (done) => {
+      mockEndpointContext.getProfile.mockReturnValue({ serviceProviderConfig: { etag: { supported: false } } });
+      const { context, mockSetHeader } = ctx('GET');
+      const body = { id: 'u1', meta: { version: 'W/"v1"' } };
+      interceptor.intercept(context, { handle: () => of(body) } as CallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).not.toHaveBeenCalled();
+          done();
+        },
+      });
+    });
+
+    it('DOES set ETag header when etag.supported is true', (done) => {
+      mockEndpointContext.getProfile.mockReturnValue({ serviceProviderConfig: { etag: { supported: true } } });
+      const { context, mockSetHeader } = ctx('GET');
+      const body = { id: 'u1', meta: { version: 'W/"v1"' } };
+      interceptor.intercept(context, { handle: () => of(body) } as CallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).toHaveBeenCalledWith('ETag', 'W/"v1"');
+          done();
+        },
+      });
+    });
   });
 
   // ─── ETag Header ───────────────────────────────────────────────────────────
