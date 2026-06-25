@@ -9,8 +9,15 @@ const config: Config = {
     '^@app/(.*)$': '<rootDir>/src/$1',
   },
   transform: {
-    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+    // `allowJs` lets ts-jest down-compile the ESM-only `jose` package (see
+    // transformIgnorePatterns below) from ESM to CommonJS for the CJS test runtime.
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: { allowJs: true } }],
   },
+  // `jose` v6 is published ESM-only. Jest runs the suite as CommonJS, so the
+  // package must be transformed rather than left to the runtime `require()`
+  // (which throws `SyntaxError: Unexpected token 'export'`). Everything else in
+  // node_modules stays ignored for transform speed.
+  transformIgnorePatterns: ['/node_modules/(?!jose/)'],
   testRegex: '.*\\.e2e-spec\\.ts$',
   testTimeout: 30_000,
   collectCoverageFrom: [
