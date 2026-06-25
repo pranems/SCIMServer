@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependencies
+- Bumped `jose` from 5.10.0 to 6.2.3 in `/api`. jose v6 is published ESM-only (it dropped its CommonJS build), so the CommonJS Jest runtime can no longer `require()` it - the unit job failed with `SyntaxError: Unexpected token 'export'` while loading [api/src/oauth/external-jwks-validator.service.spec.ts](api/src/oauth/external-jwks-validator.service.spec.ts). Fixed by transforming just that package to CommonJS for tests: added `transformIgnorePatterns: ['/node_modules/(?!jose/)']` plus a ts-jest `allowJs` override to both [api/jest.config.ts](api/jest.config.ts) and [api/test/e2e/jest-e2e.config.ts](api/test/e2e/jest-e2e.config.ts). No application source changed - the production validator already loads jose via dynamic `import()`, which Node 24 resolves natively at runtime.
+
 ### Documentation
 - Corrected the API surface count across all user-facing docs from the stale "84 routes / 19 controllers" to the source-verified **86 route handlers across 20 controllers** (the earlier figure omitted `DashboardController`'s 2 analytics routes and `WebController`'s SPA catch-all). Updated [README.md](README.md), [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) (header + 3 new route-table rows), [docs/INDEX.md](docs/INDEX.md), and [docs/MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md) (controller table).
 - Corrected the importable-collection counts in [docs/INDEX.md](docs/INDEX.md): OpenAPI 75 operations, Postman 81 requests, Insomnia 72 requests (v0.37 export).
