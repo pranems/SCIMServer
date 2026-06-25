@@ -43,7 +43,17 @@
 .PARAMETER Subscription
     Azure subscription to switch to before promoting. REQUIRED when promoting the
     customer-facing (calmsand) prod, which lives in the separate `AnandSa-Test-150`
-    tenant. You must `az login` into that tenant first, then this switches context.
+    tenant. When scripts/az-tenant.ps1 is present, the matching isolated CLI profile
+    is selected automatically and (if scripts/setup-deploy-sp.ps1 has been run) login
+    is non-interactive via a deployment service principal - no `az login` per promote.
+
+.PARAMETER AzureConfigDir
+    Explicit AZURE_CONFIG_DIR (isolated az CLI profile) to use for this run. Normally
+    you do not need this - it is derived from -Subscription via scripts/az-tenant.ps1.
+
+.PARAMETER DeviceCode
+    Use the device-code login flow if an interactive sign-in is needed (default is
+    the normal browser popup).
 
 .PARAMETER BlueGreen
     Perform a TRUE blue/green deploy: pin the current (blue) revision at 100%
@@ -110,6 +120,8 @@ param(
     [string]$DevAppName = 'scimserver-dev',
     [string]$ImageTag,
     [string]$Subscription,
+    [string]$AzureConfigDir,
+    [switch]$DeviceCode,
     [switch]$BlueGreen,
     [switch]$RunVerification,
     [switch]$VerifyPlaywright,
@@ -128,33 +140,53 @@ Write-Host "  SCIMServer - Promote to Production" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Check Azure CLI auth ---
-try {
-    $account = az account show --output json 2>$null | ConvertFrom-Json
-    if (-not $account) { throw "not logged in" }
-    Write-Host "✅ Azure CLI: $($account.user.name) ($($account.name))" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Azure CLI not authenticated. Run: az login" -ForegroundColor Red
-    exit 1
-}
-
-# --- Cross-tenant guard ---
+# --- Cross-tenant authentication ---
 # The two prod instances live in DIFFERENT Azure AD tenants:
 #   - Dev + parallel prod (proudbush, app 'scimserver') -> ProvIAM_Subscription
 #   - Customer-facing prod (calmsand, app 'scimserver-prod') -> AnandSa-Test-150 (separate tenant)
-# You cannot promote both in one az session. If -Subscription is provided, switch to it
-# and confirm the active context matches before touching prod.
-if ($Subscription) {
-    Write-Host "🔁 Setting active subscription to '$Subscription'..." -ForegroundColor Cyan
-    az account set --subscription $Subscription 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Could not switch to subscription '$Subscription'." -ForegroundColor Red
-        Write-Host "   If this is the customer-facing (calmsand / AnandSa-Test-150) prod in a separate tenant," -ForegroundColor Yellow
-        Write-Host "   run 'az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950' first, then re-run this script." -ForegroundColor Yellow
+# You cannot hold both in one ~/.azure cache, so scripts/az-tenant.ps1 keeps each
+# tenant in its own isolated profile (AZURE_CONFIG_DIR) and signs in non-interactively
+# via a deployment service principal once scripts/setup-deploy-sp.ps1 has been run.
+# The helper is optional - if it is absent we fall back to the legacy az-account check.
+$azHelper = Join-Path $PSScriptRoot 'az-tenant.ps1'
+if (Test-Path $azHelper) { . $azHelper }
+
+if ($AzureConfigDir) { $env:AZURE_CONFIG_DIR = $AzureConfigDir }
+
+if (Get-Command Connect-ScimTenant -ErrorAction SilentlyContinue) {
+    # Default to ProvIAM (dev + proudbush) when no -Subscription is given; calmsand
+    # promotion always passes -Subscription AnandSa-Test-150.
+    $targetSub = if ($Subscription) { $Subscription } else { 'ProvIAM_Subscription' }
+    $account = Connect-ScimTenant -Subscription $targetSub -DeviceCode:$DeviceCode
+    if (-not $account) {
+        Write-Host "❌ Could not authenticate to '$targetSub'." -ForegroundColor Red
+        Write-Host "   Run '. ./scripts/az-tenant.ps1; Show-ScimDeployStatus' to inspect, or" -ForegroundColor Yellow
+        Write-Host "   'pwsh scripts/setup-deploy-sp.ps1' to bootstrap non-interactive login." -ForegroundColor Yellow
         exit 1
     }
-    $account = az account show --output json 2>$null | ConvertFrom-Json
-    Write-Host "   ✅ Active subscription: $($account.name) (tenant $($account.tenantId))" -ForegroundColor Green
+    Write-Host "✅ Azure CLI: $($account.user.name) ($($account.name), tenant $($account.tenantId))" -ForegroundColor Green
+} else {
+    # --- Legacy path (helper not present) ---
+    try {
+        $account = az account show --output json 2>$null | ConvertFrom-Json
+        if (-not $account) { throw "not logged in" }
+        Write-Host "✅ Azure CLI: $($account.user.name) ($($account.name))" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Azure CLI not authenticated. Run: az login" -ForegroundColor Red
+        exit 1
+    }
+    if ($Subscription) {
+        Write-Host "🔁 Setting active subscription to '$Subscription'..." -ForegroundColor Cyan
+        az account set --subscription $Subscription 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Could not switch to subscription '$Subscription'." -ForegroundColor Red
+            Write-Host "   If this is the customer-facing (calmsand / AnandSa-Test-150) prod in a separate tenant," -ForegroundColor Yellow
+            Write-Host "   run 'az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950' first, then re-run this script." -ForegroundColor Yellow
+            exit 1
+        }
+        $account = az account show --output json 2>$null | ConvertFrom-Json
+        Write-Host "   ✅ Active subscription: $($account.name) (tenant $($account.tenantId))" -ForegroundColor Green
+    }
 }
 
 # When promoting the customer-facing (calmsand) prod, the dev app lives in a DIFFERENT

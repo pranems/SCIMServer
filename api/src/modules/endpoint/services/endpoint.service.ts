@@ -719,6 +719,11 @@ export class EndpointService implements OnModuleInit {
       }
       merged.settings = { ...current.settings, ...partial.settings };
     }
+    // A1 - replace the authentication block wholesale when provided (the admin
+    // authentication-methods API computes the full block and submits it).
+    if (partial.authentication !== undefined) {
+      merged.authentication = partial.authentication;
+    }
 
     // Validate & expand the merged profile
     const result = validateAndExpandProfile(merged);

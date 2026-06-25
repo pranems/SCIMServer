@@ -11,6 +11,7 @@ import { AppModule } from './modules/app/app.module';
 import { parseCorsOrigin } from './security/cors-origin';
 import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from './security/helmet-config';
 import { applySpaFallback } from './bootstrap/spa-fallback';
+import { OAUTH_METADATA_PATH } from './oauth/oauth.constants';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -110,6 +111,8 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix(globalPrefix, {
     exclude: [
       { path: '/', method: RequestMethod.ALL },
+      // RFC 8414 - authorization-server metadata is served at the deployment root.
+      { path: OAUTH_METADATA_PATH, method: RequestMethod.GET },
     ]
   });
 

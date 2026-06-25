@@ -10876,16 +10876,363 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$scopeEpId" -Method 
 Write-Host "`n--- 9z-AL: Post-PATCH validation scoping Tests Complete ---" -ForegroundColor Green
 
 # ============================================
-# TEST SECTION 9z-AM: Profile Enforcement Gaps (v0.53.3)
+# TEST SECTION 9z-AM: OAuth Asymmetric Signing + JWKS (Pre-Q.B)
+$script:currentSection = "9z-AM: OAuth Asymmetric JWKS (Pre-Q.B)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AM: OAuth Asymmetric Signing + JWKS (Pre-Q.B)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Helper: decode a JWT header segment (base64url -> JSON object)
+function ConvertFrom-JwtHeader {
+    param([string]$Jwt)
+    $seg = $Jwt.Split('.')[0].Replace('-', '+').Replace('_', '/')
+    switch ($seg.Length % 4) { 2 { $seg += '==' } 3 { $seg += '=' } }
+    $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($seg))
+    return ($json | ConvertFrom-Json)
+}
+
+try {
+    # T1: JWKS endpoint is public (no Authorization header) and returns a key set
+    $jwks = Invoke-RestMethod -Uri "$baseUrl/scim/oauth/jwks" -Method GET
+    $jwkCount = if ($jwks.keys) { @($jwks.keys).Count } else { 0 }
+    Test-Result -Success ($jwkCount -ge 1) -Message "9z-AM.T1: GET /oauth/jwks public, returns >=1 key (count=$jwkCount)"
+
+    $jwk = if ($jwkCount -ge 1) { @($jwks.keys)[0] } else { $null }
+
+    # T2: published key carries a non-empty kid
+    Test-Result -Success ($null -ne $jwk -and -not [string]::IsNullOrEmpty($jwk.kid)) -Message "9z-AM.T2: published JWK carries a non-empty kid"
+
+    # T3: published key advertises an asymmetric alg + signature use
+    $jwkAlgOk = ($null -ne $jwk) -and ($jwk.alg -in @('RS256', 'ES256')) -and ($jwk.use -eq 'sig')
+    Test-Result -Success $jwkAlgOk -Message "9z-AM.T3: published JWK alg in {RS256,ES256} and use=sig (alg=$($jwk.alg), use=$($jwk.use))"
+
+    # T4: NO private key material is ever published
+    $noPrivate = ($null -ne $jwk) -and ($null -eq $jwk.d) -and ($null -eq $jwk.p) -and ($null -eq $jwk.q)
+    Test-Result -Success $noPrivate -Message "9z-AM.T4: published JWK carries no private material (d/p/q absent)"
+
+    # T5: the issued access token is asymmetrically signed (NOT HS256)
+    $jwtHeader = ConvertFrom-JwtHeader -Jwt $Token
+    Test-Result -Success ($jwtHeader.alg -in @('RS256', 'ES256')) -Message "9z-AM.T5: issued token header alg is asymmetric (alg=$($jwtHeader.alg))"
+
+    # T6: the issued token kid matches the published JWKS kid (active key is published)
+    Test-Result -Success ($null -ne $jwk -and $jwtHeader.kid -eq $jwk.kid) -Message "9z-AM.T6: issued token kid matches published JWKS kid"
+
+    # T7: the issued token already authorizes SCIM calls (verified via $headers throughout this run)
+    $whoami = Invoke-RestMethod -Uri "$scimBase/Users?count=1" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $whoami) -Message "9z-AM.T7: asymmetric token authorizes a SCIM call (List Users)"
+} catch {
+    Test-Result -Success $false -Message "9z-AM: OAuth Asymmetric JWKS section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AM: OAuth Asymmetric JWKS Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AN: Authentication Method Model round-trip (A0, inert)
+$script:currentSection = "9z-AN: Auth Method Model (A0)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AN: Authentication Method Model (A0, inert)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $a0Name = "live-test-authmodel-$(Get-Random)"
+    $a0Body = @{
+        name    = $a0Name
+        profile = @{
+            schemas       = @(@{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = @(@{ name = "userName" }) })
+            resourceTypes = @(@{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() })
+            authentication = @{
+                schemaVersion = 1
+                methods = @(@{
+                    id = "m-1"; type = "wif-7523"; displayName = "WIF"; plane = "token"
+                    config = @{
+                        issuer = "https://login.microsoftonline.com/tid/v2.0"
+                        audience = "appid-guid"
+                        clientSecret = "LIVE-LEAK-SECRET"
+                    }
+                    credentialRef = "cred-1"
+                })
+                defaultMethodId = "m-1"
+            }
+        }
+    } | ConvertTo-Json -Depth 12
+
+    $a0Create = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $a0Body
+    $a0Id = $a0Create.id
+    Test-Result -Success ($null -ne $a0Id) -Message "9z-AN.T1: endpoint with profile.authentication created"
+
+    $a0CreateAuth = $a0Create.profile.authentication
+    Test-Result -Success ($null -ne $a0CreateAuth -and $a0CreateAuth.methods[0].id -eq "m-1" -and $a0CreateAuth.methods[0].type -eq "wif-7523") -Message "9z-AN.T2: create response round-trips authentication.methods[0]"
+    Test-Result -Success ($a0CreateAuth.schemaVersion -eq 1 -and $a0CreateAuth.defaultMethodId -eq "m-1") -Message "9z-AN.T3: schemaVersion + defaultMethodId round-trip"
+
+    # No-secret contract: clientSecret stripped, raw secret absent from response
+    $a0CreateJson = $a0Create | ConvertTo-Json -Depth 12
+    Test-Result -Success ($null -eq $a0CreateAuth.methods[0].config.clientSecret) -Message "9z-AN.T4: secret-looking config key (clientSecret) stripped"
+    Test-Result -Success (-not ($a0CreateJson -match "LIVE-LEAK-SECRET")) -Message "9z-AN.T5: submitted secret value absent from create response"
+    Test-Result -Success ($a0CreateAuth.methods[0].config.issuer -eq "https://login.microsoftonline.com/tid/v2.0") -Message "9z-AN.T6: public config (issuer) preserved"
+
+    # GET round-trip
+    $a0Get = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$a0Id" -Method GET -Headers $headers
+    Test-Result -Success ($a0Get.profile.authentication.methods[0].id -eq "m-1") -Message "9z-AN.T7: GET round-trips authentication.methods[0]"
+    $a0GetJson = $a0Get | ConvertTo-Json -Depth 12
+    Test-Result -Success (-not ($a0GetJson -match "LIVE-LEAK-SECRET")) -Message "9z-AN.T8: submitted secret value absent from GET response"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$a0Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AN: Authentication Method Model section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AN: Authentication Method Model Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AO: OAuth Discovery + Bearer Errors (Q0)
+$script:currentSection = "9z-AO: OAuth Discovery (Q0)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AO: OAuth Discovery + Bearer Errors (Q0)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+function ConvertFrom-JwtPayload {
+    param([string]$Jwt)
+    $seg = $Jwt.Split('.')[1].Replace('-', '+').Replace('_', '/')
+    switch ($seg.Length % 4) { 2 { $seg += '==' } 3 { $seg += '=' } }
+    $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($seg))
+    return ($json | ConvertFrom-Json)
+}
+
+try {
+    # RFC 8414 - authorization-server metadata published at the deployment root
+    $meta = Invoke-RestMethod -Uri "$baseUrl/.well-known/oauth-authorization-server" -Method GET
+    Test-Result -Success ($null -ne $meta.issuer -and "$($meta.issuer)".Length -gt 0) -Message "9z-AO.T1: RFC 8414 metadata issuer present (issuer=$($meta.issuer))"
+    Test-Result -Success ("$($meta.token_endpoint)" -like "*/scim/oauth/token") -Message "9z-AO.T2: metadata token_endpoint resolves"
+    Test-Result -Success ("$($meta.jwks_uri)" -like "*/scim/oauth/jwks") -Message "9z-AO.T3: metadata jwks_uri resolves"
+    Test-Result -Success ($meta.grant_types_supported -contains "client_credentials") -Message "9z-AO.T4: metadata advertises client_credentials grant"
+
+    # Token iss matches metadata issuer; token carries an aud claim (Q0)
+    $payload = ConvertFrom-JwtPayload -Jwt $Token
+    Test-Result -Success ($payload.iss -eq $meta.issuer) -Message "9z-AO.T5: token iss matches metadata issuer"
+    Test-Result -Success ($null -ne $payload.aud -and "$($payload.aud)".Length -gt 0) -Message "9z-AO.T6: issued token carries aud claim (aud=$($payload.aud))"
+
+    # RFC 6750 section 3 - invalid bearer -> 401 with enriched WWW-Authenticate
+    $invResp = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Headers @{ Authorization = "Bearer invalid-token-9zAO" } -SkipHttpErrorCheck
+    $wwwAuth = [string]($invResp.Headers['WWW-Authenticate'])
+    Test-Result -Success ($invResp.StatusCode -eq 401) -Message "9z-AO.T7: invalid bearer returns 401 (status=$($invResp.StatusCode))"
+    Test-Result -Success ($wwwAuth -match 'error="invalid_token"') -Message "9z-AO.T8: 401 WWW-Authenticate carries error=invalid_token"
+    Test-Result -Success ($wwwAuth -match 'realm="SCIM"') -Message "9z-AO.T9: 401 WWW-Authenticate carries realm=SCIM"
+} catch {
+    Test-Result -Success $false -Message "9z-AO: OAuth Discovery section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AO: OAuth Discovery Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AP: Per-Endpoint OAuth Client + Token Issuer (Q1)
+$script:currentSection = "9z-AP: Per-Endpoint OAuth Client (Q1)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AP: Per-Endpoint OAuth Client + Token Issuer (Q1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+function ConvertFrom-JwtPayloadAP {
+    param([string]$Jwt)
+    $seg = $Jwt.Split('.')[1].Replace('-', '+').Replace('_', '/')
+    switch ($seg.Length % 4) { 2 { $seg += '==' } 3 { $seg += '=' } }
+    $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($seg))
+    return ($json | ConvertFrom-Json)
+}
+
+try {
+    # Create two endpoints with per-endpoint credentials enabled
+    $apEpA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-q1a-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $apEpB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-q1b-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $apIdA = $apEpA.id; $apIdB = $apEpB.id
+    foreach ($id in @($apIdA, $apIdB)) {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$id" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    }
+    Test-Result -Success ($null -ne $apIdA -and $null -ne $apIdB) -Message "9z-AP.T1: created two per-endpoint-credential endpoints"
+
+    # Create an oauth_client credential on endpoint A
+    $apCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "q1-live"
+    } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $apCred.clientId -and $null -ne $apCred.clientSecret -and $null -eq $apCred.token) -Message "9z-AP.T2: oauth_client create returns clientId+clientSecret (no bearer token)"
+
+    # Mint a per-endpoint token at the per-endpoint token endpoint
+    $apTokenResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST -ContentType "application/json" -Body (@{
+        grant_type = "client_credentials"; client_id = $apCred.clientId; client_secret = $apCred.clientSecret
+    } | ConvertTo-Json)
+    $apToken = $apTokenResp.access_token
+    Test-Result -Success ($null -ne $apToken) -Message "9z-AP.T3: per-endpoint token minted"
+
+    $apPayload = ConvertFrom-JwtPayloadAP -Jwt $apToken
+    Test-Result -Success ($apPayload.endpoint_id -eq $apIdA) -Message "9z-AP.T4: token carries endpoint_id claim for endpoint A"
+
+    # The per-endpoint token authorizes endpoint A's SCIM routes
+    $apHeadersA = @{ Authorization = "Bearer $apToken" }
+    $apListA = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$apIdA/Users?count=1" -Headers $apHeadersA -SkipHttpErrorCheck
+    Test-Result -Success ($apListA.StatusCode -eq 200) -Message "9z-AP.T5: per-endpoint token authorizes its OWN endpoint (status=$($apListA.StatusCode))"
+
+    # The per-endpoint token is REJECTED on endpoint B (Q1 scoping)
+    $apListB = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$apIdB/Users?count=1" -Headers $apHeadersA -SkipHttpErrorCheck
+    Test-Result -Success ($apListB.StatusCode -eq 401) -Message "9z-AP.T6: per-endpoint token REJECTED on a different endpoint (status=$($apListB.StatusCode))"
+
+    # Invalid client_secret -> 401
+    $apBadSecret = $false
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST -ContentType "application/json" -Body (@{
+        grant_type = "client_credentials"; client_id = $apCred.clientId; client_secret = "wrong"
+    } | ConvertTo-Json) | Out-Null } catch { $apBadSecret = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $apBadSecret -Message "9z-AP.T7: invalid client_secret rejected with 401"
+
+    # The clientSecret never appears in a credential list response
+    $apCredList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA/credentials" -Method GET -Headers $headers
+    $apListJson = $apCredList | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($apListJson -match 'clientSecret')) -Message "9z-AP.T8: clientSecret absent from credential list response"
+    $apOauthRow = @($apCredList | Where-Object { $_.credentialType -eq 'oauth_client' })[0]
+    Test-Result -Success ($null -ne $apOauthRow.clientId) -Message "9z-AP.T9: public clientId IS exposed in the list for oauth_client rows"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA" -Method DELETE -Headers $headers | Out-Null } catch {}
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdB" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AP: Per-Endpoint OAuth Client section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AP: Per-Endpoint OAuth Client Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AQ: Admin Authentication-Methods CRUD + orthogonal WIF gate (A1)
+$script:currentSection = "9z-AQ: Auth-Methods CRUD (A1)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AQ: Admin Authentication-Methods CRUD + WIF gate (A1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $aqEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-a1-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $aqId = $aqEp.id
+    $aqMethodsUrl = "$baseUrl/scim/admin/endpoints/$aqId/authentication/methods"
+
+    # Empty list to start
+    $aqList0 = Invoke-RestMethod -Uri $aqMethodsUrl -Method GET -Headers $headers
+    Test-Result -Success (@($aqList0.methods).Count -eq 0) -Message "9z-AQ.T1: authentication methods start empty"
+
+    # Add a method (with a secret-looking config key that must be stripped)
+    $aqAdd = Invoke-RestMethod -Uri $aqMethodsUrl -Method POST -Headers $headers -Body (@{
+        type = "wif-7523"; displayName = "WIF"; plane = "token"
+        config = @{ issuer = "https://idp/v2.0"; clientSecret = "AQ-LEAK" }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($null -ne $aqAdd.id -and $aqAdd.type -eq "wif-7523") -Message "9z-AQ.T2: method added with server-assigned id"
+    $aqAddJson = $aqAdd | ConvertTo-Json -Depth 6
+    Test-Result -Success ($null -eq $aqAdd.config.clientSecret -and -not ($aqAddJson -match "AQ-LEAK")) -Message "9z-AQ.T3: secret-looking config key stripped on add"
+
+    # List reflects the method
+    $aqList1 = Invoke-RestMethod -Uri $aqMethodsUrl -Method GET -Headers $headers
+    Test-Result -Success (@($aqList1.methods | Where-Object { $_.type -eq "wif-7523" }).Count -ge 1) -Message "9z-AQ.T4: list reflects the added method"
+
+    # Unknown type rejected
+    $aqBadType = $false
+    try { Invoke-RestMethod -Uri $aqMethodsUrl -Method POST -Headers $headers -Body (@{ type = "not-real" } | ConvertTo-Json) | Out-Null } catch { $aqBadType = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $aqBadType -Message "9z-AQ.T5: unknown method type rejected 400"
+
+    # Delete by id
+    Invoke-RestMethod -Uri "$aqMethodsUrl/$($aqAdd.id)" -Method DELETE -Headers $headers | Out-Null
+    $aqList2 = Invoke-RestMethod -Uri $aqMethodsUrl -Method GET -Headers $headers
+    Test-Result -Success (@($aqList2.methods | Where-Object { $_.id -eq $aqAdd.id }).Count -eq 0) -Message "9z-AQ.T6: method deleted by id"
+
+    # Orthogonal gate: wif credential rejected until WifCredentialsEnabled is on
+    $aqWifBlocked = $false
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "wif" } | ConvertTo-Json) | Out-Null } catch { $aqWifBlocked = ($_.Exception.Response.StatusCode.value__ -eq 403) }
+    Test-Result -Success $aqWifBlocked -Message "9z-AQ.T7: wif credential blocked (403) when WifCredentialsEnabled off"
+
+    # Enable WifCredentialsEnabled, then a wif credential is allowed and returns NO secret
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $aqWifCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"
+        wif = @{ assertionProfile = "jwt-bearer"; expectedIssuer = "https://idp/v2.0"; expectedSubject = "sub"; expectedAudience = "appid"; jwksUri = "https://login.microsoftonline.com/tid/discovery/v2.0/keys"; allowedTenantId = "tid" }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($aqWifCred.credentialType -eq "wif") -Message "9z-AQ.T8: wif credential allowed when WifCredentialsEnabled on"
+    $aqWifJson = $aqWifCred | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($aqWifJson -match "token|clientSecret|credentialHash")) -Message "9z-AQ.T9: wif credential response carries NO secret/hash/token"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$aqId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AQ: Auth-Methods CRUD section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AQ: Auth-Methods CRUD Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-AR: Computed authenticationSchemes (A2)
+$script:currentSection = "9z-AR: Computed authnSchemes (A2)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AR: Computed authenticationSchemes (A2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $arEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-a2-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $arId = $arEp.id
+    $arSpcUrl = "$baseUrl/scim/endpoints/$arId/ServiceProviderConfig"
+    $arMethodsUrl = "$baseUrl/scim/admin/endpoints/$arId/authentication/methods"
+
+    # Method-less endpoint advertises baseline only
+    $arSpc0 = Invoke-RestMethod -Uri $arSpcUrl -Method GET -Headers $headers
+    Test-Result -Success (@($arSpc0.authenticationSchemes).Count -eq 1 -and $arSpc0.authenticationSchemes[0].type -eq "oauthbearertoken") -Message "9z-AR.T1: method-less endpoint advertises only baseline oauthbearertoken"
+
+    # Add an enabled method -> its scheme appears
+    $arMethod = Invoke-RestMethod -Uri $arMethodsUrl -Method POST -Headers $headers -Body (@{
+        type = "wif-7523"; displayName = "WIF"; specUri = "https://www.rfc-editor.org/rfc/rfc7523"
+    } | ConvertTo-Json)
+    $arSpc1 = Invoke-RestMethod -Uri $arSpcUrl -Method GET -Headers $headers
+    $arNames = @($arSpc1.authenticationSchemes | ForEach-Object { $_.name })
+    Test-Result -Success (@($arSpc1.authenticationSchemes).Count -ge 2 -and ($arNames -contains "WIF")) -Message "9z-AR.T2: enabled method adds its scheme alongside baseline"
+    $arWif = @($arSpc1.authenticationSchemes | Where-Object { $_.name -eq "WIF" })[0]
+    Test-Result -Success ($arWif.type -eq "oauth2") -Message "9z-AR.T3: wif-7523 maps to the oauth2 scheme type"
+
+    # Exactly one primary
+    $arPrimaries = @($arSpc1.authenticationSchemes | Where-Object { $_.primary -eq $true })
+    Test-Result -Success (@($arPrimaries).Count -eq 1) -Message "9z-AR.T4: exactly one scheme is primary"
+
+    # defaultMethodId moves primary onto the method scheme
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$arId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ authentication = @{ schemaVersion = 1; methods = @($arMethod); defaultMethodId = $arMethod.id } }
+    } | ConvertTo-Json -Depth 8) | Out-Null
+    $arSpc2 = Invoke-RestMethod -Uri $arSpcUrl -Method GET -Headers $headers
+    $arPrimary2 = @($arSpc2.authenticationSchemes | Where-Object { $_.primary -eq $true })[0]
+    Test-Result -Success ($arPrimary2.name -eq "WIF") -Message "9z-AR.T5: defaultMethodId moves primary onto that method scheme"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$arId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AR: Computed authnSchemes section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AR: Computed authnSchemes Tests Complete ---" -ForegroundColor Green
+# TEST SECTION 9z-AS: Profile Enforcement Gaps (v0.53.3)
 # Verifies the runtime honors what discovery advertises:
 #   Gap 1  - user-only endpoint rejects Group CRUD with 404
 #   Gap 2/3/4 - filter/sort/patch disabled in SPC are enforced (403/403/501)
 #   Gap 6  - per-endpoint filter.maxResults clamps the page size
 #   Gap 10 - etag.supported=false omits the ETag header
 # ============================================
-$script:currentSection = "9z-AM: Profile Enforcement Gaps"
+$script:currentSection = "9z-AS: Profile Enforcement Gaps"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9z-AM: PROFILE ENFORCEMENT GAPS" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AS: PROFILE ENFORCEMENT GAPS" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 $pegHeaders = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/scim+json"; Accept = "application/scim+json" }
@@ -10908,28 +11255,28 @@ function Invoke-NullPatchGeneric($url, $method, $body) {
 }
 
 # ---- Gap 1: user-only endpoint rejects Group CRUD ----
-Write-Host "`n--- 9z-AM Gap 1: user-only endpoint rejects Group CRUD ---" -ForegroundColor Cyan
+Write-Host "`n--- 9z-AS Gap 1: user-only endpoint rejects Group CRUD ---" -ForegroundColor Cyan
 $pegUserOnlyBody = @{ name = "live-peg-useronly-$(Get-Random)"; profilePreset = "user-only" } | ConvertTo-Json
 $pegUserOnlyEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegUserOnlyBody
 $pegUoId = $pegUserOnlyEp.id
 $pegUoBase = "$baseUrl/scim/endpoints/$pegUoId"
-Test-Result -Success ($null -ne $pegUoId) -Message "9z-AM.setup: created user-only endpoint $pegUoId"
+Test-Result -Success ($null -ne $pegUoId) -Message "9z-AS.setup: created user-only endpoint $pegUoId"
 
 $pegGroupPost = Invoke-NullPatchGeneric "$pegUoBase/Groups" "POST" @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group"); displayName = "x" }
-Test-Result -Success ($pegGroupPost.Status -eq 404) -Message "9z-AM.1: POST /Groups on user-only endpoint -> 404 (status=$($pegGroupPost.Status))"
-Test-Result -Success ($pegGroupPost.Body.scimType -eq "noTarget") -Message "9z-AM.2: 404 scimType is noTarget"
-Test-Result -Success ($pegGroupPost.Body.'urn:scimserver:api:messages:2.0:Diagnostics'.errorCode -eq "RESOURCE_TYPE_NOT_SUPPORTED") -Message "9z-AM.3: diagnostics errorCode RESOURCE_TYPE_NOT_SUPPORTED"
+Test-Result -Success ($pegGroupPost.Status -eq 404) -Message "9z-AS.1: POST /Groups on user-only endpoint -> 404 (status=$($pegGroupPost.Status))"
+Test-Result -Success ($pegGroupPost.Body.scimType -eq "noTarget") -Message "9z-AS.2: 404 scimType is noTarget"
+Test-Result -Success ($pegGroupPost.Body.'urn:scimserver:api:messages:2.0:Diagnostics'.errorCode -eq "RESOURCE_TYPE_NOT_SUPPORTED") -Message "9z-AS.3: diagnostics errorCode RESOURCE_TYPE_NOT_SUPPORTED"
 
 $pegGroupGet = Invoke-NullPatchGeneric "$pegUoBase/Groups" "GET" $null
-Test-Result -Success ($pegGroupGet.Status -eq 404) -Message "9z-AM.4: GET /Groups on user-only endpoint -> 404 (status=$($pegGroupGet.Status))"
+Test-Result -Success ($pegGroupGet.Status -eq 404) -Message "9z-AS.4: GET /Groups on user-only endpoint -> 404 (status=$($pegGroupGet.Status))"
 
 # User CRUD still works on the same endpoint
 $pegUoUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "peg-uo-$(Get-Random)@x.io" } | ConvertTo-Json
 $pegUoUser = Invoke-RestMethod -Uri "$pegUoBase/Users" -Method POST -Headers $pegHeaders -Body $pegUoUserBody
-Test-Result -Success ($null -ne $pegUoUser.id) -Message "9z-AM.5: User CRUD still works on the user-only endpoint"
+Test-Result -Success ($null -ne $pegUoUser.id) -Message "9z-AS.5: User CRUD still works on the user-only endpoint"
 
 # ---- Gaps 2/3/4: capability gating (uses a rfc-standard endpoint we narrow via PATCH) ----
-Write-Host "`n--- 9z-AM Gaps 2/3/4: capability gating ---" -ForegroundColor Cyan
+Write-Host "`n--- 9z-AS Gaps 2/3/4: capability gating ---" -ForegroundColor Cyan
 $pegCapBody = @{ name = "live-peg-cap-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
 $pegCapEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegCapBody
 $pegCapId = $pegCapEp.id
@@ -10943,22 +11290,22 @@ $pegCapUser = Invoke-RestMethod -Uri "$pegCapBase/Users" -Method POST -Headers $
 $pegPatchOff = @{ profile = @{ serviceProviderConfig = @{ patch = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegCapId" -Method PATCH -Headers $headers -Body $pegPatchOff | Out-Null
 $pegPatchTry = Invoke-NullPatchGeneric "$pegCapBase/Users/$($pegCapUser.id)" "PATCH" @{ schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp"); Operations = @(@{ op = "replace"; path = "displayName"; value = "y" }) }
-Test-Result -Success ($pegPatchTry.Status -eq 501) -Message "9z-AM.6: PATCH with patch.supported=false -> 501 (status=$($pegPatchTry.Status))"
+Test-Result -Success ($pegPatchTry.Status -eq 501) -Message "9z-AS.6: PATCH with patch.supported=false -> 501 (status=$($pegPatchTry.Status))"
 
 # Gap 2: filter.supported=false -> 403
 $pegFilterOff = @{ profile = @{ serviceProviderConfig = @{ filter = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegCapId" -Method PATCH -Headers $headers -Body $pegFilterOff | Out-Null
 $pegFilterTry = Invoke-NullPatchGeneric "$pegCapBase/Users?filter=userName%20eq%20%22x%22" "GET" $null
-Test-Result -Success ($pegFilterTry.Status -eq 403) -Message "9z-AM.7: GET ?filter= with filter.supported=false -> 403 (status=$($pegFilterTry.Status))"
+Test-Result -Success ($pegFilterTry.Status -eq 403) -Message "9z-AS.7: GET ?filter= with filter.supported=false -> 403 (status=$($pegFilterTry.Status))"
 
 # Gap 3: sort.supported=false -> 403
 $pegSortOff = @{ profile = @{ serviceProviderConfig = @{ sort = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegCapId" -Method PATCH -Headers $headers -Body $pegSortOff | Out-Null
 $pegSortTry = Invoke-NullPatchGeneric "$pegCapBase/Users?sortBy=userName" "GET" $null
-Test-Result -Success ($pegSortTry.Status -eq 403) -Message "9z-AM.8: GET ?sortBy= with sort.supported=false -> 403 (status=$($pegSortTry.Status))"
+Test-Result -Success ($pegSortTry.Status -eq 403) -Message "9z-AS.8: GET ?sortBy= with sort.supported=false -> 403 (status=$($pegSortTry.Status))"
 
 # ---- Gap 6: per-endpoint filter.maxResults clamps page size ----
-Write-Host "`n--- 9z-AM Gap 6: filter.maxResults clamp ---" -ForegroundColor Cyan
+Write-Host "`n--- 9z-AS Gap 6: filter.maxResults clamp ---" -ForegroundColor Cyan
 $pegMrBody = @{ name = "live-peg-maxresults-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
 $pegMrEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegMrBody
 $pegMrId = $pegMrEp.id
@@ -10970,11 +11317,11 @@ for ($i = 0; $i -lt 4; $i++) {
 $pegMrSet = @{ profile = @{ serviceProviderConfig = @{ filter = @{ supported = $true; maxResults = 2 } } } } | ConvertTo-Json -Depth 6
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegMrId" -Method PATCH -Headers $headers -Body $pegMrSet | Out-Null
 $pegMrList = Invoke-RestMethod -Uri "$pegMrBase/Users?count=100" -Method GET -Headers $pegHeaders
-Test-Result -Success (@($pegMrList.Resources).Count -le 2) -Message "9z-AM.9: filter.maxResults=2 clamps page size to <=2 (returned=$(@($pegMrList.Resources).Count))"
-Test-Result -Success ($pegMrList.totalResults -ge 4) -Message "9z-AM.10: totalResults still reflects full count (>=4)"
+Test-Result -Success (@($pegMrList.Resources).Count -le 2) -Message "9z-AS.9: filter.maxResults=2 clamps page size to <=2 (returned=$(@($pegMrList.Resources).Count))"
+Test-Result -Success ($pegMrList.totalResults -ge 4) -Message "9z-AS.10: totalResults still reflects full count (>=4)"
 
 # ---- Gap 10: etag.supported=false omits the ETag header ----
-Write-Host "`n--- 9z-AM Gap 10: etag.supported ---" -ForegroundColor Cyan
+Write-Host "`n--- 9z-AS Gap 10: etag.supported ---" -ForegroundColor Cyan
 $pegEtBody = @{ name = "live-peg-etag-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
 $pegEtEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegEtBody
 $pegEtId = $pegEtEp.id
@@ -10983,18 +11330,18 @@ $pegEtUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); u
 $pegEtUser = Invoke-RestMethod -Uri "$pegEtBase/Users" -Method POST -Headers $pegHeaders -Body $pegEtUserBody
 # Default (etag.supported=true) -> ETag header present
 $pegEtOn = Invoke-WebRequest -Uri "$pegEtBase/Users/$($pegEtUser.id)" -Method GET -Headers $pegHeaders -SkipHttpErrorCheck
-Test-Result -Success ($null -ne $pegEtOn.Headers['ETag']) -Message "9z-AM.11: ETag header present when etag.supported=true (default)"
+Test-Result -Success ($null -ne $pegEtOn.Headers['ETag']) -Message "9z-AS.11: ETag header present when etag.supported=true (default)"
 # Narrow to etag.supported=false -> ETag header absent
 $pegEtOff = @{ profile = @{ serviceProviderConfig = @{ etag = @{ supported = $false } } } } | ConvertTo-Json -Depth 6
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegEtId" -Method PATCH -Headers $headers -Body $pegEtOff | Out-Null
 $pegEtOffResp = Invoke-WebRequest -Uri "$pegEtBase/Users/$($pegEtUser.id)" -Method GET -Headers $pegHeaders -SkipHttpErrorCheck
-Test-Result -Success ($null -eq $pegEtOffResp.Headers['ETag']) -Message "9z-AM.12: ETag header absent when etag.supported=false"
+Test-Result -Success ($null -eq $pegEtOffResp.Headers['ETag']) -Message "9z-AS.12: ETag header absent when etag.supported=false"
 
 # ---- Cleanup ----
 foreach ($epId in @($pegUoId, $pegCapId, $pegMrId, $pegEtId)) {
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$epId" -Method DELETE -Headers $headers | Out-Null } catch {}
 }
-Write-Host "`n--- 9z-AM: Profile Enforcement Gaps Tests Complete ---" -ForegroundColor Green
+Write-Host "`n--- 9z-AS: Profile Enforcement Gaps Tests Complete ---" -ForegroundColor Green
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

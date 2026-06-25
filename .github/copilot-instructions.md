@@ -130,6 +130,18 @@ When working on development projects:
 - Always use a single hyphen (`-`) where an em-dash would otherwise appear
 - This applies to ALL file types: `.ts`, `.js`, `.json`, `.md`, `.ps1`, `.yml`, `.html`, `.css`, `.mjs`, etc.
 
+## Doc Code-Block Formatting Rule (CRITICAL - added 2026-06-23)
+
+Origin: 2026-06-23. The first cut of [docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md](docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md) shipped SCIM payload examples collapsed onto 1-2 lines (`{ "schemas": [...], "Operations": [ { "op": ... } ] }`). That is technically valid JSON but unreadable - a reader cannot scan the envelope, the op, the path, or the value at a glance, and copy-paste into a client produces a wall of text. Standing rules for EVERY fenced code block in ANY `.md` under the repo:
+
+1. **Pretty-print, always.** Any literal JSON (and JSON-like: request/response bodies, config snippets) in a ```json fence MUST be multi-line, 2-space-indented, one structural member per line. Never collapse an object or array onto a shared line to "save space." Each `Operations[]` element sits on its own line(s); a single-key op may stay on one line (`{ "op": "replace", "path": "active", "value": false }`) but the surrounding envelope (`schemas`, `Operations`) is always broken out.
+2. **Every ```json block MUST parse.** Before committing a doc, every literal ```json block has to round-trip through a JSON parser (e.g. `ConvertFrom-Json`) with zero errors. A doc commit that adds/edits a ```json block without this check is incomplete.
+3. **Schematic templates use ```jsonc, not ```json.** A block that contains placeholders (`<varies>`, `<id>`, `add|replace|remove`) or comments is NOT literal JSON. Fence it as ```jsonc (or ```text) and add a one-line `// Schematic shape ...` note, so the "every ```json parses" gate stays airtight and the reader knows it is a template.
+4. **HTTP examples are realistic.** Request/response examples carry the real method + path line, the relevant headers (`Authorization`, `Content-Type: application/scim+json`, `If-Match`, `ETag`), and a pretty-printed body. Prefer values verified against a live run over invented ones.
+5. **Applies to all languages.** The same readability bar holds for ```ts / ```powershell / ```bash / ```yaml blocks: no minified one-liners, sensible indentation, and the snippet must reflect what the cited source actually does.
+
+This is now the house norm for all documentation, retroactively and going forward. When editing an existing doc with collapsed code blocks, reformat them as part of the change.
+
 ## Git Commit Rules (CRITICAL)
 - NEVER use `git commit --amend` unless explicitly specified by the user - always create new commits with `git commit -m "..."`
 - NEVER rewrite history on commits that have been pushed

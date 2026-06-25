@@ -10,7 +10,14 @@
  * @see docs/SCHEMA_TEMPLATES_DESIGN.md §5.6 (Auto-Expand), §5.7 steps 1-2
  */
 import type { ScimSchemaDefinition, ScimSchemaAttribute } from '../discovery/scim-schema-registry';
-import type { EndpointProfile, ShorthandSchemaInput, ShorthandProfileInput, ServiceProviderConfig } from './endpoint-profile.types';
+import type {
+  EndpointProfile,
+  ShorthandSchemaInput,
+  ShorthandProfileInput,
+  ServiceProviderConfig,
+  ProfileAuthentication,
+  AuthenticationMethod,
+} from './endpoint-profile.types';
 import {
   RFC_SCHEMA_ATTRIBUTE_MAPS,
   RFC_SCHEMA_ALL_ATTRIBUTES,
@@ -165,6 +172,71 @@ function expandServiceProviderConfig(input?: Partial<ServiceProviderConfig>): Se
  * Pipeline: autoExpand → autoInject
  * (Validation/tighten-only happens separately in the orchestrator)
  */
+// ─── Authentication model expansion (A0) ────────────────────────────────
+
+/** Current schema version of the embedded profile.authentication block. */
+export const CURRENT_AUTH_SCHEMA_VERSION = 1;
+
+/**
+ * Key fragments that mark a config entry as secret. Matched against the key with
+ * all non-alphanumerics removed and lower-cased, so `client_secret`,
+ * `clientSecret`, `private-key`, `credentialHash`, etc. all match while public
+ * trust values (`issuer`, `audience`, `jwksUri`, ...) do not.
+ */
+const SECRET_KEY_FRAGMENTS = ['secret', 'password', 'passphrase', 'privatekey', 'credentialhash'];
+
+function isSecretKey(key: string): boolean {
+  const norm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return SECRET_KEY_FRAGMENTS.some((fragment) => norm.includes(fragment));
+}
+
+/** Remove secret-looking keys from a method's non-secret Class-A config. */
+function stripSecretsFromConfig(config: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (!isSecretKey(key)) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Project one method to its known, non-secret fields. Unknown keys (including
+ * any secret-looking ones) are dropped so the stored/returned shape can never
+ * carry secret material (architecture section 2.3, the three data classes).
+ */
+function expandAuthenticationMethod(method: AuthenticationMethod): AuthenticationMethod {
+  const out: AuthenticationMethod = { id: method.id, type: method.type };
+  if (method.displayName !== undefined) out.displayName = method.displayName;
+  if (method.description !== undefined) out.description = method.description;
+  if (method.specUri !== undefined) out.specUri = method.specUri;
+  if (method.plane !== undefined) out.plane = method.plane;
+  if (method.tokenEndpointAuthMethod !== undefined) out.tokenEndpointAuthMethod = method.tokenEndpointAuthMethod;
+  if (method.enabled !== undefined) out.enabled = method.enabled;
+  if (method.priority !== undefined) out.priority = method.priority;
+  if (method.lifecycleStatus !== undefined) out.lifecycleStatus = method.lifecycleStatus;
+  if (method.config !== undefined && method.config !== null && typeof method.config === 'object') {
+    out.config = stripSecretsFromConfig(method.config);
+  }
+  if (method.credentialRef !== undefined) out.credentialRef = method.credentialRef;
+  return out;
+}
+
+/**
+ * Normalize an inert authentication block on expand (A0): default the
+ * schemaVersion, coerce methods to an array, and project each method to its
+ * known non-secret fields. INERT - no resolver consults the result yet.
+ */
+export function expandAuthentication(auth: ProfileAuthentication): ProfileAuthentication {
+  const methods = Array.isArray(auth.methods) ? auth.methods.map(expandAuthenticationMethod) : [];
+  const result: ProfileAuthentication = {
+    schemaVersion: typeof auth.schemaVersion === 'number' ? auth.schemaVersion : CURRENT_AUTH_SCHEMA_VERSION,
+    methods,
+  };
+  if (auth.defaultMethodId !== undefined) result.defaultMethodId = auth.defaultMethodId;
+  if (auth.policy !== undefined) result.policy = auth.policy;
+  return result;
+}
+
 export function expandProfile(input: ShorthandProfileInput): EndpointProfile {
   // 1. Expand schemas
   const expandedSchemas = (input.schemas ?? []).map(s => expandSchema(s));
@@ -181,10 +253,17 @@ export function expandProfile(input: ShorthandProfileInput): EndpointProfile {
   // 5. Settings
   const settings = input.settings ?? {};
 
-  return {
+  const profile: EndpointProfile = {
     schemas: injectedSchemas,
     resourceTypes: [...resourceTypes],
     serviceProviderConfig,
     settings: { ...settings },
   };
+
+  // 6. A0 - thread the inert authentication block through unchanged (secrets stripped).
+  if (input.authentication) {
+    profile.authentication = expandAuthentication(input.authentication);
+  }
+
+  return profile;
 }

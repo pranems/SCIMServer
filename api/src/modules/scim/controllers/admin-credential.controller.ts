@@ -43,8 +43,54 @@ const BCRYPT_SALT_ROUNDS = 12;
 
 interface CreateCredentialDto {
   label?: string;
-  credentialType?: string; // "bearer" (default) | "oauth_client"
+  credentialType?: string; // "bearer" (default) | "oauth_client" | "wif"
   expiresAt?: string;      // ISO 8601 date
+  wif?: WifTrustInput;     // required when credentialType === "wif"
+}
+
+/**
+ * WIF trust config (A1) - all PUBLIC values; NO secret material. Persisted on
+ * the `wif` EndpointCredential.metadata (no credentialHash). The validator
+ * (Q6) consumes these to check an assertion.
+ */
+interface WifTrustInput {
+  assertionProfile?: 'jwt-bearer' | 'token-exchange';
+  subjectTokenType?: string | null;
+  expectedResource?: string | null;
+  expectedIssuer: string;
+  expectedSubject: string;
+  expectedAudience: string;
+  jwksUri: string;
+  allowedTenantId: string;
+  requiredRoles?: string[];
+  scope?: string;
+  issuedTokenTtlSec?: number;
+}
+
+/** Keys allowed on a WIF trust metadata object (no secret-bearing keys). */
+const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
+  'assertionProfile', 'subjectTokenType', 'expectedResource', 'expectedIssuer',
+  'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId',
+  'requiredRoles', 'scope', 'issuedTokenTtlSec',
+];
+
+/**
+ * Unified create-credential response shape. Different credential types populate
+ * different one-time-secret fields (`token` for bearer, `clientId`+`clientSecret`
+ * for oauth_client, `wif` public trust for wif), so they are all optional.
+ */
+interface CreateCredentialResponse {
+  id: string;
+  endpointId: string;
+  credentialType: string;
+  label: string | null;
+  active: boolean;
+  createdAt: Date;
+  expiresAt: Date | null;
+  token?: string;
+  clientId?: string;
+  clientSecret?: string;
+  wif?: Record<string, unknown>;
 }
 
 @Controller('admin/endpoints')
@@ -68,22 +114,36 @@ export class AdminCredentialController {
   async createCredential(
     @Param('endpointId') endpointId: string,
     @Body() dto: CreateCredentialDto,
-  ) {
+  ): Promise<CreateCredentialResponse> {
     const endpoint = await this.requireEndpoint(endpointId);
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+
+    const credentialType = dto.credentialType ?? 'bearer';
+    if (!['bearer', 'oauth_client', 'wif'].includes(credentialType)) {
+      throw new BadRequestException(
+        `Invalid credentialType "${credentialType}". Allowed values: "bearer", "oauth_client", "wif".`,
+      );
+    }
+
+    // A1 - orthogonal create gate. WIF rides its own enabling flag
+    // (WifCredentialsEnabled), independent of the bcrypt-bearer gate
+    // (PerEndpointCredentialsEnabled). bearer/oauth_client keep the existing
+    // PerEndpointCredentialsEnabled requirement.
+    if (credentialType === 'wif') {
+      if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
+        throw new ForbiddenException(
+          `WIF credentials are not enabled for endpoint "${endpointId}". ` +
+          `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
+        );
+      }
+      return this.createWifCredential(endpointId, dto);
+    }
 
     // Validate that per-endpoint credentials are enabled
-    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED)) {
       throw new ForbiddenException(
         `Per-endpoint credentials are not enabled for endpoint "${endpointId}". ` +
         `Set "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
-      );
-    }
-
-    const credentialType = dto.credentialType ?? 'bearer';
-    if (!['bearer', 'oauth_client'].includes(credentialType)) {
-      throw new BadRequestException(
-        `Invalid credentialType "${credentialType}". Allowed values: "bearer", "oauth_client".`,
       );
     }
 
@@ -104,6 +164,49 @@ export class AdminCredentialController {
 
     // Hash with bcrypt
     const hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
+
+    // Q1: an `oauth_client` credential is a per-endpoint client_id / client_secret
+    // pair used at the per-endpoint token endpoint to mint endpoint-scoped tokens.
+    // The plaintext secret rides `credentialHash` (bcrypt); the public client_id
+    // rides `metadata.clientId`. Both the client_id and the one-time secret are
+    // returned at create; the secret is NEVER stored or returned again.
+    if (credentialType === 'oauth_client') {
+      const clientId = `epc_${crypto.randomBytes(12).toString('hex')}`;
+      const credential = await this.credentialRepo.create({
+        endpointId,
+        credentialType,
+        credentialHash: hash,
+        label: dto.label ?? null,
+        metadata: { clientId },
+        expiresAt,
+      });
+
+      this.logger.info(
+        LogCategory.AUTH,
+        `Created per-endpoint oauth_client credential "${credential.id}" (clientId "${clientId}") for endpoint "${endpointId}"`,
+      );
+
+      const oauthEventPayload: ScimCredentialEventPayload = {
+        endpointId,
+        credentialId: credential.id,
+        credentialType: credential.credentialType,
+        label: credential.label ?? undefined,
+      };
+      this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_CREATED, oauthEventPayload);
+
+      return {
+        id: credential.id,
+        endpointId: credential.endpointId,
+        credentialType: credential.credentialType,
+        label: credential.label,
+        active: credential.active,
+        createdAt: credential.createdAt,
+        expiresAt: credential.expiresAt,
+        clientId,
+        // ⚠️ Secret is returned ONLY here, ONCE. Only its bcrypt hash is stored.
+        clientSecret: plaintext,
+      };
+    }
 
     const credential = await this.credentialRepo.create({
       endpointId,
@@ -159,6 +262,11 @@ export class AdminCredentialController {
       active: c.active,
       createdAt: c.createdAt,
       expiresAt: c.expiresAt,
+      // Q1: expose the PUBLIC client_id for oauth_client credentials so the UI
+      // can show it. The secret is never stored and never returned in a list.
+      ...(c.credentialType === 'oauth_client' && c.metadata?.clientId
+        ? { clientId: c.metadata.clientId as string }
+        : {}),
       // Hash is NEVER returned in list responses
     }));
   }
@@ -193,6 +301,61 @@ export class AdminCredentialController {
       label: credential.label ?? undefined,
     };
     this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, credentialEventPayload);
+  }
+
+  /**
+   * Create a `wif` credential (A1). The trust config is ALL public values -
+   * NO secret material. It rides EndpointCredential.metadata with an empty
+   * credentialHash; the response carries no secret/hash/token field.
+   */
+  private async createWifCredential(endpointId: string, dto: CreateCredentialDto): Promise<CreateCredentialResponse> {
+    const trust = dto.wif;
+    if (!trust || typeof trust !== 'object') {
+      throw new BadRequestException('A "wif" credential requires a "wif" trust object.');
+    }
+    for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
+      if (!trust[required] || typeof trust[required] !== 'string') {
+        throw new BadRequestException(`WIF trust is missing required field "${required}".`);
+      }
+    }
+
+    // Project to the known public keys only - any secret-looking key the caller
+    // sent is dropped (defense in depth; the type already forbids them).
+    const metadata: Record<string, unknown> = {};
+    for (const key of WIF_TRUST_KEYS) {
+      if (trust[key] !== undefined) metadata[key] = trust[key];
+    }
+    metadata.assertionProfile = trust.assertionProfile ?? 'jwt-bearer';
+
+    const credential = await this.credentialRepo.create({
+      endpointId,
+      credentialType: 'wif',
+      credentialHash: '', // WIF stores NO secret
+      label: dto.label ?? null,
+      metadata,
+    });
+
+    this.logger.info(LogCategory.AUTH, `Created wif credential "${credential.id}" for endpoint "${endpointId}"`);
+
+    const wifEventPayload: ScimCredentialEventPayload = {
+      endpointId,
+      credentialId: credential.id,
+      credentialType: credential.credentialType,
+      label: credential.label ?? undefined,
+    };
+    this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_CREATED, wifEventPayload);
+
+    return {
+      id: credential.id,
+      endpointId: credential.endpointId,
+      credentialType: credential.credentialType,
+      label: credential.label,
+      active: credential.active,
+      createdAt: credential.createdAt,
+      expiresAt: credential.expiresAt,
+      // The full public trust config is echoed back (no secret exists).
+      wif: metadata,
+    };
   }
 
   private async requireEndpoint(endpointId: string) {
