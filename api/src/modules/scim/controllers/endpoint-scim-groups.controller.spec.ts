@@ -447,7 +447,140 @@ describe('EndpointScimGroupsController', () => {
     });
   });
 
-  // ───────────── G8e: returned characteristic filtering ─────────────
+  // ───────────── Gap 1: resource-type gating (RFC 7643 §6) ─────────────
+
+  describe('Resource-type gating (user-only endpoint rejects Groups)', () => {
+    const userOnlyEndpoint = {
+      ...mockEndpoint,
+      name: 'user-only-ep',
+      profile: {
+        schemas: [],
+        resourceTypes: [
+          { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+        ],
+        serviceProviderConfig: {},
+        settings: {},
+      },
+    };
+
+    it('createGroup should throw 404 noTarget when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.createGroup('endpoint-1', { schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: 'x' } as any, mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+
+      expect(mockGroupsService.createGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('getGroup should throw 404 when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.getGroup('endpoint-1', 'group-123', mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+
+      expect(mockGroupsService.getGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('listGroups should throw 404 when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('deleteGroup should throw 404 when Group is not in the profile', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnlyEndpoint);
+
+      await expect(
+        controller.deleteGroup('endpoint-1', 'group-123', mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
+
+      expect(mockGroupsService.deleteGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('createGroup should succeed when Group IS in the profile', async () => {
+      const bothEndpoint = {
+        ...mockEndpoint,
+        profile: {
+          schemas: [],
+          resourceTypes: [
+            { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+            { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [] },
+          ],
+          serviceProviderConfig: {},
+          settings: {},
+        },
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(bothEndpoint);
+      mockGroupsService.createGroupForEndpoint.mockResolvedValue({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], id: 'g1', displayName: 'x', members: [], meta: {},
+      });
+
+      await expect(
+        controller.createGroup('endpoint-1', { schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: 'x' } as any, mockRequest)
+      ).resolves.toBeDefined();
+
+      expect(mockGroupsService.createGroupForEndpoint).toHaveBeenCalled();
+    });
+  });
+
+  // ───────────── Gaps 2/3/4: capability gating ─────────────
+
+  describe('Capability gating (filter/sort/patch)', () => {
+    function epWithSpc(spc: Record<string, unknown>) {
+      return {
+        ...mockEndpoint,
+        profile: {
+          schemas: [],
+          resourceTypes: [
+            { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [] },
+          ],
+          serviceProviderConfig: spc,
+          settings: {},
+        },
+      };
+    }
+
+    it('listGroups throws 403 when filter.supported=false and a filter is supplied', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ filter: { supported: false } }));
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest, 'displayName eq "x"')
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('listGroups succeeds when filter.supported=false but no filter is supplied', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ filter: { supported: false } }));
+      mockGroupsService.listGroupsForEndpoint.mockResolvedValue({ schemas: [], totalResults: 0, Resources: [] });
+      await expect(controller.listGroups('endpoint-1', mockRequest)).resolves.toBeDefined();
+    });
+
+    it('listGroups throws 403 when sort.supported=false and sortBy is supplied', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ sort: { supported: false } }));
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest, undefined, undefined, undefined, 'displayName')
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('updateGroup throws 501 when patch.supported=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ patch: { supported: false } }));
+      await expect(
+        controller.updateGroup('endpoint-1', 'g1', { schemas: [], Operations: [] } as any, mockRequest)
+      ).rejects.toMatchObject({ status: 501 });
+      expect(mockGroupsService.patchGroupForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('updateGroup succeeds when patch.supported=true', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(epWithSpc({ patch: { supported: true } }));
+      mockGroupsService.patchGroupForEndpoint.mockResolvedValue({ schemas: [], id: 'g1', displayName: 'x', members: [], meta: {} });
+      await expect(
+        controller.updateGroup('endpoint-1', 'g1', { schemas: [], Operations: [] } as any, mockRequest)
+      ).resolves.toBeDefined();
+    });
+  });
+
 
   describe('G8e - returned:request attribute filtering', () => {
     it('POST createGroup should strip returned:request attributes from response', async () => {

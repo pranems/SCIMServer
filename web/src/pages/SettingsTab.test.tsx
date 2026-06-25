@@ -109,6 +109,7 @@ describe('SettingsTab', () => {
     expect(screen.getByRole('switch', { name: /GroupHardDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /MultiMemberPatchOpForGroupEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /SchemaDiscoveryEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /AllowAndCoerceBooleanStrings/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /VerbosePatchSupported/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /PatchOpAllowRemoveAllMembers/i })).toBeInTheDocument();
@@ -186,6 +187,31 @@ describe('SettingsTab', () => {
     expect(mutateAsync).toHaveBeenCalledWith({
       profile: { settings: { RequireIfMatch: false } },
     });
+  });
+
+  it('reflects CustomResourceTypesEnabled and toggles it via profile.settings', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ CustomResourceTypesEnabled: 'True' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const sw = screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i }) as HTMLInputElement;
+    expect(sw.checked).toBe(true);
+    await user.click(sw);
+    expect(mutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { CustomResourceTypesEnabled: false } },
+    });
+  });
+
+  it('defaults CustomResourceTypesEnabled to off when the flag is absent', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const sw = screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i }) as HTMLInputElement;
+    expect(sw.checked).toBe(false);
   });
 
   it('shows a success MessageBar after a successful toggle', async () => {

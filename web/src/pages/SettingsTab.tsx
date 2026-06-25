@@ -142,6 +142,12 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     defaultValue: true,
   },
   {
+    key: 'CustomResourceTypesEnabled',
+    label: 'CustomResourceTypesEnabled',
+    description: 'Allow registering custom resource types (beyond User and Group) on the Resource Types tab.',
+    defaultValue: false,
+  },
+  {
     key: 'PerEndpointCredentialsEnabled',
     label: 'PerEndpointCredentialsEnabled',
     description: 'Validate the bearer token against this endpoint\'s credential set.',

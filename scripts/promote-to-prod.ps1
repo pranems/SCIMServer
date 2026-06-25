@@ -43,7 +43,17 @@
 .PARAMETER Subscription
     Azure subscription to switch to before promoting. REQUIRED when promoting the
     customer-facing (calmsand) prod, which lives in the separate `AnandSa-Test-150`
-    tenant. You must `az login` into that tenant first, then this switches context.
+    tenant. When scripts/az-tenant.ps1 is present, the matching isolated CLI profile
+    is selected automatically and (if scripts/setup-deploy-sp.ps1 has been run) login
+    is non-interactive via a deployment service principal - no `az login` per promote.
+
+.PARAMETER AzureConfigDir
+    Explicit AZURE_CONFIG_DIR (isolated az CLI profile) to use for this run. Normally
+    you do not need this - it is derived from -Subscription via scripts/az-tenant.ps1.
+
+.PARAMETER DeviceCode
+    Use the device-code login flow if an interactive sign-in is needed (default is
+    the normal browser popup).
 
 .PARAMETER BlueGreen
     Perform a TRUE blue/green deploy: pin the current (blue) revision at 100%
@@ -110,6 +120,8 @@ param(
     [string]$DevAppName = 'scimserver-dev',
     [string]$ImageTag,
     [string]$Subscription,
+    [string]$AzureConfigDir,
+    [switch]$DeviceCode,
     [switch]$BlueGreen,
     [switch]$RunVerification,
     [switch]$VerifyPlaywright,
@@ -128,33 +140,53 @@ Write-Host "  SCIMServer - Promote to Production" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Check Azure CLI auth ---
-try {
-    $account = az account show --output json 2>$null | ConvertFrom-Json
-    if (-not $account) { throw "not logged in" }
-    Write-Host "✅ Azure CLI: $($account.user.name) ($($account.name))" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Azure CLI not authenticated. Run: az login" -ForegroundColor Red
-    exit 1
-}
-
-# --- Cross-tenant guard ---
+# --- Cross-tenant authentication ---
 # The two prod instances live in DIFFERENT Azure AD tenants:
 #   - Dev + parallel prod (proudbush, app 'scimserver') -> ProvIAM_Subscription
 #   - Customer-facing prod (calmsand, app 'scimserver-prod') -> AnandSa-Test-150 (separate tenant)
-# You cannot promote both in one az session. If -Subscription is provided, switch to it
-# and confirm the active context matches before touching prod.
-if ($Subscription) {
-    Write-Host "🔁 Setting active subscription to '$Subscription'..." -ForegroundColor Cyan
-    az account set --subscription $Subscription 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Could not switch to subscription '$Subscription'." -ForegroundColor Red
-        Write-Host "   If this is the customer-facing (calmsand / AnandSa-Test-150) prod in a separate tenant," -ForegroundColor Yellow
-        Write-Host "   run 'az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950' first, then re-run this script." -ForegroundColor Yellow
+# You cannot hold both in one ~/.azure cache, so scripts/az-tenant.ps1 keeps each
+# tenant in its own isolated profile (AZURE_CONFIG_DIR) and signs in non-interactively
+# via a deployment service principal once scripts/setup-deploy-sp.ps1 has been run.
+# The helper is optional - if it is absent we fall back to the legacy az-account check.
+$azHelper = Join-Path $PSScriptRoot 'az-tenant.ps1'
+if (Test-Path $azHelper) { . $azHelper }
+
+if ($AzureConfigDir) { $env:AZURE_CONFIG_DIR = $AzureConfigDir }
+
+if (Get-Command Connect-ScimTenant -ErrorAction SilentlyContinue) {
+    # Default to ProvIAM (dev + proudbush) when no -Subscription is given; calmsand
+    # promotion always passes -Subscription AnandSa-Test-150.
+    $targetSub = if ($Subscription) { $Subscription } else { 'ProvIAM_Subscription' }
+    $account = Connect-ScimTenant -Subscription $targetSub -DeviceCode:$DeviceCode
+    if (-not $account) {
+        Write-Host "❌ Could not authenticate to '$targetSub'." -ForegroundColor Red
+        Write-Host "   Run '. ./scripts/az-tenant.ps1; Show-ScimDeployStatus' to inspect, or" -ForegroundColor Yellow
+        Write-Host "   'pwsh scripts/setup-deploy-sp.ps1' to bootstrap non-interactive login." -ForegroundColor Yellow
         exit 1
     }
-    $account = az account show --output json 2>$null | ConvertFrom-Json
-    Write-Host "   ✅ Active subscription: $($account.name) (tenant $($account.tenantId))" -ForegroundColor Green
+    Write-Host "✅ Azure CLI: $($account.user.name) ($($account.name), tenant $($account.tenantId))" -ForegroundColor Green
+} else {
+    # --- Legacy path (helper not present) ---
+    try {
+        $account = az account show --output json 2>$null | ConvertFrom-Json
+        if (-not $account) { throw "not logged in" }
+        Write-Host "✅ Azure CLI: $($account.user.name) ($($account.name))" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Azure CLI not authenticated. Run: az login" -ForegroundColor Red
+        exit 1
+    }
+    if ($Subscription) {
+        Write-Host "🔁 Setting active subscription to '$Subscription'..." -ForegroundColor Cyan
+        az account set --subscription $Subscription 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Could not switch to subscription '$Subscription'." -ForegroundColor Red
+            Write-Host "   If this is the customer-facing (calmsand / AnandSa-Test-150) prod in a separate tenant," -ForegroundColor Yellow
+            Write-Host "   run 'az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950' first, then re-run this script." -ForegroundColor Yellow
+            exit 1
+        }
+        $account = az account show --output json 2>$null | ConvertFrom-Json
+        Write-Host "   ✅ Active subscription: $($account.name) (tenant $($account.tenantId))" -ForegroundColor Green
+    }
 }
 
 # When promoting the customer-facing (calmsand) prod, the dev app lives in a DIFFERENT
@@ -431,11 +463,79 @@ if (-not $BlueGreen) {
 # =========================================================================
 Write-Host "🚀 Step 3: TRUE blue/green deployment..." -ForegroundColor Cyan
 
-# 3a. Identify the current (blue) revision serving traffic.
-$blueRevision = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
-    --query "properties.latestReadyRevisionName" --output tsv 2>$null
+# 3a. Identify the current (blue) revision ACTUALLY SERVING traffic.
+# CRITICAL: blue MUST be the active revision with the most traffic, NOT
+# `latestReadyRevisionName`. After a prior aborted blue/green attempt the
+# latest-created revision can be a deactivated green - selecting it as blue
+# and pinning 100% traffic to a deactivated revision leaves the ingress with
+# nowhere to route and 404s the public FQDN. (Root-caused 2026-06-24: a second
+# same-day attempt picked a deactivated v0.53.4 revision as "blue", pinned
+# traffic to it, and briefly 404'd proudbush until traffic was restored to the
+# real serving revision.) We pick the highest-weight ACTIVE revision from the
+# live traffic table; only if none has weight (fresh single-revision app) do we
+# fall back to latestReadyRevisionName.
+# Resilience (added 2026-06-24 after a calmsand promote aborted on a transient
+# empty `az` result even though the traffic table was perfectly valid): every
+# `az` query below is retried up to 4 times. We also handle the
+# `latestRevision:true` traffic-row shape (calmsand auto-routes to newest, so its
+# weighted row may carry no explicit revisionName) by resolving the highest-weight
+# ACTIVE revision directly from the revision list.
+$blueRevision = $null
+for ($blueAttempt = 1; $blueAttempt -le 4 -and [string]::IsNullOrWhiteSpace($blueRevision); $blueAttempt++) {
+    if ($blueAttempt -gt 1) {
+        Write-Host "   (blue-resolution retry $blueAttempt/4 after transient empty az result)" -ForegroundColor DarkYellow
+        Start-Sleep -Seconds 5
+    }
+    try {
+        $trafficRows = az containerapp ingress traffic show --name $ProdAppName --resource-group $ProdResourceGroup -o json 2>$null | ConvertFrom-Json
+        $activeRevNames = az containerapp revision list --name $ProdAppName --resource-group $ProdResourceGroup --query "[?properties.active].name" -o json 2>$null | ConvertFrom-Json
+        # Case 1: explicit-named weighted row that is also active (labeled/proudbush shape).
+        $topServing = $trafficRows |
+            Where-Object { $_.weight -gt 0 -and $_.revisionName -and ($activeRevNames -contains $_.revisionName) } |
+            Sort-Object -Property weight -Descending |
+            Select-Object -First 1
+        if ($topServing -and $topServing.revisionName) {
+            $blueRevision = $topServing.revisionName
+            Write-Host "   Blue = highest-traffic ACTIVE named revision: $blueRevision ($($topServing.weight)%)" -ForegroundColor Gray
+        }
+        # Case 2: weighted `latestRevision:true` row with no explicit revisionName
+        # (calmsand auto-route shape). Resolve the highest-weight ACTIVE revision directly.
+        if ([string]::IsNullOrWhiteSpace($blueRevision)) {
+            $latestRow = $trafficRows | Where-Object { $_.latestRevision -eq $true -and $_.weight -gt 0 } | Select-Object -First 1
+            if ($latestRow) {
+                $topActive = az containerapp revision list --name $ProdAppName --resource-group $ProdResourceGroup `
+                    --query "[?properties.active] | sort_by(@, &properties.trafficWeight)[-1].name" -o tsv 2>$null
+                if (-not [string]::IsNullOrWhiteSpace($topActive)) {
+                    $blueRevision = $topActive.Trim()
+                    Write-Host "   Blue = highest-weight ACTIVE revision (latestRevision auto-route shape): $blueRevision" -ForegroundColor Gray
+                }
+            }
+        }
+    } catch {
+        Write-Host "   (blue-resolution attempt $blueAttempt threw: $($_.Exception.Message))" -ForegroundColor DarkYellow
+    }
+    # Fallback within the retry loop: latestReadyRevisionName (also transient-prone).
+    if ([string]::IsNullOrWhiteSpace($blueRevision)) {
+        $latestReady = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
+            --query "properties.latestReadyRevisionName" --output tsv 2>$null
+        if (-not [string]::IsNullOrWhiteSpace($latestReady)) {
+            $blueRevision = $latestReady.Trim()
+            Write-Host "   Blue = latestReadyRevisionName fallback: $blueRevision" -ForegroundColor Gray
+        }
+    }
+}
 if ([string]::IsNullOrWhiteSpace($blueRevision)) {
-    Write-Host "❌ Could not resolve current (blue) revision name." -ForegroundColor Red
+    Write-Host "❌ Could not resolve current (blue) revision name after 4 attempts." -ForegroundColor Red
+    Write-Host "   Inspect: az containerapp ingress traffic show -n $ProdAppName -g $ProdResourceGroup -o json" -ForegroundColor Yellow
+    Write-Host "   And:     az containerapp revision list -n $ProdAppName -g $ProdResourceGroup -o table" -ForegroundColor Yellow
+    exit 1
+}
+# Safety: confirm the chosen blue is ACTIVE before we pin traffic to it.
+$blueActive = az containerapp revision show --name $ProdAppName --resource-group $ProdResourceGroup `
+    --revision $blueRevision --query "properties.active" -o tsv 2>$null
+if ($blueActive -ne 'true') {
+    Write-Host "❌ Selected blue revision '$blueRevision' is not active (active=$blueActive). Refusing to pin traffic to a dead revision." -ForegroundColor Red
+    Write-Host "   Inspect: az containerapp revision list -n $ProdAppName -g $ProdResourceGroup -o table" -ForegroundColor Yellow
     exit 1
 }
 Write-Host "   Blue (current) revision: $blueRevision" -ForegroundColor Gray
@@ -479,6 +579,12 @@ az containerapp ingress traffic set --name $ProdAppName --resource-group $ProdRe
 # 3f. Label green so it gets a stable private soak URL.
 az containerapp revision label add --name $ProdAppName --resource-group $ProdResourceGroup `
     --revision $greenRevision --label green --yes --output none 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    # Non-fatal here (Step 4b re-asserts routing authoritatively), but surface it:
+    # a silently-failed label move is exactly what lets verification hit the
+    # PRIOR revision through a stale 'green' label.
+    Write-Host "   ⚠️  'green' label add returned non-zero; Step 4b will verify routing." -ForegroundColor Yellow
+}
 $envSuffix = $prodFqdn -replace "^$([regex]::Escape($ProdAppName))\.", ''
 $greenFqdn = "$ProdAppName---green.$envSuffix"
 Write-Host "   Green soak URL: https://$greenFqdn" -ForegroundColor Gray
@@ -519,6 +625,65 @@ function Invoke-GreenRollback {
 if (-not $greenHealthy) {
     Invoke-GreenRollback -Reason "green did not become healthy within $($maxAttempts * $delaySeconds)s"
     exit 1
+}
+
+# --- Step 4b: Confirm the green soak URL actually routes to the NEW green
+# revision, not a stale 'green' label still pointing at the PRIOR revision.
+# The /scim/health probe in Step 4 passes for ANY healthy revision, so without
+# this assertion a lagging or failed label move would run the entire Step 5
+# verification against the OLD image. That produces a confusing failure (a
+# version-specific Playwright/contract assertion fails) or, worse, a false
+# PASS that promotes nothing new. We assert the served runtime.hostname carries
+# this promotion's green revision suffix, retrying to absorb label-propagation
+# delay. (Root-caused 2026-06-24: a same-day second blue/green left the prior
+# green-labelled revision in place; verification ran against v0.53.3 while green
+# was v0.53.4 and the new UI spec correctly flagged the mismatch.)
+Write-Host ""
+Write-Host "🔎 Step 4b: Confirming green URL routes to the new revision ($greenRevision)..." -ForegroundColor Cyan
+$greenTokenBody = '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"' + $ProdClientSecret + '"}'
+$routedToGreen = $false
+for ($i = 1; $i -le 30; $i++) {
+    try {
+        $gTok = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/oauth/token" -Method Post -Body $greenTokenBody -ContentType 'application/json' -TimeoutSec 15).access_token
+        $gVer = Invoke-RestMethod -Uri "https://$greenFqdn/scim/admin/version" -Headers @{ Authorization = "Bearer $gTok" } -TimeoutSec 15
+        if ($gVer.runtime.hostname -match [regex]::Escape($greenSuffix)) {
+            Write-Host "   ✅ Green URL routes to $($gVer.runtime.hostname) (v$($gVer.version))" -ForegroundColor Green
+            $routedToGreen = $true
+            break
+        }
+        Write-Host "   Waiting for 'green' label to route to $greenSuffix (currently $($gVer.runtime.hostname))... ($i/30)" -ForegroundColor Gray
+    } catch {
+        Write-Host "   Waiting for green version endpoint... ($i/30)" -ForegroundColor Gray
+    }
+    Start-Sleep -Seconds 10
+}
+if (-not $routedToGreen) {
+    Invoke-GreenRollback -Reason "green soak URL never routed to the new revision $greenRevision (stale/lagging 'green' label). Verification was NOT run against the new image; refusing to promote."
+    exit 1
+}
+
+# --- Step 4c: Assert the green-served VERSION matches the promoted tag.
+# Routing to the right revision is necessary but not sufficient: the image
+# behind that revision can still be the wrong build. (Root-caused 2026-06-24:
+# the GHCR publish workflow builds from the REMOTE branch ref, but the ACR
+# image is built+pushed from the LOCAL working tree. When a version-bump commit
+# was not pushed before the GHCR build ran, the GHCR ':0.53.4' tag actually
+# contained v0.53.3 code - dev (ACR) was correct while both prods (GHCR) were
+# stale. The revision routed correctly but served the wrong version.) When the
+# promoted -ImageTag is a semver, we require the served version to equal it.
+if ($ImageTag -match '^\d+\.\d+\.\d+') {
+    $servedVersion = $null
+    try {
+        $gTok2 = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/oauth/token" -Method Post -Body $greenTokenBody -ContentType 'application/json' -TimeoutSec 15).access_token
+        $servedVersion = (Invoke-RestMethod -Uri "https://$greenFqdn/scim/admin/version" -Headers @{ Authorization = "Bearer $gTok2" } -TimeoutSec 15).version
+    } catch { }
+    if ($servedVersion -ne $ImageTag) {
+        Invoke-GreenRollback -Reason "green serves version '$servedVersion' but promoted tag is '$ImageTag'. The image behind the green revision is the WRONG build (likely a registry tag built from a stale ref). Refusing to promote a mislabeled image."
+        exit 1
+    }
+    Write-Host "   ✅ Green serves the expected version v$servedVersion (matches -ImageTag $ImageTag)" -ForegroundColor Green
+} else {
+    Write-Host "   (ImageTag '$ImageTag' is not a semver; skipping version-match assertion)" -ForegroundColor DarkGray
 }
 
 # --- Step 5: Full verification cycle against green soak URL ---

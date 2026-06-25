@@ -57,6 +57,10 @@ export async function createTestApp(
 
   const app = moduleFixture.createNestApplication<NestExpressApplication>();
 
+  // Mirror production: disable Express's automatic content-hash ETag so the
+  // SCIM meta.version ETag (ScimEtagInterceptor) is the only ETag source.
+  app.set('etag', false);
+
   // Mirror production middleware from main.ts
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (req.url.startsWith('//')) {

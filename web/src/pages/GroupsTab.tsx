@@ -21,6 +21,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
+import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
@@ -98,6 +99,18 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   }
 
   if (error) {
+    // v0.53.3 profile enforcement: a user-only endpoint 404s /Groups.
+    // Render a contained, explanatory empty state instead of a generic
+    // failure so a stale deep-link / refresh does not look broken.
+    if (isResourceTypeUnsupportedError(error)) {
+      return (
+        <EmptyState
+          data-testid="groups-unsupported"
+          title="Groups are not supported by this endpoint"
+          body="This endpoint's profile does not declare a Group resource type, so it serves Users only. Open the Resource types tab to see what this endpoint supports."
+        />
+      );
+    }
     return (
       <div className={classes.center} data-testid="groups-error">
         <Text>Failed to load groups: {error.message}</Text>

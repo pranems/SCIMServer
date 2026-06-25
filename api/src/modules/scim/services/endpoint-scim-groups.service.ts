@@ -45,6 +45,7 @@ import {
   assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
+import { resolveNumericLimit } from '../common/capability-resolver';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListGroupsParams {
@@ -204,8 +205,11 @@ export class EndpointScimGroupsService {
   ): Promise<ScimListResponse<ScimGroupResource>> {
     this.logger.enrichContext({ resourceType: 'Group', operation: 'list' });
 
-    if (count > MAX_COUNT) {
-      count = MAX_COUNT;
+    // Gap 6: clamp to the per-endpoint filter.maxResults (RFC 7644 §3.4.2.4),
+    // falling back to the global MAX_COUNT when the profile does not set it.
+    const maxResults = resolveNumericLimit(this.endpointContext.getProfile?.(), (s) => s.filter?.maxResults, MAX_COUNT);
+    if (count > maxResults) {
+      count = maxResults;
     }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'List groups', { filter, startIndex, count, endpointId });
@@ -244,7 +248,7 @@ export class EndpointScimGroupsService {
 
     const totalResults = resources.length;
     const skip = Math.max(startIndex - 1, 0);
-    const take = Math.max(Math.min(count, MAX_COUNT), 0);
+    const take = Math.max(Math.min(count, maxResults), 0);
     const paginatedResources = resources.slice(skip, skip + take);
 
     this.logger.debug(LogCategory.SCIM_GROUP, 'List groups result', { totalResults, returned: paginatedResources.length, endpointId });
@@ -275,7 +279,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config);
+    enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -490,7 +494,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, endpointConfig);
+    enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
 
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
@@ -555,7 +559,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config);
+    enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Settings v7: Gate hard delete behind GroupHardDeleteEnabled (default: true)
     const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED);

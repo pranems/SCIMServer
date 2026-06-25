@@ -224,6 +224,71 @@ First step of the reconciled authentication build ([docs/auth/AUTHENTICATION_ARC
 - TDD: 22 new unit tests in [endpoint-config.interface.spec.ts](api/src/modules/endpoint/endpoint-config.interface.spec.ts) (RED confirmed at assertion level via no-op stubs, then GREEN). Covers `validateStructuredFlag` (valid/unknown-key/missing-required/non-object/null/array/no-schema), `validateEndpointConfig` structured dispatch round-trip, and `getConfigStructured`.
 - API unit: **3,825 -> 3,847** (103 suites, all pass). API build: PASS (0 errors). API ESLint: 0 errors, 4 warnings (baseline, no new `any`). Targeted E2E (config-flags + admin-endpoints-create + profile-flag-combos, inmemory): 48/48 pass.
 - Cross-backend parity: N/A (pure validation utility, no `isInMemoryBackend` branch). UI/live/Playwright: N/A (no registered flag, no runtime/HTTP surface yet; deferred to Q6.2).
+## [0.53.5] - 2026-06-24 - Fix: Resource Types tab shows current types + Settings exposes the flag
+
+Follow-up UX fix reported on customer-facing prod. The per-endpoint **Resource Types** tab rendered *only* a "Custom resource types are disabled" info panel when the `CustomResourceTypesEnabled` flag was off - it never showed the endpoint's **current valid resource types**. On a user-only endpoint the operator saw a dead-end panel with no indication that User was still served. Separately, the **Settings** tab did not expose `CustomResourceTypesEnabled`, so there was no UI affordance to turn the feature on. Pure web-layer change; no API behavior changed.
+
+### Fixed
+
+- **Always-visible resource-type inventory:** [web/src/pages/ResourceTypesTab.tsx](web/src/pages/ResourceTypesTab.tsx) now always renders an inventory of the endpoint's current resource types (built-in **User**/**Group** plus any custom), each tagged `built-in` or `custom`, regardless of the `CustomResourceTypesEnabled` flag. A user-only endpoint shows the **User** row (and no Group row), mirroring the server's fail-open `resolveResourceType` default of User+Group when the profile declares none. When the flag is off, the inventory is still shown alongside a contained info panel; the Create affordance and custom-row Delete buttons are hidden (built-in rows are never deletable).
+- **Settings exposes the gate:** [web/src/pages/SettingsTab.tsx](web/src/pages/SettingsTab.tsx) adds `CustomResourceTypesEnabled` to the boolean-flag toggle registry (default off), so the operator can enable custom resource-type registration directly from the UI. Toggling fires the same `useUpdateEndpointConfig` `{ profile: { settings: { ... } } }` path as every other flag.
+
+### Tests
+
+- **Web vitest:** [web/src/pages/ResourceTypesTab.test.tsx](web/src/pages/ResourceTypesTab.test.tsx) updated for the always-visible inventory (user-only endpoint shows User not Group; built-in rows tagged + non-deletable; custom rows tagged + deletable; flag-off still shows the inventory) and [web/src/pages/SettingsTab.test.tsx](web/src/pages/SettingsTab.test.tsx) adds CustomResourceTypesEnabled presence + toggle + default-off coverage.
+- **Playwright:** new [web/e2e/resource-types-inventory.spec.ts](web/e2e/resource-types-inventory.spec.ts) creates a throwaway user-only endpoint, asserts the Resource Types tab lists the User row with the flag off (no Group row, no Create button, no fatal boundary) and the Settings tab exposes the CustomResourceTypesEnabled toggle, then deletes the endpoint. Runs against local dev, Docker compose, and Azure dev.
+
+## [0.53.4] - 2026-06-24 - Fix: admin UI tolerates profile-enforced resource types (no fatal page)
+
+Follow-up to v0.53.3. The runtime enforcement was correct, but the **admin UI** had not been taught about it: the endpoint detail page rendered the Groups tab unconditionally, and the Groups route loader eagerly prefetched `GET /Groups`. On a **user-only** endpoint that call now returns `404 noTarget` (`RESOURCE_TYPE_NOT_SUPPORTED`), and the unhandled loader rejection tripped the route error boundary - replacing the whole endpoint detail surface with **"Something went wrong / Resource type \"Group\" is not supported by endpoint ..."**. Reported on customer-facing prod at `/endpoints/3dbe8e5c-.../users`. This is a pure web-layer fix; no API behavior changed.
+
+### Fixed
+
+- **Resource-type tab gating:** [web/src/pages/EndpointDetailPage.tsx](web/src/pages/EndpointDetailPage.tsx) now hides the **Users** or **Groups** tab when the endpoint profile does not declare that resource type, so the operator can never navigate into a tab the server would 404. Gating uses the new client resolver and is **fail-open** (absent/empty `resourceTypes` shows all tabs) - an exact mirror of the server's `resolveResourceType`.
+- **Resilient tab loaders:** the Users and Groups route loaders ([web/src/routes/endpoints.$endpointId.users.tsx](web/src/routes/endpoints.$endpointId.users.tsx), [web/src/routes/endpoints.$endpointId.groups.tsx](web/src/routes/endpoints.$endpointId.groups.tsx)) now treat the SCIM list prefetch as **best-effort** (swallow errors), so a stale deep-link / refresh onto an unsupported tab renders a contained empty state instead of the fatal route boundary.
+- **Friendly unsupported state:** [web/src/pages/GroupsTab.tsx](web/src/pages/GroupsTab.tsx) and [web/src/pages/UsersTab.tsx](web/src/pages/UsersTab.tsx) detect the resource-type-unsupported 404 and render an explanatory `EmptyState` ("Groups are not supported by this endpoint ...") rather than a generic failure.
+
+### Added
+
+- **Client mirror of the server resolver:** [web/src/api/endpoint-capabilities.ts](web/src/api/endpoint-capabilities.ts) exports `endpointSupportsResourceType` (fail-open, matches `resolveResourceType` exactly) and `isResourceTypeUnsupportedError` (classifies the 404 via the diagnostics `errorCode` with a `noTarget` + detail-phrase fallback).
+
+### Tests
+
+- **Web vitest +13** (1,073 -> **1,086**): new [web/src/api/endpoint-capabilities.test.ts](web/src/api/endpoint-capabilities.test.ts) (fail-open + match-by-name/endpoint + error classification), tab-gating cases in [web/src/pages/EndpointDetailPage.test.tsx](web/src/pages/EndpointDetailPage.test.tsx), and the unsupported-state case in [web/src/pages/GroupsTab.test.tsx](web/src/pages/GroupsTab.test.tsx).
+- **Playwright regression spec:** new [web/e2e/profile-enforcement-ui.spec.ts](web/e2e/profile-enforcement-ui.spec.ts) creates a throwaway user-only endpoint, asserts the Groups tab is hidden, the fatal boundary never appears on `/users`, and a direct load of `/groups` renders the contained empty state - then deletes the endpoint. Reproduces the prod report as a browser-level regression guard.
+
+### Why a gate missed it
+
+Every v0.53.3 gate was **API-scoped** (jest unit, jest e2e, live-test 9z-AM, discovery-vs-enforcement parity). The Playwright suite ran but had **no spec that drove the admin UI against a user-only endpoint**, so the UI's eager `GET /Groups` was never exercised against the new 404. The new Playwright spec closes that exact gap; see [docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md) "UI enforcement parity" for the standing rule.
+
+## [0.53.3] - 2026-06-23 - Fix: enforce endpoint profile (resource types + capabilities) at runtime
+
+Closes the **advertise-but-don't-enforce** bug class: the discovery endpoints (`/ResourceTypes`, `/ServiceProviderConfig`) faithfully project the endpoint profile, but the built-in CRUD + capability layers only partially consulted it, so an endpoint could advertise one thing and do another. Reported instance: a **user-only** endpoint (no `Group` resource type) still served the entire Group CRUD surface on customer-facing prod. Full design: [docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](docs/ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md). Branched off the v0.53.2 prod tag (not master) so prod gets only this targeted fix (decision D16).
+
+### Added
+
+- **Two shared, pure resolvers** that both discovery and enforcement consult so "advertised == enforced" is structural: `resolveResourceType` ([api/src/modules/scim/common/resource-type-resolver.ts](api/src/modules/scim/common/resource-type-resolver.ts)) and the capability resolver family `resolveBooleanCapability` / `resolveNumericLimit` / `resolveDependentBoolean` ([api/src/modules/scim/common/capability-resolver.ts](api/src/modules/scim/common/capability-resolver.ts)). Precedence **stored SPC -> settings -> registry default**; never throws (OpenFeature typed-evaluation rule).
+- **Capability enforcement helpers** ([api/src/modules/scim/common/capability-enforcement.ts](api/src/modules/scim/common/capability-enforcement.ts)) shared by Users/Groups/Me so each rejection's status/`scimType`/`errorCode` is defined once.
+- **Discovery-vs-enforcement parity harness** ([api/test/e2e/discovery-enforcement-parity.e2e-spec.ts](api/test/e2e/discovery-enforcement-parity.e2e-spec.ts)) - for every built-in preset, asserts that any resource type NOT in `/ResourceTypes` is rejected by CRUD. This single suite would have caught the reported bug and catches the next preset that narrows its types.
+
+### Fixed (10 enforcement gaps)
+
+- **Gap 1 - resource types (the reported bug):** built-in Users/Groups/Me controllers now return **404 `noTarget`** (`RESOURCE_TYPE_NOT_SUPPORTED`) when the endpoint profile does not declare that resource type. A user-only endpoint now rejects all Group CRUD.
+- **Gap 9 - bulk re-check:** the bulk processor re-checks resource types per sub-operation, so a `/Groups` op on a user-only endpoint yields a per-op 404 inside the envelope.
+- **Gap 2/3 - filter/sort:** `?filter=` / `sortBy` are rejected with **403** when `serviceProviderConfig.filter.supported` / `sort.supported` is explicitly `false`.
+- **Gap 4 - patch:** PATCH is rejected with **501 `notImplemented`** when `patch.supported` is `false`.
+- **Gap 5 - changePassword (intentionally not enforced):** `changePassword.supported` stays advertised metadata only. This server has no distinct change-password operation to gate - `password` is a `writeOnly` attribute (RFC 7643 §7.6) whose writability is governed by its mutability (accepted on write, stripped from responses). Blocking password writes on this flag would break standard Entra ID/Okta provisioning and password-reset flows (decision D19).
+- **Gap 6 - filter.maxResults:** the Users/Groups list services clamp `count` to the per-endpoint `filter.maxResults` instead of the global `MAX_COUNT`.
+- **Gap 7 - bulk limits:** the bulk controller enforces per-endpoint `bulk.maxOperations` (**413**) and `bulk.maxPayloadSize` instead of global constants.
+- **Gap 10 - etag:** the ETag interceptor and `enforceIfMatch` skip ETag emission / `If-Match` enforcement when `etag.supported` is `false`; `RequireIfMatch` is guarded by `etag.supported` (a dependent setting is inert when its parent capability is off).
+- **Express auto-ETag disabled** app-wide (`app.set('etag', false)`) so the SCIM `meta.version` weak ETag (RFC 7644 §3.14) is the only ETag source (decision D20).
+
+All enforcement is **fail-open**: a capability is enforced only when explicitly set to `false`, and resource-type gating only triggers when the profile declares `resourceTypes` (decision D17). Endpoints from full presets (entra-id, rfc-standard, minimal) and legacy/partial-profile endpoints are unchanged.
+
+### Tests
+
+- API unit: **3,816 -> 3,884** (+68; resolver/enforcement/controller/interceptor/service specs).
+- API E2E: added `profile-enforcement-gaps.e2e-spec` (13) + `discovery-enforcement-parity.e2e-spec` (7); full suite green on both InMemory (1,239) and Prisma backends.
 
 ## [0.53.2] - 2026-06-10 - Fix: stabilize endpoint-detail Overview visual-regression baseline
 

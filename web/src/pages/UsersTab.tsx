@@ -27,6 +27,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
+import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { UsersSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
@@ -158,6 +159,18 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   }
 
   if (error) {
+    // v0.53.3 profile enforcement: a group-only endpoint 404s /Users.
+    // Render a contained, explanatory empty state instead of a generic
+    // failure so a stale deep-link / refresh does not look broken.
+    if (isResourceTypeUnsupportedError(error)) {
+      return (
+        <EmptyState
+          data-testid="users-unsupported"
+          title="Users are not supported by this endpoint"
+          body="This endpoint's profile does not declare a User resource type. Open the Resource types tab to see what this endpoint supports."
+        />
+      );
+    }
     return (
       <div className={classes.center} data-testid="users-error">
         <Text>Failed to load users: {error.message}</Text>
