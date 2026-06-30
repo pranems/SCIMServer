@@ -311,7 +311,56 @@ Per the [R7 self-improvement discipline](../../.github/copilot-instructions.md),
 
 ---
 
-## 8. Reference
+## 8. Post-merge integration addendum (jose 5->6 + master reconcile, 2026-06-29)
+
+> **Scope.** Sections 1-7 cover the 11-step build proper (17 issues). This addendum captures the issues from the *integration tail* - reconciling `feat/wif` with `origin/master` (jose 5.10.0 -> 6.2.3 + dependabot minor bumps) and re-running the heavy validation pipeline across all form factors. Per the standing RCA-ledger rule, every issue of every type is recorded here with the same symptom / RCA / fix / why / prevention structure, numbered I-18+ to extend the build ledger. Captured at fix-confirmation time per discipline D1.
+
+### 8.1 Addendum dashboard
+
+| ID | Title | Type | Sev | Surfaced in | Detected at | Status | Fix |
+|---|---|---|---|---|---|---|---|
+| I-18 | WIF credentials Playwright spec used `?tab=` query param instead of the path-based route | T3 | Medium | Playwright vs dev | Stage 5.3 (first-ever live run) | Fixed | 16d4c02 |
+| I-19 | Playwright Chromium binary drift after dependabot `@playwright/test` bump (128 specs RED) | T6 | Low | Playwright vs dev | Stage 5.4 (browser sync) | Worked around | (binary install) |
+
+> **Verified-and-dismissed non-issue: the jose 5 -> 6 major bump.** NOT an issue - de-risked and clean. The WIF code loads jose via dynamic `import('jose')` (no API-surface coupling), the jose-6 PR touched only a jest ESM-transform config, a runtime smoke confirmed `jwtVerify` + `createLocalJWKSet` exist in v6, and every tier stayed green (unit 4011/0, E2E 1283/0, Docker live 1109/0, local live 1109/0, dev live 1109/0). Recorded for completeness, not as a defect - the v6 ESM-only constraint was an anticipated design property, exactly like the Q2 note in the provenance header.
+
+### 8.2 I-18 (Medium, T3) - WIF spec used `?tab=` instead of the path-based route
+
+- **Symptom.** Three `wif-credentials.spec.ts` tests failed against dev with `getByTestId('tab-credentials')` timeout / "element(s) not found", before any WIF assertion ran. The failure was **identical before and after** a clean web-bundle redeploy.
+- **Root cause.** The spec deep-linked the credentials tab via `page.goto('/endpoints/<id>?tab=credentials')`. But [EndpointDetailPage](../../web/src/pages/EndpointDetailPage.tsx) selects the active tab from the URL **path** (`activeTab = pathToTab(pathname, endpointId)`) using TanStack file-based child routes (`/endpoints/<id>/credentials`, rendered through `<Outlet />`); there is no `?tab=` handling anywhere. The unknown search param was ignored, the index (overview) route stayed matched, OverviewTab rendered, and the CredentialsTab carrying `data-testid="tab-credentials"` never mounted. `?tab=` is a stale pre-migration mental model that survives only in comments - including the header of the sibling [endpoint-detail-tabs.spec.ts](../../web/e2e/endpoint-detail-tabs.spec.ts), whose *code* nonetheless uses the correct path URL and passes.
+- **Why it escaped until now.** The spec was authored during the Q6 build but **never executed against a live, rendered CredentialsTab** - the WIF UI bundle had not been deployed to any reachable environment (dev's `api/public` carried zero `Federated Identity` markers until this session's clean rebuild). It shipped as "written coverage" that had never gone RED -> GREEN. This session's clean rebuild deployed the WIF UI for the first time, the spec ran in a real browser for the first time, and the wrong URL surfaced immediately.
+- **Fix.** Switched the helper to `page.goto('/endpoints/<id>/credentials')`, matching the proven pattern in `endpoint-detail-tabs.spec.ts`, and corrected the stale header comment ([16d4c02](EXECUTION_LEDGER.md)).
+- **Why the fix works.** The path URL matches the real `credentials` child route, so `pathToTab` returns `'credentials'`, the `<Outlet />` mounts CredentialsTab, and `tab-credentials` + the WIF section render. Verified vs dev (clean revision `v84cc2efweb`): 2 passed, 1 expected-skip (the first endpoint has `WifCredentialsEnabled` off, so the form-only test self-skips), 0 failed.
+- **Prevention.** (a) **Stage 0 RED-first applies to E2E specs too** - a UI spec must run against a live rendered surface (go RED, then GREEN) before it counts as coverage; a never-executed spec is a hypothesis, not coverage. (b) **Deploy-then-Playwright ordering** - a spec for a new UI surface MUST run against an environment where that surface is actually deployed; if the bundle predates the surface, the spec exercises nothing. (c) **One shared tab-navigation helper** - the path-based deep-link should be shared, not re-derived per spec, so the stale `?tab=` model cannot reappear.
+
+### 8.3 I-19 (Low, T6) - Playwright Chromium binary drift after dependabot bump
+
+- **Symptom.** The first Playwright run vs dev reported 128 failed / 3 passed, every failure `browserType.launch: Executable doesn't exist at ...chromium_headless_shell-1228...`.
+- **Root cause.** The merged dependabot bump moved `@playwright/test` to a version expecting Chromium build v1228, but the machine still had the prior browser binary. This is exactly the class the Stage 5.4 "browser-binary sync" one-shot step exists for.
+- **Fix / resolution.** `npx playwright install chromium` (downloaded headless-shell v1228); the count immediately recovered from 128 RED to 5 RED (the 5 being I-18's 3 plus 2 pre-existing baseline-drift specs).
+- **Prevention.** When a diff bumps `@playwright/test`, run `npx playwright install` as a one-shot before the Stage 5.3 run. A large "Executable doesn't exist" failure block is binary drift, never a code regression - read the error class before classifying.
+
+### 8.4 Diagnostic lesson - necessary but not sufficient (two independent defects on one path)
+
+The WIF specs had **two** independent blockers stacked on the same code path, and fixing the first did not turn them green:
+
+1. The deployed dev bundle genuinely **lacked the WIF UI** (0 `Federated Identity` markers) - a real deployment-staleness fact, fixed by the clean `--no-cache` rebuild + redeploy.
+2. Even with the fresh bundle live, the spec **still failed** because the `?tab=` URL never reached the tab (I-18).
+
+The lesson: when a clean rebuild does not change a failure, do not conclude "the rebuild was pointless" - conclude "there is a SECOND defect." The rebuild was *necessary* (the WIF UI had to be deployed for the spec to ever pass) but not *sufficient* (the URL also had to be right). Reading the actual error + the page ARIA snapshot (per R3 visual-regression-diagnosis) instead of hand-waving the unchanged failure as "flaky / environmental" is what surfaced the real I-18 root cause.
+
+### 8.5 Escape analysis (addendum)
+
+| ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier |
+|---|---|---|---|---|
+| I-18 | Stage 5.3 (first live Playwright run, this session) | Stage 0 (RED-first) at authoring time | many stages | The spec was committed during Q6 without ever running against a deployed WIF UI - no environment had the surface live, so it never went RED. The earliest catch is RED-first at authoring: run the spec, watch it fail for the right reason, then make it pass. |
+| I-19 | Stage 5.4 (browser sync) | Stage 5.4 | none | Binary drift is precisely what the Stage 5.4 one-shot exists for; it fired as designed. The only cost was one RED run before the install. |
+
+**Headline (I-18):** a spec that has never executed against its target is not coverage. The auth-build analog was I-05 (a live-test section authored but not smoke-run before batching); I-18 is the UI/Playwright instance of the same class - *author-and-run-before-counting-it-as-coverage*. This reinforces the existing standing convention rather than adding a new one.
+
+---
+
+## 9. Reference
 
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - The reconciled plan: [AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies)
