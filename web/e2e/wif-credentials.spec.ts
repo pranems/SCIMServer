@@ -3,8 +3,8 @@
  * section on the CredentialsTab (Q6.5).
  *
  * USER PATHS COVERED
- *   /endpoints -> first card -> ?tab=credentials -> the WIF section
- *   renders. Two branches by the endpoint's WifCredentialsEnabled flag:
+ *   /endpoints -> first card -> /endpoints/$id/credentials -> the WIF
+ *   section renders. Two branches by the endpoint's WifCredentialsEnabled flag:
  *     - flag OFF: the disabled banner shows and the inputs are hidden.
  *     - flag ON : the 4 Entra EditableFields + Save + Test Connection +
  *       Copy-as-JSON render; Test Connection produces a per-step result;
@@ -47,8 +47,10 @@ async function openFirstEndpointCredentials(page: Page): Promise<void> {
   await first.click();
   await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
 
-  // Deep-link straight to the credentials tab.
-  await page.goto(`/endpoints/${endpointId}?tab=credentials`);
+  // Deep-link straight to the credentials tab. The EndpointDetailPage uses
+  // PATH-based child routes (`/endpoints/$id/credentials`), not a `?tab=`
+  // search param - matching the proven pattern in endpoint-detail-tabs.spec.ts.
+  await page.goto(`/endpoints/${endpointId}/credentials`);
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 }
 
