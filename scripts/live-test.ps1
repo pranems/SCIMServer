@@ -12055,6 +12055,56 @@ try {
 Write-Host "`n--- 9z-AT10: WI-8 reveal + security settings Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT11: WI-9 credential rotate (lost-secret recovery)
+$script:currentSection = "9z-AT11: WI-9 rotate"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT11: WI-9 credential rotate (lost-secret recovery)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at11Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi9-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at11Id = $at11Ep.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; CredentialSecretVisibility = "always" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    $at11Cred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "wi9-live"
+    } | ConvertTo-Json)
+
+    # T1: rotate mints a NEW secret + a NEW id, preserving the public client_id.
+    $at11Rot = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Cred.id)/rotate" -Method POST -Headers $headers
+    $at11Ok = ($at11Rot.id -ne $at11Cred.id) -and ($at11Rot.rotatedFrom -eq $at11Cred.id) -and `
+        ($null -ne $at11Rot.clientSecret) -and ($at11Rot.clientSecret -ne $at11Cred.clientSecret) -and `
+        ($at11Rot.clientId -eq $at11Cred.clientId)
+    Test-Result -Success $at11Ok -Message "9z-AT11.T1: rotate mints new secret + new id, preserves client_id"
+
+    # T2: rotate never leaks the stored envelope.
+    $at11RotJson = $at11Rot | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($at11RotJson -match '"secretEnvelope"')) -Message "9z-AT11.T2: rotate response never exposes secretEnvelope"
+
+    # T3: the old credential is deactivated and the new one is active.
+    $at11List = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials" -Method GET -Headers $headers
+    $at11Old = $at11List | Where-Object { $_.id -eq $at11Cred.id }
+    $at11New = $at11List | Where-Object { $_.id -eq $at11Rot.id }
+    Test-Result -Success (($at11Old.active -eq $false) -and ($at11New.active -eq $true)) -Message "9z-AT11.T3: old credential deactivated, new one active"
+
+    # T4: the rotated secret is revealable (endpoint retains under always).
+    $at11Reveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/reveal" -Method POST -Headers $headers
+    Test-Result -Success (($at11Reveal.retained -eq $true) -and ($at11Reveal.clientSecret -eq $at11Rot.clientSecret)) -Message "9z-AT11.T4: rotated secret is revealable and matches"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT11: WI-9 rotate section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT11: WI-9 rotate Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

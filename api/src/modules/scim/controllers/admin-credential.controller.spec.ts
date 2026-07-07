@@ -562,4 +562,62 @@ describe('AdminCredentialController', () => {
       expect(payload).not.toHaveProperty('hash');
     });
   });
+
+  describe('rotateCredential (WI-9)', () => {
+    it('mints a new oauth_client secret, preserves the client_id, and deactivates the old', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({
+        ...mockCredential,
+        id: 'old-cred',
+        credentialType: 'oauth_client',
+        metadata: { clientId: 'epc_keep' },
+      });
+      mockCredentialRepo.create.mockResolvedValue({
+        ...mockCredential,
+        id: 'new-cred',
+        credentialType: 'oauth_client',
+        metadata: { clientId: 'epc_keep' },
+      });
+
+      const res = await controller.rotateCredential(mockEndpoint.id, 'old-cred');
+
+      expect(res.id).toBe('new-cred');
+      expect(res.rotatedFrom).toBe('old-cred');
+      expect(res.clientId).toBe('epc_keep');
+      expect(res.clientSecret).toBeDefined();
+      // The new credential keeps the client_id.
+      const createArg = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata?: { clientId?: string } };
+      expect(createArg.metadata?.clientId).toBe('epc_keep');
+      // The old credential is deactivated.
+      expect(mockCredentialRepo.deactivate).toHaveBeenCalledWith('old-cred');
+    });
+
+    it('returns the token field for a bearer credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'old-b', credentialType: 'bearer' });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, id: 'new-b', credentialType: 'bearer' });
+      const res = await controller.rotateCredential(mockEndpoint.id, 'old-b');
+      expect(res.token).toBeDefined();
+      expect(res.clientSecret).toBeUndefined();
+    });
+
+    it('rejects rotating a wif credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'w', credentialType: 'wif', credentialHash: '' });
+      await expect(controller.rotateCredential(mockEndpoint.id, 'w')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws NotFound when the credential does not belong to the endpoint', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, endpointId: 'other-ep' });
+      await expect(controller.rotateCredential(mockEndpoint.id, 'x')).rejects.toThrow(NotFoundException);
+    });
+
+    it('emits a create + a revoke event and never leaks the hash', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'old-e', credentialType: 'oauth_client', metadata: { clientId: 'epc_e' } });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, id: 'new-e', credentialType: 'oauth_client', metadata: { clientId: 'epc_e' } });
+      await controller.rotateCredential(mockEndpoint.id, 'old-e');
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(SCIM_EVENTS.CREDENTIAL_CREATED, expect.objectContaining({ credentialId: 'new-e' }));
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(SCIM_EVENTS.CREDENTIAL_REVOKED, expect.objectContaining({ credentialId: 'old-e' }));
+      for (const [, payload] of mockEventEmitter.emit.mock.calls as [string, Record<string, unknown>][]) {
+        expect(payload).not.toHaveProperty('credentialHash');
+      }
+    });
+  });
 });

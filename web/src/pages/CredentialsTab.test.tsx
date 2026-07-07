@@ -24,6 +24,7 @@ const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockResolveMutate = vi.fn();
 const mockRevealMutate = vi.fn();
+const mockRotateMutate = vi.fn();
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
 
@@ -46,6 +47,10 @@ vi.mock('../api/queries', async () => {
     }),
     useRevealCredential: () => ({
       mutate: mockRevealMutate,
+      isPending: false,
+    }),
+    useRotateCredential: () => ({
+      mutate: mockRotateMutate,
       isPending: false,
     }),
   };
@@ -358,7 +363,35 @@ describe('CredentialsTab', () => {
     expect(screen.queryByTestId('credential-reveal-cred-dead')).not.toBeInTheDocument();
   });
 
-  // ─── Federated Identity (WIF) section (Q6.5) ───────────────────────
+  // ─── WI-9: rotate ──────────────────────────────────────────────────
+
+  it('shows a Rotate button for an active non-wif credential and calls the rotate mutation', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      credentials: [
+        { id: 'cred-rot', credentialType: 'oauth_client', label: 'Rotatable', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    const rotateBtn = screen.getByTestId('credential-rotate-cred-rot');
+    fireEvent.click(rotateBtn);
+    expect(mockRotateMutate).toHaveBeenCalledTimes(1);
+    expect(mockRotateMutate.mock.calls[0][0]).toBe('cred-rot');
+  });
+
+  it('does not show a Rotate button for a wif credential', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        { id: 'cred-wif', credentialType: 'wif', label: 'WIF trust', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('credential-rotate-cred-wif')).not.toBeInTheDocument();
+  });
 
   function wifInput(testId: string): HTMLElement {
     const root = screen.getByTestId(testId);

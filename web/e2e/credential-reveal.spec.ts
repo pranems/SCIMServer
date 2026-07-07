@@ -76,4 +76,17 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
       await expect(revealButtons.first()).toBeEnabled();
     }
   });
+
+  test('a Rotate button accompanies each retained-capable credential', async ({ page }) => {
+    await openFirstEndpointCredentials(page);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible();
+    const rotateButtons = page.locator('[data-testid^="credential-rotate-"]');
+    const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
+    // Reveal + Rotate are shown for the same credentials (both secret-bearing,
+    // active, non-wif), so their counts match.
+    expect(await rotateButtons.count()).toBe(await revealButtons.count());
+    if ((await rotateButtons.count()) > 0) {
+      await expect(rotateButtons.first()).toBeEnabled();
+    }
+  });
 });

@@ -480,6 +480,91 @@ export class AdminCredentialController {
   }
 
   /**
+   * POST /admin/endpoints/:endpointId/credentials/:credentialId/rotate  (WI-9)
+   *
+   * Rotate a `bearer` or `oauth_client` credential: mint a NEW secret (shown
+   * once here, retained encrypted if the effective CredentialSecretVisibility
+   * is `always`), then deactivate the OLD credential. The new credential keeps
+   * the same type + label; an `oauth_client` keeps its public client_id so the
+   * IdP only needs to update the secret. This is the lost-secret recovery path:
+   * when a secret was shown once and forgotten (or the endpoint is `once`), the
+   * operator rotates to obtain a fresh viewable secret without reconfiguring
+   * the client_id. `wif` credentials have no secret and cannot be rotated.
+   */
+  @Post(':endpointId/credentials/:credentialId/rotate')
+  @HttpCode(201)
+  async rotateCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+  ): Promise<Record<string, unknown>> {
+    const endpoint = await this.requireEndpoint(endpointId);
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+
+    const old = await this.credentialRepo.findById(credentialId);
+    if (!old || old.endpointId !== endpointId) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    if (old.credentialType === 'wif') {
+      throw new BadRequestException('A "wif" credential has no secret to rotate.');
+    }
+
+    // Mint a fresh secret + bcrypt hash.
+    const plaintext = crypto.randomBytes(32).toString('base64url');
+    const hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
+    const secretEnvelope = await this.maybeRetainSecret(config, plaintext);
+
+    // oauth_client keeps its public client_id so only the secret changes.
+    const isOauth = old.credentialType === 'oauth_client';
+    const clientId = isOauth && typeof old.metadata?.clientId === 'string' ? old.metadata.clientId : null;
+
+    const created = await this.credentialRepo.create({
+      endpointId,
+      credentialType: old.credentialType,
+      credentialHash: hash,
+      label: old.label ?? null,
+      metadata: clientId ? { clientId } : old.metadata ?? null,
+      secretEnvelope,
+      expiresAt: old.expiresAt,
+    });
+
+    // Deactivate the old credential AFTER the new one is persisted.
+    await this.credentialRepo.deactivate(credentialId);
+
+    this.logger.info(
+      LogCategory.AUTH,
+      `Rotated credential "${credentialId}" -> "${created.id}" for endpoint "${endpointId}" (type "${old.credentialType}")`,
+    );
+    // Emit a create + a revoke so cross-tab consumers refresh both.
+    this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_CREATED, {
+      endpointId,
+      credentialId: created.id,
+      credentialType: created.credentialType,
+      label: created.label ?? undefined,
+    } as ScimCredentialEventPayload);
+    this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, {
+      endpointId,
+      credentialId,
+      credentialType: old.credentialType,
+      label: old.label ?? undefined,
+    } as ScimCredentialEventPayload);
+
+    const secretField = isOauth ? 'clientSecret' : 'token';
+    return {
+      id: created.id,
+      endpointId: created.endpointId,
+      credentialType: created.credentialType,
+      label: created.label,
+      active: created.active,
+      createdAt: created.createdAt,
+      expiresAt: created.expiresAt,
+      rotatedFrom: credentialId,
+      ...(clientId ? { clientId } : {}),
+      // Secret is returned ONLY here, ONCE.
+      [secretField]: plaintext,
+    };
+  }
+
+  /**
    * Create a `wif` credential (A1). The trust config is ALL public values -
    * NO secret material. It rides EndpointCredential.metadata with an empty
    * credentialHash; the response carries no secret/hash/token field.

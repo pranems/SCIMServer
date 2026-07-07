@@ -50,6 +50,8 @@ import {
   useResolveWifDiscovery,
   useRevealCredential,
   type RevealResult,
+  useRotateCredential,
+  type RotateResult,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -620,6 +622,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const createMutation = useCreateCredential(endpointId);
   const deleteMutation = useDeleteCredential(endpointId);
   const revealMutation = useRevealCredential(endpointId);
+  const rotateMutation = useRotateCredential(endpointId);
 
   // Local UI state
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -634,6 +637,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   // WI-8: reveal result (retained secret or a "not retained" reason).
   const [revealResult, setRevealResult] = React.useState<RevealResult | null>(null);
+
+  // WI-9: rotate result (the one-time new secret).
+  const [rotateResult, setRotateResult] = React.useState<RotateResult | null>(null);
 
   const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -806,6 +812,22 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     Reveal
                   </Button>
                 )}
+                {cred.active && cred.credentialType !== 'wif' && (
+                  <Button
+                    appearance="subtle"
+                    onClick={() => {
+                      setRotateResult(null);
+                      rotateMutation.mutate(cred.id, {
+                        onSuccess: (r) => setRotateResult(r),
+                      });
+                    }}
+                    disabled={rotateMutation.isPending}
+                    aria-label={`Rotate secret for ${cred.label ?? cred.id}`}
+                    data-testid={`credential-rotate-${cred.id}`}
+                  >
+                    Rotate
+                  </Button>
+                )}
                 <Button
                   appearance="subtle"
                   icon={<Delete24Regular />}
@@ -936,6 +958,38 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
             {revealResult?.reason ??
               'This secret is not retained. Rotate the credential to obtain a viewable secret.'}
           </Body1>
+        )}
+      </FormDialog>
+
+      {/* WI-9: rotate result dialog (the one-time NEW secret) */}
+      <FormDialog
+        open={Boolean(rotateResult)}
+        onCancel={() => setRotateResult(null)}
+        onSubmit={() => setRotateResult(null)}
+        title="Rotated credential - new secret"
+        submitLabel="Done"
+        cancelLabel="Close"
+        data-testid="credentials-rotate-dialog"
+      >
+        {rotateResult && (
+          <div className={classes.revealBox} data-testid="credentials-rotate-secret">
+            <Body1>
+              A new secret was minted and the old credential was revoked. Copy it now - it is shown
+              once{rotateResult.clientId ? '. The client id is unchanged.' : '.'}
+            </Body1>
+            {rotateResult.clientId && (
+              <CopyableField
+                value={rotateResult.clientId}
+                monospace
+                data-testid="credentials-rotate-clientid"
+              />
+            )}
+            <CopyableField
+              value={rotateResult.clientSecret ?? rotateResult.token ?? ''}
+              monospace
+              data-testid="credentials-rotate-value"
+            />
+          </div>
         )}
       </FormDialog>
     </div>

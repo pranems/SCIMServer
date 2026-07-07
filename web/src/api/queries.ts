@@ -1513,6 +1513,37 @@ export function useRevealCredential(endpointId: string) {
   });
 }
 
+/**
+ * WI-9 - rotate a credential: mint a fresh secret (shown once, retained if the
+ * effective visibility is `always`) and deactivate the old one. For an
+ * oauth_client the public client_id is preserved. Returns the one-time secret.
+ */
+export interface RotateResult {
+  id: string;
+  credentialType: string;
+  label: string | null;
+  clientId?: string;
+  clientSecret?: string;
+  token?: string;
+  rotatedFrom: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export function useRotateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth<RotateResult>(
+        `/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/rotate`,
+        { method: 'POST' },
+      ),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
 /** Revoke (delete) a per-endpoint credential. Optimistic: removes from cached overview. */
 export function useDeleteCredential(endpointId: string) {
   const qc = useQueryClient();
