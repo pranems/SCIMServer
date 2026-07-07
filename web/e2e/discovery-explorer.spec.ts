@@ -36,6 +36,15 @@ async function openDiscovery(page: Page): Promise<boolean> {
     return false;
   }
   await expect(page.getByTestId('discovery-primary-picker')).toBeVisible({ timeout: 30_000 });
+  // The discovery surfaces only render once a PRIMARY endpoint is picked
+  // (otherwise the page shows a "Pick an endpoint to begin" empty state).
+  // The picker does NOT auto-select, so click the first option to make the
+  // ServiceProviderConfig / ResourceTypes / Schemas sections mount.
+  const firstOption = page.locator('[data-testid^="discovery-primary-option-"]').first();
+  if ((await firstOption.count()) === 0) {
+    return false;
+  }
+  await firstOption.click();
   return true;
 }
 

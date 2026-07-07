@@ -213,6 +213,38 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   // endpoint overview is intercepted so two `wif` credentials render without
   // touching the server.
   test('WI-16: multiple wif trusts render a multi-trust header + all rows', async ({ page }) => {
+    // The endpoint-detail layout route loader fetches the endpoint detail
+    // (GET /scim/admin/endpoints/ep-multi) BEFORE the credentials child
+    // renders; EndpointDetailPage shows an error panel (not the tabs) if
+    // that 404s. ep-multi is a synthetic id, so mock the detail too - not
+    // just the overview - or `tab-credentials` never mounts. (Root cause of
+    // the 2026-07-07 dev-deploy Stage 5.3 failure: only overview was mocked.)
+    await page.route('**/scim/admin/endpoints/ep-multi', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      // Guard against accidentally swallowing a suffixed URL (e.g. /stats).
+      if (!route.request().url().endsWith('/ep-multi')) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'ep-multi',
+          name: 'wi16-multi',
+          displayName: 'WI-16 Multi-trust',
+          active: true,
+          scimBasePath: '/scim/v2/endpoints/ep-multi',
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          // Empty profile.resourceTypes -> fail-open -> all tabs render.
+          profile: {
+            schemas: [],
+            resourceTypes: [],
+            serviceProviderConfig: { documentationUri: '', patch: { supported: true } },
+            settings: {},
+          },
+        }),
+      });
+    });
+
     // Intercept the overview BFF response BEFORE navigating, injecting two
     // active wif credentials + the WifCredentialsEnabled flag.
     await page.route('**/scim/admin/endpoints/*/overview', async (route) => {
