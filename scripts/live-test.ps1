@@ -11873,6 +11873,58 @@ try {
 Write-Host "`n--- 9z-AT7: WI-15 JWKS host allowlist Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT8: WI-2 connection-info assembler
+$script:currentSection = "9z-AT8: WI-2 connection-info"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT8: WI-2 connection-info assembler" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at8Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi2-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at8Id = $at8Ep.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: connection-info returns the documented top-level shape.
+    $at8Info = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id/connection-info" -Method GET -Headers $headers
+    $at8HasShape = ($at8Info.endpointId -eq $at8Id) -and ($null -ne $at8Info.urls) -and `
+        ($null -ne $at8Info.enabledMethods) -and ($null -ne $at8Info.disabledMethods)
+    Test-Result -Success $at8HasShape -Message "9z-AT8.T1: connection-info returns endpointId + urls + enabled/disabled methods"
+
+    # T2: the SCIM base URL is the leading /scim/v2/endpoints/{id} form.
+    $at8V2 = ($at8Info.urls.scimBaseUrl -like "*/scim/v2/endpoints/$at8Id")
+    Test-Result -Success $at8V2 -Message "9z-AT8.T2: scimBaseUrl uses the leading /scim/v2/endpoints/{id} form"
+
+    # T3: the token endpoint is the bare /scim/endpoints/{id}/oauth/token form.
+    $at8Tok = ($at8Info.urls.tokenEndpoint -like "*/scim/endpoints/$at8Id/oauth/token")
+    Test-Result -Success $at8Tok -Message "9z-AT8.T3: tokenEndpoint uses the bare /scim/endpoints/{id}/oauth/token form"
+
+    # T4: oauth_client + wif are enabled; the response carries NO secret.
+    $at8EnabledMethods = @($at8Info.enabledMethods | ForEach-Object { $_.method })
+    $at8Json = $at8Info | ConvertTo-Json -Depth 8
+    $at8NoSecret = (-not ($at8Json -match '"clientSecret"\s*:\s*"[^"]')) -and (-not ($at8Json -match '"secretToken"\s*:\s*"[^"]'))
+    Test-Result -Success (($at8EnabledMethods -contains "oauth_client") -and ($at8EnabledMethods -contains "wif") -and $at8NoSecret) -Message "9z-AT8.T4: oauth_client + wif enabled and NO secret value present"
+
+    # T5: an unknown endpoint returns 404.
+    $at8NotFound = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/00000000-0000-0000-0000-000000000000/connection-info" -Method GET -Headers $headers | Out-Null
+    } catch { $at8NotFound = ($_.Exception.Response.StatusCode.value__ -eq 404) }
+    Test-Result -Success $at8NotFound -Message "9z-AT8.T5: connection-info for an unknown endpoint -> 404"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT8: WI-2 connection-info section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT8: WI-2 connection-info Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

@@ -8,6 +8,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { AdminConnectionInfoController } from './controllers/admin-connection-info.controller';
 import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
@@ -31,6 +32,7 @@ import { EndpointScimGroupsService } from './services/endpoint-scim-groups.servi
 import { EndpointScimGenericService } from './services/endpoint-scim-generic.service';
 import { BulkProcessorService } from './services/bulk-processor.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
+import { ConnectionInfoService } from './services/connection-info.service';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
@@ -46,6 +48,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     SchemasController,
     AdminController,
     AdminCredentialController,
+    AdminConnectionInfoController,
     AdminAuthenticationMethodController,
     AdminJwksHostController,
     EndpointOAuthController,
@@ -72,6 +75,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimGenericService,
     BulkProcessorService,
     EndpointContextStorage,
+    ConnectionInfoService,
     // Q6 - bind the A3 assertion-provider seam to the WIF validate+issue pipeline.
     WifAssertionTokenProvider,
     {

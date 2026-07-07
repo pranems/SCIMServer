@@ -4,7 +4,7 @@
 >
 > **Why it exists.** Today the properties are scattered: the SCIM base path is relative, the per-endpoint token URL is only assembled inside the WIF UI, the OAuth client secret is shown once as a bare token with no surrounding context, and the same SCIM URL is spelled three different ways across the codebase. This doc is the blueprint for collapsing that into one copy-ready "here is exactly what to paste into Entra, for your auth method" experience.
 >
-> **Status.** Analysis + design. The `connection-info` API and `ConnectionPanel` UI described in [Part 6](#6-proposed-connection-info-api-single-source-of-truth) and [Part 8](#8-ui-mockups) are PROPOSED, not yet implemented. The auth flows, routes, models, and URL behavior in [Part 2](#2-scimservers-actual-url-shapes-authoritative) through [Part 5](#5-the-authentication-combination-matrix) are CURRENT and verified against the sources cited inline.
+> **Status.** Analysis + design. The `connection-info` API described in [Part 6](#6-proposed-connection-info-api-single-source-of-truth) is IMPLEMENTED (WI-2, shipped 0.54.0-alpha.21: [connection-info.service.ts](../../api/src/modules/scim/services/connection-info.service.ts) + [admin-connection-info.controller.ts](../../api/src/modules/scim/controllers/admin-connection-info.controller.ts)); the `ConnectionPanel` UI described in [Part 8](#8-ui-mockups) is in progress (WI-3/WI-4/WI-5). The auth flows, routes, models, and URL behavior in [Part 2](#2-scimservers-actual-url-shapes-authoritative) through [Part 5](#5-the-authentication-combination-matrix) are CURRENT and verified against the sources cited inline.
 >
 > **Provenance.** RFC and industry-norm facts in [Part 1](#1-how-auth-token-endpoint-urls-work-in-rfcs--industry) are cited to [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749), and the [Microsoft Entra SCIM tutorial](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups). SCIMServer behavior is cited to the actual sources ([api/src/main.ts](../../api/src/main.ts), [endpoint-oauth.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts), [admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts), [authentication-schemes.ts](../../api/src/modules/scim/discovery/authentication-schemes.ts), [wif-assertion-validator.service.ts](../../api/src/oauth/wif-assertion-validator.service.ts)).
 
@@ -1115,6 +1115,8 @@ Grounding the decision against how the industry handles the same problem:
 
 ## 6. Proposed connection-info API (single source of truth)
 
+> **Status.** IMPLEMENTED as WI-2 (0.54.0-alpha.21). Served by [admin-connection-info.controller.ts](../../api/src/modules/scim/controllers/admin-connection-info.controller.ts) via the pure [connection-info.service.ts](../../api/src/modules/scim/services/connection-info.service.ts) assembler. One deviation from the pre-WI-12 example below: `urls.oauthMetadata` points at the PER-ENDPOINT RFC 8414 append form (`.../scim/endpoints/{id}/.well-known/oauth-authorization-server`, WI-12) rather than the global document, since it is the single source of truth for THIS endpoint.
+
 A new admin endpoint assembles every absolute URL and the per-method property set once, server-side, reusing the host logic already in [oauth-metadata.controller.ts](../../api/src/oauth/oauth-metadata.controller.ts). No UI hand-builds URLs after this lands. No secrets are returned (secrets remain one-time on credential create).
 
 **Request:**
@@ -1577,7 +1579,7 @@ One epic, sequenced into independently-shippable items. Sizes are relative (S/M/
 | WI | Title | Size | Depends on | Summary |
 |---|---|---|---|---|
 | WI-1 | Fix the WIF SCIM URL (`/endpoints/{id}/v2` bug) | S | none | **DONE (2026-07-06).** Corrected [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) `scimUrl` to `/scim/v2/endpoints/{id}`; vitest regression + Playwright regression added. |
-| WI-2 | `ConnectionInfoService` + `GET /admin/endpoints/{id}/connection-info` | M | none | Server-side URL + per-method assembler (Part 6 shape); no secrets; key-allowlist contract. |
+| WI-2 | `ConnectionInfoService` + `GET /admin/endpoints/{id}/connection-info` | M | none | **DONE (2026-07-07).** Pure server-side URL + per-method assembler ([connection-info.service.ts](../../api/src/modules/scim/services/connection-info.service.ts)) + [admin-connection-info.controller.ts](../../api/src/modules/scim/controllers/admin-connection-info.controller.ts) returning the Part 6 shape; no secrets; key-allowlist contract. UI consumer is WI-3/4/5. See [6](#6-proposed-connection-info-api-single-source-of-truth). |
 | WI-3 | Surface connection info on the BFF overview | S | WI-2 | Assembled absolute URLs into `useEndpointOverview`; UI stops hand-building URLs. |
 | WI-4 | `<ConnectionPanel>` primitive + Entra-field mapping table | M | WI-2, WI-3 | One reusable component; method selector; copy/CopyJson/.env/Download; R9 testids. |
 | WI-5 | Connect surface + Overview card + wiring | M | WI-4 | Connect tab + card; wire into the 8 surfaces; new lazy route gets a size-limit budget. |
