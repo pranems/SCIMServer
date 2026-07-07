@@ -22,10 +22,13 @@ vi.mock('../api/queries', async () => {
     useJwksHostAllowlist: vi.fn(() => ({ data: undefined, isLoading: false })),
     useAddJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
     useRemoveJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    // WI-8 - server security settings hooks.
+    useSecuritySettings: vi.fn(() => ({ data: undefined, isLoading: false })),
+    useUpdateSecuritySettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   };
 });
 
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -238,5 +241,50 @@ describe('SettingsPage JWKS host allowlist (WI-15)', () => {
     wrap(<SettingsPage />);
     screen.getByTestId('jwks-host-remove-sts.contoso.example.com').click();
     expect(mutate).toHaveBeenCalledWith('sts.contoso.example.com');
+  });
+});
+
+// ─── WI-8: SecuritySettingsSection ───────────────────────────────────
+
+describe('SettingsPage security settings (WI-8)', () => {
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.54.0', runtime: { node: 'v24', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    (useSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { credentialSecretVisibility: 'always', kek: { configured: true, isDefault: true } },
+      isLoading: false,
+    });
+    (useUpdateSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+  });
+
+  it('renders the security settings card with the visibility group + KEK status', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('security-settings-card')).toBeInTheDocument();
+    expect(screen.getByTestId('security-visibility-group')).toBeInTheDocument();
+    const always = screen.getByTestId('security-visibility-always') as HTMLInputElement;
+    expect(always.checked).toBe(true);
+    expect(screen.getByTestId('security-kek-status').textContent).toContain('default');
+  });
+
+  it('reflects a server value of once', () => {
+    (useSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { credentialSecretVisibility: 'once', kek: { configured: true, isDefault: false } },
+      isLoading: false,
+    });
+    wrap(<SettingsPage />);
+    const once = screen.getByTestId('security-visibility-once') as HTMLInputElement;
+    expect(once.checked).toBe(true);
+    expect(screen.getByTestId('security-kek-status').textContent).toContain('configured');
+  });
+
+  it('selecting once fires the update mutation with the enum value', () => {
+    const mutate = vi.fn();
+    (useUpdateSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    screen.getByTestId('security-visibility-once').click();
+    expect(mutate).toHaveBeenCalledWith({ credentialSecretVisibility: 'once' });
   });
 });

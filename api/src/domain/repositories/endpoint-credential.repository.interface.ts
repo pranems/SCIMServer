@@ -29,6 +29,13 @@ export interface IEndpointCredentialRepository {
    */
   clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number>;
 
+  /**
+   * WI-8: purge the retained secret envelope for EVERY credential (used when
+   * the server-scope CredentialSecretVisibility flips to `once`, the global
+   * ceiling). Returns the number of rows cleared.
+   */
+  clearAllSecretEnvelopes(): Promise<number>;
+
   /** Hard delete a credential. */
   delete(id: string): Promise<void>;
 }

@@ -95,6 +95,14 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     return result.count;
   }
 
+  async clearAllSecretEnvelopes(): Promise<number> {
+    const result = await this.prisma.endpointCredential.updateMany({
+      where: { secretEnvelope: { not: null } },
+      data: { secretEnvelope: null },
+    });
+    return result.count;
+  }
+
   private toModel(row: any): EndpointCredentialModel {
     return {
       id: row.id,

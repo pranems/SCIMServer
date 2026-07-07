@@ -404,6 +404,82 @@ export class AdminCredentialController {
   }
 
   /**
+   * POST /admin/endpoints/:endpointId/credentials/:credentialId/reveal  (WI-8)
+   *
+   * Reveal a RETAINED credential secret. Admin-only + audit-logged. Gated by
+   * the effective CredentialSecretVisibility (must be `always`) AND the
+   * presence of a stored envelope. When the effective setting is `once`, the
+   * credential predates the feature, or no envelope was retained, this returns
+   * a non-error `{retained:false, reason}` shape (never an error) so the UI can
+   * explain "rotate to get a viewable secret". Every reveal attempt writes a
+   * LogCategory.AUTH audit entry.
+   */
+  @Post(':endpointId/credentials/:credentialId/reveal')
+  @HttpCode(200)
+  async revealCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+  ): Promise<Record<string, unknown>> {
+    const endpoint = await this.requireEndpoint(endpointId);
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+
+    const credential = await this.credentialRepo.findById(credentialId);
+    if (!credential || credential.endpointId !== endpointId) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+
+    const clientId =
+      credential.credentialType === 'oauth_client' && typeof credential.metadata?.clientId === 'string'
+        ? { clientId: credential.metadata.clientId }
+        : {};
+
+    const effective = await this.credentialSecurity.getEffectiveVisibility(config);
+    const base = {
+      id: credential.id,
+      credentialType: credential.credentialType,
+      ...clientId,
+    };
+
+    // Not retained: setting is once, pre-feature (no envelope), or encryption is down.
+    if (effective !== 'always' || !credential.secretEnvelope) {
+      this.logger.info(
+        LogCategory.AUTH,
+        `Reveal DENIED for credential "${credentialId}" (endpoint "${endpointId}"): not retained ` +
+          `(effective=${effective}, hasEnvelope=${credential.secretEnvelope ? 'yes' : 'no'})`,
+      );
+      const reason =
+        effective !== 'always'
+          ? `CredentialSecretVisibility is "${effective}" for this endpoint - rotate the credential to obtain a viewable secret.`
+          : 'This credential predates secret retention (no encrypted copy was kept) - rotate the credential to obtain a viewable secret.';
+      return { ...base, retained: false, reason };
+    }
+
+    try {
+      const secret = this.credentialEncryption.decrypt(credential.secretEnvelope);
+      // Audit every successful reveal (no secret in the log line).
+      this.logger.warn(
+        LogCategory.AUTH,
+        `Reveal GRANTED for credential "${credentialId}" (endpoint "${endpointId}", type "${credential.credentialType}")`,
+      );
+      const secretField =
+        credential.credentialType === 'oauth_client' ? 'clientSecret' : 'token';
+      return { ...base, [secretField]: secret, retained: true };
+    } catch (err) {
+      // Envelope present but undecryptable (KEK changed / DEK unavailable).
+      this.logger.error(
+        LogCategory.AUTH,
+        `Reveal FAILED for credential "${credentialId}" (endpoint "${endpointId}"): ${(err as Error).message}`,
+      );
+      return {
+        ...base,
+        retained: false,
+        reason:
+          'The retained secret could not be decrypted (the credential KEK may have changed) - rotate the credential to obtain a viewable secret.',
+      };
+    }
+  }
+
+  /**
    * Create a `wif` credential (A1). The trust config is ALL public values -
    * NO secret material. It rides EndpointCredential.metadata with an empty
    * credentialHash; the response carries no secret/hash/token field.

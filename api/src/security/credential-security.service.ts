@@ -65,4 +65,12 @@ export class CredentialSecurityService {
   async purgeRetainedSecrets(endpointId: string): Promise<number> {
     return this.credentialRepo.clearSecretEnvelopesForEndpoint(endpointId);
   }
+
+  /**
+   * Purge EVERY retained secret envelope (used when the server-scope visibility
+   * flips to `once`, the global ceiling). Returns the number of rows cleared.
+   */
+  async purgeAllRetainedSecrets(): Promise<number> {
+    return this.credentialRepo.clearAllSecretEnvelopes();
+  }
 }

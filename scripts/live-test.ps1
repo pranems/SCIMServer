@@ -11983,6 +11983,78 @@ try {
 Write-Host "`n--- 9z-AT9: WI-7 secret visibility Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT10: WI-8 secret reveal + server security settings
+$script:currentSection = "9z-AT10: WI-8 reveal + security settings"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT10: WI-8 secret reveal + server security settings" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # T1: GET /admin/settings/security returns the server visibility + KEK status (no KEK value).
+    $at10Sec = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/security" -Method GET -Headers $headers
+    $at10SecJson = $at10Sec | ConvertTo-Json -Depth 6
+    $at10SecOk = ($at10Sec.credentialSecretVisibility -in @("always", "once")) -and `
+        ($null -ne $at10Sec.kek) -and ($at10Sec.kek.configured -eq $true) -and `
+        (-not ($at10SecJson -match "changeme-credential-kek"))
+    Test-Result -Success $at10SecOk -Message "9z-AT10.T1: GET security settings returns visibility + KEK status (no KEK value leaked)"
+
+    # Ensure the server ceiling is always for the reveal test.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/security" -Method PUT -Headers $headers -Body (@{
+        credentialSecretVisibility = "always"
+    } | ConvertTo-Json) | Out-Null
+
+    # T2: an invalid server visibility value is rejected -> 400.
+    $at10BadPut = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/security" -Method PUT -Headers $headers -Body (@{
+            credentialSecretVisibility = "bogus"
+        } | ConvertTo-Json) | Out-Null
+    } catch { $at10BadPut = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at10BadPut -Message "9z-AT10.T2: PUT security settings rejects an invalid enum -> 400"
+
+    # T3: reveal a retained oauth_client secret under always -> matches the one-time create secret.
+    $at10Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi8-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at10Id = $at10Ep.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; CredentialSecretVisibility = "always" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $at10Cred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "wi8-live"
+    } | ConvertTo-Json)
+    $at10Reveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id/credentials/$($at10Cred.id)/reveal" -Method POST -Headers $headers
+    Test-Result -Success (($at10Reveal.retained -eq $true) -and ($at10Reveal.clientSecret -eq $at10Cred.clientSecret)) -Message "9z-AT10.T3: reveal under always returns the retained secret matching create"
+
+    # T4: reveal never leaks the stored envelope.
+    $at10RevealJson = $at10Reveal | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($at10RevealJson -match '"secretEnvelope"')) -Message "9z-AT10.T4: reveal response never exposes secretEnvelope"
+
+    # T5: an endpoint set to once returns retained:false (rotate to view).
+    $at10Ep2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi8b-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at10Id2 = $at10Ep2.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; CredentialSecretVisibility = "once" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $at10Cred2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "wi8-once-live"
+    } | ConvertTo-Json)
+    $at10Reveal2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2/credentials/$($at10Cred2.id)/reveal" -Method POST -Headers $headers
+    Test-Result -Success (($at10Reveal2.retained -eq $false) -and ($null -eq $at10Reveal2.clientSecret)) -Message "9z-AT10.T5: reveal under once returns retained:false with no secret"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT10: WI-8 reveal + security settings section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT10: WI-8 reveal + security settings Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

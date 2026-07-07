@@ -70,6 +70,17 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     return cleared;
   }
 
+  async clearAllSecretEnvelopes(): Promise<number> {
+    let cleared = 0;
+    for (const cred of this.store.values()) {
+      if (cred.secretEnvelope !== null) {
+        cred.secretEnvelope = null;
+        cleared += 1;
+      }
+    }
+    return cleared;
+  }
+
   async delete(id: string): Promise<void> {
     this.store.delete(id);
   }

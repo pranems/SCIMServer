@@ -23,6 +23,7 @@ const mockUseEndpointOverview = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockResolveMutate = vi.fn();
+const mockRevealMutate = vi.fn();
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
 
@@ -41,6 +42,10 @@ vi.mock('../api/queries', async () => {
     }),
     useResolveWifDiscovery: () => ({
       mutate: mockResolveMutate,
+      isPending: false,
+    }),
+    useRevealCredential: () => ({
+      mutate: mockRevealMutate,
       isPending: false,
     }),
   };
@@ -66,6 +71,19 @@ const baseOverview: EndpointOverviewResponse = {
   credentials: [],
   recentActivity: [],
   configFlags: { PerEndpointCredentialsEnabled: true },
+  connectionInfo: {
+    endpointId: 'ep-1',
+    displayName: 'Production',
+    urls: {
+      scimBaseUrl: 'https://x/scim/v2/endpoints/ep-1',
+      scimBaseUrlBare: 'https://x/scim/endpoints/ep-1',
+      tokenEndpoint: 'https://x/scim/endpoints/ep-1/oauth/token',
+      serviceProviderConfig: 'https://x/scim/v2/endpoints/ep-1/ServiceProviderConfig',
+      oauthMetadata: 'https://x/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+    },
+    enabledMethods: [],
+    disabledMethods: [],
+  },
 };
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -309,6 +327,35 @@ describe('CredentialsTab', () => {
 
     expect(mockDeleteMutate).toHaveBeenCalledTimes(1);
     expect(mockDeleteMutate.mock.calls[0][0]).toBe('cred-x');
+  });
+
+  // ─── WI-8: reveal ──────────────────────────────────────────────────
+
+  it('shows a Reveal button for an active non-wif credential and calls the reveal mutation', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      credentials: [
+        { id: 'cred-r', credentialType: 'oauth_client', label: 'Revealable', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    const revealBtn = screen.getByTestId('credential-reveal-cred-r');
+    fireEvent.click(revealBtn);
+    expect(mockRevealMutate).toHaveBeenCalledTimes(1);
+    expect(mockRevealMutate.mock.calls[0][0]).toBe('cred-r');
+  });
+
+  it('does not show a Reveal button for a revoked credential', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      credentials: [
+        { id: 'cred-dead', credentialType: 'oauth_client', label: 'Gone', active: false, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('credential-reveal-cred-dead')).not.toBeInTheDocument();
   });
 
   // ─── Federated Identity (WIF) section (Q6.5) ───────────────────────

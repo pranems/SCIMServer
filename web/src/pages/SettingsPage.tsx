@@ -18,12 +18,14 @@ import {
   Dropdown,
   Option,
   Switch,
+  Radio,
+  RadioGroup,
   Input,
   Field,
   Divider,
   Button,
 } from '@fluentui/react-components';
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -171,6 +173,9 @@ export const SettingsPage: React.FC = () => {
       {/* WI-15 - JWKS host allowlist admin */}
       <JwksHostAllowlistSection />
 
+      {/* WI-8 - server-scope credential security settings */}
+      <SecuritySettingsSection />
+
       {/* Phase N2 - re-open onboarding wizard */}
       <OnboardingResetCard />
     </div>
@@ -258,6 +263,70 @@ const JwksHostAllowlistSection: React.FC = () => {
           </Caption1>
         </div>
       )}
+    </Card>
+  );
+};
+
+// ─── WI-8: SecuritySettingsSection ───────────────────────────────
+//
+// Server-scope credential security: the CredentialSecretVisibility ceiling
+// (always | once) and the read-only KEK status. Setting the server value to
+// `once` forces `once` on every endpoint (most-restrictive-wins) and purges
+// any retained secret ciphertext.
+
+const SecuritySettingsSection: React.FC = () => {
+  const classes = useStyles();
+  const { data, isLoading } = useSecuritySettings();
+  const update = useUpdateSecuritySettings();
+
+  const visibility = data?.credentialSecretVisibility ?? 'always';
+
+  const onChange = (next: 'always' | 'once'): void => {
+    if (next === visibility) return;
+    update.mutate({ credentialSecretVisibility: next });
+  };
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="security-settings-card">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>Credential secret security (server)</Subtitle1>
+        {data && <CopyJsonButton value={data} data-testid="security-settings-copy-json" />}
+      </div>
+      <Caption1>
+        Server-scope ceiling for whether per-endpoint credential secrets are retained
+        (encrypted at rest) and re-viewable by an admin. Setting this to &quot;once&quot; forces
+        every endpoint to &quot;once&quot; and purges any retained secret copies, regardless of the
+        per-endpoint setting.
+      </Caption1>
+
+      {isLoading && <Caption1>Loading...</Caption1>}
+      {data && (
+        <>
+          <Field label="CredentialSecretVisibility (server ceiling)">
+            <RadioGroup
+              layout="horizontal"
+              value={visibility}
+              disabled={update.isPending}
+              onChange={(_e, d) => onChange(d.value as 'always' | 'once')}
+              data-testid="security-visibility-group"
+            >
+              <Radio value="always" label="always (retain + reveal)" data-testid="security-visibility-always" />
+              <Radio value="once" label="once (show at create only)" data-testid="security-visibility-once" />
+            </RadioGroup>
+          </Field>
+
+          <div className={classes.row}>
+            <Text>Credential KEK</Text>
+            <Text data-testid="security-kek-status">
+              {data.kek.isDefault
+                ? 'default (cosmetic - set a private CREDENTIAL_KEK in prod)'
+                : 'configured (private)'}
+            </Text>
+          </div>
+        </>
+      )}
+
+      <ScimErrorMessage error={update.error} />
     </Card>
   );
 };

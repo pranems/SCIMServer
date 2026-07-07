@@ -1456,6 +1456,63 @@ export function useConnectionInfo(endpointId: string) {
   });
 }
 
+/** WI-8 - the server-scope security settings (visibility + KEK status). */
+export interface SecuritySettings {
+  credentialSecretVisibility: 'always' | 'once';
+  kek: { configured: boolean; isDefault: boolean };
+}
+
+const SECURITY_SETTINGS_KEY = ['admin', 'settings', 'security'] as const;
+
+/** WI-8 - read the server security settings. */
+export function useSecuritySettings() {
+  return useQuery<SecuritySettings>({
+    queryKey: SECURITY_SETTINGS_KEY,
+    queryFn: () => fetchWithAuth<SecuritySettings>('/scim/admin/settings/security'),
+  });
+}
+
+/** WI-8 - set the server-scope CredentialSecretVisibility. */
+export function useUpdateSecuritySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { credentialSecretVisibility: 'always' | 'once' }) =>
+      fetchWithAuth<SecuritySettings>('/scim/admin/settings/security', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: SECURITY_SETTINGS_KEY });
+    },
+  });
+}
+
+/**
+ * WI-8 - reveal a retained credential secret (admin-only, audit-logged). Returns
+ * `{retained:true, clientSecret|token}` when the secret was kept, or
+ * `{retained:false, reason}` when the effective visibility is `once`, the
+ * credential predates retention, or the envelope cannot be decrypted.
+ */
+export interface RevealResult {
+  id: string;
+  credentialType: string;
+  clientId?: string;
+  clientSecret?: string;
+  token?: string;
+  retained: boolean;
+  reason?: string;
+}
+
+export function useRevealCredential(endpointId: string) {
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth<RevealResult>(
+        `/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/reveal`,
+        { method: 'POST' },
+      ),
+  });
+}
+
 /** Revoke (delete) a per-endpoint credential. Optimistic: removes from cached overview. */
 export function useDeleteCredential(endpointId: string) {
   const qc = useQueryClient();

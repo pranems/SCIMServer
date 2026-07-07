@@ -48,6 +48,8 @@ import {
   useCreateCredential,
   useDeleteCredential,
   useResolveWifDiscovery,
+  useRevealCredential,
+  type RevealResult,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -108,6 +110,11 @@ const useStyles = makeStyles({
   tokenRow: {
     display: 'flex',
     alignItems: 'center',
+    gap: '8px',
+  },
+  revealBox: {
+    display: 'flex',
+    flexDirection: 'column',
     gap: '8px',
   },
   forbiddenBlock: {
@@ -612,6 +619,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const { data, isLoading, error } = useEndpointOverview(endpointId);
   const createMutation = useCreateCredential(endpointId);
   const deleteMutation = useDeleteCredential(endpointId);
+  const revealMutation = useRevealCredential(endpointId);
 
   // Local UI state
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -623,6 +631,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   const [deleteTarget, setDeleteTarget] = React.useState<EndpointOverviewCredential | null>(null);
   const [deleteError, setDeleteError] = React.useState<unknown>(null);
+
+  // WI-8: reveal result (retained secret or a "not retained" reason).
+  const [revealResult, setRevealResult] = React.useState<RevealResult | null>(null);
 
   const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -779,6 +790,22 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                   {cred.active ? 'Active' : 'Revoked'}
                 </Badge>
+                {cred.active && cred.credentialType !== 'wif' && (
+                  <Button
+                    appearance="subtle"
+                    onClick={() => {
+                      setRevealResult(null);
+                      revealMutation.mutate(cred.id, {
+                        onSuccess: (r) => setRevealResult(r),
+                      });
+                    }}
+                    disabled={revealMutation.isPending}
+                    aria-label={`Reveal secret for ${cred.label ?? cred.id}`}
+                    data-testid={`credential-reveal-${cred.id}`}
+                  >
+                    Reveal
+                  </Button>
+                )}
                 <Button
                   appearance="subtle"
                   icon={<Delete24Regular />}
@@ -881,6 +908,35 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           Once revoked, any SCIM client using this token will start receiving
           401 Unauthorized. This cannot be undone.
         </Body1>
+      </FormDialog>
+
+      {/* WI-8: reveal result dialog (retained secret or "not retained" reason) */}
+      <FormDialog
+        open={Boolean(revealResult)}
+        onCancel={() => setRevealResult(null)}
+        onSubmit={() => setRevealResult(null)}
+        title="Revealed credential secret"
+        submitLabel="Done"
+        cancelLabel="Close"
+        data-testid="credentials-reveal-dialog"
+      >
+        {revealResult?.retained ? (
+          <div className={classes.revealBox} data-testid="credentials-reveal-secret">
+            <Body1>
+              This is the retained secret for this credential. Handle it like any secret.
+            </Body1>
+            <CopyableField
+              value={revealResult.clientSecret ?? revealResult.token ?? ''}
+              monospace
+              data-testid="credentials-reveal-value"
+            />
+          </div>
+        ) : (
+          <Body1 data-testid="credentials-reveal-not-retained">
+            {revealResult?.reason ??
+              'This secret is not retained. Rotate the credential to obtain a viewable secret.'}
+          </Body1>
+        )}
       </FormDialog>
     </div>
   );
