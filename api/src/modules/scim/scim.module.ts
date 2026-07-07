@@ -8,6 +8,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
 import { EndpointOAuthMetadataController } from './controllers/endpoint-oauth-metadata.controller';
@@ -46,6 +47,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     AdminController,
     AdminCredentialController,
     AdminAuthenticationMethodController,
+    AdminJwksHostController,
     EndpointOAuthController,
     EndpointScimUsersController,
     EndpointScimGroupsController,

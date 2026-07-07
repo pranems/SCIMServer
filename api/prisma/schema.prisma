@@ -143,3 +143,22 @@ model EndpointCredential {
 
   @@index([endpointId, active])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WI-15 — JWKS host allowlist (persisted, admin-editable-at-runtime layer)
+//
+// The effective JWKS host allowlist is the UNION of three layers: a compiled
+// well-known IdP seed + the JWKS_HOST_ALLOWLIST env var + these admin-added
+// rows. This is the persisted layer - hosts an admin adds at runtime (via the
+// admin API) so onboarding a new customer IdP host never needs a redeploy. It
+// is a convenience/runtime-flexibility choice: server-global, no deny-list, no
+// lock flag. The existing https + exact-host-match SSRF validation is retained.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model JwksHostAllowlistEntry {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  host      String   @unique @db.VarChar(255)  // lowercased hostname, exact match
+  label     String?  @db.VarChar(255)          // optional human note
+  createdAt DateTime @default(now()) @db.Timestamptz
+}
+

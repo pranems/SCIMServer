@@ -2,7 +2,7 @@
  * SettingsPage tests.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { SettingsPage } from './SettingsPage';
@@ -17,10 +17,15 @@ vi.mock('../api/queries', async () => {
     // tests don't have to mock them.
     useLogConfig: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
     useUpdateLogConfig: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
+    // WI-15 - JWKS host allowlist hooks. Benign defaults so pre-existing
+    // tests need not mock them.
+    useJwksHostAllowlist: vi.fn(() => ({ data: undefined, isLoading: false })),
+    useAddJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    useRemoveJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   };
 });
 
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -152,5 +157,86 @@ describe('SettingsPage onboarding reset (Phase N2)', () => {
     btn.click();
     expect(localStorage.getItem('scimserver.onboarding.completedAt')).toBeNull();
     expect(localStorage.getItem('scimserver.onboarding.forceOpen')).toBe('1');
+  });
+});
+
+// ─── WI-15: JwksHostAllowlistSection ─────────────────────────────────
+
+describe('SettingsPage JWKS host allowlist (WI-15)', () => {
+  const view = {
+    seed: ['login.microsoftonline.com', 'accounts.google.com'],
+    env: ['idp.env.example.com'],
+    persisted: ['login.acme.example.com', 'sts.contoso.example.com'],
+    effective: [
+      'login.microsoftonline.com',
+      'accounts.google.com',
+      'idp.env.example.com',
+      'login.acme.example.com',
+      'sts.contoso.example.com',
+    ],
+  };
+
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.54.0', runtime: { node: 'v24', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    (useJwksHostAllowlist as ReturnType<typeof vi.fn>).mockReturnValue({ data: view, isLoading: false });
+    (useAddJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    (useRemoveJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+  });
+
+  it('renders the JWKS host card', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('jwks-hosts-card')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-hosts-input')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-hosts-add-button')).toBeInTheDocument();
+  });
+
+  it('lists each persisted host with a remove button', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('jwks-host-row-login.acme.example.com')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-host-remove-login.acme.example.com')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-host-row-sts.contoso.example.com')).toBeInTheDocument();
+  });
+
+  it('shows the seed + env hosts as built-in / always-allowed', () => {
+    wrap(<SettingsPage />);
+    const builtin = screen.getByTestId('jwks-hosts-builtin');
+    expect(builtin.textContent).toContain('login.microsoftonline.com');
+    expect(builtin.textContent).toContain('idp.env.example.com');
+  });
+
+  it('shows the empty state when there are no persisted hosts', () => {
+    (useJwksHostAllowlist as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...view, persisted: [] },
+      isLoading: false,
+    });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('jwks-hosts-empty')).toBeInTheDocument();
+  });
+
+  it('disables the Add button until a host is typed, then calls the add mutation lowercased', () => {
+    const mutate = vi.fn();
+    (useAddJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    const addBtn = screen.getByTestId('jwks-hosts-add-button');
+    expect(addBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId('jwks-hosts-input'), { target: { value: 'NEW.Idp.Example.COM' } });
+    expect(addBtn).not.toBeDisabled();
+    addBtn.click();
+    expect(mutate).toHaveBeenCalledWith(
+      { host: 'new.idp.example.com' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('clicking Remove calls the remove mutation with the host', () => {
+    const mutate = vi.fn();
+    (useRemoveJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    screen.getByTestId('jwks-host-remove-sts.contoso.example.com').click();
+    expect(mutate).toHaveBeenCalledWith('sts.contoso.example.com');
   });
 });

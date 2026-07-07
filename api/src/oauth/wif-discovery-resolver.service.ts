@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 import { JWKS_FETCH } from './external-jwks-validator.service';
+import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
 
 /**
  * WifDiscoveryResolverService (WI-14) - config-time resolver that turns one or
@@ -55,6 +56,7 @@ export class WifDiscoveryResolverService {
     private readonly config: ConfigService,
     private readonly logger: ScimLogger,
     @Optional() @Inject(JWKS_FETCH) private readonly fetchFn?: typeof fetch,
+    @Optional() private readonly allowlistService?: JwksHostAllowlistService,
   ) {
     const raw = this.config.get<string>('JWKS_HOST_ALLOWLIST') ?? '';
     this.hostAllowlist = new Set(
@@ -128,10 +130,14 @@ export class WifDiscoveryResolverService {
       throw new BadRequestException(`URL must use https (got "${url.protocol}").`);
     }
     const host = url.hostname.toLowerCase();
-    if (!this.hostAllowlist.has(host)) {
+    // WI-15: consult the shared effective allowlist (seed + env + persisted)
+    // when wired; otherwise fall back to the env-only Set (unit-test standalone).
+    const allowed = this.allowlistService
+      ? this.allowlistService.isAllowed(host)
+      : this.hostAllowlist.has(host);
+    if (!allowed) {
       this.logger.warn(LogCategory.AUTH, 'WIF discovery host not permitted by allowlist (SSRF guard)', {
         host,
-        allowlist: Array.from(this.hostAllowlist),
       });
       throw new BadRequestException(
         `Discovery host "${host}" is not permitted by the JWKS_HOST_ALLOWLIST.`,

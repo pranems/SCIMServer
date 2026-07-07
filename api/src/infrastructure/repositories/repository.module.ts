@@ -15,15 +15,18 @@ import {
   GROUP_REPOSITORY,
   GENERIC_RESOURCE_REPOSITORY,
   ENDPOINT_CREDENTIAL_REPOSITORY,
+  JWKS_HOST_ALLOWLIST_REPOSITORY,
 } from '../../domain/repositories/repository.tokens';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
 import { PrismaGroupRepository } from './prisma/prisma-group.repository';
 import { PrismaGenericResourceRepository } from './prisma/prisma-generic-resource.repository';
 import { PrismaEndpointCredentialRepository } from './prisma/prisma-endpoint-credential.repository';
+import { PrismaJwksHostAllowlistRepository } from './prisma/prisma-jwks-host-allowlist.repository';
 import { InMemoryUserRepository } from './inmemory/inmemory-user.repository';
 import { InMemoryGroupRepository } from './inmemory/inmemory-group.repository';
 import { InMemoryGenericResourceRepository } from './inmemory/inmemory-generic-resource.repository';
 import { InMemoryEndpointCredentialRepository } from './inmemory/inmemory-endpoint-credential.repository';
+import { InMemoryJwksHostAllowlistRepository } from './inmemory/inmemory-jwks-host-allowlist.repository';
 import { PrismaModule } from '../../modules/prisma/prisma.module';
 
 @Module({})
@@ -56,8 +59,9 @@ export class RepositoryModule {
           { provide: GROUP_REPOSITORY, useClass: InMemoryGroupRepository },
           { provide: GENERIC_RESOURCE_REPOSITORY, useClass: InMemoryGenericResourceRepository },
           { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useClass: InMemoryEndpointCredentialRepository },
+          { provide: JWKS_HOST_ALLOWLIST_REPOSITORY, useClass: InMemoryJwksHostAllowlistRepository },
         ],
-        exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY],
+        exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY],
       };
       return this.cachedModule;
     }
@@ -72,8 +76,9 @@ export class RepositoryModule {
         { provide: GROUP_REPOSITORY, useClass: PrismaGroupRepository },
         { provide: GENERIC_RESOURCE_REPOSITORY, useClass: PrismaGenericResourceRepository },
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useClass: PrismaEndpointCredentialRepository },
+        { provide: JWKS_HOST_ALLOWLIST_REPOSITORY, useClass: PrismaJwksHostAllowlistRepository },
       ],
-      exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY],
+      exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY],
     };
     return this.cachedModule;
   }

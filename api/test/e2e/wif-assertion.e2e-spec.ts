@@ -431,4 +431,63 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     expect(res.body.clientId).toBe(ocEndpoint);
     expect(typeof res.body.clientSecret).toBe('string');
   });
+
+  // ─── WI-15 - runtime-editable JWKS host allowlist ─────────────────────────
+  it('WI-15: the allowlist view exposes the seed + env + effective union', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    // The well-known seed is present out of the box.
+    expect(res.body.seed).toEqual(expect.arrayContaining(['login.microsoftonline.com']));
+    // The env host set for this suite is present.
+    expect(res.body.env).toContain('login.microsoftonline.com');
+    expect(res.body.effective).toEqual(expect.arrayContaining(['login.microsoftonline.com']));
+  });
+
+  it('WI-15: adding a host at runtime makes discovery against it succeed (hot-reload)', async () => {
+    const NEW_HOST = 'idp.contoso-runtime.example.com';
+    // Before adding, a discovery against the host is SSRF-rejected.
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/wif/resolve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ discoveryUrl: `https://${NEW_HOST}/.well-known/openid-configuration` })
+      .expect(400);
+
+    // Add the host at runtime.
+    const addRes = await request(app.getHttpServer())
+      .post('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ host: NEW_HOST, label: 'contoso runtime' })
+      .expect(201);
+    expect(addRes.body.persisted).toContain(NEW_HOST);
+
+    // The discovery mock returns a doc whose issuer/jwks_uri hosts are the
+    // Entra host (allowlisted), so the resolve now passes the discovery-host
+    // SSRF check for NEW_HOST and proceeds.
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/wif/resolve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ discoveryUrl: `https://${NEW_HOST}/.well-known/openid-configuration` })
+      .expect(201);
+
+    // Remove it; discovery is rejected again.
+    await request(app.getHttpServer())
+      .delete(`/scim/admin/settings/jwks-hosts/${NEW_HOST}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/wif/resolve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ discoveryUrl: `https://${NEW_HOST}/.well-known/openid-configuration` })
+      .expect(400);
+  });
+
+  it('WI-15: rejects a non-bare-hostname add (scheme/path/spaces)', async () => {
+    await request(app.getHttpServer())
+      .post('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ host: 'https://evil.example/keys' })
+      .expect(400);
+  });
 });

@@ -11822,6 +11822,57 @@ try {
 Write-Host "`n--- 9z-AT6: WI-14 discovery resolver Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT7: WI-15 JWKS host allowlist admin (hot-reload)
+$script:currentSection = "9z-AT7: WI-15 JWKS host allowlist"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT7: WI-15 JWKS host allowlist admin (hot-reload)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # T1: the allowlist view exposes the seed + env + persisted + effective layers.
+    $at7View = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method GET -Headers $headers
+    $at7HasLayers = ($null -ne $at7View.seed) -and ($null -ne $at7View.env) -and `
+        ($null -ne $at7View.persisted) -and ($null -ne $at7View.effective)
+    Test-Result -Success $at7HasLayers -Message "9z-AT7.T1: JWKS allowlist view exposes seed/env/persisted/effective layers"
+
+    # T2: the well-known Entra seed host is always present in the effective union.
+    $at7HasSeed = ($at7View.effective -contains "login.microsoftonline.com")
+    Test-Result -Success $at7HasSeed -Message "9z-AT7.T2: effective allowlist always contains the well-known Entra seed host"
+
+    # T3: a non-bare hostname (scheme/path) is rejected -> 400.
+    $at7BadHost = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method POST -Headers $headers -Body (@{
+            host = "https://idp.example.com/path"
+        } | ConvertTo-Json) | Out-Null
+    } catch { $at7BadHost = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at7BadHost -Message "9z-AT7.T3: non-bare-hostname add rejected -> 400"
+
+    # T4: adding a host at runtime persists it into the effective union (hot-reload, no redeploy).
+    $at7Host = "live-at7-$(Get-Random).jwks.example.com"
+    $at7Added = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method POST -Headers $headers -Body (@{
+        host = $at7Host; label = "live-test WI-15"
+    } | ConvertTo-Json)
+    $at7NowAllowed = ($at7Added.persisted -contains $at7Host) -and ($at7Added.effective -contains $at7Host)
+    Test-Result -Success $at7NowAllowed -Message "9z-AT7.T4: added host appears in persisted + effective (hot-reload)"
+
+    # T5: removing the host takes it back out of the effective union.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts/$([uri]::EscapeDataString($at7Host))" -Method DELETE -Headers $headers | Out-Null
+    $at7After = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method GET -Headers $headers
+    $at7Removed = (-not ($at7After.persisted -contains $at7Host)) -and (-not ($at7After.effective -contains $at7Host))
+    Test-Result -Success $at7Removed -Message "9z-AT7.T5: removed host is gone from persisted + effective"
+
+    # T6: seed hosts are NOT in the persisted layer (they are compiled-in, not removable).
+    $at6SeedNotPersisted = (-not ($at7After.persisted -contains "login.microsoftonline.com"))
+    Test-Result -Success $at6SeedNotPersisted -Message "9z-AT7.T6: seed host is not in the persisted (removable) layer"
+} catch {
+    Test-Result -Success $false -Message "9z-AT7: WI-15 JWKS host allowlist section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT7: WI-15 JWKS host allowlist Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

@@ -23,7 +23,7 @@ import {
   Divider,
   Button,
 } from '@fluentui/react-components';
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -56,6 +56,10 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusSmall,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
+  // WI-15 - JWKS host add row
+  jwksAddRow: { display: 'flex', gap: '12px', alignItems: 'flex-end' },
+  jwksAddField: { flex: 1 },
+  jwksDivider: { marginTop: '8px', marginBottom: '8px' },
 });
 
 export const SettingsPage: React.FC = () => {
@@ -164,9 +168,97 @@ export const SettingsPage: React.FC = () => {
       {/* Phase L4 - log config admin */}
       <LogConfigSection />
 
+      {/* WI-15 - JWKS host allowlist admin */}
+      <JwksHostAllowlistSection />
+
       {/* Phase N2 - re-open onboarding wizard */}
       <OnboardingResetCard />
     </div>
+  );
+};
+
+// ─── WI-15: JwksHostAllowlistSection ─────────────────────────────
+//
+// Server-global JWKS host allowlist manager. The effective allowlist is the
+// UNION of a compiled well-known seed + the JWKS_HOST_ALLOWLIST env + a
+// persisted admin-editable layer. An admin can add a host at runtime (no
+// redeploy) and remove a persisted host. Seed/env hosts are shown but not
+// removable (they are not in the persisted layer). Convenience/flexibility
+// feature - no deny-list, no lock flag.
+
+const JwksHostAllowlistSection: React.FC = () => {
+  const classes = useStyles();
+  const { data, isLoading } = useJwksHostAllowlist();
+  const addHost = useAddJwksHost();
+  const removeHost = useRemoveJwksHost();
+  const [newHost, setNewHost] = useState('');
+
+  const onAdd = (): void => {
+    const host = newHost.trim().toLowerCase();
+    if (host === '') return;
+    addHost.mutate({ host }, { onSuccess: () => setNewHost('') });
+  };
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="jwks-hosts-card">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>JWKS host allowlist (WIF SSRF guard)</Subtitle1>
+        {data && <CopyJsonButton value={data} data-testid="jwks-hosts-copy-json" />}
+      </div>
+      <Caption1>
+        Server-global. The effective allowlist is the union of a built-in well-known
+        IdP seed, the JWKS_HOST_ALLOWLIST env var, and the persisted hosts below. Add a
+        host to trust a new IdP&apos;s JWKS/discovery endpoint without a redeploy.
+      </Caption1>
+
+      <div className={classes.jwksAddRow}>
+        <Field label="Add a host (bare hostname, no scheme/path)" className={classes.jwksAddField}>
+          <Input
+            value={newHost}
+            onChange={(_e, d) => setNewHost(d.value)}
+            placeholder="login.example.com"
+            data-testid="jwks-hosts-input"
+          />
+        </Field>
+        <Button
+          appearance="primary"
+          onClick={onAdd}
+          disabled={newHost.trim() === '' || addHost.isPending}
+          data-testid="jwks-hosts-add-button"
+        >
+          {addHost.isPending ? 'Adding...' : 'Add host'}
+        </Button>
+      </div>
+
+      <ScimErrorMessage error={addHost.error ?? removeHost.error} />
+
+      {isLoading && <Caption1>Loading...</Caption1>}
+      {data && (
+        <div data-testid="jwks-hosts-list">
+          {data.persisted.length === 0 && (
+            <Caption1 data-testid="jwks-hosts-empty">No admin-added hosts yet.</Caption1>
+          )}
+          {data.persisted.map((host) => (
+            <div key={host} className={classes.categoryRow} data-testid={`jwks-host-row-${host}`}>
+              <Text>{host}</Text>
+              <Button
+                appearance="subtle"
+                size="small"
+                onClick={() => removeHost.mutate(host)}
+                disabled={removeHost.isPending}
+                data-testid={`jwks-host-remove-${host}`}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+          <Divider className={classes.jwksDivider} />
+          <Caption1 data-testid="jwks-hosts-builtin">
+            Built-in (seed + env), always allowed: {[...data.seed, ...data.env].join(', ')}
+          </Caption1>
+        </div>
+      )}
+    </Card>
   );
 };
 

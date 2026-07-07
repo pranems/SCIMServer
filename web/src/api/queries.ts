@@ -1392,6 +1392,53 @@ export function useResolveWifDiscovery(endpointId: string) {
   });
 }
 
+/** WI-15 - the effective JWKS host allowlist view (seed + env + persisted). */
+export interface JwksAllowlistView {
+  seed: string[];
+  env: string[];
+  persisted: string[];
+  effective: string[];
+}
+
+const JWKS_HOSTS_KEY = ['admin', 'jwks-hosts'] as const;
+
+/** WI-15 - read the JWKS host allowlist (server-global). */
+export function useJwksHostAllowlist() {
+  return useQuery({
+    queryKey: JWKS_HOSTS_KEY,
+    queryFn: () => fetchWithAuth<JwksAllowlistView>('/scim/admin/settings/jwks-hosts'),
+  });
+}
+
+/** WI-15 - add a host to the persisted JWKS allowlist layer (hot-reloaded). */
+export function useAddJwksHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { host: string; label?: string }) =>
+      fetchWithAuth<JwksAllowlistView>('/scim/admin/settings/jwks-hosts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/** WI-15 - remove a host from the persisted JWKS allowlist layer. */
+export function useRemoveJwksHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (host: string) =>
+      fetchWithAuth(`/scim/admin/settings/jwks-hosts/${encodeURIComponent(host)}`, {
+        method: 'DELETE',
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
 /** Revoke (delete) a per-endpoint credential. Optimistic: removes from cached overview. */
 export function useDeleteCredential(endpointId: string) {
   const qc = useQueryClient();

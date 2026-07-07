@@ -2,6 +2,7 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
+import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
 
 export const JWKS_FETCH = Symbol('JWKS_FETCH');
 
@@ -51,6 +52,7 @@ export class ExternalJwksValidatorService {
     private readonly config: ConfigService,
     private readonly logger: ScimLogger,
     @Optional() @Inject(JWKS_FETCH) private readonly fetchFn?: typeof fetch,
+    @Optional() private readonly allowlistService?: JwksHostAllowlistService,
   ) {
     const raw = this.config.get<string>('JWKS_HOST_ALLOWLIST') ?? '';
     this.hostAllowlist = new Set(
@@ -120,10 +122,16 @@ export class ExternalJwksValidatorService {
       throw new Error(`jwksUri must use https (got "${url.protocol}").`);
     }
     const host = url.hostname.toLowerCase();
-    if (!this.hostAllowlist.has(host)) {
+    // WI-15: consult the shared effective allowlist (seed + env + persisted
+    // admin-editable union) when it is wired; otherwise fall back to the
+    // env-only Set this service parsed at construction (unchanged behavior for
+    // unit tests that construct the validator standalone).
+    const allowed = this.allowlistService
+      ? this.allowlistService.isAllowed(host)
+      : this.hostAllowlist.has(host);
+    if (!allowed) {
       this.logger.warn(LogCategory.AUTH, 'JWKS host not permitted by allowlist (SSRF guard)', {
         host,
-        allowlist: Array.from(this.hostAllowlist),
       });
       throw new Error(`JWKS host "${host}" is not permitted by the JWKS_HOST_ALLOWLIST.`);
     }
