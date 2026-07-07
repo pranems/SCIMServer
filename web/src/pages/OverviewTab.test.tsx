@@ -62,6 +62,21 @@ const mockOverview: EndpointOverviewResponse = {
   ],
   recentActivity: [],
   configFlags: { StrictSchemaValidation: true },
+  connectionInfo: {
+    endpointId: 'ep-1',
+    displayName: 'Production',
+    urls: {
+      scimBaseUrl: 'https://example.com/scim/v2/endpoints/ep-1',
+      scimBaseUrlBare: 'https://example.com/scim/endpoints/ep-1/v2',
+      tokenEndpoint: 'https://example.com/scim/endpoints/ep-1/oauth/token',
+      serviceProviderConfig:
+        'https://example.com/scim/v2/endpoints/ep-1/ServiceProviderConfig',
+      oauthMetadata:
+        'https://example.com/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+    },
+    enabledMethods: [],
+    disabledMethods: [],
+  },
 };
 
 function renderWithProviders(ui: React.ReactElement) {
