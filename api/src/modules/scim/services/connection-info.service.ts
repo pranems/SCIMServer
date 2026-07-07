@@ -31,12 +31,10 @@ import {
 } from '../../endpoint/endpoint-config.interface';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
 import type {
-  ClientSecretState,
   ConnectionDisabledMethod,
   ConnectionEnabledMethod,
   ConnectionInfo,
   ConnectionInfoUrls,
-  ConnectionMethod,
 } from '../../../shared/types/connection-info.types';
 
 // Re-export the shared connection-info types so existing importers of this

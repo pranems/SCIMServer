@@ -116,9 +116,10 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     }
 
     // Mine-but-invalid-stop: the assertion matched no configured WIF trust.
-    throw (
-      lastError ?? new WifAssertionInvalidError('No configured WIF trust accepted the assertion.')
-    );
+    if (lastError instanceof Error) {
+      throw lastError;
+    }
+    throw new WifAssertionInvalidError('No configured WIF trust accepted the assertion.');
   }
 
   /**
