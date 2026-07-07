@@ -31,6 +31,9 @@ $script:flowSteps = @()
 $script:flowStepCounter = 0
 $script:lastLinkedFlowStepId = 0
 $script:currentSection = "Setup"
+$script:preexistingEndpointIds = @()
+$script:orphanGuardArmed = $false
+$script:orphanReconciled = $false
 
 function Write-VerboseLog {
     param([string]$Label, $Data)
@@ -260,6 +263,39 @@ function Test-Result {
     }
 }
 
+function Invoke-OrphanReconciliation {
+    # Belt-and-suspenders leak sweep. Deletes every endpoint that exists now but
+    # did NOT exist when the run started (i.e. created by this run and never
+    # cleaned up). Naming-independent, so it catches leaks from ANY section - not
+    # only the ones whose name matches a known prefix like the old live-test-*
+    # sweep did (that filter is exactly why the 5/14 run leaked live-entra-* etc).
+    # Self-contained: never throws, never counts as a test, idempotent. Acts only
+    # when the startup snapshot armed the guard, so a failed snapshot (empty
+    # baseline) can never trigger a mass-delete of every endpoint on the target.
+    if (-not $script:orphanGuardArmed) { return }
+    if ($script:orphanReconciled) { return }
+    $script:orphanReconciled = $true
+    try {
+        $live = @((Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?count=500" -Headers $headers -ErrorAction Stop).endpoints)
+        $leaked = @($live | Where-Object { $script:preexistingEndpointIds -notcontains $_.id })
+        if ($leaked.Count -gt 0) {
+            Write-Host "`n🧹 Orphan reconciliation: $($leaked.Count) endpoint(s) leaked this run - deleting:" -ForegroundColor Yellow
+            foreach ($ep in $leaked) {
+                try {
+                    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ep.id)" -Method DELETE -Headers $headers -ErrorAction Stop | Out-Null
+                    Write-Host "   deleted $($ep.name) ($($ep.id))" -ForegroundColor DarkGray
+                } catch {
+                    Write-Host "   FAILED to delete $($ep.name) ($($ep.id)): $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+        } else {
+            Write-Host "`n🧹 Orphan reconciliation: no leaked endpoints (clean run)" -ForegroundColor DarkGray
+        }
+    } catch {
+        Write-Host "⚠️  Orphan reconciliation skipped (could not list endpoints): $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 if ($VerboseMode) {
     Write-Host "🔍 VERBOSE MODE ENABLED -- request/response details will be shown" -ForegroundColor Magenta
     Write-Host ""
@@ -277,6 +313,33 @@ Write-VerboseLog "Token expires_in" "$($tokenResponse.expires_in)s"
 
 $headers = @{Authorization="Bearer $Token"; 'Content-Type'='application/json'}
 $script:startTime = Get-Date
+
+# ============================================
+# ORPHAN-ENDPOINT SAFETY NET (arm)
+# Snapshot the endpoints that already exist so the reconciliation sweep - which
+# runs on the normal-exit path (explicit call before the summary) AND on the
+# error path (the trap below) - can delete anything THIS run creates but fails to
+# clean up. That is exactly how the 5/14 section-9z run leaked 6 endpoints: a
+# test threw before the section's cleanup line, and the end-of-run sweep only
+# matched live-test-* names so it missed live-entra/minimal/rfc/useronly/inline/
+# patch-*. The sweep here is naming-independent (diffs live-vs-snapshot).
+# ARM only if the snapshot succeeds; otherwise an empty baseline would make the
+# sweep delete every endpoint on the target.
+# ============================================
+try {
+    $script:preexistingEndpointIds = @((Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?count=500" -Headers $headers -ErrorAction Stop).endpoints | ForEach-Object { $_.id })
+    $script:orphanGuardArmed = $true
+    Write-Host "🧹 Orphan guard armed: snapshotted $($script:preexistingEndpointIds.Count) pre-existing endpoint(s)" -ForegroundColor DarkGray
+} catch {
+    Write-Host "⚠️  Orphan guard NOT armed (endpoint snapshot failed: $($_.Exception.Message)); leak sweep disabled for safety" -ForegroundColor Yellow
+}
+
+# On any UNHANDLED terminating error anywhere below, reconcile (delete this run's
+# leaked endpoints) BEFORE the script stops. `break` re-throws so the exit code
+# and stop-on-error behaviour stay exactly as before - only the cleanup is added.
+# Local try/catch blocks in the sections handle their own errors first, so this
+# only fires for the unexpected failures that would otherwise leak.
+trap { Invoke-OrphanReconciliation; break }
 
 # ============================================
 # TEST SECTION 1: ENDPOINT CRUD OPERATIONS
@@ -6546,6 +6609,11 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 9z: ENDPOINT PROFILES & PRESET DISCOVERY" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
+# Wrap the whole section so its 6 preset endpoints are ALWAYS cleaned up, even if
+# a test below throws. The pre-fix code cleaned up only on the success path, which
+# is how the 5/14 run leaked live-entra/minimal/rfc/useronly/inline/patch-*.
+try {
+
 # --- Setup: Create endpoints with different presets ---
 Write-Host "`n--- Setup: Create Endpoints with Presets ---" -ForegroundColor Cyan
 $entraBody = @{ name = "live-entra-$(Get-Random)"; profilePreset = "entra-id" } | ConvertTo-Json
@@ -6693,10 +6761,19 @@ Test-Result -Success ($p35.profile.settings.StrictSchemaValidation -eq "True") -
 try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
 Test-Result -Success $true -Message "9z.36: Cleaned up PATCH test endpoint"
 
-# --- Cleanup ---
-Write-Host "`n--- Cleanup: Delete test endpoints ---" -ForegroundColor Cyan
-@($entraEp.id, $minimalEp.id, $rfcEp.id, $userOnlyEp.id, $inlineEp.id) | ForEach-Object {
-    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$_" -Method DELETE -Headers $headers | Out-Null } catch {}
+}
+finally {
+    # --- Guaranteed cleanup: runs on success AND on any throw in the try above ---
+    # Delete all 6 preset endpoints by object (null-guarded so a mid-section throw
+    # before a given endpoint was created is harmless). Idempotent: on the success
+    # path the patch endpoint was already deleted above; a second DELETE 404s and
+    # is swallowed.
+    Write-Host "`n--- Cleanup: Delete test endpoints ---" -ForegroundColor Cyan
+    @($entraEp, $minimalEp, $rfcEp, $userOnlyEp, $inlineEp, $patchEp) | ForEach-Object {
+        if ($_ -and $_.id) {
+            try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($_.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+        }
+    }
 }
 Test-Result -Success $true -Message "9z.cleanup: Deleted profile test endpoints"
 
@@ -11619,6 +11696,11 @@ try {
 } catch {
     Write-Host "  ⚠️ Could not list endpoints for sweep cleanup: $_" -ForegroundColor Yellow
 }
+
+# Naming-independent belt: catch anything the name-based sweep above missed
+# (e.g. live-entra-*, cache-live-*, g8h-*-test-*, audit-test-* ... any endpoint
+# this run created under a non live-test-* name and did not delete).
+Invoke-OrphanReconciliation
 
 # ============================================
 # FINAL SUMMARY
