@@ -2,7 +2,7 @@
 
 > **Version:** 0.54.0-alpha.7 - **Updated:** June 18, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 20 flags: 18 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`).  
+> 21 flags: 18 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`).  
 > 4 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `structured` (the last added Pre-Q.A, reserved for the WIF trust object).
 
 ---
@@ -133,6 +133,20 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 18 | [`SecretTokenBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
 | 19 | [`OAuthClientCredentialsAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
 | 20 | [`SharedSecretBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `true` | Authentication |
+| 21 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | enum (`always`/`once`) | `always` | Authentication |
+
+### CredentialSecretVisibility
+
+WI-7 (design section 6A). Controls whether a per-endpoint credential secret is
+retained (encrypted at rest, re-viewable by an admin) or shown exactly once at
+creation. Enum `always` (default) or `once`. The **server-scope** setting is the
+ceiling: most-restrictive-wins, so a server value of `once` forces `once` on
+every endpoint regardless of the endpoint value. When the effective value is
+`always`, a freshly-created secret is encrypted via the WI-6 envelope scheme and
+stored on the credential; when it is `once`, no ciphertext is retained (and a
+flip to `once` purges any retained ciphertext). The retained envelope is NEVER
+exposed on any response; reveal is a separate admin-only, audit-logged endpoint
+(WI-8). Pre-feature credentials are bcrypt-only and cannot be retro-revealed.
 
 ### WifCredentialsEnabled
 

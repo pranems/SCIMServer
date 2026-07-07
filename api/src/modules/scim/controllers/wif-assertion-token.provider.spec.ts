@@ -37,6 +37,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       credentialHash: '',
       label: 'Entra WIF',
       metadata: { ...wifMetadata },
+      secretEnvelope: null,
       active: true,
       createdAt: new Date(),
       expiresAt: null,

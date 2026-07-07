@@ -90,6 +90,10 @@ describe('AdminCredentialController', () => {
       mockScimLogger,
       (mockEventEmitter = { emit: jest.fn() }) as unknown as EventEmitter2,
       { resolve: jest.fn() } as any,
+      // WI-6/WI-7: credential encryption + security services. Defaults make
+      // retention a no-op (isReady=false) so existing tests are unaffected.
+      { isReady: jest.fn().mockReturnValue(false), encrypt: jest.fn(), decrypt: jest.fn() } as any,
+      { getEffectiveVisibility: jest.fn().mockResolvedValue('always'), getServerVisibility: jest.fn().mockResolvedValue('always'), purgeRetainedSecrets: jest.fn() } as any,
     );
   });
 

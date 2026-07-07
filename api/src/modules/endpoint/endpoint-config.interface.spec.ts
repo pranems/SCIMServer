@@ -6,6 +6,8 @@ import {
   getConfigStructured,
   getOptionalConfigBoolean,
   getEffectiveAuthEnablement,
+  getEffectiveCredentialSecretVisibility,
+  normalizeCredentialSecretVisibility,
   validateEndpointConfig,
   validateStructuredFlag,
   DEFAULT_ENDPOINT_CONFIG,
@@ -1367,6 +1369,64 @@ describe('endpoint-config.interface', () => {
         });
         expect(eff.secretTokenBearer).toBe(true);
         expect(eff.sharedSecretBearer).toBe(false);
+      });
+    });
+
+    // WI-7: CredentialSecretVisibility precedence (server ceiling).
+    describe('getEffectiveCredentialSecretVisibility', () => {
+      it('defaults to "always" when nothing is set', () => {
+        expect(getEffectiveCredentialSecretVisibility(undefined, {})).toBe('always');
+      });
+
+      it('server "once" forces "once" even when the endpoint says "always"', () => {
+        expect(
+          getEffectiveCredentialSecretVisibility('once', { CredentialSecretVisibility: 'always' }),
+        ).toBe('once');
+      });
+
+      it('server "always" lets the endpoint opt into "once"', () => {
+        expect(
+          getEffectiveCredentialSecretVisibility('always', { CredentialSecretVisibility: 'once' }),
+        ).toBe('once');
+      });
+
+      it('server "always" + endpoint "always" -> "always"', () => {
+        expect(
+          getEffectiveCredentialSecretVisibility('always', { CredentialSecretVisibility: 'always' }),
+        ).toBe('always');
+      });
+
+      it('is case-insensitive and falls back to "always" on invalid values', () => {
+        expect(getEffectiveCredentialSecretVisibility('ONCE', {})).toBe('once');
+        expect(getEffectiveCredentialSecretVisibility('bogus', { CredentialSecretVisibility: 'nope' })).toBe('always');
+      });
+    });
+
+    describe('normalizeCredentialSecretVisibility', () => {
+      it('normalizes valid values and rejects the rest', () => {
+        expect(normalizeCredentialSecretVisibility('always')).toBe('always');
+        expect(normalizeCredentialSecretVisibility('Once')).toBe('once');
+        expect(normalizeCredentialSecretVisibility('x')).toBeUndefined();
+        expect(normalizeCredentialSecretVisibility(42)).toBeUndefined();
+      });
+    });
+
+    describe('validateEndpointConfig - CredentialSecretVisibility', () => {
+      it('accepts always/once (case-insensitive)', () => {
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'always' })).not.toThrow();
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'ONCE' })).not.toThrow();
+      });
+
+      it('rejects an invalid enum value', () => {
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'sometimes' })).toThrow(
+          /Allowed values: "always", "once"/,
+        );
+      });
+
+      it('rejects a non-string value', () => {
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: true })).toThrow(
+          /Expected string/,
+        );
       });
     });
   });

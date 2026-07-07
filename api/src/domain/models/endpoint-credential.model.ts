@@ -13,6 +13,8 @@ export interface EndpointCredentialModel {
   credentialHash: string;   // bcrypt hash
   label: string | null;
   metadata: Record<string, unknown> | null;
+  /** WI-7: retained secret, DEK-encrypted (`v1.<iv>.<ct>.<tag>`); null unless retained. */
+  secretEnvelope: string | null;
   active: boolean;
   createdAt: Date;
   expiresAt: Date | null;
@@ -24,5 +26,7 @@ export interface EndpointCredentialCreateInput {
   credentialHash: string;
   label?: string | null;
   metadata?: Record<string, unknown> | null;
+  /** WI-7: retained (DEK-encrypted) secret envelope; omit/null when not retained. */
+  secretEnvelope?: string | null;
   expiresAt?: Date | null;
 }

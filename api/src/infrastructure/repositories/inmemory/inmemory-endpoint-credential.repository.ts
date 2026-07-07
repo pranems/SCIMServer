@@ -23,6 +23,7 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
       credentialHash: input.credentialHash,
       label: input.label ?? null,
       metadata: input.metadata ?? null,
+      secretEnvelope: input.secretEnvelope ?? null,
       active: true,
       createdAt: new Date(),
       expiresAt: input.expiresAt ?? null,
@@ -56,6 +57,17 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     if (!cred) return null;
     cred.active = false;
     return cred;
+  }
+
+  async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
+    let cleared = 0;
+    for (const cred of this.store.values()) {
+      if (cred.endpointId === endpointId && cred.secretEnvelope !== null) {
+        cred.secretEnvelope = null;
+        cleared += 1;
+      }
+    }
+    return cleared;
   }
 
   async delete(id: string): Promise<void> {

@@ -11932,6 +11932,57 @@ try {
 Write-Host "`n--- 9z-AT8: WI-2 connection-info Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT9: WI-7 CredentialSecretVisibility (endpoint flag + retention)
+$script:currentSection = "9z-AT9: WI-7 secret visibility"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT9: WI-7 CredentialSecretVisibility (endpoint flag + retention)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at9Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi7-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at9Id = $at9Ep.id
+
+    # T1: the endpoint accepts CredentialSecretVisibility=always.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; CredentialSecretVisibility = "always" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $at9Get = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id" -Method GET -Headers $headers
+    Test-Result -Success ($at9Get.profile.settings.CredentialSecretVisibility -eq "always") -Message "9z-AT9.T1: endpoint accepts CredentialSecretVisibility=always"
+
+    # T2: an invalid visibility value is rejected -> 400.
+    $at9BadVis = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ CredentialSecretVisibility = "sometimes" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    } catch { $at9BadVis = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at9BadVis -Message "9z-AT9.T2: invalid CredentialSecretVisibility value rejected -> 400"
+
+    # T3: creating an oauth_client under always returns the one-time secret and NEVER leaks the stored envelope.
+    $at9Cred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "wi7-live"
+    } | ConvertTo-Json)
+    $at9CredJson = $at9Cred | ConvertTo-Json -Depth 8
+    $at9NoEnvelope = (-not ($at9CredJson -match '"secretEnvelope"')) -and (-not ($at9CredJson -match '"credentialHash"'))
+    Test-Result -Success (($null -ne $at9Cred.clientSecret) -and $at9NoEnvelope) -Message "9z-AT9.T3: oauth_client create returns one-time secret, never leaks secretEnvelope/hash"
+
+    # T4: the credentials list never exposes the retained envelope.
+    $at9List = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id/credentials" -Method GET -Headers $headers
+    $at9ListJson = $at9List | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($at9ListJson -match '"secretEnvelope"')) -Message "9z-AT9.T4: credentials list never exposes secretEnvelope"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT9: WI-7 CredentialSecretVisibility section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT9: WI-7 secret visibility Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

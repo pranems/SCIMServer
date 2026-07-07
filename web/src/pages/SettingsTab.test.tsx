@@ -49,6 +49,19 @@ function overviewWith(configFlags: Record<string, unknown>): EndpointOverviewRes
     credentials: [],
     recentActivity: [],
     configFlags,
+    connectionInfo: {
+      endpointId: EP_ID,
+      displayName: 'prod',
+      urls: {
+        scimBaseUrl: 'https://x/scim/v2/endpoints/ep-1',
+        scimBaseUrlBare: 'https://x/scim/endpoints/ep-1',
+        tokenEndpoint: 'https://x/scim/endpoints/ep-1/oauth/token',
+        serviceProviderConfig: 'https://x/scim/v2/endpoints/ep-1/ServiceProviderConfig',
+        oauthMetadata: 'https://x/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+      },
+      enabledMethods: [],
+      disabledMethods: [],
+    },
   };
 }
 
@@ -260,6 +273,41 @@ describe('SettingsTab', () => {
     wrap(<SettingsTab endpointId={EP_ID} />);
     const sw = screen.getByRole('switch', { name: /StrictSchemaValidation/i }) as HTMLInputElement;
     expect(sw.disabled).toBe(true);
+  });
+
+  // ── WI-7: CredentialSecretVisibility enum control ─────────────────
+  it('renders the CredentialSecretVisibility control defaulting to always', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getByTestId('settings-credential-visibility')).toBeInTheDocument();
+    const always = screen.getByTestId('credential-visibility-always') as HTMLInputElement;
+    expect(always.checked).toBe(true);
+  });
+
+  it('reflects a stored CredentialSecretVisibility=once', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ CredentialSecretVisibility: 'once' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const once = screen.getByTestId('credential-visibility-once') as HTMLInputElement;
+    expect(once.checked).toBe(true);
+  });
+
+  it('selecting "once" fires useUpdateEndpointConfig with the enum value', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ CredentialSecretVisibility: 'always' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    await user.click(screen.getByTestId('credential-visibility-once'));
+    expect(mutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { CredentialSecretVisibility: 'once' } },
+    });
   });
 
   it('renders the PrimaryEnforcement value as read-only info (not a Switch)', () => {

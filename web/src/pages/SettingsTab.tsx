@@ -33,6 +33,8 @@ import {
   tokens,
   Card,
   Switch,
+  Radio,
+  RadioGroup,
   Spinner,
   Badge,
   Text,
@@ -329,6 +331,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     .map((k) => [k, flags[k]] as const)
     .filter(([, v]) => v !== undefined && v !== null && v !== '');
 
+  // WI-7: CredentialSecretVisibility is an enum (always|once), not a boolean.
+  const visibilityRaw = typeof flags.CredentialSecretVisibility === 'string'
+    ? flags.CredentialSecretVisibility.toLowerCase()
+    : 'always';
+  const visibility = visibilityRaw === 'once' ? 'once' : 'always';
+  const visibilityPending = isPending && pendingKey === 'CredentialSecretVisibility';
+
+  async function handleVisibilityChange(next: 'always' | 'once') {
+    if (next === visibility) return;
+    setFeedback(null);
+    try {
+      await updateMutation.mutateAsync({
+        profile: { settings: { CredentialSecretVisibility: next } },
+      });
+      setFeedback({ type: 'success', message: `CredentialSecretVisibility set to ${next}.` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update failed.';
+      setFeedback({ type: 'error', message: `Failed to update CredentialSecretVisibility: ${msg}` });
+    }
+  }
+
   return (
     <div className={classes.root} data-testid="settings-tab">
       <Subtitle1>Endpoint Configuration</Subtitle1>
@@ -397,6 +420,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
               </div>
             );
           })}
+        </Card>
+
+        {/* ── WI-7: CredentialSecretVisibility (enum) ──────────── */}
+        <Card className={classes.card} data-testid="settings-credential-visibility">
+          <Caption1>Credential secret visibility</Caption1>
+          <div className={classes.flagRow}>
+            <RadioGroup
+              layout="horizontal"
+              value={visibility}
+              disabled={visibilityPending}
+              onChange={(_, d) => { void handleVisibilityChange(d.value as 'always' | 'once'); }}
+              aria-label="CredentialSecretVisibility"
+            >
+              <Radio value="always" label="always (retain + reveal)" data-testid="credential-visibility-always" />
+              <Radio value="once" label="once (show at create only)" data-testid="credential-visibility-once" />
+            </RadioGroup>
+            <Caption1 className={classes.flagDescription}>
+              WI-7: whether a per-endpoint credential secret is retained (encrypted at rest) and
+              re-viewable by an admin, or shown exactly once at creation. The server-scope setting
+              is the ceiling - if the server is set to &quot;once&quot; this endpoint is forced to
+              &quot;once&quot; regardless of the value here.
+            </Caption1>
+          </div>
         </Card>
 
         {/* ── Read-only (non-boolean) settings card ────────────── */}

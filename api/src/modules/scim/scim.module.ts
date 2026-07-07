@@ -34,6 +34,7 @@ import { BulkProcessorService } from './services/bulk-processor.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ConnectionInfoService } from './services/connection-info.service';
 import { CredentialEncryptionService } from '../../security/credential-encryption.service';
+import { CredentialSecurityService } from '../../security/credential-security.service';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
@@ -78,6 +79,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointContextStorage,
     ConnectionInfoService,
     CredentialEncryptionService,
+    CredentialSecurityService,
     // Q6 - bind the A3 assertion-provider seam to the WIF validate+issue pipeline.
     WifAssertionTokenProvider,
     {

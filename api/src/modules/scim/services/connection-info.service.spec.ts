@@ -27,6 +27,7 @@ function cred(over: Partial<EndpointCredentialModel>): EndpointCredentialModel {
     credentialHash: 'bcrypt$xxx',
     label: null,
     metadata: null,
+    secretEnvelope: null,
     active: true,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     expiresAt: null,

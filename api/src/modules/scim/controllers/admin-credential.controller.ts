@@ -39,6 +39,8 @@ import {
 import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { CredentialEncryptionService } from '../../../security/credential-encryption.service';
+import { CredentialSecurityService } from '../../../security/credential-security.service';
 import {
   SCIM_EVENTS,
   type ScimCredentialEventPayload,
@@ -150,6 +152,8 @@ export class AdminCredentialController {
     private readonly logger: ScimLogger,
     private readonly eventEmitter: EventEmitter2,
     private readonly wifResolver: WifDiscoveryResolverService,
+    private readonly credentialEncryption: CredentialEncryptionService,
+    private readonly credentialSecurity: CredentialSecurityService,
   ) {}
 
   /**
@@ -272,6 +276,7 @@ export class AdminCredentialController {
         credentialHash: hash,
         label: dto.label ?? null,
         metadata: { clientId },
+        secretEnvelope: await this.maybeRetainSecret(config, plaintext),
         expiresAt,
       });
 
@@ -307,6 +312,7 @@ export class AdminCredentialController {
       credentialType,
       credentialHash: hash,
       label: dto.label ?? null,
+      secretEnvelope: await this.maybeRetainSecret(config, plaintext),
       expiresAt,
     });
 
@@ -458,5 +464,31 @@ export class AdminCredentialController {
 
   private async requireEndpoint(endpointId: string) {
     return this.endpointService.getEndpoint(endpointId);
+  }
+
+  /**
+   * WI-7: when the effective CredentialSecretVisibility for the endpoint is
+   * `always`, encrypt the plaintext secret for retention and return the
+   * envelope; otherwise return null (show-once). Never throws into the create
+   * path - if encryption is unavailable (KEK init failed) it logs and returns
+   * null so credential creation still succeeds (the secret is simply not
+   * retained, i.e. degrades to show-once).
+   */
+  private async maybeRetainSecret(
+    config: EndpointConfig,
+    plaintext: string,
+  ): Promise<string | null> {
+    try {
+      const effective = await this.credentialSecurity.getEffectiveVisibility(config);
+      if (effective !== 'always') return null;
+      if (!this.credentialEncryption.isReady()) return null;
+      return this.credentialEncryption.encrypt(plaintext);
+    } catch (err) {
+      this.logger.warn(
+        LogCategory.AUTH,
+        `Could not retain credential secret (degrading to show-once): ${(err as Error).message}`,
+      );
+      return null;
+    }
   }
 }

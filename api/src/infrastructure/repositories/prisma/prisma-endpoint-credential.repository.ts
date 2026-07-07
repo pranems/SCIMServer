@@ -18,6 +18,7 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
         credentialHash: input.credentialHash,
         label: input.label ?? null,
         metadata: input.metadata ? (input.metadata as any) : undefined,
+        secretEnvelope: input.secretEnvelope ?? null,
         expiresAt: input.expiresAt ?? null,
       },
     });
@@ -86,6 +87,14 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
+  async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
+    const result = await this.prisma.endpointCredential.updateMany({
+      where: { endpointId, secretEnvelope: { not: null } },
+      data: { secretEnvelope: null },
+    });
+    return result.count;
+  }
+
   private toModel(row: any): EndpointCredentialModel {
     return {
       id: row.id,
@@ -94,6 +103,7 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
       credentialHash: row.credentialHash,
       label: row.label ?? null,
       metadata: row.metadata as Record<string, unknown> | null,
+      secretEnvelope: row.secretEnvelope ?? null,
       active: row.active,
       createdAt: row.createdAt,
       expiresAt: row.expiresAt ?? null,

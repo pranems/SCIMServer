@@ -202,8 +202,16 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see docs/auth/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 8.6
    */
   WIF_CREDENTIALS_ENABLED: 'WifCredentialsEnabled',
-} as const;
 
+  /**
+   * `CredentialSecretVisibility` (WI-7): whether a per-endpoint credential
+   * secret is retained (encrypted at rest) and re-viewable by an admin, or
+   * shown exactly once at create. Enum: `always` (default) | `once`. Stored
+   * explicitly; the server-scope setting is the ceiling (most-restrictive
+   * wins). See docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md section 6A.
+   */
+  CREDENTIAL_SECRET_VISIBILITY: 'CredentialSecretVisibility',
+} as const;
 /**
  * Type for endpoint config flag values (the runtime string keys).
  */
@@ -212,7 +220,7 @@ export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPO
 // ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
-type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'structured';
+type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'credentialVisibility' | 'structured';
 
 /**
  * Shape contract for a `structured` config flag value (Pre-Q.A).
@@ -447,6 +455,16 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'attached and the WIF token-mint path is offered. When false (default), WIF is off and existing ' +
       'endpoints are untouched. Orthogonal to PerEndpointCredentialsEnabled.',
   },
+  CREDENTIAL_SECRET_VISIBILITY: {
+    key: ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY,
+    type: 'credentialVisibility',
+    default: undefined, // string default via getEffectiveCredentialSecretVisibility (server ceiling -> 'always')
+    description:
+      'Controls whether a per-endpoint credential secret is retained (encrypted at rest) and ' +
+      're-viewable by an admin, or shown once at creation. "always" (default): retain + reveal. ' +
+      '"once": shown once at create, then hidden (retained ciphertext is purged). The server-scope ' +
+      'setting is the ceiling - most-restrictive-wins, so server "once" forces "once" everywhere.',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -478,6 +496,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
   [ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY]?: string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -640,6 +659,46 @@ export function getEffectiveAuthEnablement(
   return { secretTokenBearer, oauthClientCredentials, sharedSecretBearer };
 }
 
+// ─── WI-7: CredentialSecretVisibility precedence (server is the ceiling) ──────
+
+/** The two visibility values. `always` retains + reveals; `once` shows once. */
+export type CredentialSecretVisibility = 'always' | 'once';
+
+/** Valid CredentialSecretVisibility values (case-insensitive). */
+export const VALID_CREDENTIAL_SECRET_VISIBILITY = ['always', 'once'] as const;
+
+/**
+ * Normalize an arbitrary stored value to a valid visibility, or undefined when
+ * absent/invalid (so callers can apply the default).
+ */
+export function normalizeCredentialSecretVisibility(
+  value: unknown,
+): CredentialSecretVisibility | undefined {
+  if (typeof value !== 'string') return undefined;
+  const v = value.trim().toLowerCase();
+  return v === 'always' || v === 'once' ? (v as CredentialSecretVisibility) : undefined;
+}
+
+/**
+ * Compute the EFFECTIVE CredentialSecretVisibility for an endpoint, applying
+ * the design 6A.3 precedence: `once` is more restrictive than `always`, and the
+ * SERVER scope is the ceiling (most-restrictive-wins). So:
+ *   - server `once`  -> always `once` (no endpoint can override).
+ *   - server `always`-> the endpoint value if set, else `always`.
+ * Missing/invalid values fall back to `always` (the retain-friendly default).
+ */
+export function getEffectiveCredentialSecretVisibility(
+  serverValue: unknown,
+  config: EndpointConfig | undefined,
+): CredentialSecretVisibility {
+  const server = normalizeCredentialSecretVisibility(serverValue) ?? 'always';
+  if (server === 'once') return 'once'; // server ceiling
+  const endpoint = normalizeCredentialSecretVisibility(
+    config?.[ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY],
+  );
+  return endpoint ?? 'always';
+}
+
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 /** Valid boolean string values (case-insensitive). */
@@ -723,6 +782,27 @@ function validatePrimaryEnforcementFlag(config: Record<string, any>, flagName: s
 }
 
 /**
+ * Validate a `credentialVisibility` config flag value (WI-7). Enum always|once.
+ */
+function validateCredentialVisibilityFlag(config: Record<string, any>, flagName: string): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  if (typeof value === 'string') {
+    if (!VALID_CREDENTIAL_SECRET_VISIBILITY.includes(value.toLowerCase() as CredentialSecretVisibility)) {
+      throw new Error(
+        `Invalid value "${value}" for config flag "${flagName}". ` +
+        `Allowed values: "always", "once" (case-insensitive).`,
+      );
+    }
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected string ("always"/"once"), got ${typeof value}.`,
+    );
+  }
+}
+
+/**
  * Validate a `structured` (object-valued) config flag against its shape contract.
  *
  * - Absent value: passes.
@@ -791,6 +871,8 @@ export function validateEndpointConfig(
       validateLogLevelFlag(config, def.key);
     } else if (def.type === 'primaryEnforcement') {
       validatePrimaryEnforcementFlag(config, def.key);
+    } else if (def.type === 'credentialVisibility') {
+      validateCredentialVisibilityFlag(config, def.key);
     } else if (def.type === 'structured') {
       validateStructuredFlag(config, def.key, def.structuredSchema);
     }
