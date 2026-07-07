@@ -287,6 +287,10 @@ DATABASE_URL=postgresql://scim:scim@localhost:5432/scimdb
 CORS_ORIGINS=http://localhost:5173
 ```
 
+> **Reserved (forthcoming):** `CREDENTIAL_KEK=changeme-credential-kek` is the key-encryption-key for the upcoming re-viewable-credential-secret feature (design-locked, not yet consumed by code). When it ships it MUST be identical across every instance and every redeploy, and the default is cosmetic until you rotate it to a private value in production. It is NOT on the authentication path - changing it never locks an endpoint out; it only affects re-viewing retained secrets. Full operator guide: [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 6A.
+
+> **Required before WIF - `JWKS_HOST_ALLOWLIST`:** a comma-separated list of identity-provider hostnames SCIMServer is allowed to fetch signing keys (JWKS) from - the anti-SSRF choke point for Workload Identity Federation. The default is EMPTY, which rejects every host, so WIF assertion validation fails closed until you set it. Example: `JWKS_HOST_ALLOWLIST=login.microsoftonline.com`. Companion `JWKS_CACHE_MAX_AGE_MS` (default `600000`) bounds the key cache. Today it is read once at boot (restart to change). Forthcoming ([WI-15](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md#5d-jwks-host-allowlist-prepopulated-persisted-hot-editable)): a prepopulated well-known-IdP seed + a persisted, admin-editable, hot-reloaded layer (a convenience/runtime-flexibility choice - no deny-list or lock flag); the env var then becomes one of three union layers.
+
 **web/.env**:
 ```env
 VITE_API_BASE=http://localhost:3000

@@ -1234,6 +1234,9 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 | `OAUTH_CLIENT_ID` | `scimserver-client` | OAuth client identifier |
 | `OAUTH_CLIENT_SECRET` | Auto-generated (dev) | OAuth client secret. **Required** in production |
 | `OAUTH_CLIENT_SCOPES` | `scim.read,scim.write,scim.manage` | Comma-separated allowed scopes |
+| `CREDENTIAL_KEK` | `changeme-credential-kek` | **Reserved (forthcoming).** Key-encryption-key for the re-viewable-credential-secret feature (design-locked, not yet active). Must match across all instances/redeploys; not on the auth path; default is cosmetic until rotated. See [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 6A |
+| `JWKS_HOST_ALLOWLIST` | (empty = all rejected) | Comma-separated IdP hostnames SCIMServer may fetch JWKS from (anti-SSRF choke point). **Required before WIF** can validate an assertion; empty fails closed. e.g. `login.microsoftonline.com`. Forthcoming (WI-15): prepopulated well-known seed + persisted, admin-editable hot-reload layer. See [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 5D |
+| `JWKS_CACHE_MAX_AGE_MS` | `600000` | Max age (ms) of a cached JWKS before it is refetched |
 
 ### Logging
 
@@ -1428,7 +1431,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 | [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | Azure Container Apps deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](docs/DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker build, run, and test guide |
 | [SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md) | RFC compliance matrix |
-| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
 | [TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md) | Architecture deep dive |
 
 ---
@@ -1451,4 +1454,4 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE).

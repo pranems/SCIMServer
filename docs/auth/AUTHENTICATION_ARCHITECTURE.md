@@ -241,6 +241,8 @@ v1 and v2 are the **same code path**. The only differences are the `iss` string,
 
 Because `trustProfiles[]` is a list, one method can accept v1 + v2 simultaneously - exactly what a v1->v2 migration on a single endpoint needs.
 
+> **Multiple distinct IdPs on one endpoint (not just v1/v2 of one issuer).** The same iterate-and-select mechanism lets several DIFFERENT issuers (a customer's Entra tenant + an Okta org + a Ping instance) provision one endpoint at once. The decided design is config-level + token-level ONLY ([CONNECTION_INFO_AND_ENTRA_SETUP.md section 5F](CONNECTION_INFO_AND_ENTRA_SETUP.md#5f-multiple-idps--wif-sources-writing-into-one-endpoint)): iterate every trust (WI-16) and select by issuer before verifying (WI-17). **The resource level is UNCHANGED by design - all resources share one common pool; isolation is achieved by creating a SEPARATE endpoint per IdP, not by any per-source resource partitioning.**
+
 > **Reconciliation with the WIF doc's "v2-only DECIDED" ([WIF section 4.1](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#41-decided---entra-v2-token-format-only-issuer-and-audience)).** That decision is correct and narrowly scoped: it governs what **Microsoft Entra's provisioning service emits** (v2-only). This document is the broader product question - **SCIMServer as a general relying party** should be *able* to trust v1-emitting issuers (legacy Entra apps with `requestedAccessTokenVersion: 1`, ISVs onboarded pre-v2-switch). Resolution: **global default stays v2-only (the secure default, matches Entra); v1 is a deliberately-enabled capability, gated by a global allowlist and opt-in per endpoint.** The WIF doc's secure default is intact; the hard architectural lock-out is removed.
 
 ### 3.2 Axis B: assertion profile (RFC 7523 vs RFC 8693)
@@ -399,7 +401,7 @@ flowchart LR
 | Authentication master switch (deployment kill switch) | Global | env / deploy | a deployment must forbid the feature regardless of endpoint config |
 | Allowed assertion profiles (`wif-7523`, `wif-8693`) | Global ceiling | runtime | ship `wif-8693` "off" until GA-tested; flip on without touching endpoints |
 | Allowed token versions (`v1`, `v2`) | Global ceiling | runtime | default v2-only; deliberately enable v1 for compat |
-| **JWKS host allowlist** | Global | env / deploy | **critical SSRF choke point** - must NOT be per-endpoint |
+| **JWKS host allowlist** | Global | seed + env + persisted (runtime-tunable via the `GlobalAuthPolicy` row, [section 6.2](#62-what-the-design-adds-proposed-and-where)) | **SSRF choke point** (https + exact-host match) - server-global, never per-endpoint. Prepopulated well-known seed + `JWKS_HOST_ALLOWLIST` env + a persisted, admin-editable-at-runtime hot-reloaded layer (WI-15, [CONNECTION_INFO section 5D](CONNECTION_INFO_AND_ENTRA_SETUP.md#5d-jwks-host-allowlist-prepopulated-persisted-hot-editable)) - a convenience/runtime-flexibility choice (no deny-list or lock flag) |
 | ISV signing key + `kid` + published JWKS | Global | env / secret store | one signing identity per deployment -> one JWKS to publish |
 | Allowed algs (RS256/ES256), clock skew, JWKS cache max-age, fail-closed | Global | env | uniform security/operational policy |
 | Issued-token TTL bounds (1-6 h) | Global | env | enforce the range; endpoint picks inside it |
@@ -407,7 +409,7 @@ flowchart LR
 | **Scope catalog** (scope strings + operation semantics) | Global | config | the resource guard must share one vocabulary |
 | Default scope + global scope ceiling | Global | config | safety boundary |
 | Role-enforcement global policy (off / allow / force) | Global | runtime | a strict deployment can mandate roles everywhere |
-| `WifCredentialsEnabled` / per-method enable flags | Per-endpoint | flag (10-cell) | opt-in, default false |
+| `WifCredentialsEnabled` / per-method enable flags | Per-endpoint | flag (10-cell) | opt-in, default false (the per-method flag-split family is [section 5.3](#53-auth-method-enablement-flags-the-flag-split-family)) |
 | `acceptedProfiles` (subset of global) | Per-endpoint | method config | SuccessFactors=7523, Google=8693 |
 | `trustProfiles[]` (one per version x identityModel) | Per-endpoint | method config | the list enables simultaneous per-app+1P, v1+v2 |
 | issuer/subject/audience/jwksUri/allowedTenantId/requiredRoles per anchor | Per-endpoint | method config | the per-customer trust anchors |
@@ -441,6 +443,32 @@ Storage location and management surface are **independent decisions**: profile-e
 ```
 
 The small `authentication` wrapper (vs a flat `authenticationMethods` array) is justified because `defaultMethodId` and `policy` are natural siblings of `methods` - it gives the authZ overlay a home without a future migration.
+
+### 5.3 Auth-method enablement flags (the flag-split family)
+
+> **Status.** DESIGN, operator-confirmed 2026-07-06 (naming Option B). Not yet implemented. Tracked as WI-11 in [CONNECTION_INFO_AND_ENTRA_SETUP.md section 3A](CONNECTION_INFO_AND_ENTRA_SETUP.md#3a-auth-method-enablement-flags-proposed-flag-split-family).
+
+Today one flag, `PerEndpointCredentialsEnabled`, gates BOTH the `bearer` and `oauth_client` credential types - at creation ([admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts)) AND on the resource-plane validation path ([shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) `tryEndpointCredential`: flag off -> per-endpoint credentials are skipped and go inert). And there is no per-endpoint way to refuse the global `SCIM_SHARED_SECRET`. Both are addressed by splitting into one flag per method (which maps cleanly onto the per-method `AuthenticationProvider` model - one enable flag per active method type):
+
+| Flag | Gates (create + validate) | Method / provider | Default (migration) |
+|---|---|---|---|
+| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` | `bearer` provider (Entra Secret Token) | = old `PerEndpointCredentialsEnabled` |
+| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` | `oauth-client` provider (Entra OAuth2 CC) | = old `PerEndpointCredentialsEnabled` |
+| `WifCredentialsEnabled` (unchanged) | `wif` trust | `wif-7523` provider | unchanged |
+| `SharedSecretBearerAuthEnabled` (new) | whether this endpoint accepts the global `SCIM_SHARED_SECRET` (guard Tier-3) | `shared-secret` provider | `true` (back-compat) |
+
+Migration is value-preserving: for every endpoint set `SecretTokenBearerAuthEnabled` = `OAuthClientCredentialsAuthEnabled` = the old `PerEndpointCredentialsEnabled` value and `SharedSecretBearerAuthEnabled` = `true`; the guard reads the old flag as a one-release fallback, then it is retired. Each new flag lands with the full 10-cell config-flag matrix (`endpointConfigFlagAudit`). The operator chose Option B (retain `Auth` in the name) for explicitness, accepting the mild inconsistency with the existing `WifCredentialsEnabled`.
+
+### 5.4 WIF trust ergonomics (config-time discovery resolver + smart defaults)
+
+> **Status.** DESIGN, operator-confirmed 2026-07-06. Detail + wire examples in [CONNECTION_INFO_AND_ENTRA_SETUP.md sections 5B + 5C](CONNECTION_INFO_AND_ENTRA_SETUP.md#5b-wif-trust-field-reference-examples-provenance-usage-validation) (WI-13 + WI-14). This subsection records the architectural principle; that doc carries the field-by-field reference.
+
+The WIF trust splits into **signing-trust fields** (`expectedIssuer`, `jwksUri` - mechanical properties of the IdP + cloud, identical for every customer) and **discriminator fields** (`expectedSubject`, `expectedAudience`, `expectedTenantId` - the per-relationship security anchors). Only the discriminators carry security weight, so only they must be supplied; the signing-trust fields are **derivable** and the audience is **generatable**. Two ergonomics follow, both config-time only (the runtime validation path is unchanged):
+
+1. **Discovery resolver.** A config-time action reads the source IdP's `.well-known/openid-configuration` - via a full URL (any OIDC IdP) OR a preset + tenant id (Entra commercial/gov/china, Okta, Google) - and stores `issuer` + `jwks_uri` into the `expectedIssuer` + `jwksUri` fields. The fetch is gated by the same `JWKS_HOST_ALLOWLIST` (section 10) that guards the runtime JWKS fetch, and the returned `issuer` is validated before storing (RFC 8414 section 3.3). This is what makes "accessible from any tenant / any IdP" work WITHOUT weakening validation: trust stays per-endpoint and exact-match; only the config ergonomics are generic. It reads the SOURCE IdP's discovery doc - the opposite direction from [section 8.5](#85-per-endpoint-oauth-as-metadata-url-rfc-8414---options-norm-decision), where SCIMServer PUBLISHES its own metadata.
+2. **Naming + aliases.** The contract keeps the descriptive `expected*` names (predicate semantics; aligns with Microsoft `ValidIssuer` / Keycloak / Auth0), and additionally ACCEPTS the bare claim names (`iss` / `sub` / `aud` / `tid` / `roles`) as INPUT aliases so a decoded token can be pasted directly. `allowedTenantId` is renamed `expectedTenantId` (old name kept as an alias - it is a live contract). The `expectedAudience` defaults to the endpointId (v2-only; a per-endpoint audience also blocks cross-endpoint token replay), and the per-endpoint `oauth-client` credential defaults `client_id` to the endpointId with a generated `client_secret`.
+
+NONE of this touches the resource-plane or token-plane validation - it is config-time convenience that fills the same stored fields the validator already reads. The security invariant holds: derive/generate the mechanical fields, never default a discriminator to "accept anything."
 
 ---
 
@@ -829,6 +857,19 @@ The crucial subtlety: **`grant_type=client_credentials` is shared by plain-CC an
 4. **Three-outcome provider contract** ([section 2.2](#22-the-three-outcome-acceptor-contract-a-hardening-requirement)) stops a clearly-7523 assertion that fails signature from falling through to plain-CC.
 5. **`grant_type` + fields is the floor; `iss` is the refinement.** Never route by `iss` before the structural tier establishes the profile.
 
+### 8.5 Per-endpoint OAuth AS metadata URL (RFC 8414) - options, norm, decision
+
+> **Status.** DESIGN, decided 2026-07-06 (Option B). Tracked as WI-12 in [CONNECTION_INFO_AND_ENTRA_SETUP.md section 2.4](CONNECTION_INFO_AND_ENTRA_SETUP.md#24-per-endpoint-oauth-as-metadata-url-options-norm-decision). Today only the GLOBAL metadata exists at the deployment root ([oauth-metadata.controller.ts](../../api/src/oauth/oauth-metadata.controller.ts)), advertising only the global `/scim/oauth/token`; a per-endpoint document is missing.
+
+RFC 8414 gives two placements when the issuer has a path component (`https://host/scim/endpoints/{id}`):
+
+| Option | URL | Basis |
+|---|---|---|
+| A - RFC 8414 section 3 strict (insert) | `https://host/.well-known/oauth-authorization-server/scim/endpoints/{id}` | canonical multi-issuer-per-host form |
+| **B - OIDC-style append (DECIDED)** | `https://host/scim/endpoints/{id}/.well-known/oauth-authorization-server` | RFC 8414 section 5 (OIDC transform); already the form in [section 7.4](#74-d-discovery--key-publication) |
+
+The industry norm is overwhelmingly the append form: Entra (`/{tenant}/v2.0/.well-known/openid-configuration`), Okta (`/oauth2/{authServerId}/.well-known/oauth-authorization-server`), Keycloak (`/realms/{realm}/.well-known/openid-configuration`), AWS Cognito (`/{poolId}/.well-known/openid-configuration`). **Decision: Option B** (co-locates discovery with the endpoint's routes; matches every major IdP). RFC 8414 section 5 permits also serving Option A during a transition. Two hard rules: the returned `issuer` MUST exactly equal the identifier used to build the URL (mix-up defense), and `token_endpoint` must be the per-endpoint one. Because there is one global signing key today, the per-endpoint `jwks_uri` points at the shared `/scim/oauth/jwks`. Entra's provisioning client does not consume this document (the admin types the values); it is for standards-based OAuth clients and self-consistency.
+
 ---
 
 ## 9. Coverage: SCIM + Entra mechanisms
@@ -864,7 +905,7 @@ SCIM does not implement auth; it **advertises** it. RFC 7643 section 5 defines `
 | Threat | Mitigation | Level |
 |---|---|---|
 | Algorithm confusion (`alg:none`, HMAC-with-public-key) | pin `allowedAlgs` to RS256/ES256; reject all else | Global |
-| **JWKS SSRF** (attacker/operator-set `jwksUri`) | host allowlist enforced at config-write AND at fetch; single choke point | **Global** |
+| **JWKS SSRF** (attacker/operator-set `jwksUri`) | host allowlist (seed + env + persisted, admin-editable at runtime) - https + exact-host match, enforced before any network call; single choke point (WI-15) | **Global** |
 | v1 widening the attack surface | v1 off by default; deliberate global enable; per-endpoint cannot self-enable past the ceiling | Global ceiling |
 | Cross-tenant access | `tid` == `allowedTenantId`; exact-match `iss` already embeds the tenant | Per-endpoint |
 | Issuer spoofing across versions | exact-string `iss` match drives trust-profile selection; no substring/normalized compare | Per-endpoint |
