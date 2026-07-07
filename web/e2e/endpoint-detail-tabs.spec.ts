@@ -153,4 +153,15 @@ test.describe('EndpointDetailPage - tab matrix', () => {
     // loose regex that allows either end-of-string or query string.
     await expect(page).toHaveURL(/\/logs(\?|$)/);
   });
+
+  // WI-11: the Settings tab surfaces the per-method auth-enablement switches.
+  test('WI-11: Settings tab exposes the per-method auth-enablement switches', async ({ page }) => {
+    const id = await openFirstEndpoint(page);
+    await page.goto(`/endpoints/${id}/settings`);
+    await expect(page.getByTestId('settings-tab')).toBeVisible({ timeout: 20_000 });
+
+    await expect(page.getByRole('switch', { name: /SecretTokenBearerAuthEnabled/i })).toBeVisible();
+    await expect(page.getByRole('switch', { name: /OAuthClientCredentialsAuthEnabled/i })).toBeVisible();
+    await expect(page.getByRole('switch', { name: /SharedSecretBearerAuthEnabled/i })).toBeVisible();
+  });
 });

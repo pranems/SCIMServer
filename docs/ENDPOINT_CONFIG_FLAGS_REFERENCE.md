@@ -2,7 +2,7 @@
 
 > **Version:** 0.54.0-alpha.7 - **Updated:** June 18, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 17 flags: 15 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`).  
+> 20 flags: 18 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`).  
 > 4 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `structured` (the last added Pre-Q.A, reserved for the WIF trust object).
 
 ---
@@ -130,6 +130,9 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 15 | [`logLevel`](#loglevel) | string | (global) | Logging |
 | 16 | [`logFileEnabled`](#logfileenabled) | boolean | `true` | Logging |
 | 17 | [`WifCredentialsEnabled`](#wifcredentialsenabled) | boolean | `false` | Authentication |
+| 18 | [`SecretTokenBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
+| 19 | [`OAuthClientCredentialsAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
+| 20 | [`SharedSecretBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `true` | Authentication |
 
 ### WifCredentialsEnabled
 
@@ -141,6 +144,30 @@ credential may be attached (via `POST /admin/endpoints/:id/credentials` with
 permitted when `WifCredentialsEnabled` is on, independent of the bearer gate,
 and a `bearer` credential still requires `PerEndpointCredentialsEnabled`.
 Added in A1 ([docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](auth/AUTHENTICATION_METHODS_ADMIN_API.md)).
+
+### WI-11 per-method auth-enablement flags
+
+WI-11 splits the double-duty `PerEndpointCredentialsEnabled` into three flags,
+each gating one auth method independently (at credential-create AND on the
+resource-plane validation path):
+
+| Flag | Gates | Effective default |
+|---|---|---|
+| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` (Entra "Secret Token") | falls back to `PerEndpointCredentialsEnabled` when unset |
+| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` (Entra "OAuth2 client-credentials") | falls back to `PerEndpointCredentialsEnabled` when unset |
+| `SharedSecretBearerAuthEnabled` | whether the endpoint accepts the global `SCIM_SHARED_SECRET` | `true` (unset means accept, back-compat) |
+
+The effective value is computed by `getEffectiveAuthEnablement()`
+([endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)). The
+migration is **value-preserving**: an endpoint that only has the legacy
+`PerEndpointCredentialsEnabled` behaves byte-for-byte as before (that flag is
+read as a one-release fallback for both per-endpoint methods). An explicit new
+flag always overrides the legacy fallback. The new capability is
+`SharedSecretBearerAuthEnabled=false`, which makes an endpoint refuse the global
+shared secret on its resource routes and accept only its own credentials (or
+endpoint-scoped OAuth tokens). `*` The two per-endpoint flags show `false` as
+their registry default, but their EFFECTIVE value inherits the legacy flag when
+that is set.
 
 ---
 

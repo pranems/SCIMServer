@@ -111,6 +111,54 @@ describe('SharedSecretGuard', () => {
     expect(guard).toBeDefined();
   });
 
+  describe('WI-11 - SharedSecretBearerAuthEnabled gate on the global secret', () => {
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=false REFUSES the global secret', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { SharedSecretBearerAuthEnabled: false } },
+        active: true,
+      });
+      const { context } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=true (default) still accepts the global secret', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { SharedSecretBearerAuthEnabled: true } },
+        active: true,
+      });
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+
+    it('an unset endpoint (no auth flags) still accepts the global secret (back-compat)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: {} },
+        active: true,
+      });
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+
+    it('a GLOBAL (non-endpoint) route always accepts the shared secret regardless of any flag', async () => {
+      const { context, request } = createMockContext('Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+  });
+
   describe('public routes', () => {
     it('should allow access to public routes without auth', async () => {
       const { context } = createMockContext(undefined, true);

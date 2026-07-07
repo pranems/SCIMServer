@@ -81,6 +81,32 @@ export const ENDPOINT_CONFIG_FLAGS = {
   PER_ENDPOINT_CREDENTIALS_ENABLED: 'PerEndpointCredentialsEnabled',
 
   /**
+   * WI-11 - per-method auth-enablement flag family (splits the double-duty
+   * PerEndpointCredentialsEnabled). Each gates one auth method independently,
+   * at credential-create AND on the resource-plane validation path.
+   *
+   * `SecretTokenBearerAuthEnabled`: gates the per-endpoint `bearer` credential
+   * (Entra "Secret Token"). Effective value falls back to the legacy
+   * PerEndpointCredentialsEnabled when unset (value-preserving migration).
+   */
+  SECRET_TOKEN_BEARER_AUTH_ENABLED: 'SecretTokenBearerAuthEnabled',
+
+  /**
+   * WI-11 - gates the per-endpoint `oauth_client` credential (Entra "OAuth2
+   * client-credentials"). Effective value falls back to the legacy
+   * PerEndpointCredentialsEnabled when unset (value-preserving migration).
+   */
+  OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED: 'OAuthClientCredentialsAuthEnabled',
+
+  /**
+   * WI-11 - whether THIS endpoint accepts the global SCIM_SHARED_SECRET. New
+   * capability: an operator can make an endpoint refuse the global secret and
+   * accept ONLY its own credentials. Effective value defaults to `true` when
+   * unset (back-compat: every endpoint accepts the global secret today).
+   */
+  SHARED_SECRET_BEARER_AUTH_ENABLED: 'SharedSecretBearerAuthEnabled',
+
+  /**
    * When true, write responses include a warning extension URN listing any readOnly
    * attributes that were silently stripped from the incoming payload.
    * When false (default), stripping happens silently without response annotation.
@@ -292,7 +318,36 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'When true, incoming bearer tokens are validated against the EndpointCredential table ' +
       '(bcrypt-hashed per-endpoint tokens). Falls back to global SCIM_SHARED_SECRET and OAuth JWT. ' +
       'When false (default), only global SCIM_SHARED_SECRET and OAuth JWT are used. ' +
-      'Enable for multi-tenant deployments where each endpoint has its own secret.',
+      'Enable for multi-tenant deployments where each endpoint has its own secret. ' +
+      'WI-11: superseded by SecretTokenBearerAuthEnabled + OAuthClientCredentialsAuthEnabled ' +
+      '(this flag is read as a one-release fallback for both).',
+  },
+  SECRET_TOKEN_BEARER_AUTH_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'WI-11. When true, this endpoint accepts a per-endpoint bcrypt bearer token (Entra "Secret Token"). ' +
+      'When unset, the effective value falls back to the legacy PerEndpointCredentialsEnabled ' +
+      '(value-preserving migration). Gates both credential-create and the resource-plane validation path.',
+  },
+  OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'WI-11. When true, this endpoint accepts a per-endpoint oauth_client credential (Entra "OAuth2 ' +
+      'client-credentials"). When unset, the effective value falls back to the legacy ' +
+      'PerEndpointCredentialsEnabled (value-preserving migration). Gates both create and validation.',
+  },
+  SHARED_SECRET_BEARER_AUTH_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'WI-11. When true (default), this endpoint accepts the global SCIM_SHARED_SECRET as a bearer token. ' +
+      'When false, the endpoint refuses the global secret and accepts ONLY its own per-endpoint ' +
+      'credentials (or endpoint-scoped OAuth tokens). Back-compat: unset means true.',
   },
   INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: {
     key: ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE,
@@ -410,6 +465,9 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]?: boolean | string;
@@ -515,6 +573,71 @@ export function getConfigStructured(
     return value as Record<string, unknown>;
   }
   return undefined;
+}
+
+/**
+ * Read a boolean flag ONLY when it is explicitly set, returning `undefined`
+ * when the key is absent (so a caller can distinguish "unset" from "false").
+ * This is the primitive the WI-11 effective-flag fallback is built on.
+ */
+export function getOptionalConfigBoolean(
+  config: EndpointConfig | undefined,
+  key: string,
+): boolean | undefined {
+  if (!config) return undefined;
+  const value = config[key];
+  if (value === undefined) return undefined;
+  return parseBooleanValue(value);
+}
+
+/**
+ * WI-11 - the effective per-method auth enablement for an endpoint.
+ *
+ * The single legacy `PerEndpointCredentialsEnabled` flag is split into a
+ * per-method family. This helper computes the EFFECTIVE value of each new flag
+ * with a value-preserving fallback, so existing endpoints (which have only the
+ * legacy flag, or nothing) behave byte-for-byte as before:
+ *
+ *  - `secretTokenBearer`      = SecretTokenBearerAuthEnabled if set, else the
+ *                               legacy PerEndpointCredentialsEnabled, else false.
+ *  - `oauthClientCredentials` = OAuthClientCredentialsAuthEnabled if set, else the
+ *                               legacy PerEndpointCredentialsEnabled, else false.
+ *  - `sharedSecretBearer`     = SharedSecretBearerAuthEnabled if set, else true
+ *                               (back-compat: every endpoint accepts the global
+ *                               secret today).
+ *
+ * The legacy flag is read as a one-release fallback; once every endpoint carries
+ * the new flags explicitly it can be retired.
+ */
+export interface EffectiveAuthEnablement {
+  /** Per-endpoint bcrypt `bearer` credential (Entra Secret Token). */
+  secretTokenBearer: boolean;
+  /** Per-endpoint `oauth_client` credential (Entra OAuth2 client-credentials). */
+  oauthClientCredentials: boolean;
+  /** Whether this endpoint accepts the global SCIM_SHARED_SECRET. */
+  sharedSecretBearer: boolean;
+}
+
+export function getEffectiveAuthEnablement(
+  config: EndpointConfig | undefined,
+): EffectiveAuthEnablement {
+  const legacy = getOptionalConfigBoolean(
+    config,
+    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+  );
+  const legacyOrFalse = legacy ?? false;
+
+  const secretTokenBearer =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED) ??
+    legacyOrFalse;
+  const oauthClientCredentials =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED) ??
+    legacyOrFalse;
+  const sharedSecretBearer =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED) ??
+    true;
+
+  return { secretTokenBearer, oauthClientCredentials, sharedSecretBearer };
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────

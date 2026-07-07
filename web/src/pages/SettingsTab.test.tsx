@@ -103,6 +103,10 @@ describe('SettingsTab', () => {
     expect(screen.getByRole('switch', { name: /StrictSchemaValidation/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /RequireIfMatch/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /PerEndpointCredentialsEnabled/i })).toBeInTheDocument();
+    // WI-11: the per-method auth-enablement flag family.
+    expect(screen.getByRole('switch', { name: /SecretTokenBearerAuthEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /OAuthClientCredentialsAuthEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /SharedSecretBearerAuthEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /WifCredentialsEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /UserSoftDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /UserHardDeleteEnabled/i })).toBeInTheDocument();

@@ -4,6 +4,8 @@ import {
   getConfigBooleanWithDefault,
   getConfigString,
   getConfigStructured,
+  getOptionalConfigBoolean,
+  getEffectiveAuthEnablement,
   validateEndpointConfig,
   validateStructuredFlag,
   DEFAULT_ENDPOINT_CONFIG,
@@ -1304,6 +1306,67 @@ describe('endpoint-config.interface', () => {
 
       it('should return undefined for a null value', () => {
         expect(getConfigStructured({ WifTrust: null }, 'WifTrust')).toBeUndefined();
+      });
+    });
+  });
+
+  describe('WI-11 - per-method auth-enablement flag family', () => {
+    it('registers the three new flag keys', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED).toBe('SecretTokenBearerAuthEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED).toBe('OAuthClientCredentialsAuthEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED).toBe('SharedSecretBearerAuthEnabled');
+    });
+
+    describe('getOptionalConfigBoolean', () => {
+      it('returns undefined when the key is absent', () => {
+        expect(getOptionalConfigBoolean({}, 'SecretTokenBearerAuthEnabled')).toBeUndefined();
+      });
+      it('returns the parsed value when set (boolean or string)', () => {
+        expect(getOptionalConfigBoolean({ SecretTokenBearerAuthEnabled: true }, 'SecretTokenBearerAuthEnabled')).toBe(true);
+        expect(getOptionalConfigBoolean({ SecretTokenBearerAuthEnabled: 'False' }, 'SecretTokenBearerAuthEnabled')).toBe(false);
+      });
+    });
+
+    describe('getEffectiveAuthEnablement', () => {
+      it('a bare endpoint (no flags) accepts the shared secret, no per-endpoint methods', () => {
+        const eff = getEffectiveAuthEnablement({});
+        expect(eff).toEqual({
+          secretTokenBearer: false,
+          oauthClientCredentials: false,
+          sharedSecretBearer: true,
+        });
+      });
+
+      it('value-preserving: legacy PerEndpointCredentialsEnabled=true enables BOTH new per-endpoint methods', () => {
+        const eff = getEffectiveAuthEnablement({ PerEndpointCredentialsEnabled: true });
+        expect(eff.secretTokenBearer).toBe(true);
+        expect(eff.oauthClientCredentials).toBe(true);
+        // Shared secret still accepted (unset -> true).
+        expect(eff.sharedSecretBearer).toBe(true);
+      });
+
+      it('an explicit new flag OVERRIDES the legacy fallback', () => {
+        const eff = getEffectiveAuthEnablement({
+          PerEndpointCredentialsEnabled: true,
+          OAuthClientCredentialsAuthEnabled: false,
+        });
+        // bearer inherits legacy true; oauth_client explicitly off.
+        expect(eff.secretTokenBearer).toBe(true);
+        expect(eff.oauthClientCredentials).toBe(false);
+      });
+
+      it('SharedSecretBearerAuthEnabled=false makes the endpoint refuse the global secret', () => {
+        const eff = getEffectiveAuthEnablement({ SharedSecretBearerAuthEnabled: false });
+        expect(eff.sharedSecretBearer).toBe(false);
+      });
+
+      it('accepts string boolean values (Entra-style "True"/"False")', () => {
+        const eff = getEffectiveAuthEnablement({
+          SecretTokenBearerAuthEnabled: 'True',
+          SharedSecretBearerAuthEnabled: 'False',
+        });
+        expect(eff.secretTokenBearer).toBe(true);
+        expect(eff.sharedSecretBearer).toBe(false);
       });
     });
   });

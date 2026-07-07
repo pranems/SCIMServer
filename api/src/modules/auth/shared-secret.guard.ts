@@ -20,7 +20,7 @@ import { LogCategory } from '../logging/log-levels';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../endpoint/services/endpoint.service';
-import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../endpoint/endpoint-config.interface';
+import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../endpoint/endpoint-config.interface';
 
 // bcrypt is heavy - lazy-load via dynamic import cached on first use
 let bcryptCompare: (data: string, hash: string) => Promise<boolean>;
@@ -164,6 +164,21 @@ export class SharedSecretGuard implements CanActivate {
     // S-2: timing-safe comparison via safeCompare prevents byte-by-byte
     // guessing of the configured shared secret via response-time analysis.
     if (safeCompare(token, expectedSecret)) {
+      // WI-11 - an endpoint-scoped request may REFUSE the global shared secret
+      // when SharedSecretBearerAuthEnabled is false on that endpoint (it then
+      // accepts only its own per-endpoint credentials / endpoint-scoped OAuth).
+      // Global (non-endpoint) routes always accept the secret.
+      if (endpointId && this.endpointService) {
+        const allowed = await this.isSharedSecretAllowedForEndpoint(endpointId);
+        if (!allowed) {
+          this.logger.warn(
+            LogCategory.AUTH,
+            'Global shared secret refused: SharedSecretBearerAuthEnabled is off for this endpoint',
+            { endpointId },
+          );
+          this.reject(response, 'This endpoint does not accept the global shared secret.', 'invalid_token');
+        }
+      }
       this.logger.info(LogCategory.AUTH, 'Legacy bearer token authentication successful');
       request.authType = 'legacy';
       this.logger.enrichContext({ authType: 'legacy' });
@@ -186,6 +201,27 @@ export class SharedSecretGuard implements CanActivate {
   }
 
   /**
+   * WI-11 - whether the endpoint accepts the global SCIM_SHARED_SECRET.
+   * Effective SharedSecretBearerAuthEnabled defaults to `true` (back-compat),
+   * so an endpoint refuses the global secret ONLY when it explicitly sets the
+   * flag to false. On any lookup error we fail OPEN (return true) to preserve
+   * today's behavior - the secret still had to match to reach this check.
+   */
+  private async isSharedSecretAllowedForEndpoint(endpointId: string): Promise<boolean> {
+    try {
+      const endpoint = await this.endpointService!.getEndpoint(endpointId);
+      const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+      return getEffectiveAuthEnablement(config).sharedSecretBearer;
+    } catch (error) {
+      this.logger.debug(LogCategory.AUTH, 'Shared-secret enablement check failed, allowing (fail-open)', {
+        endpointId,
+        error: (error as Error).message,
+      });
+      return true;
+    }
+  }
+
+  /**
    * Try to authenticate via per-endpoint credentials.
    * Returns true if a matching active credential is found.
    * Returns false to allow fallback to OAuth/legacy.
@@ -196,15 +232,15 @@ export class SharedSecretGuard implements CanActivate {
     request: AuthenticatedRequest,
   ): Promise<boolean> {
     try {
-      // Check if the endpoint has per-endpoint credentials enabled
+      // WI-11 - per-method enablement. `bearer` credentials ride
+      // SecretTokenBearerAuthEnabled and `oauth_client` credentials ride
+      // OAuthClientCredentialsAuthEnabled; each falls back to the legacy
+      // PerEndpointCredentialsEnabled when unset (value-preserving migration).
       const endpoint = await this.endpointService!.getEndpoint(endpointId);
       const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-      const perEndpointEnabled = getConfigBoolean(
-        config,
-        ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
-      );
+      const effective = getEffectiveAuthEnablement(config);
 
-      if (!perEndpointEnabled) {
+      if (!effective.secretTokenBearer && !effective.oauthClientCredentials) {
         this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });
         return false; // Fall through to OAuth/legacy
       }
@@ -216,10 +252,17 @@ export class SharedSecretGuard implements CanActivate {
         return false; // Fall through to OAuth/legacy
       }
 
-      // Compare token against each credential's bcrypt hash
+      // Compare token against each credential's bcrypt hash, but ONLY consider a
+      // credential whose type's auth method is enabled (WI-11). A `wif` row has
+      // an empty hash and never matches; a `bearer`/`oauth_client` row is
+      // skipped when its method flag is off.
       const compare = await loadBcryptCompare();
       for (const cred of credentials) {
-        const isMatch = await compare(token, cred.credentialHash);
+        if (cred.credentialType === 'bearer' && !effective.secretTokenBearer) continue;
+        if (cred.credentialType === 'oauth_client' && !effective.oauthClientCredentials) continue;
+        const isMatch = cred.credentialHash
+          ? await compare(token, cred.credentialHash)
+          : false;
         if (isMatch) {
           request.authType = 'endpoint_credential';
           request.authCredentialId = cred.id;

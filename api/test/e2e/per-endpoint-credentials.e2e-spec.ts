@@ -350,4 +350,64 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(400);
     });
   });
+
+  // ───────── WI-11 - per-method auth-enablement flag family ─────────
+  describe('WI-11 - per-method auth-enablement flags', () => {
+    const legacyToken = getLegacyToken();
+
+    it('allows a bearer credential create when only SecretTokenBearerAuthEnabled is on', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SecretTokenBearerAuthEnabled: true });
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'wi11-bearer' })
+        .expect(201);
+    });
+
+    it('blocks an oauth_client create when OAuthClientCredentialsAuthEnabled is off (bearer only)', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: false });
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'oauth_client', label: 'wi11-oc' })
+        .expect(403);
+    });
+
+    it('value-preserving: legacy PerEndpointCredentialsEnabled=true still allows bearer create', async () => {
+      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'wi11-legacy' })
+        .expect(201);
+    });
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=false REFUSES the global shared secret', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SharedSecretBearerAuthEnabled: false });
+      // The global shared secret (legacyToken) is refused on this endpoint's routes.
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(401);
+    });
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=true (default) still accepts the global secret', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SharedSecretBearerAuthEnabled: true });
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+    });
+
+    it('a default endpoint (no auth flags) still accepts the global secret (back-compat)', async () => {
+      const ep = await createEndpointWithConfig(app, token, {});
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+    });
+  });
 });

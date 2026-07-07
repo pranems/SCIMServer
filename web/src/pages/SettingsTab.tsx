@@ -154,6 +154,24 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     defaultValue: false,
   },
   {
+    key: 'SecretTokenBearerAuthEnabled',
+    label: 'SecretTokenBearerAuthEnabled',
+    description: 'WI-11: accept a per-endpoint bcrypt bearer token (Entra "Secret Token"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
+    defaultValue: false,
+  },
+  {
+    key: 'OAuthClientCredentialsAuthEnabled',
+    label: 'OAuthClientCredentialsAuthEnabled',
+    description: 'WI-11: accept a per-endpoint oauth_client credential (Entra "OAuth2 client-credentials"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
+    defaultValue: false,
+  },
+  {
+    key: 'SharedSecretBearerAuthEnabled',
+    label: 'SharedSecretBearerAuthEnabled',
+    description: 'WI-11: whether this endpoint accepts the global SCIM shared secret. Turn OFF to make the endpoint accept only its own credentials. Defaults to on.',
+    defaultValue: true,
+  },
+  {
     key: 'WifCredentialsEnabled',
     label: 'WifCredentialsEnabled',
     description: 'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',

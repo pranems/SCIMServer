@@ -11710,6 +11710,65 @@ try {
 Write-Host "`n--- 9z-AT4: WI-12 per-endpoint OAuth metadata Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT5: WI-11 per-method auth-enablement flag family
+$script:currentSection = "9z-AT5: WI-11 auth-flag split"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT5: WI-11 per-method auth-enablement flag family" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # T1: bearer create allowed with only SecretTokenBearerAuthEnabled on.
+    $at5EpA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi11a-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at5EpA.id)" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $at5Bearer = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at5EpA.id)/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "bearer"; label = "wi11-live-bearer"
+    } | ConvertTo-Json)
+    Test-Result -Success ($at5Bearer.credentialType -eq "bearer") -Message "9z-AT5.T1: bearer create allowed with only SecretTokenBearerAuthEnabled on"
+
+    # T2: oauth_client create blocked when OAuthClientCredentialsAuthEnabled is off.
+    $at5OcBlocked = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at5EpA.id)/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "oauth_client"; label = "wi11-live-oc"
+        } | ConvertTo-Json) | Out-Null
+    } catch { $at5OcBlocked = ($_.Exception.Response.StatusCode.value__ -eq 403) }
+    Test-Result -Success $at5OcBlocked -Message "9z-AT5.T2: oauth_client create blocked when OAuthClientCredentialsAuthEnabled off"
+
+    # T3: an endpoint with SharedSecretBearerAuthEnabled=false REFUSES the global secret.
+    $at5EpB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi11b-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at5EpB.id)" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SharedSecretBearerAuthEnabled = "False" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    # The global shared secret ($Token) is refused on this endpoint's RESOURCE
+    # routes (admin routes are global and still accept it, which is how cleanup
+    # below still works).
+    $at5Refused = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($at5EpB.id)/Users?count=1" -Method GET -Headers @{ Authorization = "Bearer $Token" } | Out-Null
+    } catch { $at5Refused = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $at5Refused -Message "9z-AT5.T3: SharedSecretBearerAuthEnabled=false refuses the global shared secret on resource routes"
+
+    # T4: a default endpoint still accepts the global secret (back-compat).
+    $at5Users = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($at5EpA.id)/Users?count=1" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $at5Users) -Message "9z-AT5.T4: default endpoint still accepts the admin/global token (back-compat)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at5EpA.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at5EpB.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT5: WI-11 auth-flag-split section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT5: WI-11 auth-flag split Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

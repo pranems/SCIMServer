@@ -258,6 +258,48 @@ describe('AdminCredentialController', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    // ── WI-11 - per-method create gate ──────────────────────────────────────
+    it('WI-11: allows a bearer credential when SecretTokenBearerAuthEnabled is on (no legacy flag)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { SecretTokenBearerAuthEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+      const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' });
+      expect(result.credentialType).toBe('bearer');
+    });
+
+    it('WI-11: allows an oauth_client credential when OAuthClientCredentialsAuthEnabled is on (no legacy flag)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: 'epc_x' } });
+      const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' });
+      expect(result.credentialType).toBe('oauth_client');
+    });
+
+    it('WI-11: value-preserving - legacy PerEndpointCredentialsEnabled=true still allows bearer + oauth_client', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+      await expect(controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' })).resolves.toBeDefined();
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: 'epc_y' } });
+      await expect(controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' })).resolves.toBeDefined();
+    });
+
+    it('WI-11: an explicit OAuthClientCredentialsAuthEnabled=false blocks oauth_client even if bearer is on', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: false } },
+      });
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('the wif response carries NO secret/hash field', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,

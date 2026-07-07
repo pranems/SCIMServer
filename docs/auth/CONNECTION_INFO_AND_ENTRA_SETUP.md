@@ -192,7 +192,7 @@ Combinations 1 and 2 use Entra's Secret Token field. Combinations 3 and 4 use En
 
 ## 3A. Auth-method enablement flags (proposed flag-split family)
 
-> **Status.** DESIGN, operator-confirmed 2026-07-06 (naming Option B). Not yet implemented - [WI-11](#11a-work-items-delivery-backlog).
+> **Status.** DONE (2026-07-06, [endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts) `getEffectiveAuthEnablement`). Shipped as the three flags below with a value-preserving fallback to the legacy `PerEndpointCredentialsEnabled`. - [WI-11](#11a-work-items-delivery-backlog).
 
 ### 3A.1 The problem with today's single flag
 
@@ -1586,7 +1586,7 @@ One epic, sequenced into independently-shippable items. Sizes are relative (S/M/
 | WI-8 | Reveal endpoint + audit log | M | WI-6, WI-7 | `POST .../reveal` admin-only, gated by effective setting, `LogCategory.AUTH` audit; old credentials return non-error "not retained". |
 | WI-9 | One-click rotate | M | WI-2 (WI-6 optional) | `POST .../rotate` mints new secret (shown once, retained if allowed), revokes old; the lost-secret recovery path. |
 | WI-10 | Docs / INDEX / CHANGELOG / session + KEK deployment docs | S | ships with each item | Fold KEK operator guide into DEPLOYMENT.md + README env table + docker-compose when WI-6 lands. |
-| WI-11 | Split `PerEndpointCredentialsEnabled` into the per-method flag family | M | none | `SecretTokenBearerAuthEnabled` + `OAuthClientCredentialsAuthEnabled` + new `SharedSecretBearerAuthEnabled`; value-preserving migration; old flag read as a one-release fallback then retired; 10-cell matrix per flag. See [3A](#3a-auth-method-enablement-flags-proposed-flag-split-family). |
+| WI-11 | Split `PerEndpointCredentialsEnabled` into the per-method flag family | M | none | **DONE (2026-07-06).** `SecretTokenBearerAuthEnabled` + `OAuthClientCredentialsAuthEnabled` + new `SharedSecretBearerAuthEnabled`; `getEffectiveAuthEnablement` value-preserving fallback to the legacy flag; wired into create-gate + guard; 3 SettingsTab Switches. See [3A](#3a-auth-method-enablement-flags-proposed-flag-split-family). |
 | WI-12 | Per-endpoint OAuth AS metadata (RFC 8414) | S | none | **DONE (2026-07-06).** `GET /scim/endpoints/{id}/.well-known/oauth-authorization-server` (append form, Option B) advertising the per-endpoint `token_endpoint` + shared `jwks_uri`; `issuer` equals the bare per-endpoint identifier. UI: return-box metadata URL row. See [2.4](#24-per-endpoint-oauth-as-metadata-url-options-norm-decision). |
 | WI-13 | WIF trust field claim-name aliases + per-field examples/hints | S | none | **DONE (2026-07-06).** Accepts `iss`/`sub`/`aud`/`tid`/`roles` as INPUT aliases + `expectedTenantId` (alias of `allowedTenantId`); normalized before validation; canonical wins; aliases not persisted. UI alias hint + tenant field relabel. See [5B](#5b-wif-trust-field-reference-examples-provenance-usage-validation). |
 | WI-14 | WIF trust discovery resolver + smart defaults | M | none | Config-time `POST /admin/endpoints/{id}/wif/resolve` with full-`discoveryUrl` OR `preset`+`tenantId` modes (host-allowlist gated, config-time only); fills `expectedIssuer`+`jwksUri`; defaults `expectedAudience` to the endpointId; `oauth_client` defaults `client_id`=endpointId + generated `client_secret`. See [5C](#5c-simplifying-wif-trust-setup-discovery-resolver--smart-defaults). |

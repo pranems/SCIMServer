@@ -31,7 +31,7 @@ import * as bcrypt from 'bcrypt';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import {
@@ -167,9 +167,7 @@ export class AdminCredentialController {
     }
 
     // A1 - orthogonal create gate. WIF rides its own enabling flag
-    // (WifCredentialsEnabled), independent of the bcrypt-bearer gate
-    // (PerEndpointCredentialsEnabled). bearer/oauth_client keep the existing
-    // PerEndpointCredentialsEnabled requirement.
+    // (WifCredentialsEnabled), independent of the bcrypt-bearer gate.
     if (credentialType === 'wif') {
       if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
         throw new ForbiddenException(
@@ -180,11 +178,22 @@ export class AdminCredentialController {
       return this.createWifCredential(endpointId, dto);
     }
 
-    // Validate that per-endpoint credentials are enabled
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED)) {
+    // WI-11 - per-method create gate. `bearer` rides SecretTokenBearerAuthEnabled
+    // and `oauth_client` rides OAuthClientCredentialsAuthEnabled; each falls back
+    // to the legacy PerEndpointCredentialsEnabled when unset (value-preserving).
+    const effective = getEffectiveAuthEnablement(config);
+    if (credentialType === 'bearer' && !effective.secretTokenBearer) {
       throw new ForbiddenException(
-        `Per-endpoint credentials are not enabled for endpoint "${endpointId}". ` +
-        `Set "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
+        `Per-endpoint bearer (Secret Token) auth is not enabled for endpoint "${endpointId}". ` +
+        `Set "${ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED}" to "True" in the endpoint config ` +
+        `(or the legacy "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}").`,
+      );
+    }
+    if (credentialType === 'oauth_client' && !effective.oauthClientCredentials) {
+      throw new ForbiddenException(
+        `Per-endpoint OAuth client-credentials auth is not enabled for endpoint "${endpointId}". ` +
+        `Set "${ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED}" to "True" in the endpoint config ` +
+        `(or the legacy "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}").`,
       );
     }
 
