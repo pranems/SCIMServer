@@ -5,6 +5,7 @@ import {
   WifAssertionValidatorService,
   WifAssertionInvalidError,
   type WifTrust,
+  type WifValidatedClaims,
 } from '../../../oauth/wif-assertion-validator.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
@@ -24,6 +25,12 @@ import type { IAssertionTokenProvider } from './assertion-token-provider';
  *  - A `wif` trust exists and the assertion is valid -> mints and returns the
  *    endpoint's own short-lived token, scoped to the configured `scope`.
  *
+ * WI-16 (multi-trust): an endpoint may hold SEVERAL `wif` trusts (one per IdP,
+ * per CONNECTION_INFO_AND_ENTRA_SETUP.md section 5F). Every active `wif` row is
+ * tried until one validates; if none does, the assertion is "mine-but-invalid"
+ * and we fail closed (throw). This is the config-level half of the multi-IdP
+ * design; the resource level is unchanged (all IdPs share one common pool).
+ *
  * The minted token is the ISV's OWN token (the Entra assertion is presented once
  * here and never rides the SCIM calls). No secret is read or stored - the WIF
  * trust is all public values on the `wif` EndpointCredential.metadata.
@@ -40,38 +47,65 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
 
   async mintFromAssertion(endpointId: string, clientAssertion: string): Promise<AccessToken | null> {
     const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
-    const wif = credentials.find((c) => c.credentialType === 'wif');
+    const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
 
     // Not-mine-continue: no WIF trust configured for this endpoint.
-    if (!wif) {
+    if (wifCredentials.length === 0) {
       return null;
     }
 
-    // From here on the assertion is "mine": any failure throws (the controller
-    // maps that to invalid_client) and NEVER falls through.
-    const trust = this.buildTrust(wif.metadata);
-    const claims = await this.validator.validate(clientAssertion, trust);
+    // From here on the assertion is "mine": one of the configured WIF trusts
+    // must accept it. WI-16 tries each active `wif` trust in turn; a rejecting
+    // or misconfigured trust is treated as a non-match and we keep trying the
+    // rest. If NONE accepts, we fail closed (throw the last error) and NEVER
+    // fall through to another auth method.
+    let lastError: unknown;
+    for (const wif of wifCredentials) {
+      let trust: WifTrust;
+      try {
+        trust = this.buildTrust(wif.metadata);
+      } catch (err) {
+        // A misconfigured trust row cannot match; remember the error so a
+        // whole-endpoint failure still surfaces a reason, and try the next.
+        lastError = err;
+        continue;
+      }
 
-    const token = await this.oauthService.generateEndpointAccessToken(
-      endpointId,
-      String(claims.sub),
-      undefined,
-      { ttlSec: trust.issuedTokenTtlSec, trustedScope: trust.scope },
+      let claims: WifValidatedClaims;
+      try {
+        claims = await this.validator.validate(clientAssertion, trust);
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+
+      const token = await this.oauthService.generateEndpointAccessToken(
+        endpointId,
+        String(claims.sub),
+        undefined,
+        { ttlSec: trust.issuedTokenTtlSec, trustedScope: trust.scope },
+      );
+
+      // A4 - shadow authorization telemetry. Compute the future role -> scope gate
+      // WITHOUT enforcing it (roleEnforcement is `off` in A4), so an operator can
+      // see in telemetry whether turning enforcement on would reject/narrow this
+      // live customer BEFORE flipping it. This NEVER changes what was minted above.
+      this.emitShadowTelemetry(endpointId, claims, trust, token);
+
+      this.logger.info(LogCategory.AUTH, 'WIF assertion accepted; endpoint token minted', {
+        endpointId,
+        subject: trust.expectedSubject,
+        scope: token.scope,
+        credentialId: wif.id,
+      });
+
+      return token;
+    }
+
+    // Mine-but-invalid-stop: the assertion matched no configured WIF trust.
+    throw (
+      lastError ?? new WifAssertionInvalidError('No configured WIF trust accepted the assertion.')
     );
-
-    // A4 - shadow authorization telemetry. Compute the future role -> scope gate
-    // WITHOUT enforcing it (roleEnforcement is `off` in A4), so an operator can
-    // see in telemetry whether turning enforcement on would reject/narrow this
-    // live customer BEFORE flipping it. This NEVER changes what was minted above.
-    this.emitShadowTelemetry(endpointId, claims, trust, token);
-
-    this.logger.info(LogCategory.AUTH, 'WIF assertion accepted; endpoint token minted', {
-      endpointId,
-      subject: trust.expectedSubject,
-      scope: token.scope,
-    });
-
-    return token;
   }
 
   /**

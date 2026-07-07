@@ -145,4 +145,57 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       identityModel: 'first-party',
     });
   });
+
+  // ─── WI-16 - multiple wif trusts on one endpoint (iterate, not first-only) ──
+  it('WI-16: mints when the assertion validates against a NON-first wif trust', async () => {
+    const first = wifCredential();
+    first.id = 'cred-wif-1';
+    first.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-A/v2.0', jwksUri: 'https://issuer-A/keys' };
+    const second = wifCredential();
+    second.id = 'cred-wif-2';
+    second.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-B/v2.0', jwksUri: 'https://issuer-B/keys' };
+    findActiveByEndpoint.mockResolvedValue([first, second]);
+
+    // The assertion is valid ONLY against the second trust (issuer-B); the
+    // first trust rejects. Today's first-only `find` would stop at the first
+    // and throw; WI-16 must try the second and mint.
+    validate.mockImplementation((_assertion: string, trust: { expectedIssuer: string }) => {
+      if (trust.expectedIssuer === 'https://issuer-B/v2.0') {
+        return Promise.resolve({
+          iss: 'https://issuer-B/v2.0',
+          sub: wifMetadata.expectedSubject,
+          aud: wifMetadata.expectedAudience,
+          tid: 'tenant-123',
+          roles: ['Scim.Provision'],
+        });
+      }
+      return Promise.reject(new WifAssertionInvalidError('issuer mismatch'));
+    });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    expect(result).toEqual({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+    // Both trusts were tried (first rejected, second accepted).
+    expect(validate).toHaveBeenCalledTimes(2);
+    expect(generateEndpointAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('WI-16: throws mine-but-invalid-stop when NO wif trust matches (multi-trust)', async () => {
+    const first = wifCredential();
+    first.id = 'cred-wif-1';
+    first.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-A/v2.0' };
+    const second = wifCredential();
+    second.id = 'cred-wif-2';
+    second.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-B/v2.0' };
+    findActiveByEndpoint.mockResolvedValue([first, second]);
+    validate.mockRejectedValue(new WifAssertionInvalidError('issuer mismatch'));
+
+    await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).rejects.toBeInstanceOf(
+      WifAssertionInvalidError,
+    );
+    // Both trusts were tried before failing closed.
+    expect(validate).toHaveBeenCalledTimes(2);
+    expect(generateEndpointAccessToken).not.toHaveBeenCalled();
+  });
 });

@@ -138,6 +138,107 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .expect(200);
   });
 
+  // ─── WI-16 - multiple WIF trusts on one endpoint (iterate, not first-only) ──
+  it('WI-16: an endpoint with TWO wif trusts mints when the assertion matches the second', async () => {
+    // A dedicated endpoint carrying two WIF trusts: the FIRST (issuer-A) does
+    // NOT match the signed assertion; the SECOND is the real issuer. Proves the
+    // provider iterates every trust instead of stopping at the first.
+    const multiEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+
+    // Trust 1 - a different issuer that the assertion will NOT satisfy.
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${multiEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Trust A (non-matching issuer)',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: 'https://login.microsoftonline.com/tenant-other/v2.0',
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: 'tenant-other',
+          requiredRoles: ['Scim.Provision'],
+          scope: 'scim.read',
+          issuedTokenTtlSec: 3600,
+        },
+      })
+      .expect(201);
+
+    // Trust 2 - the real issuer the assertion is signed for.
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${multiEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Trust B (matching issuer)',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: ISSUER,
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: TENANT,
+          requiredRoles: ['Scim.Provision'],
+          scope: 'scim.read scim.write',
+          issuedTokenTtlSec: 7200,
+        },
+      })
+      .expect(201);
+
+    const assertion = await signAssertion();
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${multiEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(201);
+
+    // Minted against the SECOND trust (its scope + ttl, not trust A's).
+    expect(res.body.token_type).toBe('Bearer');
+    expect(res.body.expires_in).toBe(7200);
+    expect(res.body.scope).toBe('scim.read scim.write');
+    const payload = decodePayload(res.body.access_token);
+    expect(payload.endpoint_id).toBe(multiEndpoint);
+  });
+
+  it('WI-16: an endpoint whose wif trusts ALL reject the assertion returns invalid_client', async () => {
+    const multiEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    // Two trusts, neither matching the assertion's issuer/tenant.
+    for (const tenant of ['tenant-x', 'tenant-y']) {
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${multiEndpoint}/credentials`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          credentialType: 'wif',
+          label: `Trust ${tenant}`,
+          wif: {
+            assertionProfile: 'jwt-bearer',
+            expectedIssuer: `https://login.microsoftonline.com/${tenant}/v2.0`,
+            expectedSubject: SUBJECT,
+            expectedAudience: AUDIENCE,
+            jwksUri: JWKS_URI,
+            allowedTenantId: tenant,
+            requiredRoles: ['Scim.Provision'],
+            issuedTokenTtlSec: 3600,
+          },
+        })
+        .expect(201);
+    }
+
+    const assertion = await signAssertion(); // iss=ISSUER, tid=TENANT - matches neither
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${multiEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(401);
+    expect(res.body.detail).toBe('invalid_client');
+  });
+
   it('rejects a wrong issuer with invalid_client', async () => {
     const assertion = await signAssertion({ iss: 'https://evil.example/v2.0' });
     const res = await postAssertion(assertion).expect(401);

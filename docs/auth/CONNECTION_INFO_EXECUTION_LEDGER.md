@@ -13,7 +13,7 @@
 | WI | Title | Track | Size | Status | Commit | Notes |
 |---|---|---|---|---|---|---|
 | WI-1 | Fix WIF SCIM URL (`/endpoints/{id}/v2` bug) | A (pre) | S | DONE (local) | _pending_ | Client-side string fix in [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx); live prod bug. vitest RED->GREEN (18/18) + full web vitest 1094/1094 + Playwright regression (4 tests list). tsc baseline 0-new; build+size pass. dev-Azure Playwright batched to pre-track checkpoint. |
-| WI-16 | Multi-trust WIF config (iterate all `wif` rows) | D | S | NOT-STARTED | - | Provider `find` -> iterate; actions the 5F decision. |
+| WI-16 | Multi-trust WIF config (iterate all `wif` rows) | D | S | DONE (local) | _pending_ | Provider `find` -> iterate; actions the 5F decision. 7 provider unit + 2 E2E (multi-trust mint + all-reject) + 1 vitest (multi-trust header) + Playwright multi-trust UI + live 9z-AT2 (5 asserts). CredentialsTab multi-trust header UI. API build clean. |
 | WI-17 | Issuer-first trust selection + source-stamped mint | D | M | NOT-STARTED | - | Depends WI-16. |
 | WI-13 | WIF trust claim-name aliases + `expectedTenantId` | C | S | NOT-STARTED | - | Input aliases; `allowedTenantId` -> `expectedTenantId` (alias kept). |
 | WI-12 | Per-endpoint OAuth AS metadata (RFC 8414) | C | S | NOT-STARTED | - | Append-form `.well-known/oauth-authorization-server`. |
@@ -61,3 +61,5 @@ Each WI runs the full ladder before it is called DONE:
 |------|-------|
 | 2026-07-06 | Ledger created. Branch `feat/wif` at `ec8620f` (design-only). Sequence decided: WI-1 -> Track D -> Track C -> Track A -> Track B. Starting WI-1. |
 | 2026-07-06 | WI-1 DONE (local gates). Fixed `scimUrl` in CredentialsTab.tsx `.../endpoints/{id}/v2` -> `/scim/v2/endpoints/{id}`. TDD: vitest RED (received `/scim/endpoints/ep-1/v2`) -> GREEN 18/18. Static: web tsc 96 baseline / 0 new, web eslint N/A (no config), web build exit 0, size-limit exit 0. Full web vitest 1094/1094 (93 files). Playwright regression authored (route-mocked create POST, no server mutation) - 4 tests list clean. Version 0.54.0-alpha.12 -> alpha.13. dev-Azure Playwright batched to the pre-track checkpoint (same cadence as the auth build). Commit next. |
+| 2026-07-06 | WI-1 committed `3482329`. |
+| 2026-07-07 | WI-16 DONE (local gates). Multi-trust WIF: provider `find` -> `filter`+iterate every active `wif` row; fail-closed if none accepts; single-trust unchanged. TDD: 2 provider unit RED (validate called once, expected twice) -> GREEN 7/7. E2E: 2 new (mint-against-second-trust; all-reject -> invalid_client) GREEN 10/10. UI: "Configured federated trusts (N)" header + guidance; 1 vitest (19/19) + 1 Playwright (route-mocked two-trust overview). Live: section 9z-AT2 (two trusts both list active), parse OK. Gates: API build clean; API unit 4013/4013 (114 suites); web tsc 96 baseline / 0 new. Version alpha.13 -> alpha.14. dev-Azure live+Playwright batched to the Track-D checkpoint. Commit next. |

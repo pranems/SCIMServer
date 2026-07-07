@@ -171,4 +171,60 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     expect(label).toContain(`/scim/v2/endpoints/${endpointId}`);
     expect(label).not.toContain(`/scim/endpoints/${endpointId}/v2`);
   });
+
+  // WI-16 regression: when an endpoint has SEVERAL wif trusts, the credentials
+  // tab shows a multi-trust header + guidance and lists every trust. The
+  // endpoint overview is intercepted so two `wif` credentials render without
+  // touching the server.
+  test('WI-16: multiple wif trusts render a multi-trust header + all rows', async ({ page }) => {
+    // Intercept the overview BFF response BEFORE navigating, injecting two
+    // active wif credentials + the WifCredentialsEnabled flag.
+    await page.route('**/scim/admin/endpoints/*/overview', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const url = route.request().url();
+      const idMatch = url.match(/endpoints\/([^/]+)\/overview/);
+      const endpointId = idMatch ? idMatch[1] : 'ep-multi';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          endpoint: {
+            id: endpointId,
+            name: 'wi16-multi',
+            displayName: 'WI-16 Multi-trust',
+            preset: 'entra-id',
+            active: true,
+            scimBasePath: `/scim/endpoints/${endpointId}/v2`,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+          stats: {
+            userCount: 0,
+            activeUserCount: 0,
+            groupCount: 0,
+            activeGroupCount: 0,
+            genericResourceCount: 0,
+          },
+          credentials: [
+            { id: 'wif-a', credentialType: 'wif', label: 'Contoso Entra', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+            { id: 'wif-b', credentialType: 'wif', label: 'Acme Okta', active: true, createdAt: '2026-06-02T00:00:00Z', expiresAt: null },
+          ],
+          recentActivity: [],
+          configFlags: { WifCredentialsEnabled: true },
+        }),
+      });
+    });
+
+    await page.goto('/endpoints/ep-multi/credentials');
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+    // Both trust rows render.
+    await expect(page.getByTestId('wif-credential-row-wif-a')).toBeVisible();
+    await expect(page.getByTestId('wif-credential-row-wif-b')).toBeVisible();
+
+    // The multi-trust header shows the count + simultaneous-auth guidance.
+    const header = page.getByTestId('wif-credentials-list-header');
+    await expect(header).toBeVisible();
+    await expect(header).toContainText('Configured federated trusts (2)');
+    await expect(header).toContainText(/authenticates at the same time/i);
+  });
 });

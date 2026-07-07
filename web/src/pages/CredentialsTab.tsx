@@ -174,6 +174,12 @@ const useWifStyles = makeStyles({
     fontFamily: 'monospace',
     fontSize: '12px',
   },
+  wifListHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    marginBottom: '4px',
+  },
 });
 
 export interface CredentialsTabProps {
@@ -482,6 +488,16 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
 
             {wifCredentials.length > 0 && (
               <div className={classes.list} data-testid="wif-credentials-list">
+                <div className={wif.wifListHeader} data-testid="wif-credentials-list-header">
+                  <Subtitle2>
+                    Configured federated trusts ({wifCredentials.length})
+                  </Subtitle2>
+                  <Caption1>
+                    {wifCredentials.length > 1
+                      ? 'Every active trust below authenticates at the same time - an assertion from any of these identity providers can provision this endpoint. All resources land in one common pool; for isolation, create a separate endpoint per identity provider.'
+                      : 'Add another trust to let a second identity provider (for example an additional Entra tenant, Okta, or Ping) provision this same endpoint.'}
+                  </Caption1>
+                </div>
                 {wifCredentials.map((cred) => (
                   <Card key={cred.id} className={wif.wifRow} data-testid={`wif-credential-row-${cred.id}`}>
                     <div className={wif.wifRowGrid}>

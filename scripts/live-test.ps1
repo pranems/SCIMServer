@@ -11550,6 +11550,86 @@ try {
 Write-Host "`n--- 9z-AT: WIF validate+issue Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT2: WI-16 multiple WIF trusts on one endpoint (multi-IdP config)
+$script:currentSection = "9z-AT2: WI-16 multi-trust WIF"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT2: WI-16 multiple WIF trusts on one endpoint" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at2Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi16-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at2Id = $at2Ep.id
+
+    # Enable WIF credentials on the endpoint
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # Persist TWO WIF trusts (one per simulated IdP), both public values, no secret.
+    $at2WifA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "contoso-entra"
+        wif = @{
+            assertionProfile = "jwt-bearer"
+            expectedIssuer   = "https://login.microsoftonline.com/tenant-A/v2.0"
+            expectedSubject  = "sp-A"
+            expectedAudience = "api://scimserver-wi16"
+            jwksUri          = "https://login.microsoftonline.com/tenant-A/discovery/v2.0/keys"
+            allowedTenantId  = "tenant-A"
+        }
+    } | ConvertTo-Json -Depth 6)
+    $at2WifB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "acme-okta"
+        wif = @{
+            assertionProfile = "jwt-bearer"
+            expectedIssuer   = "https://acme.okta.com/oauth2/default"
+            expectedSubject  = "sp-B"
+            expectedAudience = "api://scimserver-wi16"
+            jwksUri          = "https://acme.okta.com/oauth2/default/v1/keys"
+            allowedTenantId  = "okta-org-B"
+        }
+    } | ConvertTo-Json -Depth 6)
+
+    Test-Result -Success ($at2WifA.credentialType -eq "wif" -and $at2WifB.credentialType -eq "wif") -Message "9z-AT2.T1: two wif trusts persisted on one endpoint"
+
+    # T2: both trusts list as active simultaneously (multi-IdP config, 5F).
+    $at2List = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id/credentials" -Method GET -Headers $headers
+    $at2WifActive = @($at2List | Where-Object { $_.credentialType -eq "wif" -and $_.active -eq $true })
+    Test-Result -Success ($at2WifActive.Count -eq 2) -Message "9z-AT2.T2: both wif trusts active at once (count=$($at2WifActive.Count))"
+
+    # T3: no secret/hash on either trust (no-secret contract holds for multi-trust).
+    $at2Json = $at2List | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($at2Json -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-AT2.T3: multi-trust list carries NO secret/hash/token"
+
+    # T4: an untrusted assertion still fails closed even with multiple trusts (none match -> 401).
+    $at2Reject = $false
+    $at2Fake = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImxpdmUifQ.eyJpc3MiOiJodHRwczovL2V2aWwuZXhhbXBsZS92Mi4wIn0.c2ln"
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at2Id/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_assertion = $at2Fake; client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+        } | Out-Null
+    } catch {
+        $at2Reject = ($_.Exception.Response.StatusCode.value__ -eq 401)
+    }
+    Test-Result -Success $at2Reject -Message "9z-AT2.T4: assertion matching NO trust fails closed -> 401 (all trusts tried)"
+
+    # T5: revoke one trust; the other stays active (independent lifecycle).
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id/credentials/$($at2WifA.id)" -Method DELETE -Headers $headers | Out-Null
+    $at2List2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id/credentials" -Method GET -Headers $headers
+    $at2StillActive = @($at2List2 | Where-Object { $_.credentialType -eq "wif" -and $_.active -eq $true })
+    Test-Result -Success ($at2StillActive.Count -eq 1 -and $at2StillActive[0].id -eq $at2WifB.id) -Message "9z-AT2.T5: revoking one trust leaves the other active (independent lifecycle)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at2Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT2: WI-16 multi-trust section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT2: WI-16 multi-trust Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

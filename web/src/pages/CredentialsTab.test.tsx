@@ -422,4 +422,30 @@ describe('CredentialsTab', () => {
     fireEvent.click(screen.getByTestId('wif-credential-delete-wif-1'));
     expect(mockDeleteMutate).toHaveBeenCalledWith('wif-1');
   });
+
+  it('WI-16: shows a multi-trust header + guidance when several wif trusts exist', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { WifCredentialsEnabled: true },
+        credentials: [
+          { id: 'wif-1', credentialType: 'wif', label: 'Contoso Entra', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+          { id: 'wif-2', credentialType: 'wif', label: 'Acme Okta', active: true, createdAt: '2026-06-02T00:00:00Z', expiresAt: null },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // Both trust rows render.
+    expect(screen.getByTestId('wif-credential-row-wif-1')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-credential-row-wif-2')).toBeInTheDocument();
+
+    // The multi-trust header shows the count and explains simultaneous auth.
+    const header = screen.getByTestId('wif-credentials-list-header');
+    expect(header).toBeInTheDocument();
+    expect(header.textContent).toContain('Configured federated trusts (2)');
+    expect(header.textContent).toMatch(/authenticates at the same time/i);
+  });
 });
