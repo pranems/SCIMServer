@@ -401,6 +401,13 @@ describe('CredentialsTab', () => {
     const scimCopyBtn = screen.getByTestId('wif-return-scimurl-copy-button');
     expect(scimCopyBtn.getAttribute('aria-label')).toContain('/scim/v2/endpoints/ep-1');
     expect(scimCopyBtn.getAttribute('aria-label')).not.toContain('/scim/endpoints/ep-1/v2');
+
+    // WI-12: the per-endpoint RFC 8414 OAuth AS metadata URL (append form) is
+    // surfaced in the return box.
+    const metaCopyBtn = screen.getByTestId('wif-return-metadataurl-copy-button');
+    expect(metaCopyBtn.getAttribute('aria-label')).toContain(
+      '/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+    );
   });
 
   it('Test Connection renders a per-step readiness result (G3 client-side)', () => {

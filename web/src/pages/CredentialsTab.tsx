@@ -293,6 +293,10 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   // `/scim/endpoints/{id}`. The earlier `/scim/endpoints/{id}/v2` form put the
   // version at the tail, which is not a route the server serves.
   const scimUrl = `${origin}/scim/v2/endpoints/${endpointId}`;
+  // WI-12: the per-endpoint RFC 8414 OAuth AS metadata URL (append form). A
+  // standards-based OAuth client can GET this to discover the token endpoint +
+  // JWKS without prior configuration.
+  const metadataUrl = `${origin}/scim/endpoints/${endpointId}/.well-known/oauth-authorization-server`;
 
   const requiredOk =
     trustPayload.expectedIssuer !== '' &&
@@ -477,6 +481,15 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                     monospace
                     truncate
                     data-testid="wif-return-scimurl"
+                  />
+                </div>
+                <div className={wif.returnRow}>
+                  <Caption1>OAuth metadata URL (RFC 8414)</Caption1>
+                  <CopyableField
+                    value={metadataUrl}
+                    monospace
+                    truncate
+                    data-testid="wif-return-metadataurl"
                   />
                 </div>
               </div>

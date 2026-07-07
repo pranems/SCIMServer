@@ -184,6 +184,14 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     const label = (await scimCopy.getAttribute('aria-label')) ?? '';
     expect(label).toContain(`/scim/v2/endpoints/${endpointId}`);
     expect(label).not.toContain(`/scim/endpoints/${endpointId}/v2`);
+
+    // WI-12: the per-endpoint RFC 8414 OAuth metadata URL is surfaced too.
+    const metaCopy = page.getByTestId('wif-return-metadataurl-copy-button');
+    await expect(metaCopy).toBeVisible();
+    const metaLabel = (await metaCopy.getAttribute('aria-label')) ?? '';
+    expect(metaLabel).toContain(
+      `/scim/endpoints/${endpointId}/.well-known/oauth-authorization-server`,
+    );
   });
 
   // WI-16 regression: when an endpoint has SEVERAL wif trusts, the credentials

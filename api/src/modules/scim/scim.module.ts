@@ -10,6 +10,7 @@ import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
+import { EndpointOAuthMetadataController } from './controllers/endpoint-oauth-metadata.controller';
 import { ASSERTION_TOKEN_PROVIDER } from './controllers/assertion-token-provider';
 import { WifAssertionTokenProvider } from './controllers/wif-assertion-token.provider';
 import { ResourceTypesController } from './controllers/resource-types.controller';
@@ -52,6 +53,10 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimDiscoveryController,
     ScimMeController,
     EndpointLogController,
+    // Per-endpoint RFC 8414 metadata (WI-12) - MUST be registered before the
+    // generic controller so its 2-segment `.well-known/oauth-authorization-server`
+    // route wins over the generic `:resourceType/:id` wildcard.
+    EndpointOAuthMetadataController,
     // Generic controller MUST be registered LAST - its wildcard :resourceType
     // param would otherwise shadow built-in routes like /Users, /Groups, etc.
     EndpointScimGenericController,

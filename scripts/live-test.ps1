@@ -11675,6 +11675,41 @@ try {
 Write-Host "`n--- 9z-AT3: WI-13 WIF trust aliases Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT4: WI-12 per-endpoint RFC 8414 OAuth AS metadata
+$script:currentSection = "9z-AT4: WI-12 per-endpoint OAuth metadata"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT4: WI-12 per-endpoint RFC 8414 OAuth AS metadata" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at4Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi12-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at4Id = $at4Ep.id
+    $at4MetaUrl = "$baseUrl/scim/endpoints/$at4Id/.well-known/oauth-authorization-server"
+
+    # The metadata is PUBLIC (no bearer required).
+    $at4Meta = Invoke-RestMethod -Uri $at4MetaUrl -Method GET
+    Test-Result -Success ($at4Meta.issuer -match "/scim/endpoints/$at4Id$") -Message "9z-AT4.T1: issuer equals the per-endpoint identifier (RFC 8414 s3.3)"
+    Test-Result -Success ($at4Meta.token_endpoint -match "/scim/endpoints/$at4Id/oauth/token$") -Message "9z-AT4.T2: token_endpoint is the per-endpoint one"
+    Test-Result -Success ($at4Meta.jwks_uri -match "/scim/oauth/jwks$") -Message "9z-AT4.T3: jwks_uri points at the shared global key set"
+    Test-Result -Success ($at4Meta.token_endpoint.StartsWith($at4Meta.issuer)) -Message "9z-AT4.T4: token_endpoint starts with issuer (self-consistent)"
+    Test-Result -Success ($at4Meta.grant_types_supported -contains "client_credentials") -Message "9z-AT4.T5: advertises client_credentials grant"
+
+    # The resource routes still resolve on the same endpoint (no shadowing).
+    $at4Users = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at4Id/Users?count=1" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $at4Users) -Message "9z-AT4.T6: /Users still resolves alongside the .well-known route (no shadowing)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at4Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT4: WI-12 metadata section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT4: WI-12 per-endpoint OAuth metadata Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

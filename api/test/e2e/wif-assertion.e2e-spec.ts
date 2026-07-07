@@ -350,4 +350,29 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     const payload = decodePayload(res.body.access_token);
     expect(payload.endpoint_id).toBe(aliasEndpoint);
   });
+
+  // ─── WI-12 - per-endpoint RFC 8414 OAuth AS metadata (append form) ─────────
+  it('WI-12: serves per-endpoint OAuth AS metadata at the append-form well-known path', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/scim/endpoints/${endpointId}/.well-known/oauth-authorization-server`)
+      .expect(200);
+
+    // RFC 8414 section 3.3 - issuer MUST equal the identifier used to build the URL.
+    expect(res.body.issuer).toMatch(new RegExp(`/scim/endpoints/${endpointId}$`));
+    // token_endpoint must be the PER-ENDPOINT one.
+    expect(res.body.token_endpoint).toMatch(
+      new RegExp(`/scim/endpoints/${endpointId}/oauth/token$`),
+    );
+    // jwks_uri points at the SHARED global key set.
+    expect(res.body.jwks_uri).toMatch(/\/scim\/oauth\/jwks$/);
+    expect(res.body.grant_types_supported).toContain('client_credentials');
+  });
+
+  it('WI-12: per-endpoint metadata is public (no bearer required) and self-consistent', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/scim/endpoints/${endpointId}/.well-known/oauth-authorization-server`)
+      .expect(200);
+    // The token_endpoint URL must start with the issuer identifier (self-consistency).
+    expect(res.body.token_endpoint.startsWith(res.body.issuer)).toBe(true);
+  });
 });
