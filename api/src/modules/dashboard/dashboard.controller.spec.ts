@@ -21,6 +21,16 @@ import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import type { DashboardResponse, EndpointOverviewResponse } from '../../shared/types/dashboard.types';
+import { ConnectionInfoService } from '../scim/services/connection-info.service';
+
+/** Minimal Express-like request stub for the overview host derivation (WI-3). */
+function reqStub(): any {
+  return {
+    headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'scim.example.com' },
+    protocol: 'https',
+    get: () => 'scim.example.com',
+  };
+}
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -128,6 +138,8 @@ describe('DashboardController', () => {
         { provide: EndpointService, useValue: mockEndpointWithGet },
         { provide: LoggingService, useValue: mockLoggingService },
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: mockCredentialRepo },
+        // WI-3: the pure connection-info assembler (real instance).
+        ConnectionInfoService,
       ],
     }).compile();
 
@@ -310,13 +322,13 @@ describe('DashboardController', () => {
     });
 
     it('returns the canonical overview shape (key allowlist)', async () => {
-      const result: EndpointOverviewResponse = await controller.getEndpointOverview(endpointId);
+      const result: EndpointOverviewResponse = await controller.getEndpointOverview(endpointId, reqStub());
 
       // Top-level keys lock - never add an undocumented key without
       // updating the test, the response contract doc, and the frontend
       // hook's TypeScript shape.
       expect(Object.keys(result).sort()).toEqual(
-        ['configFlags', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
+        ['configFlags', 'connectionInfo', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
       );
       expect(Object.keys(result.endpoint).sort()).toEqual(
         ['active', 'createdAt', 'displayName', 'id', 'name', 'preset', 'scimBasePath'].sort(),
@@ -327,7 +339,7 @@ describe('DashboardController', () => {
     });
 
     it('reads stats from StatsProjectionService (zero DB queries)', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       expect(mockStatsService.getEndpointStats).toHaveBeenCalledWith(endpointId);
       expect(result.stats.userCount).toBe(500);
@@ -336,12 +348,12 @@ describe('DashboardController', () => {
     });
 
     it('extracts preset from endpoint profile', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
       expect(result.endpoint.preset).toBe('entra-id');
     });
 
     it('returns empty credentials array when none exist', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
       expect(result.credentials).toEqual([]);
     });
 
@@ -361,7 +373,7 @@ describe('DashboardController', () => {
         } as any,
       ]);
 
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       expect(result.credentials).toHaveLength(1);
       const cred = result.credentials[0];
@@ -392,7 +404,7 @@ describe('DashboardController', () => {
         hasPrev: false,
       });
 
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       // Capped at 10 entries even when the upstream returns more.
       expect(result.recentActivity.length).toBeLessThanOrEqual(10);
@@ -406,7 +418,7 @@ describe('DashboardController', () => {
     });
 
     it('returns config flags from profile.settings (all non-undefined)', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       expect(result.configFlags).toEqual({
         StrictSchemaValidation: true,
@@ -420,7 +432,7 @@ describe('DashboardController', () => {
         new NotFoundException('Endpoint "missing" not found'),
       );
 
-      await expect(controller.getEndpointOverview('missing')).rejects.toBeInstanceOf(
+      await expect(controller.getEndpointOverview('missing', reqStub())).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -442,7 +454,7 @@ describe('DashboardController', () => {
         },
       });
 
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
       expect(result.configFlags).toEqual({});
       expect(result.endpoint.preset).toBe('minimal');
     });

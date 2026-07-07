@@ -11,6 +11,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md S14.1
  * @see docs/DELIVERY_PLAN.md UI-B1
  */
+import type { ConnectionInfo } from './connection-info.types';
 
 // ─── Resource Stats ──────────────────────────────────────────────────────
 
@@ -299,6 +300,12 @@ export interface EndpointOverviewResponse {
   credentials: EndpointOverviewCredential[];
   recentActivity: EndpointOverviewActivity[];
   configFlags: Record<string, unknown>;
+  /**
+   * WI-3: the assembled connection-info (absolute URLs + per-method Entra
+   * field set) so the UI never hand-builds URLs. Same shape the dedicated
+   * `GET /admin/endpoints/{id}/connection-info` returns; no secrets.
+   */
+  connectionInfo: ConnectionInfo;
 }
 
 // ─── Presets ─────────────────────────────────────────────────────────────

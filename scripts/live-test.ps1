@@ -11916,6 +11916,13 @@ try {
     } catch { $at8NotFound = ($_.Exception.Response.StatusCode.value__ -eq 404) }
     Test-Result -Success $at8NotFound -Message "9z-AT8.T5: connection-info for an unknown endpoint -> 404"
 
+    # T6 (WI-3): the per-endpoint Overview BFF now embeds the same connectionInfo.
+    $at8Overview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id/overview" -Method GET -Headers $headers
+    $at8OverviewHasCi = ($null -ne $at8Overview.connectionInfo) -and `
+        ($at8Overview.connectionInfo.endpointId -eq $at8Id) -and `
+        ($at8Overview.connectionInfo.urls.scimBaseUrl -like "*/scim/v2/endpoints/$at8Id")
+    Test-Result -Success $at8OverviewHasCi -Message "9z-AT8.T6: WI-3 overview BFF embeds connectionInfo (absolute URLs)"
+
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id" -Method DELETE -Headers $headers | Out-Null } catch {}
 } catch {

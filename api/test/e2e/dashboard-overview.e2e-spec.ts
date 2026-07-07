@@ -56,8 +56,17 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     // Top-level allowlist - prevents accidental field additions that
     // ship internal data to the client.
     expect(Object.keys(res.body).sort()).toEqual(
-      ['configFlags', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
+      ['configFlags', 'connectionInfo', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
     );
+
+    // WI-3: the overview carries the assembled connection-info (absolute URLs
+    // + per-method Entra field set) so the UI never hand-builds URLs.
+    expect(res.body.connectionInfo.endpointId).toBe(endpointId);
+    expect(res.body.connectionInfo.urls.scimBaseUrl).toContain(`/scim/v2/endpoints/${endpointId}`);
+    expect(Array.isArray(res.body.connectionInfo.enabledMethods)).toBe(true);
+    expect(Array.isArray(res.body.connectionInfo.disabledMethods)).toBe(true);
+    // No secret ever leaks through the overview.
+    expect(JSON.stringify(res.body.connectionInfo)).not.toContain('bcrypt$');
 
     // Endpoint summary contract.
     expect(res.body.endpoint.id).toBe(endpointId);

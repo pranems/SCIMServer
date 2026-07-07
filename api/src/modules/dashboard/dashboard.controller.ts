@@ -13,13 +13,15 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md S14
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase B1
  */
-import { Controller, Get, Inject, Param } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Req } from '@nestjs/common';
+import type { Request } from 'express';
 
 import { StatsProjectionService } from '../stats/stats-projection.service';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
+import { ConnectionInfoService } from '../scim/services/connection-info.service';
 import type {
   DashboardResponse,
   DashboardEndpoint,
@@ -57,6 +59,7 @@ export class DashboardController {
     private readonly loggingService: LoggingService,
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
+    private readonly connectionInfo: ConnectionInfoService,
   ) {}
 
   /**
@@ -157,6 +160,7 @@ export class DashboardController {
   @Get('endpoints/:endpointId/overview')
   async getEndpointOverview(
     @Param('endpointId') endpointId: string,
+    @Req() req: Request,
   ): Promise<EndpointOverviewResponse> {
     // Throws NotFoundException for unknown endpoints - propagates as 404.
     const endpoint = await this.endpointService.getEndpoint(endpointId, 'full');
@@ -213,6 +217,17 @@ export class DashboardController {
         ? { ...(profile.settings as Record<string, unknown>) }
         : {};
 
+    // WI-3: assemble the connection-info (absolute URLs + per-method Entra
+    // field set) so the Overview UI never hand-builds URLs. Host is derived
+    // from the request exactly as the connection-info controller does.
+    const proto = req.headers['x-forwarded-proto']?.toString() ?? req.protocol;
+    const host = req.headers['x-forwarded-host']?.toString() ?? req.get('host');
+    const connectionInfo = this.connectionInfo.assemble(
+      endpoint,
+      credentialRows,
+      `${proto}://${host}`,
+    );
+
     return {
       endpoint: {
         id: endpoint.id,
@@ -233,6 +248,7 @@ export class DashboardController {
       credentials,
       recentActivity,
       configFlags,
+      connectionInfo,
     };
   }
 }

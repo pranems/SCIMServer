@@ -16,9 +16,15 @@ import { LoggingModule } from '../logging/logging.module';
 import { StatsModule } from '../stats/stats.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { DashboardController } from './dashboard.controller';
+import { ConnectionInfoService } from '../scim/services/connection-info.service';
 
 @Module({
   imports: [StatsModule, EndpointModule, LoggingModule, RepositoryModule.register()],
   controllers: [DashboardController],
+  // ConnectionInfoService is a pure, stateless assembler (WI-2/WI-3). It is
+  // provided directly here (rather than importing ScimModule) to keep
+  // DashboardModule self-contained and avoid a module cycle; two instances of a
+  // stateless service are harmless.
+  providers: [ConnectionInfoService],
 })
 export class DashboardModule {}
