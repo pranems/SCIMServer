@@ -198,4 +198,93 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     expect(validate).toHaveBeenCalledTimes(2);
     expect(generateEndpointAccessToken).not.toHaveBeenCalled();
   });
+
+  // ─── WI-17 - issuer-first selection + source-stamped mint ──────────────────
+  /** Build a fake (unsigned) assertion whose decoded payload carries `iss`. */
+  function assertionWithIssuer(iss: string): string {
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'k' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ iss })).toString('base64url');
+    return `${header}.${payload}.sig`;
+  }
+
+  it('WI-17: tries the issuer-matching trust FIRST (validate called once, O(1))', async () => {
+    // Trust A is listed first but does NOT match the assertion issuer; trust B
+    // (listed second) matches. Issuer-first ordering must try B directly, so
+    // validate is called exactly ONCE (against B), not twice.
+    const first = wifCredential();
+    first.id = 'cred-wif-A';
+    first.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-A/v2.0', jwksUri: 'https://issuer-A/keys' };
+    const second = wifCredential();
+    second.id = 'cred-wif-B';
+    second.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-B/v2.0', jwksUri: 'https://issuer-B/keys' };
+    findActiveByEndpoint.mockResolvedValue([first, second]);
+
+    validate.mockResolvedValue({
+      iss: 'https://issuer-B/v2.0',
+      sub: wifMetadata.expectedSubject,
+      aud: wifMetadata.expectedAudience,
+      tid: 'tenant-123',
+      roles: ['Scim.Provision'],
+    });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    const result = await provider.mintFromAssertion('ep-1', assertionWithIssuer('https://issuer-B/v2.0'));
+
+    expect(result).toEqual({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+    // Issuer-first: only the matching trust (B) was validated.
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(validate).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ expectedIssuer: 'https://issuer-B/v2.0' }),
+    );
+  });
+
+  it('WI-17: stamps the winning trust issuer (sourceIssuer) on the minted token', async () => {
+    const cred = wifCredential();
+    cred.id = 'cred-wif-src';
+    cred.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-src/v2.0' };
+    findActiveByEndpoint.mockResolvedValue([cred]);
+    validate.mockResolvedValue({
+      iss: 'https://issuer-src/v2.0',
+      sub: wifMetadata.expectedSubject,
+      aud: wifMetadata.expectedAudience,
+      tid: 'tenant-123',
+      roles: ['Scim.Provision'],
+    });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    await provider.mintFromAssertion('ep-1', assertionWithIssuer('https://issuer-src/v2.0'));
+
+    // The mint call carries the winning trust's issuer as sourceIssuer.
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1',
+      wifMetadata.expectedSubject,
+      undefined,
+      expect.objectContaining({ sourceIssuer: 'https://issuer-src/v2.0' }),
+    );
+  });
+
+  it('WI-17: falls back to trying every trust when the assertion issuer is undecodable', async () => {
+    // A non-JWT assertion string cannot yield an `iss`; the provider must not
+    // throw on decode and must fall back to the WI-16 try-all behavior.
+    const first = wifCredential();
+    first.id = 'cred-wif-1';
+    first.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-A/v2.0' };
+    const second = wifCredential();
+    second.id = 'cred-wif-2';
+    second.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-B/v2.0' };
+    findActiveByEndpoint.mockResolvedValue([first, second]);
+    validate.mockImplementation((_a: string, trust: { expectedIssuer: string }) =>
+      trust.expectedIssuer === 'https://issuer-B/v2.0'
+        ? Promise.resolve({ iss: 'https://issuer-B/v2.0', sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] })
+        : Promise.reject(new WifAssertionInvalidError('issuer mismatch')),
+    );
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    const result = await provider.mintFromAssertion('ep-1', 'not-a-jwt');
+
+    expect(result).toEqual({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+    // Undecodable issuer -> try-all order (A rejects, B accepts) = 2 calls.
+    expect(validate).toHaveBeenCalledTimes(2);
+  });
 });

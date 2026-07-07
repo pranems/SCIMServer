@@ -125,6 +125,8 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     const payload = decodePayload(res.body.access_token);
     expect(payload.endpoint_id).toBe(endpointId);
     expect(payload.sub).toBe(SUBJECT);
+    // WI-17: the minted token is source-stamped with the winning trust's issuer.
+    expect(payload.src_iss).toBe(ISSUER);
   });
 
   it('the minted token authorizes the endpoint SCIM routes', async () => {

@@ -240,5 +240,22 @@ describe('OAuthService', () => {
       const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', 'scim.read unknown.scope');
       expect(result.scope).toBe('scim.read');
     });
+
+    it('WI-17: stamps a src_iss claim on the token when sourceIssuer is supplied', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        trustedScope: 'scim.read',
+        sourceIssuer: 'https://login.microsoftonline.com/tenant-x/v2.0',
+      });
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ src_iss: 'https://login.microsoftonline.com/tenant-x/v2.0' }),
+        expect.any(Object),
+      );
+    });
+
+    it('WI-17: omits src_iss when sourceIssuer is not supplied (plain oauth_client)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload).not.toHaveProperty('src_iss');
+    });
   });
 });

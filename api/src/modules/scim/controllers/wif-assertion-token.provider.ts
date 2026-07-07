@@ -55,12 +55,19 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     }
 
     // From here on the assertion is "mine": one of the configured WIF trusts
-    // must accept it. WI-16 tries each active `wif` trust in turn; a rejecting
-    // or misconfigured trust is treated as a non-match and we keep trying the
-    // rest. If NONE accepts, we fail closed (throw the last error) and NEVER
-    // fall through to another auth method.
+    // must accept it. WI-17 orders the trusts issuer-first - decode the
+    // assertion's `iss` WITHOUT verifying it and try the trust whose
+    // `expectedIssuer` matches FIRST, so the common multi-IdP case does exactly
+    // one JWKS verification (O(1)) instead of N. The decoded `iss` only SELECTS
+    // the order; the signature is still verified against that trust's JWKS, so
+    // an attacker cannot gain anything by spoofing the unverified claim. WI-16
+    // guarantees the fallback: if the issuer is undecodable or matches nothing,
+    // every trust is tried in turn. A rejecting or misconfigured trust is a
+    // non-match; if NONE accepts, we fail closed (throw) and NEVER fall through.
+    const orderedTrusts = this.orderByAssertionIssuer(wifCredentials, clientAssertion);
+
     let lastError: unknown;
-    for (const wif of wifCredentials) {
+    for (const wif of orderedTrusts) {
       let trust: WifTrust;
       try {
         trust = this.buildTrust(wif.metadata);
@@ -83,7 +90,12 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         endpointId,
         String(claims.sub),
         undefined,
-        { ttlSec: trust.issuedTokenTtlSec, trustedScope: trust.scope },
+        {
+          ttlSec: trust.issuedTokenTtlSec,
+          trustedScope: trust.scope,
+          // WI-17 - stamp the winning trust's issuer for source attribution.
+          sourceIssuer: trust.expectedIssuer,
+        },
       );
 
       // A4 - shadow authorization telemetry. Compute the future role -> scope gate
@@ -97,6 +109,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         subject: trust.expectedSubject,
         scope: token.scope,
         credentialId: wif.id,
+        sourceIssuer: trust.expectedIssuer,
       });
 
       return token;
@@ -106,6 +119,54 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     throw (
       lastError ?? new WifAssertionInvalidError('No configured WIF trust accepted the assertion.')
     );
+  }
+
+  /**
+   * WI-17 - order the WIF trusts so the one whose `expectedIssuer` matches the
+   * assertion's (UNVERIFIED) `iss` claim is tried first. Selection only; the
+   * signature is still verified against the chosen trust's JWKS. If the `iss`
+   * cannot be decoded (non-JWT string, malformed segment) or matches no trust,
+   * the original order is preserved and every trust is tried (WI-16 fallback).
+   */
+  private orderByAssertionIssuer<T extends { metadata: Record<string, unknown> | null }>(
+    trusts: T[],
+    assertion: string,
+  ): T[] {
+    if (trusts.length <= 1) {
+      return trusts;
+    }
+    const iss = this.decodeUnverifiedIssuer(assertion);
+    if (!iss) {
+      return trusts;
+    }
+    const matchIndex = trusts.findIndex((t) => (t.metadata ?? {}).expectedIssuer === iss);
+    if (matchIndex <= 0) {
+      // -1 (no match) or 0 (already first) -> nothing to reorder.
+      return trusts;
+    }
+    const reordered = [...trusts];
+    const [match] = reordered.splice(matchIndex, 1);
+    reordered.unshift(match);
+    return reordered;
+  }
+
+  /**
+   * Decode the `iss` claim from a JWT WITHOUT verifying the signature. Used
+   * ONLY to pick which trust to try first (WI-17); it is never a trust
+   * decision. Returns null for any non-JWT / malformed / iss-less input.
+   */
+  private decodeUnverifiedIssuer(assertion: string): string | null {
+    try {
+      const segments = assertion.split('.');
+      if (segments.length < 2) {
+        return null;
+      }
+      const payloadJson = Buffer.from(segments[1], 'base64url').toString('utf-8');
+      const payload = JSON.parse(payloadJson) as { iss?: unknown };
+      return typeof payload.iss === 'string' && payload.iss.length > 0 ? payload.iss : null;
+    } catch {
+      return null;
+    }
   }
 
   /**

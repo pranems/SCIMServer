@@ -1072,11 +1072,13 @@ A single-trust endpoint is unaffected: with one `wif` row the iteration selects 
 
 ### 5F.2 Token level (WI-17) - issuer-first selection, then verify
 
+> **Status.** DONE (2026-07-06, [wif-assertion-token.provider.ts](../../api/src/modules/scim/controllers/wif-assertion-token.provider.ts) + [oauth.service.ts](../../api/src/oauth/oauth.service.ts)). Shipped as described below.
+
 At `POST .../oauth/token`, when more than one `wif` trust exists:
 
-1. Decode the assertion's `iss` (and `tid`) WITHOUT verifying, and use them ONLY to SELECT the matching trust anchor. An unknown `iss` is rejected (`invalid_client`), never allowed to fall through. This keeps selection O(1) - never N JWKS fetches.
-2. Verify the signature + claims against THAT anchor's `jwksUri` / `expected*` (the existing [WifAssertionValidatorService](../../api/src/oauth/wif-assertion-validator.service.ts) path, unchanged per anchor). The decode-to-select is NOT a trust decision - the signature check against the selected JWKS is still the gate.
-3. Mint the endpoint's own token exactly as today, additionally stamping the winning source (`src_iss` + the credential id) so telemetry can attribute which IdP drove the call.
+1. Decode the assertion's `iss` claim WITHOUT verifying it, and use it ONLY to ORDER the trusts so the one whose `expectedIssuer` matches is tried FIRST. This keeps the common case at exactly one JWKS verification (O(1)) instead of N. If the `iss` is undecodable (a non-JWT string) or matches no configured trust, the original order is preserved and every trust is tried in turn (the WI-16 fallback) - the unverified claim is never trusted to make a reject decision.
+2. Verify the signature + claims against THAT anchor's `jwksUri` / `expected*` (the existing [WifAssertionValidatorService](../../api/src/oauth/wif-assertion-validator.service.ts) path, unchanged per anchor). The decode-to-select is NOT a trust decision - the signature check against the selected JWKS is still the gate. If NO configured trust validates the assertion, it fails closed (`invalid_client`), never falling through to another auth method.
+3. Mint the endpoint's own token exactly as today, additionally stamping the winning source (`src_iss`, the winning trust's issuer) so telemetry can attribute which IdP drove the call; the winning credential id is stamped on the mint log line. Plain `oauth_client` mints omit `src_iss`.
 
 Each anchor's `jwksUri` is cached independently (the validator keys its cache per URI), so N issuers means N cache entries, each honoring `JWKS_CACHE_MAX_AGE_MS`. Every anchor's `jwksUri` host must be in the [5D](#5d-jwks-host-allowlist-prepopulated-persisted-hot-editable) allowlist - multi-IdP is exactly why that allowlist naturally holds several hosts.
 

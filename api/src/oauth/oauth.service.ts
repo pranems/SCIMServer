@@ -151,7 +151,7 @@ export class OAuthService {
     endpointId: string,
     clientId: string,
     requestedScope?: string,
-    options?: { ttlSec?: number; trustedScope?: string },
+    options?: { ttlSec?: number; trustedScope?: string; sourceIssuer?: string },
   ): Promise<AccessToken> {
     const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
 
@@ -180,6 +180,13 @@ export class OAuthService {
       endpoint_id: endpointId,
       scope: grantedScope,
       token_type: 'access_token',
+      // WI-17 - when the token is minted from a federated (WIF) assertion, stamp
+      // the winning trust's issuer so telemetry + downstream consumers can
+      // attribute which identity provider drove the call. Omitted for plain
+      // oauth_client mints (no source issuer).
+      ...(options?.sourceIssuer && options.sourceIssuer.trim().length > 0
+        ? { src_iss: options.sourceIssuer.trim() }
+        : {}),
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: `${expiresIn}s` });
