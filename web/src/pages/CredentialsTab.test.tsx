@@ -339,6 +339,21 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-copy-json')).toBeInTheDocument();
   });
 
+  it('WI-13: shows the claim-name alias hint when WIF is enabled', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    const hint = screen.getByTestId('wif-field-alias-hint');
+    expect(hint).toBeInTheDocument();
+    expect(hint.textContent).toMatch(/iss/);
+    expect(hint.textContent).toMatch(/expectedTenantId/);
+    // The tenant field label reflects both the claim name and the alias.
+    expect(screen.getByText(/tid \/ expectedTenantId/i)).toBeInTheDocument();
+  });
+
   it('enables Save once required fields are filled and posts a wif credential (G2)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },

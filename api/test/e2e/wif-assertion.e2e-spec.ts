@@ -300,4 +300,54 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     expect(names).not.toContain('Workload Identity Federation');
     expect(names).toContain('OAuth Bearer Token');
   });
+
+  // ─── WI-13 - claim-name input aliases + expectedTenantId ───────────────────
+  it('WI-13: accepts bare claim-name aliases (iss/sub/aud/tid/roles) and mints', async () => {
+    const aliasEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+
+    // Create the trust using ONLY the bare claim-name aliases + expectedTenantId.
+    const created = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${aliasEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Alias-shaped trust',
+        wif: {
+          iss: ISSUER,
+          sub: SUBJECT,
+          aud: AUDIENCE,
+          jwksUri: JWKS_URI,
+          expectedTenantId: TENANT,
+          roles: ['Scim.Provision'],
+          scope: 'scim.read scim.write',
+          issuedTokenTtlSec: 7200,
+        },
+      })
+      .expect(201);
+
+    // The echoed public trust carries the CANONICAL keys, not the aliases.
+    expect(created.body.wif).toMatchObject({
+      expectedIssuer: ISSUER,
+      expectedSubject: SUBJECT,
+      expectedAudience: AUDIENCE,
+      allowedTenantId: TENANT,
+      requiredRoles: ['Scim.Provision'],
+    });
+    expect(created.body.wif).not.toHaveProperty('iss');
+    expect(created.body.wif).not.toHaveProperty('tid');
+    expect(created.body.wif).not.toHaveProperty('expectedTenantId');
+
+    // And the alias-created trust actually works: a valid assertion mints.
+    const assertion = await signAssertion();
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${aliasEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(201);
+    expect(res.body.token_type).toBe('Bearer');
+    const payload = decodePayload(res.body.access_token);
+    expect(payload.endpoint_id).toBe(aliasEndpoint);
+  });
 });

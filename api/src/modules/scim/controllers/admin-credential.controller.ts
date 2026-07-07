@@ -82,6 +82,40 @@ const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
 ];
 
 /**
+ * WI-13 - accepted INPUT aliases for the WIF trust fields, so a power user can
+ * paste a decoded token's bare claim names (`iss`/`sub`/`aud`/`tid`/`roles`) or
+ * the clearer `expectedTenantId`, and they normalize to the canonical stored
+ * keys. A canonical key, when explicitly supplied, ALWAYS wins over its alias.
+ * The runtime validation + storage contract is unchanged - this is purely a
+ * config-time input convenience that fills the SAME canonical fields.
+ */
+const WIF_TRUST_ALIASES: Readonly<Record<string, keyof WifTrustInput>> = {
+  iss: 'expectedIssuer',
+  sub: 'expectedSubject',
+  aud: 'expectedAudience',
+  tid: 'allowedTenantId',
+  expectedTenantId: 'allowedTenantId',
+  roles: 'requiredRoles',
+};
+
+/**
+ * Normalize a raw WIF trust input: copy any accepted alias key onto its
+ * canonical key WITHOUT overwriting a canonical key the caller set explicitly.
+ * Returns a shallow copy; the original is not mutated.
+ */
+function normalizeWifTrustAliases(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...raw };
+  for (const [alias, canonical] of Object.entries(WIF_TRUST_ALIASES)) {
+    if (out[alias] !== undefined && out[canonical] === undefined) {
+      out[canonical] = out[alias];
+    }
+    // Drop the alias key so it never leaks into stored metadata.
+    delete out[alias];
+  }
+  return out;
+}
+
+/**
  * Unified create-credential response shape. Different credential types populate
  * different one-time-secret fields (`token` for bearer, `clientId`+`clientSecret`
  * for oauth_client, `wif` public trust for wif), so they are all optional.
@@ -316,10 +350,14 @@ export class AdminCredentialController {
    * credentialHash; the response carries no secret/hash/token field.
    */
   private async createWifCredential(endpointId: string, dto: CreateCredentialDto): Promise<CreateCredentialResponse> {
-    const trust = dto.wif;
-    if (!trust || typeof trust !== 'object') {
+    const rawTrust = dto.wif;
+    if (!rawTrust || typeof rawTrust !== 'object') {
       throw new BadRequestException('A "wif" credential requires a "wif" trust object.');
     }
+    // WI-13 - normalize claim-name aliases (iss/sub/aud/tid/roles/expectedTenantId)
+    // onto their canonical keys BEFORE validation, so a pasted decoded-token
+    // shape is accepted. A canonical key set explicitly always wins.
+    const trust = normalizeWifTrustAliases(rawTrust as unknown as Record<string, unknown>);
     for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
       if (!trust[required] || typeof trust[required] !== 'string') {
         throw new BadRequestException(`WIF trust is missing required field "${required}".`);

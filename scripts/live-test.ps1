@@ -11630,6 +11630,51 @@ try {
 Write-Host "`n--- 9z-AT2: WI-16 multi-trust Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT3: WI-13 WIF trust claim-name aliases + expectedTenantId
+$script:currentSection = "9z-AT3: WI-13 WIF trust aliases"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT3: WI-13 WIF trust claim-name aliases + expectedTenantId" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at3Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi13-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at3Id = $at3Ep.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at3Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # Create a WIF trust using ONLY the bare claim-name aliases + expectedTenantId.
+    $at3Wif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at3Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "wi13-alias-live"
+        wif = @{
+            iss              = "https://login.microsoftonline.com/tenant-wi13/v2.0"
+            sub              = "sp-wi13"
+            aud              = "api://scimserver-wi13"
+            jwksUri          = "https://login.microsoftonline.com/tenant-wi13/discovery/v2.0/keys"
+            expectedTenantId = "tenant-wi13"
+            roles            = @("Scim.Provision")
+        }
+    } | ConvertTo-Json -Depth 6)
+
+    # The echoed public trust carries CANONICAL keys, never the aliases.
+    Test-Result -Success ($at3Wif.wif.expectedIssuer -eq "https://login.microsoftonline.com/tenant-wi13/v2.0") -Message "9z-AT3.T1: iss alias normalized to expectedIssuer"
+    Test-Result -Success ($at3Wif.wif.allowedTenantId -eq "tenant-wi13") -Message "9z-AT3.T2: expectedTenantId alias normalized to allowedTenantId"
+    $at3Json = $at3Wif | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($at3Json -match '"iss"|"tid"|"expectedTenantId"')) -Message "9z-AT3.T3: alias keys are NOT persisted (only canonical keys stored)"
+    Test-Result -Success ($at3Wif.wif.requiredRoles -contains "Scim.Provision") -Message "9z-AT3.T4: roles alias normalized to requiredRoles"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at3Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT3: WI-13 alias section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT3: WI-13 WIF trust aliases Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

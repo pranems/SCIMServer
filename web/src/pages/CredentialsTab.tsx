@@ -180,6 +180,11 @@ const useWifStyles = makeStyles({
     gap: '4px',
     marginBottom: '4px',
   },
+  aliasHint: {
+    display: 'block',
+    color: tokens.colorNeutralForeground3,
+    marginBottom: '8px',
+  },
 });
 
 export interface CredentialsTabProps {
@@ -351,6 +356,10 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
           </MessageBar>
         ) : (
           <>
+            <Caption1 data-testid="wif-field-alias-hint" className={wif.aliasHint}>
+              Tip: you can paste a decoded token&apos;s bare claim names - `iss`, `sub`, `aud`,
+              `tid`, `roles` (or `expectedTenantId`) are accepted and normalize to these fields.
+            </Caption1>
             <div className={wif.fieldGrid}>
               <EditableField
                 label="Issuer (iss)"
@@ -385,7 +394,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 data-testid="wif-field-jwks"
               />
               <EditableField
-                label="Allowed tenant id (tid)"
+                label="Allowed tenant id (tid / expectedTenantId)"
                 value={form.allowedTenantId}
                 onChange={setField('allowedTenantId')}
                 placeholder="tenant guid"

@@ -282,6 +282,76 @@ describe('AdminCredentialController', () => {
     });
   });
 
+  describe('WI-13 - WIF trust claim-name input aliases + expectedTenantId', () => {
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+    });
+
+    it('accepts bare claim names (iss/sub/aud/tid/roles) as aliases and stores canonical keys', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          iss: 'https://login.microsoftonline.com/tid/v2.0',
+          sub: 'sp-obj-id',
+          aud: 'api://appid',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          tid: 'tenant-guid',
+          roles: ['Scim.Provision'],
+        },
+      } as never);
+
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata).toMatchObject({
+        expectedIssuer: 'https://login.microsoftonline.com/tid/v2.0',
+        expectedSubject: 'sp-obj-id',
+        expectedAudience: 'api://appid',
+        allowedTenantId: 'tenant-guid',
+        requiredRoles: ['Scim.Provision'],
+      });
+      // Alias keys must NOT be persisted (only canonical keys are stored).
+      expect(created.metadata).not.toHaveProperty('iss');
+      expect(created.metadata).not.toHaveProperty('tid');
+      expect(created.metadata).not.toHaveProperty('roles');
+    });
+
+    it('accepts expectedTenantId as the preferred name for the tenant (alias of allowedTenantId)', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: 'https://idp/v2.0',
+          expectedSubject: 'sub',
+          expectedAudience: 'appid',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          expectedTenantId: 'tenant-new-name',
+        },
+      } as never);
+
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata.allowedTenantId).toBe('tenant-new-name');
+    });
+
+    it('prefers an explicit canonical key over its alias when both are supplied', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: 'https://canonical/v2.0',
+          iss: 'https://alias/v2.0',
+          expectedSubject: 'sub',
+          expectedAudience: 'appid',
+          jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+          allowedTenantId: 'tid',
+        },
+      } as never);
+
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata.expectedIssuer).toBe('https://canonical/v2.0');
+    });
+  });
+
   describe('listCredentials', () => {
     it('should list credentials without hashes', async () => {
       const result = await controller.listCredentials(mockEndpoint.id);
