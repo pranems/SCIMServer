@@ -36,6 +36,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-devjwtsecretkey123456}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-devscimclientsecret}
       SCIM_SHARED_SECRET: ${SCIM_SHARED_SECRET:-devscimsharedsecret}
+      # WI-6: KEK for the re-viewable-credential-secret feature. Default is
+      # cosmetic - set a private value in prod and keep it identical across
+      # every instance + redeploy. NOT on the auth path.
+      CREDENTIAL_KEK: ${CREDENTIAL_KEK:-changeme-credential-kek}
     depends_on:
       postgres:
         condition: service_healthy

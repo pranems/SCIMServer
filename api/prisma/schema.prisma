@@ -162,3 +162,14 @@ model JwksHostAllowlistEntry {
   createdAt DateTime @default(now()) @db.Timestamptz
 }
 
+// WI-6: per-install data-encryption-key (DEK), stored WRAPPED by the KEK.
+// The KEK lives only in env (CREDENTIAL_KEK); this wrapped DEK + its scrypt
+// salt survive restart/redeploy/backup, while a DB dump alone stays inert.
+model CredentialDek {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wrappedDek String   @db.Text                 // v1.<iv>.<ct>.<tag> (KEK-wrapped)
+  kekSalt    String   @db.VarChar(255)         // base64url scrypt salt
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz
+}
+
