@@ -39,6 +39,9 @@ export type { CopyableJsonBlockProps } from './CopyableJsonBlock';
 export { EditableField } from './EditableField';
 export type { EditableFieldProps } from './EditableField';
 
+export { ConnectionPanel } from './ConnectionPanel';
+export type { ConnectionPanelProps } from './ConnectionPanel';
+
 export { EtagBadge } from './EtagBadge';
 export type { EtagBadgeProps } from './EtagBadge';
 

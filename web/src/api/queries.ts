@@ -26,6 +26,7 @@ import type {
   VersionInfo,
   HealthResponse,
 } from '@scim/types/dashboard.types';
+import type { ConnectionInfo } from '@scim/types/connection-info.types';
 import { getStoredToken, notifyTokenInvalid, clearStoredToken } from '../auth/token';
 import { ScimApiError } from './scim-error';
 
@@ -1436,6 +1437,22 @@ export function useRemoveJwksHost() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
     },
+  });
+}
+
+/**
+ * WI-2/WI-4 - fetch the assembled connection-info for an endpoint (absolute
+ * URLs + per-method Entra field set; no secrets). The per-endpoint Overview
+ * BFF already embeds this same shape (WI-3), so prefer `useEndpointOverview`
+ * when the overview is already loaded; this dedicated hook is for surfaces that
+ * only need the connection block.
+ */
+export function useConnectionInfo(endpointId: string) {
+  return useQuery<ConnectionInfo>({
+    queryKey: ['admin', 'endpoints', endpointId, 'connection-info'],
+    queryFn: () =>
+      fetchWithAuth<ConnectionInfo>(`/scim/admin/endpoints/${endpointId}/connection-info`),
+    enabled: endpointId.length > 0,
   });
 }
 
