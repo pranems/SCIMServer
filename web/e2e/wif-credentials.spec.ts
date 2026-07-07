@@ -100,4 +100,75 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(page.getByTestId('wif-test-result')).toBeVisible();
     await expect(page.getByText('JWKS URI is https')).toBeVisible();
   });
+
+  // WI-1 regression: the WIF return-values box must present the SCIM base URL
+  // in the spec form `/scim/v2/endpoints/{id}` (the `/scim/v2` version segment
+  // is a LEADING prefix the server rewrites), NOT the buggy tail form
+  // `/scim/endpoints/{id}/v2` which is not a route the server serves.
+  //
+  // SAFETY: the create POST is intercepted client-side and fulfilled with a
+  // mock success, so the return box renders WITHOUT creating any real `wif`
+  // credential on the server. No cleanup is required.
+  test('WI-1: the return-values SCIM URL uses the /scim/v2/endpoints/{id} spec form', async ({
+    page,
+  }) => {
+    await page.goto('/endpoints');
+    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
+
+    const cards = page.locator('[data-testid^="endpoint-"]').filter({
+      hasNot: page.locator('[data-testid^="endpoint-detail"]'),
+    });
+    const count = await cards.count();
+    test.skip(count === 0, 'Tenant has zero endpoints; cannot exercise the WIF return box.');
+
+    const first = cards.first();
+    const cardTestId = (await first.getAttribute('data-testid')) ?? '';
+    const endpointId = cardTestId.replace(/^endpoint-/, '');
+    await first.click();
+    await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
+    await page.goto(`/endpoints/${endpointId}/credentials`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+    const issuer = page.getByTestId('wif-field-issuer');
+    const formVisible = await issuer.isVisible().catch(() => false);
+    test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+
+    // Intercept the credential-create POST and fulfill it with a mock success
+    // so the return box renders but NO server-side credential is created.
+    await page.route('**/scim/admin/endpoints/*/credentials', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'wi1-mock-credential-id',
+          endpointId,
+          credentialType: 'wif',
+          active: true,
+        }),
+      });
+    });
+
+    // Fill the four required Entra trust fields, then Save.
+    await issuer.getByRole('textbox').fill('https://login.microsoftonline.com/t/v2.0');
+    await page.getByTestId('wif-field-subject').getByRole('textbox').fill('sp-obj-id');
+    await page.getByTestId('wif-field-audience').getByRole('textbox').fill('api://app');
+    await page
+      .getByTestId('wif-field-jwks')
+      .getByRole('textbox')
+      .fill('https://login.microsoftonline.com/t/discovery/v2.0/keys');
+    await page.getByTestId('wif-field-tenant').getByRole('textbox').fill('tenant-guid');
+
+    const save = page.getByTestId('wif-save-button');
+    await expect(save).toBeEnabled();
+    await save.click();
+
+    // The return box renders on the mocked success. Assert the SCIM URL shape
+    // via the copy button's aria-label (CopyableField sets `Copy ${value}`).
+    const scimCopy = page.getByTestId('wif-return-scimurl-copy-button');
+    await expect(scimCopy).toBeVisible({ timeout: 15_000 });
+    const label = (await scimCopy.getAttribute('aria-label')) ?? '';
+    expect(label).toContain(`/scim/v2/endpoints/${endpointId}`);
+    expect(label).not.toContain(`/scim/endpoints/${endpointId}/v2`);
+  });
 });

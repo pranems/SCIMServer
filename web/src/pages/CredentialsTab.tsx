@@ -277,7 +277,11 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const tokenUrl = `${origin}/scim/endpoints/${endpointId}/oauth/token`;
-  const scimUrl = `${origin}/scim/endpoints/${endpointId}/v2`;
+  // WI-1: the SCIM base is the spec form `/scim/v2/endpoints/{id}` - the
+  // `/scim/v2` version segment is a LEADING prefix that the server rewrites to
+  // `/scim/endpoints/{id}`. The earlier `/scim/endpoints/{id}/v2` form put the
+  // version at the tail, which is not a route the server serves.
+  const scimUrl = `${origin}/scim/v2/endpoints/${endpointId}`;
 
   const requiredOk =
     trustPayload.expectedIssuer !== '' &&

@@ -378,6 +378,14 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-return-clientid')).toBeInTheDocument();
     expect(screen.getByTestId('wif-return-tokenurl')).toBeInTheDocument();
     expect(screen.getByTestId('wif-return-scimurl')).toBeInTheDocument();
+
+    // WI-1 regression: the SCIM URL must be the spec form
+    // `/scim/v2/endpoints/{id}` (the `/scim/v2` rewrite is a leading prefix),
+    // NOT the buggy `/scim/endpoints/{id}/v2`. CopyableField sets the copy
+    // button's aria-label deterministically to `Copy ${value}`, so assert on it.
+    const scimCopyBtn = screen.getByTestId('wif-return-scimurl-copy-button');
+    expect(scimCopyBtn.getAttribute('aria-label')).toContain('/scim/v2/endpoints/ep-1');
+    expect(scimCopyBtn.getAttribute('aria-label')).not.toContain('/scim/endpoints/ep-1/v2');
   });
 
   it('Test Connection renders a per-step readiness result (G3 client-side)', () => {

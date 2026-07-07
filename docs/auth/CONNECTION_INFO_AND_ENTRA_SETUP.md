@@ -140,7 +140,7 @@ The same SCIM base is currently spelled three different ways:
 | Where | Spelling | Correct? |
 |---|---|---|
 | Admin API `scimBasePath` | `/scim/endpoints/{id}` | Yes (bare, relative) |
-| WIF UI ([CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx)) | `${origin}/scim/endpoints/${id}/v2` | **No** - `/v2` after the id is a resource-type slot, not the version prefix |
+| WIF UI ([CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx)) | `${origin}/scim/v2/endpoints/${id}` | Yes - **fixed in WI-1** (was `.../endpoints/{id}/v2`, where `/v2` after the id is a resource-type slot, not the version prefix) |
 | Spec-aligned Entra form | `/scim/v2/endpoints/{id}` | Yes (version is a leading prefix) |
 
 The fix is to assemble the URL **once** server-side (Part 6) and have every UI consume that, instead of hand-building it. The WIF return-values box should show `https://host/scim/v2/endpoints/{id}` (or the bare form), never `.../endpoints/{id}/v2`.
@@ -743,7 +743,7 @@ sequenceDiagram
     API-->>Entra: 201 (SCIM User + meta)
 ```
 
-> **Known bug ([WI-1](#11a-work-items-delivery-backlog)):** the admin UI's WIF return box shows the SCIM URL as `.../endpoints/{id}/v2`, but the correct form used in Step 3 is `/scim/v2/endpoints/{id}` (the `/scim/v2` rewrite is a leading prefix - see [2.3](#23-the-three-way-url-inconsistency-a-bug-this-design-fixes)).
+> **Fixed ([WI-1](#11a-work-items-delivery-backlog), 2026-07-06):** the admin UI's WIF return box now shows the SCIM URL as `/scim/v2/endpoints/{id}` (the correct form used in Step 3); it previously showed `.../endpoints/{id}/v2` (the `/scim/v2` rewrite is a leading prefix - see [2.3](#23-the-three-way-url-inconsistency-a-bug-this-design-fixes)).
 
 ---
 
@@ -1574,7 +1574,7 @@ One epic, sequenced into independently-shippable items. Sizes are relative (S/M/
 
 | WI | Title | Size | Depends on | Summary |
 |---|---|---|---|---|
-| WI-1 | Fix the WIF SCIM URL (`/endpoints/{id}/v2` bug) | S | none | Correct [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) `scimUrl` to `/scim/v2/endpoints/{id}`; ships standalone first. |
+| WI-1 | Fix the WIF SCIM URL (`/endpoints/{id}/v2` bug) | S | none | **DONE (2026-07-06).** Corrected [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) `scimUrl` to `/scim/v2/endpoints/{id}`; vitest regression + Playwright regression added. |
 | WI-2 | `ConnectionInfoService` + `GET /admin/endpoints/{id}/connection-info` | M | none | Server-side URL + per-method assembler (Part 6 shape); no secrets; key-allowlist contract. |
 | WI-3 | Surface connection info on the BFF overview | S | WI-2 | Assembled absolute URLs into `useEndpointOverview`; UI stops hand-building URLs. |
 | WI-4 | `<ConnectionPanel>` primitive + Entra-field mapping table | M | WI-2, WI-3 | One reusable component; method selector; copy/CopyJson/.env/Download; R9 testids. |

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **WI-1: WIF return-values SCIM URL** ([CredentialsTab.tsx](web/src/pages/CredentialsTab.tsx)) - the "Federated Identity (WIF)" return box built the SCIM base URL as `${origin}/scim/endpoints/${id}/v2`, putting the version segment at the TAIL where the server treats it as a resource-type slot, not the API version. Corrected to the spec form `${origin}/scim/v2/endpoints/${id}` (the `/scim/v2` rewrite is a LEADING prefix the server rewrites to `/scim/endpoints/${id}`). This is the first work item of the connection-info epic ([docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 11A). Validation: vitest RED->GREEN regression asserting the rendered copy-button aria-label carries `/scim/v2/endpoints/{id}` and never `/scim/endpoints/{id}/v2` ([CredentialsTab.test.tsx](web/src/pages/CredentialsTab.test.tsx)); a route-mocked Playwright regression ([web/e2e/wif-credentials.spec.ts](web/e2e/wif-credentials.spec.ts)) that fulfills the create POST client-side (no server mutation) and asserts the return-box URL shape in a real browser. Full web vitest 1094/1094; tsc at baseline (0 new); web build + size-limit pass. Version 0.54.0-alpha.12 -> 0.54.0-alpha.13.
+
 ### Dependencies
 - Bumped `jose` from 5.10.0 to 6.2.3 in `/api`. jose v6 is published ESM-only (it dropped its CommonJS build), so the CommonJS Jest runtime can no longer `require()` it - the unit job failed with `SyntaxError: Unexpected token 'export'` while loading [api/src/oauth/external-jwks-validator.service.spec.ts](api/src/oauth/external-jwks-validator.service.spec.ts). Fixed by transforming just that package to CommonJS for tests: added `transformIgnorePatterns: ['/node_modules/(?!jose/)']` plus a ts-jest `allowJs` override to both [api/jest.config.ts](api/jest.config.ts) and [api/test/e2e/jest-e2e.config.ts](api/test/e2e/jest-e2e.config.ts). No application source changed - the production validator already loads jose via dynamic `import()`, which Node 24 resolves natively at runtime.
 
