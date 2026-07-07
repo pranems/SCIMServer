@@ -47,6 +47,7 @@ import {
   useEndpointOverview,
   useCreateCredential,
   useDeleteCredential,
+  useResolveWifDiscovery,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -185,6 +186,12 @@ const useWifStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     marginBottom: '8px',
   },
+  resolveRow: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: '8px',
+    marginBottom: '8px',
+  },
 });
 
 export interface CredentialsTabProps {
@@ -261,6 +268,31 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   const [saveError, setSaveError] = React.useState<unknown>(null);
   const [saved, setSaved] = React.useState<{ id: string } | null>(null);
   const [testSteps, setTestSteps] = React.useState<WifTestStep[] | null>(null);
+
+  // WI-14 - config-time discovery resolver state.
+  const resolveMutation = useResolveWifDiscovery(endpointId);
+  const [resolveTenantId, setResolveTenantId] = React.useState('');
+  const [resolveError, setResolveError] = React.useState<unknown>(null);
+
+  const onResolve = (): void => {
+    setResolveError(null);
+    resolveMutation.mutate(
+      { preset: 'entra-commercial', tenantId: resolveTenantId.trim() },
+      {
+        onSuccess: (res) => {
+          setForm((prev) => ({
+            ...prev,
+            expectedIssuer: res.expectedIssuer,
+            jwksUri: res.jwksUri,
+            // Only propose the audience default when the admin has not typed one.
+            expectedAudience: prev.expectedAudience || res.expectedAudience,
+            allowedTenantId: prev.allowedTenantId || resolveTenantId.trim(),
+          }));
+        },
+        onError: (err) => setResolveError(err),
+      },
+    );
+  };
 
   const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
 
@@ -360,6 +392,32 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
           </MessageBar>
         ) : (
           <>
+            <div className={wif.resolveRow} data-testid="wif-resolve-row">
+              <EditableField
+                label="Resolve from Entra tenant id (WI-14 discovery)"
+                value={resolveTenantId}
+                onChange={setResolveTenantId}
+                placeholder="tenant guid - fills Issuer + JWKS URI automatically"
+                monospace
+                data-testid="wif-resolve-tenant"
+              />
+              <Button
+                appearance="secondary"
+                onClick={onResolve}
+                disabled={resolveTenantId.trim() === '' || resolveMutation.isPending}
+                data-testid="wif-resolve-button"
+              >
+                {resolveMutation.isPending ? 'Resolving...' : 'Resolve from IdP'}
+              </Button>
+            </div>
+            {resolveError != null && (
+              <MessageBar intent="error" data-testid="wif-resolve-error">
+                <MessageBarBody>
+                  <MessageBarTitle>Could not resolve the IdP discovery document</MessageBarTitle>
+                  {(resolveError as Error).message}
+                </MessageBarBody>
+              </MessageBar>
+            )}
             <Caption1 data-testid="wif-field-alias-hint" className={wif.aliasHint}>
               Tip: you can paste a decoded token&apos;s bare claim names - `iss`, `sub`, `aud`,
               `tid`, `roles` (or `expectedTenantId`) are accepted and normalize to these fields.

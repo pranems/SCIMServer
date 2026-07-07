@@ -22,6 +22,7 @@ import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 const mockUseEndpointOverview = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockResolveMutate = vi.fn();
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
 
@@ -37,6 +38,10 @@ vi.mock('../api/queries', async () => {
     useDeleteCredential: () => ({
       mutate: mockDeleteMutate,
       isPending: deleteMutationState.isPending,
+    }),
+    useResolveWifDiscovery: () => ({
+      mutate: mockResolveMutate,
+      isPending: false,
     }),
   };
 });
@@ -352,6 +357,30 @@ describe('CredentialsTab', () => {
     expect(hint.textContent).toMatch(/expectedTenantId/);
     // The tenant field label reflects both the claim name and the alias.
     expect(screen.getByText(/tid \/ expectedTenantId/i)).toBeInTheDocument();
+  });
+
+  it('WI-14: the discovery resolver row is present and fires resolve with the tenant id', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    mockResolveMutate.mockClear();
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // The resolver row + tenant input + button render.
+    expect(screen.getByTestId('wif-resolve-row')).toBeInTheDocument();
+    const btn = screen.getByTestId('wif-resolve-button');
+    // Button is disabled until a tenant id is entered.
+    expect(btn).toBeDisabled();
+
+    fireEvent.change(wifInput('wif-resolve-tenant'), { target: { value: 'tenant-guid-123' } });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+
+    expect(mockResolveMutate).toHaveBeenCalledTimes(1);
+    const body = mockResolveMutate.mock.calls[0][0];
+    expect(body).toMatchObject({ preset: 'entra-commercial', tenantId: 'tenant-guid-123' });
   });
 
   it('enables Save once required fields are filled and posts a wif credential (G2)', () => {

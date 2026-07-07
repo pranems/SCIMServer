@@ -31,6 +31,11 @@ import * as bcrypt from 'bcrypt';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
+import {
+  WifDiscoveryResolverService,
+  type WifResolveRequest,
+  type WifResolveResult,
+} from '../../../oauth/wif-discovery-resolver.service';
 import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
@@ -46,6 +51,7 @@ interface CreateCredentialDto {
   credentialType?: string; // "bearer" (default) | "oauth_client" | "wif"
   expiresAt?: string;      // ISO 8601 date
   wif?: WifTrustInput;     // required when credentialType === "wif"
+  clientId?: string;       // WI-14: optional explicit client_id for oauth_client
 }
 
 /**
@@ -143,7 +149,34 @@ export class AdminCredentialController {
     private readonly endpointService: EndpointService,
     private readonly logger: ScimLogger,
     private readonly eventEmitter: EventEmitter2,
+    private readonly wifResolver: WifDiscoveryResolverService,
   ) {}
+
+  /**
+   * POST /admin/endpoints/:endpointId/wif/resolve  (WI-14)
+   *
+   * Config-time WIF discovery resolver. Reads the SOURCE IdP's OIDC discovery
+   * document and returns the signing-trust fields (`expectedIssuer` +
+   * `jwksUri`) plus a proposed `expectedAudience` default (the endpointId), so
+   * the admin fills five previously-required fields from one or two inputs.
+   * Nothing is persisted here - the returned values are handed to the normal
+   * `wif` create call. Gated by the JWKS host allowlist (SSRF).
+   */
+  @Post(':endpointId/wif/resolve')
+  async resolveWifDiscovery(
+    @Param('endpointId') endpointId: string,
+    @Body() body: WifResolveRequest,
+  ): Promise<WifResolveResult> {
+    const endpoint = await this.requireEndpoint(endpointId);
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
+      throw new ForbiddenException(
+        `WIF credentials are not enabled for endpoint "${endpointId}". ` +
+        `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
+      );
+    }
+    return this.wifResolver.resolve(endpointId, body ?? {});
+  }
 
   /**
    * POST /admin/endpoints/:endpointId/credentials
@@ -221,7 +254,18 @@ export class AdminCredentialController {
     // rides `metadata.clientId`. Both the client_id and the one-time secret are
     // returned at create; the secret is NEVER stored or returned again.
     if (credentialType === 'oauth_client') {
-      const clientId = `epc_${crypto.randomBytes(12).toString('hex')}`;
+      // WI-14 smart default: the FIRST oauth_client on an endpoint may use the
+      // endpointId as its (public) client_id - no lookup needed. Any additional
+      // one gets a generated id to avoid a collision. An explicit dto.clientId
+      // always wins.
+      let clientId: string;
+      if (dto.clientId && dto.clientId.trim().length > 0) {
+        clientId = dto.clientId.trim();
+      } else {
+        const existing = await this.credentialRepo.findByEndpoint(endpointId);
+        const hasOauthClient = existing.some((c) => c.credentialType === 'oauth_client');
+        clientId = hasOauthClient ? `epc_${crypto.randomBytes(12).toString('hex')}` : endpointId;
+      }
       const credential = await this.credentialRepo.create({
         endpointId,
         credentialType,

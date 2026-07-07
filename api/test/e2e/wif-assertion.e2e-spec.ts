@@ -72,7 +72,19 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     jwk.alg = 'RS256';
     jwk.use = 'sig';
     const jwks = { keys: [jwk] };
-    const fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => jwks });
+    // Content-aware mock: a discovery URL returns an OIDC discovery doc (for the
+    // WI-14 resolver); anything else returns the JWKS key set (for verify).
+    const discoveryDoc = {
+      issuer: ISSUER,
+      jwks_uri: JWKS_URI,
+    };
+    const fetchMock = jest.fn().mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          typeof url === 'string' && url.includes('.well-known/openid-configuration') ? discoveryDoc : jwks,
+      }),
+    );
 
     app = await createTestApp((builder) => builder.overrideProvider(JWKS_FETCH).useValue(fetchMock));
     adminToken = await getAuthToken(app);
@@ -374,5 +386,49 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .expect(200);
     // The token_endpoint URL must start with the issuer identifier (self-consistency).
     expect(res.body.token_endpoint.startsWith(res.body.issuer)).toBe(true);
+  });
+
+  // ─── WI-14 - config-time WIF discovery resolver ───────────────────────────
+  it('WI-14: resolves the WIF signing-trust fields from a full discovery URL (Mode A)', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/wif/resolve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ discoveryUrl: `${ISSUER}/.well-known/openid-configuration` })
+      .expect(201);
+
+    expect(res.body.expectedIssuer).toBe(ISSUER);
+    expect(res.body.jwksUri).toBe(JWKS_URI);
+    // Audience defaults to the endpointId.
+    expect(res.body.expectedAudience).toBe(endpointId);
+  });
+
+  it('WI-14: resolves from a preset + tenantId (Mode B)', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/wif/resolve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ preset: 'entra-commercial', tenantId: TENANT })
+      .expect(201);
+    expect(res.body.expectedIssuer).toBe(ISSUER);
+  });
+
+  it('WI-14: rejects a discovery host not on the JWKS allowlist (SSRF)', async () => {
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/wif/resolve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ discoveryUrl: 'https://evil.example/.well-known/openid-configuration' })
+      .expect(400);
+  });
+
+  it('WI-14: the FIRST oauth_client on an endpoint defaults client_id to the endpointId', async () => {
+    const ocEndpoint = await createEndpointWithConfig(app, adminToken, {
+      OAuthClientCredentialsAuthEnabled: 'True',
+    });
+    const res = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${ocEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ credentialType: 'oauth_client', label: 'wi14-default-id' })
+      .expect(201);
+    expect(res.body.clientId).toBe(ocEndpoint);
+    expect(typeof res.body.clientSecret).toBe('string');
   });
 });

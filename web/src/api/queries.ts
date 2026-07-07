@@ -1377,6 +1377,21 @@ export function useCreateCredential(endpointId: string) {
   });
 }
 
+/**
+ * WI-14 - resolve the WIF signing-trust fields from the source IdP's OIDC
+ * discovery document. Config-time only; nothing is persisted. Returns
+ * { expectedIssuer, jwksUri, expectedAudience }.
+ */
+export function useResolveWifDiscovery(endpointId: string) {
+  return useMutation({
+    mutationFn: (body: { discoveryUrl?: string; preset?: string; tenantId?: string }) =>
+      fetchWithAuth<{ expectedIssuer: string; jwksUri: string; expectedAudience: string }>(
+        `/scim/admin/endpoints/${endpointId}/wif/resolve`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+  });
+}
+
 /** Revoke (delete) a per-endpoint credential. Optimistic: removes from cached overview. */
 export function useDeleteCredential(endpointId: string) {
   const qc = useQueryClient();

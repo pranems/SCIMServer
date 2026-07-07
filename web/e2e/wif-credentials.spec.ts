@@ -115,6 +115,18 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(hint).toContainText('expectedTenantId');
   });
 
+  // WI-14 regression: the discovery resolver row is present when WIF is enabled.
+  test('WI-14: the WIF discovery resolver row renders when WIF is enabled', async ({ page }) => {
+    await openFirstEndpointCredentials(page);
+
+    const issuer = page.getByTestId('wif-field-issuer');
+    const formVisible = await issuer.isVisible().catch(() => false);
+    test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+
+    await expect(page.getByTestId('wif-resolve-row')).toBeVisible();
+    await expect(page.getByTestId('wif-resolve-button')).toBeVisible();
+  });
+
   // WI-1 regression: the WIF return-values box must present the SCIM base URL
   // in the spec form `/scim/v2/endpoints/{id}` (the `/scim/v2` version segment
   // is a LEADING prefix the server rewrites), NOT the buggy tail form

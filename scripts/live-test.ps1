@@ -11769,6 +11769,59 @@ try {
 Write-Host "`n--- 9z-AT5: WI-11 auth-flag split Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT6: WI-14 WIF discovery resolver + oauth_client smart default
+$script:currentSection = "9z-AT6: WI-14 discovery resolver"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT6: WI-14 WIF discovery resolver + oauth_client smart default" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at6Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wi14-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at6Id = $at6Ep.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at6Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True"; OAuthClientCredentialsAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: a discovery host NOT on the allowlist is rejected (SSRF) -> 400.
+    $at6Ssrf = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at6Id/wif/resolve" -Method POST -Headers $headers -Body (@{
+            discoveryUrl = "https://evil.example/.well-known/openid-configuration"
+        } | ConvertTo-Json) | Out-Null
+    } catch { $at6Ssrf = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at6Ssrf -Message "9z-AT6.T1: discovery host not on allowlist rejected (SSRF) -> 400"
+
+    # T2: a missing-inputs resolve is a 400 (neither discoveryUrl nor preset).
+    $at6BadReq = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at6Id/wif/resolve" -Method POST -Headers $headers -Body (@{} | ConvertTo-Json) | Out-Null
+    } catch { $at6BadReq = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at6BadReq -Message "9z-AT6.T2: resolve with neither discoveryUrl nor preset -> 400"
+
+    # T3: oauth_client smart default - the FIRST oauth_client uses the endpointId as client_id.
+    $at6Oc = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at6Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "wi14-default-id"
+    } | ConvertTo-Json)
+    Test-Result -Success ($at6Oc.clientId -eq $at6Id) -Message "9z-AT6.T3: first oauth_client client_id defaults to the endpointId"
+
+    # T4: a SECOND oauth_client gets a generated (epc_) client_id.
+    $at6Oc2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at6Id/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "wi14-generated-id"
+    } | ConvertTo-Json)
+    Test-Result -Success ($at6Oc2.clientId -like "epc_*" -and $at6Oc2.clientId -ne $at6Id) -Message "9z-AT6.T4: second oauth_client gets a generated client_id"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at6Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT6: WI-14 resolver section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT6: WI-14 discovery resolver Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

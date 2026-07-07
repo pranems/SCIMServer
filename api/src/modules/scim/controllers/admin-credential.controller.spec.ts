@@ -89,6 +89,7 @@ describe('AdminCredentialController', () => {
       mockEndpointService as any,
       mockScimLogger,
       (mockEventEmitter = { emit: jest.fn() }) as unknown as EventEmitter2,
+      { resolve: jest.fn() } as any,
     );
   });
 
@@ -298,6 +299,48 @@ describe('AdminCredentialController', () => {
       await expect(
         controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    // ── WI-14 - oauth_client smart default client_id ───────────────────────
+    it('WI-14: the FIRST oauth_client on an endpoint defaults its client_id to the endpointId', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
+      });
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([]); // no existing oauth_client
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: mockEndpoint.id } });
+      const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' });
+      expect(result.clientId).toBe(mockEndpoint.id);
+      // The create call carried the endpointId as the client_id.
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: { clientId: string } };
+      expect(created.metadata.clientId).toBe(mockEndpoint.id);
+    });
+
+    it('WI-14: a SECOND oauth_client gets a generated client_id (no collision)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
+      });
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([{ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: mockEndpoint.id } }]);
+      mockCredentialRepo.create.mockImplementation((data: { metadata?: { clientId?: string } }) =>
+        Promise.resolve({ ...mockCredential, credentialType: 'oauth_client', metadata: data.metadata }),
+      );
+      const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' });
+      expect(result.clientId).toMatch(/^epc_/);
+      expect(result.clientId).not.toBe(mockEndpoint.id);
+    });
+
+    it('WI-14: an explicit clientId always wins over the default', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
+      });
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([]);
+      mockCredentialRepo.create.mockImplementation((data: { metadata?: { clientId?: string } }) =>
+        Promise.resolve({ ...mockCredential, credentialType: 'oauth_client', metadata: data.metadata }),
+      );
+      const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client', clientId: 'my-custom-id' } as never);
+      expect(result.clientId).toBe('my-custom-id');
     });
 
     it('the wif response carries NO secret/hash field', async () => {
