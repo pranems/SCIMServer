@@ -58,7 +58,9 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   test('the WIF section is always present on the credentials tab', async ({ page }) => {
     await openFirstEndpointCredentials(page);
     await expect(page.getByTestId('wif-section')).toBeVisible();
-    await expect(page.getByText('Federated Identity (WIF)')).toBeVisible();
+    // The endpoint may hold several wif rows (each repeats the heading text), so
+    // scope to the first match to avoid a strict-mode violation.
+    await expect(page.getByText('Federated Identity (WIF)').first()).toBeVisible();
   });
 
   test('WIF section shows either the disabled banner or the input form', async ({ page }) => {
@@ -244,6 +246,22 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
           ],
           recentActivity: [],
           configFlags: { WifCredentialsEnabled: true },
+          // WI-3: connectionInfo is a required field on the overview BFF shape.
+          // Without it the CredentialsTab connection consumers throw and the
+          // tab never renders (PA shared-shape ripple).
+          connectionInfo: {
+            endpointId,
+            displayName: 'WI-16 Multi-trust',
+            urls: {
+              scimBaseUrl: `https://dev.example/scim/v2/endpoints/${endpointId}`,
+              scimBaseUrlBare: `https://dev.example/scim/endpoints/${endpointId}`,
+              tokenEndpoint: `https://dev.example/scim/endpoints/${endpointId}/oauth/token`,
+              serviceProviderConfig: `https://dev.example/scim/v2/endpoints/${endpointId}/ServiceProviderConfig`,
+              oauthMetadata: `https://dev.example/scim/endpoints/${endpointId}/.well-known/oauth-authorization-server`,
+            },
+            enabledMethods: [],
+            disabledMethods: [],
+          },
         }),
       });
     });

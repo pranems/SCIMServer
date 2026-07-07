@@ -24,12 +24,24 @@ import { Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 
-/** Top-level URL prefixes owned by the SPA. */
+/** Top-level URL prefixes owned by the SPA.
+ *
+ * MUST stay in sync with the top-level routes in web/src/router.ts. A route
+ * present there but absent here 404s on hard-refresh / deep-link (the request
+ * reaches Express with no matching NestJS controller and no SPA fallback). The
+ * route-coverage drift guard in spa-fallback.spec.ts reads the actual web
+ * route files and fails if a top-level route is missing from this list.
+ */
 export const SPA_PATH_PREFIXES = [
-  '/admin',     // legacy admin tab UI
-  '/endpoints', // Phase A1+ - endpoints list and per-endpoint detail (incl. tabs)
-  '/logs',      // Phase A1+ - global logs page
-  '/settings',  // Phase A1+ - global settings page
+  '/admin',            // legacy admin tab UI
+  '/discovery',        // discovery explorer page
+  '/endpoints',        // endpoints list + per-endpoint detail (incl. tabs)
+  '/logs',             // global logs page
+  '/manual-provision', // manual provisioning page
+  '/me',               // current-user profile page
+  '/operations',       // cross-endpoint operations page
+  '/settings',         // global settings page
+  '/workbench',        // request workbench page
 ] as const;
 
 /** Where the bundled SPA index.html lives relative to the api root.

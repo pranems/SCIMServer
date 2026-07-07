@@ -6,18 +6,70 @@
  *   - applySpaFallback registers middleware via app.use() for every
  *     prefix exactly once, mounted with the same handler
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { SPA_PATH_PREFIXES, resolveSpaIndexPath, applySpaFallback } from './spa-fallback';
 
 describe('spa-fallback helper', () => {
   describe('SPA_PATH_PREFIXES', () => {
-    it('contains the four current SPA path prefixes', () => {
-      // Phase A1+ adds /endpoints, /logs, /settings; legacy /admin
-      // tab UI still ships under ?ui=legacy. If a future phase drops
-      // a prefix or adds a new one, update this assertion AND
-      // web/src/router.ts in lockstep.
-      expect([...SPA_PATH_PREFIXES]).toEqual(['/admin', '/endpoints', '/logs', '/settings']);
+    it('contains every top-level SPA route prefix', () => {
+      // MUST stay in sync with the top-level routes in web/src/router.ts. A
+      // route present there but absent here 404s on hard-refresh / deep-link.
+      // The 2026-07-07 dev-deploy audit found /discovery, /operations,
+      // /workbench, /me, /manual-provision missing here (they 404'd on hard
+      // navigation) - this list now covers all top-level SPA routes.
+      expect([...SPA_PATH_PREFIXES]).toEqual([
+        '/admin',
+        '/discovery',
+        '/endpoints',
+        '/logs',
+        '/manual-provision',
+        '/me',
+        '/operations',
+        '/settings',
+        '/workbench',
+      ]);
     });
+
+    it('is sorted so the list is easy to eyeball against the router', () => {
+      const sorted = [...SPA_PATH_PREFIXES].sort();
+      expect([...SPA_PATH_PREFIXES]).toEqual(sorted);
+    });
+
+    // Drift guard: read the ACTUAL top-level route files in
+    // web/src/routes and assert every top-level URL prefix they declare
+    // is covered by SPA_PATH_PREFIXES. A route added to the router but
+    // not to the allowlist 404s on hard-refresh - the exact escape the
+    // 2026-07-07 dev-deploy audit found for /discovery + /operations +
+    // /workbench + /me + /manual-provision. Skips when the web tree is
+    // not present (isolated api container), so it is a dev-time guard.
+    const routesDir = join(__dirname, '..', '..', '..', 'web', 'src', 'routes');
+    const hasWebRoutes = existsSync(routesDir);
+    (hasWebRoutes ? it : it.skip)(
+      'covers every top-level route declared in web/src/routes (drift guard)',
+      () => {
+        const routeFiles = readdirSync(routesDir).filter(
+          (f) => f.endsWith('.tsx') && !f.startsWith('__'),
+        );
+        const allowed = new Set<string>(SPA_PATH_PREFIXES);
+        const missing: Array<{ file: string; prefix: string }> = [];
+        for (const file of routeFiles) {
+          const src = readFileSync(join(routesDir, file), 'utf8');
+          // Only routes parented on rootRoute contribute a top-level
+          // URL prefix. Nested routes inherit their ancestor's prefix.
+          if (!/getParentRoute:\s*\(\)\s*=>\s*rootRoute/.test(src)) continue;
+          const pathMatch = src.match(/path:\s*['"]([^'"]+)['"]/);
+          if (!pathMatch) continue;
+          const routePath = pathMatch[1];
+          if (routePath === '/') continue; // index route, served by root
+          const segments = routePath.split('/').filter(Boolean);
+          if (segments.length === 0) continue;
+          const prefix = '/' + segments[0];
+          if (!allowed.has(prefix)) missing.push({ file, prefix });
+        }
+        expect(missing).toEqual([]);
+      },
+    );
 
     it('every prefix is a single-segment URL starting with /', () => {
       for (const prefix of SPA_PATH_PREFIXES) {
