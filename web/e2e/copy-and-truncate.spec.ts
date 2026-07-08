@@ -223,6 +223,26 @@ test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
       `expected a TruncatedText span whose textContent === "${fullValue}"; ` +
         `report = ${JSON.stringify(overflowReport)}`,
     ).toBeDefined();
+    // The "ellipsis actually fired" signal (scrollWidth > clientWidth)
+    // can ONLY be verified when the text GENUINELY overflows the
+    // TruncatedText cap. A userName that is >= 40 chars but composed of
+    // narrow glyphs (lowercase + '.' + '@' - e.g.
+    // "testSyncUser@proviamtest08.onmicrosoft.com" = 42 chars but ~267px)
+    // renders UNDER the 280px maxWidth, so the browser correctly does NOT
+    // clip and scrollWidth === clientWidth. That is not a truncation bug -
+    // there is simply nothing to truncate. Skip the ellipsis assertion in
+    // that case (the R4/R5 bounded-width invariants above already ran and
+    // passed) rather than false-RED, exactly as the earlier probe skips
+    // when the tenant has no >= 40-char userName at all. The gate still
+    // fully asserts ellipsis whenever a genuinely-overflowing userName is
+    // present. (2026-07-07: dev's longest userName was a 42-char/267px
+    // value that fits the cap, producing a false-RED before this guard.)
+    test.skip(
+      truncatorMatch!.scrollWidth <= truncatorMatch!.clientWidth,
+      `Longest userName on dev ("${fullValue}", ${fullValue.length} chars) renders at ` +
+        `${truncatorMatch!.scrollWidth}px, under the 280px TruncatedText cap, so nothing clips. ` +
+        `Seed a wider/longer userName to exercise the ellipsis-fired assertion.`,
+    );
     expect(
       truncatorMatch!.scrollWidth,
       `TruncatedText scrollWidth (${truncatorMatch!.scrollWidth}px) must exceed clientWidth ` +

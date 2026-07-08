@@ -190,6 +190,15 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Manual Provision page', async ({ page }) => {
     await page.goto('/manual-provision');
+    // Load guard (2026-07-07): assert the SPA actually rendered the page
+    // BEFORE screenshotting. Without this, a hard-navigation that 404s
+    // (as /manual-provision did before the spa-fallback allowlist fix)
+    // silently screenshots the NestJS "Cannot GET /manual-provision" JSON
+    // 404 - and --update-snapshots would happily bake that error page in
+    // as the baseline, so the gate goes green comparing a 404 to a 404
+    // and never catches the routing bug. Every visual baseline MUST prove
+    // its page loaded first.
+    await expect(page.getByTestId('manual-provision-page')).toBeVisible({ timeout: 30_000 });
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('manual-provision.png', {
       ...SNAPSHOT_OPTIONS,
