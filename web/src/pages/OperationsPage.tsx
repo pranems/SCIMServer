@@ -28,6 +28,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Card,
   Subtitle1,
@@ -56,7 +57,7 @@ import {
   type DatabaseUserRow,
   type DatabaseGroupRow,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 
@@ -87,6 +88,14 @@ const useStyles = makeStyles({
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: tokens.fontSizeBase300,
+    // R5 (copilot-instructions.md): a table whose cells truncate MUST use
+    // `table-layout:fixed` + explicit column widths, otherwise the browser
+    // sizes each column to its natural content width - a long email-shaped
+    // userName then balloons the first column (measured 591px of 856px on
+    // dev), pushing the active/endpoint/created columns off-screen so the
+    // grid reads as a single-column list. Fixed layout makes the <th>
+    // widths below authoritative and lets the inner TruncatedText clip.
+    tableLayout: 'fixed',
   },
   rowHeader: {
     textAlign: 'left',
@@ -98,6 +107,20 @@ const useStyles = makeStyles({
   rowCell: {
     padding: '8px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
+    // Belt + braces with tableLayout:fixed: guarantees no inner descendant
+    // can visually overflow its bounded column.
+    overflow: 'hidden',
+  },
+  // Explicit column widths (R5). The name column carries no width so it
+  // takes the remaining space under table-layout:fixed; the trailing
+  // metadata columns are pinned so they always stay visible.
+  colName: { width: 'auto' },
+  colActive: { width: '110px' },
+  colMembers: { width: '110px' },
+  colEndpoint: { width: '180px' },
+  colCreated: { width: '200px' },
+  nameText: {
+    fontWeight: tokens.fontWeightSemibold,
   },
   endpointBadgeLink: {
     textDecoration: 'none',
@@ -319,17 +342,21 @@ const UsersSection: React.FC<{
           <table className={classes.rowTable}>
             <thead>
               <tr>
-                <th className={classes.rowHeader}>userName</th>
-                <th className={classes.rowHeader}>active</th>
-                <th className={classes.rowHeader}>endpoint</th>
-                <th className={classes.rowHeader}>created</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colName)}>userName</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colActive)}>active</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)}>endpoint</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colCreated)}>created</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((u) => (
                 <tr key={u.id} data-testid={`operations-user-row-${u.id}`}>
                   <td className={classes.rowCell}>
-                    <Text weight="semibold">{u.userName ?? '-'}</Text>
+                    <TruncatedText
+                      text={u.userName ?? '-'}
+                      className={classes.nameText}
+                      data-testid={`operations-user-row-${u.id}-username`}
+                    />
                     <br />
                     <CopyableField
                       value={u.id}
@@ -475,17 +502,21 @@ const GroupsSection: React.FC<{
           <table className={classes.rowTable}>
             <thead>
               <tr>
-                <th className={classes.rowHeader}>displayName</th>
-                <th className={classes.rowHeader}>members</th>
-                <th className={classes.rowHeader}>endpoint</th>
-                <th className={classes.rowHeader}>created</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colName)}>displayName</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colMembers)}>members</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)}>endpoint</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colCreated)}>created</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((g) => (
                 <tr key={g.id} data-testid={`operations-group-row-${g.id}`}>
                   <td className={classes.rowCell}>
-                    <Text weight="semibold">{g.displayName ?? '-'}</Text>
+                    <TruncatedText
+                      text={g.displayName ?? '-'}
+                      className={classes.nameText}
+                      data-testid={`operations-group-row-${g.id}-displayname`}
+                    />
                     <br />
                     <CopyableField
                       value={g.id}
