@@ -110,6 +110,33 @@ test.describe('Operations (/operations)', () => {
     // (c) the trailing metadata columns actually have width (are visible).
     const created = geom!.headers[3];
     expect(created.width, 'the created column must be visibly wide').toBeGreaterThan(80);
+
+    // (d) narrow-viewport robustness: percentage widths must keep the
+    // userName column readable even when the window is small. A px-fixed
+    // metadata set + an `auto` name column collapsed the name to ~26px at
+    // a 588px table (found during the 2026-07-08 visual pass). Shrink the
+    // viewport and assert the name column still takes a proportional share.
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.waitForTimeout(400);
+    const narrow = await page.evaluate(() => {
+      const table = document.querySelector('table');
+      if (!table) return null;
+      const tRect = table.getBoundingClientRect();
+      const nameTh = table.querySelector('thead th');
+      const nameRect = nameTh!.getBoundingClientRect();
+      return {
+        tableWidth: tRect.width,
+        namePct: Math.round((nameRect.width / tRect.width) * 100),
+        nameWidth: Math.round(nameRect.width),
+      };
+    });
+    expect(narrow, 'table still present at narrow viewport').not.toBeNull();
+    expect(
+      narrow!.namePct,
+      `at a narrow viewport the userName column is only ${narrow!.namePct}% ` +
+        `(${narrow!.nameWidth}px) of the ${Math.round(narrow!.tableWidth)}px table - ` +
+        `it collapsed. Percentage column widths should keep it near 40%.`,
+    ).toBeGreaterThanOrEqual(30);
   });
 
   test('toggling the active-only switch does not break the users list', async ({ page }) => {

@@ -65,6 +65,18 @@ type OperationsTabKey = 'users' | 'groups' | 'statistics';
 
 const PAGE_SIZE = 50;
 
+/**
+ * Format an ISO timestamp as a short local date for the `created`
+ * column. The full value is preserved in the CSV export; the table cell
+ * only needs a scannable date (the raw ISO string forced the column wide
+ * and clipped awkwardly under the R5 overflow:hidden cell).
+ */
+function formatCreated(iso: string | null | undefined): string {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
+}
+
 const useStyles = makeStyles({
   page: {
     display: 'flex',
@@ -111,14 +123,17 @@ const useStyles = makeStyles({
     // can visually overflow its bounded column.
     overflow: 'hidden',
   },
-  // Explicit column widths (R5). The name column carries no width so it
-  // takes the remaining space under table-layout:fixed; the trailing
-  // metadata columns are pinned so they always stay visible.
-  colName: { width: 'auto' },
-  colActive: { width: '110px' },
-  colMembers: { width: '110px' },
-  colEndpoint: { width: '180px' },
-  colCreated: { width: '200px' },
+  // Explicit column widths (R5). Percentages (not px + one `auto`) so the
+  // columns scale PROPORTIONALLY under table-layout:fixed at ANY viewport:
+  // a px-fixed metadata set + an `auto` name column starves the name column
+  // to a few px on narrow screens (measured 26px at a 588px table), while
+  // pure percentages keep the name column dominant-but-bounded everywhere.
+  // Name + one metadata trio each sum to 100%.
+  colName: { width: '40%' },
+  colActive: { width: '14%' },
+  colMembers: { width: '14%' },
+  colEndpoint: { width: '20%' },
+  colCreated: { width: '26%' },
   nameText: {
     fontWeight: tokens.fontWeightSemibold,
   },
@@ -386,7 +401,7 @@ const UsersSection: React.FC<{
                     )}
                   </td>
                   <td className={classes.rowCell}>
-                    <Caption1>{u.createdAt ?? '-'}</Caption1>
+                    <Caption1>{formatCreated(u.createdAt)}</Caption1>
                   </td>
                 </tr>
               ))}
@@ -544,7 +559,7 @@ const GroupsSection: React.FC<{
                     )}
                   </td>
                   <td className={classes.rowCell}>
-                    <Caption1>{g.createdAt ?? '-'}</Caption1>
+                    <Caption1>{formatCreated(g.createdAt)}</Caption1>
                   </td>
                 </tr>
               ))}
