@@ -64,6 +64,9 @@ describe('AdminCredentialController', () => {
       findActiveByEndpoint: jest.fn().mockResolvedValue([mockCredential]),
       deactivate: jest.fn().mockResolvedValue({ ...mockCredential, active: false }),
       delete: jest.fn().mockResolvedValue(undefined),
+      updateMetadata: jest.fn().mockImplementation((id: string, metadata: Record<string, unknown>) =>
+        Promise.resolve({ ...mockCredential, id, metadata }),
+      ),
     };
 
     mockEndpointService = {
@@ -480,6 +483,111 @@ describe('AdminCredentialController', () => {
 
       await expect(
         controller.revokeCredential(mockEndpoint.id, mockCredential.id),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateWifCredential (item 4 - edit a saved trust)', () => {
+    const wifCred = {
+      ...mockCredential,
+      id: 'wif-edit-1',
+      credentialType: 'wif',
+      credentialHash: '',
+      metadata: {
+        expectedIssuer: 'https://old.example/v2.0',
+        expectedSubject: 'old-sub',
+        expectedAudience: 'old-aud',
+        jwksUri: 'https://old.example/keys',
+        allowedTenantId: 'old-tid',
+        assertionProfile: 'jwt-bearer',
+      },
+    };
+
+    it('replaces the public trust metadata and echoes the updated trust', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(wifCred);
+      const result = await controller.updateWifCredential(mockEndpoint.id, 'wif-edit-1', {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: 'https://new.example/v2.0',
+          expectedSubject: 'new-sub',
+          expectedAudience: 'new-aud',
+          jwksUri: 'https://new.example/keys',
+          allowedTenantId: 'new-tid',
+          requiredRoles: ['Scim.Provision'],
+        },
+      } as never);
+
+      expect(mockCredentialRepo.updateMetadata).toHaveBeenCalledWith(
+        'wif-edit-1',
+        expect.objectContaining({
+          expectedIssuer: 'https://new.example/v2.0',
+          expectedSubject: 'new-sub',
+          allowedTenantId: 'new-tid',
+          requiredRoles: ['Scim.Provision'],
+        }),
+      );
+      expect(result.wif).toMatchObject({ expectedIssuer: 'https://new.example/v2.0' });
+      // No secret ever appears on a wif response.
+      expect((result as unknown as Record<string, unknown>).token).toBeUndefined();
+    });
+
+    it('accepts claim-name aliases (iss/sub/aud/tid) on edit', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(wifCred);
+      await controller.updateWifCredential(mockEndpoint.id, 'wif-edit-1', {
+        credentialType: 'wif',
+        wif: {
+          iss: 'https://alias.example/v2.0',
+          sub: 'alias-sub',
+          aud: 'alias-aud',
+          jwksUri: 'https://alias.example/keys',
+          tid: 'alias-tid',
+        },
+      } as never);
+      const meta = mockCredentialRepo.updateMetadata.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+      expect(meta.expectedIssuer).toBe('https://alias.example/v2.0');
+      expect(meta.allowedTenantId).toBe('alias-tid');
+      expect(meta.iss).toBeUndefined();
+    });
+
+    it('rejects an edit that drops a required field', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(wifCred);
+      await expect(
+        controller.updateWifCredential(mockEndpoint.id, 'wif-edit-1', {
+          credentialType: 'wif',
+          wif: { expectedIssuer: 'https://x/v2.0' },
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects editing a non-wif credential (rotate a secret instead)', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+      await expect(
+        controller.updateWifCredential(mockEndpoint.id, mockCredential.id, {
+          credentialType: 'wif',
+          wif: {
+            expectedIssuer: 'https://x/v2.0',
+            expectedSubject: 's',
+            expectedAudience: 'a',
+            jwksUri: 'https://x/keys',
+            allowedTenantId: 't',
+          },
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('404s when the credential does not exist / belongs to another endpoint', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(null);
+      await expect(
+        controller.updateWifCredential(mockEndpoint.id, 'ghost', {
+          credentialType: 'wif',
+          wif: {
+            expectedIssuer: 'https://x/v2.0',
+            expectedSubject: 's',
+            expectedAudience: 'a',
+            jwksUri: 'https://x/keys',
+            allowedTenantId: 't',
+          },
+        } as never),
       ).rejects.toThrow(NotFoundException);
     });
   });

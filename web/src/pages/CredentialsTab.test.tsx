@@ -26,6 +26,7 @@ const mockResolveMutate = vi.fn();
 const mockRevealMutate = vi.fn();
 const mockRotateMutate = vi.fn();
 const mockAddJwksHost = vi.fn();
+const mockUpdateWif = vi.fn();
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
 let jwksAllowlistState: { data: { seed: string[]; env: string[]; persisted: string[]; effective: string[] } | undefined; isLoading: boolean } = {
@@ -60,6 +61,7 @@ vi.mock('../api/queries', async () => {
     }),
     useJwksHostAllowlist: () => jwksAllowlistState,
     useAddJwksHost: () => ({ mutate: mockAddJwksHost, isPending: false, isError: false, error: null }),
+    useUpdateWifCredential: () => ({ mutate: mockUpdateWif, isPending: false }),
   };
 });
 
@@ -455,6 +457,93 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-credential-cred-wif-scope').textContent).toContain(
       'scim.read scim.write',
     );
+  });
+
+  it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
+    mockUpdateWif.mockClear();
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-edit',
+          credentialType: 'wif',
+          label: 'Editable trust',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://old.example/v2.0',
+            expectedSubject: 'old-sub',
+            expectedAudience: 'old-aud',
+            jwksUri: 'https://login.microsoftonline.com/t/keys',
+            allowedTenantId: 'old-tid',
+            requiredRoles: ['Scim.Provision'],
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // Click Edit on the saved trust row.
+    fireEvent.click(screen.getByTestId('wif-credential-edit-cred-edit'));
+    // The form is now populated with the saved values (R10: assert the value).
+    expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('https://old.example/v2.0');
+    expect((wifInput('wif-field-subject') as HTMLInputElement).value).toBe('old-sub');
+    expect((wifInput('wif-field-tenant') as HTMLInputElement).value).toBe('old-tid');
+    // The editing banner + Save changes label appear.
+    expect(screen.getByTestId('wif-editing-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-save-button').textContent).toContain('Save changes');
+
+    // Change the issuer and save -> update mutation fires with the credential id.
+    fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://new.example/v2.0' } });
+    fireEvent.click(screen.getByTestId('wif-save-button'));
+    expect(mockUpdateWif).toHaveBeenCalledTimes(1);
+    const arg = mockUpdateWif.mock.calls[0][0];
+    expect(arg.credentialId).toBe('cred-edit');
+    expect(arg.wif.expectedIssuer).toBe('https://new.example/v2.0');
+    expect(arg.wif.allowedTenantId).toBe('old-tid');
+  });
+
+  it('item 4: Cancel edit clears the form and exits edit mode', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-cancel',
+          credentialType: 'wif',
+          label: 'Trust',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://x.example/v2.0',
+            expectedSubject: 'sub',
+            expectedAudience: 'aud',
+            jwksUri: 'https://login.microsoftonline.com/t/keys',
+            allowedTenantId: 'tid',
+            requiredRoles: null,
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('wif-credential-edit-cred-cancel'));
+    expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('https://x.example/v2.0');
+    fireEvent.click(screen.getByTestId('wif-cancel-edit-button'));
+    // Back to create mode: form cleared, banner gone.
+    expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByTestId('wif-editing-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wif-save-button').textContent).toContain('Save WIF trust');
   });
 
   it('renders a dash for absent optional trust fields (stable grid shape)', () => {

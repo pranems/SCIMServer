@@ -84,4 +84,14 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
   async delete(id: string): Promise<void> {
     this.store.delete(id);
   }
+
+  async updateMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<EndpointCredentialModel | null> {
+    const cred = this.store.get(id);
+    if (!cred) return null;
+    cred.metadata = metadata;
+    return cred;
+  }
 }

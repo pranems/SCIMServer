@@ -38,4 +38,13 @@ export interface IEndpointCredentialRepository {
 
   /** Hard delete a credential. */
   delete(id: string): Promise<void>;
+
+  /**
+   * Item 4: replace a credential's public metadata (used to EDIT a saved WIF
+   * trust in place - correct a typo, rotate the JWKS URI, change required
+   * roles, etc). Only the metadata JSON is replaced; credentialType, hash,
+   * and secret envelope are untouched. Returns the updated row, or null if
+   * the credential does not exist.
+   */
+  updateMetadata(id: string, metadata: Record<string, unknown>): Promise<EndpointCredentialModel | null>;
 }

@@ -87,6 +87,22 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
+  async updateMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<EndpointCredentialModel | null> {
+    try {
+      const row = await this.prisma.endpointCredential.update({
+        where: { id },
+        data: { metadata: metadata as any },
+      });
+      return this.toModel(row);
+    } catch {
+      // Not found or invalid id.
+      return null;
+    }
+  }
+
   async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
     const result = await this.prisma.endpointCredential.updateMany({
       where: { endpointId, secretEnvelope: { not: null } },

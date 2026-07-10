@@ -23,6 +23,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   ForbiddenException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -401,6 +402,73 @@ export class AdminCredentialController {
       label: credential.label ?? undefined,
     };
     this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, credentialEventPayload);
+  }
+
+  /**
+   * PUT /admin/endpoints/:endpointId/credentials/:credentialId  (item 4)
+   *
+   * Edit a saved WIF trust in place. WIF trusts are all-public config (no
+   * secret), so the operator can correct a typo, rotate the JWKS URI, change
+   * the required roles, etc. after the fact. ONLY `wif` credentials are
+   * editable this way (bearer/oauth_client secrets are rotated, not edited).
+   * Applies the same alias normalization + required-field validation + public
+   * key projection as create, then replaces the metadata. Echoes the updated
+   * public trust (never a secret - a WIF credential has none).
+   */
+  @Put(':endpointId/credentials/:credentialId')
+  async updateWifCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+    @Body() dto: CreateCredentialDto,
+  ): Promise<CreateCredentialResponse> {
+    await this.requireEndpoint(endpointId);
+
+    const credential = await this.credentialRepo.findById(credentialId);
+    if (!credential || credential.endpointId !== endpointId) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    if (credential.credentialType !== 'wif') {
+      throw new BadRequestException(
+        'Only "wif" credentials are editable. Rotate a bearer/oauth_client secret instead of editing it.',
+      );
+    }
+
+    const rawTrust = dto.wif;
+    if (!rawTrust || typeof rawTrust !== 'object') {
+      throw new BadRequestException('A "wif" credential update requires a "wif" trust object.');
+    }
+    const trust = normalizeWifTrustAliases(rawTrust as unknown as Record<string, unknown>);
+    for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
+      if (!trust[required] || typeof trust[required] !== 'string') {
+        throw new BadRequestException(`WIF trust is missing required field "${required}".`);
+      }
+    }
+
+    const metadata: Record<string, unknown> = {};
+    for (const key of WIF_TRUST_KEYS) {
+      if (trust[key] !== undefined) metadata[key] = trust[key];
+    }
+    metadata.assertionProfile = trust.assertionProfile ?? 'jwt-bearer';
+
+    const updated = await this.credentialRepo.updateMetadata(credentialId, metadata);
+    if (!updated) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+
+    // Allow editing the label too when supplied (via a metadata-adjacent path
+    // is not modeled; label stays as-is unless a future change adds it).
+    this.logger.info(LogCategory.AUTH, `Updated wif credential "${credentialId}" for endpoint "${endpointId}"`);
+
+    return {
+      id: updated.id,
+      endpointId: updated.endpointId,
+      credentialType: updated.credentialType,
+      label: updated.label,
+      active: updated.active,
+      createdAt: updated.createdAt,
+      expiresAt: updated.expiresAt,
+      wif: metadata,
+    };
   }
 
   /**

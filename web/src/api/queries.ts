@@ -1393,6 +1393,24 @@ export function useResolveWifDiscovery(endpointId: string) {
   });
 }
 
+/**
+ * Item 4 - edit a saved WIF trust in place (PUT). Replaces the public trust
+ * metadata; invalidates the overview so the trust display refreshes.
+ */
+export function useUpdateWifCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ credentialId, wif }: { credentialId: string; wif: Record<string, unknown> }) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ credentialType: 'wif', wif }),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
 /** WI-15 - the effective JWKS host allowlist view (seed + env + persisted). */
 export interface JwksAllowlistView {
   seed: string[];

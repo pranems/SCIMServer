@@ -37,6 +37,7 @@ import {
 import {
   Add24Regular,
   Delete24Regular,
+  Edit24Regular,
   Copy16Regular,
   Key24Regular,
   Warning24Regular,
@@ -54,6 +55,7 @@ import {
   type RotateResult,
   useJwksHostAllowlist,
   useAddJwksHost,
+  useUpdateWifCredential,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -456,6 +458,10 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   const [saveError, setSaveError] = React.useState<unknown>(null);
   const [saved, setSaved] = React.useState<{ id: string } | null>(null);
   const [testSteps, setTestSteps] = React.useState<WifTestStep[] | null>(null);
+  // Item 4 - edit mode: when set, the form edits an existing trust (PUT)
+  // instead of creating a new one.
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const updateMutation = useUpdateWifCredential(endpointId);
 
   // WI-14 - config-time discovery resolver state.
   const resolveMutation = useResolveWifDiscovery(endpointId);
@@ -528,6 +534,20 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   const onSave = (): void => {
     setSaveError(null);
     setSaved(null);
+    if (editingId != null) {
+      // Item 4 - edit an existing trust in place (PUT).
+      updateMutation.mutate(
+        { credentialId: editingId, wif: trustPayload },
+        {
+          onSuccess: () => {
+            setEditingId(null);
+            setForm(EMPTY_WIF_FORM);
+          },
+          onError: (err) => setSaveError(err),
+        },
+      );
+      return;
+    }
     createMutation.mutate(
       { credentialType: 'wif', label: 'Federated Identity (WIF)', wif: trustPayload },
       {
@@ -538,6 +558,33 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
         onError: (err) => setSaveError(err),
       },
     );
+  };
+
+  // Item 4 - load a saved trust into the form for editing.
+  const onEditTrust = (cred: EndpointOverviewCredential): void => {
+    const t = cred.wif;
+    if (!t) return;
+    setSaved(null);
+    setSaveError(null);
+    setTestSteps(null);
+    setEditingId(cred.id);
+    setForm({
+      expectedIssuer: t.expectedIssuer ?? '',
+      expectedSubject: t.expectedSubject ?? '',
+      expectedAudience: t.expectedAudience ?? '',
+      jwksUri: t.jwksUri ?? '',
+      allowedTenantId: t.allowedTenantId ?? '',
+      requiredRoles: (t.requiredRoles ?? []).join(', '),
+      scope: t.scope ?? '',
+    });
+    // Bring the form into view for the operator.
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const onCancelEdit = (): void => {
+    setEditingId(null);
+    setForm(EMPTY_WIF_FORM);
+    setSaveError(null);
   };
 
   // Client-side readiness dry-run (the real validation is server-side).
@@ -672,11 +719,24 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
               <Button
                 appearance="primary"
                 onClick={onSave}
-                disabled={!requiredOk || createMutation.isPending}
+                disabled={!requiredOk || createMutation.isPending || updateMutation.isPending}
                 data-testid="wif-save-button"
               >
-                Save WIF trust
+                {editingId != null
+                  ? updateMutation.isPending
+                    ? 'Saving changes...'
+                    : 'Save changes'
+                  : 'Save WIF trust'}
               </Button>
+              {editingId != null && (
+                <Button
+                  appearance="secondary"
+                  onClick={onCancelEdit}
+                  data-testid="wif-cancel-edit-button"
+                >
+                  Cancel edit
+                </Button>
+              )}
               <Button
                 icon={<PlugConnected24Regular />}
                 onClick={onTestConnection}
@@ -690,6 +750,13 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 data-testid="wif-copy-json"
               />
             </div>
+            {editingId != null && (
+              <MessageBar intent="info" data-testid="wif-editing-banner">
+                <MessageBarBody>
+                  Editing an existing trust. Save changes to update it, or Cancel edit to discard.
+                </MessageBarBody>
+              </MessageBar>
+            )}
 
             {saveError != null && (
               <MessageBar intent="error" data-testid="wif-save-error">
@@ -777,13 +844,24 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                       <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                         {cred.active ? 'Active' : 'Revoked'}
                       </Badge>
-                      <Button
-                        appearance="subtle"
-                        icon={<Delete24Regular />}
-                        onClick={() => deleteMutation.mutate(cred.id)}
-                        aria-label={`Revoke WIF credential ${cred.label ?? cred.id}`}
-                        data-testid={`wif-credential-delete-${cred.id}`}
-                      />
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <Button
+                          appearance="subtle"
+                          icon={<Edit24Regular />}
+                          onClick={() => onEditTrust(cred)}
+                          aria-label={`Edit WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-edit-${cred.id}`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          appearance="subtle"
+                          icon={<Delete24Regular />}
+                          onClick={() => deleteMutation.mutate(cred.id)}
+                          aria-label={`Revoke WIF credential ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-delete-${cred.id}`}
+                        />
+                      </div>
                     </div>
                     <WifTrustDetails credId={cred.id} trust={cred.wif} styles={wif} />
                   </Card>
