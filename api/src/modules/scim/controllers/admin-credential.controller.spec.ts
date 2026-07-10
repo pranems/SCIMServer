@@ -25,6 +25,7 @@ describe('AdminCredentialController', () => {
   let mockCredentialRepo: Record<string, jest.Mock>;
   let mockEndpointService: Record<string, jest.Mock>;
   let mockEventEmitter: { emit: jest.Mock };
+  let mockWifResolver: { resolve: jest.Mock; verifyTrust: jest.Mock };
 
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
@@ -67,6 +68,9 @@ describe('AdminCredentialController', () => {
       updateMetadata: jest.fn().mockImplementation((id: string, metadata: Record<string, unknown>) =>
         Promise.resolve({ ...mockCredential, id, metadata }),
       ),
+      updateLabel: jest.fn().mockImplementation((id: string, label: string | null) =>
+        Promise.resolve({ ...mockCredential, id, label }),
+      ),
     };
 
     mockEndpointService = {
@@ -92,7 +96,7 @@ describe('AdminCredentialController', () => {
       mockEndpointService as any,
       mockScimLogger,
       (mockEventEmitter = { emit: jest.fn() }) as unknown as EventEmitter2,
-      { resolve: jest.fn() } as any,
+      (mockWifResolver = { resolve: jest.fn(), verifyTrust: jest.fn().mockResolvedValue({ ok: true, checks: [] }) }) as any,
       // WI-6/WI-7: credential encryption + security services. Defaults make
       // retention a no-op (isReady=false) so existing tests are unaffected.
       { isReady: jest.fn().mockReturnValue(false), encrypt: jest.fn(), decrypt: jest.fn() } as any,
@@ -589,6 +593,81 @@ describe('AdminCredentialController', () => {
           },
         } as never),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('item 4: edits the label when supplied alongside the trust', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(wifCred);
+      await controller.updateWifCredential(mockEndpoint.id, 'wif-edit-1', {
+        credentialType: 'wif',
+        label: 'Renamed trust',
+        wif: {
+          expectedIssuer: 'https://new.example/v2.0',
+          expectedSubject: 's',
+          expectedAudience: 'a',
+          jwksUri: 'https://new.example/keys',
+          allowedTenantId: 't',
+        },
+      } as never);
+      expect(mockCredentialRepo.updateLabel).toHaveBeenCalledWith('wif-edit-1', 'Renamed trust');
+    });
+  });
+
+  describe('item C - verify-on-save reachability gate', () => {
+    const wifTrust = {
+      expectedIssuer: 'https://idp.example/v2.0',
+      expectedSubject: 'sub',
+      expectedAudience: 'aud',
+      jwksUri: 'https://idp.example/keys',
+      allowedTenantId: 'tid',
+    };
+
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+    });
+
+    it('does NOT verify when verify is absent/false (backward compat, pre-staging allowed)', async () => {
+      await controller.createCredential(mockEndpoint.id, { credentialType: 'wif', wif: wifTrust } as never);
+      expect(mockWifResolver.verifyTrust).not.toHaveBeenCalled();
+      expect(mockCredentialRepo.create).toHaveBeenCalled();
+    });
+
+    it('verifies + persists when verify:true and the checks pass', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [{ id: 'jwksServesKeys', label: 'JWKS serves keys', ok: true, detail: '5 keys' }] });
+      await controller.createCredential(mockEndpoint.id, { credentialType: 'wif', verify: true, wif: wifTrust } as never);
+      expect(mockWifResolver.verifyTrust).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedIssuer: wifTrust.expectedIssuer, jwksUri: wifTrust.jwksUri }),
+      );
+      expect(mockCredentialRepo.create).toHaveBeenCalled();
+    });
+
+    it('rejects with 422 + the failed checks and does NOT persist when verify:true fails', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({
+        ok: false,
+        checks: [
+          { id: 'jwksReachable', label: 'JWKS URI reachable', ok: false, detail: 'HTTP 404.' },
+          { id: 'jwksServesKeys', label: 'JWKS serves keys', ok: false, detail: 'no keys' },
+        ],
+      });
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'wif', verify: true, wif: wifTrust } as never),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: expect.objectContaining({ scimType: 'invalidValue', checks: expect.any(Array) }),
+      });
+      expect(mockCredentialRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('the same gate applies to an edit (PUT) with verify:true', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'wif-x', credentialType: 'wif', credentialHash: '', metadata: wifTrust });
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: false, checks: [{ id: 'jwksReachable', label: 'JWKS URI reachable', ok: false, detail: 'HTTP 500.' }] });
+      await expect(
+        controller.updateWifCredential(mockEndpoint.id, 'wif-x', { credentialType: 'wif', verify: true, wif: wifTrust } as never),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
     });
   });
 

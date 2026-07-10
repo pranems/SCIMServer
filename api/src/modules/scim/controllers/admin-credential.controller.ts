@@ -25,6 +25,7 @@ import {
   Post,
   Put,
   ForbiddenException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as crypto from 'node:crypto';
@@ -57,6 +58,15 @@ interface CreateCredentialDto {
   expiresAt?: string;      // ISO 8601 date
   wif?: WifTrustInput;     // required when credentialType === "wif"
   clientId?: string;       // WI-14: optional explicit client_id for oauth_client
+  /**
+   * Item C: when true, a `wif` create/edit runs the server-side reachability +
+   * liveness verification (issuer OIDC discovery + JWKS serves keys) BEFORE
+   * persisting, and rejects with 422 + the failed checks when it does not pass
+   * - so the operator never saves a trust that will fail at runtime. Default
+   * (absent/false) preserves the ability to pre-stage a trust before its IdP is
+   * fully live.
+   */
+  verify?: boolean;
 }
 
 /**
@@ -474,6 +484,9 @@ export class AdminCredentialController {
       }
     }
 
+    // Item C: opt-in reachability + liveness gate BEFORE persisting the edit.
+    await this.verifyTrustOrThrow(dto.verify, trust);
+
     const metadata: Record<string, unknown> = {};
     for (const key of WIF_TRUST_KEYS) {
       if (trust[key] !== undefined) metadata[key] = trust[key];
@@ -485,18 +498,21 @@ export class AdminCredentialController {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
     }
 
-    // Allow editing the label too when supplied (via a metadata-adjacent path
-    // is not modeled; label stays as-is unless a future change adds it).
+    // Item 4: allow editing the label in the same call when supplied.
+    let labelled = updated;
+    if (dto.label !== undefined && dto.label !== updated.label && this.credentialRepo.updateLabel) {
+      labelled = (await this.credentialRepo.updateLabel(credentialId, dto.label)) ?? updated;
+    }
     this.logger.info(LogCategory.AUTH, `Updated wif credential "${credentialId}" for endpoint "${endpointId}"`);
 
     return {
-      id: updated.id,
-      endpointId: updated.endpointId,
-      credentialType: updated.credentialType,
-      label: updated.label,
-      active: updated.active,
-      createdAt: updated.createdAt,
-      expiresAt: updated.expiresAt,
+      id: labelled.id,
+      endpointId: labelled.endpointId,
+      credentialType: labelled.credentialType,
+      label: labelled.label,
+      active: labelled.active,
+      createdAt: labelled.createdAt,
+      expiresAt: labelled.expiresAt,
       wif: metadata,
     };
   }
@@ -663,6 +679,32 @@ export class AdminCredentialController {
   }
 
   /**
+   * Item C: when `verify` is true, run the server-side reachability + liveness
+   * verification (issuer OIDC discovery + JWKS serves a non-empty key set) and
+   * throw 422 with the failed checks if it does not pass, so a trust that would
+   * fail at runtime is never persisted. A no-op when `verify` is falsy (which
+   * preserves the ability to pre-stage a trust before its IdP is fully live).
+   */
+  private async verifyTrustOrThrow(
+    verify: boolean | undefined,
+    trust: Record<string, unknown>,
+  ): Promise<void> {
+    if (!verify) return;
+    const result = await this.wifResolver.verifyTrust({
+      expectedIssuer: typeof trust.expectedIssuer === 'string' ? trust.expectedIssuer : undefined,
+      jwksUri: typeof trust.jwksUri === 'string' ? trust.jwksUri : undefined,
+    });
+    if (!result.ok) {
+      const failed = result.checks.filter((c) => !c.ok).map((c) => `${c.label}: ${c.detail}`);
+      throw new UnprocessableEntityException({
+        message: `WIF trust verification failed: ${failed.join('; ')}`,
+        scimType: 'invalidValue',
+        checks: result.checks,
+      });
+    }
+  }
+
+  /**
    * Create a `wif` credential (A1). The trust config is ALL public values -
    * NO secret material. It rides EndpointCredential.metadata with an empty
    * credentialHash; the response carries no secret/hash/token field.
@@ -681,6 +723,9 @@ export class AdminCredentialController {
         throw new BadRequestException(`WIF trust is missing required field "${required}".`);
       }
     }
+
+    // Item C: opt-in reachability + liveness gate BEFORE persisting.
+    await this.verifyTrustOrThrow(dto.verify, trust);
 
     // Project to the known public keys only - any secret-looking key the caller
     // sent is dropped (defense in depth; the type already forbids them).

@@ -94,4 +94,11 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     cred.metadata = metadata;
     return cred;
   }
+
+  async updateLabel(id: string, label: string | null): Promise<EndpointCredentialModel | null> {
+    const cred = this.store.get(id);
+    if (!cred) return null;
+    cred.label = label;
+    return cred;
+  }
 }

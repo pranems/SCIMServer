@@ -103,6 +103,18 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
+  async updateLabel(id: string, label: string | null): Promise<EndpointCredentialModel | null> {
+    try {
+      const row = await this.prisma.endpointCredential.update({
+        where: { id },
+        data: { label },
+      });
+      return this.toModel(row);
+    } catch {
+      return null;
+    }
+  }
+
   async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
     const result = await this.prisma.endpointCredential.updateMany({
       where: { endpointId, secretEnvelope: { not: null } },

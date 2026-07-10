@@ -467,6 +467,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   // Item 6 - server-side reachability/liveness verification.
   const verifyMutation = useVerifyWifTrust(endpointId);
   const [verifyResult, setVerifyResult] = React.useState<WifVerifyResult | null>(null);
+  // Item C - when a verify-gated save fails, offer an explicit override.
+  const [needsOverride, setNeedsOverride] = React.useState(false);
 
   // WI-14 - config-time discovery resolver state.
   const resolveMutation = useResolveWifDiscovery(endpointId);
@@ -537,30 +539,53 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     trustPayload.allowedTenantId !== '';
 
   const onSave = (): void => {
+    // Item C: first attempt runs the server-side reachability + liveness gate
+    // (verify:true). If it fails, the API returns 422 with the checks; we
+    // render the checklist and offer an explicit "Save anyway" that re-submits
+    // without the gate. A passing verify persists immediately.
+    doSave(true);
+  };
+
+  const doSave = (verify: boolean): void => {
     setSaveError(null);
     setSaved(null);
+    setNeedsOverride(false);
+    if (verify) setVerifyResult(null);
+    const onError = (err: unknown): void => {
+      // A 422 from the verify gate carries the per-check checklist in rawBody.
+      const e = err as { status?: number; rawBody?: { checks?: WifVerifyResult['checks'] } };
+      if (e?.status === 422 && Array.isArray(e.rawBody?.checks)) {
+        setVerifyResult({ ok: false, checks: e.rawBody!.checks! });
+        setNeedsOverride(true);
+        return;
+      }
+      setSaveError(err);
+    };
     if (editingId != null) {
-      // Item 4 - edit an existing trust in place (PUT).
       updateMutation.mutate(
-        { credentialId: editingId, wif: trustPayload },
+        { credentialId: editingId, wif: trustPayload, verify },
         {
           onSuccess: () => {
             setEditingId(null);
             setForm(EMPTY_WIF_FORM);
+            setNeedsOverride(false);
+            setVerifyResult(null);
           },
-          onError: (err) => setSaveError(err),
+          onError,
         },
       );
       return;
     }
     createMutation.mutate(
-      { credentialType: 'wif', label: 'Federated Identity (WIF)', wif: trustPayload },
+      { credentialType: 'wif', label: 'Federated Identity (WIF)', wif: trustPayload, verify },
       {
         onSuccess: (raw) => {
           const cred = raw as unknown as { id: string };
           setSaved({ id: cred.id });
+          setNeedsOverride(false);
+          setVerifyResult(null);
         },
-        onError: (err) => setSaveError(err),
+        onError,
       },
     );
   };
@@ -749,6 +774,16 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                   data-testid="wif-cancel-edit-button"
                 >
                   Cancel edit
+                </Button>
+              )}
+              {needsOverride && (
+                <Button
+                  appearance="secondary"
+                  onClick={() => doSave(false)}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  data-testid="wif-save-anyway-button"
+                >
+                  Save anyway
                 </Button>
               )}
               <Button

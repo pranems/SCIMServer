@@ -1367,6 +1367,7 @@ export function useCreateCredential(endpointId: string) {
       expiresAt?: string;
       credentialType?: string;
       wif?: Record<string, unknown>;
+      verify?: boolean;
     }) =>
       fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials`, {
         method: 'POST',
@@ -1400,10 +1401,10 @@ export function useResolveWifDiscovery(endpointId: string) {
 export function useUpdateWifCredential(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ credentialId, wif }: { credentialId: string; wif: Record<string, unknown> }) =>
+    mutationFn: ({ credentialId, wif, label, verify }: { credentialId: string; wif: Record<string, unknown>; label?: string; verify?: boolean }) =>
       fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
         method: 'PUT',
-        body: JSON.stringify({ credentialType: 'wif', wif }),
+        body: JSON.stringify({ credentialType: 'wif', wif, ...(label !== undefined ? { label } : {}), ...(verify ? { verify: true } : {}) }),
       }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });

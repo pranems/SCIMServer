@@ -47,4 +47,11 @@ export interface IEndpointCredentialRepository {
    * the credential does not exist.
    */
   updateMetadata(id: string, metadata: Record<string, unknown>): Promise<EndpointCredentialModel | null>;
+
+  /**
+   * Item 4: update a credential's label (used to rename a WIF trust while
+   * editing it). Optional so older repo mocks stay compatible. Returns the
+   * updated row, or null if the credential does not exist.
+   */
+  updateLabel?(id: string, label: string | null): Promise<EndpointCredentialModel | null>;
 }

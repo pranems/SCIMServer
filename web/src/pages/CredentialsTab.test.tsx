@@ -777,6 +777,8 @@ describe('CredentialsTab', () => {
       jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
       allowedTenantId: 'tenant-guid',
     });
+    // Item C: the first save requests the server-side verify gate.
+    expect(body.verify).toBe(true);
 
     // The 3 ISV return values render after a successful save (G2).
     expect(screen.getByTestId('wif-return-values')).toBeInTheDocument();
@@ -798,6 +800,54 @@ describe('CredentialsTab', () => {
     expect(metaCopyBtn.getAttribute('aria-label')).toContain(
       '/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
     );
+  });
+
+  it('item C: a 422 verify failure renders the checklist + a Save-anyway that re-saves without the gate', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    // First save (verify:true) -> the server rejects with 422 + checks.
+    // Second save (verify:false, "Save anyway") -> success.
+    let call = 0;
+    mockCreateMutate.mockImplementation((_body, opts) => {
+      call += 1;
+      if (call === 1) {
+        opts?.onError?.({
+          status: 422,
+          rawBody: {
+            scimType: 'invalidValue',
+            checks: [
+              { id: 'jwksReachable', label: 'JWKS URI reachable', ok: false, detail: 'GET returned HTTP 404.' },
+              { id: 'jwksServesKeys', label: 'JWKS serves a non-empty key set', ok: false, detail: 'not a JWKS' },
+            ],
+          },
+        });
+      } else {
+        opts?.onSuccess?.({ id: 'wif-forced', credentialType: 'wif' });
+      }
+    });
+
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://idp.example/v2.0' } });
+    fireEvent.change(wifInput('wif-field-subject'), { target: { value: 'sub' } });
+    fireEvent.change(wifInput('wif-field-audience'), { target: { value: 'aud' } });
+    fireEvent.change(wifInput('wif-field-jwks'), { target: { value: 'https://idp.example/keys' } });
+    fireEvent.change(wifInput('wif-field-tenant'), { target: { value: 'tid' } });
+
+    // First save -> verify:true -> 422 -> checklist + Save-anyway appear.
+    fireEvent.click(screen.getByTestId('wif-save-button'));
+    expect(mockCreateMutate.mock.calls[0][0].verify).toBe(true);
+    expect(screen.getByTestId('wif-verify-result')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-verify-check-jwksReachable').textContent).toContain('404');
+    const anyway = screen.getByTestId('wif-save-anyway-button');
+    expect(anyway).toBeInTheDocument();
+
+    // Save anyway -> verify:false -> success.
+    fireEvent.click(anyway);
+    expect(mockCreateMutate.mock.calls[1][0].verify).toBe(false);
+    expect(screen.getByTestId('wif-return-values')).toBeInTheDocument();
   });
 
   it('Test Connection renders a per-step readiness result (G3 client-side)', () => {
