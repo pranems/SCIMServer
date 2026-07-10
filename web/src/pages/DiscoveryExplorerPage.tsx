@@ -123,11 +123,20 @@ const useStyles = makeStyles({
     rowGap: '6px',
     alignItems: 'center',
   },
+  diffTableScroll: {
+    width: '100%',
+    overflowX: 'auto',
+  },
   diffTable: {
     width: '100%',
+    minWidth: '480px',
     borderCollapse: 'collapse',
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
+    // R5: fixed layout so a long attribute name / value cannot balloon a
+    // column. Values WRAP (not truncate) because a diff is meant to be
+    // read in full; wordBreak keeps long unbreakable tokens inside the cell.
+    tableLayout: 'fixed',
   },
   diffHeaderCell: {
     textAlign: 'left',
@@ -142,10 +151,14 @@ const useStyles = makeStyles({
   diffNameCell: {
     padding: '6px 8px',
     fontWeight: 600,
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   diffCell: {
     padding: '4px 8px',
     fontSize: '11px',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   cellTighten: {
     backgroundColor: '#e5f5e0', // light green
@@ -505,6 +518,7 @@ const SpcSection: React.FC<{
     <Card className={classes.surfaceCard} data-testid="discovery-spc-section">
       {secondaryLoading && <LoadingSkeleton count={2} height="20px" />}
       {secondaryError && <ScimErrorMessage error={secondaryError} />}
+      <div className={classes.diffTableScroll}>
       <table className={classes.diffTable}>
         <thead>
           <tr>
@@ -523,6 +537,7 @@ const SpcSection: React.FC<{
           ))}
         </tbody>
       </table>
+      </div>
     </Card>
   );
 };
@@ -687,6 +702,7 @@ const SchemasDiffView: React.FC<{
               {diff.summary.onlyACount} only on primary ·{' '}
               {diff.summary.onlyBCount} only on secondary
             </Caption1>
+            <div className={classes.diffTableScroll}>
             <table className={classes.diffTable} style={{ marginTop: '8px' }}>
               <thead>
                 <tr>
@@ -704,6 +720,7 @@ const SchemasDiffView: React.FC<{
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         );
       })}

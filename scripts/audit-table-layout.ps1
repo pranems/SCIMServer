@@ -40,12 +40,9 @@ $ErrorActionPreference = 'Stop'
 # Operations bug was, but each is still an R5 gap to migrate when next
 # touched. Listed here so the gate flags only NEW offenders. Remove an entry
 # when its table is migrated to table-layout:fixed + percentage widths.
-$R53Allowlist = @(
-    'pages/LogsPage.tsx',
-    'pages/LogsTab.tsx',
-    'pages/WorkbenchPage.tsx',
-    'pages/DiscoveryExplorerPage.tsx'
-)
+# 2026-07-09: all four migrated to table-layout:fixed + %/colgroup widths +
+# horizontal-scroll wrappers, so the allowlist is now empty.
+$R53Allowlist = @()
 
 if (-not (Test-Path $WebSrc)) {
     Write-Error "web/src not found at $WebSrc"

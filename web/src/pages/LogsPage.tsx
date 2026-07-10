@@ -20,6 +20,7 @@
 import React from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Text,
   Badge,
@@ -92,7 +93,17 @@ const useStyles = makeStyles({
   chip: {
     cursor: 'pointer',
   },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  // R5: horizontal-scroll wrapper so a narrow window scrolls instead of
+  // clipping; the table stays >= minWidth for readability and expands to
+  // fill wider windows.
+  tableScroll: { width: '100%', overflowX: 'auto' },
+  table: { width: '100%', minWidth: '720px', borderCollapse: 'collapse', tableLayout: 'fixed' },
+  // Percentage column widths (R5.1) - scale proportionally on resize.
+  colMethod: { width: '9%' },
+  colUrl: { width: '46%' },
+  colStatus: { width: '11%' },
+  colDuration: { width: '12%' },
+  colTime: { width: '22%' },
   th: {
     textAlign: 'left',
     padding: '10px 12px',
@@ -105,6 +116,7 @@ const useStyles = makeStyles({
     padding: '10px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     fontSize: '13px',
+    overflow: 'hidden',
   },
   tr: {
     cursor: 'pointer',
@@ -393,14 +405,15 @@ export const LogsPage: React.FC = () => {
           data-testid="logs-empty"
         />
       ) : (
+        <div className={classes.tableScroll}>
         <table className={classes.table}>
           <thead>
             <tr>
-              <th className={classes.th}>Method</th>
-              <th className={classes.th}>URL</th>
-              <th className={classes.th}>Status</th>
-              <th className={classes.th}>Duration</th>
-              <th className={classes.th}>Time</th>
+              <th className={mergeClasses(classes.th, classes.colMethod)}>Method</th>
+              <th className={mergeClasses(classes.th, classes.colUrl)}>URL</th>
+              <th className={mergeClasses(classes.th, classes.colStatus)}>Status</th>
+              <th className={mergeClasses(classes.th, classes.colDuration)}>Duration</th>
+              <th className={mergeClasses(classes.th, classes.colTime)}>Time</th>
             </tr>
           </thead>
           <tbody>
@@ -425,7 +438,7 @@ export const LogsPage: React.FC = () => {
                     value={log.url}
                     truncate
                     monospace
-                    maxWidth="500px"
+                    maxWidth="100%"
                     data-testid={`log-row-url-${log.id}`}
                   />
                 </td>
@@ -446,6 +459,7 @@ export const LogsPage: React.FC = () => {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* Phase D5 - DetailDrawer for log inspection */}
