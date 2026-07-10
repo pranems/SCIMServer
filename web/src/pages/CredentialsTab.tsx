@@ -140,9 +140,16 @@ const useWifStyles = makeStyles({
     gap: '8px',
   },
   fieldGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '12px',
+    // WIF trust inputs stack ONE PER ROW at full width so long URLs
+    // (issuer / JWKS URI / audience) are readable end-to-end and every
+    // field expands with the window instead of being squeezed into a
+    // scattered multi-column grid. minWidth:0 lets the flex children
+    // shrink below their content width on narrow viewports.
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+    width: '100%',
+    minWidth: 0,
   },
   actions: {
     display: 'flex',
