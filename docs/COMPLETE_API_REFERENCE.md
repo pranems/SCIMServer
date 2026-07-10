@@ -465,6 +465,60 @@ Authorization: Bearer changeme-scim
 
 ---
 
+### PUT /scim/admin/endpoints/:endpointId/credentials/:credentialId
+
+Edit a `wif` trust in place (only `wif` credentials are editable; bearer/oauth_client secrets are rotated). Applies the same validation + public-key projection as create, replaces the metadata, and can also change the `label`. Never returns a secret. Optional `verify: true` runs the reachability gate first and rejects with `422` if it fails (nothing persisted). Returns `400` for a non-wif credential or a dropped required field; `404` for an unknown/cross-endpoint id.
+
+```http
+PUT /scim/admin/endpoints/a1b2c3d4-.../credentials/cred-uuid-... HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+Content-Type: application/scim+json
+```
+
+```json
+{
+  "credentialType": "wif",
+  "label": "Contoso Entra (prod)",
+  "verify": true,
+  "wif": {
+    "expectedIssuer": "https://login.microsoftonline.com/<tenant>/v2.0",
+    "expectedSubject": "sp-object-id",
+    "expectedAudience": "api://scim-app",
+    "jwksUri": "https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys",
+    "allowedTenantId": "<tenant>",
+    "requiredRoles": ["Scim.Provision"],
+    "roleEnforcement": "off"
+  }
+}
+```
+
+**Response:** 200 with the updated public trust (no secret). `422` when `verify:true` and the reachability checks fail (body carries `scimType: "invalidValue"` + `checks[]`).
+
+---
+
+### POST /scim/admin/endpoints/:endpointId/wif/verify
+
+Config-time reachability + liveness check for a WIF trust's issuer + JWKS URI. Non-throwing: returns a per-check checklist. SSRF-gated by the JWKS host allowlist (a disallowed host is a failed check, never fetched). Requires `WifCredentialsEnabled: true`.
+
+```http
+POST /scim/admin/endpoints/a1b2c3d4-.../wif/verify HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+Content-Type: application/scim+json
+```
+
+```json
+{
+  "expectedIssuer": "https://login.microsoftonline.com/<tenant>/v2.0",
+  "jwksUri": "https://login.windows.net/<tenant>/discovery/v2.0/keys"
+}
+```
+
+**Response:** 200 with `{ "ok": boolean, "checks": [ { "id", "label", "ok", "detail" } ] }` (checks: `issuerFormat`, `issuerHostAllowed`, `issuerReachable`, `jwksFormat`, `jwksHostAllowed`, `jwksReachable`, `jwksServesKeys`).
+
+---
+
 ## Admin - Logs & Audit Trail
 
 ### GET /scim/admin/logs
