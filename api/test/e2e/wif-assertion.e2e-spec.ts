@@ -7,7 +7,9 @@
  *    token endpoint -> SCIMServer validates it against the trust's JWKS and mints
  *    the ISV's OWN short-lived, endpoint-scoped token.
  *  - That minted token authorizes the endpoint's SCIM routes.
- *  - A wrong issuer / tenant / missing role each -> `invalid_client`.
+ *  - A wrong issuer / tenant -> `invalid_client`. A missing role is ADVISORY
+ *    by default (allowed + logged); it rejects only when the trust opts into
+ *    `roleEnforcement: 'enforce'`.
  *  - The `wif` credential response carries NO secret/hash.
  *
  * The remote JWKS fetch is overridden with a local in-memory key set so no
@@ -265,10 +267,54 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     expect(res.body.detail).toBe('invalid_client');
   });
 
-  it('rejects an assertion missing the required role with invalid_client', async () => {
+  it('ALLOWS an assertion missing the required role by default (advisory roles)', async () => {
+    // The main endpoint's trust has requiredRoles:['Scim.Provision'] but no
+    // roleEnforcement, so a missing role is advisory: the token still mints
+    // and the provisioning flow continues to the next step.
     const assertion = await signAssertion({ roles: ['Scim.Read'] });
-    const res = await postAssertion(assertion).expect(401);
-    expect(res.body.detail).toBe('invalid_client');
+    const res = await postAssertion(assertion).expect(201);
+    expect(res.body.access_token).toBeTruthy();
+  });
+
+  it('rejects a missing required role ONLY when the trust opts into roleEnforcement:enforce', async () => {
+    // A dedicated endpoint whose trust enforces roles.
+    const enforceEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${enforceEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Enforced-roles trust',
+        wif: {
+          expectedIssuer: ISSUER,
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: TENANT,
+          requiredRoles: ['Scim.Provision'],
+          roleEnforcement: 'enforce',
+        },
+      })
+      .expect(201);
+
+    // Missing the required role -> rejected with invalid_client.
+    const missing = await signAssertion({ roles: ['Scim.Read'] });
+    const rejected = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${enforceEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: missing, client_assertion_type: JWT_BEARER })
+      .expect(401);
+    expect(rejected.body.detail).toBe('invalid_client');
+
+    // With the required role present -> mints.
+    const ok = await signAssertion({ roles: ['Scim.Provision'] });
+    await request(app.getHttpServer())
+      .post(`/scim/endpoints/${enforceEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: ok, client_assertion_type: JWT_BEARER })
+      .expect(201);
   });
 
   it('never returns a secret/hash on the wif credential (no-secret contract)', async () => {

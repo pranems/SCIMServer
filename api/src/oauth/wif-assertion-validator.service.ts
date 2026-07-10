@@ -94,13 +94,30 @@ export class WifAssertionValidatorService {
       this.fail('tenant mismatch', trust);
     }
 
-    // Step 3 - required roles must be a subset of the assertion's `roles`.
+    // Step 3 - roles are ADVISORY by default. A missing required role is
+    // logged but does NOT block token issuance, so a provisioning flow always
+    // continues to the next step even if the identity provider has not yet
+    // assigned the app role (a common first-run ordering problem). Only a
+    // trust that explicitly opts into `roleEnforcement: 'enforce'` rejects on
+    // a missing role. `off` (default) and `shadow` allow + log.
     const required = trust.requiredRoles ?? [];
     if (required.length > 0) {
       const present = Array.isArray(claims.roles) ? claims.roles : [];
       const missing = required.filter((r) => !present.includes(r));
       if (missing.length > 0) {
-        this.fail(`missing required role(s): ${missing.join(', ')}`, trust);
+        if (trust.roleEnforcement === 'enforce') {
+          this.fail(`missing required role(s): ${missing.join(', ')}`, trust);
+        } else {
+          this.logger.warn(
+            LogCategory.AUTH,
+            'WIF assertion missing required role(s) - advisory, allowed (set roleEnforcement:enforce to reject)',
+            {
+              missing,
+              issuer: trust.expectedIssuer,
+              roleEnforcement: trust.roleEnforcement ?? 'off',
+            },
+          );
+        }
       }
     }
 

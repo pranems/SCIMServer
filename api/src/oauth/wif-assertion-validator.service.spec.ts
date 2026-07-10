@@ -92,16 +92,41 @@ describe('WifAssertionValidatorService (Q6.3)', () => {
     await expect(service.validate('a', TRUST)).rejects.toBeInstanceOf(WifAssertionInvalidError);
   });
 
-  it('rejects when a required role is missing', async () => {
+  it('rejects when a required role is missing AND roleEnforcement is enforce', async () => {
+    const trust: WifTrust = { ...TRUST, roleEnforcement: 'enforce' };
     verify.mockResolvedValue({ payload: { ...goodPayload(), roles: ['Scim.Read'] }, protectedHeader: {} });
-    await expect(service.validate('a', TRUST)).rejects.toBeInstanceOf(WifAssertionInvalidError);
+    await expect(service.validate('a', trust)).rejects.toBeInstanceOf(WifAssertionInvalidError);
   });
 
-  it('rejects when the roles claim is absent but roles are required', async () => {
+  it('rejects when the roles claim is absent, roles required, AND roleEnforcement is enforce', async () => {
+    const trust: WifTrust = { ...TRUST, roleEnforcement: 'enforce' };
     const p = goodPayload();
     delete (p as Record<string, unknown>).roles;
     verify.mockResolvedValue({ payload: p, protectedHeader: {} });
-    await expect(service.validate('a', TRUST)).rejects.toBeInstanceOf(WifAssertionInvalidError);
+    await expect(service.validate('a', trust)).rejects.toBeInstanceOf(WifAssertionInvalidError);
+  });
+
+  it('ALLOWS a missing required role by default (advisory) so the flow continues', async () => {
+    // Default trust has requiredRoles:['Scim.Provision'] but no roleEnforcement.
+    verify.mockResolvedValue({ payload: { ...goodPayload(), roles: ['Scim.Read'] }, protectedHeader: {} });
+    const claims = await service.validate('a', TRUST);
+    // Non-blocking: validation succeeds and returns the claims.
+    expect(claims.sub).toBe(TRUST.expectedSubject);
+  });
+
+  it('ALLOWS an absent roles claim by default (advisory) even when roles are required', async () => {
+    const p = goodPayload();
+    delete (p as Record<string, unknown>).roles;
+    verify.mockResolvedValue({ payload: p, protectedHeader: {} });
+    const claims = await service.validate('a', TRUST);
+    expect(claims.sub).toBe(TRUST.expectedSubject);
+  });
+
+  it('ALLOWS a missing role under roleEnforcement:shadow (log-only, not enforce)', async () => {
+    const trust: WifTrust = { ...TRUST, roleEnforcement: 'shadow' };
+    verify.mockResolvedValue({ payload: { ...goodPayload(), roles: [] }, protectedHeader: {} });
+    const claims = await service.validate('a', trust);
+    expect(claims.sub).toBe(TRUST.expectedSubject);
   });
 
   it('does not require roles when requiredRoles is empty', async () => {
