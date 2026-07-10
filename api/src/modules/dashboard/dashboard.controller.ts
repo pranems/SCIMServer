@@ -29,7 +29,33 @@ import type {
   EndpointOverviewResponse,
   EndpointOverviewActivity,
   EndpointOverviewCredential,
+  EndpointOverviewWifTrust,
 } from '../../shared/types/dashboard.types';
+
+/**
+ * Project a WIF credential's stored metadata to the public display shape,
+ * hard-allowlisting the trust-configuration keys. A WIF credential has no
+ * secret, but this closed allowlist guarantees a future metadata addition
+ * (e.g. an internal seam field) cannot silently leak through the overview.
+ */
+function projectWifTrust(
+  metadata: Record<string, unknown> | null | undefined,
+): EndpointOverviewWifTrust | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const asString = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+  const roles = metadata.requiredRoles;
+  return {
+    expectedIssuer: asString(metadata.expectedIssuer),
+    expectedSubject: asString(metadata.expectedSubject),
+    expectedAudience: asString(metadata.expectedAudience),
+    jwksUri: asString(metadata.jwksUri),
+    allowedTenantId: asString(metadata.allowedTenantId),
+    requiredRoles: Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : null,
+    scope: asString(metadata.scope),
+    assertionProfile: asString(metadata.assertionProfile),
+    issuedTokenTtlSec: typeof metadata.issuedTokenTtlSec === 'number' ? metadata.issuedTokenTtlSec : null,
+  };
+}
 
 /** Cached version string read once at construction */
 let cachedVersion: string | null = null;
@@ -187,6 +213,10 @@ export class DashboardController {
           ? c.expiresAt.toISOString()
           : String(c.expiresAt)
         : null,
+      // Surface the public WIF trust fields so the UI can display + edit
+      // the full trust. projectWifTrust returns null for non-wif rows and
+      // hard-allowlists the keys so no secret/internal field can leak.
+      ...(c.credentialType === 'wif' ? { wif: projectWifTrust(c.metadata) } : {}),
     }));
 
     // Recent activity projection - same shape as DashboardActivity but

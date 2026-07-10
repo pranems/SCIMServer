@@ -393,6 +393,100 @@ describe('CredentialsTab', () => {
     expect(screen.queryByTestId('credential-rotate-cred-wif')).not.toBeInTheDocument();
   });
 
+  it('displays the full public trust field VALUES for a configured wif trust', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-wif',
+          credentialType: 'wif',
+          label: 'Contoso Entra',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://login.microsoftonline.com/contoso/v2.0',
+            expectedSubject: 'sp-object-id-123',
+            expectedAudience: 'api://scim-app',
+            jwksUri: 'https://login.microsoftonline.com/contoso/discovery/v2.0/keys',
+            allowedTenantId: 'contoso-tenant-guid',
+            requiredRoles: ['Scim.Provision', 'Scim.Read'],
+            scope: 'scim.read scim.write',
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // R10: assert the RENDERED VALUES, not just that the row exists.
+    const details = screen.getByTestId('wif-credential-details-cred-wif');
+    expect(details).toBeInTheDocument();
+    // Each value flows through CopyableField, whose copy button aria-label
+    // carries the value; assert the value is actually present in the DOM.
+    expect(screen.getByTestId('wif-credential-cred-wif-issuer').textContent).toContain(
+      'https://login.microsoftonline.com/contoso/v2.0',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-subject').textContent).toContain(
+      'sp-object-id-123',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-audience').textContent).toContain(
+      'api://scim-app',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-jwks').textContent).toContain(
+      'https://login.microsoftonline.com/contoso/discovery/v2.0/keys',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-tenant').textContent).toContain(
+      'contoso-tenant-guid',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-roles').textContent).toContain(
+      'Scim.Provision, Scim.Read',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-scope').textContent).toContain(
+      'scim.read scim.write',
+    );
+  });
+
+  it('renders a dash for absent optional trust fields (stable grid shape)', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-wif2',
+          credentialType: 'wif',
+          label: 'Minimal trust',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://idp.example/v2.0',
+            expectedSubject: 'sub-1',
+            expectedAudience: 'aud-1',
+            jwksUri: 'https://idp.example/keys',
+            allowedTenantId: 'tid-1',
+            requiredRoles: null,
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // Optional roles + scope absent -> dash, grid still has the rows.
+    expect(screen.getByTestId('wif-credential-cred-wif2-roles').textContent).toBe('-');
+    expect(screen.getByTestId('wif-credential-cred-wif2-scope').textContent).toBe('-');
+    // Required issuer still shows its value.
+    expect(screen.getByTestId('wif-credential-cred-wif2-issuer').textContent).toContain(
+      'https://idp.example/v2.0',
+    );
+  });
+
   function wifInput(testId: string): HTMLElement {
     const root = screen.getByTestId(testId);
     return root.querySelector('input') ?? root.querySelector('textarea') ?? root;

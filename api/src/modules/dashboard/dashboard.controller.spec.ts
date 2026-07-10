@@ -385,6 +385,80 @@ describe('DashboardController', () => {
       expect((cred as unknown as Record<string, unknown>).credentialHash).toBeUndefined();
     });
 
+    it('projects the public WIF trust fields for a wif credential', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValueOnce([
+        {
+          id: 'wif-1',
+          endpointId,
+          credentialType: 'wif',
+          label: 'Contoso Entra',
+          active: true,
+          createdAt: new Date('2026-02-01T00:00:00Z'),
+          expiresAt: null,
+          credentialHash: '',
+          metadata: {
+            expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
+            expectedSubject: 'sp-obj-id',
+            expectedAudience: 'api://app',
+            jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
+            allowedTenantId: 'tenant-guid',
+            requiredRoles: ['Scim.Provision'],
+            scope: 'scim.read scim.write',
+            assertionProfile: 'jwt-bearer',
+            // An internal seam field that MUST NOT leak through the display
+            // projection (closed allowlist).
+            roleScopeMap: { 'Scim.Provision': ['scim.write'] },
+          },
+        } as any,
+      ]);
+
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
+      const cred = result.credentials[0];
+      expect(cred.credentialType).toBe('wif');
+      expect(cred.wif).toBeDefined();
+      const trust = cred.wif!;
+      expect(trust.expectedIssuer).toBe('https://login.microsoftonline.com/t/v2.0');
+      expect(trust.expectedSubject).toBe('sp-obj-id');
+      expect(trust.expectedAudience).toBe('api://app');
+      expect(trust.jwksUri).toBe('https://login.microsoftonline.com/t/discovery/v2.0/keys');
+      expect(trust.allowedTenantId).toBe('tenant-guid');
+      expect(trust.requiredRoles).toEqual(['Scim.Provision']);
+      expect(trust.scope).toBe('scim.read scim.write');
+      // Closed-allowlist guard: the seam field is not projected.
+      expect(Object.keys(trust).sort()).toEqual(
+        [
+          'allowedTenantId',
+          'assertionProfile',
+          'expectedAudience',
+          'expectedIssuer',
+          'expectedSubject',
+          'issuedTokenTtlSec',
+          'jwksUri',
+          'requiredRoles',
+          'scope',
+        ].sort(),
+      );
+      expect((trust as unknown as Record<string, unknown>).roleScopeMap).toBeUndefined();
+    });
+
+    it('does not attach a wif field to non-wif credentials', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValueOnce([
+        {
+          id: 'bearer-1',
+          endpointId,
+          credentialType: 'bearer',
+          label: 'Entra',
+          active: true,
+          createdAt: new Date('2026-02-01T00:00:00Z'),
+          expiresAt: null,
+          credentialHash: 'hash',
+        } as any,
+      ]);
+
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
+      expect(result.credentials[0].wif).toBeUndefined();
+    });
+
     it('returns recent activity scoped to the endpoint (last 10)', async () => {
       mockLoggingService.listLogs.mockResolvedValueOnce({
         items: Array.from({ length: 12 }, (_, i) => ({

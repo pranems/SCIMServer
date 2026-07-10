@@ -281,6 +281,31 @@ export interface EndpointOverviewCredential {
   active: boolean;
   createdAt: string;
   expiresAt?: string | null;
+  /**
+   * Public WIF trust fields, present ONLY when credentialType === 'wif'.
+   * These are all non-secret trust-configuration values (a WIF credential
+   * stores no secret), surfaced so the UI can display the full trust and
+   * offer inline editing without a second round trip. NEVER includes any
+   * secret/hash material (a WIF credential has none).
+   */
+  wif?: EndpointOverviewWifTrust | null;
+}
+
+/**
+ * Public projection of a WIF trust for display + edit in the UI. Every
+ * field here is a non-secret trust-configuration value. Kept as a closed
+ * allowlist so a future metadata addition cannot silently leak.
+ */
+export interface EndpointOverviewWifTrust {
+  expectedIssuer?: string | null;
+  expectedSubject?: string | null;
+  expectedAudience?: string | null;
+  jwksUri?: string | null;
+  allowedTenantId?: string | null;
+  requiredRoles?: string[] | null;
+  scope?: string | null;
+  assertionProfile?: string | null;
+  issuedTokenTtlSec?: number | null;
 }
 
 /** Recent activity row with display-name resolution. */

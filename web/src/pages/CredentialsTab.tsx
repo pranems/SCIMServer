@@ -191,6 +191,21 @@ const useWifStyles = makeStyles({
     fontFamily: 'monospace',
     fontSize: '12px',
   },
+  // Trust field detail grid shown under each configured trust row so the
+  // operator can read every important value (issuer / subject / audience /
+  // JWKS / tenant / roles). label column is fixed, value column takes the
+  // rest and wraps long URLs.
+  wifDetailGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(120px, 160px) 1fr',
+    columnGap: '12px',
+    rowGap: '6px',
+    marginTop: '10px',
+    alignItems: 'start',
+  },
+  wifDetailLabel: {
+    color: tokens.colorNeutralForeground3,
+  },
   wifListHeader: {
     display: 'flex',
     flexDirection: 'column',
@@ -248,6 +263,57 @@ interface WifTestStep {
   label: string;
   ok: boolean;
 }
+
+/**
+ * Read-only detail grid of a configured trust's public fields. Renders
+ * every important value (issuer / subject / audience / JWKS / tenant /
+ * roles / scope) so the operator can see exactly what was saved, each as
+ * a copyable value. Fields the trust does not carry are shown as a muted
+ * dash so the grid shape is stable.
+ */
+const WifTrustDetails: React.FC<{
+  credId: string;
+  trust: EndpointOverviewCredential['wif'];
+  styles: ReturnType<typeof useWifStyles>;
+}> = ({ credId, trust, styles }) => {
+  if (!trust) return null;
+  const rows: Array<{ key: string; label: string; value: string | null }> = [
+    { key: 'issuer', label: 'Issuer (iss)', value: trust.expectedIssuer ?? null },
+    { key: 'subject', label: 'Subject (sub)', value: trust.expectedSubject ?? null },
+    { key: 'audience', label: 'Audience (aud)', value: trust.expectedAudience ?? null },
+    { key: 'jwks', label: 'JWKS URI', value: trust.jwksUri ?? null },
+    { key: 'tenant', label: 'Allowed tenant', value: trust.allowedTenantId ?? null },
+    {
+      key: 'roles',
+      label: 'Required roles',
+      value:
+        trust.requiredRoles && trust.requiredRoles.length > 0
+          ? trust.requiredRoles.join(', ')
+          : null,
+    },
+    { key: 'scope', label: 'Issued scope', value: trust.scope ?? null },
+  ];
+  return (
+    <div className={styles.wifDetailGrid} data-testid={`wif-credential-details-${credId}`}>
+      {rows.map((r) => (
+        <React.Fragment key={r.key}>
+          <Caption1 className={styles.wifDetailLabel}>{r.label}</Caption1>
+          {r.value ? (
+            <CopyableField
+              value={r.value}
+              monospace
+              truncate
+              maxWidth="100%"
+              data-testid={`wif-credential-${credId}-${r.key}`}
+            />
+          ) : (
+            <Caption1 data-testid={`wif-credential-${credId}-${r.key}`}>-</Caption1>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
 
 interface WifCredentialsSectionProps {
   endpointId: string;
@@ -612,6 +678,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         data-testid={`wif-credential-delete-${cred.id}`}
                       />
                     </div>
+                    <WifTrustDetails credId={cred.id} trust={cred.wif} styles={wif} />
                   </Card>
                 ))}
               </div>
