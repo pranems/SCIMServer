@@ -435,6 +435,7 @@ describe('DashboardController', () => {
           'issuedTokenTtlSec',
           'jwksUri',
           'requiredRoles',
+          'roleEnforcement',
           'scope',
         ].sort(),
       );

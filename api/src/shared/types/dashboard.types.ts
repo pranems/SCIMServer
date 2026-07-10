@@ -306,6 +306,8 @@ export interface EndpointOverviewWifTrust {
   scope?: string | null;
   assertionProfile?: string | null;
   issuedTokenTtlSec?: number | null;
+  /** Item E - role-enforcement posture (off default | shadow | enforce). */
+  roleEnforcement?: 'off' | 'shadow' | 'enforce' | null;
 }
 
 /** Recent activity row with display-name resolution. */

@@ -30,6 +30,8 @@ import {
   Input,
   Field,
   Text,
+  Dropdown,
+  Option,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
@@ -273,6 +275,8 @@ interface WifTrustForm {
   allowedTenantId: string;
   requiredRoles: string;
   scope: string;
+  /** Item E - how a missing required role is handled at auth time. */
+  roleEnforcement: 'off' | 'shadow' | 'enforce';
 }
 
 const EMPTY_WIF_FORM: WifTrustForm = {
@@ -283,6 +287,7 @@ const EMPTY_WIF_FORM: WifTrustForm = {
   allowedTenantId: '',
   requiredRoles: '',
   scope: '',
+  roleEnforcement: 'off',
 };
 
 /** A single Test Connection readiness step (client-side dry-run). */
@@ -319,6 +324,11 @@ const WifTrustDetails: React.FC<{
           : null,
     },
     { key: 'scope', label: 'Issued scope', value: trust.scope ?? null },
+    {
+      key: 'enforcement',
+      label: 'Role enforcement',
+      value: trust.roleEnforcement && trust.roleEnforcement !== 'off' ? trust.roleEnforcement : 'advisory (default)',
+    },
   ];
   return (
     <div className={styles.wifDetailGrid} data-testid={`wif-credential-details-${credId}`}>
@@ -349,6 +359,24 @@ function hostOf(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Inline URL-format validation for a WIF field (item D). Returns an error
+ * string when the value is non-empty but not a valid https URL, else
+ * undefined. Empty is not an error here (required-ness is enforced at Save).
+ */
+function httpsUrlError(value: string): string | undefined {
+  const v = value.trim();
+  if (v === '') return undefined;
+  let url: URL;
+  try {
+    url = new URL(v);
+  } catch {
+    return 'Not a valid URL - include the https:// scheme.';
+  }
+  if (url.protocol !== 'https:') return 'Must use https.';
+  return undefined;
 }
 
 /**
@@ -516,6 +544,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       allowedTenantId: form.allowedTenantId.trim(),
       ...(roles.length > 0 ? { requiredRoles: roles } : {}),
       ...(form.scope.trim() ? { scope: form.scope.trim() } : {}),
+      // Item E - only send a non-default enforcement mode.
+      ...(form.roleEnforcement !== 'off' ? { roleEnforcement: form.roleEnforcement } : {}),
     };
   }, [form]);
 
@@ -606,6 +636,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       allowedTenantId: t.allowedTenantId ?? '',
       requiredRoles: (t.requiredRoles ?? []).join(', '),
       scope: t.scope ?? '',
+      roleEnforcement: (t.roleEnforcement as WifTrustForm['roleEnforcement']) ?? 'off',
     });
     // Bring the form into view for the operator.
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -703,6 +734,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 onChange={setField('expectedIssuer')}
                 placeholder="https://login.microsoftonline.com/<tenant>/v2.0"
                 monospace
+                validationMessage={httpsUrlError(form.expectedIssuer)}
                 data-testid="wif-field-issuer"
               />
               <EditableField
@@ -727,6 +759,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 onChange={setField('jwksUri')}
                 placeholder="https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys"
                 monospace
+                validationMessage={httpsUrlError(form.jwksUri)}
                 data-testid="wif-field-jwks"
               />
               <JwksAllowlistNotice jwksUri={form.jwksUri} styles={wif} />
@@ -752,6 +785,38 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 placeholder="scim.read scim.write"
                 data-testid="wif-field-scope"
               />
+              <Field
+                label="Required-role enforcement"
+                hint="Roles are advisory by default: a missing required role is logged but still authenticates so the flow continues. Choose Enforce to reject an assertion that lacks a required role."
+              >
+                <Dropdown
+                  value={
+                    form.roleEnforcement === 'enforce'
+                      ? 'Enforce - reject a missing required role'
+                      : form.roleEnforcement === 'shadow'
+                        ? 'Shadow - log only (advisory)'
+                        : 'Advisory (default) - allow + log'
+                  }
+                  selectedOptions={[form.roleEnforcement]}
+                  onOptionSelect={(_e, d) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      roleEnforcement: (d.optionValue as WifTrustForm['roleEnforcement']) ?? 'off',
+                    }))
+                  }
+                  data-testid="wif-field-role-enforcement"
+                >
+                  <Option value="off" text="Advisory (default) - allow + log">
+                    Advisory (default) - allow + log
+                  </Option>
+                  <Option value="shadow" text="Shadow - log only (advisory)">
+                    Shadow - log only (advisory)
+                  </Option>
+                  <Option value="enforce" text="Enforce - reject a missing required role">
+                    Enforce - reject a missing required role
+                  </Option>
+                </Dropdown>
+              </Field>
             </div>
 
             <div className={wif.actions}>

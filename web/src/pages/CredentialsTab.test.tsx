@@ -850,6 +850,44 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-return-values')).toBeInTheDocument();
   });
 
+  it('item D: shows an inline validation message for a non-https issuer/JWKS URL', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // A non-https issuer surfaces the inline error via the Fluent Field.
+    fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'http://insecure/v2.0' } });
+    expect(screen.getByText(/Must use https/i)).toBeInTheDocument();
+    // A malformed JWKS URL surfaces the scheme hint.
+    fireEvent.change(wifInput('wif-field-jwks'), { target: { value: 'not-a-url' } });
+    expect(screen.getByText(/include the https:\/\/ scheme/i)).toBeInTheDocument();
+  });
+
+  it('item E: the role-enforcement dropdown sends roleEnforcement only when non-default', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    mockCreateMutate.mockClear();
+    mockCreateMutate.mockImplementation((_body, opts) => opts?.onSuccess?.({ id: 'x', credentialType: 'wif' }));
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://idp/v2.0' } });
+    fireEvent.change(wifInput('wif-field-subject'), { target: { value: 's' } });
+    fireEvent.change(wifInput('wif-field-audience'), { target: { value: 'a' } });
+    fireEvent.change(wifInput('wif-field-jwks'), { target: { value: 'https://idp/keys' } });
+    fireEvent.change(wifInput('wif-field-tenant'), { target: { value: 't' } });
+
+    // Default (Advisory/off): payload omits roleEnforcement.
+    fireEvent.click(screen.getByTestId('wif-save-button'));
+    expect(mockCreateMutate.mock.calls[0][0].wif.roleEnforcement).toBeUndefined();
+
+    // The dropdown control is present for opting into strict mode.
+    expect(screen.getByTestId('wif-field-role-enforcement')).toBeInTheDocument();
+  });
+
   it('Test Connection renders a per-step readiness result (G3 client-side)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },

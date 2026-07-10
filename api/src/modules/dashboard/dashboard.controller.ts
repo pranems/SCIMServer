@@ -44,6 +44,7 @@ function projectWifTrust(
   if (!metadata || typeof metadata !== 'object') return null;
   const asString = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
   const roles = metadata.requiredRoles;
+  const enforcement = metadata.roleEnforcement;
   return {
     expectedIssuer: asString(metadata.expectedIssuer),
     expectedSubject: asString(metadata.expectedSubject),
@@ -54,6 +55,8 @@ function projectWifTrust(
     scope: asString(metadata.scope),
     assertionProfile: asString(metadata.assertionProfile),
     issuedTokenTtlSec: typeof metadata.issuedTokenTtlSec === 'number' ? metadata.issuedTokenTtlSec : null,
+    roleEnforcement:
+      enforcement === 'off' || enforcement === 'shadow' || enforcement === 'enforce' ? enforcement : null,
   };
 }
 

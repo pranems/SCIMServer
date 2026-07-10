@@ -116,6 +116,10 @@ export interface EditableFieldProps {
   monospace?: boolean;
   /** Hide the inline "buttons" affordance row (rarely useful). */
   hideButtons?: boolean;
+  /** Optional inline validation message rendered under the field. */
+  validationMessage?: string;
+  /** Validation state driving the message styling. Default 'error'. */
+  validationState?: 'error' | 'warning' | 'success' | 'none';
 }
 
 const HISTORY_CAP = 50;
@@ -131,6 +135,8 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   'data-testid': testId,
   monospace = false,
   hideButtons = false,
+  validationMessage,
+  validationState = 'error',
 }) => {
   const classes = useStyles();
   const { copy, status } = useCopyToClipboard();
@@ -238,7 +244,13 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   );
 
   return (
-    <Field label={label} className={classes.root} data-testid={testId}>
+    <Field
+      label={label}
+      className={classes.root}
+      data-testid={testId}
+      validationMessage={validationMessage}
+      validationState={validationMessage ? (validationState === 'none' ? undefined : validationState) : undefined}
+    >
       <div className={classes.inputRow}>
         <div className={classes.inputCell}>{fieldContents}</div>
         {!hideButtons && (
