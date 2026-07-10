@@ -171,5 +171,8 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
     await expect(page.getByTestId('connect-tab-panel-secret-retained-note')).toBeVisible();
     // The one-time "copy now" warning must NOT show for a persistent reveal.
     await expect(page.getByTestId('connect-tab-panel-secret-warning')).toHaveCount(0);
+    // R4: Entra-accurate labels + generic-IDP helper descriptions are present.
+    await expect(page.getByTestId('connect-tab-panel-intro')).toContainText(/Entra/i);
+    await expect(page.getByTestId('connect-tab-panel-desc-clientIdentifier')).toContainText(/Client ID/i);
   });
 });

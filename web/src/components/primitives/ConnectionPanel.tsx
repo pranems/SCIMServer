@@ -49,25 +49,54 @@ const useStyles = makeStyles({
   fieldGrid: { display: 'flex', flexDirection: 'column', gap: '8px' },
   fieldRow: {
     display: 'grid',
-    gridTemplateColumns: '160px 1fr',
-    alignItems: 'center',
+    gridTemplateColumns: '220px 1fr',
+    alignItems: 'start',
     gap: '12px',
-    padding: '4px 0',
+    padding: '6px 0',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
   },
-  fieldLabel: { color: tokens.colorNeutralForeground2 },
+  labelCell: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  fieldLabel: { color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightSemibold },
+  fieldDesc: { color: tokens.colorNeutralForeground3 },
+  intro: { color: tokens.colorNeutralForeground3, marginBottom: '4px' },
   actions: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' },
   authMethod: { fontWeight: tokens.fontWeightSemibold },
   empty: { padding: '12px 0' },
 });
 
-/** Human labels for the Entra field keys (fallback: the raw key). */
+/**
+ * Field labels use Microsoft Entra ID's exact wording (so an operator pasting
+ * into the Entra provisioning form recognizes each field 1:1), with the raw
+ * key as a fallback.
+ */
 const FIELD_LABELS: Record<string, string> = {
   tenantUrl: 'Tenant URL',
-  tokenEndpoint: 'Token Endpoint',
-  clientIdentifier: 'Client Identifier',
+  tokenEndpoint: 'OAuth token endpoint',
+  clientIdentifier: 'Client ID',
   clientSecret: 'Client Secret',
   secretToken: 'Secret Token',
+  expectedAudience: 'Audience',
+};
+
+/**
+ * Generic, IdP-agnostic helper text for each field. SCIMServer targets ANY
+ * SCIM 2.0 identity provider (Entra, Okta, OneLogin, Ping, custom clients), so
+ * each description names Entra's label AND explains the field generically so a
+ * non-Entra client operator knows where it goes.
+ */
+const FIELD_DESCRIPTIONS: Record<string, string> = {
+  tenantUrl:
+    'The SCIM base URL for this endpoint. Entra calls it "Tenant URL"; Okta/OneLogin/Ping call it the "SCIM base URL" / "Base URL". Paste it into your IdP\'s SCIM connector URL field.',
+  secretToken:
+    'The bearer token your IdP sends in the Authorization header. Entra calls it "Secret Token"; other clients call it "API token" / "bearer token".',
+  tokenEndpoint:
+    'The OAuth 2.0 token endpoint where the client exchanges its credentials for an access token (client_credentials grant). Entra calls it "OAuth token endpoint".',
+  clientIdentifier:
+    'The public client identifier for the OAuth client_credentials grant. Entra/Okta call it "Client ID".',
+  clientSecret:
+    'The confidential client secret for the OAuth client_credentials grant. Entra/Okta call it "Client Secret".',
+  expectedAudience:
+    'For Workload Identity Federation: the audience (aud) claim the source IdP token must carry when calling this endpoint.',
 };
 
 /** Map an Entra field key to its `.env` variable name. */
@@ -215,13 +244,26 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         Authentication Method: {method.entraAuthenticationMethod}
       </Text>
 
+      <Caption1 className={classes.intro} data-testid={`${testId}-intro`}>
+        Labels match Microsoft Entra ID&apos;s provisioning form. For Okta, OneLogin, Ping, or a
+        custom SCIM client, the per-field notes explain the equivalent value to paste.
+      </Caption1>
+
       <div className={classes.fieldGrid} data-testid={`${testId}-fields`}>
         {Object.entries(method.entraFields).map(([key, value]) => {
           const label = FIELD_LABELS[key] ?? key;
+          const desc = FIELD_DESCRIPTIONS[key];
           const isSecret = key === 'clientSecret' || key === 'secretToken';
           return (
             <div key={key} className={classes.fieldRow} data-testid={`${testId}-field-${key}`}>
-              <Text className={classes.fieldLabel}>{label}</Text>
+              <div className={classes.labelCell}>
+                <Text className={classes.fieldLabel}>{label}</Text>
+                {desc && (
+                  <Caption1 className={classes.fieldDesc} data-testid={`${testId}-desc-${key}`}>
+                    {desc}
+                  </Caption1>
+                )}
+              </div>
               {value !== null ? (
                 <CopyableField value={value} monospace truncate data-testid={`${testId}-value-${key}`} />
               ) : isSecret && secretForMethod ? (
@@ -245,7 +287,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         })}
         {method.expectedAudience && (
           <div className={classes.fieldRow} data-testid={`${testId}-field-expectedAudience`}>
-            <Text className={classes.fieldLabel}>Expected audience</Text>
+            <div className={classes.labelCell}>
+              <Text className={classes.fieldLabel}>{FIELD_LABELS.expectedAudience}</Text>
+              <Caption1 className={classes.fieldDesc}>{FIELD_DESCRIPTIONS.expectedAudience}</Caption1>
+            </div>
             <CopyableField
               value={method.expectedAudience}
               monospace

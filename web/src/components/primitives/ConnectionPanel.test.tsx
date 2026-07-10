@@ -143,4 +143,12 @@ describe('ConnectionPanel (WI-4)', () => {
     renderWithFluent(<ConnectionPanel connectionInfo={ci} />);
     expect(screen.getByTestId('connection-panel-secret-placeholder')).toHaveTextContent('Create a credential');
   });
-});
+  it('R4: shows Entra-accurate labels + generic-IDP helper descriptions per field', () => {
+    renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
+    // The intro explains the labels match Entra and notes other IdPs.
+    expect(screen.getByTestId('connection-panel-intro')).toHaveTextContent(/Entra/i);
+    // Each field carries a generic description naming the equivalent for other clients.
+    expect(screen.getByTestId('connection-panel-desc-tenantUrl')).toHaveTextContent(/SCIM base URL/i);
+    expect(screen.getByTestId('connection-panel-desc-tenantUrl')).toHaveTextContent(/Okta|OneLogin|Ping/i);
+    expect(screen.getByTestId('connection-panel-desc-clientIdentifier')).toHaveTextContent(/Client ID/i);
+  });});
