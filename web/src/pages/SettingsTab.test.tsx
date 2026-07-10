@@ -321,16 +321,43 @@ describe('SettingsTab', () => {
     });
   });
 
-  it('renders the PrimaryEnforcement value as read-only info (not a Switch)', () => {
+  it('renders PrimaryEnforcement as an editable Dropdown (not a Switch, not read-only)', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({ PrimaryEnforcement: 'reject' }),
       isLoading: false, error: null,
     });
     wrap(<SettingsTab endpointId={EP_ID} />);
-    // PrimaryEnforcement key is rendered exactly once (as a row label).
-    expect(screen.getByText('PrimaryEnforcement')).toBeInTheDocument();
-    // Badge renders the value exactly.
-    expect(screen.getByText('reject')).toBeInTheDocument();
+    // Rendered as an enum Dropdown row reflecting the current value.
+    const dropdown = screen.getByTestId('settings-enum-PrimaryEnforcement-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown.textContent).toContain('reject');
+    // It is NOT a Switch.
     expect(screen.queryByRole('switch', { name: /PrimaryEnforcement/i })).toBeNull();
+  });
+
+  it('groups boolean flags into related-category cards', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getByTestId('settings-category-authentication-methods')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-category-validation-schema')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-category-patch-semantics')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-category-lifecycle-deletes')).toBeInTheDocument();
+    // The auth-method switches live under the Authentication methods card.
+    const authCard = screen.getByTestId('settings-category-authentication-methods');
+    expect(authCard.querySelector('[aria-label="WifCredentialsEnabled"]')).not.toBeNull();
+  });
+
+  it('logLevel renders as an enum Dropdown with the log levels', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ logLevel: 'WARN' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const dropdown = screen.getByTestId('settings-enum-logLevel-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown.textContent).toContain('WARN');
   });
 });

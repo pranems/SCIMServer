@@ -35,6 +35,8 @@ import {
   Switch,
   Radio,
   RadioGroup,
+  Dropdown,
+  Option,
   Spinner,
   Badge,
   Text,
@@ -63,7 +65,27 @@ interface BoolFlag {
   label: string;
   description: string;
   defaultValue: boolean;
+  category: FlagCategory;
 }
+
+// Related-settings groupings shown as separate cards (operator request:
+// organize the grown settings list into related categories).
+type FlagCategory =
+  | 'Validation & schema'
+  | 'Concurrency & ETags'
+  | 'Lifecycle & deletes'
+  | 'PATCH semantics'
+  | 'Discovery'
+  | 'Authentication methods';
+
+const CATEGORY_ORDER: readonly FlagCategory[] = [
+  'Authentication methods',
+  'Validation & schema',
+  'PATCH semantics',
+  'Lifecycle & deletes',
+  'Concurrency & ETags',
+  'Discovery',
+];
 
 const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
   // ── Validation & schema ───────────────────────────────────────────
@@ -72,12 +94,14 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     label: 'StrictSchemaValidation',
     description: 'Reject resources whose schemas[] is missing a declared extension URN.',
     defaultValue: false,
+    category: 'Validation & schema',
   },
   {
     key: 'AllowAndCoerceBooleanStrings',
     label: 'AllowAndCoerceBooleanStrings',
     description: 'Coerce "True" / "False" string values to real booleans on write.',
     defaultValue: true,
+    category: 'Validation & schema',
   },
   // ── Concurrency / etags ───────────────────────────────────────────
   {
@@ -85,6 +109,7 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     label: 'RequireIfMatch',
     description: 'Mandate an If-Match ETag header on PUT, PATCH, and DELETE requests.',
     defaultValue: false,
+    category: 'Concurrency & ETags',
   },
   // ── Lifecycle / deletes ───────────────────────────────────────────
   {
@@ -92,18 +117,21 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     label: 'UserSoftDeleteEnabled',
     description: 'PATCH active=false soft-deactivates the user (default RFC behavior).',
     defaultValue: true,
+    category: 'Lifecycle & deletes',
   },
   {
     key: 'UserHardDeleteEnabled',
     label: 'UserHardDeleteEnabled',
     description: 'DELETE /Users/{id} permanently removes the row.',
     defaultValue: true,
+    category: 'Lifecycle & deletes',
   },
   {
     key: 'GroupHardDeleteEnabled',
     label: 'GroupHardDeleteEnabled',
     description: 'DELETE /Groups/{id} permanently removes the group.',
     defaultValue: true,
+    category: 'Lifecycle & deletes',
   },
   // ── PATCH semantics ───────────────────────────────────────────────
   {
@@ -111,30 +139,35 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     label: 'MultiMemberPatchOpForGroupEnabled',
     description: 'Accept multi-member add/remove inside a single PATCH op on a Group.',
     defaultValue: true,
+    category: 'PATCH semantics',
   },
   {
     key: 'PatchOpAllowRemoveAllMembers',
     label: 'PatchOpAllowRemoveAllMembers',
     description: 'Allow remove path=members (clear the entire membership list).',
     defaultValue: false,
+    category: 'PATCH semantics',
   },
   {
     key: 'VerbosePatchSupported',
     label: 'VerbosePatchSupported',
     description: 'Resolve dot-notation paths (e.g. name.familyName) inside PATCH.',
     defaultValue: false,
+    category: 'PATCH semantics',
   },
   {
     key: 'IncludeWarningAboutIgnoredReadOnlyAttribute',
     label: 'IncludeWarningAboutIgnoredReadOnlyAttribute',
     description: 'Append a warning header when a readOnly attribute is silently stripped.',
     defaultValue: false,
+    category: 'PATCH semantics',
   },
   {
     key: 'IgnoreReadOnlyAttributesInPatch',
     label: 'IgnoreReadOnlyAttributesInPatch',
     description: 'Strip (instead of reject) readOnly attributes encountered in PATCH ops.',
     defaultValue: false,
+    category: 'PATCH semantics',
   },
   // ── Discovery / auth ──────────────────────────────────────────────
   {
@@ -142,50 +175,94 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     label: 'SchemaDiscoveryEnabled',
     description: 'Expose /Schemas, /ResourceTypes, /ServiceProviderConfig under this endpoint.',
     defaultValue: true,
+    category: 'Discovery',
   },
   {
     key: 'CustomResourceTypesEnabled',
     label: 'CustomResourceTypesEnabled',
     description: 'Allow registering custom resource types (beyond User and Group) on the Resource Types tab.',
     defaultValue: false,
+    category: 'Discovery',
   },
   {
     key: 'PerEndpointCredentialsEnabled',
     label: 'PerEndpointCredentialsEnabled',
     description: 'Validate the bearer token against this endpoint\'s credential set.',
     defaultValue: false,
+    category: 'Authentication methods',
   },
   {
     key: 'SecretTokenBearerAuthEnabled',
     label: 'SecretTokenBearerAuthEnabled',
     description: 'WI-11: accept a per-endpoint bcrypt bearer token (Entra "Secret Token"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
     defaultValue: false,
+    category: 'Authentication methods',
   },
   {
     key: 'OAuthClientCredentialsAuthEnabled',
     label: 'OAuthClientCredentialsAuthEnabled',
     description: 'WI-11: accept a per-endpoint oauth_client credential (Entra "OAuth2 client-credentials"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
     defaultValue: false,
+    category: 'Authentication methods',
   },
   {
     key: 'SharedSecretBearerAuthEnabled',
     label: 'SharedSecretBearerAuthEnabled',
     description: 'WI-11: whether this endpoint accepts the global SCIM shared secret. Turn OFF to make the endpoint accept only its own credentials. Defaults to on.',
     defaultValue: true,
+    category: 'Authentication methods',
   },
   {
     key: 'WifCredentialsEnabled',
     label: 'WifCredentialsEnabled',
     description: 'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',
     defaultValue: false,
+    category: 'Authentication methods',
   },
 ];
 
-// Read-only (non-boolean) flag keys we still want to surface so the
-// operator can see (but not toggle) the active value. PrimaryEnforcement
-// is an enum and logLevel is a string|number - both need a richer
-// editor that's out of scope for E2.
-const READ_ONLY_KEYS = ['PrimaryEnforcement', 'logLevel'] as const;
+// ─── Enumerated (multi-option) settings ───────────────────────────────
+// Non-boolean settings that have a fixed set of allowed values. These
+// render as a Dropdown (not a Switch or a read-only badge) so the
+// operator can pick a value directly per UX best practice.
+
+interface EnumSetting {
+  key: string;
+  label: string;
+  description: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  defaultValue: string;
+}
+
+const ENUM_SETTINGS: ReadonlyArray<EnumSetting> = [
+  {
+    key: 'PrimaryEnforcement',
+    label: 'PrimaryEnforcement',
+    description:
+      'How a resource with more than one primary=true sub-attribute (e.g. two primary emails) is handled: passthrough (accept as-is), normalize (keep the first primary, clear the rest), or reject (422).',
+    options: [
+      { value: 'passthrough', label: 'passthrough (accept as-is)' },
+      { value: 'normalize', label: 'normalize (keep first primary)' },
+      { value: 'reject', label: 'reject (422 on duplicate primary)' },
+    ],
+    defaultValue: 'passthrough',
+  },
+  {
+    key: 'logLevel',
+    label: 'logLevel',
+    description: 'Per-endpoint log verbosity override. Falls back to the server global level when unset.',
+    options: [
+      { value: 'TRACE', label: 'TRACE' },
+      { value: 'DEBUG', label: 'DEBUG' },
+      { value: 'INFO', label: 'INFO' },
+      { value: 'WARN', label: 'WARN' },
+      { value: 'ERROR', label: 'ERROR' },
+      { value: 'FATAL', label: 'FATAL' },
+      { value: 'OFF', label: 'OFF' },
+    ],
+    defaultValue: 'INFO',
+  },
+];
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -320,9 +397,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     flags.CredentialSecretVisibility.toLowerCase() === 'once'
       ? 'once'
       : 'always';
-  for (const k of READ_ONLY_KEYS) {
-    const v = flags[k];
-    if (v !== undefined && v !== null && v !== '') effectiveSettings[k] = String(v);
+  for (const s of ENUM_SETTINGS) {
+    const v = flags[s.key];
+    effectiveSettings[s.key] = typeof v === 'string' && v !== '' ? v : s.defaultValue;
   }
   const settingsExport = { profile: { settings: effectiveSettings } };
 
@@ -345,10 +422,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     }
   }
 
-  const readOnlyEntries = READ_ONLY_KEYS
-    .map((k) => [k, flags[k]] as const)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '');
-
   // WI-7: CredentialSecretVisibility is an enum (always|once), not a boolean.
   const visibilityRaw = typeof flags.CredentialSecretVisibility === 'string'
     ? flags.CredentialSecretVisibility.toLowerCase()
@@ -367,6 +440,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Update failed.';
       setFeedback({ type: 'error', message: `Failed to update CredentialSecretVisibility: ${msg}` });
+    }
+  }
+
+  async function handleEnumChange(setting: EnumSetting, next: string) {
+    const current = typeof flags[setting.key] === 'string' ? (flags[setting.key] as string) : setting.defaultValue;
+    if (next === current) return;
+    setFeedback(null);
+    try {
+      await updateMutation.mutateAsync({
+        profile: { settings: { [setting.key]: next } },
+      });
+      setFeedback({ type: 'success', message: `${setting.label} set to ${next}.` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update failed.';
+      setFeedback({ type: 'error', message: `Failed to update ${setting.label}: ${msg}` });
     }
   }
 
@@ -424,28 +512,35 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
           )}
         </Card>
 
-        {/* ── Boolean toggles card ─────────────────────────────── */}
-        <Card className={classes.card}>
-          <Caption1>Configuration Flags</Caption1>
-          {BOOLEAN_FLAGS.map((flag) => {
-            const checked = coerceFlag(flags[flag.key], flag.defaultValue);
-            const disabled = isPending && pendingKey === flag.key;
-            return (
-              <div key={flag.key} className={classes.flagRow}>
-                <div className={classes.flagHeader}>
-                  <Text className={classes.monospace}>{flag.label}</Text>
-                  <Switch
-                    aria-label={flag.label}
-                    checked={checked}
-                    disabled={disabled}
-                    onChange={(_, d) => { void handleToggle(flag, d.checked); }}
-                  />
-                </div>
-                <Caption1 className={classes.flagDescription}>{flag.description}</Caption1>
-              </div>
-            );
-          })}
-        </Card>
+        {/* ── Boolean toggles grouped by category ──────────────── */}
+        {CATEGORY_ORDER.map((category) => {
+          const flagsInCategory = BOOLEAN_FLAGS.filter((f) => f.category === category);
+          if (flagsInCategory.length === 0) return null;
+          const catTestId = `settings-category-${category.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+          return (
+            <Card key={category} className={classes.card} data-testid={catTestId}>
+              <Caption1>{category}</Caption1>
+              {flagsInCategory.map((flag) => {
+                const checked = coerceFlag(flags[flag.key], flag.defaultValue);
+                const disabled = isPending && pendingKey === flag.key;
+                return (
+                  <div key={flag.key} className={classes.flagRow}>
+                    <div className={classes.flagHeader}>
+                      <Text className={classes.monospace}>{flag.label}</Text>
+                      <Switch
+                        aria-label={flag.label}
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={(_, d) => { void handleToggle(flag, d.checked); }}
+                      />
+                    </div>
+                    <Caption1 className={classes.flagDescription}>{flag.description}</Caption1>
+                  </div>
+                );
+              })}
+            </Card>
+          );
+        })}
 
         {/* ── WI-7: CredentialSecretVisibility (enum) ──────────── */}
         <Card className={classes.card} data-testid="settings-credential-visibility">
@@ -470,21 +565,40 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
           </div>
         </Card>
 
-        {/* ── Read-only (non-boolean) settings card ────────────── */}
-        {readOnlyEntries.length > 0 && (
-          <Card className={classes.card}>
-            <Caption1>Read-only Settings</Caption1>
-            {readOnlyEntries.map(([key, value]) => (
-              <div key={key} className={classes.generalRow}>
-                <Text className={classes.monospace}>{key}</Text>
-                <Badge appearance="outline">{String(value)}</Badge>
+        {/* ── Enumerated (multi-option) settings card ──────────── */}
+        <Card className={classes.card} data-testid="settings-enum-settings">
+          <Caption1>Enumerated settings</Caption1>
+          {ENUM_SETTINGS.map((setting) => {
+            const raw = flags[setting.key];
+            const current = typeof raw === 'string' && raw !== '' ? raw : setting.defaultValue;
+            const disabled = isPending && pendingKey === setting.key;
+            const selectedLabel = setting.options.find((o) => o.value === current)?.label ?? current;
+            return (
+              <div key={setting.key} className={classes.flagRow} data-testid={`settings-enum-${setting.key}`}>
+                <div className={classes.flagHeader}>
+                  <Text className={classes.monospace}>{setting.label}</Text>
+                  <Dropdown
+                    aria-label={setting.label}
+                    value={selectedLabel}
+                    selectedOptions={[current]}
+                    disabled={disabled}
+                    onOptionSelect={(_, d) => {
+                      if (d.optionValue) void handleEnumChange(setting, d.optionValue);
+                    }}
+                    data-testid={`settings-enum-${setting.key}-dropdown`}
+                  >
+                    {setting.options.map((o) => (
+                      <Option key={o.value} value={o.value} text={o.label}>
+                        {o.label}
+                      </Option>
+                    ))}
+                  </Dropdown>
+                </div>
+                <Caption1 className={classes.flagDescription}>{setting.description}</Caption1>
               </div>
-            ))}
-            <Caption1 className={classes.flagDescription}>
-              These settings have non-boolean values; edit via the admin API.
-            </Caption1>
-          </Card>
-        )}
+            );
+          })}
+        </Card>
       </div>
 
       {/* Pending indicator at the bottom (kept separate from feedback bar) */}

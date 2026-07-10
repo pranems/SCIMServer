@@ -63,4 +63,17 @@ test.describe('SettingsTab - CredentialSecretVisibility (WI-7)', () => {
     // Exactly one is checked.
     expect(alwaysChecked !== onceChecked).toBe(true);
   });
+
+  test('settings are grouped into category cards + enum settings render as Dropdowns', async ({ page }) => {
+    await openFirstEndpointSettings(page);
+    // Related-category cards render.
+    await expect(page.getByTestId('settings-category-authentication-methods')).toBeVisible();
+    await expect(page.getByTestId('settings-category-validation-schema')).toBeVisible();
+    // Multi-option settings render as Dropdowns (not read-only badges).
+    await expect(page.getByTestId('settings-enum-PrimaryEnforcement-dropdown')).toBeVisible();
+    await expect(page.getByTestId('settings-enum-logLevel-dropdown')).toBeVisible();
+    // Settings JSON export affordances present.
+    await expect(page.getByTestId('settings-tab-export-copy')).toBeVisible();
+    await expect(page.getByTestId('settings-tab-export-download')).toBeVisible();
+  });
 });
