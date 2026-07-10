@@ -993,3 +993,137 @@ describe('CredentialsTab', () => {
     expect(header.textContent).toMatch(/authenticates at the same time/i);
   });
 });
+
+// ─── R6: per-method credential sub-tabs ────────────────────────────────
+
+describe('CredentialsTab - per-method sub-tabs (R6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createMutationState = { isPending: false };
+    deleteMutationState = { isPending: false };
+  });
+
+  const twoMethodCreds = [
+    { id: 'br-1', credentialType: 'bearer' as const, label: 'Bearer one', active: true, createdAt: '2026-04-01T10:00:00Z', expiresAt: null },
+    { id: 'oc-1', credentialType: 'oauth_client' as const, label: 'OAuth one', active: true, createdAt: '2026-04-02T10:00:00Z', expiresAt: null },
+  ];
+
+  it('shows only tabs for ENABLED auth methods (+ All + shared secret default)', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
+        credentials: twoMethodCreds,
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credentials-method-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-all')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-shared_secret')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-oauth_client')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-wif')).toBeInTheDocument();
+  });
+
+  it('omits the tab for a disabled method (WIF off -> no WIF tab)', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, WifCredentialsEnabled: false, SharedSecretBearerAuthEnabled: false },
+        credentials: twoMethodCreds,
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('credentials-method-tab-wif')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credentials-method-tab-shared_secret')).not.toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
+  });
+
+  it('the All tab lists credentials of every method', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+        credentials: twoMethodCreds,
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credential-row-br-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-row-oc-1')).toBeInTheDocument();
+  });
+
+  it('selecting the OAuth2 client tab filters the list to oauth_client only', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+        credentials: twoMethodCreds,
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-method-tab-oauth_client'));
+    // Only the oauth_client credential is listed now.
+    expect(screen.getByTestId('credential-row-oc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-row-br-1')).not.toBeInTheDocument();
+  });
+
+  it('the OAuth2 client tab defaults the create dialog to the oauth_client type', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { PerEndpointCredentialsEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+        credentials: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-method-tab-oauth_client'));
+    fireEvent.click(screen.getByTestId('credentials-create-button'));
+    const dialog = screen.getByTestId('credentials-create-dialog');
+    fireEvent.click(dialog.querySelector('button[type="submit"]')!);
+    expect(mockCreateMutate.mock.calls[0][0]).toMatchObject({ credentialType: 'oauth_client' });
+  });
+
+  it('the Shared secret tab shows the global-secret info and no create button', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { SharedSecretBearerAuthEnabled: true, PerEndpointCredentialsEnabled: true },
+        credentials: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-method-tab-shared_secret'));
+    expect(screen.getByTestId('credentials-shared-secret-info')).toBeInTheDocument();
+    // No per-endpoint create button under the shared-secret tab.
+    expect(screen.queryByTestId('credentials-create-button')).not.toBeInTheDocument();
+  });
+
+  it('the WIF tab shows the WIF section and hides the generic list', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: true },
+        credentials: twoMethodCreds,
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-method-tab-wif'));
+    expect(screen.getByTestId('wif-section')).toBeInTheDocument();
+    // The generic credential rows are not shown under the WIF tab.
+    expect(screen.queryByTestId('credential-row-br-1')).not.toBeInTheDocument();
+  });
+});

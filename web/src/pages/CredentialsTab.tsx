@@ -36,6 +36,8 @@ import {
   MessageBarBody,
   MessageBarTitle,
   Link,
+  TabList,
+  Tab,
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -1032,6 +1034,53 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   );
 };
 
+// ─── R6: per-method credential sub-tabs ───────────────────────────────
+// The Credentials tab is organized into sub-tabs per ENABLED authentication
+// method (driven by the endpoint's config flags) plus an "All" overview tab.
+// Only methods enabled in Settings get a tab, so the operator sees exactly the
+// auth surface this endpoint accepts.
+
+type MethodTab = 'all' | 'shared_secret' | 'bearer' | 'oauth_client' | 'wif';
+
+interface MethodTabDef {
+  value: MethodTab;
+  label: string;
+  /** The credentialType this tab scopes the list to (null for all / shared). */
+  credentialType: 'bearer' | 'oauth_client' | 'wif' | null;
+}
+
+/** Coerce 'True'/'False' (Entra style) + booleans into a JS boolean. */
+function coerceCredFlag(raw: unknown, fallback: boolean): boolean {
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'string') {
+    const l = raw.toLowerCase();
+    if (l === 'true') return true;
+    if (l === 'false') return false;
+  }
+  return fallback;
+}
+
+/**
+ * Compute the enabled auth-method tabs from the endpoint config flags,
+ * mirroring the backend getEffectiveAuthEnablement precedence: the two
+ * per-endpoint flags fall back to the legacy PerEndpointCredentialsEnabled,
+ * and the shared-secret flag defaults to on.
+ */
+function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
+  const legacy = coerceCredFlag(flags.PerEndpointCredentialsEnabled, false);
+  const sharedSecret = coerceCredFlag(flags.SharedSecretBearerAuthEnabled, true);
+  const secretTokenBearer = coerceCredFlag(flags.SecretTokenBearerAuthEnabled, legacy);
+  const oauthClient = coerceCredFlag(flags.OAuthClientCredentialsAuthEnabled, legacy);
+  const wif = coerceCredFlag(flags.WifCredentialsEnabled, false);
+
+  const tabs: MethodTabDef[] = [{ value: 'all', label: 'All', credentialType: null }];
+  if (sharedSecret) tabs.push({ value: 'shared_secret', label: 'Shared secret', credentialType: null });
+  if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
+  if (oauthClient) tabs.push({ value: 'oauth_client', label: 'OAuth2 client', credentialType: 'oauth_client' });
+  if (wif) tabs.push({ value: 'wif', label: 'WIF', credentialType: 'wif' });
+  return tabs;
+}
+
 export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const navigate = useNavigate();
@@ -1046,6 +1095,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const [labelInput, setLabelInput] = React.useState('');
   // R7 - which credential type the create dialog will mint.
   const [createType, setCreateType] = React.useState<'bearer' | 'oauth_client'>('bearer');
+  // R6 - the selected per-method sub-tab.
+  const [methodTab, setMethodTab] = React.useState<MethodTab>('all');
   const [createError, setCreateError] = React.useState<unknown>(null);
   // Plaintext token returned ONCE on create - keep around so the user
   // can copy it. Cleared when the modal closes after acknowledgement.
@@ -1062,9 +1113,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'error'>('idle');
 
-  const onOpenCreate = (): void => {
+  const onOpenCreate = (type: 'bearer' | 'oauth_client' = 'bearer'): void => {
     setLabelInput('');
-    setCreateType('bearer');
+    setCreateType(type);
     setCreateError(null);
     setCreatedCred(null);
     setCreateOpen(true);
@@ -1163,19 +1214,39 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const wifEnabled = Boolean(data?.configFlags?.WifCredentialsEnabled);
   const credentials = data?.credentials ?? [];
 
+  // R6 - per-method sub-tabs. Only enabled methods get a tab; if the current
+  // selection is no longer enabled, fall back to the "All" overview.
+  const configFlags = (data?.configFlags ?? {}) as Record<string, unknown>;
+  const methodTabs = enabledMethodTabs(configFlags);
+  const activeTab: MethodTab = methodTabs.some((t) => t.value === methodTab) ? methodTab : 'all';
+  const activeDef = methodTabs.find((t) => t.value === activeTab) ?? methodTabs[0];
+  const showGenericList = activeTab === 'all' || activeTab === 'bearer' || activeTab === 'oauth_client';
+  const showWifSection = activeTab === 'all' || activeTab === 'wif';
+  const showSharedSecretInfo = activeTab === 'shared_secret';
+  const createTypeForTab: 'bearer' | 'oauth_client' = activeTab === 'oauth_client' ? 'oauth_client' : 'bearer';
+  const listCredentials =
+    activeTab === 'all'
+      ? credentials
+      : activeDef.credentialType
+        ? credentials.filter((c) => c.credentialType === activeDef.credentialType)
+        : [];
+  const flagEnabledForTab = activeTab === 'all' ? flagEnabled : true;
+
   return (
     <div className={classes.root} data-testid="tab-credentials">
       <div className={classes.header}>
         <Subtitle1>Credentials ({credentials.length})</Subtitle1>
-        <Button
-          appearance="primary"
-          icon={<Add24Regular />}
-          onClick={onOpenCreate}
-          data-testid="credentials-create-button"
-          disabled={!flagEnabled}
-        >
-          Add credential
-        </Button>
+        {showGenericList && (
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            onClick={() => onOpenCreate(createTypeForTab)}
+            data-testid="credentials-create-button"
+            disabled={!flagEnabledForTab}
+          >
+            Add credential
+          </Button>
+        )}
       </div>
 
       <Caption1>
@@ -1189,7 +1260,32 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         to see exactly what to paste into your identity provider.
       </Caption1>
 
-      {!flagEnabled && (
+      {/* R6 - per-method sub-tabs (only enabled methods) */}
+      <TabList
+        selectedValue={activeTab}
+        onTabSelect={(_, d) => setMethodTab(d.value as MethodTab)}
+        data-testid="credentials-method-tabs"
+      >
+        {methodTabs.map((t) => (
+          <Tab key={t.value} value={t.value} data-testid={`credentials-method-tab-${t.value}`}>
+            {t.label}
+          </Tab>
+        ))}
+      </TabList>
+
+      {showSharedSecretInfo && (
+        <MessageBar intent="info" data-testid="credentials-shared-secret-info">
+          <MessageBarBody>
+            <MessageBarTitle>Shared-secret bearer (global)</MessageBarTitle>
+            This endpoint accepts the server-wide SCIM shared secret as a bearer token. There is no
+            per-endpoint credential to create here - the secret is configured at the server level.
+            Turn off <code>SharedSecretBearerAuthEnabled</code> in Settings to require this endpoint
+            to use only its own credentials.
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
+      {showGenericList && !flagEnabledForTab && (
         <MessageBar intent="warning" data-testid="credentials-flag-disabled-banner">
           <MessageBarBody>
             <MessageBarTitle>Per-endpoint credentials are disabled</MessageBarTitle>
@@ -1200,18 +1296,18 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         </MessageBar>
       )}
 
-      {flagEnabled && credentials.length === 0 ? (
+      {showGenericList && (flagEnabledForTab && listCredentials.length === 0 ? (
         <EmptyState
           icon={<Key24Regular />}
           title="No credentials configured"
           body="Create a per-endpoint bearer credential so SCIM clients can authenticate without sharing the global secret."
           actionLabel="Add credential"
-          onAction={onOpenCreate}
+          onAction={() => onOpenCreate(createTypeForTab)}
           data-testid="credentials-empty"
         />
       ) : (
         <div className={classes.list} data-testid="credentials-list">
-          {credentials.map((cred) => (
+          {listCredentials.map((cred) => (
             <Card
               key={cred.id}
               className={classes.row}
@@ -1276,16 +1372,18 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
             </Card>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Federated Identity (WIF) section (Q6.5) */}
-      <WifCredentialsSection
-        endpointId={endpointId}
-        enabled={wifEnabled}
-        credentials={credentials}
-        createMutation={createMutation}
-        deleteMutation={deleteMutation}
-      />
+      {showWifSection && (
+        <WifCredentialsSection
+          endpointId={endpointId}
+          enabled={wifEnabled}
+          credentials={credentials}
+          createMutation={createMutation}
+          deleteMutation={deleteMutation}
+        />
+      )}
 
       {/* Create dialog */}
       <FormDialog

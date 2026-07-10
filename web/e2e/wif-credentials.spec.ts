@@ -312,3 +312,78 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(header).toContainText(/authenticates at the same time/i);
   });
 });
+
+/**
+ * R6 - the Credentials tab is organized into per-method sub-tabs (only enabled
+ * methods get a tab). Route-mocked so it is deterministic.
+ */
+test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
+  const EP = 'ep-r6';
+
+  test('shows a tab per enabled method + filters the list by method', async ({ page }) => {
+    await page.route(`**/scim/admin/endpoints/${EP}`, async (route) => {
+      if (route.request().method() !== 'GET' || !route.request().url().endsWith(`/${EP}`)) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: EP, name: 'r6', displayName: 'R6 methods', active: true,
+          scimBasePath: `/scim/v2/endpoints/${EP}`, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+          profile: { schemas: [], resourceTypes: [], serviceProviderConfig: { documentationUri: '', patch: { supported: true } }, settings: {} },
+        }),
+      });
+    });
+    await page.route('**/scim/admin/endpoints/*/overview', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          endpoint: { id: EP, name: 'r6', displayName: 'R6 methods', preset: 'entra-id', active: true, scimBasePath: `/scim/endpoints/${EP}/v2`, createdAt: '2026-01-01T00:00:00Z' },
+          stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
+          credentials: [
+            { id: 'br-1', credentialType: 'bearer', label: 'Bearer one', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+            { id: 'oc-1', credentialType: 'oauth_client', label: 'OAuth one', active: true, createdAt: '2026-06-02T00:00:00Z', expiresAt: null },
+          ],
+          recentActivity: [],
+          configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
+          connectionInfo: {
+            endpointId: EP, displayName: 'R6 methods',
+            urls: { scimBaseUrl: `https://dev.example/scim/v2/endpoints/${EP}`, scimBaseUrlBare: `https://dev.example/scim/endpoints/${EP}`, tokenEndpoint: `https://dev.example/scim/endpoints/${EP}/oauth/token`, serviceProviderConfig: `https://dev.example/scim/v2/endpoints/${EP}/ServiceProviderConfig`, oauthMetadata: `https://dev.example/scim/endpoints/${EP}/.well-known/oauth-authorization-server` },
+            enabledMethods: [], disabledMethods: [],
+          },
+        }),
+      });
+    });
+
+    await page.goto(`/endpoints/${EP}/credentials`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+    // R10: assert the RENDERED tabs + filtering behavior, not just presence.
+    await expect(page.getByTestId('credentials-method-tab-all')).toBeVisible();
+    await expect(page.getByTestId('credentials-method-tab-shared_secret')).toBeVisible();
+    await expect(page.getByTestId('credentials-method-tab-bearer')).toBeVisible();
+    await expect(page.getByTestId('credentials-method-tab-oauth_client')).toBeVisible();
+    await expect(page.getByTestId('credentials-method-tab-wif')).toBeVisible();
+
+    // All tab: both method rows visible.
+    await expect(page.getByTestId('credential-row-br-1')).toBeVisible();
+    await expect(page.getByTestId('credential-row-oc-1')).toBeVisible();
+
+    // OAuth2 client tab: only the oauth_client row.
+    await page.getByTestId('credentials-method-tab-oauth_client').click();
+    await expect(page.getByTestId('credential-row-oc-1')).toBeVisible();
+    await expect(page.getByTestId('credential-row-br-1')).toHaveCount(0);
+
+    // Shared secret tab: info banner + no create button.
+    await page.getByTestId('credentials-method-tab-shared_secret').click();
+    await expect(page.getByTestId('credentials-shared-secret-info')).toBeVisible();
+    await expect(page.getByTestId('credentials-create-button')).toHaveCount(0);
+
+    // WIF tab: the WIF section shows, generic rows hidden.
+    await page.getByTestId('credentials-method-tab-wif').click();
+    await expect(page.getByTestId('wif-section')).toBeVisible();
+    await expect(page.getByTestId('credential-row-br-1')).toHaveCount(0);
+  });
+});
+
