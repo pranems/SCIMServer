@@ -551,50 +551,70 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
   });
 
   it('R1: PUT edits a persisted entry by id (host + label), 404 for unknown id', async () => {
+    // Unique hostnames so the test is isolated against a PERSISTENT (prisma) DB
+    // across runs - fixed names collide on the unique host constraint.
+    const uniq = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const beforeHost = `r1-edit-before-${uniq}.example.com`;
+    const afterHost = `r1-edit-after-${uniq}.example.com`;
     const added = await request(app.getHttpServer())
       .post('/scim/admin/settings/jwks-hosts')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ host: 'r1-edit-before.example.com', label: 'before' })
+      .send({ host: beforeHost, label: 'before' })
       .expect(201);
     const entry = (added.body.persistedEntries as Array<{ id: string; host: string }>).find(
-      (e) => e.host === 'r1-edit-before.example.com',
+      (e) => e.host === beforeHost,
     );
     expect(entry).toBeDefined();
 
     const edited = await request(app.getHttpServer())
       .put(`/scim/admin/settings/jwks-hosts/${entry!.id}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ host: 'r1-edit-after.example.com', label: 'after' })
+      .send({ host: afterHost, label: 'after' })
       .expect(200);
-    expect(edited.body.effective).toContain('r1-edit-after.example.com');
-    expect(edited.body.effective).not.toContain('r1-edit-before.example.com');
+    expect(edited.body.effective).toContain(afterHost);
+    expect(edited.body.effective).not.toContain(beforeHost);
 
     await request(app.getHttpServer())
       .put('/scim/admin/settings/jwks-hosts/no-such-id')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ host: 'whatever.example.com' })
+      .send({ host: `r1-unknown-${uniq}.example.com` })
       .expect(404);
+
+    // Self-clean the edited row so re-runs stay isolated.
+    await request(app.getHttpServer())
+      .delete(`/scim/admin/settings/jwks-hosts/${afterHost}`)
+      .set('Authorization', `Bearer ${adminToken}`);
   });
 
   it('R1: PATCH selectively adds and removes hosts in one call', async () => {
+    const uniq = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const removeHost = `r1-patch-remove-${uniq}.example.com`;
+    const addA = `r1-patch-add-a-${uniq}.example.com`;
+    const addB = `r1-patch-add-b-${uniq}.example.com`;
     // Seed a host to remove.
     await request(app.getHttpServer())
       .post('/scim/admin/settings/jwks-hosts')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ host: 'r1-patch-remove.example.com' })
+      .send({ host: removeHost })
       .expect(201);
 
     const res = await request(app.getHttpServer())
       .patch('/scim/admin/settings/jwks-hosts')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ add: ['r1-patch-add-a.example.com', 'r1-patch-add-b.example.com'], remove: ['r1-patch-remove.example.com'] })
+      .send({ add: [addA, addB], remove: [removeHost] })
       .expect(200);
     expect(res.body.added).toBe(2);
     expect(res.body.removed).toBe(1);
     expect(res.body.view.effective).toEqual(
-      expect.arrayContaining(['r1-patch-add-a.example.com', 'r1-patch-add-b.example.com']),
+      expect.arrayContaining([addA, addB]),
     );
-    expect(res.body.view.effective).not.toContain('r1-patch-remove.example.com');
+    expect(res.body.view.effective).not.toContain(removeHost);
+
+    // Self-clean the added rows so re-runs stay isolated.
+    await request(app.getHttpServer())
+      .patch('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ remove: [addA, addB] });
   });
 
   it('R1: PATCH rejects an empty body and a non-bare add host', async () => {

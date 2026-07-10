@@ -38,13 +38,22 @@ export class PrismaJwksHostAllowlistRepository implements IJwksHostAllowlistRepo
 
   async update(id: string, host: string, label: string | null): Promise<JwksHostAllowlistEntryModel | null> {
     const normalized = host.trim().toLowerCase();
-    const existing = await this.prisma.jwksHostAllowlistEntry.findUnique({ where: { id } });
-    if (!existing) return null;
-    const row = await this.prisma.jwksHostAllowlistEntry.update({
-      where: { id },
-      data: { host: normalized, label: label ?? null },
-    });
-    return this.toModel(row);
+    // The id column is a Postgres UUID; a malformed or non-existent id must
+    // resolve to "not found" (404) rather than a 500 cast error, matching the
+    // InMemory backend (cross-backend parity). Guard the lookup so any
+    // not-found / invalid-id error returns null.
+    try {
+      const existing = await this.prisma.jwksHostAllowlistEntry.findUnique({ where: { id } });
+      if (!existing) return null;
+      const row = await this.prisma.jwksHostAllowlistEntry.update({
+        where: { id },
+        data: { host: normalized, label: label ?? null },
+      });
+      return this.toModel(row);
+    } catch {
+      // Invalid UUID format or record-not-found -> treat as not found.
+      return null;
+    }
   }
 
   private toModel(row: {

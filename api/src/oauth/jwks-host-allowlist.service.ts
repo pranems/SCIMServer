@@ -117,7 +117,16 @@ export class JwksHostAllowlistService implements OnModuleInit {
     for (const host of WELL_KNOWN_JWKS_HOST_SEED) {
       const normalized = host.toLowerCase();
       if (!have.has(normalized)) {
-        await this.repo.add(normalized, 'well-known IdP (seed)');
+        // Per-host try/catch: a concurrent init (multiple app instances against
+        // the same DB) can race the unique-host insert. The compiled seed is a
+        // permanent safety floor, so a failed persist of one seed row must not
+        // abort seeding the rest or the whole persisted-layer load.
+        try {
+          await this.repo.add(normalized, 'well-known IdP (seed)');
+        } catch {
+          // ignore - another instance won the race, or a transient DB error;
+          // the host is covered by the compiled floor regardless.
+        }
       }
     }
   }
