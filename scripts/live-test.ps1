@@ -12437,6 +12437,46 @@ Write-Host "`n--- 9z-AY: WI-D1 Token Error Shape Tests Complete ---" -Foreground
 
 
 # ============================================
+# TEST SECTION 9z-AZ: WI-D2 auth-errors reason-code catalog endpoint
+# ============================================
+$script:currentSection = "9z-AZ: Auth-errors catalog (WI-D2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AZ: Auth-Errors Reason-Code Catalog (WI-D2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # The catalog is public documentation (no auth) - a client or operator can
+    # resolve any reason_code seen on the wire / in logs / in the UI.
+    $azCat = Invoke-RestMethod -Uri "$baseUrl/scim/docs/auth-errors" -Method GET
+    Test-Result -Success ($null -ne $azCat -and $azCat.count -gt 0) -Message "9z-AZ.T1: catalog returns a non-empty reason set"
+    Test-Result -Success ($azCat.reasons.Count -eq $azCat.count) -Message "9z-AZ.T2: reasons array length matches count"
+
+    $azValidWire = @('invalid_client','invalid_request','unsupported_grant_type','invalid_token')
+    $azAllValid = $true
+    foreach ($r in $azCat.reasons) {
+        if ($azValidWire -notcontains $r.wireError) { $azAllValid = $false }
+        if (@('T1','T2','T3','T4') -notcontains $r.tier) { $azAllValid = $false }
+    }
+    Test-Result -Success $azAllValid -Message "9z-AZ.T3: every reason has a valid RFC-6749/6750 wireError + tier"
+
+    $azPlanes = $azCat.reasons | ForEach-Object { $_.plane } | Sort-Object -Unique
+    Test-Result -Success (($azPlanes -contains 'wif') -and ($azPlanes -contains 'oauth_client') -and ($azPlanes -contains 'bearer')) -Message "9z-AZ.T4: catalog covers wif + oauth_client + bearer planes"
+
+    # T5: plane filter
+    $azWif = Invoke-RestMethod -Uri "$baseUrl/scim/docs/auth-errors?plane=wif" -Method GET
+    $azWifOnly = $true
+    foreach ($r in $azWif.reasons) { if ($r.plane -ne 'wif') { $azWifOnly = $false } }
+    Test-Result -Success $azWifOnly -Message "9z-AZ.T5: ?plane=wif returns only wif reasons"
+
+    # T6: oauth_client_auth_failed is merged (T3, opaque description)
+    $azMerged = $azCat.reasons | Where-Object { $_.reasonCode -eq 'oauth_client_auth_failed' }
+    Test-Result -Success ($null -ne $azMerged -and $azMerged.tier -eq 'T3' -and $azMerged.actorDescription -eq 'Client authentication failed.') -Message "9z-AZ.T6: oauth_client_auth_failed is merged (T3, opaque)"
+} catch {
+    Test-Result -Success $false -Message "9z-AZ: WI-D2 catalog endpoint section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-AZ: WI-D2 Catalog Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

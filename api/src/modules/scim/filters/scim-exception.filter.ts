@@ -8,6 +8,7 @@ import type { Response, Request } from 'express';
 
 import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
+import { wireDescriptionFor } from '../../../oauth/auth-reason-catalog';
 import { LogCategory } from '../../logging/log-levels';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
@@ -223,15 +224,22 @@ export class ScimExceptionFilter implements ExceptionFilter {
     const body: Record<string, unknown> = {
       error: typeof raw.error === 'string' ? raw.error : 'invalid_request',
     };
+    // When a curated reason_code is present (WI-D2/D3), the catalog is the
+    // source of truth for the tier-safe actor description - fall back to it so
+    // the wire text can never drift from the catalog.
+    const reasonCode = typeof raw.reason_code === 'string' ? raw.reason_code : undefined;
+    const catalogDescription = wireDescriptionFor(reasonCode);
     const description =
       typeof raw.error_description === 'string'
         ? raw.error_description
-        : typeof raw.message === 'string'
-          ? raw.message
-          : fallbackMessage;
+        : catalogDescription
+          ? catalogDescription
+          : typeof raw.message === 'string'
+            ? raw.message
+            : fallbackMessage;
     if (description) body.error_description = description;
     // Pass through the curated diagnostics fields when present (WI-D2/D3 set these).
-    if (typeof raw.reason_code === 'string') body.reason_code = raw.reason_code;
+    if (reasonCode) body.reason_code = reasonCode;
     if (typeof raw.error_uri === 'string') body.error_uri = raw.error_uri;
 
     // Enrich with the correlation id (== X-Request-Id) + a timestamp so the

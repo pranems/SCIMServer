@@ -109,6 +109,19 @@ describe('ScimExceptionFilter', () => {
       expect(() => new Date(body.timestamp as string).toISOString()).not.toThrow();
     });
 
+    it('fills error_description from the WI-D2 catalog when a known reason_code has no description', () => {
+      const exception = new HttpException(
+        { error: 'invalid_client', reason_code: 'wif_audience_mismatch' },
+        HttpStatus.UNAUTHORIZED,
+      );
+
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.reason_code).toBe('wif_audience_mismatch');
+      expect(body.error_description).toMatch(/audience/i);
+    });
+
     it('passes through curated diagnostics fields (reason_code, error_uri) when present', () => {
       const exception = new HttpException(
         {

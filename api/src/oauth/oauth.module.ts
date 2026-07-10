@@ -5,6 +5,7 @@ import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 import { JwksController } from './jwks.controller';
 import { OAuthMetadataController } from './oauth-metadata.controller';
+import { AuthErrorsCatalogController } from './auth-errors-catalog.controller';
 import { OAuthSigningKeyService } from './oauth-signing-key.service';
 import { OAuthSigningModule } from './oauth-signing.module';
 import { ExternalJwksValidatorService, JWKS_FETCH } from './external-jwks-validator.service';
@@ -50,7 +51,7 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
       useFactory: (keys: OAuthSigningKeyService) => buildJwtModuleOptions(keys),
     }),
   ],
-  controllers: [OAuthController, JwksController, OAuthMetadataController],
+  controllers: [OAuthController, JwksController, OAuthMetadataController, AuthErrorsCatalogController],
   providers: [
     OAuthService,
     ExternalJwksValidatorService,
