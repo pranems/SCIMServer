@@ -27,7 +27,7 @@ import {
   Link,
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock, SettingsJsonExport } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -262,21 +262,27 @@ const ServerConnectionInfoCard: React.FC = () => {
   );
 };
 
-// ─── WI-15: JwksHostAllowlistSection ─────────────────────────────
+// ─── WI-15 / R1: JwksHostAllowlistSection ────────────────────────
 //
 // Server-global JWKS host allowlist manager. The effective allowlist is the
 // UNION of a compiled well-known seed + the JWKS_HOST_ALLOWLIST env + a
-// persisted admin-editable layer. An admin can add a host at runtime (no
-// redeploy) and remove a persisted host. Seed/env hosts are shown but not
-// removable (they are not in the persisted layer). Convenience/flexibility
-// feature - no deny-list, no lock flag.
+// persisted admin-editable layer. R1: the seed is prepopulated into the
+// persisted table, so every allowlist host is a full CRUD row (add / edit /
+// remove) - plus a PATCH-based selective bulk add-and-remove box. Convenience/
+// flexibility feature - no deny-list, no lock flag.
 
 const JwksHostAllowlistSection: React.FC = () => {
   const classes = useStyles();
   const { data, isLoading } = useJwksHostAllowlist();
   const addHost = useAddJwksHost();
   const removeHost = useRemoveJwksHost();
+  const updateHost = useUpdateJwksHost();
+  const patchHosts = usePatchJwksHosts();
   const [newHost, setNewHost] = useState('');
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editHost, setEditHost] = useState('');
+  const [bulkAdd, setBulkAdd] = useState('');
+  const [bulkRemove, setBulkRemove] = useState('');
 
   const onAdd = (): void => {
     const host = newHost.trim().toLowerCase();
@@ -284,16 +290,47 @@ const JwksHostAllowlistSection: React.FC = () => {
     addHost.mutate({ host }, { onSuccess: () => setNewHost('') });
   };
 
+  const onStartEdit = (id: string, host: string): void => {
+    setEditId(id);
+    setEditHost(host);
+  };
+  const onSaveEdit = (): void => {
+    if (!editId) return;
+    const host = editHost.trim().toLowerCase();
+    if (host === '') return;
+    updateHost.mutate({ id: editId, host }, { onSuccess: () => { setEditId(null); setEditHost(''); } });
+  };
+
+  const parseHosts = (raw: string): string[] =>
+    raw.split(/[\s,]+/).map((h) => h.trim().toLowerCase()).filter(Boolean);
+
+  const onPatch = (): void => {
+    const add = parseHosts(bulkAdd);
+    const remove = parseHosts(bulkRemove);
+    if (add.length === 0 && remove.length === 0) return;
+    patchHosts.mutate({ add, remove }, { onSuccess: () => { setBulkAdd(''); setBulkRemove(''); } });
+  };
+
+  const entries = data?.persistedEntries ?? [];
+
   return (
     <Card className={classes.logConfigCard} data-testid="jwks-hosts-card">
       <div className={classes.logConfigHeader}>
         <Subtitle1>JWKS host allowlist (WIF SSRF guard)</Subtitle1>
-        {data && <CopyJsonButton value={data} data-testid="jwks-hosts-copy-json" />}
+        {data && (
+          <SettingsJsonExport
+            value={data}
+            filename="scimserver-jwks-host-allowlist.json"
+            copyLabel="Copy as JSON"
+            data-testid="jwks-hosts-export"
+          />
+        )}
       </div>
       <Caption1>
         Server-global. The effective allowlist is the union of a built-in well-known
-        IdP seed, the JWKS_HOST_ALLOWLIST env var, and the persisted hosts below. Add a
-        host to trust a new IdP&apos;s JWKS/discovery endpoint without a redeploy.
+        IdP seed (prepopulated as editable rows below), the JWKS_HOST_ALLOWLIST env var,
+        and the persisted hosts. Add, edit, or remove a host to change which IdP JWKS /
+        discovery endpoints are trusted - no redeploy.
       </Caption1>
 
       <div className={classes.jwksAddRow}>
@@ -315,31 +352,104 @@ const JwksHostAllowlistSection: React.FC = () => {
         </Button>
       </div>
 
-      <ScimErrorMessage error={addHost.error ?? removeHost.error} />
+      {/* R1 - PATCH selective bulk add + remove */}
+      <div className={classes.jwksAddRow} data-testid="jwks-hosts-patch-row">
+        <Field label="Selectively add (comma/space separated)" className={classes.jwksAddField}>
+          <Input
+            value={bulkAdd}
+            onChange={(_e, d) => setBulkAdd(d.value)}
+            placeholder="a.example.com, b.example.com"
+            data-testid="jwks-hosts-patch-add"
+          />
+        </Field>
+        <Field label="Selectively remove" className={classes.jwksAddField}>
+          <Input
+            value={bulkRemove}
+            onChange={(_e, d) => setBulkRemove(d.value)}
+            placeholder="old.example.com"
+            data-testid="jwks-hosts-patch-remove"
+          />
+        </Field>
+        <Button
+          appearance="secondary"
+          onClick={onPatch}
+          disabled={(bulkAdd.trim() === '' && bulkRemove.trim() === '') || patchHosts.isPending}
+          data-testid="jwks-hosts-patch-button"
+        >
+          {patchHosts.isPending ? 'Applying...' : 'Apply changes'}
+        </Button>
+      </div>
+
+      <ScimErrorMessage error={addHost.error ?? removeHost.error ?? updateHost.error ?? patchHosts.error} />
 
       {isLoading && <Caption1>Loading...</Caption1>}
       {data && (
         <div data-testid="jwks-hosts-list">
-          {data.persisted.length === 0 && (
-            <Caption1 data-testid="jwks-hosts-empty">No admin-added hosts yet.</Caption1>
+          {entries.length === 0 && (
+            <Caption1 data-testid="jwks-hosts-empty">No hosts configured yet.</Caption1>
           )}
-          {data.persisted.map((host) => (
-            <div key={host} className={classes.categoryRow} data-testid={`jwks-host-row-${host}`}>
-              <Text>{host}</Text>
-              <Button
-                appearance="subtle"
-                size="small"
-                onClick={() => removeHost.mutate(host)}
-                disabled={removeHost.isPending}
-                data-testid={`jwks-host-remove-${host}`}
-              >
-                Remove
-              </Button>
+          {entries.map((entry) => (
+            <div key={entry.id} className={classes.categoryRow} data-testid={`jwks-host-row-${entry.host}`}>
+              {editId === entry.id ? (
+                <>
+                  <Input
+                    value={editHost}
+                    onChange={(_e, d) => setEditHost(d.value)}
+                    data-testid={`jwks-host-edit-input-${entry.host}`}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      appearance="primary"
+                      size="small"
+                      onClick={onSaveEdit}
+                      disabled={editHost.trim() === '' || updateHost.isPending}
+                      data-testid={`jwks-host-save-${entry.host}`}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      onClick={() => { setEditId(null); setEditHost(''); }}
+                      data-testid={`jwks-host-cancel-${entry.host}`}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Text>
+                    {entry.host}
+                    {entry.label ? ` (${entry.label})` : ''}
+                  </Text>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      onClick={() => onStartEdit(entry.id, entry.host)}
+                      data-testid={`jwks-host-edit-${entry.host}`}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      onClick={() => removeHost.mutate(entry.host)}
+                      disabled={removeHost.isPending}
+                      data-testid={`jwks-host-remove-${entry.host}`}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
           <Divider className={classes.jwksDivider} />
           <Caption1 data-testid="jwks-hosts-builtin">
-            Built-in (seed + env), always allowed: {[...data.seed, ...data.env].join(', ')}
+            Built-in safety floor (compiled seed + env), always allowed even if a row is removed:{' '}
+            {[...data.seed, ...data.env].join(', ')}
           </Caption1>
         </div>
       )}

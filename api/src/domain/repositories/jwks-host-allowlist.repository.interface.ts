@@ -19,6 +19,12 @@ export interface IJwksHostAllowlistRepository {
   findAll(): Promise<JwksHostAllowlistEntryModel[]>;
   /** Add a host (idempotent on the unique host). Returns the row. */
   add(host: string, label: string | null): Promise<JwksHostAllowlistEntryModel>;
+  /**
+   * Update a persisted entry by id: change its host and/or label. Returns the
+   * updated row, or null if no row with that id exists. (R1 - edit a specific
+   * allowlist entry, persisted thereafter.)
+   */
+  update(id: string, host: string, label: string | null): Promise<JwksHostAllowlistEntryModel | null>;
   /** Remove a host by its (lowercased) value. Returns true if a row was removed. */
   removeByHost(host: string): Promise<boolean>;
 }

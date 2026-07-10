@@ -22,13 +22,15 @@ vi.mock('../api/queries', async () => {
     useJwksHostAllowlist: vi.fn(() => ({ data: undefined, isLoading: false })),
     useAddJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
     useRemoveJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    useUpdateJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    usePatchJwksHosts: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
     // WI-8 - server security settings hooks.
     useSecuritySettings: vi.fn(() => ({ data: undefined, isLoading: false })),
     useUpdateSecuritySettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   };
 });
 
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -190,6 +192,10 @@ describe('SettingsPage JWKS host allowlist (WI-15)', () => {
     seed: ['login.microsoftonline.com', 'accounts.google.com'],
     env: ['idp.env.example.com'],
     persisted: ['login.acme.example.com', 'sts.contoso.example.com'],
+    persistedEntries: [
+      { id: 'e1', host: 'login.acme.example.com', label: null },
+      { id: 'e2', host: 'sts.contoso.example.com', label: null },
+    ],
     effective: [
       'login.microsoftonline.com',
       'accounts.google.com',
@@ -208,6 +214,8 @@ describe('SettingsPage JWKS host allowlist (WI-15)', () => {
     (useJwksHostAllowlist as ReturnType<typeof vi.fn>).mockReturnValue({ data: view, isLoading: false });
     (useAddJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
     (useRemoveJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    (useUpdateJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    (usePatchJwksHosts as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
   });
 
   it('renders the JWKS host card', () => {
@@ -233,7 +241,7 @@ describe('SettingsPage JWKS host allowlist (WI-15)', () => {
 
   it('shows the empty state when there are no persisted hosts', () => {
     (useJwksHostAllowlist as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: { ...view, persisted: [] },
+      data: { ...view, persisted: [], persistedEntries: [] },
       isLoading: false,
     });
     wrap(<SettingsPage />);
@@ -261,6 +269,32 @@ describe('SettingsPage JWKS host allowlist (WI-15)', () => {
     wrap(<SettingsPage />);
     screen.getByTestId('jwks-host-remove-sts.contoso.example.com').click();
     expect(mutate).toHaveBeenCalledWith('sts.contoso.example.com');
+  });
+
+  it('R1: Edit-in-place calls the update mutation with the id + new host lowercased', () => {
+    const mutate = vi.fn();
+    (useUpdateJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    fireEvent.click(screen.getByTestId('jwks-host-edit-login.acme.example.com'));
+    fireEvent.change(screen.getByTestId('jwks-host-edit-input-login.acme.example.com'), { target: { value: 'Renamed.Example.COM' } });
+    fireEvent.click(screen.getByTestId('jwks-host-save-login.acme.example.com'));
+    expect(mutate).toHaveBeenCalledWith(
+      { id: 'e1', host: 'renamed.example.com' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('R1: the PATCH selective add/remove box calls patch with parsed host lists', () => {
+    const mutate = vi.fn();
+    (usePatchJwksHosts as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    fireEvent.change(screen.getByTestId('jwks-hosts-patch-add'), { target: { value: 'A.example.com, b.example.com' } });
+    fireEvent.change(screen.getByTestId('jwks-hosts-patch-remove'), { target: { value: 'old.example.com' } });
+    fireEvent.click(screen.getByTestId('jwks-hosts-patch-button'));
+    expect(mutate).toHaveBeenCalledWith(
+      { add: ['a.example.com', 'b.example.com'], remove: ['old.example.com'] },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 });
 

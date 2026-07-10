@@ -30,6 +30,13 @@ describe('JwksHostAllowlistService (WI-15)', () => {
         repoStore = repoStore.filter((e) => e.host !== host);
         return repoStore.length < before;
       }),
+      update: jest.fn(async (id: string, host: string, label: string | null) => {
+        const row = repoStore.find((e) => e.id === id);
+        if (!row) return null;
+        row.host = host;
+        row.label = label;
+        return row;
+      }),
     };
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -78,11 +85,61 @@ describe('JwksHostAllowlistService (WI-15)', () => {
     expect(service.isAllowed('temp.example.com')).toBe(false);
   });
 
-  it('a seed host cannot be removed (not in the persisted layer) but stays allowed', async () => {
+  it('R1: the well-known seed is prepopulated into the persisted table as editable rows', () => {
+    const v = service.view();
+    // Each compiled seed host now has a persisted entry (id + host) an admin can edit/remove.
+    for (const seed of WELL_KNOWN_JWKS_HOST_SEED) {
+      const entry = v.persistedEntries.find((e) => e.host === seed);
+      expect(entry).toBeDefined();
+      expect(entry?.id).toBeTruthy();
+    }
+  });
+
+  it('R1: a prepopulated seed row is removable, but the host stays allowed via the compiled safety floor', async () => {
     const { removed } = await service.removeHost('login.microsoftonline.com');
-    expect(removed).toBe(false);
-    // Still allowed via the seed layer.
+    // The persisted seed row IS removed now (prepopulated), unlike the old compiled-only behavior.
+    expect(removed).toBe(true);
+    // Still allowed via the compiled seed floor (accidental removal cannot brick Entra auth).
     expect(service.isAllowed('login.microsoftonline.com')).toBe(true);
+  });
+
+  it('R1: updateHost edits a persisted entry by id and hot-reloads the union', async () => {
+    await service.addHost('old-host.example.com');
+    const entry = service.view().persistedEntries.find((e) => e.host === 'old-host.example.com');
+    expect(entry).toBeDefined();
+    const { updated } = await service.updateHost(entry!.id, 'new-host.example.com', 'renamed');
+    expect(updated).toBe(true);
+    expect(service.isAllowed('new-host.example.com')).toBe(true);
+    expect(service.isAllowed('old-host.example.com')).toBe(false);
+    const after = service.view().persistedEntries.find((e) => e.id === entry!.id);
+    expect(after?.host).toBe('new-host.example.com');
+    expect(after?.label).toBe('renamed');
+  });
+
+  it('R1: updateHost returns updated:false for an unknown id', async () => {
+    const { updated } = await service.updateHost('no-such-id', 'whatever.example.com');
+    expect(updated).toBe(false);
+  });
+
+  it('R1: patchHosts selectively adds AND removes in a single call', async () => {
+    await service.addHost('to-remove.example.com');
+    expect(service.isAllowed('to-remove.example.com')).toBe(true);
+    const { added, removed } = await service.patchHosts(
+      ['new-a.example.com', 'new-b.example.com'],
+      ['to-remove.example.com'],
+    );
+    expect(added).toBe(2);
+    expect(removed).toBe(1);
+    expect(service.isAllowed('new-a.example.com')).toBe(true);
+    expect(service.isAllowed('new-b.example.com')).toBe(true);
+    expect(service.isAllowed('to-remove.example.com')).toBe(false);
+  });
+
+  it('R1: patchHosts add is idempotent (re-adding an existing host counts 0)', async () => {
+    await service.addHost('already.example.com');
+    const { added } = await service.patchHosts(['already.example.com'], []);
+    expect(added).toBe(0);
+    expect(service.isAllowed('already.example.com')).toBe(true);
   });
 
   it('view() exposes the three layers + the effective union', async () => {

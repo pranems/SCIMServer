@@ -80,3 +80,58 @@ test.describe('SettingsPage - JWKS host allowlist (WI-15)', () => {
     }
   });
 });
+
+/**
+ * R1 - the JWKS host allowlist card offers full CRUD: the seed is prepopulated
+ * as editable rows, each row has Edit + Remove, plus a PATCH-based selective
+ * add/remove box. Route-mocked so it is deterministic and mutates nothing real.
+ */
+test.describe('SettingsPage - JWKS host allowlist full CRUD (R1)', () => {
+  test('renders prepopulated rows with Edit + the PATCH selective add/remove box', async ({ page }) => {
+    // The Settings page gates rendering on version + health; mock them so the
+    // page leaves the loading skeleton (preview has no backend).
+    await page.route('**/scim/admin/version', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '0.54.9', runtime: { node: 'v24', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'inmemory', databaseProvider: 'inmemory' } }) });
+    });
+    await page.route('**/health', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', uptime: 60 }) });
+    });
+    await page.route('**/scim/admin/settings/jwks-hosts', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          seed: ['login.microsoftonline.com', 'accounts.google.com'],
+          env: [],
+          persisted: ['login.microsoftonline.com', 'acme.example.com'],
+          persistedEntries: [
+            { id: 's1', host: 'login.microsoftonline.com', label: 'well-known IdP (seed)' },
+            { id: 'p1', host: 'acme.example.com', label: null },
+          ],
+          effective: ['login.microsoftonline.com', 'accounts.google.com', 'acme.example.com'],
+        }),
+      });
+    });
+
+    await page.goto('/settings');
+    await expect(page.getByTestId('jwks-hosts-card')).toBeVisible({ timeout: 30_000 });
+
+    // R10: assert the RENDERED CRUD affordances, not just card presence.
+    // Seed host is a prepopulated, editable row.
+    await expect(page.getByTestId('jwks-host-row-login.microsoftonline.com')).toBeVisible();
+    await expect(page.getByTestId('jwks-host-edit-login.microsoftonline.com')).toBeVisible();
+    await expect(page.getByTestId('jwks-host-row-acme.example.com')).toBeVisible();
+    await expect(page.getByTestId('jwks-host-edit-acme.example.com')).toBeVisible();
+    await expect(page.getByTestId('jwks-host-remove-acme.example.com')).toBeVisible();
+    // The PATCH selective add/remove box is present.
+    await expect(page.getByTestId('jwks-hosts-patch-add')).toBeVisible();
+    await expect(page.getByTestId('jwks-hosts-patch-remove')).toBeVisible();
+    await expect(page.getByTestId('jwks-hosts-patch-button')).toBeVisible();
+
+    // Clicking Edit swaps the row into an inline input.
+    await page.getByTestId('jwks-host-edit-acme.example.com').click();
+    await expect(page.getByTestId('jwks-host-edit-input-acme.example.com')).toBeVisible();
+    await expect(page.getByTestId('jwks-host-save-acme.example.com')).toBeVisible();
+  });
+});

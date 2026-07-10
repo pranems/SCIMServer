@@ -11863,9 +11863,41 @@ try {
     $at7Removed = (-not ($at7After.persisted -contains $at7Host)) -and (-not ($at7After.effective -contains $at7Host))
     Test-Result -Success $at7Removed -Message "9z-AT7.T5: removed host is gone from persisted + effective"
 
-    # T6: seed hosts are NOT in the persisted layer (they are compiled-in, not removable).
-    $at6SeedNotPersisted = (-not ($at7After.persisted -contains "login.microsoftonline.com"))
-    Test-Result -Success $at6SeedNotPersisted -Message "9z-AT7.T6: seed host is not in the persisted (removable) layer"
+    # T6 (R1): seed hosts are now PREPOPULATED as persisted entries (editable rows),
+    # each with an id + host, while still remaining in the compiled safety floor.
+    $at7SeedEntry = $at7After.persistedEntries | Where-Object { $_.host -eq "login.microsoftonline.com" }
+    Test-Result -Success ($null -ne $at7SeedEntry -and -not [string]::IsNullOrEmpty($at7SeedEntry.id)) -Message "9z-AT7.T6: R1 seed host is prepopulated as an editable persisted entry (id + host)"
+
+    # T7 (R1): PUT edits a persisted entry by id (host + label); the union hot-reloads.
+    $at7EditHost = "live-at7-edit-$(Get-Random).jwks.example.com"
+    $at7EditAdded = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method POST -Headers $headers -Body (@{ host = $at7EditHost } | ConvertTo-Json)
+    $at7EditEntry = $at7EditAdded.persistedEntries | Where-Object { $_.host -eq $at7EditHost }
+    $at7EditNewHost = "live-at7-edited-$(Get-Random).jwks.example.com"
+    $at7Edited = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts/$([uri]::EscapeDataString($at7EditEntry.id))" -Method PUT -Headers $headers -Body (@{ host = $at7EditNewHost; label = "renamed" } | ConvertTo-Json)
+    $at7EditOk = ($at7Edited.effective -contains $at7EditNewHost) -and (-not ($at7Edited.effective -contains $at7EditHost))
+    Test-Result -Success $at7EditOk -Message "9z-AT7.T7: R1 PUT edits a persisted entry by id (host changed, hot-reloaded)"
+    # cleanup the edited entry
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts/$([uri]::EscapeDataString($at7EditNewHost))" -Method DELETE -Headers $headers | Out-Null
+
+    # T8 (R1): PATCH selectively adds AND removes hosts in a single call.
+    $at7PatchRemove = "live-at7-patchrm-$(Get-Random).jwks.example.com"
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method POST -Headers $headers -Body (@{ host = $at7PatchRemove } | ConvertTo-Json) | Out-Null
+    $at7PatchAddA = "live-at7-patcha-$(Get-Random).jwks.example.com"
+    $at7PatchAddB = "live-at7-patchb-$(Get-Random).jwks.example.com"
+    $at7Patched = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method PATCH -Headers $headers -Body (@{ add = @($at7PatchAddA, $at7PatchAddB); remove = @($at7PatchRemove) } | ConvertTo-Json)
+    $at7PatchOk = ($at7Patched.added -eq 2) -and ($at7Patched.removed -eq 1) -and `
+        ($at7Patched.view.effective -contains $at7PatchAddA) -and ($at7Patched.view.effective -contains $at7PatchAddB) -and `
+        (-not ($at7Patched.view.effective -contains $at7PatchRemove))
+    Test-Result -Success $at7PatchOk -Message "9z-AT7.T8: R1 PATCH selectively adds 2 + removes 1 in one call"
+    # cleanup the patch-added hosts
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method PATCH -Headers $headers -Body (@{ remove = @($at7PatchAddA, $at7PatchAddB) } | ConvertTo-Json) | Out-Null
+
+    # T9 (R1): PATCH with an empty body is rejected -> 400.
+    $at7PatchEmpty = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method PATCH -Headers $headers -Body (@{} | ConvertTo-Json) | Out-Null
+    } catch { $at7PatchEmpty = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at7PatchEmpty -Message "9z-AT7.T9: R1 PATCH with an empty body rejected -> 400"
 } catch {
     Test-Result -Success $false -Message "9z-AT7: WI-15 JWKS host allowlist section threw: $($_.Exception.Message)"
 }

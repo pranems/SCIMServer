@@ -465,7 +465,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .expect(400);
   });
 
-  it('WI-14: the FIRST oauth_client on an endpoint defaults client_id to the endpointId', async () => {
+  it('WI-14/R7: the FIRST oauth_client on an endpoint defaults client_id to client-id-<endpointId>', async () => {
     const ocEndpoint = await createEndpointWithConfig(app, adminToken, {
       OAuthClientCredentialsAuthEnabled: 'True',
     });
@@ -474,7 +474,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ credentialType: 'oauth_client', label: 'wi14-default-id' })
       .expect(201);
-    expect(res.body.clientId).toBe(ocEndpoint);
+    expect(res.body.clientId).toBe(`client-id-${ocEndpoint}`);
     expect(typeof res.body.clientSecret).toBe('string');
   });
 
@@ -534,6 +534,79 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .post('/scim/admin/settings/jwks-hosts')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ host: 'https://evil.example/keys' })
+      .expect(400);
+  });
+
+  // ─── R1 - seed prepopulation + PUT edit + PATCH selective add/remove ──────
+  it('R1: the well-known seed is prepopulated as editable persisted entries (id + host)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const entries = res.body.persistedEntries as Array<{ id: string; host: string; label: string | null }>;
+    expect(Array.isArray(entries)).toBe(true);
+    const seedEntry = entries.find((e) => e.host === 'login.microsoftonline.com');
+    expect(seedEntry).toBeDefined();
+    expect(seedEntry?.id).toBeTruthy();
+  });
+
+  it('R1: PUT edits a persisted entry by id (host + label), 404 for unknown id', async () => {
+    const added = await request(app.getHttpServer())
+      .post('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ host: 'r1-edit-before.example.com', label: 'before' })
+      .expect(201);
+    const entry = (added.body.persistedEntries as Array<{ id: string; host: string }>).find(
+      (e) => e.host === 'r1-edit-before.example.com',
+    );
+    expect(entry).toBeDefined();
+
+    const edited = await request(app.getHttpServer())
+      .put(`/scim/admin/settings/jwks-hosts/${entry!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ host: 'r1-edit-after.example.com', label: 'after' })
+      .expect(200);
+    expect(edited.body.effective).toContain('r1-edit-after.example.com');
+    expect(edited.body.effective).not.toContain('r1-edit-before.example.com');
+
+    await request(app.getHttpServer())
+      .put('/scim/admin/settings/jwks-hosts/no-such-id')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ host: 'whatever.example.com' })
+      .expect(404);
+  });
+
+  it('R1: PATCH selectively adds and removes hosts in one call', async () => {
+    // Seed a host to remove.
+    await request(app.getHttpServer())
+      .post('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ host: 'r1-patch-remove.example.com' })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .patch('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ add: ['r1-patch-add-a.example.com', 'r1-patch-add-b.example.com'], remove: ['r1-patch-remove.example.com'] })
+      .expect(200);
+    expect(res.body.added).toBe(2);
+    expect(res.body.removed).toBe(1);
+    expect(res.body.view.effective).toEqual(
+      expect.arrayContaining(['r1-patch-add-a.example.com', 'r1-patch-add-b.example.com']),
+    );
+    expect(res.body.view.effective).not.toContain('r1-patch-remove.example.com');
+  });
+
+  it('R1: PATCH rejects an empty body and a non-bare add host', async () => {
+    await request(app.getHttpServer())
+      .patch('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({})
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch('/scim/admin/settings/jwks-hosts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ add: ['https://evil.example/keys'] })
       .expect(400);
   });
 });

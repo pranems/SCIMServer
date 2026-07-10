@@ -1442,11 +1442,19 @@ export function useVerifyWifTrust(endpointId: string) {
 }
 
 /** WI-15 - the effective JWKS host allowlist view (seed + env + persisted). */
+export interface JwksAllowlistPersistedEntry {
+  id: string;
+  host: string;
+  label: string | null;
+}
+
 export interface JwksAllowlistView {
   seed: string[];
   env: string[];
   persisted: string[];
   effective: string[];
+  /** R1 - persisted rows with id + label, for edit/remove by id in the UI. */
+  persistedEntries: JwksAllowlistPersistedEntry[];
 }
 
 const JWKS_HOSTS_KEY = ['admin', 'jwks-hosts'] as const;
@@ -1468,6 +1476,36 @@ export function useAddJwksHost() {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/** R1 - edit a persisted JWKS allowlist entry by id (host and/or label). */
+export function useUpdateJwksHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, host, label }: { id: string; host: string; label?: string }) =>
+      fetchWithAuth<JwksAllowlistView>(`/scim/admin/settings/jwks-hosts/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ host, label }),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/** R1 - selectively add AND/OR remove JWKS hosts in a single PATCH call. */
+export function usePatchJwksHosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { add?: string[]; remove?: string[] }) =>
+      fetchWithAuth<{ added: number; removed: number; view: JwksAllowlistView }>(
+        '/scim/admin/settings/jwks-hosts',
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
     },

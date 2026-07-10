@@ -40,4 +40,13 @@ export class InMemoryJwksHostAllowlistRepository implements IJwksHostAllowlistRe
     this.store.delete(entry.id);
     return true;
   }
+
+  async update(id: string, host: string, label: string | null): Promise<JwksHostAllowlistEntryModel | null> {
+    const existing = this.store.get(id);
+    if (!existing) return null;
+    const normalized = host.trim().toLowerCase();
+    const updated: JwksHostAllowlistEntryModel = { ...existing, host: normalized, label: label ?? null };
+    this.store.set(id, updated);
+    return updated;
+  }
 }

@@ -36,6 +36,17 @@ export class PrismaJwksHostAllowlistRepository implements IJwksHostAllowlistRepo
     return result.count > 0;
   }
 
+  async update(id: string, host: string, label: string | null): Promise<JwksHostAllowlistEntryModel | null> {
+    const normalized = host.trim().toLowerCase();
+    const existing = await this.prisma.jwksHostAllowlistEntry.findUnique({ where: { id } });
+    if (!existing) return null;
+    const row = await this.prisma.jwksHostAllowlistEntry.update({
+      where: { id },
+      data: { host: normalized, label: label ?? null },
+    });
+    return this.toModel(row);
+  }
+
   private toModel(row: {
     id: string;
     host: string;

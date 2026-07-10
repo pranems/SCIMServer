@@ -36,11 +36,23 @@ export const WELL_KNOWN_JWKS_HOST_SEED: ReadonlyArray<string> = [
   'accounts.google.com', // Google OIDC
 ];
 
+export interface JwksAllowlistPersistedEntry {
+  id: string;
+  host: string;
+  label: string | null;
+}
+
 export interface JwksAllowlistView {
   seed: string[];
   env: string[];
   persisted: string[];
   effective: string[];
+  /**
+   * R1 - the persisted rows with their id + label, so the admin UI can edit or
+   * remove a specific entry by id. `persisted` (the bare host strings) is kept
+   * for backward compatibility.
+   */
+  persistedEntries: JwksAllowlistPersistedEntry[];
 }
 
 @Injectable()
@@ -51,6 +63,8 @@ export class JwksHostAllowlistService implements OnModuleInit {
   private effective: Set<string>;
   /** Just the persisted layer, mirrored in memory for hot-reload + the view. */
   private persisted = new Set<string>();
+  /** R1 - the persisted rows (id + host + label) for the admin edit/remove UI. */
+  private persistedEntries: JwksAllowlistPersistedEntry[] = [];
 
   constructor(
     private readonly config: ConfigService,
@@ -68,8 +82,13 @@ export class JwksHostAllowlistService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     if (!this.repo) return;
     try {
+      // R1 - prepopulate the well-known IdP seed into the persisted table so
+      // the seed hosts appear as editable/removable rows in the admin UI.
+      // Idempotent: repo.add is a no-op if the host already exists.
+      await this.ensureSeeded();
       const rows = await this.repo.findAll();
-      this.persisted = new Set(rows.map((r) => r.host.toLowerCase()));
+      this.persistedEntries = rows.map((r) => ({ id: r.id, host: r.host.toLowerCase(), label: r.label }));
+      this.persisted = new Set(this.persistedEntries.map((e) => e.host));
       this.rebuild();
       this.logger.info(LogCategory.AUTH, 'JWKS host allowlist loaded', {
         seed: this.seed.size,
@@ -81,6 +100,25 @@ export class JwksHostAllowlistService implements OnModuleInit {
       this.logger.warn(LogCategory.AUTH, 'JWKS host allowlist persisted-layer load failed (using seed+env)', {
         error: (err as Error).message,
       });
+    }
+  }
+
+  /**
+   * R1 - ensure every compiled well-known seed host exists as a persisted row.
+   * Runs once at startup; idempotent. The compiled seed also remains a
+   * permanent effective-union safety floor (a persisted seed row can be edited
+   * or removed, but the compiled seed keeps well-known IdPs reachable so an
+   * accidental removal cannot brick Entra/Google auth).
+   */
+  private async ensureSeeded(): Promise<void> {
+    if (!this.repo) return;
+    const existing = await this.repo.findAll();
+    const have = new Set(existing.map((r) => r.host.toLowerCase()));
+    for (const host of WELL_KNOWN_JWKS_HOST_SEED) {
+      const normalized = host.toLowerCase();
+      if (!have.has(normalized)) {
+        await this.repo.add(normalized, 'well-known IdP (seed)');
+      }
     }
   }
 
@@ -96,6 +134,7 @@ export class JwksHostAllowlistService implements OnModuleInit {
       env: [...this.env].sort(),
       persisted: [...this.persisted].sort(),
       effective: [...this.effective].sort(),
+      persistedEntries: [...this.persistedEntries].sort((a, b) => a.host.localeCompare(b.host)),
     };
   }
 
@@ -110,10 +149,26 @@ export class JwksHostAllowlistService implements OnModuleInit {
       throw new Error('JWKS host allowlist persistence is not available.');
     }
     await this.repo.add(normalized, label);
-    this.persisted.add(normalized);
-    this.rebuild();
+    await this.reloadPersisted();
     this.logger.info(LogCategory.AUTH, 'JWKS host added to allowlist (runtime)', { host: normalized });
     return this.view();
+  }
+
+  /**
+   * R1 - update a persisted entry by id (change its host and/or label) and
+   * hot-reload the union. Returns null via the boolean when no such row exists.
+   */
+  async updateHost(id: string, host: string, label: string | null = null): Promise<{ updated: boolean; view: JwksAllowlistView }> {
+    const normalized = host.trim().toLowerCase();
+    if (!this.repo) {
+      throw new Error('JWKS host allowlist persistence is not available.');
+    }
+    const row = await this.repo.update(id, normalized, label);
+    await this.reloadPersisted();
+    if (row) {
+      this.logger.info(LogCategory.AUTH, 'JWKS host updated in allowlist (runtime)', { id, host: normalized });
+    }
+    return { updated: row != null, view: this.view() };
   }
 
   /**
@@ -128,12 +183,54 @@ export class JwksHostAllowlistService implements OnModuleInit {
       throw new Error('JWKS host allowlist persistence is not available.');
     }
     const removed = await this.repo.removeByHost(normalized);
-    this.persisted.delete(normalized);
-    this.rebuild();
+    await this.reloadPersisted();
     if (removed) {
       this.logger.info(LogCategory.AUTH, 'JWKS host removed from allowlist (runtime)', { host: normalized });
     }
     return { removed, view: this.view() };
+  }
+
+  /**
+   * R1 - selectively add and/or remove hosts in a single call (PATCH). `add`
+   * hosts are appended to the persisted layer (idempotent); `remove` hosts are
+   * deleted from it. Both lists are normalized + validated as bare hostnames
+   * by the caller. Returns the count actually added/removed + the fresh view.
+   * The union is hot-reloaded once at the end.
+   */
+  async patchHosts(
+    add: string[] = [],
+    remove: string[] = [],
+  ): Promise<{ added: number; removed: number; view: JwksAllowlistView }> {
+    if (!this.repo) {
+      throw new Error('JWKS host allowlist persistence is not available.');
+    }
+    let added = 0;
+    let removed = 0;
+    for (const host of add) {
+      const normalized = host.trim().toLowerCase();
+      if (normalized === '') continue;
+      const before = this.persisted.has(normalized);
+      await this.repo.add(normalized, null);
+      if (!before) added += 1;
+    }
+    for (const host of remove) {
+      const normalized = host.trim().toLowerCase();
+      if (normalized === '') continue;
+      const didRemove = await this.repo.removeByHost(normalized);
+      if (didRemove) removed += 1;
+    }
+    await this.reloadPersisted();
+    this.logger.info(LogCategory.AUTH, 'JWKS host allowlist patched (runtime)', { added, removed });
+    return { added, removed, view: this.view() };
+  }
+
+  /** Reload the persisted layer from the repo and rebuild the union. */
+  private async reloadPersisted(): Promise<void> {
+    if (!this.repo) return;
+    const rows = await this.repo.findAll();
+    this.persistedEntries = rows.map((r) => ({ id: r.id, host: r.host.toLowerCase(), label: r.label }));
+    this.persisted = new Set(this.persistedEntries.map((e) => e.host));
+    this.rebuild();
   }
 
   /** Recompute the effective union from the three layers. */
