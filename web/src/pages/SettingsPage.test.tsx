@@ -109,6 +109,18 @@ describe('SettingsPage log config (Phase L4)', () => {
     expect(screen.getByTestId('log-config-export-download')).toBeInTheDocument();
   });
 
+  it('R4b: renders the SCIMServer-level connection info card with global URLs', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('server-connection-info-card')).toBeInTheDocument();
+    // The GLOBAL token endpoint (not per-endpoint) is shown.
+    expect(screen.getByTestId('server-conn-token-endpoint').textContent).toContain('/scim/oauth/token');
+    expect(screen.getByTestId('server-conn-jwks-uri').textContent).toContain('/scim/oauth/jwks');
+    expect(screen.getByTestId('server-conn-oauth-metadata').textContent).toContain('/.well-known/oauth-authorization-server');
+    // Copy/Download JSON export affordances.
+    expect(screen.getByTestId('server-connection-info-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('server-connection-info-export-download')).toBeInTheDocument();
+  });
+
   it('renders the global level Combobox seeded from availableLevels', () => {
     (useLogConfig as ReturnType<typeof vi.fn>).mockReturnValue({ data: sampleConfig, isLoading: false, isError: false, error: null });
     wrap(<SettingsPage />);

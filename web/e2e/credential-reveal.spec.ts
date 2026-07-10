@@ -56,6 +56,9 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
     // Settings JSON export affordances (Copy + Download).
     await expect(page.getByTestId('security-settings-export-copy')).toBeVisible();
     await expect(page.getByTestId('security-settings-export-download')).toBeVisible();
+    // R4b: the SCIMServer-level connection info card shows the global URLs.
+    await expect(page.getByTestId('server-connection-info-card')).toBeVisible();
+    await expect(page.getByTestId('server-conn-token-endpoint')).toContainText('/scim/oauth/token');
   });
 
   test('the KEK status line reports whether the KEK is the default', async ({ page }) => {

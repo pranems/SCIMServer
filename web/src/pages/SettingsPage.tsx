@@ -167,6 +167,9 @@ export const SettingsPage: React.FC = () => {
         )}
       </div>
 
+      {/* R4b - SCIMServer-level (global) connection info for admins */}
+      <ServerConnectionInfoCard />
+
       {/* Phase L4 - log config admin */}
       <LogConfigSection />
 
@@ -179,6 +182,70 @@ export const SettingsPage: React.FC = () => {
       {/* Phase N2 - re-open onboarding wizard */}
       <OnboardingResetCard />
     </div>
+  );
+};
+
+// ─── R4b: ServerConnectionInfoCard ───────────────────────────────
+//
+// SCIMServer-level (global, not per-endpoint) connection info an admin gives
+// to a client that connects at the server scope: the base URL, the GLOBAL
+// OAuth token endpoint (/scim/oauth/token), the global JWKS URI, the RFC 8414
+// OAuth AS metadata URL, and the SCIM ServiceProviderConfig. URLs are derived
+// from the browser origin (same approach the per-endpoint ConnectionPanel
+// uses), so they always match this deployment. No secret is ever shown. The
+// per-endpoint equivalent lives on each endpoint's Connect tab.
+
+const ServerConnectionInfoCard: React.FC = () => {
+  const classes = useStyles();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const prefix = 'scim';
+  const urls = {
+    baseUrl: origin,
+    tokenEndpoint: `${origin}/${prefix}/oauth/token`,
+    jwksUri: `${origin}/${prefix}/oauth/jwks`,
+    oauthMetadata: `${origin}/.well-known/oauth-authorization-server`,
+    scimServiceProviderConfig: `${origin}/${prefix}/v2/ServiceProviderConfig`,
+  };
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="server-connection-info-card">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>Server connection info (SCIMServer level)</Subtitle1>
+        <SettingsJsonExport
+          value={urls}
+          filename="scimserver-connection-info.json"
+          copyLabel="Copy as JSON"
+          data-testid="server-connection-info-export"
+        />
+      </div>
+      <Caption1>
+        SCIMServer-level (global) values for a client that connects at the server scope. Each
+        endpoint also has its own per-endpoint values on its Connect tab. Labels follow Microsoft
+        Entra ID; other IdPs (Okta, OneLogin, Ping, custom clients) use the equivalent field. No
+        secret is shown here - the global SCIM shared secret is server-configured.
+      </Caption1>
+
+      <div className={classes.row}>
+        <Text>Base URL</Text>
+        <CopyableField value={urls.baseUrl} monospace data-testid="server-conn-base-url" />
+      </div>
+      <div className={classes.row}>
+        <Text>OAuth token endpoint (global)</Text>
+        <CopyableField value={urls.tokenEndpoint} monospace data-testid="server-conn-token-endpoint" />
+      </div>
+      <div className={classes.row}>
+        <Text>JWKS URI</Text>
+        <CopyableField value={urls.jwksUri} monospace data-testid="server-conn-jwks-uri" />
+      </div>
+      <div className={classes.row}>
+        <Text>OAuth metadata (RFC 8414)</Text>
+        <CopyableField value={urls.oauthMetadata} monospace data-testid="server-conn-oauth-metadata" />
+      </div>
+      <div className={classes.row}>
+        <Text>ServiceProviderConfig</Text>
+        <CopyableField value={urls.scimServiceProviderConfig} monospace data-testid="server-conn-spc" />
+      </div>
+    </Card>
   );
 };
 
