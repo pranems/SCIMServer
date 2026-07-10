@@ -211,6 +211,31 @@ describe('AdminCredentialController', () => {
       expect(JSON.stringify(createArg)).not.toContain(result.clientSecret);
     });
 
+    it('R7: the first oauth_client uses the client-id-<endpointId> + client-secret-<uuid> format', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([]);
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'oauth_client',
+      });
+      // Readable, operator-requested formats.
+      expect(result.clientId).toBe(`client-id-${mockEndpoint.id}`);
+      expect(result.clientSecret).toMatch(
+        /^client-secret-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+    });
+
+    it('R7: an additional oauth_client gets a generated client-id-<uuid> (no collision)', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([
+        { credentialType: 'oauth_client', metadata: { clientId: `client-id-${mockEndpoint.id}` } },
+      ] as never);
+      const result = await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'oauth_client',
+      });
+      expect(result.clientId).toMatch(
+        /^client-id-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+      expect(result.clientId).not.toBe(`client-id-${mockEndpoint.id}`);
+    });
+
     it('should throw NotFoundException for non-existent endpoint', async () => {
       mockEndpointService.getEndpoint.mockRejectedValue(
         new NotFoundException('Endpoint not found'),
@@ -319,12 +344,12 @@ describe('AdminCredentialController', () => {
         profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
       });
       mockCredentialRepo.findByEndpoint.mockResolvedValue([]); // no existing oauth_client
-      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: mockEndpoint.id } });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: `client-id-${mockEndpoint.id}` } });
       const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' });
-      expect(result.clientId).toBe(mockEndpoint.id);
-      // The create call carried the endpointId as the client_id.
+      expect(result.clientId).toBe(`client-id-${mockEndpoint.id}`);
+      // The create call carried the client-id-<endpointId> form as the client_id.
       const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: { clientId: string } };
-      expect(created.metadata.clientId).toBe(mockEndpoint.id);
+      expect(created.metadata.clientId).toBe(`client-id-${mockEndpoint.id}`);
     });
 
     it('WI-14: a SECOND oauth_client gets a generated client_id (no collision)', async () => {
@@ -332,13 +357,13 @@ describe('AdminCredentialController', () => {
         ...mockEndpoint,
         profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
       });
-      mockCredentialRepo.findByEndpoint.mockResolvedValue([{ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: mockEndpoint.id } }]);
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([{ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: `client-id-${mockEndpoint.id}` } }]);
       mockCredentialRepo.create.mockImplementation((data: { metadata?: { clientId?: string } }) =>
         Promise.resolve({ ...mockCredential, credentialType: 'oauth_client', metadata: data.metadata }),
       );
       const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' });
-      expect(result.clientId).toMatch(/^epc_/);
-      expect(result.clientId).not.toBe(mockEndpoint.id);
+      expect(result.clientId).toMatch(/^client-id-[0-9a-f]{8}-/);
+      expect(result.clientId).not.toBe(`client-id-${mockEndpoint.id}`);
     });
 
     it('WI-14: an explicit clientId always wins over the default', async () => {

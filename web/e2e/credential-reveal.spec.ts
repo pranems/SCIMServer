@@ -90,3 +90,74 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
     }
   });
 });
+
+/**
+ * R7 - creating an OAuth2 client credential shows the readable
+ * client-id-<endpointId> + client-secret-<uuid> pair, each copyable, plus a
+ * copy-all-as-JSON blob. Route-mocked so it is deterministic and mints nothing
+ * on the server.
+ */
+const EP_R7 = 'ep-r7-oauth';
+
+test.describe('Credentials tab - OAuth2 client create (R7)', () => {
+  test('shows client-id + client-secret + copy-as-JSON after an oauth_client create', async ({ page }) => {
+    const ID = EP_R7;
+    // Endpoint detail shell.
+    await page.route(`**/scim/admin/endpoints/${ID}`, async (route) => {
+      if (route.request().method() !== 'GET' || !route.request().url().endsWith(`/${ID}`)) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: ID, name: 'r7', displayName: 'R7 OAuth', active: true,
+          scimBasePath: `/scim/v2/endpoints/${ID}`, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+          profile: { schemas: [], resourceTypes: [], serviceProviderConfig: { documentationUri: '', patch: { supported: true } }, settings: { OAuthClientCredentialsAuthEnabled: 'True' } },
+        }),
+      });
+    });
+    await page.route('**/scim/admin/endpoints/*/overview', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          endpoint: { id: ID, name: 'r7', displayName: 'R7 OAuth', preset: 'rfc-standard', active: true, scimBasePath: `/scim/v2/endpoints/${ID}`, createdAt: '2026-01-01T00:00:00Z' },
+          stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
+          credentials: [],
+          recentActivity: [],
+          configFlags: { OAuthClientCredentialsAuthEnabled: true, PerEndpointCredentialsEnabled: true },
+          connectionInfo: { endpointId: ID, displayName: 'R7 OAuth', urls: { scimBaseUrl: '', scimBaseUrlBare: '', tokenEndpoint: '', serviceProviderConfig: '', oauthMetadata: '' }, enabledMethods: [], disabledMethods: [] },
+        }),
+      });
+    });
+    // The create POST returns the R7-shaped oauth_client response.
+    await page.route(`**/scim/admin/endpoints/${ID}/credentials`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'oauth-r7', endpointId: ID, credentialType: 'oauth_client', label: 'r7',
+          active: true, createdAt: '2026-07-10T00:00:00Z', expiresAt: null,
+          clientId: `client-id-${ID}`,
+          clientSecret: 'client-secret-11111111-2222-3333-4444-555555555555',
+        }),
+      });
+    });
+
+    await page.goto(`/endpoints/${ID}/credentials`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('credentials-create-button').click();
+    // Choose the OAuth2 client credentials type.
+    const typeDropdown = page.getByTestId('credentials-type-dropdown');
+    await typeDropdown.click();
+    await page.getByRole('option', { name: /OAuth2 client credentials/i }).click();
+    // Submit the create.
+    await page.getByTestId('credentials-create-dialog').locator('button[type="submit"]').click();
+
+    // R10: assert the RENDERED values + the JSON copy affordance.
+    await expect(page.getByTestId('credentials-oauth-clientid')).toContainText(`client-id-${ID}`);
+    await expect(page.getByTestId('credentials-oauth-clientsecret')).toContainText('client-secret-11111111-2222-3333-4444-555555555555');
+    await expect(page.getByTestId('credentials-oauth-copy-json')).toBeVisible();
+  });
+});

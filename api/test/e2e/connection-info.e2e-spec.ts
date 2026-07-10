@@ -118,7 +118,7 @@ describe('Connection-info API (E2E)', () => {
 
     const oc = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
     expect(oc.clientSecretState).toBe('set-shown-once');
-    expect(oc.entraFields.clientIdentifier).toBe(endpointId); // first oauth_client defaults to endpointId
+    expect(oc.entraFields.clientIdentifier).toBe(`client-id-${endpointId}`); // first oauth_client defaults to client-id-<endpointId>
     expect(oc.entraFields.clientSecret).toBeNull();
     // The whole response must not carry the plaintext secret anywhere.
     expect(JSON.stringify(res.body)).not.toContain(created.body.clientSecret);

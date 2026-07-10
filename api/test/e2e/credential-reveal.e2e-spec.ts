@@ -80,7 +80,7 @@ describe('Credential reveal + security settings (E2E)', () => {
     expect(revealed.body.retained).toBe(true);
     // The revealed secret matches the one shown once at creation.
     expect(revealed.body.clientSecret).toBe(oneTimeSecret);
-    expect(revealed.body.clientId).toBe(endpointId); // first oauth_client defaults to endpointId
+    expect(revealed.body.clientId).toBe(`client-id-${endpointId}`); // first oauth_client defaults to client-id-<endpointId>
     // The stored envelope is never exposed.
     expect(revealed.body.secretEnvelope).toBeUndefined();
   });

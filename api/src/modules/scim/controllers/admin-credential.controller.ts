@@ -299,25 +299,32 @@ export class AdminCredentialController {
     // rides `metadata.clientId`. Both the client_id and the one-time secret are
     // returned at create; the secret is NEVER stored or returned again.
     if (credentialType === 'oauth_client') {
-      // WI-14 smart default: the FIRST oauth_client on an endpoint may use the
-      // endpointId as its (public) client_id - no lookup needed. Any additional
-      // one gets a generated id to avoid a collision. An explicit dto.clientId
-      // always wins.
+      // R7 smart default: the FIRST oauth_client on an endpoint uses the
+      // readable `client-id-<endpointId>` form as its (public) client_id - no
+      // lookup needed. Any additional one gets a generated id to avoid a
+      // collision. An explicit dto.clientId always wins.
       let clientId: string;
       if (dto.clientId && dto.clientId.trim().length > 0) {
         clientId = dto.clientId.trim();
       } else {
         const existing = await this.credentialRepo.findByEndpoint(endpointId);
         const hasOauthClient = existing.some((c) => c.credentialType === 'oauth_client');
-        clientId = hasOauthClient ? `epc_${crypto.randomBytes(12).toString('hex')}` : endpointId;
+        clientId = hasOauthClient
+          ? `client-id-${crypto.randomUUID()}`
+          : `client-id-${endpointId}`;
       }
+      // R7: the oauth_client secret uses the readable `client-secret-<uuid>`
+      // form (operator request) instead of the generic random token. It is
+      // still hashed with bcrypt and only its hash is stored.
+      const oauthSecret = `client-secret-${crypto.randomUUID()}`;
+      const oauthHash = await bcrypt.hash(oauthSecret, BCRYPT_SALT_ROUNDS);
       const credential = await this.credentialRepo.create({
         endpointId,
         credentialType,
-        credentialHash: hash,
+        credentialHash: oauthHash,
         label: dto.label ?? null,
         metadata: { clientId },
-        secretEnvelope: await this.maybeRetainSecret(config, plaintext),
+        secretEnvelope: await this.maybeRetainSecret(config, oauthSecret),
         expiresAt,
       });
 
@@ -343,8 +350,10 @@ export class AdminCredentialController {
         createdAt: credential.createdAt,
         expiresAt: credential.expiresAt,
         clientId,
-        // ⚠️ Secret is returned ONLY here, ONCE. Only its bcrypt hash is stored.
-        clientSecret: plaintext,
+        // ⚠️ Secret is returned ONLY here, ONCE (unless retained via the
+        // effective CredentialSecretVisibility=always). Only its bcrypt hash
+        // is stored.
+        clientSecret: oauthSecret,
       };
     }
 

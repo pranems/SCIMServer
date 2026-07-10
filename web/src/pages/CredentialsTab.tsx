@@ -263,6 +263,10 @@ interface CreatedCredential {
   label: string | null;
   plaintext: string;
   createdAt: string;
+  /** R7 - the credential type that was created (bearer or oauth_client). */
+  credentialType: 'bearer' | 'oauth_client';
+  /** R7 - present for oauth_client: the public client identifier. */
+  clientId?: string;
 }
 
 // ─── WIF (federated identity) section ──────────────────────────────────
@@ -1037,6 +1041,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // Local UI state
   const [createOpen, setCreateOpen] = React.useState(false);
   const [labelInput, setLabelInput] = React.useState('');
+  // R7 - which credential type the create dialog will mint.
+  const [createType, setCreateType] = React.useState<'bearer' | 'oauth_client'>('bearer');
   const [createError, setCreateError] = React.useState<unknown>(null);
   // Plaintext token returned ONCE on create - keep around so the user
   // can copy it. Cleared when the modal closes after acknowledgement.
@@ -1055,6 +1061,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   const onOpenCreate = (): void => {
     setLabelInput('');
+    setCreateType('bearer');
     setCreateError(null);
     setCreatedCred(null);
     setCreateOpen(true);
@@ -1070,23 +1077,26 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const onSubmitCreate = (): void => {
     setCreateError(null);
     createMutation.mutate(
-      { label: labelInput.trim() || undefined },
+      { label: labelInput.trim() || undefined, credentialType: createType },
       {
         onSuccess: (raw) => {
-          // Backend returns { id, label, token, createdAt, ... } with
-          // `token` as the plaintext bearer string. Locked at backend
-          // by the controller comment "⚠️ Token is returned ONLY here".
+          // Bearer returns { id, label, token, createdAt }; oauth_client
+          // returns { id, label, clientId, clientSecret, createdAt } (R7).
           const cred = raw as unknown as {
             id: string;
             label: string | null;
-            token: string;
+            token?: string;
+            clientId?: string;
+            clientSecret?: string;
             createdAt: string;
           };
           setCreatedCred({
             id: cred.id,
             label: cred.label,
-            plaintext: cred.token,
+            plaintext: cred.clientSecret ?? cred.token ?? '',
             createdAt: cred.createdAt,
+            credentialType: createType,
+            clientId: cred.clientId,
           });
         },
         onError: (err) => {
@@ -1277,6 +1287,17 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
       >
         {!createdCred && (
           <div className={classes.formCol}>
+            <Field label="Credential type">
+              <Dropdown
+                value={createType === 'oauth_client' ? 'OAuth2 client credentials' : 'Bearer token'}
+                selectedOptions={[createType]}
+                onOptionSelect={(_, d) => setCreateType((d.optionValue as 'bearer' | 'oauth_client') ?? 'bearer')}
+                data-testid="credentials-type-dropdown"
+              >
+                <Option value="bearer" text="Bearer token">Bearer token</Option>
+                <Option value="oauth_client" text="OAuth2 client credentials">OAuth2 client credentials</Option>
+              </Dropdown>
+            </Field>
             <Field label="Label (optional)" hint="Human-readable name for this credential">
               <Input
                 value={labelInput}
@@ -1287,7 +1308,44 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
             </Field>
           </div>
         )}
-        {createdCred && (
+        {createdCred && createdCred.credentialType === 'oauth_client' && (
+          <div className={classes.formCol} data-testid="credentials-oauth-result">
+            <MessageBar intent="warning">
+              <MessageBarBody>
+                <MessageBarTitle>
+                  <Warning24Regular /> Save the client secret now
+                </MessageBarTitle>
+                The client identifier stays visible, but the secret is shown once here
+                (unless this endpoint retains secrets). The server stores only a bcrypt hash.
+              </MessageBarBody>
+            </MessageBar>
+            <Field label="Client Identifier">
+              <CopyableField
+                value={createdCred.clientId ?? ''}
+                monospace
+                data-testid="credentials-oauth-clientid"
+              />
+            </Field>
+            <Field label="Client Secret">
+              <CopyableField
+                value={createdCred.plaintext}
+                monospace
+                data-testid="credentials-oauth-clientsecret"
+              />
+            </Field>
+            <CopyJsonButton
+              value={{
+                clientId: createdCred.clientId,
+                clientSecret: createdCred.plaintext,
+                tokenEndpoint: `${window.location.origin}/scim/endpoints/${endpointId}/oauth/token`,
+                grantType: 'client_credentials',
+              }}
+              label="Copy all as JSON"
+              data-testid="credentials-oauth-copy-json"
+            />
+          </div>
+        )}
+        {createdCred && createdCred.credentialType === 'bearer' && (
           <div className={classes.formCol}>
             <MessageBar intent="warning">
               <MessageBarBody>

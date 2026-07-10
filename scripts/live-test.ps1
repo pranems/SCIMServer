@@ -12308,6 +12308,60 @@ Write-Host "`n--- 9z-AW: R3 connection-info retained-secret Tests Complete ---" 
 
 
 # ============================================
+# TEST SECTION 9z-AX: R7 oauth_client client-id/secret format + token flow
+# ============================================
+$script:currentSection = "9z-AX: R7 oauth_client format + token"
+Write-Host "`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AX: R7 oauth_client client-id/secret format + token" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $axEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-r7-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $axId = $axEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$axId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: first oauth_client uses the client-id-<endpointId> form.
+    $axCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$axId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "r7-live"
+    } | ConvertTo-Json)
+    Test-Result -Success ($axCred.clientId -eq "client-id-$axId") -Message "9z-AX.T1: first oauth_client clientId is client-id-<endpointId>"
+
+    # T2: the client secret uses the client-secret-<uuid> form.
+    $axSecretOk = $axCred.clientSecret -match '^client-secret-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    Test-Result -Success $axSecretOk -Message "9z-AX.T2: client secret is client-secret-<uuid>"
+
+    # T3: the pair authenticates at the per-endpoint token endpoint (client_credentials).
+    $axTokenResp = $null
+    try {
+        $axTokenResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$axId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_id = $axCred.clientId; client_secret = $axCred.clientSecret
+        }
+    } catch {}
+    Test-Result -Success ($null -ne $axTokenResp -and $null -ne $axTokenResp.access_token) -Message "9z-AX.T3: the client-id/secret pair mints a per-endpoint token"
+
+    # T4: a wrong secret is rejected (invalid_client).
+    $axBadReject = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$axId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_id = $axCred.clientId; client_secret = "client-secret-wrong"
+        } | Out-Null
+    } catch { $axBadReject = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $axBadReject -Message "9z-AX.T4: a wrong client secret is rejected -> 401 invalid_client"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$axId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AX: R7 oauth_client format+token section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AX: R7 oauth_client format+token Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

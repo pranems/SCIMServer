@@ -251,7 +251,7 @@ describe('CredentialsTab', () => {
     const submit = dialog.querySelector('button[type="submit"]');
     fireEvent.click(submit!);
 
-    expect(mockCreateMutate.mock.calls[0][0]).toEqual({ label: undefined });
+    expect(mockCreateMutate.mock.calls[0][0]).toEqual({ label: undefined, credentialType: 'bearer' });
   });
 
   it('shows plaintext token + copy button after successful create', () => {
@@ -277,6 +277,37 @@ describe('CredentialsTab', () => {
       'super-secret-bearer-token-123',
     );
     expect(screen.getByTestId('credentials-copy-button')).toBeInTheDocument();
+  });
+
+  it('R7: creating an oauth_client shows clientId + secret + copy-as-JSON', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
+    mockCreateMutate.mockImplementation((_body, opts) => {
+      opts?.onSuccess?.({
+        id: 'oauth-cred-id',
+        label: 'oauth prod',
+        clientId: 'client-id-ep-1',
+        clientSecret: 'client-secret-11111111-2222-3333-4444-555555555555',
+        createdAt: '2026-07-10T12:00:00Z',
+      });
+    });
+
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-create-button'));
+    const dialog = screen.getByTestId('credentials-create-dialog');
+    // Select the oauth_client type from the dropdown.
+    const typeDropdown = screen.getByTestId('credentials-type-dropdown');
+    fireEvent.click(typeDropdown.querySelector('button') ?? typeDropdown);
+    fireEvent.click(screen.getByRole('option', { name: /OAuth2 client credentials/i }));
+    fireEvent.click(dialog.querySelector('button[type="submit"]')!);
+
+    // R10: assert the RENDERED clientId + secret values + the JSON copy affordance.
+    expect(mockCreateMutate.mock.calls[0][0]).toMatchObject({ credentialType: 'oauth_client' });
+    expect(screen.getByTestId('credentials-oauth-result')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-oauth-clientid')).toHaveTextContent('client-id-ep-1');
+    expect(screen.getByTestId('credentials-oauth-clientsecret')).toHaveTextContent(
+      'client-secret-11111111-2222-3333-4444-555555555555',
+    );
+    expect(screen.getByTestId('credentials-oauth-copy-json')).toBeInTheDocument();
   });
 
   it('surfaces mutation error in the dialog (no silent failure)', () => {
