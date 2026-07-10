@@ -194,6 +194,29 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
     await expect(page.getByTestId('wif-field-role-enforcement')).toBeVisible();
   });
 
+  test('item R5: the WIF issuer field auto-resizes with the viewport (measured bounds)', async ({ page }) => {
+    // R1/R5: measure the RENDERED width of the field at two viewports and
+    // assert it grows with the window - proves the input fills its flex cell
+    // (the EditableField width:100% fix) rather than being fixed-width.
+    const issuerInput = page.getByTestId('wif-field-issuer').getByRole('textbox');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openCredentials(page);
+    await expect(issuerInput).toBeVisible();
+    const wide = await issuerInput.evaluate((el) => el.getBoundingClientRect().width);
+
+    await page.setViewportSize({ width: 820, height: 900 });
+    // allow the flex layout to settle after the resize
+    await expect(issuerInput).toBeVisible();
+    const narrow = await issuerInput.evaluate((el) => el.getBoundingClientRect().width);
+
+    // The field must actually shrink when the window shrinks (it is not
+    // pinned to a fixed width) AND must be a substantial width when wide
+    // (it fills the column, not a ~250px Fluent default).
+    expect(wide).toBeGreaterThan(narrow + 40);
+    expect(wide).toBeGreaterThan(500);
+  });
+
   test('item 6: Verify renders the per-check reachability checklist', async ({ page }) => {
     await openCredentials(page);
     // Mock the verify endpoint -> a mixed pass/fail checklist.

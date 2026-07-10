@@ -77,6 +77,14 @@ const useStyles = makeStyles({
     flex: '1 1 auto',
     minWidth: 0,
   },
+  // Fluent Input/Textarea have no intrinsic full width - without this they
+  // render at a fixed default width and never stretch to fill inputCell,
+  // which made WIF trust fields look fixed-width and not resize with the
+  // window (R5). width:100% lets the field expand/shrink with its flex cell.
+  field: {
+    width: '100%',
+    maxWidth: '100%',
+  },
   buttons: {
     display: 'inline-flex',
     flex: '0 0 auto',
@@ -229,6 +237,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       placeholder={placeholder}
       disabled={disabled}
       rows={rows}
+      className={classes.field}
       data-testid={inputTestId}
       style={monospace ? { fontFamily: 'Consolas, "Courier New", monospace', fontSize: '12px' } : undefined}
     />
@@ -238,6 +247,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       onChange={(_, d) => handleChange(d.value)}
       placeholder={placeholder}
       disabled={disabled}
+      className={classes.field}
       data-testid={inputTestId}
       style={monospace ? { fontFamily: 'Consolas, "Courier New", monospace', fontSize: '12px' } : undefined}
     />
