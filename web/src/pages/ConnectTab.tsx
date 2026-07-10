@@ -13,7 +13,8 @@
  * "Connect tab, always available").
  */
 import React from 'react';
-import { makeStyles, tokens, Text, Subtitle2, Caption1, Card } from '@fluentui/react-components';
+import { makeStyles, tokens, Text, Subtitle2, Caption1, Card, Link } from '@fluentui/react-components';
+import { useNavigate } from '@tanstack/react-router';
 import { useEndpointOverview, useConnectionRetainedSecrets } from '../api/queries';
 import { ConnectionPanel, LoadingSkeleton } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -22,6 +23,7 @@ import type { ConnectionInfo } from '@scim/types/connection-info.types';
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '16px' },
   intro: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  crossLinks: { display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' },
   disabledCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' },
   disabledRow: {
     display: 'flex',
@@ -39,6 +41,7 @@ interface ConnectTabProps {
 
 export const ConnectTab: React.FC<ConnectTabProps> = ({ endpointId }) => {
   const classes = useStyles();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointOverview(endpointId);
 
   if (isLoading) {
@@ -70,6 +73,20 @@ export const ConnectTab: React.FC<ConnectTabProps> = ({ endpointId }) => {
           is shown here only when its credential secret visibility is set to Always; otherwise
           secrets appear once, at credential-create time.
         </Caption1>
+        <div className={classes.crossLinks} data-testid="connect-tab-cross-links">
+          <Link
+            data-testid="connect-tab-link-credentials"
+            onClick={() => void navigate({ to: '/endpoints/$endpointId/credentials', params: { endpointId } })}
+          >
+            Manage credentials
+          </Link>
+          <Link
+            data-testid="connect-tab-link-settings"
+            onClick={() => void navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } })}
+          >
+            Enable / disable auth methods (Settings)
+          </Link>
+        </div>
       </div>
 
       <ConnectPanelSection endpointId={endpointId} connectionInfo={connectionInfo} />

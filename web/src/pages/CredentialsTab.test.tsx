@@ -28,6 +28,11 @@ const mockRotateMutate = vi.fn();
 const mockAddJwksHost = vi.fn();
 const mockUpdateWif = vi.fn();
 const mockVerifyWif = vi.fn();
+const mockNavigate = vi.fn();
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual('@tanstack/react-router');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
 let jwksAllowlistState: { data: { seed: string[]; env: string[]; persisted: string[]; effective: string[] } | undefined; isLoading: boolean } = {
@@ -308,6 +313,14 @@ describe('CredentialsTab', () => {
       'client-secret-11111111-2222-3333-4444-555555555555',
     );
     expect(screen.getByTestId('credentials-oauth-copy-json')).toBeInTheDocument();
+  });
+
+  it('R8: cross-links to the Connect tab of the same endpoint', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    mockNavigate.mockClear();
+    screen.getByTestId('credentials-link-connect').click();
+    expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/endpoints/$endpointId/connect' }));
   });
 
   it('surfaces mutation error in the dialog (no silent failure)', () => {

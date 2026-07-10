@@ -24,7 +24,9 @@ import {
   Field,
   Divider,
   Button,
+  Link,
 } from '@fluentui/react-components';
+import { useNavigate } from '@tanstack/react-router';
 import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock, SettingsJsonExport } from '../components/primitives';
@@ -197,6 +199,7 @@ export const SettingsPage: React.FC = () => {
 
 const ServerConnectionInfoCard: React.FC = () => {
   const classes = useStyles();
+  const navigate = useNavigate();
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const prefix = 'scim';
   const urls = {
@@ -245,6 +248,16 @@ const ServerConnectionInfoCard: React.FC = () => {
         <Text>ServiceProviderConfig</Text>
         <CopyableField value={urls.scimServiceProviderConfig} monospace data-testid="server-conn-spc" />
       </div>
+      <Caption1>
+        For per-endpoint connection details,{' '}
+        <Link
+          data-testid="server-conn-link-endpoints"
+          onClick={() => void navigate({ to: '/endpoints' })}
+        >
+          open an endpoint and its Connect tab
+        </Link>
+        .
+      </Caption1>
     </Card>
   );
 };

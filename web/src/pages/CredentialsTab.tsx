@@ -35,7 +35,9 @@ import {
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
+  Link,
 } from '@fluentui/react-components';
+import { useNavigate } from '@tanstack/react-router';
 import {
   Add24Regular,
   Delete24Regular,
@@ -1032,6 +1034,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
 
 export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointOverview(endpointId);
   const createMutation = useCreateCredential(endpointId);
   const deleteMutation = useDeleteCredential(endpointId);
@@ -1174,6 +1177,17 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           Add credential
         </Button>
       </div>
+
+      <Caption1>
+        After creating a credential,{' '}
+        <Link
+          data-testid="credentials-link-connect"
+          onClick={() => void navigate({ to: '/endpoints/$endpointId/connect', params: { endpointId } })}
+        >
+          view the connection details on the Connect tab
+        </Link>{' '}
+        to see exactly what to paste into your identity provider.
+      </Caption1>
 
       {!flagEnabled && (
         <MessageBar intent="warning" data-testid="credentials-flag-disabled-banner">

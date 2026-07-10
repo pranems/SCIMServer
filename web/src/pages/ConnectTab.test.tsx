@@ -9,6 +9,12 @@ import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { ConnectTab } from './ConnectTab';
 import { FIXTURE_ENDPOINT_OVERVIEW } from '../test/msw/fixtures';
 
+const mockNavigate = vi.fn();
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual('@tanstack/react-router');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
   return {
@@ -66,5 +72,15 @@ describe('ConnectTab (WI-5)', () => {
     renderTab();
     expect(screen.getByTestId('connect-tab-panel-value-clientSecret')).toHaveTextContent('retained-secret-xyz');
     expect(screen.getByTestId('connect-tab-panel-secret-retained-note')).toBeInTheDocument();
+  });
+
+  it('R8: cross-links to the Credentials + Settings tabs of the same endpoint', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({ data: FIXTURE_ENDPOINT_OVERVIEW, isLoading: false, error: null });
+    renderTab();
+    mockNavigate.mockClear();
+    screen.getByTestId('connect-tab-link-credentials').click();
+    expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/endpoints/$endpointId/credentials' }));
+    screen.getByTestId('connect-tab-link-settings').click();
+    expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/endpoints/$endpointId/settings' }));
   });
 });
