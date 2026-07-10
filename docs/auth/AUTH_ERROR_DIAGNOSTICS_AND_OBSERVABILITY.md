@@ -4,7 +4,7 @@
 >
 > **Why it exists.** A real WIF setup against dev endpoint `e8edd907-...` returned a bare `{ "detail": "invalid_client", "status": "401" }`. That single string hid at least two distinct, independently-fixable root causes (a JWKS host the server's allowlist did not permit, and an assertion with no `roles` claim against a trust that required one). The information needed to diagnose both existed server-side but never reached the caller or any UI. This document is the blueprint for closing that gap without weakening the security posture that makes some opacity deliberate.
 >
-> **Status.** Analysis + design, **re-verified against the latest `feat/wif` at commit `b9d615b`** (the connection-info epic WI-1..WI-17 has since shipped: connection-info API, Connect tab, JWKS-host admin allowlist, WIF discovery resolver, multi-trust, secret reveal/rotate). The current-state sections ([Part 3](#3-current-state-how-an-auth-failure-is-shaped-today), [Part 4](#4-gap-analysis-known-vs-surfaced-vs-visible)) are verified against the sources cited inline at that commit. The improvement sections ([Part 6](#6-the-unifying-idea-an-auth-decision-trace) onward) are PROPOSED, not yet implemented. No behavior described as "proposed" ships without the full feature checklist (unit + E2E + live + Playwright + docs).
+> **Status.** Analysis + design, **re-verified against the latest `feat/wif` at commit `b9d615b`** (the connection-info epic WI-1..WI-17 has since shipped: connection-info API, Connect tab, JWKS-host admin allowlist, WIF discovery resolver, multi-trust, secret reveal/rotate). **Re-verified a second time on v0.54.11 (2026-07-10)** after the R1 (JWKS full-CRUD + PATCH) / R4b / R6 / R8 batch - see [Part 1.3](#13-second-reanalysis-on-v05411-2026-07-10). The current-state sections ([Part 3](#3-current-state-how-an-auth-failure-is-shaped-today), [Part 4](#4-gap-analysis-known-vs-surfaced-vs-visible)) are verified against the sources cited inline. The improvement sections ([Part 6](#6-the-unifying-idea-an-auth-decision-trace) onward) are PROPOSED and now IN DELIVERY (WI-D1..WI-D8). No behavior described as "proposed" ships without the full feature checklist (unit + E2E + live + Playwright + docs).
 >
 > **What the epic changed for this analysis.** The central finding is UNCHANGED: token-endpoint auth failures still collapse to a bare `invalid_client` with the specific reason discarded from the response, and no UI shows which check failed. What the epic *added* is (a) a **partial relief** of the original JWKS-host root cause via a seeded, admin-editable allowlist ([Part 1.2](#12-re-diagnosis-on-the-latest-sources)), and (b) two **shipped precedents** that already do exactly what this document advocates - config-time specificity and response-level `{ retained, reason }` - which the token endpoint should now follow ([Part 5.4](#54-two-precedents-already-in-the-codebase)). The new Connect tab is the natural home for the proposed diagnostics UI ([Part 11](#11-ui-layer-improvements-the-centerpiece)).
 >
@@ -125,6 +125,24 @@ So this exact trust (JWKS host `login.windows.net`) **still fails on the latest 
 **Root cause 2 (missing role) is unchanged.** The assertion carries no `roles` claim; the trust requires `Scim.Provision`; [wif-assertion-validator.service.ts](../../api/src/oauth/wif-assertion-validator.service.ts#L103) still fails it - and the reason is still discarded from the response.
 
 **Bottom line:** the epic made the JWKS-host cause *easier to fix once you know what it is*, but did nothing to make the failure *legible*. The core problem this document addresses - a legitimate, IdP-key-controlling caller cannot tell which check failed - is exactly as present on `b9d615b` as it was on day one. Everything below still applies in full.
+
+### 1.3 Second reanalysis on v0.54.11 (2026-07-10)
+
+Re-verified again against `feat/wif` at **v0.54.11**, after a further batch shipped (R1 JWKS host allowlist *full CRUD* + selective PATCH + prepopulated editable seed; R4b SCIMServer-level connection-info card on the admin Settings page; R6 per-method credential sub-tabs; R8 contextual cross-links; the `-alpha` version suffix was dropped). The central finding is **still unchanged** - the token endpoint still collapses every auth failure to a bare `invalid_client` and no UI shows which check failed - but four deltas refine the delivery plan:
+
+- **D1 - the `jwks_host_not_allowlisted` remediation is now much richer.** R1 turned the allowlist into a fully DB-persisted, admin-CRUD-managed table: the well-known IdP seed is **prepopulated as editable rows**, and the admin surface offers add / **edit (`PUT /scim/admin/settings/jwks-hosts/{id}`)** / remove / **selective add-and-remove (`PATCH`)** plus a Copy/Download-as-JSON export on the Settings page. Every catalog remediation hint for `jwks_host_not_allowlisted` (Parts 1.2, 7.1) must point at this full-CRUD card and the PUT/PATCH verbs, not only the old `POST`. The diagnostics panel's fix-link (Part 11.1) should deep-link straight to `Settings > JWKS host allowlist` via an R8 cross-link.
+
+- **D2 - endpoint-level AND SCIMServer-level surfacing is now a first-class requirement (operator ask).** The Auth Decision Record store (Part 10.2) and the log event (Part 10.1) must be queryable and visible at **both** scopes, mirroring the existing two-scope log surfaces (`/scim/endpoints/:id/logs/recent` + `/scim/admin/log-config/recent`) and the R4b precedent (per-endpoint info on the Connect tab; SCIMServer-level info on the admin Settings page):
+  - **Endpoint scope:** `GET /scim/admin/endpoints/:id/auth-decisions` (recent auth attempts for one endpoint), surfaced on that endpoint's Connect tab (Part 11.1) and its Logs tab.
+  - **Global scope:** `GET /scim/admin/auth-decisions` (recent auth attempts across all endpoints), surfaced on the admin Logs page.
+  - **Request-log integration:** the WI-D4 AUTH decision event must flow through the *existing* ring-buffer + SSE + persistent `RequestLog` mechanism (it already captures the token-endpoint request body), and the LogsPage/LogsTab detail drawer must gain an auth-method + reason-code filter and a decoded-claim / expected-vs-received view. This makes auth failures visible in the log tools operators already use, not only in a new bespoke panel.
+
+- **D3 - R6 per-method sub-tabs give the diagnostics a second natural home.** The Credentials tab now has per-method sub-tabs (Shared secret / Per-endpoint bearer / OAuth2 client / WIF). The assertion/token debugger (Part 11.2) belongs in the **WIF sub-tab** (next to the trust it evaluates against), and a compact per-method auth-health chip (Part 11.5) can appear on each sub-tab, complementing the fuller diagnostics panel on the Connect tab.
+
+- **D4 - the primitive + cross-link toolkit is richer now.** WI-D6/D7/D8 should reuse the shipped R9 primitives (`CopyableField`, `CopyableJsonBlock`, `CopyJsonButton`, `SettingsJsonExport`) so every decoded claim + the whole trace is copyable/downloadable as JSON, and the R8 `useNavigate` cross-link pattern so the fix hints jump straight to the relevant remediation surface (Settings > JWKS hosts, the WIF sub-tab, the endpoint Settings auth flags).
+
+These deltas do not change the work-item *set* (WI-D1..WI-D8) or their order; they sharpen WI-D5/D6/D8 (two-scope + request-log integration + sub-tab home) and make WI-D2/D7's remediation text reference the R1 full-CRUD verbs. Part 14 is annotated accordingly.
+
 
 ---
 
@@ -818,14 +836,14 @@ flowchart LR
 
 | Work item | Scope | Depends on | Notes |
 |---|---|---|---|
-| WI-D1 | Filter passthrough for `*/oauth/token`; add `reason_code`/`correlation_id`/`timestamp` | - | Also fixes the RFC-6749 content-type correctness bug |
-| WI-D2 | Catalog module + public reference endpoint | - | Single source for wire + UI + docs |
+| WI-D1 | Filter passthrough for `*/oauth/token`; add `reason_code`/`correlation_id`/`timestamp` | - | Also fixes the RFC-6749 content-type correctness bug. The correlation id + `logsUrl` enrichment already exist in [scim-exception.filter.ts](../../api/src/modules/scim/filters/scim-exception.filter.ts). |
+| WI-D2 | Catalog module + public reference endpoint | - | Single source for wire + UI + docs. **D1:** `jwks_host_not_allowlisted` remediation references the R1 full-CRUD card (add/edit/PATCH), not only `POST`. |
 | WI-D3 | `AuthDecisionTrace` returned by WIF + JWKS + oauth_client validators; controller maps to catalog; multi-trust sub-traces | WI-D1, WI-D2 | Pure refactor of what is recorded, not the checks |
-| WI-D4 | One `LogCategory.AUTH` event per attempt | WI-D3 | Redacted; alert-friendly |
-| WI-D5 | Short-TTL admin-only Decision Record store (in-memory first, Prisma optional) | WI-D3 | Decoded non-secret claims only |
-| WI-D6 | Connect-tab "Auth Diagnostics" panel with expected-vs-received diff | WI-D5 | Centerpiece; R9 primitives; Playwright spec |
-| WI-D7 | Assertion/token debugger + live test-connection | WI-D3, WI-D6 | Server-evaluated dry-run + real handshake |
-| WI-D8 | `SCIM_ERROR_CATALOG` reason entries + OAuth error parsing + `authHealth` chips | WI-D2, WI-D7 | Humanized client-side messages + glance-able status |
+| WI-D4 | One `LogCategory.AUTH` event per attempt, **flowing through the existing ring-buffer + SSE + `RequestLog`** | WI-D3 | Redacted; alert-friendly. **D2:** integrate with the existing log mechanism, not a parallel one. |
+| WI-D5 | Auth Decision Record store, queryable at **BOTH endpoint scope** (`GET /scim/admin/endpoints/:id/auth-decisions`) **and global scope** (`GET /scim/admin/auth-decisions`); short-TTL admin-only (in-memory first, Prisma optional) | WI-D3 | Decoded non-secret claims only. **D2:** two-scope surfacing mirrors the existing two-scope log API + the R4b endpoint-vs-server precedent. |
+| WI-D6 | Connect-tab "Auth Diagnostics" panel with expected-vs-received diff; **also surfaced on the endpoint Logs tab + admin Logs page (global)** | WI-D5 | Centerpiece; R9 primitives; R8 cross-links to remediation; Playwright spec. **D2/D4.** |
+| WI-D7 | Assertion/token debugger + live test-connection, homed in the **R6 WIF sub-tab** of the Credentials tab | WI-D3, WI-D6 | Server-evaluated dry-run + real handshake. **D3.** |
+| WI-D8 | `SCIM_ERROR_CATALOG` reason entries + OAuth error parsing + `authHealth` chips (per-method, on the R6 sub-tabs + Connect tab) | WI-D2, WI-D7 | Humanized client-side messages + glance-able status. **D3/D4.** |
 
 Cross-cutting parity: every backend branch (`isInMemoryBackend`) that touches credential lookup must produce the same trace, per the standing cross-backend parity gate.
 
