@@ -36,6 +36,8 @@ import {
   WifDiscoveryResolverService,
   type WifResolveRequest,
   type WifResolveResult,
+  type WifVerifyRequest,
+  type WifVerifyResult,
 } from '../../../oauth/wif-discovery-resolver.service';
 import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -181,6 +183,34 @@ export class AdminCredentialController {
       );
     }
     return this.wifResolver.resolve(endpointId, body ?? {});
+  }
+
+  /**
+   * POST /admin/endpoints/:endpointId/wif/verify  (item 6)
+   *
+   * Config-time reachability + liveness check for a WIF trust's issuer + JWKS
+   * URI. Fetches (SSRF-gated) the issuer's OIDC discovery document and the JWKS
+   * URI, and reports a per-check checklist: valid https format, host on the
+   * allowlist, reachable, and that the JWKS actually serves a non-empty key set
+   * - so the operator confirms the URLs work BEFORE saving the trust instead of
+   * hitting a runtime surprise. Non-throwing: a failed check is reported, not an
+   * error status. Same allowlist gate as the runtime JWKS fetch.
+   */
+  @Post(':endpointId/wif/verify')
+  @HttpCode(200)
+  async verifyWifTrust(
+    @Param('endpointId') endpointId: string,
+    @Body() body: WifVerifyRequest,
+  ): Promise<WifVerifyResult> {
+    const endpoint = await this.requireEndpoint(endpointId);
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
+      throw new ForbiddenException(
+        `WIF credentials are not enabled for endpoint "${endpointId}". ` +
+        `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
+      );
+    }
+    return this.wifResolver.verifyTrust(body ?? {});
   }
 
   /**

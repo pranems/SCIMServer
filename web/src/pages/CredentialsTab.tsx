@@ -56,6 +56,8 @@ import {
   useJwksHostAllowlist,
   useAddJwksHost,
   useUpdateWifCredential,
+  useVerifyWifTrust,
+  type WifVerifyResult,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -462,6 +464,9 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   // instead of creating a new one.
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const updateMutation = useUpdateWifCredential(endpointId);
+  // Item 6 - server-side reachability/liveness verification.
+  const verifyMutation = useVerifyWifTrust(endpointId);
+  const [verifyResult, setVerifyResult] = React.useState<WifVerifyResult | null>(null);
 
   // WI-14 - config-time discovery resolver state.
   const resolveMutation = useResolveWifDiscovery(endpointId);
@@ -604,6 +609,15 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     ]);
   };
 
+  // Item 6 - server-side reachability + liveness verification of issuer + JWKS.
+  const onVerify = (): void => {
+    setVerifyResult(null);
+    verifyMutation.mutate(
+      { expectedIssuer: trustPayload.expectedIssuer, jwksUri: trustPayload.jwksUri },
+      { onSuccess: (res) => setVerifyResult(res) },
+    );
+  };
+
   return (
     <Card className={classes.row} data-testid="wif-section">
       <div className={wif.section}>
@@ -744,6 +758,14 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
               >
                 Test Connection
               </Button>
+              <Button
+                icon={<PlugConnected24Regular />}
+                onClick={onVerify}
+                disabled={verifyMutation.isPending}
+                data-testid="wif-verify-button"
+              >
+                {verifyMutation.isPending ? 'Verifying...' : 'Verify issuer + JWKS reachability'}
+              </Button>
               <CopyJsonButton
                 value={trustPayload}
                 label="Copy trust as JSON"
@@ -817,6 +839,35 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                       {step.ok ? 'PASS' : 'FAIL'}
                     </Badge>
                     <Caption1>{step.label}</Caption1>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {verifyMutation.isError && (
+              <MessageBar intent="error" data-testid="wif-verify-error">
+                <MessageBarBody>{(verifyMutation.error as Error).message}</MessageBarBody>
+              </MessageBar>
+            )}
+            {verifyResult != null && (
+              <div className={wif.jwksNotice} data-testid="wif-verify-result">
+                <MessageBar intent={verifyResult.ok ? 'success' : 'warning'}>
+                  <MessageBarBody>
+                    <MessageBarTitle>
+                      {verifyResult.ok
+                        ? 'Issuer + JWKS verified reachable and serving keys'
+                        : 'Some reachability checks failed - fix these before saving to avoid runtime surprises'}
+                    </MessageBarTitle>
+                  </MessageBarBody>
+                </MessageBar>
+                {verifyResult.checks.map((c) => (
+                  <div key={c.id} className={wif.testStep} data-testid={`wif-verify-check-${c.id}`}>
+                    <Badge appearance="filled" color={c.ok ? 'success' : 'danger'}>
+                      {c.ok ? 'PASS' : 'FAIL'}
+                    </Badge>
+                    <Caption1>
+                      <strong>{c.label}</strong> - {c.detail}
+                    </Caption1>
                   </div>
                 ))}
               </div>

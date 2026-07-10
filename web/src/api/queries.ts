@@ -1411,6 +1411,35 @@ export function useUpdateWifCredential(endpointId: string) {
   });
 }
 
+/** Item 6 - a single reachability/liveness check in a WIF trust verification. */
+export interface WifVerifyCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+/** Item 6 - the result of verifying a WIF trust's issuer + JWKS reachability. */
+export interface WifVerifyResult {
+  ok: boolean;
+  checks: WifVerifyCheck[];
+}
+
+/**
+ * Item 6 - verify a WIF trust's issuer + JWKS URI are reachable and actually
+ * serve what they should, at config time. SSRF-gated server-side. Returns a
+ * per-check checklist for the UI to render.
+ */
+export function useVerifyWifTrust(endpointId: string) {
+  return useMutation({
+    mutationFn: (body: { expectedIssuer?: string; jwksUri?: string }) =>
+      fetchWithAuth<WifVerifyResult>(`/scim/admin/endpoints/${endpointId}/wif/verify`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+  });
+}
+
 /** WI-15 - the effective JWKS host allowlist view (seed + env + persisted). */
 export interface JwksAllowlistView {
   seed: string[];

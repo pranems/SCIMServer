@@ -115,4 +115,88 @@ describe('WifDiscoveryResolverService (WI-14)', () => {
     expect(WifDiscoveryResolverService.PRESET_IDS).toContain('entra-commercial');
     expect(WifDiscoveryResolverService.PRESET_IDS).toContain('google');
   });
+
+  describe('verifyTrust (item 6 - reachability + liveness)', () => {
+    it('all-green: issuer serves matching discovery + JWKS serves a non-empty key set', async () => {
+      fetchMock.mockImplementation((url: string) => {
+        if (url.endsWith('/.well-known/openid-configuration')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => discoveryDoc() });
+        }
+        // JWKS URI
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ keys: [{ kid: 'k1' }, { kid: 'k2' }] }) });
+      });
+      const res = await service.verifyTrust({ expectedIssuer: ENTRA_ISSUER, jwksUri: ENTRA_JWKS });
+      expect(res.ok).toBe(true);
+      const byId = Object.fromEntries(res.checks.map((c) => [c.id, c]));
+      expect(byId.issuerFormat.ok).toBe(true);
+      expect(byId.issuerHostAllowed.ok).toBe(true);
+      expect(byId.issuerReachable.ok).toBe(true);
+      expect(byId.jwksFormat.ok).toBe(true);
+      expect(byId.jwksHostAllowed.ok).toBe(true);
+      expect(byId.jwksReachable.ok).toBe(true);
+      expect(byId.jwksServesKeys.ok).toBe(true);
+      expect(byId.jwksServesKeys.detail).toContain('2 key');
+    });
+
+    it('flags a JWKS URL that responds but serves no keys (not a JWKS)', async () => {
+      fetchMock.mockImplementation((url: string) => {
+        if (url.endsWith('/.well-known/openid-configuration')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => discoveryDoc() });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ not: 'a jwks' }) });
+      });
+      const res = await service.verifyTrust({ expectedIssuer: ENTRA_ISSUER, jwksUri: ENTRA_JWKS });
+      expect(res.ok).toBe(false);
+      const serves = res.checks.find((c) => c.id === 'jwksServesKeys');
+      expect(serves?.ok).toBe(false);
+    });
+
+    it('flags an unreachable JWKS URL (HTTP error) without throwing', async () => {
+      fetchMock.mockImplementation((url: string) => {
+        if (url.endsWith('/.well-known/openid-configuration')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => discoveryDoc() });
+        }
+        return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
+      });
+      const res = await service.verifyTrust({ expectedIssuer: ENTRA_ISSUER, jwksUri: ENTRA_JWKS });
+      expect(res.ok).toBe(false);
+      const reach = res.checks.find((c) => c.id === 'jwksReachable');
+      expect(reach?.ok).toBe(false);
+      expect(reach?.detail).toContain('404');
+    });
+
+    it('SSRF: a disallowed issuer/JWKS host is reported as a failed check and never fetched', async () => {
+      const res = await service.verifyTrust({
+        expectedIssuer: 'https://evil.example/v2.0',
+        jwksUri: 'https://evil.example/keys',
+      });
+      expect(res.ok).toBe(false);
+      const issuerHost = res.checks.find((c) => c.id === 'issuerHostAllowed');
+      const jwksHost = res.checks.find((c) => c.id === 'jwksHostAllowed');
+      expect(issuerHost?.ok).toBe(false);
+      expect(jwksHost?.ok).toBe(false);
+      // No network call was made (host rejected before fetch).
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('flags a non-https / malformed URL as a format failure', async () => {
+      const res = await service.verifyTrust({ expectedIssuer: 'http://insecure/v2.0', jwksUri: 'not-a-url' });
+      expect(res.ok).toBe(false);
+      expect(res.checks.find((c) => c.id === 'issuerFormat')?.ok).toBe(false);
+      expect(res.checks.find((c) => c.id === 'jwksFormat')?.ok).toBe(false);
+    });
+
+    it('notes a mix-up when the discovery document issuer does not match the configured issuer', async () => {
+      fetchMock.mockImplementation((url: string) => {
+        if (url.endsWith('/.well-known/openid-configuration')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => discoveryDoc({ issuer: 'https://login.microsoftonline.com/OTHER/v2.0' }) });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ keys: [{ kid: 'k1' }] }) });
+      });
+      const res = await service.verifyTrust({ expectedIssuer: ENTRA_ISSUER, jwksUri: ENTRA_JWKS });
+      const reach = res.checks.find((c) => c.id === 'issuerReachable');
+      expect(reach?.ok).toBe(true);
+      expect(reach?.detail).toMatch(/mix-up|does not match/i);
+    });
+  });
 });

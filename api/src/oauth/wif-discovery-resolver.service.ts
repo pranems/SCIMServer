@@ -48,6 +48,28 @@ export interface WifResolveResult {
   expectedAudience: string;
 }
 
+/** One reachability/liveness check in a WIF trust verification. */
+export interface WifVerifyCheck {
+  /** Stable id for the UI (issuerFormat | issuerHostAllowed | issuerReachable | jwksFormat | jwksHostAllowed | jwksReachable | jwksServesKeys). */
+  id: string;
+  label: string;
+  ok: boolean;
+  /** Human-readable detail (why it failed, or a confirming note). */
+  detail: string;
+}
+
+/** Input to verify a trust's issuer + JWKS reachability before saving it. */
+export interface WifVerifyRequest {
+  expectedIssuer?: string;
+  jwksUri?: string;
+}
+
+/** Result of a WIF trust verification - a list of per-check outcomes. */
+export interface WifVerifyResult {
+  ok: boolean;
+  checks: WifVerifyCheck[];
+}
+
 @Injectable()
 export class WifDiscoveryResolverService {
   private readonly hostAllowlist: Set<string>;
@@ -94,6 +116,118 @@ export class WifDiscoveryResolverService {
     });
 
     return { expectedIssuer: issuer, jwksUri, expectedAudience: endpointId };
+  }
+
+  /**
+   * Verify a trust's issuer + JWKS are well-formed, on the allowlist, reachable,
+   * and actually serve what they should - at CONFIG time, so the operator gets
+   * no runtime surprises. Every check is non-throwing: the result is a list of
+   * per-check outcomes (the UI renders a checklist). SSRF still applies - a
+   * disallowed host is reported as a failed check, never fetched. All network
+   * calls are operator-initiated + gated by the same allowlist as runtime.
+   */
+  async verifyTrust(req: WifVerifyRequest): Promise<WifVerifyResult> {
+    const checks: WifVerifyCheck[] = [];
+    const doFetch = this.fetchFn ?? globalThis.fetch;
+
+    // ── Issuer ────────────────────────────────────────────────────────────
+    const issuer = (req.expectedIssuer ?? '').trim();
+    if (issuer === '') {
+      checks.push({ id: 'issuerFormat', label: 'Issuer provided', ok: false, detail: 'No issuer supplied.' });
+    } else {
+      let issuerUrl: URL | null = null;
+      try {
+        issuerUrl = new URL(issuer);
+      } catch {
+        issuerUrl = null;
+      }
+      if (!issuerUrl || issuerUrl.protocol !== 'https:') {
+        checks.push({ id: 'issuerFormat', label: 'Issuer is a valid https URL', ok: false, detail: `"${issuer}" is not a valid https URL.` });
+      } else {
+        checks.push({ id: 'issuerFormat', label: 'Issuer is a valid https URL', ok: true, detail: issuer });
+        const host = issuerUrl.hostname.toLowerCase();
+        const hostOk = this.allowlistService ? this.allowlistService.isAllowed(host) : this.hostAllowlist.has(host);
+        checks.push({
+          id: 'issuerHostAllowed',
+          label: 'Issuer host on the allowlist',
+          ok: hostOk,
+          detail: hostOk ? host : `Host "${host}" is not on the JWKS_HOST_ALLOWLIST - add it before saving.`,
+        });
+        if (hostOk) {
+          // The issuer should serve its OIDC discovery document.
+          const wellKnown = issuer.replace(/\/$/, '') + '/.well-known/openid-configuration';
+          try {
+            const res = await doFetch(wellKnown);
+            if (!res.ok) {
+              checks.push({ id: 'issuerReachable', label: 'Issuer serves OIDC discovery', ok: false, detail: `GET ${wellKnown} returned HTTP ${res.status}.` });
+            } else {
+              const doc = (await res.json()) as Record<string, unknown>;
+              const docIssuer = typeof doc.issuer === 'string' ? doc.issuer : undefined;
+              const consistent = docIssuer === issuer;
+              checks.push({
+                id: 'issuerReachable',
+                label: 'Issuer serves OIDC discovery',
+                ok: true,
+                detail: consistent
+                  ? `Discovery document issuer matches (${docIssuer}).`
+                  : `Reachable, but the document's issuer ("${docIssuer ?? 'absent'}") does not match the configured issuer - possible mix-up (RFC 8414 s3.3).`,
+              });
+            }
+          } catch (err) {
+            checks.push({ id: 'issuerReachable', label: 'Issuer serves OIDC discovery', ok: false, detail: `Could not reach ${wellKnown}: ${(err as Error).message}` });
+          }
+        }
+      }
+    }
+
+    // ── JWKS URI ─────────────────────────────────────────────────────────
+    const jwks = (req.jwksUri ?? '').trim();
+    if (jwks === '') {
+      checks.push({ id: 'jwksFormat', label: 'JWKS URI provided', ok: false, detail: 'No JWKS URI supplied.' });
+    } else {
+      let jwksUrl: URL | null = null;
+      try {
+        jwksUrl = new URL(jwks);
+      } catch {
+        jwksUrl = null;
+      }
+      if (!jwksUrl || jwksUrl.protocol !== 'https:') {
+        checks.push({ id: 'jwksFormat', label: 'JWKS URI is a valid https URL', ok: false, detail: `"${jwks}" is not a valid https URL.` });
+      } else {
+        checks.push({ id: 'jwksFormat', label: 'JWKS URI is a valid https URL', ok: true, detail: jwks });
+        const host = jwksUrl.hostname.toLowerCase();
+        const hostOk = this.allowlistService ? this.allowlistService.isAllowed(host) : this.hostAllowlist.has(host);
+        checks.push({
+          id: 'jwksHostAllowed',
+          label: 'JWKS host on the allowlist',
+          ok: hostOk,
+          detail: hostOk ? host : `Host "${host}" is not on the JWKS_HOST_ALLOWLIST - add it before saving.`,
+        });
+        if (hostOk) {
+          try {
+            const res = await doFetch(jwks);
+            if (!res.ok) {
+              checks.push({ id: 'jwksReachable', label: 'JWKS URI reachable', ok: false, detail: `GET ${jwks} returned HTTP ${res.status}.` });
+            } else {
+              checks.push({ id: 'jwksReachable', label: 'JWKS URI reachable', ok: true, detail: `HTTP ${res.status}.` });
+              const body = (await res.json()) as Record<string, unknown>;
+              const keys = body.keys;
+              const servesKeys = Array.isArray(keys) && keys.length > 0;
+              checks.push({
+                id: 'jwksServesKeys',
+                label: 'JWKS serves a non-empty key set',
+                ok: servesKeys,
+                detail: servesKeys ? `Found ${(keys as unknown[]).length} key(s).` : 'The response has no non-empty "keys" array - it is not a JWKS.',
+              });
+            }
+          } catch (err) {
+            checks.push({ id: 'jwksReachable', label: 'JWKS URI reachable', ok: false, detail: `Could not reach ${jwks}: ${(err as Error).message}` });
+          }
+        }
+      }
+    }
+
+    return { ok: checks.every((c) => c.ok), checks };
   }
 
   /** Build the discovery URL from either mode; validate the inputs. */

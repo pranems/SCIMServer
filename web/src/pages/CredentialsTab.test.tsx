@@ -27,6 +27,7 @@ const mockRevealMutate = vi.fn();
 const mockRotateMutate = vi.fn();
 const mockAddJwksHost = vi.fn();
 const mockUpdateWif = vi.fn();
+const mockVerifyWif = vi.fn();
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
 let jwksAllowlistState: { data: { seed: string[]; env: string[]; persisted: string[]; effective: string[] } | undefined; isLoading: boolean } = {
@@ -62,6 +63,7 @@ vi.mock('../api/queries', async () => {
     useJwksHostAllowlist: () => jwksAllowlistState,
     useAddJwksHost: () => ({ mutate: mockAddJwksHost, isPending: false, isError: false, error: null }),
     useUpdateWifCredential: () => ({ mutate: mockUpdateWif, isPending: false }),
+    useVerifyWifTrust: () => ({ mutate: mockVerifyWif, isPending: false, isError: false, error: null }),
   };
 });
 
@@ -675,6 +677,47 @@ describe('CredentialsTab', () => {
     });
     expect(screen.getByTestId('wif-jwks-host-ok')).toBeInTheDocument();
     expect(screen.queryByTestId('wif-jwks-host-warning')).not.toBeInTheDocument();
+  });
+
+  it('item 6: Verify calls the server with issuer + jwks and renders the per-check checklist', () => {
+    mockVerifyWif.mockClear();
+    // The mocked verify hook resolves via its onSuccess callback with a result.
+    mockVerifyWif.mockImplementation(
+      (_body: unknown, opts?: { onSuccess?: (r: unknown) => void }) => {
+        opts?.onSuccess?.({
+          ok: false,
+          checks: [
+            { id: 'issuerFormat', label: 'Issuer is a valid https URL', ok: true, detail: 'https://idp/v2.0' },
+            { id: 'jwksReachable', label: 'JWKS URI reachable', ok: false, detail: 'GET returned HTTP 404.' },
+            { id: 'jwksServesKeys', label: 'JWKS serves a non-empty key set', ok: false, detail: 'not a JWKS' },
+          ],
+        });
+      },
+    );
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://idp.example/v2.0' } });
+    fireEvent.change(wifInput('wif-field-jwks'), { target: { value: 'https://idp.example/keys' } });
+    fireEvent.click(screen.getByTestId('wif-verify-button'));
+
+    // The mutation was called with the entered issuer + jwks.
+    expect(mockVerifyWif).toHaveBeenCalledTimes(1);
+    const body = mockVerifyWif.mock.calls[0][0];
+    expect(body.expectedIssuer).toBe('https://idp.example/v2.0');
+    expect(body.jwksUri).toBe('https://idp.example/keys');
+
+    // R10: the rendered checklist shows each check's OUTCOME + detail.
+    expect(screen.getByTestId('wif-verify-result')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-verify-check-issuerFormat').textContent).toContain('valid https URL');
+    const jwksReach = screen.getByTestId('wif-verify-check-jwksReachable');
+    expect(jwksReach.textContent).toContain('reachable');
+    expect(jwksReach.textContent).toContain('404');
+    expect(screen.getByTestId('wif-verify-check-jwksServesKeys')).toBeInTheDocument();
   });
 
   it('WI-14: the discovery resolver row is present and fires resolve with the tenant id', () => {
