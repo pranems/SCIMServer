@@ -36,6 +36,9 @@ export type { CopyJsonButtonProps } from './CopyJsonButton';
 export { CopyableJsonBlock } from './CopyableJsonBlock';
 export type { CopyableJsonBlockProps } from './CopyableJsonBlock';
 
+export { SettingsJsonExport } from './SettingsJsonExport';
+export type { SettingsJsonExportProps } from './SettingsJsonExport';
+
 export { EditableField } from './EditableField';
 export type { EditableFieldProps } from './EditableField';
 

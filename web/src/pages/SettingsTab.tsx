@@ -50,7 +50,7 @@ import {
   useUpdateEndpointConfig,
 } from '../api/queries';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
-import { LoadingSkeleton } from '../components/primitives';
+import { LoadingSkeleton, SettingsJsonExport } from '../components/primitives';
 
 // ─── Curated boolean flag registry ────────────────────────────────────
 // Each entry is a known boolean ProfileSetting (api/src/modules/scim/
@@ -308,6 +308,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   const pendingKey = pendingFlagKey(updateMutation.variables);
   const isPending = updateMutation.isPending;
 
+  // Build the effective settings in the exact PATCH-body shape so the export
+  // JSON can be pasted straight back into an API request, saved as a backup,
+  // or diffed against an earlier capture.
+  const effectiveSettings: Record<string, boolean | string> = {};
+  for (const flag of BOOLEAN_FLAGS) {
+    effectiveSettings[flag.key] = coerceFlag(flags[flag.key], flag.defaultValue);
+  }
+  effectiveSettings.CredentialSecretVisibility =
+    typeof flags.CredentialSecretVisibility === 'string' &&
+    flags.CredentialSecretVisibility.toLowerCase() === 'once'
+      ? 'once'
+      : 'always';
+  for (const k of READ_ONLY_KEYS) {
+    const v = flags[k];
+    if (v !== undefined && v !== null && v !== '') effectiveSettings[k] = String(v);
+  }
+  const settingsExport = { profile: { settings: effectiveSettings } };
+
   async function handleToggle(flag: BoolFlag, nextChecked: boolean) {
     setFeedback(null);
     try {
@@ -355,6 +373,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   return (
     <div className={classes.root} data-testid="settings-tab">
       <Subtitle1>Endpoint Configuration</Subtitle1>
+
+      <SettingsJsonExport
+        value={settingsExport}
+        filename={`endpoint-${overview.endpoint.name}-settings.json`}
+        copyLabel="Copy settings as JSON"
+        data-testid="settings-tab-export"
+      />
 
       {feedback && feedback.type === 'success' && (
         <MessageBar intent="success" data-testid="settings-feedback-success">

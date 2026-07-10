@@ -27,7 +27,7 @@ import {
 } from '@fluentui/react-components';
 import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
-import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock } from '../components/primitives';
+import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock, SettingsJsonExport } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { resetOnboarding } from '../hooks/useOnboarding';
 
@@ -290,7 +290,14 @@ const SecuritySettingsSection: React.FC = () => {
     <Card className={classes.logConfigCard} data-testid="security-settings-card">
       <div className={classes.logConfigHeader}>
         <Subtitle1>Credential secret security (server)</Subtitle1>
-        {data && <CopyJsonButton value={data} data-testid="security-settings-copy-json" />}
+        {data && (
+          <SettingsJsonExport
+            value={{ credentialSecretVisibility: data.credentialSecretVisibility }}
+            filename="scimserver-security-settings.json"
+            copyLabel="Copy settings as JSON"
+            data-testid="security-settings-export"
+          />
+        )}
       </div>
       <Caption1>
         Server-scope ceiling for whether per-endpoint credential secrets are retained
@@ -402,10 +409,16 @@ const LogConfigSection: React.FC = () => {
     <Card className={classes.logConfigCard} data-testid="log-config-section">
       <div className={classes.logConfigHeader}>
         <Subtitle1>Log configuration</Subtitle1>
-        <Caption1>
-          Audit trail for changes flows into <code>/scim/admin/logs</code> and the LogStreamDrawer (Pulse icon in the header).
-        </Caption1>
+        <SettingsJsonExport
+          value={{ globalLevel: cfg.globalLevel, categoryLevels: cfg.categoryLevels }}
+          filename="scimserver-log-config.json"
+          copyLabel="Copy settings as JSON"
+          data-testid="log-config-export"
+        />
       </div>
+      <Caption1>
+        Audit trail for changes flows into <code>/scim/admin/logs</code> and the LogStreamDrawer (Pulse icon in the header).
+      </Caption1>
 
       <div className={classes.logConfigGrid}>
         <Field label="Global level">

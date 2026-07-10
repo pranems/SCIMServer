@@ -53,6 +53,9 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
     await expect(page.getByTestId('security-visibility-always')).toBeVisible();
     await expect(page.getByTestId('security-visibility-once')).toBeVisible();
     await expect(page.getByTestId('security-kek-status')).toBeVisible();
+    // Settings JSON export affordances (Copy + Download).
+    await expect(page.getByTestId('security-settings-export-copy')).toBeVisible();
+    await expect(page.getByTestId('security-settings-export-download')).toBeVisible();
   });
 
   test('the KEK status line reports whether the KEK is the default', async ({ page }) => {

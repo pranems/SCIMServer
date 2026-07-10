@@ -107,6 +107,17 @@ describe('SettingsTab', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
+  it('exposes a Copy/Download settings-as-JSON export (PATCH-body shape)', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ StrictSchemaValidation: true, CredentialSecretVisibility: 'once' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getByTestId('settings-tab-export')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-tab-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-tab-export-download')).toBeInTheDocument();
+  });
+
   it('renders a Switch for every known boolean flag', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({}),

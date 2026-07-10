@@ -101,6 +101,14 @@ describe('SettingsPage log config (Phase L4)', () => {
     expect(screen.getByTestId('log-config-section')).toBeInTheDocument();
   });
 
+  it('exposes a Copy/Download log-config-as-JSON export', () => {
+    (useLogConfig as ReturnType<typeof vi.fn>).mockReturnValue({ data: sampleConfig, isLoading: false, isError: false, error: null });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('log-config-export')).toBeInTheDocument();
+    expect(screen.getByTestId('log-config-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('log-config-export-download')).toBeInTheDocument();
+  });
+
   it('renders the global level Combobox seeded from availableLevels', () => {
     (useLogConfig as ReturnType<typeof vi.fn>).mockReturnValue({ data: sampleConfig, isLoading: false, isError: false, error: null });
     wrap(<SettingsPage />);
@@ -267,6 +275,13 @@ describe('SettingsPage security settings (WI-8)', () => {
     const always = screen.getByTestId('security-visibility-always') as HTMLInputElement;
     expect(always.checked).toBe(true);
     expect(screen.getByTestId('security-kek-status').textContent).toContain('default');
+  });
+
+  it('exposes a Copy/Download security-settings-as-JSON export (PUT-body shape)', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('security-settings-export')).toBeInTheDocument();
+    expect(screen.getByTestId('security-settings-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('security-settings-export-download')).toBeInTheDocument();
   });
 
   it('reflects a server value of once', () => {
