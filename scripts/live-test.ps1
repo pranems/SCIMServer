@@ -12159,6 +12159,107 @@ Write-Host "`n--- 9z-AU: WIF A4 seams Tests Complete ---" -ForegroundColor Green
 
 
 # ============================================
+# TEST SECTION 9z-AV: WIF trust EDIT (PUT) + reachability VERIFY (2026-07 overhaul)
+$script:currentSection = "9z-AV: WIF trust edit + verify"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AV: WIF trust edit (PUT) + reachability verify" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $avEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wifedit-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $avId = $avEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # Create a wif trust to edit. A real, reachable Entra tenant is used so the
+    # verify path (below) can actually resolve discovery + JWKS.
+    $avIssuer = "https://login.microsoftonline.com/f08e6aff-ca0f-4f11-81fa-1ffd43323373/v2.0"
+    $avJwks   = "https://login.windows.net/f08e6aff-ca0f-4f11-81fa-1ffd43323373/discovery/v2.0/keys"
+    $avWif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "edit-me"
+        wif = @{
+            expectedIssuer   = $avIssuer
+            expectedSubject  = "sp-original"
+            expectedAudience = "api://orig"
+            jwksUri          = $avJwks
+            allowedTenantId  = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($avWif.credentialType -eq "wif") -Message "9z-AV.T1: wif trust created for edit"
+
+    # T2: PUT edits the trust in place - change subject + audience + label.
+    $avEdited = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials/$($avWif.id)" -Method PUT -Headers $headers -Body (@{
+        credentialType = "wif"; label = "edited-label"
+        wif = @{
+            expectedIssuer   = $avIssuer
+            expectedSubject  = "sp-CHANGED"
+            expectedAudience = "api://CHANGED"
+            jwksUri          = $avJwks
+            allowedTenantId  = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($avEdited.wif.expectedSubject -eq "sp-CHANGED" -and $avEdited.wif.expectedAudience -eq "api://CHANGED") -Message "9z-AV.T2: PUT replaced the trust's subject + audience"
+    Test-Result -Success ($avEdited.label -eq "edited-label") -Message "9z-AV.T3: PUT edited the label too"
+
+    # T4: the edit persisted (re-read via the list).
+    $avList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials" -Method GET -Headers $headers
+    $avRow = @($avList | Where-Object { $_.id -eq $avWif.id })[0]
+    Test-Result -Success ($avRow.wif.expectedSubject -eq "sp-CHANGED") -Message "9z-AV.T4: edited subject persisted (re-read)"
+    $avEditJson = $avEdited | ConvertTo-Json -Depth 8
+    Test-Result -Success (-not ($avEditJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-AV.T5: edit response carries NO secret/hash/token"
+
+    # T6: editing a NON-wif credential is rejected (400). Create a bearer first.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $avBearer = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "bearer"; label = "not-editable" } | ConvertTo-Json)
+    $avNonWifRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials/$($avBearer.id)" -Method PUT -Headers $headers -Body (@{
+            credentialType = "wif"; wif = @{ expectedIssuer = $avIssuer; expectedSubject = "x"; expectedAudience = "y"; jwksUri = $avJwks; allowedTenantId = "z" }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    } catch { $avNonWifRejected = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $avNonWifRejected -Message "9z-AV.T6: editing a non-wif credential rejected (400)"
+
+    # T7: POST /wif/verify against a REAL reachable Entra tenant -> all checks pass.
+    $avVerifyOk = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/wif/verify" -Method POST -Headers $headers -Body (@{
+        expectedIssuer = $avIssuer; jwksUri = $avJwks
+    } | ConvertTo-Json)
+    Test-Result -Success ($avVerifyOk.ok -eq $true) -Message "9z-AV.T7: verify a reachable Entra issuer + JWKS -> ok=true"
+    $avServesKeys = @($avVerifyOk.checks | Where-Object { $_.id -eq "jwksServesKeys" -and $_.ok -eq $true }).Count -eq 1
+    Test-Result -Success $avServesKeys -Message "9z-AV.T8: verify confirms the JWKS serves a non-empty key set"
+
+    # T9: verify a bogus/unreachable host on the allowlist-but-dead path -> ok=false,
+    # non-throwing (checks returned). Use a disallowed host to guarantee a failed check.
+    $avVerifyBad = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/wif/verify" -Method POST -Headers $headers -Body (@{
+        expectedIssuer = "https://not-allowed.example/v2.0"; jwksUri = "https://not-allowed.example/keys"
+    } | ConvertTo-Json)
+    Test-Result -Success ($avVerifyBad.ok -eq $false) -Message "9z-AV.T9: verify a disallowed host -> ok=false (non-throwing checklist)"
+
+    # T10: verify:true on CREATE rejects an unreachable trust with 422 and does NOT persist.
+    $avVerifyGate = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "wif"; label = "should-not-persist"; verify = $true
+            wif = @{ expectedIssuer = "https://not-allowed.example/v2.0"; expectedSubject = "s"; expectedAudience = "a"; jwksUri = "https://not-allowed.example/keys"; allowedTenantId = "t" }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    } catch { $avVerifyGate = ($_.Exception.Response.StatusCode.value__ -eq 422) }
+    Test-Result -Success $avVerifyGate -Message "9z-AV.T10: verify:true create rejects an unreachable trust with 422"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AV: WIF edit+verify section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AV: WIF edit + verify Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
