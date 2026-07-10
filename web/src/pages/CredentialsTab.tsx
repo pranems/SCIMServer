@@ -52,6 +52,8 @@ import {
   type RevealResult,
   useRotateCredential,
   type RotateResult,
+  useJwksHostAllowlist,
+  useAddJwksHost,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -223,6 +225,27 @@ const useWifStyles = makeStyles({
     gap: '8px',
     marginBottom: '8px',
   },
+  jwksNotice: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    padding: '10px 12px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  jwksHostList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  jwksHostChip: {
+    fontFamily: 'monospace',
+    fontSize: '11px',
+    padding: '2px 8px',
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
 });
 
 export interface CredentialsTabProps {
@@ -311,6 +334,89 @@ const WifTrustDetails: React.FC<{
           )}
         </React.Fragment>
       ))}
+    </div>
+  );
+};
+
+/** Extract the lowercase hostname from a URL string, or null if unparseable. */
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url.trim()).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * JWKS allowlist awareness for the WIF form. Shows the current effective
+ * allowlist (relevant context for the operator entering a JWKS URI), and
+ * when the entered JWKS host is NOT allowed, surfaces a warning with a
+ * one-click "Add to allowlist" that POSTs the host to the persisted layer
+ * then and there - so the operator can fix an SSRF-block before saving
+ * the trust instead of discovering it later at runtime.
+ */
+const JwksAllowlistNotice: React.FC<{
+  jwksUri: string;
+  styles: ReturnType<typeof useWifStyles>;
+}> = ({ jwksUri, styles }) => {
+  const { data: allowlist, isLoading } = useJwksHostAllowlist();
+  const addHost = useAddJwksHost();
+  const host = hostOf(jwksUri);
+  const effective = allowlist?.effective ?? [];
+  const isAllowed = host != null && effective.includes(host);
+  const showWarning = host != null && !isLoading && !isAllowed;
+
+  return (
+    <div className={styles.jwksNotice} data-testid="wif-jwks-allowlist-notice">
+      <Caption1>
+        <strong>JWKS host allowlist</strong> (SSRF guard) - SCIMServer only fetches signing keys
+        from these hosts at runtime. The JWKS URI host must be on this list.
+      </Caption1>
+      {isLoading ? (
+        <Caption1>Loading allowlist...</Caption1>
+      ) : (
+        <div className={styles.jwksHostList} data-testid="wif-jwks-allowlist-hosts">
+          {effective.length === 0 ? (
+            <Caption1>(empty)</Caption1>
+          ) : (
+            effective.map((h) => (
+              <span key={h} className={styles.jwksHostChip} data-testid={`wif-jwks-host-${h}`}>
+                {h}
+              </span>
+            ))
+          )}
+        </div>
+      )}
+      {host != null && isAllowed && (
+        <MessageBar intent="success" data-testid="wif-jwks-host-ok">
+          <MessageBarBody>
+            The JWKS host <code>{host}</code> is on the allowlist.
+          </MessageBarBody>
+        </MessageBar>
+      )}
+      {showWarning && (
+        <MessageBar intent="warning" data-testid="wif-jwks-host-warning">
+          <MessageBarBody>
+            <MessageBarTitle>JWKS host not on the allowlist</MessageBarTitle>
+            <code>{host}</code> is not allowed, so SCIMServer will refuse to fetch its signing
+            keys and this trust will fail at runtime. Add it now to fix this before saving.
+          </MessageBarBody>
+          <Button
+            appearance="primary"
+            size="small"
+            disabled={addHost.isPending}
+            onClick={() => addHost.mutate({ host: host! })}
+            data-testid="wif-jwks-add-host"
+          >
+            {addHost.isPending ? 'Adding...' : `Add ${host} to allowlist`}
+          </Button>
+        </MessageBar>
+      )}
+      {addHost.isError && (
+        <MessageBar intent="error" data-testid="wif-jwks-add-error">
+          <MessageBarBody>{(addHost.error as Error).message}</MessageBarBody>
+        </MessageBar>
+      )}
     </div>
   );
 };
@@ -537,6 +643,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 monospace
                 data-testid="wif-field-jwks"
               />
+              <JwksAllowlistNotice jwksUri={form.jwksUri} styles={wif} />
               <EditableField
                 label="Allowed tenant id (tid / expectedTenantId)"
                 value={form.allowedTenantId}

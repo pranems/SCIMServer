@@ -25,8 +25,13 @@ const mockDeleteMutate = vi.fn();
 const mockResolveMutate = vi.fn();
 const mockRevealMutate = vi.fn();
 const mockRotateMutate = vi.fn();
+const mockAddJwksHost = vi.fn();
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
+let jwksAllowlistState: { data: { seed: string[]; env: string[]; persisted: string[]; effective: string[] } | undefined; isLoading: boolean } = {
+  data: { seed: ['login.microsoftonline.com'], env: [], persisted: [], effective: ['login.microsoftonline.com'] },
+  isLoading: false,
+};
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -53,6 +58,8 @@ vi.mock('../api/queries', async () => {
       mutate: mockRotateMutate,
       isPending: false,
     }),
+    useJwksHostAllowlist: () => jwksAllowlistState,
+    useAddJwksHost: () => ({ mutate: mockAddJwksHost, isPending: false, isError: false, error: null }),
   };
 });
 
@@ -531,6 +538,54 @@ describe('CredentialsTab', () => {
     expect(hint.textContent).toMatch(/expectedTenantId/);
     // The tenant field label reflects both the claim name and the alias.
     expect(screen.getByText(/tid \/ expectedTenantId/i)).toBeInTheDocument();
+  });
+
+  it('JWKS allowlist: shows the effective host list + warning with inline add when the JWKS host is not allowed', () => {
+    jwksAllowlistState = {
+      data: { seed: ['login.microsoftonline.com'], env: [], persisted: [], effective: ['login.microsoftonline.com'] },
+      isLoading: false,
+    };
+    mockAddJwksHost.mockClear();
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // The allowlist is shown as relevant context (R10: assert the rendered host).
+    expect(screen.getByTestId('wif-jwks-allowlist-notice')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-jwks-host-login.microsoftonline.com')).toBeInTheDocument();
+
+    // Enter a JWKS URI whose host is NOT on the allowlist.
+    fireEvent.change(wifInput('wif-field-jwks'), {
+      target: { value: 'https://keys.okta.example/v1/keys' },
+    });
+    const warning = screen.getByTestId('wif-jwks-host-warning');
+    expect(warning).toBeInTheDocument();
+    expect(warning.textContent).toContain('keys.okta.example');
+    const addBtn = screen.getByTestId('wif-jwks-add-host');
+    expect(addBtn.textContent).toContain('keys.okta.example');
+    fireEvent.click(addBtn);
+    expect(mockAddJwksHost).toHaveBeenCalledWith({ host: 'keys.okta.example' });
+  });
+
+  it('JWKS allowlist: shows a success note when the entered JWKS host IS allowed', () => {
+    jwksAllowlistState = {
+      data: { seed: ['login.microsoftonline.com'], env: [], persisted: [], effective: ['login.microsoftonline.com'] },
+      isLoading: false,
+    };
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.change(wifInput('wif-field-jwks'), {
+      target: { value: 'https://login.microsoftonline.com/t/discovery/v2.0/keys' },
+    });
+    expect(screen.getByTestId('wif-jwks-host-ok')).toBeInTheDocument();
+    expect(screen.queryByTestId('wif-jwks-host-warning')).not.toBeInTheDocument();
   });
 
   it('WI-14: the discovery resolver row is present and fires resolve with the tenant id', () => {
