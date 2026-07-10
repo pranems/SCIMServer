@@ -12394,6 +12394,49 @@ Write-Host "`n--- 9z-AX: R7 oauth_client format+token Tests Complete ---" -Foreg
 
 
 # ============================================
+# TEST SECTION 9z-AY: WI-D1 RFC-6749 token-endpoint error shape
+# ============================================
+$script:currentSection = "9z-AY: OAuth token error shape (WI-D1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AY: RFC-6749 Token Error Shape (WI-D1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # The global token endpoint must return a FLAT RFC-6749 error body
+    # (application/json, no SCIM schemas wrapper) enriched with correlation_id
+    # + timestamp, mirroring Entra's token errors.
+    $ayResp = $null
+    $ayStatus = $null
+    $ayContentType = $null
+    $ayRaw = $null
+    try {
+        Invoke-WebRequest -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_id = "no-such-client"; client_secret = "wrong-secret"
+        } -UseBasicParsing | Out-Null
+    } catch {
+        $ayStatus = $_.Exception.Response.StatusCode.value__
+        try { $ayContentType = $_.Exception.Response.ContentType } catch {}
+        try {
+            $ayReader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $ayRaw = $ayReader.ReadToEnd()
+            $ayReader.Close()
+        } catch {}
+        if ($ayRaw) { try { $ayResp = $ayRaw | ConvertFrom-Json } catch {} }
+    }
+
+    Test-Result -Success ($ayStatus -eq 401 -or $ayStatus -eq 400) -Message "9z-AY.T1: unknown client at token endpoint -> 4xx"
+    Test-Result -Success ($null -ne $ayResp -and $null -ne $ayResp.error -and $ayResp.error -is [string]) -Message "9z-AY.T2: body carries a string RFC-6749 'error' field"
+    Test-Result -Success ($null -ne $ayResp -and $null -eq $ayResp.schemas) -Message "9z-AY.T3: body is NOT wrapped in a SCIM 'schemas' envelope"
+    Test-Result -Success ($null -ne $ayResp -and $null -ne $ayResp.error_description) -Message "9z-AY.T4: body carries error_description"
+    Test-Result -Success ($null -ne $ayResp -and $null -ne $ayResp.correlation_id -and $ayResp.correlation_id -is [string]) -Message "9z-AY.T5: body enriched with correlation_id"
+    Test-Result -Success ($null -ne $ayResp -and $null -ne $ayResp.timestamp) -Message "9z-AY.T6: body enriched with timestamp"
+    Test-Result -Success ($ayContentType -like "application/json*") -Message "9z-AY.T7: Content-Type is application/json (not application/scim+json)"
+} catch {
+    Test-Result -Success $false -Message "9z-AY: WI-D1 token error shape section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-AY: WI-D1 Token Error Shape Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

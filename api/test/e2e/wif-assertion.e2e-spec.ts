@@ -252,19 +252,19 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
       .expect(401);
-    expect(res.body.detail).toBe('invalid_client');
+    expect(res.body.error).toBe('invalid_client');
   });
 
   it('rejects a wrong issuer with invalid_client', async () => {
     const assertion = await signAssertion({ iss: 'https://evil.example/v2.0' });
     const res = await postAssertion(assertion).expect(401);
-    expect(res.body.detail).toBe('invalid_client');
+    expect(res.body.error).toBe('invalid_client');
   });
 
   it('rejects a wrong tenant id with invalid_client (cross-tenant isolation)', async () => {
     const assertion = await signAssertion({ tid: 'tenant-other' });
     const res = await postAssertion(assertion).expect(401);
-    expect(res.body.detail).toBe('invalid_client');
+    expect(res.body.error).toBe('invalid_client');
   });
 
   it('ALLOWS an assertion missing the required role by default (advisory roles)', async () => {
@@ -306,7 +306,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: missing, client_assertion_type: JWT_BEARER })
       .expect(401);
-    expect(rejected.body.detail).toBe('invalid_client');
+    expect(rejected.body.error).toBe('invalid_client');
 
     // With the required role present -> mints.
     const ok = await signAssertion({ roles: ['Scim.Provision'] });

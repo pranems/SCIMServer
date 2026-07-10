@@ -836,7 +836,7 @@ flowchart LR
 
 | Work item | Scope | Depends on | Notes |
 |---|---|---|---|
-| WI-D1 | Filter passthrough for `*/oauth/token`; add `reason_code`/`correlation_id`/`timestamp` | - | Also fixes the RFC-6749 content-type correctness bug. The correlation id + `logsUrl` enrichment already exist in [scim-exception.filter.ts](../../api/src/modules/scim/filters/scim-exception.filter.ts). |
+| WI-D1 | Filter passthrough for `*/oauth/token`; add `reason_code`/`correlation_id`/`timestamp` | - | **DONE (v0.54.12).** Also fixes the RFC-6749 content-type correctness bug. `ScimExceptionFilter` now emits a flat `application/json` RFC-6749 error (`error`/`error_description`/`reason_code?`/`error_uri?`/`correlation_id`/`timestamp`) on the token path, before SCIM wrapping. `correlation_id` sources the ALS context then falls back to the `X-Request-Id` response header. Tests: filter unit +4 (22), token E2E flattened `.detail`->`.error` (36/36; 89/89 sweep), live-test `9z-AY`. See [scim-exception.filter.ts](../../api/src/modules/scim/filters/scim-exception.filter.ts). |
 | WI-D2 | Catalog module + public reference endpoint | - | Single source for wire + UI + docs. **D1:** `jwks_host_not_allowlisted` remediation references the R1 full-CRUD card (add/edit/PATCH), not only `POST`. |
 | WI-D3 | `AuthDecisionTrace` returned by WIF + JWKS + oauth_client validators; controller maps to catalog; multi-trust sub-traces | WI-D1, WI-D2 | Pure refactor of what is recorded, not the checks |
 | WI-D4 | One `LogCategory.AUTH` event per attempt, **flowing through the existing ring-buffer + SSE + `RequestLog`** | WI-D3 | Redacted; alert-friendly. **D2:** integrate with the existing log mechanism, not a parallel one. |

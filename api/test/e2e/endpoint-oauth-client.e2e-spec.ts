@@ -108,10 +108,12 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
   it('rejects an invalid client_secret with invalid_client', async () => {
     const { clientId } = await createOauthClient(endpointA);
     const res = await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);
-    // The token endpoint currently rides the SCIM exception filter, which wraps
-    // the RFC 6749 5.2 `error` into the SCIM envelope `detail`. The raw OAuth
-    // error format for the token endpoint is formalized in A3's error catalog.
-    expect(res.body.detail).toBe('invalid_client');
+    // WI-D1: the token endpoint returns the native RFC-6749 error as
+    // application/json (NOT the SCIM envelope), enriched with a correlation_id.
+    expect(res.body.error).toBe('invalid_client');
+    expect(res.body.schemas).toBeUndefined();
+    expect(typeof res.body.correlation_id).toBe('string');
+    expect(typeof res.body.timestamp).toBe('string');
   });
 
   it('rejects a wrong grant_type with unsupported_grant_type', async () => {
@@ -120,7 +122,9 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .send({ grant_type: 'password', client_id: clientId, client_secret: clientSecret })
       .expect(400);
-    expect(res.body.detail).toBe('unsupported_grant_type');
+    expect(res.body.error).toBe('unsupported_grant_type');
+    // WI-D1: error_description survives (was dropped by the old flattener).
+    expect(typeof res.body.error_description).toBe('string');
   });
 
   it('never returns the clientSecret in a credential list response', async () => {
@@ -170,8 +174,8 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
           client_assertion_type: JWT_BEARER,
         })
         .expect(400);
-      // The SCIM exception filter wraps the RFC 6749 error into the envelope detail.
-      expect(res.body.detail).toBe('invalid_request');
+      // WI-D1: RFC-6749 error shape on the token endpoint.
+      expect(res.body.error).toBe('invalid_request');
     });
 
     it('rejects a client_assertion with an unsupported assertion type (invalid_request)', async () => {
@@ -180,7 +184,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
         .type('form')
         .send({ grant_type: 'client_credentials', client_assertion: 'a.b.c', client_assertion_type: 'urn:bogus' })
         .expect(400);
-      expect(res.body.detail).toBe('invalid_request');
+      expect(res.body.error).toBe('invalid_request');
     });
 
     it('a client_assertion is routed to the WIF path (invalid_client until Q6 wires the validator)', async () => {
@@ -191,7 +195,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
         .expect(401);
       // Routed to the assertion path (invalid_client), NOT the secret path
       // (which would be invalid_request for missing client_id/secret).
-      expect(res.body.detail).toBe('invalid_client');
+      expect(res.body.error).toBe('invalid_client');
     });
   });
 });

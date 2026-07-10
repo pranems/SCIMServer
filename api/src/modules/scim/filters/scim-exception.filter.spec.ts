@@ -40,7 +40,8 @@ describe('ScimExceptionFilter', () => {
       setHeader: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
       getHeaders: jest.fn().mockReturnValue({}),
-    };
+      getHeader: jest.fn().mockReturnValue('req-abc-123'),
+    } as any;
     mockRequest = {
       originalUrl: '/scim/Users',
       url: '/scim/Users',
@@ -64,6 +65,81 @@ describe('ScimExceptionFilter', () => {
 
   it('should be defined', () => {
     expect(filter).toBeDefined();
+  });
+
+  describe('WI-D1 OAuth token-endpoint error passthrough (RFC 6749)', () => {
+    beforeEach(() => {
+      mockRequest.originalUrl = '/scim/oauth/token';
+      mockRequest.url = '/scim/oauth/token';
+      mockRequest.method = 'POST';
+    });
+
+    it('returns a flat RFC-6749 error body (no SCIM schemas wrapper) as application/json', () => {
+      const exception = new HttpException(
+        { error: 'invalid_client', error_description: 'Client authentication failed.' },
+        HttpStatus.UNAUTHORIZED,
+      );
+
+      filter.catch(exception, mockHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(401);
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'application/json; charset=utf-8',
+      );
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.error).toBe('invalid_client');
+      expect(body.error_description).toBe('Client authentication failed.');
+      expect(body.schemas).toBeUndefined();
+      expect(body.scimType).toBeUndefined();
+    });
+
+    it('always enriches with correlation_id (from X-Request-Id) and timestamp', () => {
+      const exception = new HttpException(
+        { error: 'invalid_grant', error_description: 'The provided assertion is expired.' },
+        HttpStatus.BAD_REQUEST,
+      );
+
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(typeof body.correlation_id).toBe('string');
+      expect(body.correlation_id).toBe('req-abc-123');
+      expect(typeof body.timestamp).toBe('string');
+      expect(() => new Date(body.timestamp as string).toISOString()).not.toThrow();
+    });
+
+    it('passes through curated diagnostics fields (reason_code, error_uri) when present', () => {
+      const exception = new HttpException(
+        {
+          error: 'invalid_client',
+          error_description: 'JWKS host not on the allowlist.',
+          reason_code: 'jwks_host_not_allowlisted',
+          error_uri: 'https://example/docs/auth-errors#jwks_host_not_allowlisted',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.reason_code).toBe('jwks_host_not_allowlisted');
+      expect(body.error_uri).toBe('https://example/docs/auth-errors#jwks_host_not_allowlisted');
+    });
+
+    it('does NOT touch a non-OAuth-error body on the token path (falls through to SCIM handling)', () => {
+      const exception = createScimError({
+        status: 500,
+        scimType: undefined,
+        detail: 'Unexpected token-endpoint failure.',
+      });
+
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      // SCIM error shape retained because the body had no string `error` field.
+      expect(body.schemas).toBeDefined();
+    });
   });
 
   describe('SCIM error responses (via createScimError)', () => {
