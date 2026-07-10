@@ -11,10 +11,14 @@ import { FIXTURE_ENDPOINT_OVERVIEW } from '../test/msw/fixtures';
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
-  return { ...actual, useEndpointOverview: vi.fn() };
+  return {
+    ...actual,
+    useEndpointOverview: vi.fn(),
+    useConnectionRetainedSecrets: vi.fn(() => ({})),
+  };
 });
 
-import { useEndpointOverview } from '../api/queries';
+import { useEndpointOverview, useConnectionRetainedSecrets } from '../api/queries';
 
 const renderTab = (): ReturnType<typeof render> =>
   render(
@@ -54,5 +58,13 @@ describe('ConnectTab (WI-5)', () => {
     // The fixture disables wif.
     expect(screen.getByTestId('connect-tab-disabled')).toBeInTheDocument();
     expect(screen.getByTestId('connect-tab-disabled-wif')).toBeInTheDocument();
+  });
+
+  it('displays a retained secret when the reveal hook returns one (R3)', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({ data: FIXTURE_ENDPOINT_OVERVIEW, isLoading: false, error: null });
+    (useConnectionRetainedSecrets as ReturnType<typeof vi.fn>).mockReturnValue({ oauth_client: 'retained-secret-xyz' });
+    renderTab();
+    expect(screen.getByTestId('connect-tab-panel-value-clientSecret')).toHaveTextContent('retained-secret-xyz');
+    expect(screen.getByTestId('connect-tab-panel-secret-retained-note')).toBeInTheDocument();
   });
 });

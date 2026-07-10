@@ -16,7 +16,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D2 (TanStack Query)
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A4
  */
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import type {
   DashboardResponse,
   EndpointListResponse,
@@ -1559,6 +1559,48 @@ export function useRevealCredential(endpointId: string) {
         { method: 'POST' },
       ),
   });
+}
+
+/**
+ * R3 - reveal the retained secrets for the Connect tab. Given the connection
+ * methods (each may carry `credentialId` + `secretRetained`), this reveals the
+ * secret for every retained credential in parallel and returns a
+ * `method -> secret` map. Used by the Connect tab to ALWAYS display the secret
+ * when the effective `CredentialSecretVisibility` is `always` (the reveal
+ * endpoint stays the authority - a non-retained credential simply yields no
+ * entry). Cached for 30 s so opening the tab does not spam the audit log.
+ */
+export interface ConnectionRevealMethod {
+  method: string;
+  credentialId?: string | null;
+  secretRetained?: boolean;
+}
+
+export function useConnectionRetainedSecrets(
+  endpointId: string,
+  methods: ConnectionRevealMethod[],
+): Partial<Record<string, string>> {
+  const retained = methods.filter((m) => m.secretRetained && m.credentialId);
+  const results = useQueries({
+    queries: retained.map((m) => ({
+      queryKey: ['connection-reveal', endpointId, m.credentialId] as const,
+      queryFn: () =>
+        fetchWithAuth<RevealResult>(
+          `/scim/admin/endpoints/${endpointId}/credentials/${m.credentialId}/reveal`,
+          { method: 'POST' },
+        ),
+      staleTime: 30_000,
+    })),
+  });
+  const out: Record<string, string> = {};
+  retained.forEach((m, i) => {
+    const r = results[i]?.data;
+    if (r?.retained) {
+      const secret = r.clientSecret ?? r.token;
+      if (secret) out[m.method] = secret;
+    }
+  });
+  return out;
 }
 
 /**

@@ -93,8 +93,6 @@ export class ConnectionInfoService {
     const wifEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED);
 
     const activeCreds = credentials.filter((c) => c.active);
-    const hasActive = (type: string): boolean =>
-      activeCreds.some((c) => c.credentialType === type);
 
     const enabledMethods: ConnectionEnabledMethod[] = [];
     const disabledMethods: ConnectionDisabledMethod[] = [];
@@ -123,6 +121,7 @@ export class ConnectionInfoService {
 
     // ── bearer (per-endpoint Secret Token) ────────────────────────────────
     if (effective.secretTokenBearer) {
+      const bearerCred = activeCreds.find((c) => c.credentialType === 'bearer');
       enabledMethods.push({
         method: 'bearer',
         label: 'Per-endpoint bearer token (Secret Token)',
@@ -131,7 +130,9 @@ export class ConnectionInfoService {
           tenantUrl: urls.scimBaseUrl,
           secretToken: null,
         },
-        clientSecretState: hasActive('bearer') ? 'set-shown-once' : 'create-required',
+        clientSecretState: bearerCred ? 'set-shown-once' : 'create-required',
+        credentialId: bearerCred?.id ?? null,
+        secretRetained: !!bearerCred?.secretEnvelope,
       });
     } else {
       disabledMethods.push({
@@ -157,6 +158,8 @@ export class ConnectionInfoService {
           clientSecret: null,
         },
         clientSecretState: oauthCred ? 'set-shown-once' : 'create-required',
+        credentialId: oauthCred?.id ?? null,
+        secretRetained: !!oauthCred?.secretEnvelope,
       });
     } else {
       disabledMethods.push({

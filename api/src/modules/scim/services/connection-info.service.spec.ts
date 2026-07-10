@@ -147,6 +147,55 @@ describe('ConnectionInfoService', () => {
     });
   });
 
+  describe('assemble - credentialId + secretRetained (R3)', () => {
+    it('surfaces the active oauth_client credentialId + secretRetained when an envelope was kept', () => {
+      const info = service.assemble(
+        endpoint({ OAuthClientCredentialsAuthEnabled: 'True' }),
+        [cred({ id: 'oc-1', credentialType: 'oauth_client', metadata: { clientId: 'client-id-x' }, secretEnvelope: 'v1.aa.bb.cc' })],
+        'https://x',
+      );
+      const oc = info.enabledMethods.find((m) => m.method === 'oauth_client');
+      expect(oc?.credentialId).toBe('oc-1');
+      expect(oc?.secretRetained).toBe(true);
+    });
+
+    it('reports secretRetained false when the oauth_client credential kept no envelope', () => {
+      const info = service.assemble(
+        endpoint({ OAuthClientCredentialsAuthEnabled: 'True' }),
+        [cred({ id: 'oc-2', credentialType: 'oauth_client', metadata: { clientId: 'client-id-y' }, secretEnvelope: null })],
+        'https://x',
+      );
+      const oc = info.enabledMethods.find((m) => m.method === 'oauth_client');
+      expect(oc?.credentialId).toBe('oc-2');
+      expect(oc?.secretRetained).toBe(false);
+    });
+
+    it('surfaces the bearer credentialId + secretRetained from its envelope', () => {
+      const info = service.assemble(
+        endpoint({ SecretTokenBearerAuthEnabled: 'True' }),
+        [cred({ id: 'br-1', credentialType: 'bearer', secretEnvelope: 'v1.dd.ee.ff' })],
+        'https://x',
+      );
+      const br = info.enabledMethods.find((m) => m.method === 'bearer');
+      expect(br?.credentialId).toBe('br-1');
+      expect(br?.secretRetained).toBe(true);
+    });
+
+    it('has null credentialId + secretRetained false when no per-endpoint credential exists', () => {
+      const info = service.assemble(
+        endpoint({ SecretTokenBearerAuthEnabled: 'True', OAuthClientCredentialsAuthEnabled: 'True' }),
+        [],
+        'https://x',
+      );
+      const br = info.enabledMethods.find((m) => m.method === 'bearer');
+      const oc = info.enabledMethods.find((m) => m.method === 'oauth_client');
+      expect(br?.credentialId ?? null).toBeNull();
+      expect(br?.secretRetained).toBe(false);
+      expect(oc?.credentialId ?? null).toBeNull();
+      expect(oc?.secretRetained).toBe(false);
+    });
+  });
+
   describe('assemble - wif audience', () => {
     it('defaults the wif expectedAudience to the endpointId', () => {
       const info = service.assemble(endpoint({ WifCredentialsEnabled: 'True' }), [], 'https://x');

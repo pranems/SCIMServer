@@ -89,3 +89,87 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
     await expect(page.getByTestId('connect-tab-panel-value-expectedAudience')).toBeVisible();
   });
 });
+
+/**
+ * R3 - the Connect tab ALWAYS displays a retained secret when the effective
+ * credential secret visibility is `always`. Route-mocked so it is deterministic
+ * and never touches a real credential: the overview returns an oauth_client
+ * method carrying `secretRetained:true` + a `credentialId`, and the reveal
+ * endpoint returns the retained secret.
+ */
+const EP_R3 = 'ep-connect-r3';
+
+test.describe('Connect tab - retained secret reveal (R3)', () => {
+  test('shows the retained oauth_client secret with the re-viewable note', async ({ page }) => {
+    const ID = EP_R3;
+    const base = `https://scim.example.com/scim/v2/endpoints/${ID}`;
+    const overview = {
+      endpoint: { id: ID, name: 'r3', displayName: 'R3 Connect', active: true },
+      connectionInfo: {
+        endpointId: ID,
+        displayName: 'R3 Connect',
+        urls: {
+          scimBaseUrl: base,
+          scimBaseUrlBare: `https://scim.example.com/scim/endpoints/${ID}`,
+          tokenEndpoint: `https://scim.example.com/scim/endpoints/${ID}/oauth/token`,
+          serviceProviderConfig: `${base}/ServiceProviderConfig`,
+          oauthMetadata: `https://scim.example.com/scim/endpoints/${ID}/.well-known/oauth-authorization-server`,
+        },
+        enabledMethods: [
+          {
+            method: 'oauth_client',
+            label: 'OAuth2 client credentials',
+            entraAuthenticationMethod: 'OAuth2 Client Credentials Grant',
+            entraFields: {
+              tenantUrl: base,
+              tokenEndpoint: `https://scim.example.com/scim/endpoints/${ID}/oauth/token`,
+              clientIdentifier: `client-id-${ID}`,
+              clientSecret: null,
+            },
+            clientSecretState: 'set-shown-once',
+            credentialId: 'cred-r3',
+            secretRetained: true,
+          },
+        ],
+        disabledMethods: [],
+      },
+    };
+
+    // The endpoint-detail shell fetches the endpoint GET before rendering the tab.
+    await page.route(`**/scim/admin/endpoints/${ID}`, async (route) => {
+      if (route.request().method() !== 'GET' || !route.request().url().endsWith(`/${ID}`)) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: ID,
+          name: 'r3',
+          displayName: 'R3 Connect',
+          active: true,
+          scimBasePath: `/scim/v2/endpoints/${ID}`,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          profile: { schemas: [], resourceTypes: [], serviceProviderConfig: { documentationUri: '', patch: { supported: true } }, settings: {} },
+        }),
+      });
+    });
+    await page.route(`**/scim/admin/endpoints/${ID}/overview`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(overview) });
+    });
+    await page.route(`**/scim/admin/endpoints/${ID}/credentials/cred-r3/reveal`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'cred-r3', credentialType: 'oauth_client', clientId: `client-id-${ID}`, clientSecret: 'retained-secret-r3', retained: true }),
+      });
+    });
+
+    await page.goto(`/endpoints/${ID}/connect`);
+    await expect(page.getByTestId('connect-tab')).toBeVisible({ timeout: 30_000 });
+    // R10: assert the RENDERED secret value + the re-viewable note, not just presence.
+    await expect(page.getByTestId('connect-tab-panel-value-clientSecret')).toContainText('retained-secret-r3');
+    await expect(page.getByTestId('connect-tab-panel-secret-retained-note')).toBeVisible();
+    // The one-time "copy now" warning must NOT show for a persistent reveal.
+    await expect(page.getByTestId('connect-tab-panel-secret-warning')).toHaveCount(0);
+  });
+});

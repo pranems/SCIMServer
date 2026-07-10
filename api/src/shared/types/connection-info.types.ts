@@ -41,6 +41,21 @@ export interface ConnectionEnabledMethod {
   clientSecretState: ClientSecretState;
   /** Present only for `wif`: the audience the source token must carry. */
   expectedAudience?: string;
+  /**
+   * The active per-endpoint credential id backing this method (bearer /
+   * oauth_client), when one exists. The UI uses it to call the reveal
+   * endpoint. Null for methods with no per-endpoint credential (shared_secret,
+   * wif) or when no credential has been created yet.
+   */
+  credentialId?: string | null;
+  /**
+   * True when this method's credential kept an encrypted copy of its secret
+   * (i.e. the effective `CredentialSecretVisibility` was `always` at create
+   * time). The UI may then re-view the secret via the reveal endpoint. The
+   * reveal endpoint remains the authority on whether the secret is actually
+   * returned. Never the secret value itself.
+   */
+  secretRetained?: boolean;
 }
 
 /** A disabled auth method + why + how to enable it. */

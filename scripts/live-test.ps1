@@ -12260,6 +12260,54 @@ Write-Host "`n--- 9z-AV: WIF edit + verify Tests Complete ---" -ForegroundColor 
 
 
 # ============================================
+# TEST SECTION 9z-AW: R3 connection-info retained-secret reveal (Connect tab always-show)
+# ============================================
+$script:currentSection = "9z-AW: R3 connection-info retained secret"
+Write-Host "`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AW: R3 connection-info retained-secret reveal" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    # Create an endpoint with oauth_client enabled + CredentialSecretVisibility=always.
+    $awEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-r3-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $awId = $awEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; CredentialSecretVisibility = "always" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: create an oauth_client credential (secret retained under always).
+    $awCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "r3-live"
+    } | ConvertTo-Json)
+    $awCredId = $awCred.id
+    Test-Result -Success ($null -ne $awCred.clientSecret) -Message "9z-AW.T1: oauth_client create returns the one-time secret"
+
+    # T2: connection-info surfaces the oauth_client credentialId + secretRetained:true.
+    $awInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/connection-info" -Method GET -Headers $headers
+    $awOauth = $awInfo.enabledMethods | Where-Object { $_.method -eq "oauth_client" }
+    Test-Result -Success ($null -ne $awOauth -and $awOauth.credentialId -eq $awCredId) -Message "9z-AW.T2: connection-info surfaces the oauth_client credentialId"
+    Test-Result -Success ($awOauth.secretRetained -eq $true) -Message "9z-AW.T3: connection-info reports secretRetained:true under visibility=always"
+
+    # T4: connection-info NEVER carries the secret value itself.
+    $awInfoJson = $awInfo | ConvertTo-Json -Depth 10
+    Test-Result -Success (-not ($awInfoJson -match '"clientSecret"\s*:\s*"[^"]') -and -not ($awInfoJson -match '"secretEnvelope"')) -Message "9z-AW.T4: connection-info never carries a non-null clientSecret or the envelope"
+
+    # T5: the reveal endpoint returns the retained secret (this is what the Connect tab calls to always-show).
+    $awReveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/credentials/$awCredId/reveal" -Method POST -Headers $headers
+    Test-Result -Success ($awReveal.retained -eq $true -and $null -ne $awReveal.clientSecret) -Message "9z-AW.T5: reveal returns retained:true + the clientSecret for the Connect tab always-show"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AW: R3 connection-info retained-secret section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AW: R3 connection-info retained-secret Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

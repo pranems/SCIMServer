@@ -14,9 +14,10 @@
  */
 import React from 'react';
 import { makeStyles, tokens, Text, Subtitle2, Caption1, Card } from '@fluentui/react-components';
-import { useEndpointOverview } from '../api/queries';
+import { useEndpointOverview, useConnectionRetainedSecrets } from '../api/queries';
 import { ConnectionPanel, LoadingSkeleton } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
+import type { ConnectionInfo } from '@scim/types/connection-info.types';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -65,12 +66,13 @@ export const ConnectTab: React.FC<ConnectTabProps> = ({ endpointId }) => {
         <Subtitle2>Connect a provisioning client to this endpoint</Subtitle2>
         <Caption1 className={classes.hint}>
           These are the exact values to paste into Microsoft Entra ID (or any SCIM client). URLs
-          are assembled by the server, so they always match this deployment. No secret is shown
-          here - secrets appear only once, at credential-create time.
+          are assembled by the server, so they always match this deployment. A per-endpoint secret
+          is shown here only when its credential secret visibility is set to Always; otherwise
+          secrets appear once, at credential-create time.
         </Caption1>
       </div>
 
-      <ConnectionPanel connectionInfo={connectionInfo} data-testid="connect-tab-panel" />
+      <ConnectPanelSection endpointId={endpointId} connectionInfo={connectionInfo} />
 
       {connectionInfo.disabledMethods.length > 0 && (
         <Card className={classes.disabledCard} data-testid="connect-tab-disabled">
@@ -84,5 +86,25 @@ export const ConnectTab: React.FC<ConnectTabProps> = ({ endpointId }) => {
         </Card>
       )}
     </div>
+  );
+};
+
+/**
+ * R3 - renders the ConnectionPanel and, for any enabled method whose credential
+ * kept a retained secret (effective visibility Always), reveals it so the panel
+ * ALWAYS displays the secret. Extracted so the reveal hook is called
+ * unconditionally (rules-of-hooks) after ConnectTab's loading/error guards.
+ */
+const ConnectPanelSection: React.FC<{ endpointId: string; connectionInfo: ConnectionInfo }> = ({
+  endpointId,
+  connectionInfo,
+}) => {
+  const retainedSecrets = useConnectionRetainedSecrets(endpointId, connectionInfo.enabledMethods);
+  return (
+    <ConnectionPanel
+      connectionInfo={connectionInfo}
+      retainedSecrets={retainedSecrets}
+      data-testid="connect-tab-panel"
+    />
   );
 };

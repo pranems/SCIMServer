@@ -27,7 +27,7 @@ describe('Connection-info API (E2E)', () => {
 
   const TOP_KEYS = ['endpointId', 'displayName', 'urls', 'enabledMethods', 'disabledMethods'];
   const URL_KEYS = ['scimBaseUrl', 'scimBaseUrlBare', 'tokenEndpoint', 'serviceProviderConfig', 'oauthMetadata'];
-  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience'];
+  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained'];
   const DISABLED_KEYS = ['method', 'reason', 'enableHint'];
 
   it('assembles the connection-info shape with only documented top-level keys', async () => {
@@ -121,6 +121,33 @@ describe('Connection-info API (E2E)', () => {
     expect(oc.entraFields.clientIdentifier).toBe(endpointId); // first oauth_client defaults to endpointId
     expect(oc.entraFields.clientSecret).toBeNull();
     // The whole response must not carry the plaintext secret anywhere.
+    expect(JSON.stringify(res.body)).not.toContain(created.body.clientSecret);
+  });
+
+  it('surfaces credentialId + secretRetained on the oauth_client method after a create (R3)', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      OAuthClientCredentialsAuthEnabled: true,
+      CredentialSecretVisibility: 'always',
+    });
+
+    const created = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ credentialType: 'oauth_client', label: 'r3-e2e' })
+      .expect(201);
+    const credentialId = created.body.id as string;
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const oc = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
+    // The Connect tab uses these to call the reveal endpoint + always-show the secret.
+    expect(oc.credentialId).toBe(credentialId);
+    expect(oc.secretRetained).toBe(true);
+    // Still never the secret value itself.
     expect(JSON.stringify(res.body)).not.toContain(created.body.clientSecret);
   });
 

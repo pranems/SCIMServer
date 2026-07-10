@@ -97,6 +97,31 @@ describe('ConnectionPanel (WI-4)', () => {
     expect(screen.getByTestId('connection-panel-secret-warning')).toBeInTheDocument();
   });
 
+  it('renders a retained secret persistently (re-viewable note, no one-time warning) - R3', () => {
+    renderWithFluent(
+      <ConnectionPanel
+        connectionInfo={info()}
+        retainedSecrets={{ oauth_client: 'retained-client-secret' }}
+      />,
+    );
+    expect(screen.getByTestId('connection-panel-value-clientSecret')).toHaveTextContent('retained-client-secret');
+    // Persistent reveal shows the "re-viewable" note, NOT the one-time warning.
+    expect(screen.getByTestId('connection-panel-secret-retained-note')).toBeInTheDocument();
+    expect(screen.queryByTestId('connection-panel-secret-warning')).not.toBeInTheDocument();
+  });
+
+  it('includes the retained secret in the copy-as-.env payload - R3', () => {
+    renderWithFluent(
+      <ConnectionPanel
+        connectionInfo={info()}
+        retainedSecrets={{ oauth_client: 'retained-client-secret' }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('connection-panel-copy-env'));
+    const payload = writeText.mock.calls[0][0] as string;
+    expect(payload).toContain('SCIM_CLIENT_SECRET=retained-client-secret');
+  });
+
   it('copy-as-.env writes SCIM_* lines to the clipboard', () => {
     renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
     fireEvent.click(screen.getByTestId('connection-panel-copy-env'));

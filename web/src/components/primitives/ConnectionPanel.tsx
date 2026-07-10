@@ -89,6 +89,13 @@ export interface ConnectionPanelProps {
    * JSON / .env / download payloads. Never persisted.
    */
   oneTimeSecret?: { method: ConnectionMethod; secret: string } | null;
+  /**
+   * R3 - retained secrets to display persistently, keyed by method. Populated
+   * when the effective `CredentialSecretVisibility` is `always`, so the
+   * Connect tab can ALWAYS show the secret (re-viewable) rather than only at
+   * the create moment. Rendered without the one-time "copy now" warning.
+   */
+  retainedSecrets?: Partial<Record<ConnectionMethod, string>> | null;
   /** Initially-selected method; defaults to the first enabled method. */
   defaultMethod?: ConnectionMethod;
   /** Optional `data-testid` root; children derive `<id>-*`. */
@@ -103,17 +110,18 @@ export interface ConnectionPanelProps {
 function buildPayload(
   method: ConnectionEnabledMethod,
   oneTimeSecret?: { method: ConnectionMethod; secret: string } | null,
+  retainedSecrets?: Partial<Record<ConnectionMethod, string>> | null,
 ): Record<string, string> {
   const out: Record<string, string> = {};
+  const secretValue =
+    oneTimeSecret && oneTimeSecret.method === method.method
+      ? oneTimeSecret.secret
+      : (retainedSecrets?.[method.method] ?? null);
   for (const [key, value] of Object.entries(method.entraFields)) {
     if (value !== null && value !== undefined) {
       out[key] = value;
-    } else if (
-      (key === 'clientSecret' || key === 'secretToken') &&
-      oneTimeSecret &&
-      oneTimeSecret.method === method.method
-    ) {
-      out[key] = oneTimeSecret.secret;
+    } else if ((key === 'clientSecret' || key === 'secretToken') && secretValue) {
+      out[key] = secretValue;
     }
   }
   if (method.expectedAudience) out.expectedAudience = method.expectedAudience;
@@ -130,6 +138,7 @@ function toEnv(payload: Record<string, string>): string {
 export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   connectionInfo,
   oneTimeSecret,
+  retainedSecrets,
   defaultMethod,
   'data-testid': testId = 'connection-panel',
 }) => {
@@ -159,9 +168,11 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   }
 
   const method = enabled.find((m) => m.method === selected) ?? enabled[0];
-  const payload = buildPayload(method, oneTimeSecret);
-  const secretForMethod =
+  const payload = buildPayload(method, oneTimeSecret, retainedSecrets);
+  const oneTimeForMethod =
     oneTimeSecret && oneTimeSecret.method === method.method ? oneTimeSecret.secret : null;
+  const retainedForMethod = retainedSecrets?.[method.method] ?? null;
+  const secretForMethod = oneTimeForMethod ?? retainedForMethod;
 
   const onDownload = (): void => {
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -245,9 +256,17 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         )}
       </div>
 
-      {secretForMethod && (
+      {oneTimeForMethod && (
         <MessageBar intent="warning" data-testid={`${testId}-secret-warning`}>
           <MessageBarBody>Copy the secret now. It will not be shown again.</MessageBarBody>
+        </MessageBar>
+      )}
+
+      {!oneTimeForMethod && retainedForMethod && (
+        <MessageBar intent="info" data-testid={`${testId}-secret-retained-note`}>
+          <MessageBarBody>
+            This secret is re-viewable because the credential secret visibility is set to Always.
+          </MessageBarBody>
         </MessageBar>
       )}
 
