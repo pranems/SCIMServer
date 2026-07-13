@@ -223,13 +223,40 @@ test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
       `expected a TruncatedText span whose textContent === "${fullValue}"; ` +
         `report = ${JSON.stringify(overflowReport)}`,
     ).toBeDefined();
-    expect(
-      truncatorMatch!.scrollWidth,
-      `TruncatedText scrollWidth (${truncatorMatch!.scrollWidth}px) must exceed clientWidth ` +
-        `(${truncatorMatch!.clientWidth}px) on a ${fullValue.length}-char value, proving CSS ` +
-        `ellipsis actually fired. If they are equal, the browser did not clip - layout-distortion ` +
-        `risk remains.`,
-    ).toBeGreaterThan(truncatorMatch!.clientWidth);
+
+    // The "ellipsis actually fired" signal (scrollWidth > clientWidth) is only
+    // valid when the value is genuinely WIDER than the bounded box. A userName
+    // with >= 40 chars is not guaranteed to overflow the 280px TruncatedText
+    // cap: narrow glyphs (i, l, ., 1) can render 41 chars in ~263px, which fits
+    // WITHOUT clipping. Data varies per tenant (proudbush's long-name user
+    // overflowed; calmsand's 41-char user fit), so an unconditional
+    // scrollWidth > clientWidth assertion is a data-sensitive false-negative.
+    //
+    // Robust contract (R1 + R5): the box MUST be bounded (already asserted:
+    // cellWidth <= 340). Clipping is asserted ONLY when the box is actually
+    // saturated - i.e. the rendered content reached the cap. When the value
+    // fits inside the box, non-clipping is correct and asserting overflow would
+    // be wrong.
+    const TRUNCATE_MAXWIDTH = 280; // CopyableField truncate maxWidth cap (px)
+    const isBoxSaturated = truncatorMatch!.clientWidth >= TRUNCATE_MAXWIDTH - 4;
+    if (isBoxSaturated) {
+      expect(
+        truncatorMatch!.scrollWidth,
+        `TruncatedText scrollWidth (${truncatorMatch!.scrollWidth}px) must exceed clientWidth ` +
+          `(${truncatorMatch!.clientWidth}px) on a ${fullValue.length}-char value that saturated ` +
+          `the ${TRUNCATE_MAXWIDTH}px cap, proving CSS ellipsis actually fired. If they are equal, ` +
+          `the browser did not clip - layout-distortion risk remains.`,
+      ).toBeGreaterThan(truncatorMatch!.clientWidth);
+    } else {
+      // Value fit inside the bounded box - clipping legitimately did not fire.
+      // The bounded-width assertion above (cellWidth <= 340) is the real R5
+      // guard and already passed; the content simply did not need an ellipsis.
+      expect(
+        truncatorMatch!.scrollWidth,
+        `value fit inside the ${TRUNCATE_MAXWIDTH}px box (clientWidth ` +
+          `${truncatorMatch!.clientWidth}px); scrollWidth should equal clientWidth (no clip needed)`,
+      ).toBeLessThanOrEqual(truncatorMatch!.clientWidth);
+    }
   });
 
   test('copy button writes the full userName to the clipboard', async ({ page }) => {
