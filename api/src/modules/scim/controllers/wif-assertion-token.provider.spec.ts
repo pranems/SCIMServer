@@ -4,6 +4,7 @@ import { WifAssertionValidatorService, WifAssertionInvalidError } from '../../..
 import { OAuthService } from '../../../oauth/oauth.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
 
 /**
@@ -16,6 +17,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
   let validate: jest.Mock;
   let generateEndpointAccessToken: jest.Mock;
   let logger: { warn: jest.Mock; info: jest.Mock; debug: jest.Mock; error: jest.Mock };
+  let decisionStore: AuthDecisionRecordStore;
 
   const wifMetadata = {
     expectedIssuer: 'https://login.microsoftonline.com/tenant-123/v2.0',
@@ -57,10 +59,12 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
         { provide: WifAssertionValidatorService, useValue: { validate } },
         { provide: OAuthService, useValue: { generateEndpointAccessToken } },
         { provide: ScimLogger, useValue: logger },
+        AuthDecisionRecordStore,
       ],
     }).compile();
 
     provider = moduleRef.get(WifAssertionTokenProvider);
+    decisionStore = moduleRef.get(AuthDecisionRecordStore);
   });
 
   it('returns null when the endpoint has no wif trust (not-mine-continue)', async () => {
@@ -99,6 +103,10 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     expect(acceptEvents[0][2]).toEqual(
       expect.objectContaining({ outcome: 'accept', method: 'wif', endpointId: 'ep-1' }),
     );
+    // WI-D5 - the accepted decision is captured in the record store.
+    const accepted = decisionStore.query({ endpointId: 'ep-1' });
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0].outcome).toBe('accept');
   });
 
   it('throws when the assertion is for this endpoint but invalid (mine-but-invalid-stop)', async () => {
@@ -119,6 +127,10 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     expect(rejectEvents[0][2]).toEqual(
       expect.objectContaining({ outcome: 'reject', reasonCode: 'wif_issuer_mismatch' }),
     );
+    // WI-D5 - the rejected decision is captured in the store, scoped to the endpoint.
+    const rejected = decisionStore.query({ endpointId: 'ep-1', outcome: 'reject' });
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reasonCode).toBe('wif_issuer_mismatch');
   });
 
   it('throws when the wif trust metadata is missing required fields (fail closed)', async () => {

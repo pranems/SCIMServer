@@ -160,6 +160,53 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect((rejectEvent!.data as Record<string, unknown>).method).toBe('oauth_client');
   });
 
+  it('WI-D5: a rejected oauth_client attempt is queryable at both auth-decisions scopes', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);
+
+    // Global scope - the reject appears across all endpoints.
+    const global = await request(app.getHttpServer())
+      .get('/scim/admin/auth-decisions?outcome=reject&limit=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(global.body.count).toBeGreaterThan(0);
+    const globalHit = (global.body.records as Array<Record<string, unknown>>).find(
+      (r) => r.endpointId === endpointA && r.reasonCode === 'oauth_client_auth_failed',
+    );
+    expect(globalHit).toBeDefined();
+    expect(globalHit!.outcome).toBe('reject');
+    expect(globalHit!.method).toBe('oauth_client');
+
+    // Per-endpoint scope - the same record scoped to endpointA.
+    const scoped = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}/auth-decisions?limit=100`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(scoped.body.count).toBeGreaterThan(0);
+    expect(
+      (scoped.body.records as Array<Record<string, unknown>>).every((r) => r.endpointId === endpointA),
+    ).toBe(true);
+
+    // Per-endpoint scope for a DIFFERENT endpoint does NOT include endpointA's record.
+    const other = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointB}/auth-decisions?limit=100`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (other.body.records as Array<Record<string, unknown>>).some((r) => r.endpointId === endpointA),
+    ).toBe(false);
+
+    // WI-D5 - the record never carries a raw secret/assertion.
+    expect(JSON.stringify(scoped.body)).not.toContain('wrong-secret');
+  });
+
+  it('WI-D5: the auth-decisions endpoints require admin auth (401 without a bearer)', async () => {
+    await request(app.getHttpServer()).get('/scim/admin/auth-decisions').expect(401);
+    await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}/auth-decisions`)
+      .expect(401);
+  });
+
   it('rejects a wrong grant_type with unsupported_grant_type', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
     const res = await request(app.getHttpServer())

@@ -24,6 +24,7 @@ import {
 } from './assertion-token-provider';
 import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
 import { emitAuthDecisionEvent, type AuthDecisionTrace } from '../../../oauth/auth-decision-trace';
+import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 
 interface EndpointTokenRequest {
@@ -59,6 +60,8 @@ export class EndpointOAuthController {
     private readonly logger: ScimLogger,
     @Optional() @Inject(ASSERTION_TOKEN_PROVIDER)
     private readonly assertionProvider: IAssertionTokenProvider | null = null,
+    @Optional() @Inject(AuthDecisionRecordStore)
+    private readonly decisionStore: AuthDecisionRecordStore | null = null,
   ) {}
 
   @Public()
@@ -220,7 +223,7 @@ export class EndpointOAuthController {
     };
   }
 
-  /** WI-D4 - emit one canonical AUTH decision event for the oauth_client plane. */
+  /** WI-D4 + WI-D5 - emit one canonical AUTH decision event AND capture the record. */
   private emitOauthClientDecision(
     endpointId: string,
     outcome: 'accept' | 'reject',
@@ -236,6 +239,7 @@ export class EndpointOAuthController {
     };
     if (reasonCode) trace.reasonCode = reasonCode;
     emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
+    this.decisionStore?.record(trace);
   }
 
   private invalidClient(reasonCode?: string): HttpException {

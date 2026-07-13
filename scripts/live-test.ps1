@@ -12505,6 +12505,30 @@ try {
             $azDecision = $azRecent.entries | Where-Object { $_.message -eq 'Auth decision' -and $_.data.reasonCode -eq 'oauth_client_auth_failed' } | Select-Object -First 1
         }
         Test-Result -Success ($null -ne $azDecision -and $azDecision.data.outcome -eq 'reject' -and $azDecision.data.method -eq 'oauth_client') -Message "9z-AZ.T8: rejected oauth_client emits one AUTH decision event (reject) in the ring buffer"
+
+        # T9 (WI-D5): the rejected decision is queryable at BOTH auth-decisions scopes.
+        $azGlobal = $null
+        try { $azGlobal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/auth-decisions?outcome=reject&limit=100" -Method GET -Headers $headers } catch {}
+        $azGlobalHit = $null
+        if ($null -ne $azGlobal -and $null -ne $azGlobal.records) {
+            $azGlobalHit = $azGlobal.records | Where-Object { $_.endpointId -eq $azWifId -and $_.reasonCode -eq 'oauth_client_auth_failed' } | Select-Object -First 1
+        }
+        Test-Result -Success ($null -ne $azGlobalHit) -Message "9z-AZ.T9: rejected oauth_client queryable at GLOBAL /admin/auth-decisions"
+
+        $azScoped = $null
+        try { $azScoped = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$azWifId/auth-decisions?limit=100" -Method GET -Headers $headers } catch {}
+        $azScopedOk = ($null -ne $azScoped -and $azScoped.count -gt 0)
+        if ($azScopedOk) {
+            $azScopedOk = ($azScoped.records | Where-Object { $_.endpointId -ne $azWifId } | Measure-Object).Count -eq 0
+        }
+        Test-Result -Success $azScopedOk -Message "9z-AZ.T10: per-endpoint /admin/endpoints/{id}/auth-decisions scopes to that endpoint"
+
+        # T11 (WI-D5): the auth-decisions endpoints require admin auth.
+        $azUnauth = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/auth-decisions" -Method GET | Out-Null
+        } catch { $azUnauth = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+        Test-Result -Success $azUnauth -Message "9z-AZ.T11: /admin/auth-decisions requires admin auth (401 without bearer)"
     } finally {
         try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$azWifId" -Method DELETE -Headers $headers | Out-Null } catch {}
     }

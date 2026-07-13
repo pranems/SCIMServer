@@ -17,6 +17,7 @@ import {
   emitAuthDecisionEvent,
   type AuthDecisionTrace,
 } from '../../../oauth/auth-decision-trace';
+import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider } from './assertion-token-provider';
@@ -49,7 +50,14 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     private readonly validator: WifAssertionValidatorService,
     private readonly oauthService: OAuthService,
     private readonly logger: ScimLogger,
+    private readonly decisionStore: AuthDecisionRecordStore,
   ) {}
+
+  /** WI-D4 + WI-D5: emit the canonical AUTH log event AND capture the record. */
+  private recordAndEmit(trace: AuthDecisionTrace): void {
+    emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
+    this.decisionStore.record(trace);
+  }
 
   async mintFromAssertion(endpointId: string, clientAssertion: string): Promise<AccessToken | null> {
     const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
@@ -135,7 +143,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         .pass('claim_checks', { expected: trust.expectedIssuer })
         .accept()
         .build();
-      emitAuthDecisionEvent(this.logger, acceptTrace, LogCategory.AUTH);
+      this.recordAndEmit(acceptTrace);
 
       return token;
     }
@@ -158,7 +166,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         checks: [],
         subTraces,
       };
-      emitAuthDecisionEvent(this.logger, aggregateTrace, LogCategory.AUTH);
+      this.recordAndEmit(aggregateTrace);
       throw new WifAssertionInvalidError(
         'No configured WIF trust accepted the assertion.',
         'wif_no_trust_accepted',
@@ -166,19 +174,20 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       );
     }
     if (lastError instanceof WifAssertionInvalidError) {
-      emitAuthDecisionEvent(
-        this.logger,
-        lastError.trace ?? {
-          plane: 'token-mint',
-          method: 'wif',
-          outcome: 'reject',
-          reasonCode: lastError.reasonCode,
-          endpointId,
-          correlationId,
-          checks: [],
-        },
-        LogCategory.AUTH,
-      );
+      // The validator builds the trace without endpoint/correlation context;
+      // enrich it here so the WI-D5 store can scope + correlate it.
+      const rejectTrace: AuthDecisionTrace = lastError.trace
+        ? { ...lastError.trace, endpointId, correlationId }
+        : {
+            plane: 'token-mint',
+            method: 'wif',
+            outcome: 'reject',
+            reasonCode: lastError.reasonCode,
+            endpointId,
+            correlationId,
+            checks: [],
+          };
+      this.recordAndEmit(rejectTrace);
       throw lastError;
     }
     if (lastError instanceof Error) {

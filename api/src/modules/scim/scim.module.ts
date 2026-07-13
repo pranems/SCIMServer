@@ -10,6 +10,7 @@ import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
 import { AdminConnectionInfoController } from './controllers/admin-connection-info.controller';
 import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
+import { AuthDecisionsController } from './controllers/auth-decisions.controller';
 import { AdminSecuritySettingsController } from './controllers/admin-security-settings.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
@@ -55,6 +56,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     AdminAuthenticationMethodController,
     AdminJwksHostController,
     AdminSecuritySettingsController,
+    AuthDecisionsController,
     EndpointOAuthController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
