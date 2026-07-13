@@ -253,18 +253,25 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
       .expect(401);
     expect(res.body.error).toBe('invalid_client');
+    // WI-D3: multiple trusts, none accepted -> aggregate reason code.
+    expect(res.body.reason_code).toBe('wif_no_trust_accepted');
   });
 
   it('rejects a wrong issuer with invalid_client', async () => {
     const assertion = await signAssertion({ iss: 'https://evil.example/v2.0' });
     const res = await postAssertion(assertion).expect(401);
     expect(res.body.error).toBe('invalid_client');
+    // WI-D3: the specific catalog reason code + tier-safe description flow to the wire.
+    expect(res.body.reason_code).toBe('wif_issuer_mismatch');
+    expect(res.body.error_description).toMatch(/issuer/i);
   });
 
   it('rejects a wrong tenant id with invalid_client (cross-tenant isolation)', async () => {
     const assertion = await signAssertion({ tid: 'tenant-other' });
     const res = await postAssertion(assertion).expect(401);
     expect(res.body.error).toBe('invalid_client');
+    // WI-D3: the specific catalog reason code for a tenant mismatch.
+    expect(res.body.reason_code).toBe('wif_tenant_mismatch');
   });
 
   it('ALLOWS an assertion missing the required role by default (advisory roles)', async () => {

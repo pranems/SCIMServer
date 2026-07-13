@@ -37,7 +37,7 @@ export class OAuthMetadataController {
       token_endpoint: `${base}/${prefix}/oauth/token`,
       jwks_uri: `${base}/${prefix}/oauth/jwks`,
       grant_types_supported: ['client_credentials'],
-      token_endpoint_auth_methods_supported: ['client_secret_post'],
+      token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
       scopes_supported: scopes,
     };
   }

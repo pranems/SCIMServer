@@ -1,8 +1,9 @@
-﻿import { Body, Controller, Get, Post, HttpException, HttpStatus } from '@nestjs/common';
+﻿import { Body, Controller, Get, Headers, Post, HttpException, HttpStatus } from '@nestjs/common';
 import { Public } from '../modules/auth/public.decorator';
 import { OAuthService } from './oauth.service';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
+import { resolveClientCredentials } from './client-credential-location';
 
 export interface TokenRequest {
   grant_type: string;
@@ -33,7 +34,24 @@ export class OAuthController {
 
   @Public()
   @Post('token')
-  async getToken(@Body() tokenRequest: TokenRequest): Promise<TokenResponse> {
+  async getToken(
+    @Body() tokenRequest: TokenRequest,
+    @Headers('authorization') authorization?: string,
+  ): Promise<TokenResponse> {
+    // RFC 6749 section 2.3.1 - accept client credentials from the
+    // `Authorization: Basic` header (client_secret_basic) as well as the body
+    // (client_secret_post). Entra's newer provisioning experience sends them in
+    // the header; body values win when both are present.
+    const resolved = resolveClientCredentials(
+      { clientId: tokenRequest.client_id, clientSecret: tokenRequest.client_secret },
+      authorization,
+    );
+    tokenRequest = {
+      ...tokenRequest,
+      client_id: resolved.clientId as string,
+      client_secret: resolved.clientSecret as string,
+    };
+
     this.logger.debug(LogCategory.OAUTH, 'OAuth token request received', {
       grantType: tokenRequest.grant_type,
       clientId: tokenRequest.client_id,

@@ -12470,6 +12470,32 @@ try {
     # T6: oauth_client_auth_failed is merged (T3, opaque description)
     $azMerged = $azCat.reasons | Where-Object { $_.reasonCode -eq 'oauth_client_auth_failed' }
     Test-Result -Success ($null -ne $azMerged -and $azMerged.tier -eq 'T3' -and $azMerged.actorDescription -eq 'Client authentication failed.') -Message "9z-AZ.T6: oauth_client_auth_failed is merged (T3, opaque)"
+
+    # T7 (WI-D3): a wrong oauth_client secret carries the merged reason_code on the wire.
+    $azWifEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wid3-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $azWifId = $azWifEp.id
+    try {
+        $azCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$azWifId/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "oauth_client"; label = "wid3-live"
+        } | ConvertTo-Json)
+        $azErrBody = $null
+        try {
+            Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$azWifId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+                grant_type = "client_credentials"; client_id = $azCred.clientId; client_secret = "client-secret-wrong"
+            } -UseBasicParsing | Out-Null
+        } catch {
+            try {
+                $azReader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $azErrBody = $azReader.ReadToEnd() | ConvertFrom-Json
+                $azReader.Close()
+            } catch {}
+        }
+        Test-Result -Success ($null -ne $azErrBody -and $azErrBody.reason_code -eq 'oauth_client_auth_failed') -Message "9z-AZ.T7: wrong oauth_client secret -> reason_code oauth_client_auth_failed on the wire"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$azWifId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
 } catch {
     Test-Result -Success $false -Message "9z-AZ: WI-D2 catalog endpoint section threw: $($_.Exception.Message)"
 }

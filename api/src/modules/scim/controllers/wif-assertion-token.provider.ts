@@ -12,6 +12,7 @@ import type { IEndpointCredentialRepository } from '../../../domain/repositories
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { computeShadowDecision } from '../../../oauth/wif-shadow-telemetry';
+import type { AuthDecisionTrace } from '../../../oauth/auth-decision-trace';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider } from './assertion-token-provider';
 
@@ -67,6 +68,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     const orderedTrusts = this.orderByAssertionIssuer(wifCredentials, clientAssertion);
 
     let lastError: unknown;
+    const subTraces: AuthDecisionTrace[] = [];
     for (const wif of orderedTrusts) {
       let trust: WifTrust;
       try {
@@ -83,6 +85,11 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         claims = await this.validator.validate(clientAssertion, trust);
       } catch (err) {
         lastError = err;
+        // WI-D3 - collect each rejected trust's sub-trace (tagged with which
+        // trust) so a multi-trust failure can explain why EACH one was rejected.
+        if (err instanceof WifAssertionInvalidError && err.trace) {
+          subTraces.push({ ...err.trace, selectedTrustId: wif.id });
+        }
         continue;
       }
 
@@ -116,10 +123,31 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     }
 
     // Mine-but-invalid-stop: the assertion matched no configured WIF trust.
+    // WI-D3: with a SINGLE trust, rethrow its specific reason (e.g.
+    // wif_audience_mismatch). With MULTIPLE trusts, none accepted, so the
+    // aggregate reason is wif_no_trust_accepted, carrying each trust's
+    // sub-trace so the operator can see why every one was rejected.
+    if (orderedTrusts.length > 1) {
+      throw new WifAssertionInvalidError(
+        'No configured WIF trust accepted the assertion.',
+        'wif_no_trust_accepted',
+        {
+          plane: 'token-mint',
+          method: 'wif',
+          outcome: 'reject',
+          reasonCode: 'wif_no_trust_accepted',
+          checks: [],
+          subTraces,
+        },
+      );
+    }
     if (lastError instanceof Error) {
       throw lastError;
     }
-    throw new WifAssertionInvalidError('No configured WIF trust accepted the assertion.');
+    throw new WifAssertionInvalidError(
+      'No configured WIF trust accepted the assertion.',
+      'wif_no_trust_accepted',
+    );
   }
 
   /**

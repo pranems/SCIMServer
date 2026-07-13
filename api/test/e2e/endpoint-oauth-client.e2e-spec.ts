@@ -82,6 +82,25 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(payload.client_id).toBe(clientId);
   });
 
+  it('mints a per-endpoint token when credentials arrive via Authorization: Basic (client_secret_basic)', async () => {
+    // RFC 6749 section 2.3.1 - Entra's newer provisioning experience sends the
+    // client credentials in the Basic header rather than the body.
+    const { clientId, clientSecret } = await createOauthClient(endpointA);
+    const basic = Buffer.from(
+      `${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`,
+    ).toString('base64');
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${endpointA}/oauth/token`)
+      .set('Authorization', `Basic ${basic}`)
+      .send({ grant_type: 'client_credentials' })
+      .expect(201);
+
+    expect(res.body.token_type).toBe('Bearer');
+    const payload = decodePayload(res.body.access_token);
+    expect(payload.endpoint_id).toBe(endpointA);
+    expect(payload.client_id).toBe(clientId);
+  });
+
   it('the per-endpoint token authorizes ITS OWN endpoint SCIM routes', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
     const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
@@ -114,6 +133,10 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(res.body.schemas).toBeUndefined();
     expect(typeof res.body.correlation_id).toBe('string');
     expect(typeof res.body.timestamp).toBe('string');
+    // WI-D3: the merged (T3) oauth_client reason code - never distinguishes
+    // secret-not-found from secret-mismatch on the wire (P2).
+    expect(res.body.reason_code).toBe('oauth_client_auth_failed');
+    expect(res.body.error_description).toBe('Client authentication failed.');
   });
 
   it('rejects a wrong grant_type with unsupported_grant_type', async () => {

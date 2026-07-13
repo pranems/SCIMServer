@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Headers,
   HttpException,
   HttpStatus,
   Inject,
@@ -11,6 +12,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Public } from '../../auth/public.decorator';
 import { OAuthService } from '../../../oauth/oauth.service';
+import { resolveClientCredentials } from '../../../oauth/client-credential-location';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -20,6 +22,7 @@ import {
   JWT_BEARER_ASSERTION_TYPE,
   type IAssertionTokenProvider,
 } from './assertion-token-provider';
+import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
 
 interface EndpointTokenRequest {
   grant_type?: string;
@@ -61,12 +64,24 @@ export class EndpointOAuthController {
   async getToken(
     @Param('endpointId') endpointId: string,
     @Body() body: EndpointTokenRequest,
+    @Headers('authorization') authorization?: string,
   ) {
+    // RFC 6749 section 2.3.1 - accept client credentials from the
+    // `Authorization: Basic` header (client_secret_basic) in addition to the
+    // body (client_secret_post). Entra's newer provisioning experience sends
+    // them in the header; body values still win when both are present.
+    const resolved = resolveClientCredentials(
+      { clientId: body.client_id, clientSecret: body.client_secret },
+      authorization,
+    );
+    body = { ...body, client_id: resolved.clientId, client_secret: resolved.clientSecret };
+
     if (body.grant_type !== 'client_credentials') {
       throw new HttpException(
         {
           error: 'unsupported_grant_type',
           error_description: 'Only the client_credentials grant type is supported.',
+          reason_code: 'grant_type_unsupported',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -83,6 +98,7 @@ export class EndpointOAuthController {
         {
           error: 'invalid_request',
           error_description: 'client_assertion and client_secret are mutually exclusive.',
+          reason_code: 'mutually_exclusive_credentials',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -102,6 +118,7 @@ export class EndpointOAuthController {
         {
           error: 'invalid_request',
           error_description: `Unsupported client_assertion_type. Expected "${JWT_BEARER_ASSERTION_TYPE}".`,
+          reason_code: 'unsupported_assertion_type',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -114,23 +131,28 @@ export class EndpointOAuthController {
     //  - no provider wired (A3)    -> invalid_client until Q6 binds the validator
     if (!this.assertionProvider) {
       this.logger.warn(LogCategory.OAUTH, 'client_assertion presented but no WIF provider is configured', { endpointId });
-      throw this.invalidClient();
+      throw this.invalidClient('wif_no_trust_configured');
     }
 
     let minted;
     try {
       minted = await this.assertionProvider.mintFromAssertion(endpointId, body.client_assertion!);
     } catch (err) {
+      const reasonCode =
+        err instanceof WifAssertionInvalidError && err.reasonCode
+          ? err.reasonCode
+          : 'wif_no_trust_accepted';
       this.logger.warn(LogCategory.OAUTH, 'WIF assertion validation failed (mine-but-invalid-stop)', {
         endpointId,
         reason: (err as Error).message,
+        reasonCode,
       });
-      throw this.invalidClient();
+      throw this.invalidClient(reasonCode);
     }
 
     if (!minted) {
       this.logger.warn(LogCategory.OAUTH, 'No WIF trust configured for endpoint (not-mine)', { endpointId });
-      throw this.invalidClient();
+      throw this.invalidClient('wif_no_trust_configured');
     }
 
     this.logger.info(LogCategory.OAUTH, 'Per-endpoint token issued via WIF assertion', { endpointId });
@@ -149,6 +171,7 @@ export class EndpointOAuthController {
         {
           error: 'invalid_request',
           error_description: 'client_id and client_secret (or a client_assertion) are required.',
+          reason_code: 'missing_credentials',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -168,7 +191,7 @@ export class EndpointOAuthController {
         clientId: body.client_id,
         credentialFound: candidate != null,
       });
-      throw this.invalidClient();
+      throw this.invalidClient('oauth_client_auth_failed');
     }
 
     const token = await this.oauthService.generateEndpointAccessToken(
@@ -190,12 +213,15 @@ export class EndpointOAuthController {
     };
   }
 
-  private invalidClient(): HttpException {
+  private invalidClient(reasonCode?: string): HttpException {
+    // WI-D3: when a catalog reason_code is present, omit a hardcoded
+    // error_description so the WI-D1 filter fills the tier-safe description from
+    // the WI-D2 catalog (T3 merges, T4 generalizes). Without a reason code, keep
+    // the generic fallback.
     return new HttpException(
-      {
-        error: 'invalid_client',
-        error_description: 'Invalid per-endpoint client credentials.',
-      },
+      reasonCode
+        ? { error: 'invalid_client', reason_code: reasonCode }
+        : { error: 'invalid_client', error_description: 'Invalid per-endpoint client credentials.' },
       HttpStatus.UNAUTHORIZED,
     );
   }

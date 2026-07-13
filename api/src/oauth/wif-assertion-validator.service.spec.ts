@@ -142,4 +142,62 @@ describe('WifAssertionValidatorService (Q6.3)', () => {
     verify.mockRejectedValue(new Error('"exp" claim timestamp check failed'));
     await expect(service.validate('a', TRUST)).rejects.toThrow();
   });
+
+  // WI-D3 - the rejection carries a catalog reason code + a decision trace.
+  async function rejectionOf(payload: Record<string, unknown>, trust: WifTrust = TRUST) {
+    verify.mockResolvedValue({ payload, protectedHeader: { alg: 'RS256', kid: 'k1' } });
+    try {
+      await service.validate('a', trust);
+      throw new Error('expected rejection');
+    } catch (err) {
+      return err as WifAssertionInvalidError;
+    }
+  }
+
+  it('WI-D3: issuer mismatch carries reasonCode wif_issuer_mismatch + a trace', async () => {
+    const err = await rejectionOf({ ...goodPayload(), iss: 'https://evil.example/v2.0' });
+    expect(err).toBeInstanceOf(WifAssertionInvalidError);
+    expect(err.reasonCode).toBe('wif_issuer_mismatch');
+    expect(err.trace?.outcome).toBe('reject');
+    expect(err.trace?.reasonCode).toBe('wif_issuer_mismatch');
+    // The failing check is recorded with expected/received (non-secret).
+    const failed = err.trace?.checks.find((c) => c.status === 'fail');
+    expect(failed?.id).toBe('issuer_match');
+    expect(failed?.expected).toBe(TRUST.expectedIssuer);
+  });
+
+  it('WI-D3: audience mismatch carries reasonCode wif_audience_mismatch', async () => {
+    const err = await rejectionOf({ ...goodPayload(), aud: 'api://other' });
+    expect(err.reasonCode).toBe('wif_audience_mismatch');
+  });
+
+  it('WI-D3: tenant mismatch carries reasonCode wif_tenant_mismatch', async () => {
+    const err = await rejectionOf({ ...goodPayload(), tid: 'tenant-999' });
+    expect(err.reasonCode).toBe('wif_tenant_mismatch');
+  });
+
+  it('WI-D3: enforce-mode missing role carries reasonCode wif_missing_role', async () => {
+    const err = await rejectionOf({ ...goodPayload(), roles: ['Scim.Read'] }, { ...TRUST, roleEnforcement: 'enforce' });
+    expect(err.reasonCode).toBe('wif_missing_role');
+  });
+
+  it('WI-D3: a signature failure maps to a signature-plane reason code', async () => {
+    verify.mockRejectedValue(new Error('signature verification failed'));
+    try {
+      await service.validate('a', TRUST);
+      throw new Error('expected rejection');
+    } catch (err) {
+      expect(err).toBeInstanceOf(WifAssertionInvalidError);
+      expect((err as WifAssertionInvalidError).reasonCode).toBe('assertion_signature_invalid');
+    }
+  });
+
+  it('WI-D3: the trace records the decoded non-secret claims + jose header, not the raw token', async () => {
+    const err = await rejectionOf({ ...goodPayload(), sub: 'someone-else' });
+    expect(err.trace?.decodedClaims?.iss).toBe(TRUST.expectedIssuer);
+    expect(err.trace?.joseHeader?.alg).toBe('RS256');
+    // The trace never carries the assertion string itself.
+    expect(JSON.stringify(err.trace)).not.toContain('a.b.c');
+  });
 });
+

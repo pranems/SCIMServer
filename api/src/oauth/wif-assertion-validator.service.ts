@@ -3,6 +3,11 @@ import { ExternalJwksValidatorService } from './external-jwks-validator.service'
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 import type { IdentityModel, RoleEnforcementMode } from './wif-shadow-telemetry';
+import {
+  AuthDecisionTraceBuilder,
+  mapJwksErrorToReason,
+  type AuthDecisionTrace,
+} from './auth-decision-trace';
 
 /**
  * The non-secret WIF trust record the validator checks an assertion against.
@@ -42,7 +47,12 @@ export interface WifValidatedClaims {
 
 /** Raised when a WIF assertion fails validation (mine-but-invalid-stop). */
 export class WifAssertionInvalidError extends Error {
-  constructor(public readonly reason: string) {
+  constructor(
+    public readonly reason: string,
+    /** WI-D3 - the catalog reason code + decision trace for this rejection. */
+    public readonly reasonCode?: string,
+    public readonly trace?: AuthDecisionTrace,
+  ) {
     super(reason);
     this.name = 'WifAssertionInvalidError';
   }
@@ -72,27 +82,58 @@ export class WifAssertionValidatorService {
   ) {}
 
   async validate(assertion: string, trust: WifTrust): Promise<WifValidatedClaims> {
+    // WI-D3 - build an ordered decision trace as we run the checks, so the
+    // reject reason_code, the log, and the UI diff all derive from one object.
+    const trace = new AuthDecisionTraceBuilder('token-mint', 'wif', {
+      endpointId: undefined,
+    });
+
     // Step 1 - signature + alg-pin + time window + JWKS fail-closed (Q2). A
     // bad signature, an `alg: none`/HMAC token, an expired/not-yet-valid token,
     // or a JWKS outage all throw here (propagated as mine-but-invalid-stop).
-    const { payload } = await this.jwks.verify(assertion, trust.jwksUri);
-    const claims = payload as unknown as WifValidatedClaims;
+    let payload: Record<string, unknown>;
+    try {
+      const verified = await this.jwks.verify(assertion, trust.jwksUri);
+      payload = verified.payload;
+      trace.setJoseHeader(verified.protectedHeader);
+      trace.pass('jwks_signature', { expected: trust.jwksUri, detail: 'signature + alg + time window verified' });
+    } catch (err) {
+      const reasonCode = mapJwksErrorToReason(err);
+      trace.fail('jwks_signature', {
+        expected: trust.jwksUri,
+        detail: (err as Error).message,
+      });
+      this.failTraced(reasonCode, (err as Error).message, trust, trace);
+    }
+    const claims = payload! as unknown as WifValidatedClaims;
+    trace.setDecodedClaims(payload!);
 
     // Step 2 - issuer / subject / audience / tenant must match the trust.
     if (claims.iss !== trust.expectedIssuer) {
-      this.fail('issuer mismatch', trust);
+      trace.fail('issuer_match', { expected: trust.expectedIssuer, received: String(claims.iss ?? '') });
+      this.failTraced('wif_issuer_mismatch', 'issuer mismatch', trust, trace);
     }
+    trace.pass('issuer_match', { expected: trust.expectedIssuer });
     if (claims.sub !== trust.expectedSubject) {
-      this.fail('subject mismatch', trust);
+      trace.fail('subject_match', { expected: trust.expectedSubject, received: String(claims.sub ?? '') });
+      this.failTraced('wif_subject_mismatch', 'subject mismatch', trust, trace);
     }
+    trace.pass('subject_match', { expected: trust.expectedSubject });
     if (!this.audienceMatches(claims.aud, trust.expectedAudience)) {
-      this.fail('audience mismatch', trust);
+      trace.fail('audience_match', {
+        expected: trust.expectedAudience,
+        received: Array.isArray(claims.aud) ? claims.aud.join(',') : String(claims.aud ?? ''),
+      });
+      this.failTraced('wif_audience_mismatch', 'audience mismatch', trust, trace);
     }
+    trace.pass('audience_match', { expected: trust.expectedAudience });
     // Cross-tenant isolation: when a tenant id is configured, the assertion's
     // `tid` MUST match it exactly.
     if (claims.tid !== trust.allowedTenantId) {
-      this.fail('tenant mismatch', trust);
+      trace.fail('tenant_match', { expected: trust.allowedTenantId, received: String(claims.tid ?? '') });
+      this.failTraced('wif_tenant_mismatch', 'tenant mismatch', trust, trace);
     }
+    trace.pass('tenant_match', { expected: trust.allowedTenantId });
 
     // Step 3 - roles are ADVISORY by default. A missing required role is
     // logged but does NOT block token issuance, so a provisioning flow always
@@ -106,8 +147,10 @@ export class WifAssertionValidatorService {
       const missing = required.filter((r) => !present.includes(r));
       if (missing.length > 0) {
         if (trust.roleEnforcement === 'enforce') {
-          this.fail(`missing required role(s): ${missing.join(', ')}`, trust);
+          trace.fail('required_roles', { expected: required.join(','), received: present.join(',') });
+          this.failTraced('wif_missing_role', `missing required role(s): ${missing.join(', ')}`, trust, trace);
         } else {
+          trace.skip('required_roles', { detail: 'advisory (roleEnforcement not enforce)' });
           this.logger.warn(
             LogCategory.AUTH,
             'WIF assertion missing required role(s) - advisory, allowed (set roleEnforcement:enforce to reject)',
@@ -118,6 +161,8 @@ export class WifAssertionValidatorService {
             },
           );
         }
+      } else {
+        trace.pass('required_roles', { expected: required.join(',') });
       }
     }
 
@@ -130,11 +175,17 @@ export class WifAssertionValidatorService {
     return aud === expected;
   }
 
-  private fail(reason: string, trust: WifTrust): never {
+  private failTraced(
+    reasonCode: string,
+    reason: string,
+    trust: WifTrust,
+    trace: AuthDecisionTraceBuilder,
+  ): never {
     this.logger.warn(LogCategory.AUTH, 'WIF assertion rejected', {
       reason,
+      reasonCode,
       issuer: trust.expectedIssuer,
     });
-    throw new WifAssertionInvalidError(reason);
+    throw new WifAssertionInvalidError(reason, reasonCode, trace.reject(reasonCode).build());
   }
 }
