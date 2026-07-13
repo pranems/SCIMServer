@@ -347,10 +347,20 @@ test.describe('Smoke Test - Complete User Flows', () => {
       const backBtn = page.getByTestId('back-to-endpoints');
       await expect(backBtn).toBeVisible();
 
-      // Click each tab and VERIFY no error text appears
+      // Click each tab and VERIFY no error text appears.
+      // Users + Groups are CONDITIONAL tabs (v0.53.3 profile enforcement):
+      // they render only when the endpoint declares the matching resource
+      // type. Skip a conditional tab that this endpoint does not serve
+      // instead of asserting it is unconditionally present.
       const tabs = ['Users', 'Groups', 'Logs', 'Settings'];
+      const conditionalTabs = new Set(['Users', 'Groups']);
       for (const tabName of tabs) {
         const tab = page.getByRole('tab', { name: new RegExp(tabName, 'i') });
+        const isPresent = (await tab.count()) > 0;
+        if (!isPresent && conditionalTabs.has(tabName)) {
+          // Endpoint does not declare this resource type -> tab hidden by design.
+          continue;
+        }
         await expect(tab).toBeVisible();
         await tab.click();
         await page.waitForTimeout(3000);
