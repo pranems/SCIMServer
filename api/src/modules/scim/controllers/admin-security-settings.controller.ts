@@ -14,6 +14,7 @@
 import { BadRequestException, Body, Controller, Get, Put } from '@nestjs/common';
 import { CredentialSecurityService } from '../../../security/credential-security.service';
 import { CredentialEncryptionService } from '../../../security/credential-encryption.service';
+import { ConnectionSecretResolverService } from '../services/connection-secret-resolver.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import {
@@ -26,6 +27,21 @@ interface SecuritySettingsResponse {
   kek: { configured: boolean; isDefault: boolean };
 }
 
+/**
+ * The SCIMServer-level (global) connection secrets, surfaced ONLY when the
+ * server-scope CredentialSecretVisibility is `always`. These are the global
+ * SCIM shared secret (Entra "Secret Token") + the global OAuth client id /
+ * secret used by the deployment-wide token endpoint. When visibility is `once`
+ * the values are null and `revealed` is false.
+ */
+interface ServerConnectionSecretsResponse {
+  revealed: boolean;
+  visibility: CredentialSecretVisibility;
+  sharedSecret: string | null;
+  oauthClientId: string | null;
+  oauthClientSecret: string | null;
+}
+
 interface UpdateSecuritySettingsDto {
   credentialSecretVisibility?: string;
 }
@@ -35,6 +51,7 @@ export class AdminSecuritySettingsController {
   constructor(
     private readonly credentialSecurity: CredentialSecurityService,
     private readonly credentialEncryption: CredentialEncryptionService,
+    private readonly secretResolver: ConnectionSecretResolverService,
     private readonly logger: ScimLogger,
   ) {}
 
@@ -43,6 +60,31 @@ export class AdminSecuritySettingsController {
     return {
       credentialSecretVisibility: await this.credentialSecurity.getServerVisibility(),
       kek: this.credentialEncryption.getKekStatus(),
+    };
+  }
+
+  /**
+   * GET /admin/settings/security/connection-secrets - the SCIMServer-level
+   * global connection secrets, inlined ONLY when the server visibility is
+   * `always`. Admin-only (default bearer guard) + audit-logged disclosure.
+   */
+  @Get('connection-secrets')
+  async getConnectionSecrets(): Promise<ServerConnectionSecretsResponse> {
+    const visibility = await this.credentialSecurity.getServerVisibility();
+    const secrets = await this.secretResolver.resolveServerSecrets();
+    if (secrets.revealed) {
+      this.logger.warn(
+        LogCategory.AUTH,
+        `Server-level connection-secret disclosure (visibility=always): ` +
+          `shared=${secrets.sharedSecret ? 'yes' : 'no'}, oauthSecret=${secrets.oauthClientSecret ? 'yes' : 'no'}`,
+      );
+    }
+    return {
+      revealed: secrets.revealed,
+      visibility,
+      sharedSecret: secrets.sharedSecret,
+      oauthClientId: secrets.oauthClientId,
+      oauthClientSecret: secrets.oauthClientSecret,
     };
   }
 

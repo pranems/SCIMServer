@@ -1857,6 +1857,7 @@ The `urn:scimserver:api:messages:2.0:Diagnostics` extension is automatically add
 | 83a | GET | `/scim/docs/auth-errors` | Public | AuthErrorsCatalogController (WI-D2 reason-code catalog; `?plane=wif\|oauth_client\|bearer`) |
 | 83b | GET | `/scim/admin/auth-decisions` | Bearer | AuthDecisionsController (WI-D5 global recent auth decisions; `?outcome=`, `?reasonCode=`, `?limit=`) |
 | 83c | GET | `/scim/admin/endpoints/:endpointId/auth-decisions` | Bearer | AuthDecisionsController (WI-D5 per-endpoint recent auth decisions) |
+| 83d | GET | `/scim/admin/settings/security/connection-secrets` | Bearer | AdminSecuritySettingsController (server-level global secrets - SCIM shared secret + global OAuth client id/secret - inlined only when server CredentialSecretVisibility is `always`) |
 | 84 | GET | `/scim/admin/dashboard` | Bearer | DashboardController |
 | 85 | GET | `/scim/admin/endpoints/:endpointId/overview` | Bearer | DashboardController |
 | 86 | GET | `/` | Public | WebController (serves SPA) |

@@ -21,6 +21,10 @@ import {
   type ConnectionInfo,
   type ConnectionInfoEndpointInput,
 } from '../services/connection-info.service';
+import { ConnectionSecretResolverService } from '../services/connection-secret-resolver.service';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
+import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 
 @Controller('admin/endpoints')
 export class AdminConnectionInfoController {
@@ -29,6 +33,8 @@ export class AdminConnectionInfoController {
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly connectionInfo: ConnectionInfoService,
+    private readonly secretResolver: ConnectionSecretResolverService,
+    private readonly logger: ScimLogger,
   ) {}
 
   @Get(':endpointId/connection-info')
@@ -48,6 +54,21 @@ export class AdminConnectionInfoController {
     const baseUrl = `${proto}://${host}`;
 
     const credentials = await this.credentialRepo.findByEndpoint(endpointId);
-    return this.connectionInfo.assemble(endpoint, credentials, baseUrl);
+
+    // When the effective CredentialSecretVisibility is `always`, inline the
+    // actual secrets so an operator can copy every connection parameter for an
+    // Entra gallery app in one place. Withheld (null) otherwise. Each inline is
+    // an admin-only, audit-logged disclosure.
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    const secrets = await this.secretResolver.resolveForEndpoint(config, credentials);
+    if (secrets.anyEndpointSecretRevealed || secrets.sharedSecret !== null) {
+      this.logger.warn(
+        LogCategory.AUTH,
+        `Connection-info secret disclosure for endpoint "${endpointId}" ` +
+          `(visibility=always): bearer=${secrets.bearerToken ? 'yes' : 'no'}, ` +
+          `oauth=${secrets.oauthClientSecret ? 'yes' : 'no'}, shared=${secrets.sharedSecret ? 'yes' : 'no'}`,
+      );
+    }
+    return this.connectionInfo.assemble(endpoint, credentials, baseUrl, secrets);
   }
 }

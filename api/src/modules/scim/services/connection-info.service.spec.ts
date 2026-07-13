@@ -218,7 +218,7 @@ describe('ConnectionInfoService', () => {
       expect(info.displayName).toBe('onboarding-isv-prov08');
     });
 
-    it('never emits a non-null secret value anywhere in the shape', () => {
+    it('never emits a non-null secret value when NO secrets are passed (default withhold)', () => {
       const info = service.assemble(
         endpoint({ SecretTokenBearerAuthEnabled: 'True', OAuthClientCredentialsAuthEnabled: 'True', WifCredentialsEnabled: 'True', SharedSecretBearerAuthEnabled: 'True' }),
         [
@@ -234,7 +234,42 @@ describe('ConnectionInfoService', () => {
       for (const m of info.enabledMethods) {
         if ('secretToken' in m.entraFields) expect(m.entraFields.secretToken).toBeNull();
         if ('clientSecret' in m.entraFields) expect(m.entraFields.clientSecret).toBeNull();
+        expect(m.secretRevealed ?? false).toBe(false);
       }
+    });
+
+    it('inlines the secrets + sets secretRevealed when secrets ARE passed (visibility=always)', () => {
+      const info = service.assemble(
+        endpoint({ SecretTokenBearerAuthEnabled: 'True', OAuthClientCredentialsAuthEnabled: 'True', SharedSecretBearerAuthEnabled: 'True' }),
+        [
+          cred({ credentialType: 'bearer', secretEnvelope: 'env-b' }),
+          cred({ id: 'c2', credentialType: 'oauth_client', metadata: { clientId: 'epc_abc' }, secretEnvelope: 'env-o' }),
+        ],
+        'https://scim.example.com',
+        { sharedSecret: 'shared-xyz', bearerToken: 'tok-123', oauthClientSecret: 'sec-456' },
+      );
+      const bearer = info.enabledMethods.find((m) => m.method === 'bearer');
+      expect(bearer?.entraFields.secretToken).toBe('tok-123');
+      expect(bearer?.secretRevealed).toBe(true);
+      const oauth = info.enabledMethods.find((m) => m.method === 'oauth_client');
+      expect(oauth?.entraFields.clientSecret).toBe('sec-456');
+      expect(oauth?.secretRevealed).toBe(true);
+      const shared = info.enabledMethods.find((m) => m.method === 'shared_secret');
+      expect(shared?.entraFields.secretToken).toBe('shared-xyz');
+      expect(shared?.secretRevealed).toBe(true);
+      expect(shared?.clientSecretState).toBe('set-shown-once');
+    });
+
+    it('does NOT inline a per-endpoint secret when there is no credential even if a value is passed', () => {
+      const info = service.assemble(
+        endpoint({ SecretTokenBearerAuthEnabled: 'True' }),
+        [],
+        'https://scim.example.com',
+        { bearerToken: 'tok-123' },
+      );
+      const bearer = info.enabledMethods.find((m) => m.method === 'bearer');
+      expect(bearer?.entraFields.secretToken).toBeNull();
+      expect(bearer?.secretRevealed).toBe(false);
     });
   });
 });

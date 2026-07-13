@@ -12343,13 +12343,26 @@ try {
     Test-Result -Success ($null -ne $awOauth -and $awOauth.credentialId -eq $awCredId) -Message "9z-AW.T2: connection-info surfaces the oauth_client credentialId"
     Test-Result -Success ($awOauth.secretRetained -eq $true) -Message "9z-AW.T3: connection-info reports secretRetained:true under visibility=always"
 
-    # T4: connection-info NEVER carries the secret value itself.
-    $awInfoJson = $awInfo | ConvertTo-Json -Depth 10
-    Test-Result -Success (-not ($awInfoJson -match '"clientSecret"\s*:\s*"[^"]') -and -not ($awInfoJson -match '"secretEnvelope"')) -Message "9z-AW.T4: connection-info never carries a non-null clientSecret or the envelope"
+    # T4 (secret-show feature): under visibility=always the ACTUAL secret is now
+    # INLINED in connection-info so it can be pasted into Entra in one place.
+    Test-Result -Success ($awOauth.secretRevealed -eq $true -and $awOauth.entraFields.clientSecret -eq $awCred.clientSecret) -Message "9z-AW.T4: connection-info INLINES the clientSecret under visibility=always"
 
     # T5: the reveal endpoint returns the retained secret (this is what the Connect tab calls to always-show).
     $awReveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/credentials/$awCredId/reveal" -Method POST -Headers $headers
     Test-Result -Success ($awReveal.retained -eq $true -and $null -ne $awReveal.clientSecret) -Message "9z-AW.T5: reveal returns retained:true + the clientSecret for the Connect tab always-show"
+
+    # T6 (secret-show feature): flipping the endpoint to `once` WITHHOLDS the inline secret again.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ CredentialSecretVisibility = "once" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $awInfoOnce = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/connection-info" -Method GET -Headers $headers
+    $awOauthOnce = $awInfoOnce.enabledMethods | Where-Object { $_.method -eq "oauth_client" }
+    Test-Result -Success ($awOauthOnce.secretRevealed -ne $true -and $null -eq $awOauthOnce.entraFields.clientSecret) -Message "9z-AW.T6: flipping the endpoint to once WITHHOLDS the inline secret"
+
+    # T7 (secret-show feature): server-level connection-secrets returns the global
+    # shared secret + oauth client id/secret when the server visibility is always.
+    $awServerSecrets = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/security/connection-secrets" -Method GET -Headers $headers
+    Test-Result -Success ($awServerSecrets.revealed -eq $true -and $awServerSecrets.PSObject.Properties.Name -contains "oauthClientId") -Message "9z-AW.T7: server-level connection-secrets returns the global secrets when server visibility=always"
 
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId" -Method DELETE -Headers $headers | Out-Null } catch {}

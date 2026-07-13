@@ -14,13 +14,22 @@ function makeController() {
   const credentialEncryption = {
     getKekStatus: jest.fn().mockReturnValue({ configured: true, isDefault: true }),
   };
+  const secretResolver = {
+    resolveServerSecrets: jest.fn().mockResolvedValue({
+      revealed: true,
+      sharedSecret: 'shared-xyz',
+      oauthClientId: 'global-client',
+      oauthClientSecret: 'global-secret',
+    }),
+  };
   const logger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const controller = new AdminSecuritySettingsController(
     credentialSecurity as any,
     credentialEncryption as any,
+    secretResolver as any,
     logger as any,
   );
-  return { controller, credentialSecurity, credentialEncryption, logger };
+  return { controller, credentialSecurity, credentialEncryption, secretResolver, logger };
 }
 
 describe('AdminSecuritySettingsController (WI-8)', () => {
@@ -64,5 +73,37 @@ describe('AdminSecuritySettingsController (WI-8)', () => {
     const res = await controller.update({ credentialSecretVisibility: 'ONCE' });
     expect(credentialSecurity.setServerVisibility).toHaveBeenCalledWith('once');
     expect(res.credentialSecretVisibility).toBe('once');
+  });
+
+  describe('GET /connection-secrets (server-level global secrets)', () => {
+    it('returns the global secrets + audit-logs when server visibility is always', async () => {
+      const { controller, logger } = makeController();
+      const res = await controller.getConnectionSecrets();
+      expect(res.revealed).toBe(true);
+      expect(res.visibility).toBe('always');
+      expect(res.sharedSecret).toBe('shared-xyz');
+      expect(res.oauthClientId).toBe('global-client');
+      expect(res.oauthClientSecret).toBe('global-secret');
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('withholds the global secrets (revealed:false, all null) when server visibility is once', async () => {
+      const { controller, credentialSecurity, secretResolver, logger } = makeController();
+      credentialSecurity.getServerVisibility.mockResolvedValue('once');
+      secretResolver.resolveServerSecrets.mockResolvedValue({
+        revealed: false,
+        sharedSecret: null,
+        oauthClientId: null,
+        oauthClientSecret: null,
+      });
+      const res = await controller.getConnectionSecrets();
+      expect(res.revealed).toBe(false);
+      expect(res.visibility).toBe('once');
+      expect(res.sharedSecret).toBeNull();
+      expect(res.oauthClientId).toBeNull();
+      expect(res.oauthClientSecret).toBeNull();
+      // No disclosure -> no audit warn.
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
   });
 });

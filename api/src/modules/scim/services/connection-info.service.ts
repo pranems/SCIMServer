@@ -57,6 +57,19 @@ export interface ConnectionInfoEndpointInput {
   profile?: { settings?: Record<string, unknown> } | null;
 }
 
+/**
+ * The resolved secret values a connection surface may inline when the effective
+ * `CredentialSecretVisibility` is `always`. Each is null when withheld. Mirrors
+ * `ResolvedConnectionSecrets` from the ConnectionSecretResolverService so the
+ * assembler stays pure (no service dependency). Omitted entirely = withhold all
+ * (backward-compatible default: no secret is ever inlined).
+ */
+export interface AssembleSecrets {
+  sharedSecret?: string | null;
+  bearerToken?: string | null;
+  oauthClientSecret?: string | null;
+}
+
 @Injectable()
 export class ConnectionInfoService {
   /**
@@ -85,6 +98,7 @@ export class ConnectionInfoService {
     endpoint: ConnectionInfoEndpointInput,
     credentials: EndpointCredentialModel[],
     baseUrl: string,
+    secrets?: AssembleSecrets,
   ): ConnectionInfo {
     const endpointId = endpoint.id;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
@@ -99,17 +113,20 @@ export class ConnectionInfoService {
 
     // ── shared_secret (global SCIM_SHARED_SECRET bearer) ──────────────────
     if (effective.sharedSecretBearer) {
+      // The secret is the server-configured global SCIM_SHARED_SECRET. It is
+      // inlined ONLY when the server visibility is `always` (resolved upstream
+      // and passed in as `secrets.sharedSecret`); otherwise it stays null.
+      const sharedSecretValue = secrets?.sharedSecret ?? null;
       enabledMethods.push({
         method: 'shared_secret',
         label: 'Shared-secret bearer token',
         entraAuthenticationMethod: 'Secret Token',
         entraFields: {
           tenantUrl: urls.scimBaseUrl,
-          // The secret is the server-configured global SCIM_SHARED_SECRET; it
-          // is intentionally not returned here.
-          secretToken: null,
+          secretToken: sharedSecretValue,
         },
-        clientSecretState: 'none',
+        clientSecretState: sharedSecretValue ? 'set-shown-once' : 'none',
+        secretRevealed: sharedSecretValue !== null,
       });
     } else {
       disabledMethods.push({
@@ -122,17 +139,21 @@ export class ConnectionInfoService {
     // ── bearer (per-endpoint Secret Token) ────────────────────────────────
     if (effective.secretTokenBearer) {
       const bearerCred = activeCreds.find((c) => c.credentialType === 'bearer');
+      // Inline the decrypted token ONLY when the effective visibility is
+      // `always` AND the credential retained an envelope (resolved upstream).
+      const bearerSecret = bearerCred ? (secrets?.bearerToken ?? null) : null;
       enabledMethods.push({
         method: 'bearer',
         label: 'Per-endpoint bearer token (Secret Token)',
         entraAuthenticationMethod: 'Secret Token',
         entraFields: {
           tenantUrl: urls.scimBaseUrl,
-          secretToken: null,
+          secretToken: bearerSecret,
         },
         clientSecretState: bearerCred ? 'set-shown-once' : 'create-required',
         credentialId: bearerCred?.id ?? null,
         secretRetained: !!bearerCred?.secretEnvelope,
+        secretRevealed: bearerSecret !== null,
       });
     } else {
       disabledMethods.push({
@@ -147,6 +168,9 @@ export class ConnectionInfoService {
       const oauthCred = activeCreds.find((c) => c.credentialType === 'oauth_client');
       const clientId =
         typeof oauthCred?.metadata?.clientId === 'string' ? oauthCred.metadata.clientId : null;
+      // Inline the decrypted client secret ONLY when effective visibility is
+      // `always` AND the credential retained an envelope (resolved upstream).
+      const oauthSecret = oauthCred ? (secrets?.oauthClientSecret ?? null) : null;
       enabledMethods.push({
         method: 'oauth_client',
         label: 'OAuth2 client credentials',
@@ -155,11 +179,12 @@ export class ConnectionInfoService {
           tenantUrl: urls.scimBaseUrl,
           tokenEndpoint: urls.tokenEndpoint,
           clientIdentifier: clientId,
-          clientSecret: null,
+          clientSecret: oauthSecret,
         },
         clientSecretState: oauthCred ? 'set-shown-once' : 'create-required',
         credentialId: oauthCred?.id ?? null,
         secretRetained: !!oauthCred?.secretEnvelope,
+        secretRevealed: oauthSecret !== null,
       });
     } else {
       disabledMethods.push({

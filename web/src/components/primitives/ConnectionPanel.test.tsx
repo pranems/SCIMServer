@@ -97,6 +97,15 @@ describe('ConnectionPanel (WI-4)', () => {
     expect(screen.getByTestId('connection-panel-secret-warning')).toBeInTheDocument();
   });
 
+  it('renders an inline secret value straight from entraFields (visibility=always backend inline)', () => {
+    const ci = info();
+    // Backend inlines the actual secret into entraFields when visibility=always.
+    ci.enabledMethods[0].entraFields.clientSecret = 'inline-secret-abc';
+    ci.enabledMethods[0].secretRevealed = true;
+    renderWithFluent(<ConnectionPanel connectionInfo={ci} />);
+    expect(screen.getByTestId('connection-panel-value-clientSecret')).toHaveTextContent('inline-secret-abc');
+  });
+
   it('renders a retained secret persistently (re-viewable note, no one-time warning) - R3', () => {
     renderWithFluent(
       <ConnectionPanel

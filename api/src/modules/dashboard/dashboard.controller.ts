@@ -22,6 +22,8 @@ import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import { ConnectionInfoService } from '../scim/services/connection-info.service';
+import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
+import type { EndpointConfig } from '../endpoint/endpoint-config.interface';
 import type {
   DashboardResponse,
   DashboardEndpoint,
@@ -89,6 +91,7 @@ export class DashboardController {
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly connectionInfo: ConnectionInfoService,
+    private readonly secretResolver: ConnectionSecretResolverService,
   ) {}
 
   /**
@@ -255,10 +258,18 @@ export class DashboardController {
     // from the request exactly as the connection-info controller does.
     const proto = req.headers['x-forwarded-proto']?.toString() ?? req.protocol;
     const host = req.headers['x-forwarded-host']?.toString() ?? req.get('host');
+    // When CredentialSecretVisibility=always, inline the actual secrets so the
+    // Connect tab (which reads this BFF) can show every connection parameter
+    // (incl. the global shared_secret, which has no per-credential reveal path).
+    const overviewSecrets = await this.secretResolver.resolveForEndpoint(
+      configFlags as EndpointConfig,
+      credentialRows,
+    );
     const connectionInfo = this.connectionInfo.assemble(
       endpoint,
       credentialRows,
       `${proto}://${host}`,
+      overviewSecrets,
     );
 
     return {

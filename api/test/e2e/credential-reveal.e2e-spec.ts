@@ -149,4 +149,61 @@ describe('Credential reveal + security settings (E2E)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
   });
+
+  describe('GET /admin/settings/security/connection-secrets (server-level global secrets)', () => {
+    it('returns the global shared secret + oauth client id/secret when server visibility is always', async () => {
+      await request(app.getHttpServer())
+        .put('/scim/admin/settings/security')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialSecretVisibility: 'always' })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/settings/security/connection-secrets')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.revealed).toBe(true);
+      expect(res.body.visibility).toBe('always');
+      // The SCIM shared secret (Entra "Secret Token") + the global oauth client id.
+      expect(typeof res.body.sharedSecret === 'string' || res.body.sharedSecret === null).toBe(true);
+      expect(res.body).toHaveProperty('oauthClientId');
+      expect(res.body).toHaveProperty('oauthClientSecret');
+    });
+
+    it('withholds the global secrets (revealed:false, all null) when server visibility is once', async () => {
+      await request(app.getHttpServer())
+        .put('/scim/admin/settings/security')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialSecretVisibility: 'once' })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/settings/security/connection-secrets')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.revealed).toBe(false);
+      expect(res.body.visibility).toBe('once');
+      expect(res.body.sharedSecret).toBeNull();
+      expect(res.body.oauthClientId).toBeNull();
+      expect(res.body.oauthClientSecret).toBeNull();
+
+      // Restore always so other suites are unaffected.
+      await request(app.getHttpServer())
+        .put('/scim/admin/settings/security')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialSecretVisibility: 'always' })
+        .expect(200);
+    });
+
+    it('requires admin auth (401 without a bearer)', async () => {
+      await request(app.getHttpServer())
+        .get('/scim/admin/settings/security/connection-secrets')
+        .expect(401);
+    });
+  });
 });

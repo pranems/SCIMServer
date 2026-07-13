@@ -2111,6 +2111,33 @@ export const authDecisionsQueryOptions = (params: AuthDecisionsParams = {}) => {
 export const useAuthDecisions = (params: AuthDecisionsParams = {}) =>
   useQuery(authDecisionsQueryOptions(params));
 
+// ─── Server-level connection secrets (shown when visibility=always) ──
+
+/**
+ * The SCIMServer-level global connection secrets, returned by
+ * `GET /scim/admin/settings/security/connection-secrets` ONLY when the server
+ * CredentialSecretVisibility is `always`. When `once`, `revealed` is false and
+ * every value is null. Short cache; refetched when the visibility flips.
+ */
+export interface ServerConnectionSecrets {
+  revealed: boolean;
+  visibility: 'always' | 'once';
+  sharedSecret: string | null;
+  oauthClientId: string | null;
+  oauthClientSecret: string | null;
+}
+
+export const serverConnectionSecretsQueryOptions = () => ({
+  queryKey: ['server-connection-secrets'] as const,
+  queryFn: () =>
+    fetchWithAuth<ServerConnectionSecrets>('/scim/admin/settings/security/connection-secrets'),
+  staleTime: 15_000,
+});
+
+export const useServerConnectionSecrets = () =>
+  useQuery(serverConnectionSecretsQueryOptions());
+
+
 
 export function useCreateEndpoint() {
   const qc = useQueryClient();

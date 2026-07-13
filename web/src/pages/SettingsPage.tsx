@@ -27,7 +27,7 @@ import {
   Link,
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings, useServerConnectionSecrets } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock, SettingsJsonExport } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -209,13 +209,26 @@ const ServerConnectionInfoCard: React.FC = () => {
     oauthMetadata: `${origin}/.well-known/oauth-authorization-server`,
     scimServiceProviderConfig: `${origin}/${prefix}/v2/ServiceProviderConfig`,
   };
+  // When the server CredentialSecretVisibility is `always`, surface the global
+  // secrets so an admin can copy every server-scope connection parameter for an
+  // Entra gallery app in one place. Withheld (null) when `once`.
+  const { data: secrets } = useServerConnectionSecrets();
+  const revealed = secrets?.revealed ?? false;
+  const exportValue = revealed
+    ? {
+        ...urls,
+        sharedSecret: secrets?.sharedSecret ?? null,
+        oauthClientId: secrets?.oauthClientId ?? null,
+        oauthClientSecret: secrets?.oauthClientSecret ?? null,
+      }
+    : urls;
 
   return (
     <Card className={classes.logConfigCard} data-testid="server-connection-info-card">
       <div className={classes.logConfigHeader}>
         <Subtitle1>Server connection info (SCIMServer level)</Subtitle1>
         <SettingsJsonExport
-          value={urls}
+          value={exportValue}
           filename="scimserver-connection-info.json"
           copyLabel="Copy as JSON"
           data-testid="server-connection-info-export"
@@ -224,8 +237,10 @@ const ServerConnectionInfoCard: React.FC = () => {
       <Caption1>
         SCIMServer-level (global) values for a client that connects at the server scope. Each
         endpoint also has its own per-endpoint values on its Connect tab. Labels follow Microsoft
-        Entra ID; other IdPs (Okta, OneLogin, Ping, custom clients) use the equivalent field. No
-        secret is shown here - the global SCIM shared secret is server-configured.
+        Entra ID; other IdPs (Okta, OneLogin, Ping, custom clients) use the equivalent field.
+        {revealed
+          ? ' Secrets are shown because CredentialSecretVisibility is "always".'
+          : ' Secrets are hidden (CredentialSecretVisibility is "once"); set it to "always" below to show them.'}
       </Caption1>
 
       <div className={classes.row}>
@@ -248,6 +263,36 @@ const ServerConnectionInfoCard: React.FC = () => {
         <Text>ServiceProviderConfig</Text>
         <CopyableField value={urls.scimServiceProviderConfig} monospace data-testid="server-conn-spc" />
       </div>
+
+      {revealed && (
+        <>
+          <div className={classes.row}>
+            <Text>Secret Token (SCIM shared secret)</Text>
+            {secrets?.sharedSecret ? (
+              <CopyableField value={secrets.sharedSecret} monospace data-testid="server-conn-shared-secret" />
+            ) : (
+              <Caption1 data-testid="server-conn-shared-secret-unset">Not configured</Caption1>
+            )}
+          </div>
+          <div className={classes.row}>
+            <Text>OAuth client id (global)</Text>
+            {secrets?.oauthClientId ? (
+              <CopyableField value={secrets.oauthClientId} monospace data-testid="server-conn-oauth-client-id" />
+            ) : (
+              <Caption1>Not configured</Caption1>
+            )}
+          </div>
+          <div className={classes.row}>
+            <Text>OAuth client secret (global)</Text>
+            {secrets?.oauthClientSecret ? (
+              <CopyableField value={secrets.oauthClientSecret} monospace data-testid="server-conn-oauth-client-secret" />
+            ) : (
+              <Caption1 data-testid="server-conn-oauth-client-secret-unset">Not configured</Caption1>
+            )}
+          </div>
+        </>
+      )}
+
       <Caption1>
         For per-endpoint connection details,{' '}
         <Link

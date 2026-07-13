@@ -35,6 +35,7 @@ import { EndpointScimGenericService } from './services/endpoint-scim-generic.ser
 import { BulkProcessorService } from './services/bulk-processor.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ConnectionInfoService } from './services/connection-info.service';
+import { ConnectionSecretResolverService } from './services/connection-secret-resolver.service';
 import { CredentialEncryptionService } from '../../security/credential-encryption.service';
 import { CredentialSecurityService } from '../../security/credential-security.service';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
@@ -82,6 +83,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     BulkProcessorService,
     EndpointContextStorage,
     ConnectionInfoService,
+    ConnectionSecretResolverService,
     CredentialEncryptionService,
     CredentialSecurityService,
     // Q6 - bind the A3 assertion-provider seam to the WIF validate+issue pipeline.

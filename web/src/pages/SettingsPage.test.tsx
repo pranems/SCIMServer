@@ -27,10 +27,16 @@ vi.mock('../api/queries', async () => {
     // WI-8 - server security settings hooks.
     useSecuritySettings: vi.fn(() => ({ data: undefined, isLoading: false })),
     useUpdateSecuritySettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    // Server-level connection secrets (shown when visibility=always). Benign
+    // default: not revealed (secrets hidden).
+    useServerConnectionSecrets: vi.fn(() => ({
+      data: { revealed: false, visibility: 'once', sharedSecret: null, oauthClientId: null, oauthClientSecret: null },
+      isLoading: false,
+    })),
   };
 });
 
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings, useServerConnectionSecrets } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -121,6 +127,29 @@ describe('SettingsPage log config (Phase L4)', () => {
     // Copy/Download JSON export affordances.
     expect(screen.getByTestId('server-connection-info-export-copy')).toBeInTheDocument();
     expect(screen.getByTestId('server-connection-info-export-download')).toBeInTheDocument();
+  });
+
+  it('hides the global secrets when visibility is once (default mock)', () => {
+    wrap(<SettingsPage />);
+    expect(screen.queryByTestId('server-conn-shared-secret')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('server-conn-oauth-client-secret')).not.toBeInTheDocument();
+  });
+
+  it('shows the global secrets when CredentialSecretVisibility is always', () => {
+    (useServerConnectionSecrets as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        revealed: true,
+        visibility: 'always',
+        sharedSecret: 'shared-token-xyz',
+        oauthClientId: 'global-client',
+        oauthClientSecret: 'global-secret',
+      },
+      isLoading: false,
+    });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('server-conn-shared-secret').textContent).toContain('shared-token-xyz');
+    expect(screen.getByTestId('server-conn-oauth-client-id').textContent).toContain('global-client');
+    expect(screen.getByTestId('server-conn-oauth-client-secret').textContent).toContain('global-secret');
   });
 
   it('renders the global level Combobox seeded from availableLevels', () => {

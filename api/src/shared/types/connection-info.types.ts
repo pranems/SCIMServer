@@ -56,6 +56,14 @@ export interface ConnectionEnabledMethod {
    * returned. Never the secret value itself.
    */
   secretRetained?: boolean;
+  /**
+   * True when the ACTUAL secret value is inlined in `entraFields` (secretToken
+   * / clientSecret) because the effective `CredentialSecretVisibility` is
+   * `always` (operator opt-in) and the secret was resolvable. When false, the
+   * secret field is null and the surface shows the "shown once - rotate to
+   * view" fallback. Every inline is an admin-only, audit-logged disclosure.
+   */
+  secretRevealed?: boolean;
 }
 
 /** A disabled auth method + why + how to enable it. */

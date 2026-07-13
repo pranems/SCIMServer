@@ -27,7 +27,7 @@ describe('Connection-info API (E2E)', () => {
 
   const TOP_KEYS = ['endpointId', 'displayName', 'urls', 'enabledMethods', 'disabledMethods'];
   const URL_KEYS = ['scimBaseUrl', 'scimBaseUrlBare', 'tokenEndpoint', 'serviceProviderConfig', 'oauthMetadata'];
-  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained'];
+  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained', 'secretRevealed'];
   const DISABLED_KEYS = ['method', 'reason', 'enableHint'];
 
   it('assembles the connection-info shape with only documented top-level keys', async () => {
@@ -97,9 +97,10 @@ describe('Connection-info API (E2E)', () => {
     expect(oc.entraFields.clientSecret).toBeNull();
   });
 
-  it('never returns a secret value; clientSecretState flips to set-shown-once after a create', async () => {
+  it('WITHHOLDS the secret when CredentialSecretVisibility is once (shown once at create only)', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       OAuthClientCredentialsAuthEnabled: true,
+      CredentialSecretVisibility: 'once',
     });
 
     // Create an oauth_client credential (the secret is shown once here, not in connection-info).
@@ -119,12 +120,14 @@ describe('Connection-info API (E2E)', () => {
     const oc = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
     expect(oc.clientSecretState).toBe('set-shown-once');
     expect(oc.entraFields.clientIdentifier).toBe(`client-id-${endpointId}`); // first oauth_client defaults to client-id-<endpointId>
+    // visibility=once -> the secret is NOT inlined.
     expect(oc.entraFields.clientSecret).toBeNull();
+    expect(oc.secretRevealed).toBe(false);
     // The whole response must not carry the plaintext secret anywhere.
     expect(JSON.stringify(res.body)).not.toContain(created.body.clientSecret);
   });
 
-  it('surfaces credentialId + secretRetained on the oauth_client method after a create (R3)', async () => {
+  it('INLINES the secret + sets secretRevealed when CredentialSecretVisibility is always (Entra one-stop)', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       OAuthClientCredentialsAuthEnabled: true,
       CredentialSecretVisibility: 'always',
@@ -134,9 +137,10 @@ describe('Connection-info API (E2E)', () => {
       .post(`/scim/admin/endpoints/${endpointId}/credentials`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ credentialType: 'oauth_client', label: 'r3-e2e' })
+      .send({ credentialType: 'oauth_client', label: 'always-e2e' })
       .expect(201);
     const credentialId = created.body.id as string;
+    const plaintextSecret = created.body.clientSecret as string;
 
     const res = await request(app.getHttpServer())
       .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
@@ -144,11 +148,11 @@ describe('Connection-info API (E2E)', () => {
       .expect(200);
 
     const oc = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
-    // The Connect tab uses these to call the reveal endpoint + always-show the secret.
     expect(oc.credentialId).toBe(credentialId);
     expect(oc.secretRetained).toBe(true);
-    // Still never the secret value itself.
-    expect(JSON.stringify(res.body)).not.toContain(created.body.clientSecret);
+    // visibility=always -> the ACTUAL secret is inlined so it can be pasted into Entra.
+    expect(oc.secretRevealed).toBe(true);
+    expect(oc.entraFields.clientSecret).toBe(plaintextSecret);
   });
 
   it('returns 404 for an unknown endpoint', async () => {

@@ -22,6 +22,7 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/reposi
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import type { DashboardResponse, EndpointOverviewResponse } from '../../shared/types/dashboard.types';
 import { ConnectionInfoService } from '../scim/services/connection-info.service';
+import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
 
 /** Minimal Express-like request stub for the overview host derivation (WI-3). */
 function reqStub(): any {
@@ -140,6 +141,19 @@ describe('DashboardController', () => {
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: mockCredentialRepo },
         // WI-3: the pure connection-info assembler (real instance).
         ConnectionInfoService,
+        // Secret resolver stubbed to withhold everything (visibility=once
+        // default for these tests), preserving the no-secret-leak assertions.
+        {
+          provide: ConnectionSecretResolverService,
+          useValue: {
+            resolveForEndpoint: jest.fn().mockResolvedValue({
+              sharedSecret: null,
+              bearerToken: null,
+              oauthClientSecret: null,
+              anyEndpointSecretRevealed: false,
+            }),
+          },
+        },
       ],
     }).compile();
 
