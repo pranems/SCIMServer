@@ -21,6 +21,9 @@ vi.mock('../api/queries', async () => {
     ...actual,
     useEndpointOverview: vi.fn(),
     useConnectionRetainedSecrets: vi.fn(() => ({})),
+    // WI-D6: the ConnectTab now embeds AuthDiagnosticsPanel; stub its hook so
+    // these tests need no QueryClientProvider.
+    useAuthDecisions: vi.fn(() => ({ data: { count: 0, records: [] }, isLoading: false, error: null })),
   };
 });
 

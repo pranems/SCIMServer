@@ -94,9 +94,13 @@ describe('LogsTab', () => {
     );
     await screen.findByText(/no request logs/i);
     // The hook is called with (endpointId, page, urlContains, pageSize) -
-    // assert via the queryKey that mockUseQuery received.
-    const lastCall = mockUseQuery.mock.calls.at(-1) ?? [];
-    const queryArg = lastCall[0] as { queryKey: unknown[] };
+    // assert via the queryKey that mockUseQuery received. (WI-D6 added an
+    // AuthDiagnosticsPanel that also calls useQuery, so target the logs call.)
+    const logsCall = mockUseQuery.mock.calls.find(
+      (c) => Array.isArray((c[0] as { queryKey?: unknown[] })?.queryKey) &&
+        (c[0] as { queryKey: unknown[] }).queryKey[0] === 'endpoint-logs',
+    ) ?? [];
+    const queryArg = logsCall[0] as { queryKey: unknown[] };
     expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 3, 20, 'Users']);
   });
 
@@ -178,8 +182,11 @@ describe('LogsTab', () => {
     wrap(<LogsTab endpointId="ep-1" />);
     await screen.findByText(/no request logs/i);
     // Hook is called via useQuery({queryKey: ['endpoint-logs', endpointId, page, pageSize, urlContains]}).
-    const lastCall = mockUseQuery.mock.calls.at(-1) ?? [];
-    const queryArg = lastCall[0] as { queryKey: unknown[] };
+    const logsCall = mockUseQuery.mock.calls.find(
+      (c) => Array.isArray((c[0] as { queryKey?: unknown[] })?.queryKey) &&
+        (c[0] as { queryKey: unknown[] }).queryKey[0] === 'endpoint-logs',
+    ) ?? [];
+    const queryArg = logsCall[0] as { queryKey: unknown[] };
     expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 1, 50, '']);
   });
 });

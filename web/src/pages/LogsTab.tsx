@@ -26,7 +26,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
-import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, AuthDiagnosticsPanel } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -146,16 +146,20 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
         onAction={() => updateSearch({ urlContains: '' })}
       />
     ) : (
-      <EmptyState
-        data-testid="logs-tab-empty"
-        title="No request logs yet"
-        body="This endpoint has not received any SCIM requests in the visible window."
-      />
+      <div className={classes.container} data-testid="logs-tab-empty-wrap">
+        <AuthDiagnosticsPanel endpointId={endpointId} data-testid="logs-tab-auth-diagnostics" />
+        <EmptyState
+          data-testid="logs-tab-empty"
+          title="No request logs yet"
+          body="This endpoint has not received any SCIM requests in the visible window."
+        />
+      </div>
     );
   }
 
   return (
     <div className={classes.container} data-testid="logs-tab">
+      <AuthDiagnosticsPanel endpointId={endpointId} data-testid="logs-tab-auth-diagnostics" />
       <div className={classes.header}>
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
         <ExportSplitButton

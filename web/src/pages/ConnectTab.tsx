@@ -16,7 +16,7 @@ import React from 'react';
 import { makeStyles, tokens, Text, Subtitle2, Caption1, Card, Link } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import { useEndpointOverview, useConnectionRetainedSecrets } from '../api/queries';
-import { ConnectionPanel, LoadingSkeleton } from '../components/primitives';
+import { ConnectionPanel, LoadingSkeleton, AuthDiagnosticsPanel } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import type { ConnectionInfo } from '@scim/types/connection-info.types';
 
@@ -90,6 +90,8 @@ export const ConnectTab: React.FC<ConnectTabProps> = ({ endpointId }) => {
       </div>
 
       <ConnectPanelSection endpointId={endpointId} connectionInfo={connectionInfo} />
+
+      <AuthDiagnosticsPanel endpointId={endpointId} data-testid="connect-tab-auth-diagnostics" />
 
       {connectionInfo.disabledMethods.length > 0 && (
         <Card className={classes.disabledCard} data-testid="connect-tab-disabled">

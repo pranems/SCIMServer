@@ -21,6 +21,9 @@ vi.mock('../api/queries', async () => {
     useGlobalLogs: (...args: unknown[]) => mockUseGlobalLogs(...args),
     useGlobalLog: (...args: unknown[]) => mockUseGlobalLog(...args),
     useEndpoints: (...args: unknown[]) => mockUseEndpoints(...args),
+    // WI-D6: LogsPage now embeds the global AuthDiagnosticsPanel; stub its hook
+    // so these tests need no QueryClientProvider.
+    useAuthDecisions: () => ({ data: { count: 0, records: [] }, isLoading: false, error: null }),
   };
 });
 

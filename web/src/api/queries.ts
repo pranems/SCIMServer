@@ -27,6 +27,7 @@ import type {
   HealthResponse,
 } from '@scim/types/dashboard.types';
 import type { ConnectionInfo } from '@scim/types/connection-info.types';
+import type { AuthDecisionsResponse } from '@scim/types/auth-decision.types';
 import { getStoredToken, notifyTokenInvalid, clearStoredToken } from '../auth/token';
 import { ScimApiError } from './scim-error';
 
@@ -2064,6 +2065,52 @@ export interface CreateEndpointBody {
   profilePreset?: string;
   profile?: Record<string, unknown>;
 }
+
+// ─── WI-D6: Auth Decision diagnostics ────────────────────────────────
+
+/**
+ * WI-D6: recent Auth Decision Records for the diagnostics panel.
+ *
+ * Two scopes mirror the backend WI-D5 API:
+ *  - per-endpoint: `GET /scim/admin/endpoints/:id/auth-decisions`
+ *  - global:       `GET /scim/admin/auth-decisions`
+ *
+ * Pass an `endpointId` for the per-endpoint scope (Connect tab + endpoint
+ * Logs tab); omit it for the global scope (admin Logs page). Short cache -
+ * these are recent, short-TTL diagnostics that change as auth attempts arrive.
+ */
+export interface AuthDecisionsParams {
+  endpointId?: string;
+  outcome?: 'accept' | 'reject';
+  reasonCode?: string;
+  limit?: number;
+}
+
+export const authDecisionsQueryOptions = (params: AuthDecisionsParams = {}) => {
+  const qs = new URLSearchParams();
+  if (params.outcome) qs.set('outcome', params.outcome);
+  if (params.reasonCode) qs.set('reasonCode', params.reasonCode);
+  if (params.limit) qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const path = params.endpointId
+    ? `/scim/admin/endpoints/${params.endpointId}/auth-decisions${suffix}`
+    : `/scim/admin/auth-decisions${suffix}`;
+  return {
+    queryKey: [
+      'auth-decisions',
+      params.endpointId ?? '',
+      params.outcome ?? '',
+      params.reasonCode ?? '',
+      params.limit ?? '',
+    ] as const,
+    queryFn: () => fetchWithAuth<AuthDecisionsResponse>(path),
+    staleTime: 5_000,
+  };
+};
+
+export const useAuthDecisions = (params: AuthDecisionsParams = {}) =>
+  useQuery(authDecisionsQueryOptions(params));
+
 
 export function useCreateEndpoint() {
   const qc = useQueryClient();

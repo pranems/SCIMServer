@@ -46,7 +46,7 @@ import {
 } from '../api/queries';
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
 import { TIME_RANGE_VALUES } from '../routes/search-schemas';
-import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton, AuthDiagnosticsPanel } from '../components/primitives';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -311,6 +311,9 @@ export const LogsPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {/* WI-D6 - global auth diagnostics (all endpoints). */}
+      <AuthDiagnosticsPanel data-testid="global-logs-auth-diagnostics" />
 
       {/* Phase D5 toolbar: endpoint + status + time range + free-text */}
       <div className={classes.toolbar} data-testid="logs-toolbar">
