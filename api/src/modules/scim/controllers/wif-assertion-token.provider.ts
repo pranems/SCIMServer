@@ -12,7 +12,12 @@ import type { IEndpointCredentialRepository } from '../../../domain/repositories
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { computeShadowDecision } from '../../../oauth/wif-shadow-telemetry';
-import type { AuthDecisionTrace } from '../../../oauth/auth-decision-trace';
+import {
+  AuthDecisionTraceBuilder,
+  emitAuthDecisionEvent,
+  type AuthDecisionTrace,
+} from '../../../oauth/auth-decision-trace';
+import { getCorrelationContext } from '../../logging/scim-logger.service';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider } from './assertion-token-provider';
 
@@ -119,6 +124,19 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         sourceIssuer: trust.expectedIssuer,
       });
 
+      // WI-D4 - one canonical AUTH decision event for this accepted attempt.
+      const acceptTrace = new AuthDecisionTraceBuilder('token-mint', 'wif', {
+        correlationId: getCorrelationContext()?.requestId,
+        endpointId,
+      })
+        .setSelectedTrustId(wif.id)
+        .setDecodedClaims(claims)
+        .pass('jwks_signature')
+        .pass('claim_checks', { expected: trust.expectedIssuer })
+        .accept()
+        .build();
+      emitAuthDecisionEvent(this.logger, acceptTrace, LogCategory.AUTH);
+
       return token;
     }
 
@@ -127,19 +145,41 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     // wif_audience_mismatch). With MULTIPLE trusts, none accepted, so the
     // aggregate reason is wif_no_trust_accepted, carrying each trust's
     // sub-trace so the operator can see why every one was rejected.
+    // WI-D4: emit one canonical AUTH decision event for the rejected attempt.
+    const correlationId = getCorrelationContext()?.requestId;
     if (orderedTrusts.length > 1) {
+      const aggregateTrace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'reject',
+        reasonCode: 'wif_no_trust_accepted',
+        endpointId,
+        correlationId,
+        checks: [],
+        subTraces,
+      };
+      emitAuthDecisionEvent(this.logger, aggregateTrace, LogCategory.AUTH);
       throw new WifAssertionInvalidError(
         'No configured WIF trust accepted the assertion.',
         'wif_no_trust_accepted',
-        {
+        aggregateTrace,
+      );
+    }
+    if (lastError instanceof WifAssertionInvalidError) {
+      emitAuthDecisionEvent(
+        this.logger,
+        lastError.trace ?? {
           plane: 'token-mint',
           method: 'wif',
           outcome: 'reject',
-          reasonCode: 'wif_no_trust_accepted',
+          reasonCode: lastError.reasonCode,
+          endpointId,
+          correlationId,
           checks: [],
-          subTraces,
         },
+        LogCategory.AUTH,
       );
+      throw lastError;
     }
     if (lastError instanceof Error) {
       throw lastError;

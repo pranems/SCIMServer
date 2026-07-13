@@ -12493,6 +12493,18 @@ try {
             } catch {}
         }
         Test-Result -Success ($null -ne $azErrBody -and $azErrBody.reason_code -eq 'oauth_client_auth_failed') -Message "9z-AZ.T7: wrong oauth_client secret -> reason_code oauth_client_auth_failed on the wire"
+
+        # T8 (WI-D4): the rejected attempt emits one canonical AUTH decision event
+        # in the ring buffer (LogCategory.auth), derived from the same trace.
+        $azRecent = $null
+        try {
+            $azRecent = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=auth&limit=200" -Method GET -Headers $headers
+        } catch {}
+        $azDecision = $null
+        if ($null -ne $azRecent -and $null -ne $azRecent.entries) {
+            $azDecision = $azRecent.entries | Where-Object { $_.message -eq 'Auth decision' -and $_.data.reasonCode -eq 'oauth_client_auth_failed' } | Select-Object -First 1
+        }
+        Test-Result -Success ($null -ne $azDecision -and $azDecision.data.outcome -eq 'reject' -and $azDecision.data.method -eq 'oauth_client') -Message "9z-AZ.T8: rejected oauth_client emits one AUTH decision event (reject) in the ring buffer"
     } finally {
         try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$azWifId" -Method DELETE -Headers $headers | Out-Null } catch {}
     }

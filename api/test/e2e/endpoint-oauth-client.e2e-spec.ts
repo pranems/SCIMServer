@@ -139,6 +139,27 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(res.body.error_description).toBe('Client authentication failed.');
   });
 
+  it('WI-D4: a rejected oauth_client attempt emits an AUTH decision event in the ring buffer', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);
+
+    const recent = await request(app.getHttpServer())
+      .get('/scim/admin/log-config/recent?category=auth&limit=200')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const decisionEvents = (recent.body.entries as Array<Record<string, unknown>>).filter(
+      (e) => e.message === 'Auth decision',
+    );
+    expect(decisionEvents.length).toBeGreaterThan(0);
+    const rejectEvent = decisionEvents.find(
+      (e) => (e.data as Record<string, unknown>)?.reasonCode === 'oauth_client_auth_failed',
+    );
+    expect(rejectEvent).toBeDefined();
+    expect((rejectEvent!.data as Record<string, unknown>).outcome).toBe('reject');
+    expect((rejectEvent!.data as Record<string, unknown>).method).toBe('oauth_client');
+  });
+
   it('rejects a wrong grant_type with unsupported_grant_type', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
     const res = await request(app.getHttpServer())

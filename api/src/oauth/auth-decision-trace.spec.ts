@@ -2,6 +2,9 @@ import {
   AuthDecisionTraceBuilder,
   mapJwksErrorToReason,
   describeTraceReason,
+  emitAuthDecisionEvent,
+  AUTH_DECISION_EVENT,
+  type AuthDecisionTrace,
 } from './auth-decision-trace';
 
 describe('WI-D3 AuthDecisionTrace', () => {
@@ -123,4 +126,83 @@ describe('WI-D3 AuthDecisionTrace', () => {
     expect(entry?.wireError).toBe('invalid_client');
     expect(entry?.plane).toBe('wif');
   });
+
+  describe('WI-D4 emitAuthDecisionEvent', () => {
+    const makeLogger = () => ({ info: jest.fn(), warn: jest.fn() });
+
+    it('emits exactly one INFO event on accept with the AUTH_DECISION_EVENT message', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'accept',
+        endpointId: 'ep-1',
+        correlationId: 'req-1',
+        checks: [{ id: 'jwks_signature', status: 'pass' }],
+      };
+      emitAuthDecisionEvent(logger, trace, 'AUTH');
+      expect(logger.info).toHaveBeenCalledTimes(1);
+      expect(logger.warn).not.toHaveBeenCalled();
+      const [category, message, data] = logger.info.mock.calls[0];
+      expect(category).toBe('AUTH');
+      expect(message).toBe(AUTH_DECISION_EVENT);
+      expect(data.outcome).toBe('accept');
+      expect(data.method).toBe('wif');
+      expect(data.endpointId).toBe('ep-1');
+      expect(data.correlationId).toBe('req-1');
+    });
+
+    it('emits exactly one WARN event on reject with the reason code + failed check ids', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'reject',
+        reasonCode: 'wif_audience_mismatch',
+        checks: [
+          { id: 'jwks_signature', status: 'pass' },
+          { id: 'audience_match', status: 'fail', expected: 'api://a', received: 'api://b' },
+        ],
+      };
+      emitAuthDecisionEvent(logger, trace, 'AUTH');
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.info).not.toHaveBeenCalled();
+      const data = logger.warn.mock.calls[0][2];
+      expect(data.reasonCode).toBe('wif_audience_mismatch');
+      expect(data.failedChecks).toEqual(['audience_match']);
+      expect(data.checkCount).toBe(2);
+    });
+
+    it('does not leak the raw assertion or received values beyond the sanitized trace', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'reject',
+        reasonCode: 'wif_issuer_mismatch',
+        decodedClaims: { iss: 'issuer-a' },
+        checks: [],
+      };
+      emitAuthDecisionEvent(logger, trace, 'AUTH');
+      const data = logger.warn.mock.calls[0][2];
+      expect(data.decodedClaims).toEqual({ iss: 'issuer-a' });
+      expect(JSON.stringify(data)).not.toContain('signature');
+    });
+
+    it('drops undefined keys so the log line stays clean', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'oauth_client',
+        outcome: 'reject',
+        reasonCode: 'oauth_client_auth_failed',
+        checks: [],
+      };
+      emitAuthDecisionEvent(logger, trace, 'AUTH');
+      const data = logger.warn.mock.calls[0][2];
+      expect('selectedTrustId' in data).toBe(false);
+      expect('endpointId' in data).toBe(false);
+    });
+  });
 });
+

@@ -23,6 +23,8 @@ import {
   type IAssertionTokenProvider,
 } from './assertion-token-provider';
 import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
+import { emitAuthDecisionEvent, type AuthDecisionTrace } from '../../../oauth/auth-decision-trace';
+import { getCorrelationContext } from '../../logging/scim-logger.service';
 
 interface EndpointTokenRequest {
   grant_type?: string;
@@ -191,6 +193,10 @@ export class EndpointOAuthController {
         clientId: body.client_id,
         credentialFound: candidate != null,
       });
+      // WI-D4 - one canonical AUTH decision event (reject). The distinguishing
+      // fact (credentialFound) stays in the diagnostic warn above; the decision
+      // event carries only the merged (T3) reason code.
+      this.emitOauthClientDecision(endpointId, 'reject', 'oauth_client_auth_failed');
       throw this.invalidClient('oauth_client_auth_failed');
     }
 
@@ -204,6 +210,7 @@ export class EndpointOAuthController {
       endpointId,
       clientId: body.client_id,
     });
+    this.emitOauthClientDecision(endpointId, 'accept');
 
     return {
       access_token: token.accessToken,
@@ -211,6 +218,24 @@ export class EndpointOAuthController {
       expires_in: token.expiresIn,
       scope: token.scope,
     };
+  }
+
+  /** WI-D4 - emit one canonical AUTH decision event for the oauth_client plane. */
+  private emitOauthClientDecision(
+    endpointId: string,
+    outcome: 'accept' | 'reject',
+    reasonCode?: string,
+  ): void {
+    const trace: AuthDecisionTrace = {
+      plane: 'token-mint',
+      method: 'oauth_client',
+      outcome,
+      endpointId,
+      correlationId: getCorrelationContext()?.requestId,
+      checks: [],
+    };
+    if (reasonCode) trace.reasonCode = reasonCode;
+    emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
   }
 
   private invalidClient(reasonCode?: string): HttpException {

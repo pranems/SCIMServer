@@ -93,14 +93,32 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       undefined,
       expect.objectContaining({ ttlSec: 7200, trustedScope: 'scim.read scim.write' }),
     );
+    // WI-D4 - exactly one canonical AUTH decision event (accept) is emitted.
+    const acceptEvents = logger.info.mock.calls.filter((c) => c[1] === 'Auth decision');
+    expect(acceptEvents).toHaveLength(1);
+    expect(acceptEvents[0][2]).toEqual(
+      expect.objectContaining({ outcome: 'accept', method: 'wif', endpointId: 'ep-1' }),
+    );
   });
 
   it('throws when the assertion is for this endpoint but invalid (mine-but-invalid-stop)', async () => {
     findActiveByEndpoint.mockResolvedValue([wifCredential()]);
-    validate.mockRejectedValue(new WifAssertionInvalidError('issuer mismatch'));
+    validate.mockRejectedValue(new WifAssertionInvalidError('issuer mismatch', 'wif_issuer_mismatch', {
+      plane: 'token-mint',
+      method: 'wif',
+      outcome: 'reject',
+      reasonCode: 'wif_issuer_mismatch',
+      checks: [{ id: 'issuer_match', status: 'fail' }],
+    }));
 
     await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).rejects.toBeInstanceOf(WifAssertionInvalidError);
     expect(generateEndpointAccessToken).not.toHaveBeenCalled();
+    // WI-D4 - exactly one canonical AUTH decision event (reject) is emitted.
+    const rejectEvents = logger.warn.mock.calls.filter((c) => c[1] === 'Auth decision');
+    expect(rejectEvents).toHaveLength(1);
+    expect(rejectEvents[0][2]).toEqual(
+      expect.objectContaining({ outcome: 'reject', reasonCode: 'wif_issuer_mismatch' }),
+    );
   });
 
   it('throws when the wif trust metadata is missing required fields (fail closed)', async () => {

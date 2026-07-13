@@ -207,3 +207,59 @@ export function mapJwksErrorToReason(err: unknown): string {
 export function describeTraceReason(trace: Pick<AuthDecisionTrace, 'reasonCode'>) {
   return getAuthReason(trace.reasonCode);
 }
+
+/**
+ * WI-D4 - the canonical AUTH decision log message. Exactly ONE event with this
+ * message is emitted per auth attempt (accept or reject), so an operator can
+ * alert on / count / filter auth decisions without matching ad-hoc phrasings.
+ */
+export const AUTH_DECISION_EVENT = 'Auth decision';
+
+/** The minimal logger surface the emitter needs (matches ScimLogger). */
+export interface AuthDecisionLogger {
+  info(category: string, message: string, data?: Record<string, unknown>): void;
+  warn(category: string, message: string, data?: Record<string, unknown>): void;
+}
+
+/**
+ * WI-D4 - emit one structured, redacted, alert-friendly AUTH decision event
+ * for a completed auth attempt, derived from its trace. Flows through the
+ * existing ScimLogger (ring buffer + SSE + file) - NOT a parallel mechanism.
+ *
+ * An `accept` is logged at INFO, a `reject` at WARN. The payload carries the
+ * outcome, reason code, method/plane, endpoint + correlation id, a compact
+ * check summary (failed check ids + counts - never the raw values), and the
+ * non-secret decoded-claim identifiers. The raw assertion/token is never here.
+ */
+export function emitAuthDecisionEvent(
+  logger: AuthDecisionLogger,
+  trace: AuthDecisionTrace,
+  logCategoryAuth: string,
+): void {
+  const failedChecks = trace.checks.filter((c) => c.status === 'fail').map((c) => c.id);
+  const data: Record<string, unknown> = {
+    outcome: trace.outcome,
+    method: trace.method,
+    plane: trace.plane,
+    reasonCode: trace.reasonCode,
+    endpointId: trace.endpointId,
+    correlationId: trace.correlationId,
+    selectedTrustId: trace.selectedTrustId,
+    checkCount: trace.checks.length,
+    failedChecks,
+    // Non-secret decoded identifiers only (already sanitized on the builder).
+    decodedClaims: trace.decodedClaims,
+    // For a multi-trust reject, how many sub-traces (per-trust) were recorded.
+    subTraceCount: trace.subTraces?.length,
+  };
+  // Drop undefined keys so the log line stays clean.
+  for (const k of Object.keys(data)) {
+    if (data[k] === undefined) delete data[k];
+  }
+  if (trace.outcome === 'accept') {
+    logger.info(logCategoryAuth, AUTH_DECISION_EVENT, data);
+  } else {
+    logger.warn(logCategoryAuth, AUTH_DECISION_EVENT, data);
+  }
+}
+
