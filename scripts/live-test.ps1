@@ -11175,6 +11175,27 @@ try {
     $apOauthRow = @($apCredList | Where-Object { $_.credentialType -eq 'oauth_client' })[0]
     Test-Result -Success ($null -ne $apOauthRow.clientId) -Message "9z-AP.T9: public clientId IS exposed in the list for oauth_client rows"
 
+    # RFC 6749 section 2.3.1 - the token endpoint MUST also accept credentials in
+    # the Authorization: Basic header (client_secret_basic), not only in the body.
+    # This is what Entra's newer "OAuth2 client credentials grant" provisioning
+    # experience sends; a body-only endpoint fails Entra with
+    # CredentialValidationUnavailable / "Supported CredentialLocationInRequest is required".
+    $apBasic = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes(
+        "$([uri]::EscapeDataString($apCred.clientId)):$([uri]::EscapeDataString($apCred.clientSecret))"))
+    $apBasicResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST `
+        -Headers @{ Authorization = "Basic $apBasic" } -ContentType "application/json" -Body (@{
+            grant_type = "client_credentials"
+        } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $apBasicResp.access_token) -Message "9z-AP.T10: per-endpoint token minted via Authorization: Basic (client_secret_basic)"
+    $apBasicPayload = ConvertFrom-JwtPayloadAP -Jwt $apBasicResp.access_token
+    Test-Result -Success ($apBasicPayload.endpoint_id -eq $apIdA) -Message "9z-AP.T11: Basic-auth-minted token carries the correct endpoint_id claim"
+
+    # Metadata-behavior consistency: the RFC 8414 metadata MUST advertise the
+    # client_secret_basic method the endpoint actually accepts (no advertise != enforce drift).
+    $apMeta = Invoke-RestMethod -Uri "$baseUrl/.well-known/oauth-authorization-server" -Method GET
+    Test-Result -Success (@($apMeta.token_endpoint_auth_methods_supported) -contains 'client_secret_basic') `
+        -Message "9z-AP.T12: OAuth AS metadata advertises client_secret_basic (matches accepted behavior)"
+
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA" -Method DELETE -Headers $headers | Out-Null } catch {}
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdB" -Method DELETE -Headers $headers | Out-Null } catch {}

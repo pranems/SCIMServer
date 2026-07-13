@@ -96,19 +96,17 @@ test.describe('EndpointDetailPage - tab matrix', () => {
   //   (b) the URL search parameter reflects the change
   //   (c) the panel testid is rendered
   //
-  // For tabs that render an empty-state component instead of the
-  // container when the endpoint has zero items (Users, Groups), the
-  // expected testid is matched against an alternative empty-state
-  // testid as well. The spec is intentionally tolerant because the
-  // test tenant data is not seeded by this spec.
+  // NOTE: Users and Groups are CONDITIONAL tabs (v0.53.3 profile
+  // enforcement). They render only when the endpoint's profile declares
+  // the matching resource type (fail-open: absent/empty resourceTypes
+  // shows both). They are exercised separately below so this matrix only
+  // covers tabs that are ALWAYS present.
   const TAB_CASES: ReadonlyArray<{
     key: string;
     label: RegExp;
     panelTestId: string;
     altEmptyTestId?: string;
   }> = [
-    { key: 'users', label: /^Users$/i, panelTestId: 'users-tab', altEmptyTestId: 'users-empty' },
-    { key: 'groups', label: /^Groups$/i, panelTestId: 'groups-tab', altEmptyTestId: 'groups-empty' },
     { key: 'activity', label: /^Activity$/i, panelTestId: 'tab-activity' },
     { key: 'bulk', label: /^Bulk$/i, panelTestId: 'bulk-page' },
     { key: 'resource-types', label: /Resource Types/i, panelTestId: 'resource-types-tab' },
@@ -141,6 +139,71 @@ test.describe('EndpointDetailPage - tab matrix', () => {
         ? `[data-testid="${tab.panelTestId}"], [data-testid="${tab.altEmptyTestId}"]`
         : `[data-testid="${tab.panelTestId}"]`;
       await page.waitForSelector(selector, { state: 'visible', timeout: 20_000 });
+    });
+  }
+
+  // Users + Groups are conditional on the endpoint declaring the matching
+  // resource type (v0.53.3 profile enforcement). The tab is shown ONLY when
+  // profile.resourceTypes includes User / Group (fail-open: absent/empty
+  // resourceTypes shows both). This spec branches on the actual endpoint:
+  //   - tab present  -> clicking renders the panel or its empty state; and a
+  //                     deep-link renders the same.
+  //   - tab absent   -> the endpoint does not serve this resource type, so a
+  //                     stale deep-link must render the CONTAINED "unsupported"
+  //                     empty state (never a route-error crash).
+  const CONDITIONAL_TAB_CASES: ReadonlyArray<{
+    key: string;
+    label: RegExp;
+    panelTestId: string;
+    emptyTestId: string;
+    unsupportedTestId: string;
+  }> = [
+    {
+      key: 'users',
+      label: /^Users$/i,
+      panelTestId: 'users-tab',
+      emptyTestId: 'users-empty',
+      unsupportedTestId: 'users-unsupported',
+    },
+    {
+      key: 'groups',
+      label: /^Groups$/i,
+      panelTestId: 'groups-tab',
+      emptyTestId: 'groups-empty',
+      unsupportedTestId: 'groups-unsupported',
+    },
+  ];
+
+  for (const tab of CONDITIONAL_TAB_CASES) {
+    test(`conditional "${tab.key}" tab: shown-and-renders when declared, hidden-and-deep-link-unsupported otherwise`, async ({ page }) => {
+      const id = await openFirstEndpoint(page);
+      const tabBtn = page.getByRole('tab', { name: tab.label });
+      const isPresent = (await tabBtn.count()) > 0;
+
+      if (isPresent) {
+        // Endpoint declares this resource type -> click renders panel/empty.
+        await tabBtn.click();
+        await page.waitForSelector(
+          `[data-testid="${tab.panelTestId}"], [data-testid="${tab.emptyTestId}"]`,
+          { state: 'visible', timeout: 20_000 },
+        );
+
+        // Deep-link parity: visiting the URL directly renders the same.
+        await page.goto(`/endpoints/${id}/${tab.key}`);
+        await page.waitForSelector(
+          `[data-testid="${tab.panelTestId}"], [data-testid="${tab.emptyTestId}"]`,
+          { state: 'visible', timeout: 20_000 },
+        );
+      } else {
+        // Endpoint does NOT declare this resource type -> the tab is hidden by
+        // design, and a stale deep-link must render the contained "unsupported"
+        // empty state rather than tripping the route error boundary.
+        await page.goto(`/endpoints/${id}/${tab.key}`);
+        await page.waitForSelector(`[data-testid="${tab.unsupportedTestId}"]`, {
+          state: 'visible',
+          timeout: 20_000,
+        });
+      }
     });
   }
 
