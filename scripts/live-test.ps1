@@ -11119,6 +11119,22 @@ try {
     Test-Result -Success (@($apMeta.token_endpoint_auth_methods_supported) -contains 'client_secret_basic') `
         -Message "9z-AP.T12: OAuth AS metadata advertises client_secret_basic (matches accepted behavior)"
 
+    # RFC 6749 section 3.2 - the per-endpoint token endpoint MUST accept an
+    # application/x-www-form-urlencoded body (the exact shape Entra's
+    # client-credentials grant sends). The endpoint lives under endpoints/*, so
+    # the SCIM content-type middleware used to 415 it with "Supported
+    # CredentialLocationInRequest is required". Mint a token via a form body.
+    $apFormBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($apCred.clientId))&client_secret=$([uri]::EscapeDataString($apCred.clientSecret))"
+    $apFormResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST `
+        -ContentType 'application/x-www-form-urlencoded' -Body $apFormBody
+    Test-Result -Success ($null -ne $apFormResp.access_token -and $apFormResp.token_type -eq 'Bearer') `
+        -Message "9z-AP.T13: per-endpoint token accepts application/x-www-form-urlencoded body (RFC 6749 3.2, not 415)"
+    # And the full Entra shape: form-urlencoded body + Authorization: Basic header
+    $apFormBasicResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST `
+        -Headers @{ Authorization = "Basic $apBasic" } -ContentType 'application/x-www-form-urlencoded' -Body "grant_type=client_credentials"
+    Test-Result -Success ($null -ne $apFormBasicResp.access_token) `
+        -Message "9z-AP.T14: per-endpoint token accepts form-urlencoded + Authorization: Basic (exact Entra client-credentials flow)"
+
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA" -Method DELETE -Headers $headers | Out-Null } catch {}
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdB" -Method DELETE -Headers $headers | Out-Null } catch {}

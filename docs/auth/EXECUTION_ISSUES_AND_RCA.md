@@ -4,6 +4,61 @@ Per the repo standing rule "Execution Issue RCA Ledger", this records issues hit
 during auth-related work with symptom / root-cause / fix / why-the-fix-works /
 prevention + a detection-stage escape analysis.
 
+## Issue 2 - Per-endpoint token endpoint rejected `application/x-www-form-urlencoded` with 415 (Entra recurrence)
+
+| Field | Value |
+|---|---|
+| **Type** | Middleware scope surprise (SCIM rule caught an OAuth endpoint) |
+| **Severity** | High (blocked live provisioning on customer-facing prod, AFTER Issue 1 was believed fixed) |
+| **Detected by** | Operator (Entra provisioning error on calmsand) + reproduced via direct probe |
+| **Earliest gate that could have caught it** | Stage 2.2 API E2E (a form-urlencoded per-endpoint token test) - none existed |
+| **Escape delta** | Escaped Issue 1's fix verification because that verification exercised the GLOBAL token endpoint (exempt), not the per-endpoint one Entra actually uses |
+
+### Symptom
+After 0.54.0-alpha.9 (the `client_secret_basic` fix) was live, the operator still
+saw `SystemForCrossDomainIdentityManagementCredentialValidationFailure` /
+"Supported CredentialLocationInRequest is required". Direct probe of the
+per-endpoint token URL returned `415 Unsupported Media Type` with
+`CONTENT_TYPE_UNSUPPORTED` for an `application/x-www-form-urlencoded` body.
+
+### Root-cause analysis
+Entra's tenant URL is the PER-endpoint one
+(`/scim/endpoints/{id}/oauth/token`), which lives under `endpoints/*`. The SCIM
+content-type middleware ([scim-content-type-validation.middleware.ts](../../api/src/modules/scim/middleware/scim-content-type-validation.middleware.ts))
+enforces RFC 7644 §3.1 (`application/scim+json` | `application/json`) on
+`endpoints/*` routes and 415s anything else BEFORE the controller runs. Entra's
+client-credentials grant sends the token request as
+`application/x-www-form-urlencoded` (RFC 6749 §3.2), so it was rejected before
+the credentials (Basic header OR body) were ever read. The GLOBAL
+`/scim/oauth/token` sits outside `endpoints/*` and was already exempt - which is
+exactly why Issue 1's fix verified green on the global path and the per-endpoint
+gap was masked.
+
+### Fix
+The middleware now exempts ANY `*/oauth/token` path (regex
+`/\/oauth\/token\/?$/`) from the SCIM media-type rule - a token endpoint is an
+OAuth endpoint, not a SCIM resource endpoint. Identical to the `A3` exemption
+already present on the feat/wif branch (kept in lockstep).
+
+### Why the fix works
+The exemption lets the form-urlencoded body reach the token controller, where the
+Issue 1 credential resolver (Basic header + body) then authenticates it. The two
+fixes compose: Issue 1 made the endpoint read credentials from either location;
+Issue 2 lets the request's media type through so the credentials are read at all.
+
+### Prevention
+- **E2E**: `endpoint-oauth-client.e2e-spec.ts` +2 - a form-urlencoded body, and
+  form-urlencoded + `Authorization: Basic` (the exact Entra flow) - both mint a
+  token (not 415).
+- **Live**: `live-test.ps1` 9z-AP T13-T14 (per-endpoint form-urlencoded mint, + Basic).
+- **Convention (generalizable)**: when a fix is verified against a live surface,
+  verify the EXACT surface the failing client uses (per-endpoint URL), not a
+  sibling surface (global URL) that shares the code but differs in middleware
+  scope. Issue 1's verification hit the global endpoint and missed this. Also:
+  middleware scoped by URL prefix (`endpoints/*`) MUST explicitly exempt
+  sub-paths that are semantically different (OAuth token endpoints under a SCIM
+  resource prefix).
+
 ## Issue 1 - Token endpoint accepted client credentials only in the body (`client_secret_post`), not the `Authorization: Basic` header (`client_secret_basic`)
 
 | Field | Value |

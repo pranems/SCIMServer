@@ -142,6 +142,40 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(res.body.detail).toBe('unsupported_grant_type');
   });
 
+  it('accepts an application/x-www-form-urlencoded body on the per-endpoint token endpoint (RFC 6749 3.2)', async () => {
+    // Entra's client-credentials grant sends the token request as
+    // application/x-www-form-urlencoded. The per-endpoint token URL lives under
+    // endpoints/*, so the SCIM content-type middleware used to 415 it with
+    // "Supported CredentialLocationInRequest is required". The */oauth/token
+    // exemption must let the form body through and mint a token.
+    const { clientId, clientSecret } = await createOauthClient(endpointA);
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${endpointA}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret })
+      .expect(201);
+
+    expect(res.body.token_type).toBe('Bearer');
+    expect(typeof res.body.access_token).toBe('string');
+  });
+
+  it('accepts form-urlencoded + Authorization: Basic on the per-endpoint token endpoint (exact Entra flow)', async () => {
+    const { clientId, clientSecret } = await createOauthClient(endpointA);
+    const basic = Buffer.from(
+      `${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`,
+    ).toString('base64');
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${endpointA}/oauth/token`)
+      .set('Authorization', `Basic ${basic}`)
+      .type('form')
+      .send({ grant_type: 'client_credentials' })
+      .expect(201);
+
+    expect(res.body.token_type).toBe('Bearer');
+    const payload = decodePayload(res.body.access_token);
+    expect(payload.endpoint_id).toBe(endpointA);
+  });
+
   it('never returns the clientSecret in a credential list response', async () => {
     await createOauthClient(endpointA);
     const res = await request(app.getHttpServer())
