@@ -97,5 +97,25 @@ describe('OAuth discovery + bearer errors (Q0)', () => {
       );
       expect(payload.iss).toBe(meta.body.issuer);
     });
+
+    it('advertises client_secret_basic AND the token endpoint actually accepts it (advertise == enforce)', async () => {
+      // RFC 6749 section 2.3.1 - the metadata must not advertise an auth method
+      // the endpoint does not accept (the "advertise != enforce" drift that let
+      // Entra's Basic-header credential flow fail). This test binds the two.
+      const meta = await request(app.getHttpServer())
+        .get('/.well-known/oauth-authorization-server')
+        .expect(200);
+      expect(meta.body.token_endpoint_auth_methods_supported).toContain('client_secret_basic');
+
+      const basic = Buffer.from('e2e-client:e2e-client-secret').toString('base64');
+      const tokenRes = await request(app.getHttpServer())
+        .post('/scim/oauth/token')
+        .set('Authorization', `Basic ${basic}`)
+        .send({ grant_type: 'client_credentials' })
+        .expect(201);
+
+      expect(typeof tokenRes.body.access_token).toBe('string');
+      expect(tokenRes.body.token_type).toBe('Bearer');
+    });
   });
 });

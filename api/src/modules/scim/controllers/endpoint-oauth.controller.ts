@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Headers,
   HttpException,
   HttpStatus,
   Inject,
@@ -10,6 +11,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Public } from '../../auth/public.decorator';
 import { OAuthService } from '../../../oauth/oauth.service';
+import { resolveClientCredentials } from '../../../oauth/client-credential-location';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -50,7 +52,18 @@ export class EndpointOAuthController {
   async getToken(
     @Param('endpointId') endpointId: string,
     @Body() body: EndpointTokenRequest,
+    @Headers('authorization') authorization?: string,
   ) {
+    // RFC 6749 section 2.3.1 - accept client credentials from the
+    // `Authorization: Basic` header (client_secret_basic) in addition to the
+    // body (client_secret_post). Entra's newer provisioning experience sends
+    // them in the header; body values still win when both are present.
+    const resolved = resolveClientCredentials(
+      { clientId: body.client_id, clientSecret: body.client_secret },
+      authorization,
+    );
+    body = { ...body, client_id: resolved.clientId, client_secret: resolved.clientSecret };
+
     if (body.grant_type !== 'client_credentials') {
       throw new HttpException(
         {
