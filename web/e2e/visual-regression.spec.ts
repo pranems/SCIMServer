@@ -97,12 +97,25 @@ const SETTINGS_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
   '[data-testid="settings-page"] > div:first-of-type',
   '[data-testid="log-config-section"]',
+  // R4b/secret-show: the Server connection info card renders the live base URL,
+  // token/JWKS/metadata URLs, and - when CredentialSecretVisibility=always -
+  // the actual shared secret + OAuth client id/secret. Those are environment-
+  // specific + secret-bearing, so mask the whole card: never assert (or commit
+  // to a baseline PNG) live secret values.
+  '[data-testid="server-connection-info-card"]',
 ];
 
 const ENDPOINT_DETAIL_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
   '[data-testid="endpoint-detail-page"] > div:nth-of-type(1)',
   '[data-testid="endpoint-detail-page"] > div:nth-of-type(2)',
+  // The OverviewTab renders live, per-request-drifting content that a fullPage
+  // snapshot against a real dev server can never match byte-for-byte: the KPI
+  // stat cards show live user/group/credential/flag counts, and the Recent
+  // Activity feed shows real request rows with wall-clock timestamps. Mask both
+  // so the snapshot only asserts the STABLE chrome (header, tabs, layout).
+  '[data-testid="overview-kpi-row"]',
+  '[data-testid="overview-activity"]',
 ];
 
 const locatorsFor = (page: Page, selectors: string[]) =>
