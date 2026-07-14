@@ -223,5 +223,14 @@ describe('Endpoint-Scoped Logs (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
     });
+
+    it('returns 404 (not 500) for a MALFORMED log id (non-UUID on a UUID column)', async () => {
+      // Regression: on Postgres a non-UUID id makes the DB lookup throw; the
+      // detail route must degrade that to a clean 404, never a 500.
+      await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/does-not-exist`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
   });
 });

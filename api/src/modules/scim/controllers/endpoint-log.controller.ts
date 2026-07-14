@@ -143,7 +143,15 @@ export class EndpointLogController {
     if (!this.loggingService) {
       throw new NotFoundException('Persistent logging not available (InMemory backend).');
     }
-    const log = await this.loggingService.getLog(logId);
+    // A malformed logId (e.g. a non-UUID on a UUID column in Postgres) makes the
+    // DB lookup throw; degrade that to a clean 404 rather than a 500 - an id
+    // that cannot resolve is simply "not found".
+    let log: Awaited<ReturnType<typeof this.loggingService.getLog>>;
+    try {
+      log = await this.loggingService.getLog(logId);
+    } catch {
+      throw new NotFoundException(`Log "${logId}" not found for endpoint "${endpointId}".`);
+    }
     // Tenant isolation: the log's URL must reference this endpoint. Endpoint
     // request URLs contain `/endpoints/<endpointId>` (both the v2 and bare
     // rewrite forms), so a substring check on the id is a safe scope gate.
