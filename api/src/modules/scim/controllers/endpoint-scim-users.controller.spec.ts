@@ -4,6 +4,7 @@ import { EndpointScimUsersController } from './endpoint-scim-users.controller';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 
@@ -75,6 +76,10 @@ describe('EndpointScimUsersController', () => {
         {
           provide: EndpointContextStorage,
           useValue: mockEndpointContext,
+        },
+        {
+          provide: ScimLogger,
+          useValue: { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn(), trace: jest.fn() },
         },
       ],
     }).compile();
@@ -249,7 +254,7 @@ describe('EndpointScimUsersController', () => {
         mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
         mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
 
-        const result = await controller.listUsers(
+        const result: any = await controller.listUsers(
           'endpoint-1', mockRequest, undefined, '1', '10', undefined, undefined, 'userName', undefined
         );
 
@@ -308,7 +313,7 @@ describe('EndpointScimUsersController', () => {
           attributes: 'userName',
         };
 
-        const result = await controller.searchUsers('endpoint-1', searchDto as any, mockRequest);
+        const result: any = await controller.searchUsers('endpoint-1', searchDto as any, mockRequest);
 
         expect(result.Resources[0].userName).toBe('alice');
         expect(result.Resources[0].active).toBeUndefined();
@@ -513,7 +518,7 @@ describe('EndpointScimUsersController', () => {
       mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
       mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
-      const result = await controller.listUsers('endpoint-1', mockRequest);
+      const result: any = await controller.listUsers('endpoint-1', mockRequest);
 
       // returned:'request' attr should be stripped even without attributes param
       expect(result.Resources[0].secretQuestion).toBeUndefined();
@@ -818,6 +823,67 @@ describe('EndpointScimUsersController', () => {
       expect((result.name as Record<string, unknown>).familyName).toBeUndefined();
       expect(result.id).toBe('scim-g8g'); // always-returned
       expect(result.emails).toBeUndefined(); // not requested
+    });
+  });
+
+  describe('EnforceResourceTypes relaxation (User not served)', () => {
+    // Endpoint whose profile declares ONLY Group -> User is un-served.
+    const groupOnly = (enforce: boolean | undefined) => ({
+      ...mockEndpoint,
+      name: 'Group-Only-Endpoint',
+      profile: {
+        resourceTypes: [{ id: 'Group', name: 'Group', endpoint: '/Groups' }],
+        settings: enforce === undefined ? {} : { EnforceResourceTypes: enforce },
+      },
+    });
+
+    const mockRes = () => ({ setHeader: jest.fn() }) as any;
+
+    it('GET /Users returns 200 empty ListResponse + warning when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(groupOnly(false));
+      const res = mockRes();
+      const result: any = await controller.listUsers('endpoint-1', mockRequest, undefined, undefined, undefined, undefined, undefined, undefined, undefined, res);
+
+      expect(result.totalResults).toBe(0);
+      expect(result.Resources).toEqual([]);
+      expect(result.schemas).toContain('urn:scimserver:api:messages:2.0:Warning');
+      expect(result['urn:scimserver:api:messages:2.0:Warning'].warnings[0].resourceType).toBe('User');
+      expect(res.setHeader).toHaveBeenCalledWith('X-SCIM-Warning', expect.stringContaining('RESOURCE_TYPE_NOT_SERVED'));
+      expect(mockUsersService.listUsersForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('POST /Users/.search returns 200 empty ListResponse + warning when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(groupOnly(false));
+      const res = mockRes();
+      const result: any = await controller.searchUsers('endpoint-1', { schemas: [] } as any, mockRequest, res);
+      expect(result.totalResults).toBe(0);
+      expect(result['urn:scimserver:api:messages:2.0:Warning'].warnings[0].code).toBe('RESOURCE_TYPE_NOT_SERVED');
+    });
+
+    it('GET /Users still 404 when EnforceResourceTypes=true (default preserved)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(groupOnly(true));
+      await expect(
+        controller.listUsers('endpoint-1', mockRequest, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mockRes())
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('GET /Users still 404 when the flag is unset (defaults to enforce)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(groupOnly(undefined));
+      await expect(
+        controller.listUsers('endpoint-1', mockRequest, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mockRes())
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('GET /Users/{id} (item read) still 404 even when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(groupOnly(false));
+      await expect(controller.getUser('endpoint-1', 'some-id', mockRequest)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('POST /Users (create) still 404 even when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(groupOnly(false));
+      await expect(
+        controller.createUser('endpoint-1', { schemas: [], userName: 'x' } as any, mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
     });
   });
 });

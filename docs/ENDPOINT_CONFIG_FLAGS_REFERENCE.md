@@ -130,6 +130,7 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 15 | [`logLevel`](#loglevel) | string | (global) | Logging |
 | 16 | [`logFileEnabled`](#logfileenabled) | boolean | `true` | Logging |
 | 17 | [`WifCredentialsEnabled`](#wifcredentialsenabled) | boolean | `false` | Authentication |
+| 18 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
 
 ### WifCredentialsEnabled
 
@@ -141,6 +142,23 @@ credential may be attached (via `POST /admin/endpoints/:id/credentials` with
 permitted when `WifCredentialsEnabled` is on, independent of the bearer gate,
 and a `bearer` credential still requires `PerEndpointCredentialsEnabled`.
 Added in A1 ([docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](auth/AUTHENTICATION_METHODS_ADMIN_API.md)).
+
+### EnforceResourceTypes
+
+When `true` (**default**), a LIST/query on a resource type the endpoint profile
+does not declare returns `404 RESOURCE_TYPE_NOT_SUPPORTED` (the v0.53.3 Gap-1
+enforcement). When `false`, a **LIST/query** on an un-served resource type
+instead returns a `200` empty `ListResponse` (RFC 7644 §3.4.2) plus a non-fatal
+warning on three channels: a server log (**W1**), a
+`urn:scimserver:api:messages:2.0:Warning` body member (**W2**), and an
+`X-SCIM-Warning` response header (**W3**). **Item-by-id reads and all writes
+(`POST`/`PUT`/`PATCH`/`DELETE`) still reject with `404`** regardless of the flag -
+only LIST/query is relaxed. Applies symmetrically to `/Users` and `/Groups`.
+
+**Set `false` for Microsoft Entra provisioning of a user-only (no Group)
+endpoint**: Entra's Test Connection probes both `/Users` and `/Groups` and treats
+a `/Groups` 404 as `SystemForCrossDomainIdentityManagementServiceIncompatible`.
+See [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.1a](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md#81a-enforceresourcetypes-flag---relax-listquery-to-200-empty-entra-test-connection).
 
 ---
 

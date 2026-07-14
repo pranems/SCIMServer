@@ -176,6 +176,21 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see docs/auth/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 8.6
    */
   WIF_CREDENTIALS_ENABLED: 'WifCredentialsEnabled',
+
+  /**
+   * When true (default), a LIST/query on a resource type the endpoint profile
+   * does not declare returns 404 RESOURCE_TYPE_NOT_SUPPORTED (v0.53.3 Gap-1).
+   * When false, a LIST/query on an un-served resource type instead returns a
+   * 200 empty ListResponse (RFC 7644 §3.4.2) PLUS a non-fatal warning on three
+   * channels (server log, `urn:scimserver:api:messages:2.0:Warning` body member,
+   * and `X-SCIM-Warning` header). Item-by-id reads and all writes still reject
+   * with 404 regardless of the flag.
+   * In practice: set false for Microsoft Entra provisioning, whose Test
+   * Connection probes BOTH /Users and /Groups and treats a /Groups 404 on a
+   * user-only endpoint as "service incompatible".
+   * @see RFC 7644 §3.4.2 - Querying resources
+   */
+  ENFORCE_RESOURCE_TYPES: 'EnforceResourceTypes',
 } as const;
 
 /**
@@ -392,6 +407,17 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'attached and the WIF token-mint path is offered. When false (default), WIF is off and existing ' +
       'endpoints are untouched. Orthogonal to PerEndpointCredentialsEnabled.',
   },
+  ENFORCE_RESOURCE_TYPES: {
+    key: ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), a LIST/query on a resource type the endpoint profile does not declare ' +
+      'returns 404 RESOURCE_TYPE_NOT_SUPPORTED. When false, a LIST/query on an un-served resource type ' +
+      'returns a 200 empty ListResponse (RFC 7644 §3.4.2) plus a non-fatal warning (server log + ' +
+      'urn:scimserver:api:messages:2.0:Warning body member + X-SCIM-Warning header). Item-by-id reads ' +
+      'and all writes still reject with 404. Set false for Entra provisioning of user-only (no Group) endpoints.',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -420,6 +446,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
   [ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES]?: boolean | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }

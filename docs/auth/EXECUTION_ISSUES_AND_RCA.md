@@ -4,6 +4,70 @@ Per the repo standing rule "Execution Issue RCA Ledger", this records issues hit
 during auth-related work with symptom / root-cause / fix / why-the-fix-works /
 prevention + a detection-stage escape analysis.
 
+## Issue 3 - Entra Test Connection fails on user-only endpoints: `/Groups` returns 404 where Entra expects 200
+
+| Field | Value |
+|---|---|
+| **Type** | Protocol-compatibility surprise (strict enforcement vs client expectation) |
+| **Severity** | High (blocked provisioning setup on customer-facing prod for user-only endpoints) |
+| **Detected by** | Operator (Entra `InvalidCredentials` / `ServiceIncompatible` on calmsand) + direct reproduction |
+| **Earliest gate that could have caught it** | An E2E asserting an Entra-shaped `/Groups` probe on a user-only endpoint - none existed (the enforcement E2E asserted the 404 as *correct*) |
+| **Escape delta** | The v0.53.3 enforcement work codified the 404 as intended behavior; the Entra-compat implication was not modeled |
+
+### Symptom
+After the credential-location issues were resolved, Entra Test Connection
+(`OAuth2ClientCredentialsGrant`, `credentialLocationInRequest: Header`) failed
+with `InvalidCredentials` wrapping
+`SystemForCrossDomainIdentityManagementServiceIncompatible`: "An HTTP/404 Not
+Found response was returned rather than the expected HTTP/200 OK response ...
+RFC 7644 §3.4.2". Some endpoints worked, some failed; the operator suspected
+"endpoints without groups". Direct probe confirmed: on endpoint
+`3dbe8e5c...` (`SelfServ-Entra-OnlyUser-NoGroup`) `GET /Users` returned 200 but
+`GET /Groups` returned 404.
+
+### Root-cause analysis
+v0.53.3 profile enforcement (Gap 1): the Groups controller calls
+`resolveResourceType(profile, {name:'Group'})` and throws `404
+RESOURCE_TYPE_NOT_SUPPORTED` when the endpoint's `profile.resourceTypes` does not
+declare `Group`. Entra's Test Connection queries BOTH `/Users` and `/Groups` and
+- per RFC 7644 §3.4.2 - expects a `200` empty `ListResponse` for zero matches on
+a supported endpoint; a `404` on `/Groups` is read as "service incompatible /
+wrong tenant URL". So a deliberately user-only endpoint could not pass Entra's
+Test Connection under strict enforcement. Not an Entra bug - a mismatch between
+our strict-enforcement design choice and Entra's probe contract.
+
+### Fix
+New endpoint config flag `EnforceResourceTypes` (default `true` = unchanged
+strict behavior). When `false`, a **LIST/query** on an un-served resource type
+returns a `200` empty `ListResponse` instead of `404`; item-by-id reads and all
+writes still `404`. New [resource-type-enforcement.ts](../../api/src/modules/scim/common/resource-type-enforcement.ts)
+builds ONE warning object projected onto three channels (W1 log, W2
+`urn:scimserver:api:messages:2.0:Warning` body member, W3 `X-SCIM-Warning`
+header). Both Users and Groups controllers gained a `relaxableList` path in
+`validateAndSetContext`. UI Switch added to the Settings tab.
+
+### Why the fix works
+The relaxation makes a user-only endpoint answer Entra's `/Groups` probe with the
+exact `200` empty `ListResponse` RFC 7644 §3.4.2 mandates, so Test Connection
+succeeds - while the default (`true`) preserves the strict 404 for every existing
+endpoint (zero regression), and writes/item-reads are never silently relaxed
+(the "user-only" product intent holds). Entra ignores the W2 body member + W3
+header, so they add observability without breaking the probe.
+
+### Prevention
+- **Unit**: helper +7; config-flag +4; controller +12 (relaxed list/search 200
+  empty; item read + create still 404; default-enforce preserved on both
+  controllers).
+- **E2E**: `profile-enforcement-gaps` +6 - GET /Groups + .search return 200 empty
+  with W2 body + W3 header; item read + create still 404 (the exact Entra probe).
+- **Live**: `live-test.ps1` 9z-AS.5b-5g.
+- **Convention (generalizable)**: when enforcement returns a non-2xx for a
+  "resource absent / not served" case, model the major IdP's probe contract
+  (Entra/Okta expect 200 empty ListResponse on a supported endpoint, RFC 7644
+  §3.4.2) before choosing the status code, and provide an opt-out flag when the
+  strict choice breaks a mainstream client. Codifying a 404 as "correct" in a
+  test is not the same as it being client-compatible.
+
 ## Issue 2 - Per-endpoint token endpoint rejected `application/x-www-form-urlencoded` with 415 (Entra recurrence)
 
 | Field | Value |

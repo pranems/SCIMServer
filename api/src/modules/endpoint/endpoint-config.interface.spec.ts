@@ -1125,6 +1125,7 @@ describe('endpoint-config.interface', () => {
   describeBooleanFlagValidation('MultiMemberPatchOpForGroupEnabled');
   describeBooleanFlagValidation('SchemaDiscoveryEnabled');
   describeBooleanFlagValidation('WifCredentialsEnabled');
+  describeBooleanFlagValidation('EnforceResourceTypes');
 
   describe('WifCredentialsEnabled flag (A1)', () => {
     it('is registered with the WifCredentialsEnabled key', () => {
@@ -1138,6 +1139,21 @@ describe('endpoint-config.interface', () => {
 
     it('reads true when explicitly enabled', () => {
       expect(getConfigBoolean({ WifCredentialsEnabled: 'True' }, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)).toBe(true);
+    });
+  });
+
+  describe('EnforceResourceTypes flag', () => {
+    it('is registered with the EnforceResourceTypes key', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES).toBe('EnforceResourceTypes');
+    });
+
+    it('defaults to true (strict enforcement preserved for existing endpoints)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES]).toBe(true);
+      expect(getConfigBoolean(undefined, ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES)).toBe(true);
+    });
+
+    it('reads false when explicitly relaxed', () => {
+      expect(getConfigBoolean({ EnforceResourceTypes: 'False' }, ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES)).toBe(false);
     });
   });
 

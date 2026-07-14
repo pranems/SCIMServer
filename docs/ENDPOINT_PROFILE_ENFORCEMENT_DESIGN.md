@@ -401,6 +401,51 @@ flowchart LR
     S -- yes --> SVC["groupsService.createGroupForEndpoint(...)"]
 ```
 
+### 8.1a `EnforceResourceTypes` flag - relax LIST/query to 200 empty (Entra Test Connection)
+
+**Motivation.** Microsoft Entra's provisioning **Test Connection** probes BOTH `/Users` and
+`/Groups` (per RFC 7644 §3.4.2, a query for zero matches on a supported endpoint returns a
+`200` empty `ListResponse`). The strict Gap-1 behavior above returns `404` on `/Groups` for a
+**user-only** endpoint, which Entra reports as
+`SystemForCrossDomainIdentityManagementServiceIncompatible` ("HTTP/404 ... rather than the
+expected HTTP/200 ... ensure the tenant URL is correct"). So a deliberately user-only endpoint
+cannot pass Entra's Test Connection under strict enforcement.
+
+**The flag.** `EnforceResourceTypes` (endpoint config flag, **default `true`** = strict Gap-1
+behavior, fully backward-compatible). When set **`false`**, a **LIST/query** on an un-served
+resource type returns a `200` empty `ListResponse` instead of `404`. **Item-by-id reads
+(`GET /Groups/{id}`) and all writes (`POST`/`PUT`/`PATCH`/`DELETE`) still reject with `404`
+regardless of the flag** - a query for zero resources of an un-served type is semantically
+"empty", but creating one is not. The relaxation is symmetric for the Users controller.
+
+**Three-channel warning.** Every relaxed empty-list response also emits ONE warning object
+(built once in [resource-type-enforcement.ts](../api/src/modules/scim/common/resource-type-enforcement.ts),
+`buildResourceTypeWarning`) projected onto three channels so it is discoverable wherever a
+consumer looks:
+
+| Channel | Where | Audience |
+|---|---|---|
+| **W1** | structured `LogCategory` warning (server log / Logs tab) | the admin who owns the endpoint |
+| **W2** | `urn:scimserver:api:messages:2.0:Warning` array member in the response body | programmatic SCIM clients + our UI |
+| **W3** | `X-SCIM-Warning` response header (`<code>; <message>`) | proxies / curl / devtools |
+
+W3 uses a **custom `X-SCIM-Warning`** header, NOT the deprecated RFC 9111 `Warning` header. All
+three are safe for Entra, which ignores unknown body members and headers, so the response stays a
+valid `200` empty `ListResponse`.
+
+```mermaid
+flowchart TD
+    G["GET /endpoints/:id/Groups (LIST/query)"] --> RR["resolveResourceType(profile, Group)"]
+    RR --> S{"supported?"}
+    S -- yes --> LIST["normal group list"]
+    S -- no --> E{"EnforceResourceTypes?"}
+    E -- "true (default)" --> F404["404 noTarget\nRESOURCE_TYPE_NOT_SUPPORTED"]
+    E -- "false" --> W["200 empty ListResponse\n+ W1 log + W2 body Warning + W3 header"]
+```
+
+Item reads and writes skip the `EnforceResourceTypes` branch entirely (they pass no
+`relaxableList` hint to `validateAndSetContext`), so they always 404 on an un-served type.
+
 ### 8.2 Capability resolver (Gaps 2-7, 10)
 
 A pure module, e.g. `api/src/modules/scim/common/capability-resolver.ts`, with precedence
