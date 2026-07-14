@@ -36,7 +36,7 @@ export interface ConnectionInfoUrls {
 export interface ConnectionEnabledMethod {
   method: ConnectionMethod;
   label: string;
-  entraAuthenticationMethod: 'Secret Token' | 'OAuth2 Client Credentials Grant';
+  entraAuthenticationMethod: 'Secret Token' | 'OAuth2 Client Credentials Grant' | 'Workload Identity based authentication';
   entraFields: Record<string, string | null>;
   clientSecretState: ClientSecretState;
   /** Present only for `wif`: the audience the source token must carry. */

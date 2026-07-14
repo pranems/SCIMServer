@@ -36,10 +36,11 @@ function info(over: Partial<ConnectionInfo> = {}): ConnectionInfo {
       {
         method: 'wif',
         label: 'Workload Identity Federation',
-        entraAuthenticationMethod: 'OAuth2 Client Credentials Grant',
+        entraAuthenticationMethod: 'Workload Identity based authentication',
         entraFields: {
           tenantUrl: `https://scim.example.com/scim/v2/endpoints/${ID}`,
           tokenEndpoint: `https://scim.example.com/scim/endpoints/${ID}/oauth/token`,
+          clientIdentifier: 'sp-object-id-abc',
         },
         clientSecretState: 'none',
         expectedAudience: `api://scimserver/${ID}`,
@@ -81,9 +82,45 @@ describe('ConnectionPanel (WI-4)', () => {
     renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
     // Select WIF.
     fireEvent.click(screen.getByTestId('connection-panel-method-wif'));
-    // WIF has no clientIdentifier but does surface an expected audience.
-    expect(screen.queryByTestId('connection-panel-value-clientIdentifier')).not.toBeInTheDocument();
+    // WIF surfaces the sub claim as the Client identifier + an expected audience.
+    expect(screen.getByTestId('connection-panel-value-clientIdentifier')).toHaveTextContent('sp-object-id-abc');
     expect(screen.getByTestId('connection-panel-value-expectedAudience')).toHaveTextContent(`api://scimserver/${ID}`);
+  });
+
+  it('WIF: auth-method title is "Workload Identity based authentication" (not OAuth2 client credentials)', () => {
+    renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
+    fireEvent.click(screen.getByTestId('connection-panel-method-wif'));
+    expect(screen.getByTestId('connection-panel-auth-method')).toHaveTextContent(
+      'Workload Identity based authentication',
+    );
+  });
+
+  it('WIF: the Client identifier field is labelled with the sub claim', () => {
+    renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
+    fireEvent.click(screen.getByTestId('connection-panel-method-wif'));
+    const row = screen.getByTestId('connection-panel-field-clientIdentifier');
+    expect(row).toHaveTextContent('Client identifier (sub claim)');
+    expect(screen.getByTestId('connection-panel-desc-clientIdentifier')).toHaveTextContent(/sub.*claim/i);
+  });
+
+  it('shared_secret: renders the inline secretToken value (visibility=always)', () => {
+    const ci = info({
+      enabledMethods: [
+        {
+          method: 'shared_secret',
+          label: 'Shared-secret bearer token',
+          entraAuthenticationMethod: 'Secret Token',
+          entraFields: {
+            tenantUrl: `https://scim.example.com/scim/v2/endpoints/${ID}`,
+            secretToken: 'shared-token-inline',
+          },
+          clientSecretState: 'set-shown-once',
+          secretRevealed: true,
+        },
+      ],
+    });
+    renderWithFluent(<ConnectionPanel connectionInfo={ci} />);
+    expect(screen.getByTestId('connection-panel-value-secretToken')).toHaveTextContent('shared-token-inline');
   });
 
   it('renders the one-time secret + warning when oneTimeSecret matches the method', () => {

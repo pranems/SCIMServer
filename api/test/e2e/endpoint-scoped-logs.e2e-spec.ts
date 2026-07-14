@@ -183,4 +183,45 @@ describe('Endpoint-Scoped Logs (E2E)', () => {
       expect(res.body.total).toBe(0);
     });
   });
+
+  // ─── GET /endpoints/:id/logs/:logId (clickable detail) ────────────
+
+  describe('GET /endpoints/:id/logs/:logId', () => {
+    it('returns the full request/response detail for a log scoped to the endpoint, or 404 for the InMemory backend', async () => {
+      // Make a request so a log row exists, then find it via history.
+      await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/Users`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const history = await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/history?page=1&pageSize=20`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const row = (history.body.items ?? [])[0];
+      if (!row?.id) {
+        // InMemory backend has no persistent history; the detail route 404s.
+        await request(app.getHttpServer())
+          .get(`/scim/endpoints/${endpointId}/logs/does-not-exist`)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(404);
+        return;
+      }
+
+      const detail = await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/${row.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(detail.body.id).toBe(row.id);
+      expect(detail.body).toHaveProperty('requestHeaders');
+      expect(detail.body).toHaveProperty('responseBody');
+    });
+
+    it('returns 404 for an unknown log id', async () => {
+      await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/00000000-0000-0000-0000-000000000000`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+  });
 });

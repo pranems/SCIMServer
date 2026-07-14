@@ -201,13 +201,27 @@ export class ConnectionInfoService {
         typeof wifCred?.metadata?.expectedAudience === 'string'
           ? wifCred.metadata.expectedAudience
           : endpointId;
+      // Entra's WIF connectivity "Enter values from your application" form has a
+      // 3rd field "Client identifier" that takes the SUBJECT (sub) claim the
+      // SCIM endpoint expects - NOT the audience. Surface the expected subject
+      // as clientIdentifier (mapped to Entra's Client identifier field) and
+      // keep the audience as its own row (Entra shows it under "Configure
+      // trust", not the connection form).
+      const subject =
+        typeof wifCred?.metadata?.expectedSubject === 'string'
+          ? wifCred.metadata.expectedSubject
+          : null;
       enabledMethods.push({
         method: 'wif',
         label: 'Workload Identity Federation',
-        entraAuthenticationMethod: 'OAuth2 Client Credentials Grant',
+        // The Entra auth-method dropdown label for this method (NOT OAuth2
+        // client credentials, which is a different selection).
+        entraAuthenticationMethod: 'Workload Identity based authentication',
         entraFields: {
           tenantUrl: urls.scimBaseUrl,
           tokenEndpoint: urls.tokenEndpoint,
+          // Entra's "Client identifier" field = the sub claim for WIF.
+          clientIdentifier: subject,
         },
         clientSecretState: 'none',
         expectedAudience: audience,

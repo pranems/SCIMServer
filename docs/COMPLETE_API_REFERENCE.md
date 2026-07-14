@@ -1852,6 +1852,7 @@ The `urn:scimserver:api:messages:2.0:Diagnostics` extension is automatically add
 | 79 | GET | `/scim/endpoints/:id/logs/stream` | Bearer | EndpointLogController |
 | 80 | GET | `/scim/endpoints/:id/logs/download` | Bearer | EndpointLogController |
 | 81 | GET | `/scim/endpoints/:id/logs/history` | Bearer | EndpointLogController |
+| 81a | GET | `/scim/endpoints/:id/logs/:logId` | Bearer | EndpointLogController (tenant-isolated full request/response detail for the clickable endpoint-Logs drawer; 404 unless the log is scoped to the endpoint) |
 | 82 | POST | `/scim/oauth/token` | Public | OAuthController |
 | 83 | GET | `/scim/oauth/test` | Public | OAuthController |
 | 83a | GET | `/scim/docs/auth-errors` | Public | AuthErrorsCatalogController (WI-D2 reason-code catalog; `?plane=wif\|oauth_client\|bearer`) |

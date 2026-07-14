@@ -22,6 +22,7 @@ import {
   Res,
   Optional,
   Inject,
+  NotFoundException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { LogQueryService } from '../../logging/log-query.service';
@@ -122,5 +123,33 @@ export class EndpointLogController {
       minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
       includeAdmin: false,
     });
+  }
+
+  /**
+   * GET /scim/endpoints/:endpointId/logs/:logId
+   *
+   * Full request/response detail for a single log row (headers + parsed
+   * bodies), so the endpoint Logs tab can open a clickable detail drawer just
+   * like the SCIMServer-level Logs page. Tenant-isolated: the row is returned
+   * ONLY when its URL belongs to this endpoint (a per-endpoint credential
+   * holder must never read another endpoint's payloads). 404 when the log does
+   * not exist OR is not scoped to this endpoint.
+   */
+  @Get(':logId')
+  async getLogDetail(
+    @Param('endpointId') endpointId: string,
+    @Param('logId') logId: string,
+  ) {
+    if (!this.loggingService) {
+      throw new NotFoundException('Persistent logging not available (InMemory backend).');
+    }
+    const log = await this.loggingService.getLog(logId);
+    // Tenant isolation: the log's URL must reference this endpoint. Endpoint
+    // request URLs contain `/endpoints/<endpointId>` (both the v2 and bare
+    // rewrite forms), so a substring check on the id is a safe scope gate.
+    if (!log || typeof log.url !== 'string' || !log.url.includes(endpointId)) {
+      throw new NotFoundException(`Log "${logId}" not found for endpoint "${endpointId}".`);
+    }
+    return log;
   }
 }

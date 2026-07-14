@@ -210,6 +210,30 @@ describe('ConnectionInfoService', () => {
       );
       expect(info.enabledMethods.find((m) => m.method === 'wif')?.expectedAudience).toBe('api://scimserver-live');
     });
+
+    it('labels the wif method with the Entra "Workload Identity based authentication" auth method (not OAuth2 client credentials)', () => {
+      const info = service.assemble(endpoint({ WifCredentialsEnabled: 'True' }), [], 'https://x');
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.entraAuthenticationMethod).toBe('Workload Identity based authentication');
+    });
+
+    it('maps the wif expectedSubject to Entra\'s Client identifier field (sub claim)', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True' }),
+        [cred({ credentialType: 'wif', metadata: { expectedSubject: 'sp-object-id-abc', expectedAudience: 'aud' } })],
+        'https://x',
+      );
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.entraFields.clientIdentifier).toBe('sp-object-id-abc');
+      // The audience stays a separate row.
+      expect(wif?.expectedAudience).toBe('aud');
+    });
+
+    it('leaves the wif clientIdentifier null when no subject is configured', () => {
+      const info = service.assemble(endpoint({ WifCredentialsEnabled: 'True' }), [], 'https://x');
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.entraFields.clientIdentifier).toBeNull();
+    });
   });
 
   describe('assemble - display + no-secret invariant', () => {

@@ -505,6 +505,23 @@ export const endpointLogsQueryOptions = (params: EndpointLogsParams) => {
   };
 };
 
+/**
+ * Per-endpoint log detail - powers the clickable DetailDrawer on the endpoint
+ * Logs tab (mirrors the SCIMServer-level Logs page). Fetches the full
+ * request/response headers + parsed bodies for one log row, tenant-isolated to
+ * this endpoint (`GET /scim/endpoints/:id/logs/:logId`). Disabled until a row
+ * is selected.
+ */
+export const endpointLogDetailQueryOptions = (endpointId: string, logId: string | undefined) => ({
+  queryKey: ['endpoint-logs', endpointId, 'detail', logId] as const,
+  queryFn: () => fetchWithAuth<GlobalLogDetail>(`/scim/endpoints/${endpointId}/logs/${logId!}`),
+  enabled: Boolean(logId),
+  staleTime: 60_000,
+});
+
+export const useEndpointLog = (endpointId: string, logId: string | undefined) =>
+  useQuery(endpointLogDetailQueryOptions(endpointId, logId));
+
 export interface GlobalLogsParams {
   urlContains?: string;
   pageSize?: number;

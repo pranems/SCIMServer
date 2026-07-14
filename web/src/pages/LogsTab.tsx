@@ -24,9 +24,9 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { endpointLogsQueryOptions } from '../api/queries';
+import { endpointLogsQueryOptions, useEndpointLog } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
-import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, AuthDiagnosticsPanel } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, CopyableJsonBlock, DetailDrawer, AuthDiagnosticsPanel } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -87,6 +87,10 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const urlContains = search.urlContains ?? '';
   const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointLogs(endpointId, page, urlContains, pageSize);
+
+  // Clickable log detail (mirrors the SCIMServer-level Logs page).
+  const [detailId, setDetailId] = React.useState<string | undefined>(undefined);
+  const detailQuery = useEndpointLog(endpointId, detailId);
 
   const updateSearch = (next: { page?: number; urlContains?: string }): void => {
     navigate({
@@ -195,7 +199,13 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
         </thead>
         <tbody>
           {logs.map((log: any) => (
-            <tr key={log.id} className={classes.tr}>
+            <tr
+              key={log.id}
+              className={classes.tr}
+              onClick={() => setDetailId(log.id)}
+              data-testid={`logs-tab-row-${log.id}`}
+              style={{ cursor: 'pointer' }}
+            >
               <td className={classes.td}>
                 <Badge appearance="filled" color={methodColor(log.method)} className={classes.method}>
                   {log.method}
@@ -236,6 +246,40 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
           <Button appearance="subtle" disabled={!data?.hasNext} onClick={() => updateSearch({ page: page + 1 })}>Next</Button>
         </div>
       )}
+
+      <DetailDrawer
+        open={Boolean(detailId)}
+        onClose={() => setDetailId(undefined)}
+        title={detailQuery.data ? `${detailQuery.data.method} ${detailQuery.data.url}` : 'Log detail'}
+        data-testid="logs-tab-detail-drawer"
+      >
+        {detailQuery.isLoading && (
+          <LoadingSkeleton count={6} height="36px" data-testid="logs-tab-detail-skeleton" />
+        )}
+        {detailQuery.error && (
+          <Text data-testid="logs-tab-detail-error">
+            Failed to load log: {(detailQuery.error as Error).message}
+          </Text>
+        )}
+        {detailQuery.data && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <CopyableField value={detailQuery.data.url ?? ''} truncate monospace maxWidth="100%" data-testid="logs-tab-detail-url" />
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <Badge appearance="filled" color={(detailQuery.data.status ?? 0) >= 400 ? 'danger' : 'success'}>
+                {detailQuery.data.status ?? '-'}
+              </Badge>
+              <Caption1>{detailQuery.data.durationMs ?? 0}ms</Caption1>
+            </div>
+            <CopyableJsonBlock value={detailQuery.data.requestHeaders ?? {}} label="Request headers" data-testid="logs-tab-detail-request-headers" />
+            <CopyableJsonBlock value={detailQuery.data.requestBody ?? null} label="Request body" data-testid="logs-tab-detail-request-body" />
+            <CopyableJsonBlock value={detailQuery.data.responseHeaders ?? {}} label="Response headers" data-testid="logs-tab-detail-response-headers" />
+            <CopyableJsonBlock value={detailQuery.data.responseBody ?? null} label="Response body" data-testid="logs-tab-detail-response-body" />
+            {detailQuery.data.errorMessage && (
+              <Text data-testid="logs-tab-detail-error-message">{detailQuery.data.errorMessage}</Text>
+            )}
+          </div>
+        )}
+      </DetailDrawer>
     </div>
   );
 };

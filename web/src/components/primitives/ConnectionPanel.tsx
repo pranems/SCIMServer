@@ -251,8 +251,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 
       <div className={classes.fieldGrid} data-testid={`${testId}-fields`}>
         {Object.entries(method.entraFields).map(([key, value]) => {
-          const label = FIELD_LABELS[key] ?? key;
-          const desc = FIELD_DESCRIPTIONS[key];
+          // WIF maps Entra's "Client identifier" field to the sub claim, so use
+          // a WIF-specific label + description there (generic OAuth wording is
+          // wrong for WIF). All other keys use the shared labels.
+          const isWifSubject = method.method === 'wif' && key === 'clientIdentifier';
+          const label = isWifSubject
+            ? 'Client identifier (sub claim)'
+            : (FIELD_LABELS[key] ?? key);
+          const desc = isWifSubject
+            ? 'For Workload Identity Federation: Entra\'s "Client identifier" field takes the subject (sub) claim the source IdP token must carry - i.e. the service-principal object id this endpoint expects.'
+            : FIELD_DESCRIPTIONS[key];
           const isSecret = key === 'clientSecret' || key === 'secretToken';
           return (
             <div key={key} className={classes.fieldRow} data-testid={`${testId}-field-${key}`}>

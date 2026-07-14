@@ -122,6 +122,26 @@ describe('LogsTab', () => {
     expect(screen.getByTestId('export-button')).not.toBeDisabled();
   });
 
+  it('opens a detail drawer when a log row is clicked', async () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [
+          { id: 'l1', method: 'POST', url: '/scim/v2/endpoints/ep-1/Users', status: 201, durationMs: 42, createdAt: '2026-05-01T10:00:00Z',
+            requestHeaders: {}, requestBody: { userName: 'x' }, responseHeaders: {}, responseBody: { id: 'u1' } },
+        ],
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    const row = await screen.findByTestId('logs-tab-row-l1');
+    fireEvent.click(row);
+    // The detail drawer opens with the request/response blocks.
+    expect(await screen.findByTestId('logs-tab-detail-drawer')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-detail-request-body')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-detail-response-body')).toBeInTheDocument();
+  });
+
   it('CSV export invokes triggerCsvDownload with flattened log rows', async () => {
     const csvExportModule = await import('../utils/csv-export');
     const csvSpy = vi.spyOn(csvExportModule, 'triggerCsvDownload').mockImplementation(() => {});
