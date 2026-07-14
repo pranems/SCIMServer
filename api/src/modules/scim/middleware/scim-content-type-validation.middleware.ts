@@ -33,9 +33,13 @@ export class ScimContentTypeValidationMiddleware implements NestMiddleware {
       return next();
     }
 
-    // A3 - the per-endpoint OAuth token endpoint is an OAuth endpoint, not a
-    // SCIM resource endpoint: it accepts application/x-www-form-urlencoded
-    // (RFC 6749 section 3.2). Exempt it from the SCIM media-type rule.
+    // The OAuth token endpoints (global /scim/oauth/token AND per-endpoint
+    // /scim/endpoints/{id}/oauth/token) are OAuth endpoints, not SCIM resource
+    // endpoints: RFC 6749 section 3.2 requires them to accept
+    // application/x-www-form-urlencoded. The per-endpoint one lives under
+    // endpoints/* so it is otherwise caught by this middleware and 415s the
+    // exact request Entra's client-credentials grant sends. Exempt any
+    // */oauth/token path from the SCIM media-type rule.
     if (/\/oauth\/token\/?$/.test(req.path ?? req.url ?? '')) {
       return next();
     }

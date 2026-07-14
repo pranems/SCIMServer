@@ -9,15 +9,24 @@ import {
   Body,
   Query,
   Req,
+  Res,
   HttpCode,
   ForbiddenException
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { createScimError } from '../common/scim-errors';
 import { resolveResourceType } from '../common/resource-type-resolver';
+import {
+  buildResourceTypeWarning,
+  buildEmptyListResponseWithWarning,
+  formatWarningHeader,
+  SCIM_WARNING_HEADER,
+} from '../common/resource-type-enforcement';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 import { enforcePatchSupported, enforceFilterSupported, enforceSortSupported } from '../common/capability-enforcement';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
@@ -38,7 +47,8 @@ export class EndpointScimUsersController {
   constructor(
     private readonly endpointService: EndpointService,
     private readonly endpointContext: EndpointContextStorage,
-    private readonly usersService: EndpointScimUsersService
+    private readonly usersService: EndpointScimUsersService,
+    private readonly logger: ScimLogger
   ) {}
 
   /**
@@ -68,8 +78,9 @@ export class EndpointScimUsersController {
    */
   private async validateAndSetContext(
     endpointId: string,
-    req: Request
-  ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined }> {
+    req: Request,
+    opts?: { relaxableList?: boolean }
+  ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined; resourceTypeUnsupported?: boolean; endpointName?: string }> {
     const endpoint = await this.endpointService.getEndpoint(endpointId);
 
     if (!endpoint.active) {
@@ -77,11 +88,20 @@ export class EndpointScimUsersController {
     }
 
     const profile = endpoint.profile;
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
 
     // Gap 1: enforce the profile's resourceTypes for built-in CRUD (RFC 7643 §6).
     // Fail-open when resourceTypes is absent/empty; reject when User is not declared.
     const { supported } = resolveResourceType(profile, { name: 'User', endpointPath: '/Users' });
     if (!supported) {
+      // EnforceResourceTypes=false relaxes ONLY a LIST/query (opts.relaxableList)
+      // to a 200 empty ListResponse + warning; item reads + writes still 404.
+      const enforce = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES);
+      if (opts?.relaxableList && !enforce) {
+        this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
+        return { baseUrl, config, profile, resourceTypeUnsupported: true, endpointName: endpoint.name };
+      }
       throw createScimError({
         status: 404,
         scimType: 'noTarget',
@@ -90,11 +110,24 @@ export class EndpointScimUsersController {
       });
     }
 
-    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-    const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
     return { baseUrl, config, profile };
+  }
+
+  /**
+   * Emit the un-served-resource-type LIST warning on all three channels
+   * (W1 log, W3 header) and return the W2 empty-ListResponse body.
+   */
+  private relaxedEmptyUserList(endpointId: string, endpointName: string | undefined, res: Response | undefined): Record<string, unknown> {
+    const warning = buildResourceTypeWarning('User', endpointName ?? endpointId, endpointId);
+    this.logger.warn(LogCategory.SCIM_USER, warning.message, {
+      endpointId,
+      resourceType: warning.resourceType,
+      code: warning.code,
+    });
+    res?.setHeader(SCIM_WARNING_HEADER, formatWarningHeader(warning));
+    return buildEmptyListResponseWithWarning(warning);
   }
 
   /**
@@ -132,9 +165,14 @@ export class EndpointScimUsersController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'ascending' | 'descending',
     @Query('attributes') attributes?: string,
-    @Query('excludedAttributes') excludedAttributes?: string
+    @Query('excludedAttributes') excludedAttributes?: string,
+    @Res({ passthrough: true }) res?: Response
   ) {
-    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile, resourceTypeUnsupported, endpointName } =
+      await this.validateAndSetContext(endpointId, req, { relaxableList: true });
+    if (resourceTypeUnsupported) {
+      return this.relaxedEmptyUserList(endpointId, endpointName, res);
+    }
     enforceFilterSupported(profile, filter);
     enforceSortSupported(profile, sortBy);
     const result = await this.usersService.listUsersForEndpoint(
@@ -190,9 +228,14 @@ export class EndpointScimUsersController {
   async searchUsers(
     @Param('endpointId') endpointId: string,
     @Body() dto: SearchRequestDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Res({ passthrough: true }) res?: Response
   ) {
-    const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config, profile, resourceTypeUnsupported, endpointName } =
+      await this.validateAndSetContext(endpointId, req, { relaxableList: true });
+    if (resourceTypeUnsupported) {
+      return this.relaxedEmptyUserList(endpointId, endpointName, res);
+    }
     enforceFilterSupported(profile, dto.filter);
     enforceSortSupported(profile, dto.sortBy);
     const result = await this.usersService.listUsersForEndpoint(

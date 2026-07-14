@@ -97,6 +97,60 @@ describe('Profile-enforcement gaps (E2E)', () => {
     });
   });
 
+  // ─── EnforceResourceTypes=false: LIST/query relaxes to 200 empty + warning ──
+
+  describe('EnforceResourceTypes=false relaxes Group LIST to 200 empty + warning', () => {
+    const WARN = 'urn:scimserver:api:messages:2.0:Warning';
+    let endpointId: string;
+    let basePath: string;
+
+    beforeAll(async () => {
+      endpointId = await createUserOnlyEndpoint(app, token);
+      basePath = scimBasePath(endpointId);
+      // Flip the endpoint flag off.
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { EnforceResourceTypes: false } } })
+        .expect(200);
+    });
+
+    it('GET /Groups -> 200 empty ListResponse + Warning body + X-SCIM-Warning header', async () => {
+      const res = await scimGet(app, `${basePath}/Groups`, token).expect(200);
+      expect(res.body.totalResults).toBe(0);
+      expect(res.body.Resources).toEqual([]);
+      expect(res.body.schemas).toContain(WARN);
+      expect(res.body[WARN]?.warnings?.[0]?.code).toBe('RESOURCE_TYPE_NOT_SERVED');
+      expect(res.body[WARN]?.warnings?.[0]?.resourceType).toBe('Group');
+      expect(res.headers['x-scim-warning']).toContain('RESOURCE_TYPE_NOT_SERVED');
+    });
+
+    it('GET /Groups?filter=... (Entra Test Connection probe) -> 200 empty', async () => {
+      const res = await scimGet(app, `${basePath}/Groups?filter=${encodeURIComponent('displayName eq "nope"')}`, token).expect(200);
+      expect(res.body.totalResults).toBe(0);
+    });
+
+    it('POST /Groups/.search -> 200 empty ListResponse + warning', async () => {
+      const res = await scimPost(app, `${basePath}/Groups/.search`, token, {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest'],
+      }).expect(200);
+      expect(res.body.totalResults).toBe(0);
+      expect(res.body[WARN]?.warnings?.[0]?.code).toBe('RESOURCE_TYPE_NOT_SERVED');
+    });
+
+    it('GET /Groups/:id (item read) still -> 404 (only LIST/query is relaxed)', async () => {
+      const res = await scimGet(app, `${basePath}/Groups/nope`, token).expect(404);
+      expect(res.body[DIAG]?.errorCode).toBe('RESOURCE_TYPE_NOT_SUPPORTED');
+    });
+
+    it('POST /Groups (create) still -> 404 (writes never relaxed)', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: 'x',
+      }).expect(404);
+    });
+  });
+
   // ─── Gaps 2-4: capability gating ──────────────────────────────────────────
 
   describe('Gaps 2-4: capability gating', () => {

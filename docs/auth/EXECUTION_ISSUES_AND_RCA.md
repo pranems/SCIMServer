@@ -373,6 +373,125 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 The following issue was documented independently on `master` for the RFC-6749 section 2.3.1 `client_secret_basic` fix and is preserved here after the master->feat/wif merge so the CHANGELOG reference stays valid.
 
+## Issue 3 - Entra Test Connection fails on user-only endpoints: `/Groups` returns 404 where Entra expects 200
+
+| Field | Value |
+|---|---|
+| **Type** | Protocol-compatibility surprise (strict enforcement vs client expectation) |
+| **Severity** | High (blocked provisioning setup on customer-facing prod for user-only endpoints) |
+| **Detected by** | Operator (Entra `InvalidCredentials` / `ServiceIncompatible` on calmsand) + direct reproduction |
+| **Earliest gate that could have caught it** | An E2E asserting an Entra-shaped `/Groups` probe on a user-only endpoint - none existed (the enforcement E2E asserted the 404 as *correct*) |
+| **Escape delta** | The v0.53.3 enforcement work codified the 404 as intended behavior; the Entra-compat implication was not modeled |
+
+### Symptom
+After the credential-location issues were resolved, Entra Test Connection
+(`OAuth2ClientCredentialsGrant`, `credentialLocationInRequest: Header`) failed
+with `InvalidCredentials` wrapping
+`SystemForCrossDomainIdentityManagementServiceIncompatible`: "An HTTP/404 Not
+Found response was returned rather than the expected HTTP/200 OK response ...
+RFC 7644 §3.4.2". Some endpoints worked, some failed; the operator suspected
+"endpoints without groups". Direct probe confirmed: on endpoint
+`3dbe8e5c...` (`SelfServ-Entra-OnlyUser-NoGroup`) `GET /Users` returned 200 but
+`GET /Groups` returned 404.
+
+### Root-cause analysis
+v0.53.3 profile enforcement (Gap 1): the Groups controller calls
+`resolveResourceType(profile, {name:'Group'})` and throws `404
+RESOURCE_TYPE_NOT_SUPPORTED` when the endpoint's `profile.resourceTypes` does not
+declare `Group`. Entra's Test Connection queries BOTH `/Users` and `/Groups` and
+- per RFC 7644 §3.4.2 - expects a `200` empty `ListResponse` for zero matches on
+a supported endpoint; a `404` on `/Groups` is read as "service incompatible /
+wrong tenant URL". So a deliberately user-only endpoint could not pass Entra's
+Test Connection under strict enforcement. Not an Entra bug - a mismatch between
+our strict-enforcement design choice and Entra's probe contract.
+
+### Fix
+New endpoint config flag `EnforceResourceTypes` (default `true` = unchanged
+strict behavior). When `false`, a **LIST/query** on an un-served resource type
+returns a `200` empty `ListResponse` instead of `404`; item-by-id reads and all
+writes still `404`. New [resource-type-enforcement.ts](../../api/src/modules/scim/common/resource-type-enforcement.ts)
+builds ONE warning object projected onto three channels (W1 log, W2
+`urn:scimserver:api:messages:2.0:Warning` body member, W3 `X-SCIM-Warning`
+header). Both Users and Groups controllers gained a `relaxableList` path in
+`validateAndSetContext`. UI Switch added to the Settings tab.
+
+### Why the fix works
+The relaxation makes a user-only endpoint answer Entra's `/Groups` probe with the
+exact `200` empty `ListResponse` RFC 7644 §3.4.2 mandates, so Test Connection
+succeeds - while the default (`true`) preserves the strict 404 for every existing
+endpoint (zero regression), and writes/item-reads are never silently relaxed
+(the "user-only" product intent holds). Entra ignores the W2 body member + W3
+header, so they add observability without breaking the probe.
+
+### Prevention
+- **Unit**: helper +7; config-flag +4; controller +12 (relaxed list/search 200
+  empty; item read + create still 404; default-enforce preserved on both
+  controllers).
+- **E2E**: `profile-enforcement-gaps` +6 - GET /Groups + .search return 200 empty
+  with W2 body + W3 header; item read + create still 404 (the exact Entra probe).
+- **Live**: `live-test.ps1` 9z-AS.5b-5g.
+- **Convention (generalizable)**: when enforcement returns a non-2xx for a
+  "resource absent / not served" case, model the major IdP's probe contract
+  (Entra/Okta expect 200 empty ListResponse on a supported endpoint, RFC 7644
+  §3.4.2) before choosing the status code, and provide an opt-out flag when the
+  strict choice breaks a mainstream client. Codifying a 404 as "correct" in a
+  test is not the same as it being client-compatible.
+
+## Issue 2 - Per-endpoint token endpoint rejected `application/x-www-form-urlencoded` with 415 (Entra recurrence)
+
+| Field | Value |
+|---|---|
+| **Type** | Middleware scope surprise (SCIM rule caught an OAuth endpoint) |
+| **Severity** | High (blocked live provisioning on customer-facing prod, AFTER Issue 1 was believed fixed) |
+| **Detected by** | Operator (Entra provisioning error on calmsand) + reproduced via direct probe |
+| **Earliest gate that could have caught it** | Stage 2.2 API E2E (a form-urlencoded per-endpoint token test) - none existed |
+| **Escape delta** | Escaped Issue 1's fix verification because that verification exercised the GLOBAL token endpoint (exempt), not the per-endpoint one Entra actually uses |
+
+### Symptom
+After 0.54.0-alpha.9 (the `client_secret_basic` fix) was live, the operator still
+saw `SystemForCrossDomainIdentityManagementCredentialValidationFailure` /
+"Supported CredentialLocationInRequest is required". Direct probe of the
+per-endpoint token URL returned `415 Unsupported Media Type` with
+`CONTENT_TYPE_UNSUPPORTED` for an `application/x-www-form-urlencoded` body.
+
+### Root-cause analysis
+Entra's tenant URL is the PER-endpoint one
+(`/scim/endpoints/{id}/oauth/token`), which lives under `endpoints/*`. The SCIM
+content-type middleware ([scim-content-type-validation.middleware.ts](../../api/src/modules/scim/middleware/scim-content-type-validation.middleware.ts))
+enforces RFC 7644 §3.1 (`application/scim+json` | `application/json`) on
+`endpoints/*` routes and 415s anything else BEFORE the controller runs. Entra's
+client-credentials grant sends the token request as
+`application/x-www-form-urlencoded` (RFC 6749 §3.2), so it was rejected before
+the credentials (Basic header OR body) were ever read. The GLOBAL
+`/scim/oauth/token` sits outside `endpoints/*` and was already exempt - which is
+exactly why Issue 1's fix verified green on the global path and the per-endpoint
+gap was masked.
+
+### Fix
+The middleware now exempts ANY `*/oauth/token` path (regex
+`/\/oauth\/token\/?$/`) from the SCIM media-type rule - a token endpoint is an
+OAuth endpoint, not a SCIM resource endpoint. Identical to the `A3` exemption
+already present on the feat/wif branch (kept in lockstep).
+
+### Why the fix works
+The exemption lets the form-urlencoded body reach the token controller, where the
+Issue 1 credential resolver (Basic header + body) then authenticates it. The two
+fixes compose: Issue 1 made the endpoint read credentials from either location;
+Issue 2 lets the request's media type through so the credentials are read at all.
+
+### Prevention
+- **E2E**: `endpoint-oauth-client.e2e-spec.ts` +2 - a form-urlencoded body, and
+  form-urlencoded + `Authorization: Basic` (the exact Entra flow) - both mint a
+  token (not 415).
+- **Live**: `live-test.ps1` 9z-AP T13-T14 (per-endpoint form-urlencoded mint, + Basic).
+- **Convention (generalizable)**: when a fix is verified against a live surface,
+  verify the EXACT surface the failing client uses (per-endpoint URL), not a
+  sibling surface (global URL) that shares the code but differs in middleware
+  scope. Issue 1's verification hit the global endpoint and missed this. Also:
+  middleware scoped by URL prefix (`endpoints/*`) MUST explicitly exempt
+  sub-paths that are semantically different (OAuth token endpoints under a SCIM
+  resource prefix).
+
 ## Issue 1 - Token endpoint accepted client credentials only in the body (`client_secret_post`), not the `Authorization: Basic` header (`client_secret_basic`)
 
 | Field | Value |

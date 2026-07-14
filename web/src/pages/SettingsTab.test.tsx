@@ -137,6 +137,7 @@ describe('SettingsTab', () => {
     expect(screen.getByRole('switch', { name: /GroupHardDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /MultiMemberPatchOpForGroupEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /SchemaDiscoveryEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /EnforceResourceTypes/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /AllowAndCoerceBooleanStrings/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /VerbosePatchSupported/i })).toBeInTheDocument();

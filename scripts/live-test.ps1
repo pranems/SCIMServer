@@ -11196,6 +11196,22 @@ try {
     Test-Result -Success (@($apMeta.token_endpoint_auth_methods_supported) -contains 'client_secret_basic') `
         -Message "9z-AP.T12: OAuth AS metadata advertises client_secret_basic (matches accepted behavior)"
 
+    # RFC 6749 section 3.2 - the per-endpoint token endpoint MUST accept an
+    # application/x-www-form-urlencoded body (the exact shape Entra's
+    # client-credentials grant sends). The endpoint lives under endpoints/*, so
+    # the SCIM content-type middleware used to 415 it with "Supported
+    # CredentialLocationInRequest is required". Mint a token via a form body.
+    $apFormBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($apCred.clientId))&client_secret=$([uri]::EscapeDataString($apCred.clientSecret))"
+    $apFormResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST `
+        -ContentType 'application/x-www-form-urlencoded' -Body $apFormBody
+    Test-Result -Success ($null -ne $apFormResp.access_token -and $apFormResp.token_type -eq 'Bearer') `
+        -Message "9z-AP.T13: per-endpoint token accepts application/x-www-form-urlencoded body (RFC 6749 3.2, not 415)"
+    # And the full Entra shape: form-urlencoded body + Authorization: Basic header
+    $apFormBasicResp = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$apIdA/oauth/token" -Method POST `
+        -Headers @{ Authorization = "Basic $apBasic" } -ContentType 'application/x-www-form-urlencoded' -Body "grant_type=client_credentials"
+    Test-Result -Success ($null -ne $apFormBasicResp.access_token) `
+        -Message "9z-AP.T14: per-endpoint token accepts form-urlencoded + Authorization: Basic (exact Entra client-credentials flow)"
+
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdA" -Method DELETE -Headers $headers | Out-Null } catch {}
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$apIdB" -Method DELETE -Headers $headers | Out-Null } catch {}
@@ -11373,6 +11389,28 @@ $pegUoUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); u
 $pegUoUser = Invoke-RestMethod -Uri "$pegUoBase/Users" -Method POST -Headers $pegHeaders -Body $pegUoUserBody
 Test-Result -Success ($null -ne $pegUoUser.id) -Message "9z-AS.5: User CRUD still works on the user-only endpoint"
 
+# ---- EnforceResourceTypes=false relaxes Group LIST/query to 200 empty + warning ----
+Write-Host "`n--- 9z-AS EnforceResourceTypes=false: relaxed Group LIST ---" -ForegroundColor Cyan
+$pegRlBody = @{ name = "live-peg-relaxrt-$(Get-Random)"; profilePreset = "user-only" } | ConvertTo-Json
+$pegRlEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $pegRlBody
+$pegRlId = $pegRlEp.id
+$pegRlBase = "$baseUrl/scim/endpoints/$pegRlId"
+$pegRlOff = @{ profile = @{ settings = @{ EnforceResourceTypes = $false } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$pegRlId" -Method PATCH -Headers $headers -Body $pegRlOff | Out-Null
+# GET /Groups -> 200 empty ListResponse + warning body + header (the exact Entra Test-Connection probe)
+$pegRlResp = Invoke-WebRequest -Uri "$pegRlBase/Groups?filter=displayName%20eq%20%22nope%22" -Method GET -Headers $pegHeaders -SkipHttpErrorCheck
+$pegRlBodyParsed = $null
+if ($pegRlResp.Content) { $s = if ($pegRlResp.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($pegRlResp.Content) } else { [string]$pegRlResp.Content }; try { $pegRlBodyParsed = $s | ConvertFrom-Json } catch {} }
+Test-Result -Success ([int]$pegRlResp.StatusCode -eq 200) -Message "9z-AS.5b: GET /Groups on user-only + EnforceResourceTypes=false -> 200 (status=$([int]$pegRlResp.StatusCode))"
+Test-Result -Success ($pegRlBodyParsed.totalResults -eq 0 -and @($pegRlBodyParsed.Resources).Count -eq 0) -Message "9z-AS.5c: relaxed body is an empty ListResponse"
+Test-Result -Success ($pegRlBodyParsed.'urn:scimserver:api:messages:2.0:Warning'.warnings[0].code -eq "RESOURCE_TYPE_NOT_SERVED") -Message "9z-AS.5d: W2 body Warning member carries RESOURCE_TYPE_NOT_SERVED"
+Test-Result -Success ("$($pegRlResp.Headers['X-SCIM-Warning'])" -match "RESOURCE_TYPE_NOT_SERVED") -Message "9z-AS.5e: W3 X-SCIM-Warning header present"
+# Item read + writes still 404 even with the flag off
+$pegRlItem = Invoke-NullPatchGeneric "$pegRlBase/Groups/nope" "GET" $null
+Test-Result -Success ($pegRlItem.Status -eq 404) -Message "9z-AS.5f: GET /Groups/{id} still 404 with EnforceResourceTypes=false (only LIST relaxed)"
+$pegRlCreate = Invoke-NullPatchGeneric "$pegRlBase/Groups" "POST" @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group"); displayName = "x" }
+Test-Result -Success ($pegRlCreate.Status -eq 404) -Message "9z-AS.5g: POST /Groups (create) still 404 with EnforceResourceTypes=false"
+
 # ---- Gaps 2/3/4: capability gating (uses a rfc-standard endpoint we narrow via PATCH) ----
 Write-Host "`n--- 9z-AS Gaps 2/3/4: capability gating ---" -ForegroundColor Cyan
 $pegCapBody = @{ name = "live-peg-cap-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
@@ -11436,7 +11474,7 @@ $pegEtOffResp = Invoke-WebRequest -Uri "$pegEtBase/Users/$($pegEtUser.id)" -Meth
 Test-Result -Success ($null -eq $pegEtOffResp.Headers['ETag']) -Message "9z-AS.12: ETag header absent when etag.supported=false"
 
 # ---- Cleanup ----
-foreach ($epId in @($pegUoId, $pegCapId, $pegMrId, $pegEtId)) {
+foreach ($epId in @($pegUoId, $pegCapId, $pegMrId, $pegEtId, $pegRlId)) {
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$epId" -Method DELETE -Headers $headers | Out-Null } catch {}
 }
 Write-Host "`n--- 9z-AS: Profile Enforcement Gaps Tests Complete ---" -ForegroundColor Green

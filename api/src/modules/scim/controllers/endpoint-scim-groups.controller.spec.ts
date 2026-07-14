@@ -4,6 +4,7 @@ import { EndpointScimGroupsController } from './endpoint-scim-groups.controller'
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 
@@ -75,6 +76,10 @@ describe('EndpointScimGroupsController', () => {
         {
           provide: EndpointContextStorage,
           useValue: mockEndpointContext,
+        },
+        {
+          provide: ScimLogger,
+          useValue: { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn(), trace: jest.fn() },
         },
       ],
     }).compile();
@@ -244,7 +249,7 @@ describe('EndpointScimGroupsController', () => {
         mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
         mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
 
-        const result = await controller.listGroups(
+        const result: any = await controller.listGroups(
           'endpoint-1', mockRequest, undefined, '1', '10', undefined, undefined, 'displayName', undefined
         );
 
@@ -303,7 +308,7 @@ describe('EndpointScimGroupsController', () => {
           excludedAttributes: 'members',
         };
 
-        const result = await controller.searchGroups('endpoint-1', searchDto as any, mockRequest);
+        const result: any = await controller.searchGroups('endpoint-1', searchDto as any, mockRequest);
 
         expect(result.Resources[0].displayName).toBe('Eng');
         expect(result.Resources[0].members).toBeUndefined();
@@ -623,7 +628,7 @@ describe('EndpointScimGroupsController', () => {
       mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
       mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
-      const result = await controller.listGroups('endpoint-1', mockRequest);
+      const result: any = await controller.listGroups('endpoint-1', mockRequest);
 
       expect(result.Resources[0].secretTag).toBeUndefined();
       expect(result.Resources[0].displayName).toBe('Group 1');
@@ -898,6 +903,69 @@ describe('EndpointScimGroupsController', () => {
       expect(result.schemas).toBeDefined();
       expect(result.meta).toBeDefined();
       expect(result.displayName).toBe('G8g Test Group'); // always-returned for Group
+    });
+  });
+
+  describe('EnforceResourceTypes relaxation (Group not served)', () => {
+    // Endpoint whose profile declares ONLY User -> Group is un-served.
+    const userOnly = (enforce: boolean | undefined) => ({
+      ...mockEndpoint,
+      name: 'User-Only-Endpoint',
+      profile: {
+        resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users' }],
+        settings: enforce === undefined ? {} : { EnforceResourceTypes: enforce },
+      },
+    });
+
+    const mockRes = () => ({ setHeader: jest.fn() }) as any;
+
+    it('GET /Groups returns 200 empty ListResponse + warning when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnly(false));
+      const res = mockRes();
+      const result: any = await controller.listGroups('endpoint-1', mockRequest, undefined, undefined, undefined, undefined, undefined, undefined, undefined, res);
+
+      expect(result.totalResults).toBe(0);
+      expect(result.Resources).toEqual([]);
+      expect(result.schemas).toContain('urn:scimserver:api:messages:2.0:Warning');
+      expect(result['urn:scimserver:api:messages:2.0:Warning'].warnings[0].code).toBe('RESOURCE_TYPE_NOT_SERVED');
+      // W3 header set
+      expect(res.setHeader).toHaveBeenCalledWith('X-SCIM-Warning', expect.stringContaining('RESOURCE_TYPE_NOT_SERVED'));
+      // did NOT hit the groups service
+      expect(mockGroupsService.listGroupsForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('POST /Groups/.search returns 200 empty ListResponse + warning when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnly(false));
+      const res = mockRes();
+      const result: any = await controller.searchGroups('endpoint-1', { schemas: [] } as any, mockRequest, res);
+      expect(result.totalResults).toBe(0);
+      expect(result['urn:scimserver:api:messages:2.0:Warning'].warnings[0].resourceType).toBe('Group');
+    });
+
+    it('GET /Groups still 404 when EnforceResourceTypes=true (default preserved)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnly(true));
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mockRes())
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('GET /Groups still 404 when the flag is unset (defaults to enforce)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnly(undefined));
+      await expect(
+        controller.listGroups('endpoint-1', mockRequest, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mockRes())
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('GET /Groups/{id} (item read) still 404 even when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnly(false));
+      await expect(controller.getGroup('endpoint-1', 'some-id', mockRequest)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('POST /Groups (create) still 404 even when EnforceResourceTypes=false', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(userOnly(false));
+      await expect(
+        controller.createGroup('endpoint-1', { schemas: [], displayName: 'x' } as any, mockRequest)
+      ).rejects.toMatchObject({ status: 404 });
     });
   });
 });

@@ -178,6 +178,13 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     category: 'Discovery',
   },
   {
+    key: 'EnforceResourceTypes',
+    label: 'EnforceResourceTypes',
+    description: 'When on (default), a query on an un-served resource type returns 404. Turn OFF so a LIST/query on an un-served type (e.g. /Groups on a user-only endpoint) returns 200 empty + warning - needed for Entra Test Connection.',
+    defaultValue: true,
+    category: 'Discovery',
+  },
+  {
     key: 'CustomResourceTypesEnabled',
     label: 'CustomResourceTypesEnabled',
     description: 'Allow registering custom resource types (beyond User and Group) on the Resource Types tab.',

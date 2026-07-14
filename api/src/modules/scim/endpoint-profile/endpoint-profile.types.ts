@@ -120,6 +120,12 @@ export interface ProfileSettings {
   logFileEnabled?: boolean | string;
   /** Enable Workload Identity Federation (WIF) for this endpoint (A1; default false) */
   WifCredentialsEnabled?: boolean | string;
+  /**
+   * Enforce the profile's declared resourceTypes on LIST/query (default true).
+   * When false, a LIST/query on an un-served resource type returns 200 empty
+   * ListResponse + warning instead of 404. Item reads + writes still 404.
+   */
+  EnforceResourceTypes?: boolean | string;
   /** Allow any additional settings */
   [key: string]: unknown;
 }

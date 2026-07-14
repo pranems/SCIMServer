@@ -134,6 +134,7 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 19 | [`OAuthClientCredentialsAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
 | 20 | [`SharedSecretBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `true` | Authentication |
 | 21 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | enum (`always`/`once`) | `always` | Authentication |
+| 22 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
 
 ### CredentialSecretVisibility
 
@@ -182,6 +183,22 @@ shared secret on its resource routes and accept only its own credentials (or
 endpoint-scoped OAuth tokens). `*` The two per-endpoint flags show `false` as
 their registry default, but their EFFECTIVE value inherits the legacy flag when
 that is set.
+### EnforceResourceTypes
+
+When `true` (**default**), a LIST/query on a resource type the endpoint profile
+does not declare returns `404 RESOURCE_TYPE_NOT_SUPPORTED` (the v0.53.3 Gap-1
+enforcement). When `false`, a **LIST/query** on an un-served resource type
+instead returns a `200` empty `ListResponse` (RFC 7644 §3.4.2) plus a non-fatal
+warning on three channels: a server log (**W1**), a
+`urn:scimserver:api:messages:2.0:Warning` body member (**W2**), and an
+`X-SCIM-Warning` response header (**W3**). **Item-by-id reads and all writes
+(`POST`/`PUT`/`PATCH`/`DELETE`) still reject with `404`** regardless of the flag -
+only LIST/query is relaxed. Applies symmetrically to `/Users` and `/Groups`.
+
+**Set `false` for Microsoft Entra provisioning of a user-only (no Group)
+endpoint**: Entra's Test Connection probes both `/Users` and `/Groups` and treats
+a `/Groups` 404 as `SystemForCrossDomainIdentityManagementServiceIncompatible`.
+See [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.1a](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md#81a-enforceresourcetypes-flag---relax-listquery-to-200-empty-entra-test-connection).
 
 ---
 
