@@ -27,7 +27,7 @@ describe('Connection-info API (E2E)', () => {
 
   const TOP_KEYS = ['endpointId', 'displayName', 'urls', 'enabledMethods', 'disabledMethods'];
   const URL_KEYS = ['scimBaseUrl', 'scimBaseUrlBare', 'tokenEndpoint', 'serviceProviderConfig', 'oauthMetadata'];
-  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained', 'secretRevealed'];
+  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth'];
   const DISABLED_KEYS = ['method', 'reason', 'enableHint'];
 
   it('assembles the connection-info shape with only documented top-level keys', async () => {
@@ -160,5 +160,41 @@ describe('Connection-info API (E2E)', () => {
       .get('/scim/admin/endpoints/00000000-0000-0000-0000-000000000000/connection-info')
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
+  });
+
+  // WI-D8: a rejected oauth_client token attempt records an Auth Decision, which
+  // connection-info surfaces as the oauth_client method's `authHealth` block.
+  it('surfaces authHealth on the oauth_client method after a failed token attempt', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      OAuthClientCredentialsAuthEnabled: true,
+    });
+    // Create an oauth_client credential so the method is fully wired.
+    const cred = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ credentialType: 'oauth_client', label: 'authhealth-e2e' })
+      .expect(201);
+    const clientId = cred.body.clientId as string;
+
+    // Make a DELIBERATELY-wrong token request -> rejected -> records a decision.
+    await request(app.getHttpServer())
+      .post(`/scim/endpoints/${endpointId}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: 'wrong-secret' })
+      .expect(401);
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const oc = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
+    expect(oc.authHealth).toBeDefined();
+    expect(oc.authHealth.lastOutcome).toBe('reject');
+    expect(oc.authHealth.lastReasonCode).toBe('oauth_client_auth_failed');
+    expect(typeof oc.authHealth.lastAttemptAt).toBe('string');
+    // authHealth keys are documented + non-secret.
+    const AUTH_HEALTH_KEYS = ['lastOutcome', 'lastReasonCode', 'lastAttemptAt', 'lastCorrelationId'];
+    for (const key of Object.keys(oc.authHealth)) expect(AUTH_HEALTH_KEYS).toContain(key);
   });
 });

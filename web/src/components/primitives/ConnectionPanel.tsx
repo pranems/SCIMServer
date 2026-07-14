@@ -29,10 +29,10 @@ import {
   Radio,
   RadioGroup,
   Button,
+  Badge,
   MessageBar,
   MessageBarBody,
-} from '@fluentui/react-components';
-import { ArrowDownload16Regular } from '@fluentui/react-icons';
+} from '@fluentui/react-components';import { ArrowDownload16Regular } from '@fluentui/react-icons';
 import type {
   ConnectionInfo,
   ConnectionEnabledMethod,
@@ -243,6 +243,26 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       <Text className={classes.authMethod} data-testid={`${testId}-auth-method`}>
         Authentication Method: {method.entraAuthenticationMethod}
       </Text>
+
+      {method.authHealth && (
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
+          data-testid={`${testId}-auth-health-${method.method}`}
+        >
+          <Badge
+            appearance="filled"
+            color={method.authHealth.lastOutcome === 'accept' ? 'success' : 'danger'}
+            data-testid={`${testId}-auth-health-badge`}
+          >
+            {method.authHealth.lastOutcome === 'accept' ? 'Last auth: OK' : 'Last auth: FAILED'}
+          </Badge>
+          <Caption1>
+            {method.authHealth.lastReasonCode ? `${method.authHealth.lastReasonCode} - ` : ''}
+            {new Date(method.authHealth.lastAttemptAt).toLocaleString()}
+            {method.authHealth.lastCorrelationId ? ` (req ${method.authHealth.lastCorrelationId})` : ''}
+          </Caption1>
+        </div>
+      )}
 
       <Caption1 className={classes.intro} data-testid={`${testId}-intro`}>
         Labels match Microsoft Entra ID&apos;s provisioning form. For Okta, OneLogin, Ping, or a

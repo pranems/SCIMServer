@@ -95,4 +95,27 @@ describe('WI-D5 AuthDecisionRecordStore', () => {
     store.clear();
     expect(store.size()).toBe(0);
   });
+
+  // WI-D8 - the per-method latest-decision helper for connection-info authHealth.
+  describe('latestByMethodForEndpoint (WI-D8)', () => {
+    it('returns the single most-recent decision per method for one endpoint', () => {
+      store.record(trace({ endpointId: 'ep-x', method: 'wif', outcome: 'reject', correlationId: 'old' }));
+      store.record(trace({ endpointId: 'ep-x', method: 'wif', outcome: 'accept', reasonCode: undefined, correlationId: 'new' }));
+      store.record(trace({ endpointId: 'ep-x', method: 'oauth_client', outcome: 'reject', reasonCode: 'oauth_client_auth_failed', correlationId: 'oc' }));
+      const latest = store.latestByMethodForEndpoint('ep-x');
+      // wif keeps the NEWEST (accept), not the older reject.
+      expect(latest.wif.outcome).toBe('accept');
+      expect(latest.wif.correlationId).toBe('new');
+      expect(latest.oauth_client.outcome).toBe('reject');
+      expect(latest.oauth_client.reasonCode).toBe('oauth_client_auth_failed');
+    });
+
+    it('scopes strictly to the requested endpoint', () => {
+      store.record(trace({ endpointId: 'ep-a', method: 'wif' }));
+      store.record(trace({ endpointId: 'ep-b', method: 'wif' }));
+      const latest = store.latestByMethodForEndpoint('ep-b');
+      expect(latest.wif.endpointId).toBe('ep-b');
+      expect(Object.keys(store.latestByMethodForEndpoint('ep-none'))).toHaveLength(0);
+    });
+  });
 });

@@ -118,6 +118,104 @@ export const SCIM_ERROR_CATALOG: Record<string, ScimErrorCatalogEntry> = {
       'The Bulk request exceeded the 1 MB / 1000-operation limit. Split the batch into smaller chunks.',
   },
 
+  // ─── WI-D8: auth-failure reason codes (mirror the API WI-D2 catalog) ─
+  // Keyed by the `reason_code` an OAuth token error / auth-decision carries.
+  // parseScimError prefers a reasonCode hit over scimType / status fallback so
+  // an operator sees the specific auth remediation, not a generic 401/403.
+  wif_no_trust_configured: {
+    title: 'No federated-identity trust configured',
+    explanation:
+      'This endpoint has no WIF trust. Create a WIF credential and enable WifCredentialsEnabled, then retry.',
+  },
+  wif_no_trust_accepted: {
+    title: 'No WIF trust accepted the assertion',
+    explanation:
+      'Multi-trust: none of the configured trusts matched the assertion. Check which trust should match the assertion issuer, and use the assertion debugger in the Credentials WIF sub-tab to see the per-check diff.',
+  },
+  jwks_host_not_allowlisted: {
+    title: 'JWKS host not allow-listed',
+    explanation:
+      "The trust's JWKS host is not permitted by the server allowlist. Add or edit the host under Settings > JWKS host allowlist.",
+  },
+  jwks_scheme_not_https: {
+    title: 'JWKS URI must use https',
+    explanation: 'Fix the trust jwksUri to an https URL.',
+  },
+  jwks_unreachable: {
+    title: 'Identity-provider key set unreachable',
+    explanation:
+      "The identity provider's JWKS could not be retrieved. Transient or network/allowlist issue; retry and verify the JWKS URL resolves.",
+  },
+  assertion_malformed: {
+    title: 'Client assertion is malformed',
+    explanation: 'The client assertion is not a well-formed JWT. Verify the IdP is sending a compact JWS.',
+  },
+  assertion_signature_invalid: {
+    title: 'Assertion signature did not verify',
+    explanation:
+      'The assertion signature did not verify against the IdP keys. Likely key rotation or a wrong jwksUri; confirm the IdP signing key is published at that JWKS.',
+  },
+  assertion_alg_not_allowed: {
+    title: 'Assertion algorithm not permitted',
+    explanation: 'The assertion signing algorithm is not permitted (RS256/ES256 only). The IdP must sign with RS256 or ES256.',
+  },
+  assertion_expired: {
+    title: 'Assertion expired or not yet valid',
+    explanation: 'The client assertion is expired or not yet valid. Check clock skew and request a fresh assertion.',
+  },
+  wif_issuer_mismatch: {
+    title: 'Assertion issuer mismatch',
+    explanation:
+      "The assertion issuer did not match the trust expectedIssuer. Align expectedIssuer with the IdP's iss (v2.0 vs v1.0 differs).",
+  },
+  wif_subject_mismatch: {
+    title: 'Assertion subject mismatch',
+    explanation: 'The assertion subject did not match the trust expectedSubject. Align expectedSubject with the service-principal object id.',
+  },
+  wif_audience_mismatch: {
+    title: 'Assertion audience mismatch',
+    explanation:
+      "The assertion audience did not match the trust expectedAudience. Align expectedAudience; in Entra set the resource app's Application ID URI.",
+  },
+  wif_tenant_mismatch: {
+    title: 'Assertion tenant mismatch',
+    explanation: 'The assertion tenant did not match the trust allowedTenantId. Align allowedTenantId with the IdP tid.',
+  },
+  wif_missing_role: {
+    title: 'Assertion missing a required role',
+    explanation: 'The assertion is missing a required role. Grant the app role in the IdP, or remove it from requiredRoles.',
+  },
+  assertion_missing_claim: {
+    title: 'Assertion missing a required claim',
+    explanation: 'The assertion is missing a required claim. Ensure the IdP emits sub/aud/iss/tid.',
+  },
+  oauth_client_auth_failed: {
+    title: 'Client authentication failed',
+    explanation:
+      'The client id or secret is wrong (the two are deliberately indistinguishable on the wire). Re-copy the client credentials from the Connect tab and retry.',
+  },
+  grant_type_unsupported: {
+    title: 'Unsupported grant type',
+    explanation: 'Only client_credentials is supported. Send grant_type=client_credentials.',
+  },
+  missing_credentials: {
+    title: 'No client credentials presented',
+    explanation: 'Provide client_secret (oauth_client) or client_assertion (WIF jwt-bearer).',
+  },
+  mutually_exclusive_credentials: {
+    title: 'Both secret and assertion presented',
+    explanation: 'Send exactly one of client_secret or client_assertion, not both.',
+  },
+  unsupported_assertion_type: {
+    title: 'Wrong client_assertion_type',
+    explanation:
+      'Set client_assertion_type to urn:ietf:params:oauth:client-assertion-type:jwt-bearer.',
+  },
+  bearer_missing: {
+    title: 'No bearer token presented',
+    explanation: 'Send an Authorization: Bearer <token> header.',
+  },
+
   // ─── Numeric-status fallbacks (no scimType present) ──────────────
   '__http_401__': {
     title: 'Authentication required',
@@ -171,6 +269,8 @@ export interface ScimApiErrorOptions {
   detail?: string;
   rawBody?: unknown;
   requestId?: string;
+  /** WI-D8: the auth-failure reason_code from an OAuth token error body. */
+  reasonCode?: string;
 }
 
 /**
@@ -184,6 +284,8 @@ export class ScimApiError extends Error {
   readonly detail?: string;
   readonly rawBody?: unknown;
   readonly requestId?: string;
+  /** WI-D8: the auth-failure reason_code from an OAuth token error body. */
+  readonly reasonCode?: string;
 
   constructor(options: ScimApiErrorOptions) {
     super(options.detail ?? `HTTP ${options.status}`);
@@ -193,6 +295,7 @@ export class ScimApiError extends Error {
     this.detail = options.detail;
     this.rawBody = options.rawBody;
     this.requestId = options.requestId;
+    this.reasonCode = options.reasonCode;
   }
 }
 
@@ -203,6 +306,8 @@ export interface ParsedScimError {
   status?: number;
   /** RFC 7644 scimType keyword if present on the response. */
   scimType?: string;
+  /** WI-D8: auth-failure reason_code if present on an OAuth token error. */
+  reasonCode?: string;
   /** Server-provided `detail` string (or message of a non-API Error). */
   detail: string;
   /** Catalog entry for the operator-facing copy (always non-undefined). */
@@ -237,11 +342,13 @@ export function parseScimError(err: unknown): ParsedScimError {
   // ── 1. ScimApiError (the common case) ──────────────────────────
   if (err instanceof ScimApiError) {
     const catalogEntry =
+      (err.reasonCode && SCIM_ERROR_CATALOG[err.reasonCode]) ||
       (err.scimType && SCIM_ERROR_CATALOG[err.scimType]) ||
       lookupStatusFallback(err.status);
     return {
       status: err.status,
       scimType: err.scimType,
+      reasonCode: err.reasonCode,
       detail: err.detail ?? err.message,
       catalogEntry,
       rawBody: err.rawBody,

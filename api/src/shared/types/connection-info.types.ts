@@ -64,6 +64,29 @@ export interface ConnectionEnabledMethod {
    * view" fallback. Every inline is an admin-only, audit-logged disclosure.
    */
   secretRevealed?: boolean;
+  /**
+   * WI-D8: the most-recent auth outcome for this method (from the WI-D5
+   * decision store), so the surface can show a green/red chip + last reason
+   * code + deep link. Absent when no recent decision exists for this method.
+   */
+  authHealth?: ConnectionAuthHealth;
+}
+
+/**
+ * WI-D8: a per-method auth-health summary derived from the most recent Auth
+ * Decision Record (WI-D5) for this endpoint + method. Lets the Connect tab +
+ * the R6 sub-tabs show a green/red status chip + the last reason code + a deep
+ * link into the diagnostics panel WITHOUT a separate call. All non-secret.
+ */
+export interface ConnectionAuthHealth {
+  /** Outcome of the most recent auth attempt for this method. */
+  lastOutcome: 'accept' | 'reject';
+  /** Catalog reason code when the last attempt was rejected. */
+  lastReasonCode?: string;
+  /** ISO timestamp of the most recent attempt. */
+  lastAttemptAt: string;
+  /** Correlation id of the most recent attempt (to find the matching log). */
+  lastCorrelationId?: string;
 }
 
 /** A disabled auth method + why + how to enable it. */

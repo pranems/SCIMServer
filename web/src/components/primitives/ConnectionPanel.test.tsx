@@ -197,4 +197,27 @@ describe('ConnectionPanel (WI-4)', () => {
     expect(screen.getByTestId('connection-panel-desc-tenantUrl')).toHaveTextContent(/SCIM base URL/i);
     expect(screen.getByTestId('connection-panel-desc-tenantUrl')).toHaveTextContent(/Okta|OneLogin|Ping/i);
     expect(screen.getByTestId('connection-panel-desc-clientIdentifier')).toHaveTextContent(/Client ID/i);
-  });});
+  });
+
+  it('WI-D8: renders the per-method authHealth chip (FAILED + reason code) when present', () => {
+    const ci = info();
+    // Attach an authHealth block to the default (oauth_client) method.
+    ci.enabledMethods[0].authHealth = {
+      lastOutcome: 'reject',
+      lastReasonCode: 'oauth_client_auth_failed',
+      lastAttemptAt: '2026-07-14T00:00:00Z',
+      lastCorrelationId: 'req-42',
+    };
+    renderWithFluent(<ConnectionPanel connectionInfo={ci} />);
+    const chip = screen.getByTestId('connection-panel-auth-health-oauth_client');
+    expect(chip).toBeInTheDocument();
+    expect(screen.getByTestId('connection-panel-auth-health-badge')).toHaveTextContent('Last auth: FAILED');
+    expect(chip).toHaveTextContent('oauth_client_auth_failed');
+    expect(chip).toHaveTextContent('req-42');
+  });
+
+  it('WI-D8: shows no authHealth chip when the method has no recent decision', () => {
+    renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
+    expect(screen.queryByTestId('connection-panel-auth-health-oauth_client')).not.toBeInTheDocument();
+  });
+});

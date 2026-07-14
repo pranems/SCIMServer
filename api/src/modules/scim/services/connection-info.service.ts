@@ -31,10 +31,12 @@ import {
 } from '../../endpoint/endpoint-config.interface';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
 import type {
+  ConnectionAuthHealth,
   ConnectionDisabledMethod,
   ConnectionEnabledMethod,
   ConnectionInfo,
   ConnectionInfoUrls,
+  ConnectionMethod,
 } from '../../../shared/types/connection-info.types';
 
 // Re-export the shared connection-info types so existing importers of this
@@ -42,6 +44,7 @@ import type {
 // the web `ConnectionPanel` (via `@scim/types`) consumes the identical shape.
 export type {
   ClientSecretState,
+  ConnectionAuthHealth,
   ConnectionDisabledMethod,
   ConnectionEnabledMethod,
   ConnectionInfo,
@@ -70,8 +73,44 @@ export interface AssembleSecrets {
   oauthClientSecret?: string | null;
 }
 
+/**
+ * WI-D8: the most-recent auth outcome per method, keyed by `ConnectionMethod`.
+ * Resolved upstream from the WI-D5 AuthDecisionRecordStore and passed in so the
+ * assembler stays pure. Omitted entirely = no authHealth attached (default).
+ */
+export type AssembleAuthHealth = Partial<Record<ConnectionMethod, ConnectionAuthHealth>>;
+
 @Injectable()
 export class ConnectionInfoService {
+  /**
+   * WI-D8: map the store's per-method latest decisions (keyed by the trace
+   * `method` vocabulary) onto an `AssembleAuthHealth` (keyed by the connection
+   * `ConnectionMethod` vocabulary), so `assemble()` can attach a per-method
+   * green/red chip. `bearer_jwt` maps to the `bearer` connection method.
+   */
+  static buildAuthHealth(
+    latestByMethod: Record<string, { outcome: 'accept' | 'reject'; reasonCode?: string; recordedAt: string; correlationId?: string }>,
+  ): AssembleAuthHealth {
+    const methodMap: Record<string, ConnectionMethod> = {
+      wif: 'wif',
+      oauth_client: 'oauth_client',
+      shared_secret: 'shared_secret',
+      bearer_jwt: 'bearer',
+    };
+    const out: AssembleAuthHealth = {};
+    for (const [traceMethod, rec] of Object.entries(latestByMethod)) {
+      const connMethod = methodMap[traceMethod];
+      if (!connMethod) continue;
+      out[connMethod] = {
+        lastOutcome: rec.outcome,
+        lastReasonCode: rec.reasonCode,
+        lastAttemptAt: rec.recordedAt,
+        lastCorrelationId: rec.correlationId,
+      };
+    }
+    return out;
+  }
+
   /**
    * Build the absolute URL set for an endpoint. `baseUrl` is the scheme+host
    * origin (no trailing slash), e.g. `https://scim.example.com`.
@@ -99,6 +138,7 @@ export class ConnectionInfoService {
     credentials: EndpointCredentialModel[],
     baseUrl: string,
     secrets?: AssembleSecrets,
+    authHealth?: AssembleAuthHealth,
   ): ConnectionInfo {
     const endpointId = endpoint.id;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
@@ -238,7 +278,11 @@ export class ConnectionInfoService {
       endpointId,
       displayName: endpoint.displayName ?? endpoint.name,
       urls,
-      enabledMethods,
+      enabledMethods: authHealth
+        ? enabledMethods.map((m) =>
+            authHealth[m.method] ? { ...m, authHealth: authHealth[m.method] } : m,
+          )
+        : enabledMethods,
       disabledMethods,
     };
   }

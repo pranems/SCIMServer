@@ -12647,6 +12647,54 @@ Write-Host "`n--- 9z-BA: WI-D7 Debugger Tests Complete ---" -ForegroundColor Gre
 
 
 # ============================================
+$script:currentSection = "9z-BB: connection-info authHealth (WI-D8)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BB: Connection-info authHealth per-method chip (WI-D8)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # A failed oauth_client token attempt records an Auth Decision, which the
+    # connection-info assembler surfaces as the method's `authHealth` block.
+    $bbEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wid8-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bbEpId = $bbEp.id
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bbEpId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
+        } | ConvertTo-Json -Depth 4) | Out-Null
+        $bbCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bbEpId/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "oauth_client"; label = "wid8-live"
+        } | ConvertTo-Json)
+
+        # Deliberately-wrong secret -> rejected -> records a decision.
+        try {
+            Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$bbEpId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+                grant_type = "client_credentials"; client_id = $bbCred.clientId; client_secret = "wrong-secret-wid8"
+            } -UseBasicParsing | Out-Null
+        } catch {}
+
+        $bbInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bbEpId/connection-info" -Method GET -Headers $headers
+        $bbOc = $bbInfo.enabledMethods | Where-Object { $_.method -eq 'oauth_client' } | Select-Object -First 1
+        Test-Result -Success ($null -ne $bbOc.authHealth) -Message "9z-BB.T1: connection-info oauth_client method carries an authHealth block after a failed attempt"
+        Test-Result -Success ($bbOc.authHealth.lastOutcome -eq 'reject') -Message "9z-BB.T2: authHealth.lastOutcome is reject"
+        Test-Result -Success ($bbOc.authHealth.lastReasonCode -eq 'oauth_client_auth_failed') -Message "9z-BB.T3: authHealth.lastReasonCode is oauth_client_auth_failed"
+
+        # T4: authHealth carries only documented, non-secret keys.
+        $bbAllowed = @('lastOutcome','lastReasonCode','lastAttemptAt','lastCorrelationId')
+        $bbKeysOk = $true
+        foreach ($k in $bbOc.authHealth.PSObject.Properties.Name) { if ($bbAllowed -notcontains $k) { $bbKeysOk = $false } }
+        Test-Result -Success $bbKeysOk -Message "9z-BB.T4: authHealth carries only documented non-secret keys"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bbEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BB: WI-D8 authHealth section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BB: WI-D8 authHealth Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

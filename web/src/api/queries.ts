@@ -77,6 +77,7 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
     let parsedBody: unknown;
     let scimType: string | undefined;
     let detail: string | undefined;
+    let reasonCode: string | undefined;
     if (contentType.includes('json') && text.length > 0) {
       try {
         parsedBody = JSON.parse(text);
@@ -84,6 +85,13 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
           const body = parsedBody as Record<string, unknown>;
           if (typeof body.scimType === 'string') scimType = body.scimType;
           if (typeof body.detail === 'string') detail = body.detail;
+          // WI-D8: an OAuth token endpoint returns a flat RFC-6749 error body
+          // (`error`, `error_description`, `reason_code`) instead of a SCIM
+          // envelope. Surface the reason_code so parseScimError can render the
+          // specific auth remediation, and prefer error_description for detail.
+          if (typeof body.reason_code === 'string') reasonCode = body.reason_code;
+          if (!detail && typeof body.error_description === 'string') detail = body.error_description;
+          if (!detail && typeof body.error === 'string') detail = body.error;
         }
       } catch {
         // Server claimed JSON but body did not parse - fall through to text fallback.
@@ -97,6 +105,7 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
     throw new ScimApiError({
       status: res.status,
       scimType,
+      reasonCode,
       detail,
       rawBody: parsedBody ?? (text.length > 0 ? text : undefined),
       requestId: extractRequestId(res),

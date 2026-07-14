@@ -13,7 +13,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md S14
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase B1
  */
-import { Controller, Get, Inject, Param, Req } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
 
 import { StatsProjectionService } from '../stats/stats-projection.service';
@@ -22,6 +22,7 @@ import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import { ConnectionInfoService } from '../scim/services/connection-info.service';
+import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
 import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
 import type { EndpointConfig } from '../endpoint/endpoint-config.interface';
 import type {
@@ -92,6 +93,9 @@ export class DashboardController {
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly connectionInfo: ConnectionInfoService,
     private readonly secretResolver: ConnectionSecretResolverService,
+    @Optional()
+    @Inject(AuthDecisionRecordStore)
+    private readonly decisionStore?: AuthDecisionRecordStore,
   ) {}
 
   /**
@@ -270,6 +274,11 @@ export class DashboardController {
       credentialRows,
       `${proto}://${host}`,
       overviewSecrets,
+      this.decisionStore
+        ? ConnectionInfoService.buildAuthHealth(
+            this.decisionStore.latestByMethodForEndpoint(endpoint.id),
+          )
+        : undefined,
     );
 
     return {

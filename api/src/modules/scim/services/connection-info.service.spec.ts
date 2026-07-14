@@ -296,4 +296,46 @@ describe('ConnectionInfoService', () => {
       expect(bearer?.secretRevealed).toBe(false);
     });
   });
+
+  // WI-D8 - per-method authHealth attachment + the buildAuthHealth mapper.
+  describe('authHealth (WI-D8)', () => {
+    it('attaches the authHealth block to the matching enabled method only', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True', OAuthClientCredentialsAuthEnabled: 'True' }),
+        [],
+        'https://scim.example.com',
+        undefined,
+        {
+          wif: { lastOutcome: 'reject', lastReasonCode: 'wif_audience_mismatch', lastAttemptAt: '2026-07-14T00:00:00Z', lastCorrelationId: 'req-9' },
+        },
+      );
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      const oauth = info.enabledMethods.find((m) => m.method === 'oauth_client');
+      expect(wif?.authHealth?.lastOutcome).toBe('reject');
+      expect(wif?.authHealth?.lastReasonCode).toBe('wif_audience_mismatch');
+      // oauth_client had no entry in the map -> no authHealth attached.
+      expect(oauth?.authHealth).toBeUndefined();
+    });
+
+    it('omits authHealth entirely when no map is passed (back-compat)', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True' }),
+        [],
+        'https://scim.example.com',
+      );
+      expect(info.enabledMethods.every((m) => m.authHealth === undefined)).toBe(true);
+    });
+
+    it('buildAuthHealth maps trace-method keys onto ConnectionMethod (bearer_jwt -> bearer)', () => {
+      const map = ConnectionInfoService.buildAuthHealth({
+        wif: { outcome: 'accept', recordedAt: '2026-07-14T00:00:00Z', correlationId: 'a' },
+        bearer_jwt: { outcome: 'reject', reasonCode: 'bearer_missing', recordedAt: '2026-07-14T00:01:00Z' },
+      });
+      expect(map.wif?.lastOutcome).toBe('accept');
+      expect(map.bearer?.lastOutcome).toBe('reject');
+      expect(map.bearer?.lastReasonCode).toBe('bearer_missing');
+      // bearer_jwt should not leak through as its own key.
+      expect((map as Record<string, unknown>).bearer_jwt).toBeUndefined();
+    });
+  });
 });

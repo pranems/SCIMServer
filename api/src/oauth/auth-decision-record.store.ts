@@ -80,6 +80,24 @@ export class AuthDecisionRecordStore {
     return this.records.length;
   }
 
+  /**
+   * WI-D8: the single most-recent decision per auth method for one endpoint,
+   * keyed by the trace `method` (`wif` / `oauth_client` / `shared_secret` /
+   * `bearer_jwt`). Powers the connection-info `authHealth` per-method chip. The
+   * caller maps the method key onto its own `ConnectionMethod` vocabulary.
+   */
+  latestByMethodForEndpoint(endpointId: string): Record<string, AuthDecisionRecord> {
+    this.prune();
+    const out: Record<string, AuthDecisionRecord> = {};
+    // records are chronological; walk newest-first and keep the first per method.
+    for (let i = this.records.length - 1; i >= 0; i--) {
+      const rec = this.records[i];
+      if (rec.endpointId !== endpointId) continue;
+      if (!out[rec.method]) out[rec.method] = rec;
+    }
+    return out;
+  }
+
   /** Clear all records (test helper). */
   clear(): void {
     this.records.length = 0;

@@ -12,7 +12,7 @@
  */
 import { Controller, Get, NotFoundException, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { Inject } from '@nestjs/common';
+import { Inject, Optional } from '@nestjs/common';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
@@ -22,6 +22,7 @@ import {
   type ConnectionInfoEndpointInput,
 } from '../services/connection-info.service';
 import { ConnectionSecretResolverService } from '../services/connection-secret-resolver.service';
+import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
@@ -35,6 +36,9 @@ export class AdminConnectionInfoController {
     private readonly connectionInfo: ConnectionInfoService,
     private readonly secretResolver: ConnectionSecretResolverService,
     private readonly logger: ScimLogger,
+    @Optional()
+    @Inject(AuthDecisionRecordStore)
+    private readonly decisionStore?: AuthDecisionRecordStore,
   ) {}
 
   @Get(':endpointId/connection-info')
@@ -69,6 +73,9 @@ export class AdminConnectionInfoController {
           `oauth=${secrets.oauthClientSecret ? 'yes' : 'no'}, shared=${secrets.sharedSecret ? 'yes' : 'no'}`,
       );
     }
-    return this.connectionInfo.assemble(endpoint, credentials, baseUrl, secrets);
+    const authHealth = this.decisionStore
+      ? ConnectionInfoService.buildAuthHealth(this.decisionStore.latestByMethodForEndpoint(endpointId))
+      : undefined;
+    return this.connectionInfo.assemble(endpoint, credentials, baseUrl, secrets, authHealth);
   }
 }
