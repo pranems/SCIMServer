@@ -636,4 +636,42 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .send({ add: ['https://evil.example/keys'] })
       .expect(400);
   });
+
+  // ─── WI-D7 - assertion debugger dry-run (decode + run checks, no mint) ────
+  describe('WI-D7: POST /wif/debug-assertion (dry-run)', () => {
+    function postDebug(assertion: string) {
+      return request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/wif/debug-assertion`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ assertion });
+    }
+
+    it('accepts a valid assertion and returns overallOutcome accept + an accept trace, WITHOUT minting', async () => {
+      const assertion = await signAssertion();
+      const res = await postDebug(assertion).expect(200);
+      expect(res.body.overallOutcome).toBe('accept');
+      expect(Array.isArray(res.body.results)).toBe(true);
+      expect(res.body.results.length).toBeGreaterThanOrEqual(1);
+      const accepted = res.body.results.find((r: { outcome: string }) => r.outcome === 'accept');
+      expect(accepted).toBeDefined();
+      expect(accepted.trace.outcome).toBe('accept');
+      // No access_token is ever present in the debug response.
+      expect(JSON.stringify(res.body)).not.toContain('access_token');
+    });
+
+    it('rejects a wrong-audience assertion with the wif_audience_mismatch reason code + a failing check', async () => {
+      const assertion = await signAssertion({ aud: 'api://not-the-endpoint' });
+      const res = await postDebug(assertion).expect(200);
+      expect(res.body.overallOutcome).toBe('reject');
+      const rejected = res.body.results[0];
+      expect(rejected.outcome).toBe('reject');
+      expect(rejected.reasonCode).toBe('wif_audience_mismatch');
+      const failed = rejected.trace.checks.find((c: { status: string }) => c.status === 'fail');
+      expect(failed.id).toBe('audience_match');
+    });
+
+    it('rejects an empty assertion body with a 400', async () => {
+      await postDebug('   ').expect(400);
+    });
+  });
 });

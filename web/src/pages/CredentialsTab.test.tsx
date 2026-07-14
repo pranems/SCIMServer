@@ -28,6 +28,7 @@ const mockRotateMutate = vi.fn();
 const mockAddJwksHost = vi.fn();
 const mockUpdateWif = vi.fn();
 const mockVerifyWif = vi.fn();
+const mockDebugWif = vi.fn();
 const mockNavigate = vi.fn();
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router');
@@ -69,9 +70,9 @@ vi.mock('../api/queries', async () => {
     useAddJwksHost: () => ({ mutate: mockAddJwksHost, isPending: false, isError: false, error: null }),
     useUpdateWifCredential: () => ({ mutate: mockUpdateWif, isPending: false }),
     useVerifyWifTrust: () => ({ mutate: mockVerifyWif, isPending: false, isError: false, error: null }),
+    useDebugWifAssertion: () => ({ mutate: mockDebugWif, isPending: false, isError: false, error: null }),
   };
 });
-
 const baseOverview: EndpointOverviewResponse = {
   endpoint: {
     id: 'ep-1',
@@ -762,6 +763,67 @@ describe('CredentialsTab', () => {
     expect(jwksReach.textContent).toContain('reachable');
     expect(jwksReach.textContent).toContain('404');
     expect(screen.getByTestId('wif-verify-check-jwksServesKeys')).toBeInTheDocument();
+  });
+
+  it('WI-D7: the assertion debugger posts the pasted assertion and renders the per-check reject trace', () => {
+    mockDebugWif.mockClear();
+    mockDebugWif.mockImplementation(
+      (_assertion: unknown, opts?: { onSuccess?: (r: unknown) => void }) => {
+        opts?.onSuccess?.({
+          overallOutcome: 'reject',
+          results: [
+            {
+              expectedIssuer: 'https://idp.example/v2.0',
+              outcome: 'reject',
+              reasonCode: 'wif_audience_mismatch',
+              trace: {
+                plane: 'token-mint',
+                method: 'wif',
+                outcome: 'reject',
+                reasonCode: 'wif_audience_mismatch',
+                checks: [
+                  { id: 'issuer_match', status: 'pass', expected: 'https://idp.example/v2.0' },
+                  { id: 'audience_match', status: 'fail', expected: 'api://app', received: 'api://wrong' },
+                ],
+                decodedClaims: { iss: 'https://idp.example/v2.0', aud: 'api://wrong' },
+              },
+            },
+          ],
+        });
+      },
+    );
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // The debugger surface + input + button render.
+    expect(screen.getByTestId('wif-debug-assertion')).toBeInTheDocument();
+    const btn = screen.getByTestId('wif-debug-assertion-button');
+    // Disabled until an assertion is pasted.
+    expect(btn).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId('wif-debug-assertion-input'), {
+      target: { value: 'eyJhbGciOiJSUzI1NiJ9.payload.sig' },
+    });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+
+    // The mutation was posted with the trimmed assertion.
+    expect(mockDebugWif).toHaveBeenCalledTimes(1);
+    expect(mockDebugWif.mock.calls[0][0]).toBe('eyJhbGciOiJSUzI1NiJ9.payload.sig');
+
+    // R10: the rendered result shows the per-trust OUTCOME + the failing check.
+    expect(screen.getByTestId('wif-debug-assertion-result')).toBeInTheDocument();
+    const trust = screen.getByTestId('wif-debug-trust-0');
+    expect(trust.textContent).toContain('wif_audience_mismatch');
+    const failed = screen.getByTestId('wif-debug-trust-0-check-audience_match');
+    expect(failed.textContent).toContain('FAIL');
+    expect(failed.textContent).toContain('api://wrong');
+    // The decoded non-secret claims are surfaced for the operator diff.
+    expect(screen.getByTestId('wif-debug-trust-0-claims')).toBeInTheDocument();
   });
 
   it('WI-14: the discovery resolver row is present and fires resolve with the tenant id', () => {

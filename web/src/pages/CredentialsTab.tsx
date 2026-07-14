@@ -30,6 +30,7 @@ import {
   Input,
   Field,
   Text,
+  Textarea,
   Dropdown,
   Option,
   MessageBar,
@@ -64,6 +65,8 @@ import {
   useUpdateWifCredential,
   useVerifyWifTrust,
   type WifVerifyResult,
+  useDebugWifAssertion,
+  type WifDebugAssertionResponse,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import {
@@ -73,6 +76,7 @@ import {
   EditableField,
   CopyableField,
   CopyJsonButton,
+  CopyableJsonBlock,
 } from '../components/primitives';
 
 const useStyles = makeStyles({
@@ -505,6 +509,18 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   const [verifyResult, setVerifyResult] = React.useState<WifVerifyResult | null>(null);
   // Item C - when a verify-gated save fails, offer an explicit override.
   const [needsOverride, setNeedsOverride] = React.useState(false);
+
+  // WI-D7 - assertion debugger: paste a client_assertion and dry-run it
+  // against the configured trusts (real server-side checks, no mint).
+  const debugMutation = useDebugWifAssertion(endpointId);
+  const [debugAssertion, setDebugAssertion] = React.useState('');
+  const [debugResult, setDebugResult] = React.useState<WifDebugAssertionResponse | null>(null);
+  const onDebugAssertion = (): void => {
+    const value = debugAssertion.trim();
+    if (value.length === 0) return;
+    setDebugResult(null);
+    debugMutation.mutate(value, { onSuccess: (r) => setDebugResult(r) });
+  };
 
   // WI-14 - config-time discovery resolver state.
   const resolveMutation = useResolveWifDiscovery(endpointId);
@@ -980,6 +996,100 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 ))}
               </div>
             )}
+
+            {/* WI-D7 - assertion debugger: paste a client_assertion, dry-run it
+                against the configured trusts (real server checks, no mint). */}
+            <div className={wif.jwksNotice} data-testid="wif-debug-assertion">
+              <Subtitle2>Assertion debugger</Subtitle2>
+              <Caption1>
+                Paste a source-IdP <code>client_assertion</code> (a signed JWT) to dry-run it against
+                every configured trust below. This runs the exact server-side checks a real token
+                mint would - signature, issuer, subject, audience, tenant, roles - but never mints a
+                token, so you can see precisely which claim is wrong before wiring the identity
+                provider.
+              </Caption1>
+              <Textarea
+                value={debugAssertion}
+                onChange={(_, d) => setDebugAssertion(d.value)}
+                placeholder="eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+                resize="vertical"
+                data-testid="wif-debug-assertion-input"
+              />
+              <div>
+                <Button
+                  appearance="primary"
+                  disabled={debugAssertion.trim().length === 0 || debugMutation.isPending}
+                  onClick={onDebugAssertion}
+                  data-testid="wif-debug-assertion-button"
+                >
+                  {debugMutation.isPending ? 'Evaluating...' : 'Debug assertion'}
+                </Button>
+              </div>
+              {debugMutation.isError && (
+                <MessageBar intent="error" data-testid="wif-debug-assertion-error">
+                  <MessageBarBody>{(debugMutation.error as Error).message}</MessageBarBody>
+                </MessageBar>
+              )}
+              {debugResult != null && (
+                <div data-testid="wif-debug-assertion-result">
+                  <MessageBar intent={debugResult.overallOutcome === 'accept' ? 'success' : 'warning'}>
+                    <MessageBarBody>
+                      <MessageBarTitle>
+                        {debugResult.overallOutcome === 'accept'
+                          ? 'This assertion WOULD be accepted (a configured trust matches).'
+                          : debugResult.results.length === 0
+                            ? 'No WIF trust is configured for this endpoint yet.'
+                            : 'This assertion would be rejected by every configured trust.'}
+                      </MessageBarTitle>
+                    </MessageBarBody>
+                  </MessageBar>
+                  {debugResult.results.map((r, i) => (
+                    <div
+                      key={`${r.expectedIssuer}-${i}`}
+                      className={wif.testStep}
+                      style={{ flexDirection: 'column', alignItems: 'stretch', gap: '6px' }}
+                      data-testid={`wif-debug-trust-${i}`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <Badge appearance="filled" color={r.outcome === 'accept' ? 'success' : 'danger'}>
+                          {r.outcome === 'accept' ? 'ACCEPT' : 'REJECT'}
+                        </Badge>
+                        <Caption1>
+                          <strong>{r.expectedIssuer}</strong>
+                          {r.reasonCode ? ` - ${r.reasonCode}` : ''}
+                        </Caption1>
+                      </div>
+                      {r.trace.checks.map((c) => (
+                        <div
+                          key={c.id}
+                          className={wif.testStep}
+                          data-testid={`wif-debug-trust-${i}-check-${c.id}`}
+                        >
+                          <Badge
+                            appearance="filled"
+                            color={c.status === 'pass' ? 'success' : c.status === 'fail' ? 'danger' : 'warning'}
+                          >
+                            {c.status.toUpperCase()}
+                          </Badge>
+                          <Caption1>
+                            <strong>{c.id}</strong>
+                            {c.expected !== undefined ? ` - expected: ${c.expected}` : ''}
+                            {c.received !== undefined ? `, received: ${c.received}` : ''}
+                            {c.detail ? ` (${c.detail})` : ''}
+                          </Caption1>
+                        </div>
+                      ))}
+                      {r.trace.decodedClaims != null && (
+                        <CopyableJsonBlock
+                          value={r.trace.decodedClaims}
+                          data-testid={`wif-debug-trust-${i}-claims`}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {wifCredentials.length > 0 && (
               <div className={classes.list} data-testid="wif-credentials-list">

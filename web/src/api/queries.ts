@@ -1459,6 +1459,56 @@ export function useVerifyWifTrust(endpointId: string) {
   });
 }
 
+/** WI-D7 - one WIF trust's assertion-debug dry-run result. */
+export interface WifDebugTrustResult {
+  expectedIssuer: string;
+  outcome: 'accept' | 'reject';
+  reasonCode?: string;
+  /** The per-check trace (same read model the AuthDiagnosticsPanel renders). */
+  trace: AuthDecisionRecordLike;
+}
+
+/** WI-D7 - the assertion-debugger response (one result per configured trust). */
+export interface WifDebugAssertionResponse {
+  overallOutcome: 'accept' | 'reject';
+  results: WifDebugTrustResult[];
+}
+
+/**
+ * WI-D7 - the trace subset the debugger returns. It is an `AuthDecisionRecord`
+ * WITHOUT the store-only `id`/`recordedAt` (nothing is persisted for a
+ * dry-run).
+ */
+export interface AuthDecisionRecordLike {
+  plane: 'token-mint' | 'resource';
+  method: 'wif' | 'oauth_client' | 'shared_secret' | 'bearer_jwt';
+  outcome: 'accept' | 'reject';
+  reasonCode?: string;
+  checks: Array<{ id: string; status: 'pass' | 'fail' | 'skipped'; expected?: string; received?: string; detail?: string }>;
+  decodedClaims?: Record<string, unknown>;
+  joseHeader?: Record<string, unknown>;
+}
+
+/**
+ * WI-D7 - the assertion debugger. Paste a `client_assertion` and dry-run it
+ * against every configured WIF trust for the endpoint using the exact same
+ * server-side checks a real mint runs (real JWKS fetch + claim matching), but
+ * WITHOUT minting a token. Admin-only. Returns the per-check trace so the
+ * operator sees precisely which claim is wrong before wiring the IdP.
+ */
+export function useDebugWifAssertion(endpointId: string) {
+  return useMutation({
+    mutationFn: (assertion: string) =>
+      fetchWithAuth<WifDebugAssertionResponse>(
+        `/scim/admin/endpoints/${endpointId}/wif/debug-assertion`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ assertion }),
+        },
+      ),
+  });
+}
+
 /** WI-15 - the effective JWKS host allowlist view (seed + env + persisted). */
 export interface JwksAllowlistPersistedEntry {
   id: string;

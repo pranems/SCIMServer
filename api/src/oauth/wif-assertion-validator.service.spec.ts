@@ -199,5 +199,40 @@ describe('WifAssertionValidatorService (Q6.3)', () => {
     // The trace never carries the assertion string itself.
     expect(JSON.stringify(err.trace)).not.toContain('a.b.c');
   });
+
+  // WI-D7 - the debugger dry-run: never mints, never throws, always a trace.
+  describe('debug() dry-run (WI-D7)', () => {
+    it('returns outcome accept + an accept trace when every check passes', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256', kid: 'k1' } });
+      const result = await service.debug('assertion.jwt.value', TRUST);
+      expect(result.outcome).toBe('accept');
+      expect(result.trace.outcome).toBe('accept');
+      expect(result.reasonCode).toBeUndefined();
+      // Decoded non-secret claims are surfaced for the operator diff.
+      expect(result.trace.decodedClaims?.iss).toBe(TRUST.expectedIssuer);
+    });
+
+    it('returns outcome reject + reasonCode + trace on an issuer mismatch, WITHOUT throwing', async () => {
+      verify.mockResolvedValue({
+        payload: { ...goodPayload(), iss: 'https://evil.example/v2.0' },
+        protectedHeader: { alg: 'RS256' },
+      });
+      const result = await service.debug('a', TRUST);
+      expect(result.outcome).toBe('reject');
+      expect(result.reasonCode).toBe('wif_issuer_mismatch');
+      expect(result.trace.reasonCode).toBe('wif_issuer_mismatch');
+      const failed = result.trace.checks.find((c) => c.status === 'fail');
+      expect(failed?.id).toBe('issuer_match');
+    });
+
+    it('returns outcome reject on a signature failure without leaking the raw assertion', async () => {
+      verify.mockRejectedValue(new Error('signature verification failed'));
+      const result = await service.debug('a.b.c', TRUST);
+      expect(result.outcome).toBe('reject');
+      expect(result.reasonCode).toBe('assertion_signature_invalid');
+      expect(JSON.stringify(result.trace)).not.toContain('a.b.c');
+    });
+  });
 });
+
 

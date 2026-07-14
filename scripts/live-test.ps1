@@ -12573,6 +12573,80 @@ Write-Host "`n--- 9z-AZ: WI-D2 Catalog Tests Complete ---" -ForegroundColor Gree
 
 
 # ============================================
+$script:currentSection = "9z-BA: WIF assertion debugger (WI-D7)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BA: WIF Assertion Debugger dry-run (WI-D7)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # The debugger dry-runs a pasted client_assertion against the endpoint's
+    # configured WIF trusts using the real server-side checks, WITHOUT minting.
+    $baEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wid7-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $baEpId = $baEp.id
+    try {
+        # T1: a debug call on a WIF-DISABLED endpoint is 403 (Forbidden).
+        $baForbidden = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId/wif/debug-assertion" -Method POST -Headers $headers -Body (@{
+                assertion = "a.b.c"
+            } | ConvertTo-Json) | Out-Null
+        } catch { $baForbidden = ($_.Exception.Response.StatusCode.value__ -eq 403) }
+        Test-Result -Success $baForbidden -Message "9z-BA.T1: debug-assertion is 403 when WifCredentialsEnabled is off"
+
+        # Enable WIF + persist a trust so subsequent calls dry-run against it.
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+        } | ConvertTo-Json -Depth 4) | Out-Null
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "wif"; label = "wid7-live"; wif = @{
+                assertionProfile = "jwt-bearer"
+                expectedIssuer = "https://login.microsoftonline.com/tenant-wid7/v2.0"
+                expectedSubject = "sp-object-id-wid7"
+                expectedAudience = "api://scimserver-wid7"
+                jwksUri = "https://login.microsoftonline.com/tenant-wid7/discovery/v2.0/keys"
+                allowedTenantId = "tenant-wid7"
+            }
+        } | ConvertTo-Json) | Out-Null
+
+        # T2: an empty assertion body is a 400.
+        $baBadReq = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId/wif/debug-assertion" -Method POST -Headers $headers -Body (@{
+                assertion = "   "
+            } | ConvertTo-Json) | Out-Null
+        } catch { $baBadReq = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+        Test-Result -Success $baBadReq -Message "9z-BA.T2: empty assertion body -> 400"
+
+        # T3: a bogus (unverifiable) assertion returns 200 with a reject result
+        # per configured trust (never throws, never mints).
+        $baDbg = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId/wif/debug-assertion" -Method POST -Headers $headers -Body (@{
+            assertion = "not-a-real.jwt.token"
+        } | ConvertTo-Json)
+        Test-Result -Success ($baDbg.overallOutcome -eq 'reject') -Message "9z-BA.T3: a bogus assertion yields overallOutcome reject"
+        Test-Result -Success ($null -ne $baDbg.results -and $baDbg.results.Count -ge 1 -and $baDbg.results[0].outcome -eq 'reject') -Message "9z-BA.T4: one reject result per configured trust with a reasonCode + trace"
+
+        # T5: the debug response NEVER carries a minted access_token.
+        $baJson = $baDbg | ConvertTo-Json -Depth 10
+        Test-Result -Success ($baJson -notmatch 'access_token') -Message "9z-BA.T5: debug response carries no minted access_token"
+
+        # T6: the endpoint requires admin auth.
+        $baUnauth = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId/wif/debug-assertion" -Method POST -Body (@{ assertion = "a.b.c" } | ConvertTo-Json) -ContentType "application/json" | Out-Null
+        } catch { $baUnauth = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+        Test-Result -Success $baUnauth -Message "9z-BA.T6: debug-assertion requires admin auth (401 without bearer)"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$baEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BA: WI-D7 debugger section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BA: WI-D7 Debugger Tests Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

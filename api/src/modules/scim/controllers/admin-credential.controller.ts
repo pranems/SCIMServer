@@ -40,6 +40,15 @@ import {
   type WifVerifyRequest,
   type WifVerifyResult,
 } from '../../../oauth/wif-discovery-resolver.service';
+import {
+  WifAssertionValidatorService,
+  type WifTrust,
+} from '../../../oauth/wif-assertion-validator.service';
+import type {
+  WifDebugAssertionRequest,
+  WifDebugAssertionResponse,
+  WifDebugTrustResult,
+} from '../../../shared/types/wif-debug.types';
 import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
@@ -167,6 +176,7 @@ export class AdminCredentialController {
     private readonly wifResolver: WifDiscoveryResolverService,
     private readonly credentialEncryption: CredentialEncryptionService,
     private readonly credentialSecurity: CredentialSecurityService,
+    private readonly wifValidator: WifAssertionValidatorService,
   ) {}
 
   /**
@@ -224,11 +234,102 @@ export class AdminCredentialController {
   }
 
   /**
-   * POST /admin/endpoints/:endpointId/credentials
+   * POST /admin/endpoints/:endpointId/wif/debug-assertion  (WI-D7)
    *
-   * Generate a new per-endpoint credential. Returns the plaintext token
-   * exactly ONCE in the response; only the bcrypt hash is stored.
+   * Assertion debugger: decode a pasted `client_assertion` and dry-run it
+   * against EVERY configured WIF trust for this endpoint using the exact same
+   * server-side checks a real mint would run (real JWKS fetch + signature +
+   * issuer/subject/audience/tenant/role matching), but WITHOUT minting a
+   * token. Returns the per-check `AuthDecisionTrace` for each trust so the
+   * operator sees precisely which claim is wrong before the IdP is wired up.
+   * Admin-only, non-throwing on a bad assertion (a reject is a result, not a
+   * 4xx). Same WIF-enabled gate as the other wif/* admin endpoints.
    */
+  @Post(':endpointId/wif/debug-assertion')
+  @HttpCode(200)
+  async debugWifAssertion(
+    @Param('endpointId') endpointId: string,
+    @Body() body: WifDebugAssertionRequest,
+  ): Promise<WifDebugAssertionResponse> {
+    const endpoint = await this.requireEndpoint(endpointId);
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
+      throw new ForbiddenException(
+        `WIF credentials are not enabled for endpoint "${endpointId}". ` +
+        `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
+      );
+    }
+
+    const assertion = typeof body?.assertion === 'string' ? body.assertion.trim() : '';
+    if (assertion.length === 0) {
+      throw new BadRequestException('A non-empty "assertion" (client_assertion JWT) is required.');
+    }
+
+    const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
+    const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
+
+    const results: WifDebugTrustResult[] = [];
+    for (const wif of wifCredentials) {
+      let trust: WifTrust;
+      try {
+        trust = this.buildDebugTrust(wif.metadata);
+      } catch {
+        // A misconfigured trust row cannot match; skip it in the debugger just
+        // as the runtime does, but surface it as a reject so the operator sees
+        // the endpoint has an unusable trust.
+        results.push({
+          expectedIssuer:
+            typeof wif.metadata?.expectedIssuer === 'string' ? wif.metadata.expectedIssuer : '(unconfigured)',
+          outcome: 'reject',
+          reasonCode: 'wif_no_trust_configured',
+          trace: {
+            plane: 'token-mint',
+            method: 'wif',
+            outcome: 'reject',
+            reasonCode: 'wif_no_trust_configured',
+            checks: [],
+          },
+        });
+        continue;
+      }
+      const result = await this.wifValidator.debug(assertion, trust);
+      results.push({
+        expectedIssuer: trust.expectedIssuer,
+        outcome: result.outcome,
+        reasonCode: result.reasonCode,
+        trace: result.trace,
+      });
+    }
+
+    return {
+      overallOutcome: results.some((r) => r.outcome === 'accept') ? 'accept' : 'reject',
+      results,
+    };
+  }
+
+  /** WI-D7 - defensively read a WifTrust from credential metadata for a dry-run. */
+  private buildDebugTrust(metadata: Record<string, unknown> | null): WifTrust {
+    const m = metadata ?? {};
+    const requireString = (key: string): string => {
+      const value = m[key];
+      if (typeof value !== 'string' || value.length === 0) {
+        throw new Error(`WIF trust metadata is missing required field "${key}".`);
+      }
+      return value;
+    };
+    return {
+      expectedIssuer: requireString('expectedIssuer'),
+      expectedSubject: requireString('expectedSubject'),
+      expectedAudience: requireString('expectedAudience'),
+      jwksUri: requireString('jwksUri'),
+      allowedTenantId: requireString('allowedTenantId'),
+      requiredRoles: Array.isArray(m.requiredRoles)
+        ? (m.requiredRoles as unknown[]).filter((r): r is string => typeof r === 'string')
+        : undefined,
+      roleEnforcement:
+        m.roleEnforcement === 'shadow' || m.roleEnforcement === 'enforce' ? m.roleEnforcement : 'off',
+    };
+  }
   @Post(':endpointId/credentials')
   async createCredential(
     @Param('endpointId') endpointId: string,

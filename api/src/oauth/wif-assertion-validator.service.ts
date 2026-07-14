@@ -175,6 +175,45 @@ export class WifAssertionValidatorService {
     return aud === expected;
   }
 
+  /**
+   * WI-D7 - server-evaluated dry-run for the assertion debugger. Runs the SAME
+   * real checks as `validate()` (real JWKS fetch + signature + claim matching)
+   * but NEVER mints a token and NEVER throws: it always returns the decision
+   * outcome + the `AuthDecisionTrace` (the per-check expected-vs-received
+   * table), so the operator can paste an assertion and see exactly which check
+   * fails before wiring up the IdP. This is the "will this exact assertion
+   * work, and if not which claim is wrong" answer the design (Part 11.2) calls
+   * for. The trace's decoded claims + jose header are already non-secret.
+   */
+  async debug(
+    assertion: string,
+    trust: WifTrust,
+  ): Promise<{ outcome: 'accept' | 'reject'; reasonCode?: string; trace: AuthDecisionTrace }> {
+    try {
+      const claims = await this.validate(assertion, trust);
+      // Build an accept trace from the verified claims (validate() returns the
+      // claims but not the accept trace; reconstruct a compact one here).
+      const accept = new AuthDecisionTraceBuilder('token-mint', 'wif')
+        .setDecodedClaims(claims as Record<string, unknown>)
+        .pass('jwks_signature', { expected: trust.jwksUri })
+        .pass('claim_checks', { expected: trust.expectedIssuer })
+        .accept()
+        .build();
+      return { outcome: 'accept', trace: accept };
+    } catch (err) {
+      if (err instanceof WifAssertionInvalidError && err.trace) {
+        return { outcome: 'reject', reasonCode: err.reasonCode, trace: err.trace };
+      }
+      // Any non-WIF error (shouldn't happen - validate wraps everything) still
+      // yields a reject trace so the debugger never surfaces a raw stack.
+      const fallback = new AuthDecisionTraceBuilder('token-mint', 'wif')
+        .fail('jwks_signature', { detail: (err as Error).message })
+        .reject('assertion_signature_invalid')
+        .build();
+      return { outcome: 'reject', reasonCode: 'assertion_signature_invalid', trace: fallback };
+    }
+  }
+
   private failTraced(
     reasonCode: string,
     reason: string,

@@ -26,7 +26,7 @@ describe('AdminCredentialController', () => {
   let mockEndpointService: Record<string, jest.Mock>;
   let mockEventEmitter: { emit: jest.Mock };
   let mockWifResolver: { resolve: jest.Mock; verifyTrust: jest.Mock };
-
+  let mockWifValidator: { validate: jest.Mock; debug: jest.Mock };
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'test-endpoint',
@@ -101,6 +101,7 @@ describe('AdminCredentialController', () => {
       // retention a no-op (isReady=false) so existing tests are unaffected.
       { isReady: jest.fn().mockReturnValue(false), encrypt: jest.fn(), decrypt: jest.fn() } as any,
       { getEffectiveVisibility: jest.fn().mockResolvedValue('always'), getServerVisibility: jest.fn().mockResolvedValue('always'), purgeRetainedSecrets: jest.fn() } as any,
+      (mockWifValidator = { validate: jest.fn(), debug: jest.fn() }) as any,
     );
   });
 
@@ -400,6 +401,85 @@ describe('AdminCredentialController', () => {
 
       const serialized = JSON.stringify(result);
       expect(serialized).not.toMatch(/token|clientSecret|credentialHash|secret/i);
+    });
+  });
+
+  describe('WI-D7 - debugWifAssertion (assertion debugger dry-run)', () => {
+    const wifEndpoint = {
+      ...mockEndpoint,
+      profile: { settings: { WifCredentialsEnabled: true } },
+    };
+    const wifCred = {
+      ...mockCredential,
+      credentialType: 'wif',
+      metadata: {
+        expectedIssuer: 'https://idp/v2.0',
+        expectedSubject: 'sub-abc',
+        expectedAudience: 'api://app',
+        jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
+        allowedTenantId: 'tid',
+      },
+    };
+
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue(wifEndpoint);
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([wifCred]);
+    });
+
+    it('runs the validator dry-run per trust and returns overallOutcome accept when a trust accepts', async () => {
+      mockWifValidator.debug.mockResolvedValue({
+        outcome: 'accept',
+        trace: { plane: 'token-mint', method: 'wif', outcome: 'accept', checks: [] },
+      });
+
+      const result = await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
+
+      expect(mockWifValidator.debug).toHaveBeenCalledWith(
+        'a.b.c',
+        expect.objectContaining({ expectedIssuer: 'https://idp/v2.0', jwksUri: wifCred.metadata.jwksUri }),
+      );
+      expect(result.overallOutcome).toBe('accept');
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].expectedIssuer).toBe('https://idp/v2.0');
+    });
+
+    it('returns overallOutcome reject with the per-trust reasonCode when the assertion fails', async () => {
+      mockWifValidator.debug.mockResolvedValue({
+        outcome: 'reject',
+        reasonCode: 'wif_audience_mismatch',
+        trace: { plane: 'token-mint', method: 'wif', outcome: 'reject', reasonCode: 'wif_audience_mismatch', checks: [] },
+      });
+
+      const result = await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
+
+      expect(result.overallOutcome).toBe('reject');
+      expect(result.results[0].reasonCode).toBe('wif_audience_mismatch');
+    });
+
+    it('rejects an empty assertion body with a 400', async () => {
+      await expect(
+        controller.debugWifAssertion(mockEndpoint.id, { assertion: '   ' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects when WifCredentialsEnabled is off', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: false } },
+      });
+      await expect(
+        controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('surfaces a misconfigured trust row as a reject result instead of throwing', async () => {
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        { ...wifCred, metadata: { expectedIssuer: 'https://idp/v2.0' } }, // missing required fields
+      ]);
+      const result = await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
+      expect(result.overallOutcome).toBe('reject');
+      expect(result.results[0].reasonCode).toBe('wif_no_trust_configured');
+      expect(mockWifValidator.debug).not.toHaveBeenCalled();
     });
   });
 
