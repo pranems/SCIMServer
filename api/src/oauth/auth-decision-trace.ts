@@ -20,7 +20,7 @@
 import { getAuthReason, isKnownAuthReason } from './auth-reason-catalog';
 
 export type AuthPlaneKind = 'token-mint' | 'resource';
-export type AuthMethodKind = 'wif' | 'oauth_client' | 'shared_secret' | 'bearer_jwt';
+export type AuthMethodKind = 'wif' | 'oauth_client' | 'shared_secret' | 'bearer_jwt' | 'endpoint_bearer';
 export type AuthOutcome = 'accept' | 'reject';
 export type AuthCheckStatus = 'pass' | 'fail' | 'skipped';
 

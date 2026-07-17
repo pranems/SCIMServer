@@ -96,6 +96,7 @@ export class ConnectionInfoService {
       oauth_client: 'oauth_client',
       shared_secret: 'shared_secret',
       bearer_jwt: 'bearer',
+      endpoint_bearer: 'bearer',
     };
     const out: AssembleAuthHealth = {};
     for (const [traceMethod, rec] of Object.entries(latestByMethod)) {

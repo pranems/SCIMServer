@@ -12747,6 +12747,52 @@ Write-Host "`n--- 9z-BB: WI-D8 authHealth Tests Complete ---" -ForegroundColor G
 
 
 # ============================================
+$script:currentSection = "9z-BC: resource-plane auth tracing (P2)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BC: Resource-plane auth-decision tracing (Phase 2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # A rejected resource-plane auth (bad bearer on an endpoint SCIM route) must
+    # record ONE AuthDecisionTrace with plane=resource and the full
+    # method-selection cascade (token_presented, endpoint_bearer, oauth_jwt,
+    # shared_secret), never leaking the raw token.
+    $bcEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-p2-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bcEpId = $bcEp.id
+    try {
+        # Bad bearer on the endpoint's SCIM Users route -> 401.
+        $bcProbe = "p2-live-reject-probe-$(Get-Random)"
+        try {
+            Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bcEpId/Users" -Method GET -Headers @{ Authorization = "Bearer $bcProbe" } -UseBasicParsing | Out-Null
+        } catch {}
+
+        $bcDec = $null
+        try { $bcDec = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bcEpId/auth-decisions?outcome=reject&limit=50" -Method GET -Headers $headers } catch {}
+        $bcRec = $null
+        if ($null -ne $bcDec -and $null -ne $bcDec.records) {
+            $bcRec = $bcDec.records | Where-Object { $_.plane -eq 'resource' } | Select-Object -First 1
+        }
+        Test-Result -Success ($null -ne $bcRec -and $bcRec.outcome -eq 'reject') -Message "9z-BC.T1: rejected resource-plane auth records a plane=resource decision trace"
+
+        $bcIds = @()
+        if ($null -ne $bcRec) { $bcIds = $bcRec.checks | ForEach-Object { $_.id } }
+        $bcCascadeOk = (($bcIds -contains 'token_presented') -and ($bcIds -contains 'endpoint_bearer') -and ($bcIds -contains 'oauth_jwt') -and ($bcIds -contains 'shared_secret'))
+        Test-Result -Success $bcCascadeOk -Message "9z-BC.T2: the resource-plane trace names the full method-selection cascade"
+
+        $bcNoLeak = ($null -ne $bcRec) -and (($bcRec | ConvertTo-Json -Depth 10) -notmatch [regex]::Escape($bcProbe))
+        Test-Result -Success $bcNoLeak -Message "9z-BC.T3: the resource-plane trace never leaks the raw token"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bcEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BC: Phase 2 resource-plane tracing section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BC: Phase 2 Resource-plane Tracing Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -207,6 +207,52 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(401);
     });
 
+    it('Phase 2: a rejected resource-plane auth records a decision trace with the method-selection cascade', async () => {
+      const basePath = scimBasePath(endpointId);
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', 'Bearer p2-resource-reject-probe')
+        .set('Accept', 'application/scim+json')
+        .expect(401);
+
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/auth-decisions?outcome=reject&limit=50`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const rec = (res.body.records as Array<Record<string, unknown>>).find(
+        (r) => r.plane === 'resource',
+      );
+      expect(rec).toBeDefined();
+      expect(rec!.outcome).toBe('reject');
+      const checks = rec!.checks as Array<{ id: string; status: string; expected?: string; received?: string }>;
+      const ids = checks.map((c) => c.id);
+      // The cascade names each candidate + why it did not win.
+      expect(ids).toEqual(expect.arrayContaining(['token_presented', 'endpoint_bearer', 'oauth_jwt', 'shared_secret']));
+      for (const c of checks) expect(c.received).toBeDefined();
+      // The raw token is never stored.
+      expect(JSON.stringify(rec)).not.toContain('p2-resource-reject-probe');
+    });
+
+    it('Phase 2: a successful per-endpoint bearer auth records an accept trace (method=endpoint_bearer)', async () => {
+      const basePath = scimBasePath(endpointId);
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${perEndpointToken}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/auth-decisions?outcome=accept&limit=50`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const rec = (res.body.records as Array<Record<string, unknown>>).find(
+        (r) => r.plane === 'resource' && r.method === 'endpoint_bearer',
+      );
+      expect(rec).toBeDefined();
+      const eb = (rec!.checks as Array<{ id: string; status: string }>).find((c) => c.id === 'endpoint_bearer');
+      expect(eb?.status).toBe('pass');
+    });
+
     it('should reject revoked per-endpoint credential', async () => {
       const basePath = scimBasePath(endpointId);
 

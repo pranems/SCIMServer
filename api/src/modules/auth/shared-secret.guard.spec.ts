@@ -2,6 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { SharedSecretGuard } from './shared-secret.guard';
+import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
 
 describe('SharedSecretGuard', () => {
   let guard: SharedSecretGuard;
@@ -465,6 +466,94 @@ describe('SharedSecretGuard', () => {
       const result = await guardNoRepo.canActivate(context);
       expect(result).toBe(true);
       expect(request.authType).toBe('legacy');
+    });
+  });
+
+  // Phase 2 (auth observability) - the resource plane records ONE
+  // AuthDecisionTrace per endpoint-scoped auth attempt capturing the whole
+  // method-selection cascade (which candidates were enabled, what was
+  // presented, which method won, and why the others were skipped).
+  describe('Phase 2 - resource-plane auth-decision tracing', () => {
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    let store: AuthDecisionRecordStore;
+
+    beforeEach(() => {
+      store = new AuthDecisionRecordStore();
+      guard = new SharedSecretGuard(
+        mockConfigService,
+        mockOAuthService,
+        mockReflector,
+        mockLogger,
+        mockCredentialRepo,
+        mockEndpointService,
+        store,
+      );
+    });
+
+    it('records an accept trace (plane=resource, method=endpoint_bearer) when a per-endpoint bearer credential matches', async () => {
+      const bcrypt = require('bcrypt');
+      const token = 'per-endpoint-token-123';
+      const hash = await bcrypt.hash(token, 4);
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { SecretTokenBearerAuthEnabled: 'True' } },
+        active: true,
+      });
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        { id: 'cred-1', credentialType: 'bearer', credentialHash: hash, label: 'x' },
+      ]);
+
+      const { context } = createEndpointMockContext(endpointId, `Bearer ${token}`);
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+
+      const recs = store.query({ endpointId });
+      expect(recs.length).toBeGreaterThan(0);
+      expect(recs[0].plane).toBe('resource');
+      expect(recs[0].outcome).toBe('accept');
+      expect(recs[0].method).toBe('endpoint_bearer');
+      const eb = recs[0].checks.find((c) => c.id === 'endpoint_bearer');
+      expect(eb?.status).toBe('pass');
+      // No raw token is ever stored.
+      expect(JSON.stringify(recs[0])).not.toContain(token);
+    });
+
+    it('records an accept trace (method=shared_secret) when the global secret matches', async () => {
+      const { context } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      await guard.canActivate(context);
+      const recs = store.query({ endpointId, outcome: 'accept' });
+      expect(recs[0].method).toBe('shared_secret');
+      const ss = recs[0].checks.find((c) => c.id === 'shared_secret');
+      expect(ss?.status).toBe('pass');
+    });
+
+    it('records a reject trace with the full method-selection cascade when every method fails', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(new Error('invalid'));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer completely-wrong');
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+      const recs = store.query({ endpointId, outcome: 'reject' });
+      expect(recs.length).toBeGreaterThan(0);
+      const ids = recs[0].checks.map((c) => c.id);
+      expect(ids).toEqual(expect.arrayContaining(['token_presented', 'endpoint_bearer', 'oauth_jwt', 'shared_secret']));
+      // The cascade explains WHY each candidate did not win (received/detail set).
+      for (const c of recs[0].checks) {
+        expect(c.received).toBeDefined();
+      }
+      expect(JSON.stringify(recs[0])).not.toContain('completely-wrong');
+    });
+
+    it('records a reject trace with reason bearer_token_scoped_other_endpoint when an OAuth token is presented to the wrong endpoint', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        client_id: 'c1',
+        endpoint_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      });
+      const { context } = createEndpointMockContext(endpointId, 'Bearer some-oauth-jwt');
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+      const recs = store.query({ endpointId, outcome: 'reject' });
+      expect(recs[0].reasonCode).toBe('bearer_token_scoped_other_endpoint');
+      const jwt = recs[0].checks.find((c) => c.id === 'oauth_jwt');
+      expect(jwt?.status).toBe('fail');
     });
   });
 });

@@ -21,6 +21,14 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/reposi
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { getEffectiveAuthEnablement, type EndpointConfig } from '../endpoint/endpoint-config.interface';
+import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
+import {
+  emitAuthDecisionEvent,
+  type AuthDecisionTrace,
+  type AuthCheck,
+  type AuthMethodKind,
+} from '../../oauth/auth-decision-trace';
+import { getCorrelationContext } from '../logging/scim-logger.service';
 
 // bcrypt is heavy - lazy-load via dynamic import cached on first use
 let bcryptCompare: (data: string, hash: string) => Promise<boolean>;
@@ -50,6 +58,8 @@ export class SharedSecretGuard implements CanActivate {
     private readonly credentialRepo: IEndpointCredentialRepository | null,
     @Optional() @Inject(EndpointService)
     private readonly endpointService: EndpointService | null,
+    @Optional() @Inject(AuthDecisionRecordStore)
+    private readonly decisionStore: AuthDecisionRecordStore | null = null,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -94,20 +104,76 @@ export class SharedSecretGuard implements CanActivate {
       }
     }
 
+    // Phase 2 (auth observability) - accumulate the resource-plane
+    // method-selection cascade as ordered checks, and record ONE
+    // AuthDecisionTrace at the terminal decision. Best-effort: recording never
+    // changes the auth outcome and never throws.
+    const endpointId = this.extractEndpointId(request);
+    const checks: AuthCheck[] = [];
+    const recordDecision = (
+      outcome: 'accept' | 'reject',
+      method: AuthMethodKind,
+      reasonCode?: string,
+    ): void => {
+      try {
+        if (!this.decisionStore) return;
+        // Noise control: record every reject, but record an accept ONLY for
+        // endpoint-scoped routes (global admin auth accepts are UI-poll noise).
+        if (outcome === 'accept' && !endpointId) return;
+        const trace: AuthDecisionTrace = {
+          plane: 'resource',
+          method,
+          outcome,
+          checks: [...checks],
+          ...(endpointId ? { endpointId } : {}),
+          ...(getCorrelationContext()?.requestId
+            ? { correlationId: getCorrelationContext()!.requestId }
+            : {}),
+          ...(reasonCode ? { reasonCode } : {}),
+        };
+        emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
+        this.decisionStore.record(trace);
+      } catch {
+        // best-effort observability; never affect the auth decision
+      }
+    };
+
     if (!header || !header.startsWith('Bearer ')) {
+      checks.push({
+        id: 'token_presented',
+        status: 'fail',
+        expected: 'Authorization: Bearer <token>',
+        received: header ? 'non-bearer scheme' : 'no Authorization header',
+      });
+      recordDecision('reject', 'bearer_jwt', 'bearer_missing');
       this.logger.warn(LogCategory.AUTH, 'Missing or malformed Authorization header');
       this.reject(response, 'Missing bearer token.');
     }
 
     const token = header?.slice(7) ?? '';
+    checks.push({
+      id: 'token_presented',
+      status: 'pass',
+      expected: 'Authorization: Bearer <token>',
+      received: 'bearer',
+    });
 
     // ── Phase 11: Per-endpoint credential check ──────────────────────
     // If the URL contains an endpointId segment and the endpoint has
     // PerEndpointCredentialsEnabled=true, try per-endpoint credentials first.
-    const endpointId = this.extractEndpointId(request);
     if (endpointId && this.credentialRepo && this.endpointService) {
-      const matched = await this.tryEndpointCredential(endpointId, token, request);
-      if (matched) return true;
+      const matched = await this.tryEndpointCredential(endpointId, token, request, checks);
+      if (matched) {
+        recordDecision('accept', 'endpoint_bearer');
+        return true;
+      }
+    } else {
+      checks.push({
+        id: 'endpoint_bearer',
+        status: 'skipped',
+        expected: 'a matching per-endpoint bearer credential',
+        received: endpointId ? 'not attempted' : 'not an endpoint-scoped route',
+      });
     }
 
     // ── OAuth 2.0 JWT token validation ───────────────────────────────
@@ -134,6 +200,13 @@ export class SharedSecretGuard implements CanActivate {
         if (tokenEndpointId) {
           const urlEndpointId = this.extractEndpointId(request);
           if (urlEndpointId !== tokenEndpointId) {
+            checks.push({
+              id: 'oauth_jwt',
+              status: 'fail',
+              expected: `token scoped to ${urlEndpointId ?? 'this route'}`,
+              received: `scoped to a different endpoint (${tokenEndpointId})`,
+            });
+            recordDecision('reject', 'bearer_jwt', 'bearer_token_scoped_other_endpoint');
             this.logger.warn(
               LogCategory.AUTH,
               'Per-endpoint OAuth token presented to a route it is not scoped for',
@@ -147,6 +220,13 @@ export class SharedSecretGuard implements CanActivate {
           }
         }
 
+        checks.push({
+          id: 'oauth_jwt',
+          status: 'pass',
+          expected: 'a valid OAuth 2.0 JWT',
+          received: tokenEndpointId ? 'valid (endpoint-scoped)' : 'valid (global)',
+        });
+
         // Add OAuth payload to request for later use
         request.oauth = payload;
         request.authType = 'oauth';
@@ -156,8 +236,22 @@ export class SharedSecretGuard implements CanActivate {
           clientId: payload.client_id as string,
           endpointScoped: tokenEndpointId ? true : false,
         });
+        recordDecision('accept', 'bearer_jwt');
         return true;
       }
+      checks.push({
+        id: 'oauth_jwt',
+        status: 'skipped',
+        expected: 'a valid OAuth 2.0 JWT',
+        received: 'not a valid JWT',
+      });
+    } else {
+      checks.push({
+        id: 'oauth_jwt',
+        status: 'skipped',
+        expected: 'a valid OAuth 2.0 JWT',
+        received: 'token equals the global secret (tried as shared_secret)',
+      });
     }
 
     // ── Legacy global bearer token ───────────────────────────────────
@@ -171,6 +265,13 @@ export class SharedSecretGuard implements CanActivate {
       if (endpointId && this.endpointService) {
         const allowed = await this.isSharedSecretAllowedForEndpoint(endpointId);
         if (!allowed) {
+          checks.push({
+            id: 'shared_secret',
+            status: 'fail',
+            expected: 'the endpoint accepts the global SCIM shared secret',
+            received: 'refused (SharedSecretBearerAuthEnabled=false)',
+          });
+          recordDecision('reject', 'shared_secret', 'bearer_shared_secret_refused');
           this.logger.warn(
             LogCategory.AUTH,
             'Global shared secret refused: SharedSecretBearerAuthEnabled is off for this endpoint',
@@ -179,13 +280,27 @@ export class SharedSecretGuard implements CanActivate {
           this.reject(response, 'This endpoint does not accept the global shared secret.', 'invalid_token');
         }
       }
+      checks.push({
+        id: 'shared_secret',
+        status: 'pass',
+        expected: 'the global SCIM shared secret',
+        received: 'matched',
+      });
       this.logger.info(LogCategory.AUTH, 'Legacy bearer token authentication successful');
       request.authType = 'legacy';
       this.logger.enrichContext({ authType: 'legacy' });
+      recordDecision('accept', 'shared_secret');
       return true;
     }
+    checks.push({
+      id: 'shared_secret',
+      status: 'fail',
+      expected: 'the global SCIM shared secret',
+      received: 'mismatch',
+    });
 
     // Both per-endpoint, OAuth, and legacy validation failed
+    recordDecision('reject', 'bearer_jwt', 'bearer_invalid');
     this.logger.warn(LogCategory.AUTH, 'Authentication failed – per-endpoint, OAuth, and legacy token all invalid');
     this.reject(response, 'Invalid bearer token.', 'invalid_token');
   }
@@ -230,7 +345,16 @@ export class SharedSecretGuard implements CanActivate {
     endpointId: string,
     token: string,
     request: AuthenticatedRequest,
+    checks?: AuthCheck[],
   ): Promise<boolean> {
+    const note = (status: AuthCheck['status'], received: string): void => {
+      checks?.push({
+        id: 'endpoint_bearer',
+        status,
+        expected: 'a matching per-endpoint bearer credential',
+        received,
+      });
+    };
     try {
       // WI-11 - per-method enablement. `bearer` credentials ride
       // SecretTokenBearerAuthEnabled and `oauth_client` credentials ride
@@ -242,6 +366,7 @@ export class SharedSecretGuard implements CanActivate {
 
       if (!effective.secretTokenBearer && !effective.oauthClientCredentials) {
         this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });
+        note('skipped', 'per-endpoint credentials not enabled');
         return false; // Fall through to OAuth/legacy
       }
 
@@ -249,6 +374,7 @@ export class SharedSecretGuard implements CanActivate {
       const credentials = await this.credentialRepo!.findActiveByEndpoint(endpointId);
       if (credentials.length === 0) {
         this.logger.debug(LogCategory.AUTH, 'No active per-endpoint credentials found, falling back', { endpointId });
+        note('skipped', 'no active per-endpoint credentials');
         return false; // Fall through to OAuth/legacy
       }
 
@@ -272,11 +398,13 @@ export class SharedSecretGuard implements CanActivate {
             credentialId: cred.id,
             label: cred.label,
           });
+          note('pass', `matched credential ${cred.id}`);
           return true;
         }
       }
 
       this.logger.debug(LogCategory.AUTH, 'Per-endpoint credential mismatch, falling back to OAuth/legacy', { endpointId });
+      note('fail', `no active credential matched (of ${credentials.length})`);
       return false; // No match - fall through to OAuth/legacy
     } catch (error) {
       // If endpoint not found or any error, fall through to global auth
@@ -284,6 +412,7 @@ export class SharedSecretGuard implements CanActivate {
         endpointId,
         error: (error as Error).message,
       });
+      note('skipped', 'per-endpoint credential lookup failed (fell back)');
       return false;
     }
   }
