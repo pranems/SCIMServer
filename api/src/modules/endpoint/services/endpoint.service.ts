@@ -8,6 +8,8 @@ import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
 import { ENDPOINT_CONFIG_FLAGS, validateEndpointConfig } from '../endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { getCorrelationContext } from '../../logging/scim-logger.service';
+import { emitAuthAdminEvent, type AuthFlagChange } from '../../../oauth/auth-admin-event';
 import { parseLogLevel, logLevelName } from '../../logging/log-levels';
 import { validateAndExpandProfile } from '../../scim/endpoint-profile/endpoint-profile.service';
 import { getBuiltInPreset, DEFAULT_PRESET_NAME, BUILT_IN_PRESETS, PRESET_NAMES } from '../../scim/endpoint-profile/built-in-presets';
@@ -604,6 +606,12 @@ export class EndpointService implements OnModuleInit {
       if (dto.profile?.settings) {
         this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
         this.syncEndpointFileLogging(endpointId, updated.name, dto.profile.settings as Record<string, any>);
+        // Phase 4 - emit an auth-config audit event if an auth-affecting flag changed.
+        this.emitAuthFlagChangeEvent(
+          endpointId,
+          current.profile?.settings,
+          updated.profile?.settings,
+        );
       }
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
@@ -659,6 +667,12 @@ export class EndpointService implements OnModuleInit {
     if (dto.profile?.settings) {
       this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
       this.syncEndpointFileLogging(endpointId, cached.name, dto.profile.settings as Record<string, any>);
+      // Phase 4 - emit an auth-config audit event if an auth-affecting flag changed.
+      this.emitAuthFlagChangeEvent(
+        endpointId,
+        (endpoint.profile as EndpointProfile | null)?.settings,
+        cached.profile?.settings,
+      );
     }
     this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
@@ -672,6 +686,65 @@ export class EndpointService implements OnModuleInit {
     });
 
     return this.toFullResponse(cached);
+  }
+
+  /**
+   * Phase 4 - the auth-affecting endpoint config flags. A change to any of these
+   * alters HOW a client authenticates against the endpoint, so it is audited as
+   * a config-time auth event (mirroring the credential-lifecycle AUTH events).
+   */
+  private static readonly AUTH_AFFECTING_FLAGS: readonly string[] = [
+    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+    ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
+    ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
+    ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
+    ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
+    ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY,
+  ];
+
+  /** Phase 4 - diff the auth-affecting flags between the before/after settings. */
+  private detectAuthFlagChanges(
+    before: Record<string, unknown> | undefined,
+    after: Record<string, unknown> | undefined,
+  ): AuthFlagChange[] {
+    const changes: AuthFlagChange[] = [];
+    for (const flag of EndpointService.AUTH_AFFECTING_FLAGS) {
+      const from = before?.[flag];
+      const to = after?.[flag];
+      if (JSON.stringify(from) !== JSON.stringify(to)) {
+        changes.push({ flag, from, to });
+      }
+    }
+    return changes;
+  }
+
+  /**
+   * Phase 4 - emit ONE canonical `LogCategory.AUTH` config-change event when an
+   * endpoint update flips an auth-affecting flag. Never throws; a no-change
+   * update emits nothing.
+   */
+  private emitAuthFlagChangeEvent(
+    endpointId: string,
+    before: Record<string, unknown> | undefined,
+    after: Record<string, unknown> | undefined,
+  ): void {
+    try {
+      const changedFlags = this.detectAuthFlagChanges(before, after);
+      if (changedFlags.length === 0) return;
+      emitAuthAdminEvent(
+        this.scimLogger,
+        {
+          action: 'auth_flags_changed',
+          outcome: 'success',
+          endpointId,
+          changedFlags,
+          correlationId: getCorrelationContext()?.requestId,
+        },
+        LogCategory.AUTH,
+      );
+    } catch {
+      // Best-effort audit - never let an audit-log failure break the update.
+    }
   }
 
   /**

@@ -134,6 +134,47 @@ describe('EndpointService', () => {
 
       expect(result).toBeDefined();
     });
+
+    // ── Phase 4 (auth-obs) - auth-flag change audit (Prisma-branch parity) ──
+    // validateAndExpandProfile requires non-empty schemas/resourceTypes, so the
+    // before-profile mocks carry a minimal valid pair.
+    const p4MinSchema = { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' as const };
+    const p4MinRT = { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] };
+
+    it('emits an "Auth config change" event when an auth-affecting flag flips (Prisma branch)', async () => {
+      const before = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: 'False' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} } };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+      (prisma.endpoint.update as jest.Mock).mockResolvedValue({
+        ...before,
+        profile: { settings: { WifCredentialsEnabled: 'True' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} },
+      });
+
+      await service.updateEndpoint('test-endpoint-id', {
+        profile: { settings: { WifCredentialsEnabled: 'True' } as never },
+      });
+
+      const call = (scimLogger.info as jest.Mock).mock.calls.find((c) => c[1] === 'Auth config change');
+      expect(call).toBeDefined();
+      expect(call![2]).toMatchObject({ action: 'auth_flags_changed', outcome: 'success', endpointId: 'test-endpoint-id' });
+      const changed = (call![2] as { changedFlags: Array<{ flag: string; from: unknown; to: unknown }> }).changedFlags;
+      expect(changed).toEqual(expect.arrayContaining([{ flag: 'WifCredentialsEnabled', from: 'False', to: 'True' }]));
+    });
+
+    it('does NOT emit an auth event when only a non-auth setting changes (Prisma branch)', async () => {
+      const before = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: 'True' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} } };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+      (prisma.endpoint.update as jest.Mock).mockResolvedValue({
+        ...before,
+        profile: { settings: { WifCredentialsEnabled: 'True', MultiMemberPatchOpForGroupEnabled: 'True' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} },
+      });
+
+      await service.updateEndpoint('test-endpoint-id', {
+        profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'True' } as never },
+      });
+
+      const call = (scimLogger.info as jest.Mock).mock.calls.find((c) => c[1] === 'Auth config change');
+      expect(call).toBeUndefined();
+    });
   });
 
   describe('createEndpoint - name validation', () => {

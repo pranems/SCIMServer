@@ -27,6 +27,7 @@ describe('AdminCredentialController', () => {
   let mockEventEmitter: { emit: jest.Mock };
   let mockWifResolver: { resolve: jest.Mock; verifyTrust: jest.Mock };
   let mockWifValidator: { validate: jest.Mock; debug: jest.Mock };
+  let loggerSpy: { info: jest.Mock; warn: jest.Mock; error: jest.Mock };
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'test-endpoint',
@@ -90,7 +91,7 @@ describe('AdminCredentialController', () => {
       getContext: jest.fn(),
       enrichContext: jest.fn(),
     } as unknown as ScimLogger;
-
+    loggerSpy = mockScimLogger as unknown as typeof loggerSpy;
     controller = new AdminCredentialController(
       mockCredentialRepo as any,
       mockEndpointService as any,
@@ -480,6 +481,54 @@ describe('AdminCredentialController', () => {
       expect(result.overallOutcome).toBe('reject');
       expect(result.results[0].reasonCode).toBe('wif_no_trust_configured');
       expect(mockWifValidator.debug).not.toHaveBeenCalled();
+    });
+
+    // ── Phase 4 (auth-obs) - config-time audit event ──
+    it('Phase 4: emits an "Auth config change" success event (dryRun) when the debug accepts', async () => {
+      mockWifValidator.debug.mockResolvedValue({
+        outcome: 'accept',
+        trace: { plane: 'token-mint', method: 'wif', outcome: 'accept', checks: [] },
+      });
+      await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
+      const call = loggerSpy.info.mock.calls.find((c) => c[1] === 'Auth config change');
+      expect(call).toBeDefined();
+      expect(call![2]).toMatchObject({ action: 'wif_debug_assertion', outcome: 'success', dryRun: true, endpointId: mockEndpoint.id });
+    });
+
+    it('Phase 4: emits an "Auth config change" failure event (dryRun) with the reason code when the debug rejects', async () => {
+      mockWifValidator.debug.mockResolvedValue({
+        outcome: 'reject',
+        reasonCode: 'wif_audience_mismatch',
+        trace: { plane: 'token-mint', method: 'wif', outcome: 'reject', reasonCode: 'wif_audience_mismatch', checks: [] },
+      });
+      await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
+      const call = loggerSpy.warn.mock.calls.find((c) => c[1] === 'Auth config change');
+      expect(call).toBeDefined();
+      expect(call![2]).toMatchObject({ action: 'wif_debug_assertion', outcome: 'failure', dryRun: true, reasonCode: 'wif_audience_mismatch' });
+    });
+  });
+
+  // ── Phase 4 (auth-obs) - verifyWifTrust config-time audit event ──
+  describe('Phase 4 - verifyWifTrust audit event', () => {
+    const wifEndpoint = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: true } } };
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue(wifEndpoint);
+    });
+
+    it('emits an "Auth config change" success event when the verify passes', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
+      await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys' } as never);
+      const call = loggerSpy.info.mock.calls.find((c) => c[1] === 'Auth config change');
+      expect(call).toBeDefined();
+      expect(call![2]).toMatchObject({ action: 'wif_verify', outcome: 'success', method: 'wif', endpointId: mockEndpoint.id });
+    });
+
+    it('emits an "Auth config change" failure event when the verify fails', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: false, checks: [{ id: 'jwksReachable', label: 'x', ok: false }] });
+      await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys' } as never);
+      const call = loggerSpy.warn.mock.calls.find((c) => c[1] === 'Auth config change');
+      expect(call).toBeDefined();
+      expect(call![2]).toMatchObject({ action: 'wif_verify', outcome: 'failure' });
     });
   });
 

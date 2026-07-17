@@ -1,5 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwksHostAllowlistService, type JwksAllowlistView } from '../../../oauth/jwks-host-allowlist.service';
+import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
+import { emitAuthAdminEvent } from '../../../oauth/auth-admin-event';
 
 interface AddJwksHostDto {
   host?: string;
@@ -39,7 +42,10 @@ function assertBareHost(host: string): void {
  */
 @Controller('admin/settings/jwks-hosts')
 export class AdminJwksHostController {
-  constructor(private readonly allowlist: JwksHostAllowlistService) {}
+  constructor(
+    private readonly allowlist: JwksHostAllowlistService,
+    private readonly logger: ScimLogger,
+  ) {}
 
   /** GET - the three layers + the effective union. */
   @Get()
@@ -52,7 +58,14 @@ export class AdminJwksHostController {
   async add(@Body() body: AddJwksHostDto): Promise<JwksAllowlistView> {
     const host = (body?.host ?? '').trim().toLowerCase();
     assertBareHost(host);
-    return this.allowlist.addHost(host, body.label ?? null);
+    const view = await this.allowlist.addHost(host, body.label ?? null);
+    // Phase 4 - config-time auth audit event (a JWKS host is a WIF trust root).
+    emitAuthAdminEvent(
+      this.logger,
+      { action: 'jwks_host_add', outcome: 'success', host, correlationId: getCorrelationContext()?.requestId },
+      LogCategory.AUTH,
+    );
+    return view;
   }
 
   /** PUT - edit a persisted entry by id (change host and/or label). R1. */
@@ -65,6 +78,11 @@ export class AdminJwksHostController {
     if (!updated) {
       throw new NotFoundException(`No JWKS host allowlist entry with id "${id}".`);
     }
+    emitAuthAdminEvent(
+      this.logger,
+      { action: 'jwks_host_update', outcome: 'success', host, correlationId: getCorrelationContext()?.requestId },
+      LogCategory.AUTH,
+    );
     return view;
   }
 
@@ -87,13 +105,38 @@ export class AdminJwksHostController {
     for (const h of normalizedAdd) {
       assertBareHost(h);
     }
-    return this.allowlist.patchHosts(normalizedAdd, remove.map((h) => (h ?? '').trim().toLowerCase()));
+    const normalizedRemove = remove.map((h) => (h ?? '').trim().toLowerCase());
+    const result = await this.allowlist.patchHosts(normalizedAdd, normalizedRemove);
+    emitAuthAdminEvent(
+      this.logger,
+      {
+        action: 'jwks_host_patch',
+        outcome: 'success',
+        hostsAdded: normalizedAdd.length > 0 ? normalizedAdd : undefined,
+        hostsRemoved: normalizedRemove.length > 0 ? normalizedRemove : undefined,
+        correlationId: getCorrelationContext()?.requestId,
+      },
+      LogCategory.AUTH,
+    );
+    return result;
   }
 
   /** DELETE - remove a host from the persisted layer (seed/env hosts are unaffected). */
   @Delete(':host')
   @HttpCode(200)
   async remove(@Param('host') host: string): Promise<{ removed: boolean; view: JwksAllowlistView }> {
-    return this.allowlist.removeHost(host);
+    const result = await this.allowlist.removeHost(host);
+    emitAuthAdminEvent(
+      this.logger,
+      {
+        action: 'jwks_host_remove',
+        outcome: 'success',
+        host,
+        detail: result.removed ? undefined : 'no matching persisted host',
+        correlationId: getCorrelationContext()?.requestId,
+      },
+      LogCategory.AUTH,
+    );
+    return result;
   }
 }

@@ -52,6 +52,8 @@ import type {
 import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { getCorrelationContext } from '../../logging/scim-logger.service';
+import { emitAuthAdminEvent } from '../../../oauth/auth-admin-event';
 import { CredentialEncryptionService } from '../../../security/credential-encryption.service';
 import { CredentialSecurityService } from '../../../security/credential-security.service';
 import {
@@ -230,7 +232,20 @@ export class AdminCredentialController {
         `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
       );
     }
-    return this.wifResolver.verifyTrust(body ?? {});
+    const result = await this.wifResolver.verifyTrust(body ?? {});
+    // Phase 4 - config-time auth audit event for a WIF trust verification.
+    emitAuthAdminEvent(
+      this.logger,
+      {
+        action: 'wif_verify',
+        outcome: result.ok ? 'success' : 'failure',
+        endpointId,
+        method: 'wif',
+        correlationId: getCorrelationContext()?.requestId,
+      },
+      LogCategory.AUTH,
+    );
+    return result;
   }
 
   /**
@@ -301,8 +316,27 @@ export class AdminCredentialController {
       });
     }
 
+    const overallOutcome = results.some((r) => r.outcome === 'accept') ? 'accept' : 'reject';
+    // Phase 4 - config-time auth audit event for a WIF assertion dry-run. This
+    // is a DRY-RUN: it evaluates against every trust but never mints a token.
+    const firstReject = results.find((r) => r.outcome === 'reject');
+    emitAuthAdminEvent(
+      this.logger,
+      {
+        action: 'wif_debug_assertion',
+        outcome: overallOutcome === 'accept' ? 'success' : 'failure',
+        endpointId,
+        method: 'wif',
+        dryRun: true,
+        reasonCode: overallOutcome === 'accept' ? undefined : firstReject?.reasonCode,
+        detail: `${wifCredentials.length} trust(s) evaluated`,
+        correlationId: getCorrelationContext()?.requestId,
+      },
+      LogCategory.AUTH,
+    );
+
     return {
-      overallOutcome: results.some((r) => r.outcome === 'accept') ? 'accept' : 'reject',
+      overallOutcome,
       results,
     };
   }

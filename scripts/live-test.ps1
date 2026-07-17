@@ -12841,6 +12841,75 @@ Write-Host "`n--- 9z-BD: Phase 3 requestId Bridge Complete ---" -ForegroundColor
 
 
 # ============================================
+$script:currentSection = "9z-BE: config-time auth events (P4)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BE: config-time auth audit events (Phase 4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # Every config-time auth operation emits ONE canonical LogCategory.AUTH
+    # "Auth config change" event, queryable via the recent-log ring buffer.
+    # Lock the two entirely-new gap surfaces: JWKS host allowlist + auth flags.
+    function Get-BeAuthConfigEvents {
+        try {
+            $recent = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=auth&limit=300" -Method GET -Headers $headers
+            if ($null -ne $recent -and $null -ne $recent.entries) {
+                return @($recent.entries | Where-Object { $_.message -eq 'Auth config change' })
+            }
+        } catch {}
+        return @()
+    }
+
+    # (1) JWKS host add -> jwks_host_add event.
+    $beHost = "idp-$(Get-Random)-live.example.com"
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method POST -Headers $headers -Body (@{ host = $beHost; label = 'p4-live' } | ConvertTo-Json) | Out-Null
+        $beAdd = Get-BeAuthConfigEvents | Where-Object { $_.data.action -eq 'jwks_host_add' -and $_.data.host -eq $beHost } | Select-Object -First 1
+        Test-Result -Success ($null -ne $beAdd) -Message "9z-BE.T1: a JWKS host add emits a jwks_host_add auth-config event"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts/$beHost" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+    $beRemove = Get-BeAuthConfigEvents | Where-Object { $_.data.action -eq 'jwks_host_remove' -and $_.data.host -eq $beHost } | Select-Object -First 1
+    Test-Result -Success ($null -ne $beRemove) -Message "9z-BE.T2: a JWKS host remove emits a jwks_host_remove auth-config event"
+
+    # (2) Auth-affecting endpoint flag flip -> auth_flags_changed event.
+    $beEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-p4-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $beEpId = $beEp.id
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$beEpId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ WifCredentialsEnabled = 'True' } }
+        } | ConvertTo-Json -Depth 5) | Out-Null
+        $beFlag = Get-BeAuthConfigEvents | Where-Object { $_.data.action -eq 'auth_flags_changed' -and $_.data.endpointId -eq $beEpId } | Select-Object -First 1
+        Test-Result -Success ($null -ne $beFlag) -Message "9z-BE.T3: flipping an auth-affecting endpoint flag emits an auth_flags_changed event"
+
+        $beFlagNames = @()
+        if ($null -ne $beFlag) { $beFlagNames = $beFlag.data.changedFlags | ForEach-Object { $_.flag } }
+        Test-Result -Success ($beFlagNames -contains 'WifCredentialsEnabled') -Message "9z-BE.T4: the auth_flags_changed event names WifCredentialsEnabled"
+
+        # (3) A non-auth setting change must NOT emit an auth_flags_changed event.
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$beEpId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ MultiMemberPatchOpForGroupEnabled = 'True' } }
+        } | ConvertTo-Json -Depth 5) | Out-Null
+        # Re-query; the ONLY auth_flags_changed for this endpoint should still be the WIF one.
+        $beFlagEvents = @(Get-BeAuthConfigEvents | Where-Object { $_.data.action -eq 'auth_flags_changed' -and $_.data.endpointId -eq $beEpId })
+        $beNonAuthOk = $true
+        foreach ($ev in $beFlagEvents) {
+            $names = $ev.data.changedFlags | ForEach-Object { $_.flag }
+            if ($names -contains 'MultiMemberPatchOpForGroupEnabled') { $beNonAuthOk = $false }
+        }
+        Test-Result -Success $beNonAuthOk -Message "9z-BE.T5: a non-auth setting change does NOT emit an auth_flags_changed event"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$beEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BE: Phase 4 config-time auth events section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BE: Phase 4 Config-time Auth Events Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
