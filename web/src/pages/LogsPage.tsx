@@ -225,6 +225,7 @@ export const LogsPage: React.FC = () => {
   const status = search.status;
   const timeRange = search.timeRange;
   const detailId = search.detail;
+  const requestId = search.requestId;
 
   // Endpoint dropdown source. Loads in parallel; harmless if it 404s
   // (just renders an empty Combobox).
@@ -239,9 +240,25 @@ export const LogsPage: React.FC = () => {
     endpointId,
     status,
     since: timeRangeToSince(timeRange),
+    requestId,
   };
   const { data, isLoading, error } = useGlobalLogs(params);
   const detailQuery = useGlobalLog(detailId);
+
+  // Phase 3 (auth-obs) - when the operator clicks "View auth decision"
+  // in a request-log drawer, focus the embedded AuthDiagnosticsPanel on
+  // that request's correlation id and scroll it into view.
+  const [authFocus, setAuthFocus] = React.useState<string | undefined>(undefined);
+  const authPanelRef = React.useRef<HTMLDivElement | null>(null);
+
+  const viewAuthDecision = (correlationId: string): void => {
+    setAuthFocus(correlationId);
+    closeDetail();
+    // Defer the scroll until after the drawer close re-render.
+    requestAnimationFrame(() => {
+      authPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   // Helper that merges a partial filter patch into the current URL,
   // resetting page to 1 (we don't track page in this view yet but the
@@ -286,7 +303,7 @@ export const LogsPage: React.FC = () => {
     });
   };
 
-  const hasFilters = Boolean(urlContains || endpointId || status || timeRange);
+  const hasFilters = Boolean(urlContains || endpointId || status || timeRange || requestId);
 
   if (error) {
     return (
@@ -313,7 +330,13 @@ export const LogsPage: React.FC = () => {
       </div>
 
       {/* WI-D6 - global auth diagnostics (all endpoints). */}
-      <AuthDiagnosticsPanel data-testid="global-logs-auth-diagnostics" />
+      <div ref={authPanelRef}>
+        <AuthDiagnosticsPanel
+          data-testid="global-logs-auth-diagnostics"
+          focusCorrelationId={authFocus}
+          onClearFocus={() => setAuthFocus(undefined)}
+        />
+      </div>
 
       {/* Phase D5 toolbar: endpoint + status + time range + free-text */}
       <div className={classes.toolbar} data-testid="logs-toolbar">
@@ -518,6 +541,26 @@ export const LogsPage: React.FC = () => {
               <Caption1 className={classes.drawerSectionTitle}>Duration</Caption1>
               <Text>{detailQuery.data.durationMs ?? 0}ms</Text>
             </div>
+
+            {detailQuery.data.requestId && (
+              <div className={classes.drawerSection} data-testid="log-detail-correlation">
+                <Caption1 className={classes.drawerSectionTitle}>Correlation id</Caption1>
+                <CopyableField
+                  value={detailQuery.data.requestId}
+                  monospace
+                  maxWidth="100%"
+                  data-testid="log-detail-request-id"
+                />
+                <Button
+                  appearance="subtle"
+                  icon={<DocumentSearch24Regular />}
+                  onClick={() => viewAuthDecision(detailQuery.data!.requestId!)}
+                  data-testid="log-detail-view-auth-decision"
+                >
+                  View auth decision
+                </Button>
+              </div>
+            )}
 
             <div className={classes.drawerSection}>
               <CopyableJsonBlock

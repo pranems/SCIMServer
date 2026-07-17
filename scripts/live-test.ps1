@@ -12793,6 +12793,54 @@ Write-Host "`n--- 9z-BC: Phase 2 Resource-plane Tracing Complete ---" -Foregroun
 
 
 # ============================================
+$script:currentSection = "9z-BD: requestId correlation bridge (P3)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BD: correlationId <-> requestId bridge (Phase 3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # A SCIM request is stamped with an X-Request-Id response header. That id
+    # is persisted on the request-log row, so GET /admin/logs?requestId=<id>
+    # returns exactly that request and the per-log detail echoes the same id.
+    $bdEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-p3-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bdEpId = $bdEp.id
+    try {
+        # Drive a SCIM request and capture the X-Request-Id it returns.
+        $bdResp = Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bdEpId/Users" -Method GET -Headers $headers -UseBasicParsing
+        $bdRid = if ($bdResp.Headers['X-Request-Id'] -is [array]) { $bdResp.Headers['X-Request-Id'][0] } else { $bdResp.Headers['X-Request-Id'] }
+        Test-Result -Success ($null -ne $bdRid -and $bdRid.Length -gt 10) -Message "9z-BD.T1: SCIM request returns an X-Request-Id correlation header ($bdRid)"
+
+        # Allow the buffered logger to flush (Prisma backend writes in batches).
+        Start-Sleep -Milliseconds 3500
+
+        $bdList = $null
+        try { $bdList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bdRid))" -Method GET -Headers $headers } catch {}
+        $bdMatch = $null
+        if ($null -ne $bdList -and $null -ne $bdList.items) {
+            $bdMatch = $bdList.items | Where-Object { $_.requestId -eq $bdRid } | Select-Object -First 1
+        }
+        Test-Result -Success ($null -ne $bdMatch) -Message "9z-BD.T2: GET /admin/logs?requestId=<id> returns the matching request log"
+
+        $bdAllMatch = ($null -ne $bdList) -and ($null -ne $bdList.items) -and (($bdList.items | Where-Object { $_.requestId -ne $bdRid } | Measure-Object).Count -eq 0)
+        Test-Result -Success $bdAllMatch -Message "9z-BD.T3: every row returned by the requestId filter carries that correlation id"
+
+        $bdDetail = $null
+        if ($null -ne $bdMatch) {
+            try { $bdDetail = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($bdMatch.id)" -Method GET -Headers $headers } catch {}
+        }
+        Test-Result -Success ($null -ne $bdDetail -and $bdDetail.requestId -eq $bdRid) -Message "9z-BD.T4: the per-log detail echoes the same requestId"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bdEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BD: Phase 3 requestId bridge section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BD: Phase 3 requestId Bridge Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

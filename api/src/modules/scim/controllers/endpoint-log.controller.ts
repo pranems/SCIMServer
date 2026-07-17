@@ -106,6 +106,7 @@ export class EndpointLogController {
     @Query('since') since?: string,
     @Query('until') until?: string,
     @Query('minDurationMs') minDurationMs?: string,
+    @Query('requestId') requestId?: string,
   ) {
     if (!this.loggingService) {
       return { endpointId, total: 0, items: [], message: 'Persistent logging not available (InMemory backend)' };
@@ -121,6 +122,7 @@ export class EndpointLogController {
       since: since ? new Date(since) : undefined,
       until: until ? new Date(until) : undefined,
       minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
+      requestId: requestId || undefined,
       includeAdmin: false,
     });
   }

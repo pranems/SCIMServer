@@ -48,6 +48,7 @@ model RequestLog {
   errorMessage     String?
   errorStack       String?
   identifier       String?
+  requestId        String?  @db.Uuid          // P3 - the X-Request-Id correlation id, bridges to AuthDecisionTrace.correlationId
   createdAt        DateTime @default(now()) @db.Timestamptz
 
   endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
@@ -57,6 +58,7 @@ model RequestLog {
   @@index([status])
   @@index([endpointId])
   @@index([identifier])
+  @@index([requestId])
   @@index([createdAt, method, url])  // Composite for activity summary count queries
 }
 

@@ -103,4 +103,44 @@ describe('Global Logs filters (E2E) - Phase D5', () => {
     // 'since=tomorrow' should match nothing.
     expect(res.body.total).toBe(0);
   });
+
+  // ── Phase 3 (auth-obs) - requestId correlation bridge ──
+  it('GET /admin/logs?requestId round-trips the X-Request-Id of a request', async () => {
+    const ep = await createEndpoint(app, token);
+
+    // Drive a SCIM request; the interceptor stamps an X-Request-Id
+    // response header and records it on the request log row.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    const scimRes = await request(app.getHttpServer() as any)
+      .get(`/scim/endpoints/${ep}/Users`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const requestId = scimRes.headers['x-request-id'] as string;
+    expect(requestId).toBeTruthy();
+
+    // Wait for the buffered logger to flush.
+    await new Promise((r) => setTimeout(r, 3500));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    const scoped = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/logs?requestId=${encodeURIComponent(requestId)}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    // Exactly the request log(s) that carried this correlation id.
+    expect(scoped.body.total).toBeGreaterThanOrEqual(1);
+    const rows = scoped.body.items as Array<{ id: string; requestId?: string; url: string }>;
+    expect(rows.every((r) => r.requestId === requestId)).toBe(true);
+    const target = rows.find((r) => r.url.includes(ep));
+    expect(target).toBeDefined();
+
+    // The per-log detail also carries the correlation id.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    const detail = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/logs/${target!.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(detail.body.requestId).toBe(requestId);
+  }, 15_000);
 });

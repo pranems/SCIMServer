@@ -27,9 +27,10 @@ export const logsRoute = createRoute({
   validateSearch: globalLogsSearchSchema,
   loaderDeps: ({ search }) => ({
     urlContains: search.urlContains,
+    requestId: search.requestId,
   }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(
-      globalLogsQueryOptions({ urlContains: deps.urlContains }),
+      globalLogsQueryOptions({ urlContains: deps.urlContains, requestId: deps.requestId }),
     ),
 });

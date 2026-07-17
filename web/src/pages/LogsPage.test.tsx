@@ -198,6 +198,80 @@ describe('LogsPage', () => {
     });
   });
 
+  // ─── Phase 3 (auth-obs) - correlationId <-> requestId bridge ─────
+  describe('Phase 3 - correlation bridge', () => {
+    it('passes requestId from URL into useGlobalLogs', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      wrap(<LogsPage />, '/logs?requestId=corr-1');
+      await screen.findByTestId('global-logs-page');
+      const args = mockUseGlobalLogs.mock.calls.at(-1)?.[0];
+      expect(args).toMatchObject({ requestId: 'corr-1' });
+    });
+
+    it('drawer shows the correlation id + "View auth decision" link when requestId present', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      mockUseGlobalLog.mockReturnValue({
+        data: {
+          id: 'l1',
+          method: 'GET',
+          url: '/scim/endpoints/ep-prod/Users',
+          status: 401,
+          durationMs: 3,
+          createdAt: '2026-05-01T10:00:00Z',
+          requestId: 'corr-xyz',
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs?detail=l1');
+      expect(await screen.findByTestId('log-detail-correlation')).toBeInTheDocument();
+      expect(screen.getByTestId('log-detail-request-id')).toHaveTextContent('corr-xyz');
+      expect(screen.getByTestId('log-detail-view-auth-decision')).toBeInTheDocument();
+    });
+
+    it('clicking "View auth decision" focuses the embedded auth panel on the correlation id', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      mockUseGlobalLog.mockReturnValue({
+        data: {
+          id: 'l1',
+          method: 'GET',
+          url: '/scim/endpoints/ep-prod/Users',
+          status: 401,
+          durationMs: 3,
+          createdAt: '2026-05-01T10:00:00Z',
+          requestId: 'corr-xyz',
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs?detail=l1');
+      fireEvent.click(await screen.findByTestId('log-detail-view-auth-decision'));
+      // The global AuthDiagnosticsPanel now shows its focus indicator.
+      expect(
+        await screen.findByTestId('global-logs-auth-diagnostics-focus'),
+      ).toBeInTheDocument();
+    });
+
+    it('does not render the correlation section when the log has no requestId', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      mockUseGlobalLog.mockReturnValue({
+        data: {
+          id: 'l1',
+          method: 'GET',
+          url: '/scim/endpoints/ep-prod/Users',
+          status: 200,
+          durationMs: 5,
+          createdAt: '2026-05-01T10:00:00Z',
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs?detail=l1');
+      await screen.findByTestId('global-logs-page');
+      expect(screen.queryByTestId('log-detail-correlation')).not.toBeInTheDocument();
+    });
+  });
+
   // ─── Phase P1 - CopyableField primitives on row + drawer ─────────
   describe('Phase P1 - CopyableField primitives', () => {
     it('renders row URL column via CopyableField with stable testid + copy button', async () => {

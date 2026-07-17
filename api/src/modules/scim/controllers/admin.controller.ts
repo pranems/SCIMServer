@@ -168,6 +168,10 @@ export class AdminController {
     // surfaces it so the UI can restrict the global Logs page to a
     // single endpoint without going through the endpoint-scoped route.
     @Query('endpointId') endpointId?: string,
+    // Phase 3 (auth-obs): filter global logs by the X-Request-Id
+    // correlation id so the auth-audit UI can deep-link to the
+    // request log that produced a given auth decision.
+    @Query('requestId') requestId?: string,
   ) {
     return this.loggingService.listLogs({
       page: page ? Number(page) : undefined,
@@ -183,6 +187,7 @@ export class AdminController {
       hideKeepalive: hideKeepalive === 'true',
       minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
       endpointId: endpointId || undefined,
+      requestId: requestId || undefined,
     });
   }
 

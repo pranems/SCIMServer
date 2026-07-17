@@ -209,4 +209,40 @@ describe('LogsTab', () => {
     const queryArg = logsCall[0] as { queryKey: unknown[] };
     expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 1, 50, '']);
   });
+
+  // ==========================================================================
+  // Phase 3 (auth-obs) - correlationId <-> requestId bridge in the drawer
+  // ==========================================================================
+  it('drawer shows correlation id + "View auth decision" and focuses the panel on click', async () => {
+    // mockUseQuery returns the same object for the list, the detail, and the
+    // AuthDiagnosticsPanel queries. Carrying requestId on it drives the detail
+    // drawer's correlation section without a distinct per-query mock.
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [
+          { id: 'l1', method: 'GET', url: '/scim/v2/endpoints/ep-1/Users', status: 401, durationMs: 3, createdAt: '2026-05-01T10:00:00Z' },
+        ],
+        method: 'GET',
+        url: '/scim/v2/endpoints/ep-1/Users',
+        status: 401,
+        durationMs: 3,
+        requestId: 'corr-xyz',
+        requestHeaders: {},
+        requestBody: {},
+        responseHeaders: {},
+        responseBody: {},
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    fireEvent.click(await screen.findByTestId('logs-tab-row-l1'));
+    expect(await screen.findByTestId('logs-tab-detail-correlation')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-detail-request-id')).toHaveTextContent('corr-xyz');
+
+    fireEvent.click(screen.getByTestId('logs-tab-detail-view-auth-decision'));
+    expect(
+      await screen.findByTestId('logs-tab-auth-diagnostics-focus'),
+    ).toBeInTheDocument();
+  });
 });

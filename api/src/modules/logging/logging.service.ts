@@ -18,6 +18,8 @@ export interface CreateRequestLogOptions {
   error?: unknown;
   /** SCIM endpoint ID extracted from URL (persisted for indexed endpoint-scoped queries) */
   endpointId?: string;
+  /** P3 - the X-Request-Id correlation id, bridges a log row to its AuthDecisionTrace. */
+  requestId?: string;
 }
 
 @Injectable()
@@ -55,6 +57,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     errorMessage: string | null;
     errorStack: string | null;
     identifier: string | null;
+    requestId: string | null;
   }> = [];
 
   constructor(
@@ -141,6 +144,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     responseBody,
     error,
     endpointId,
+    requestId,
   }: CreateRequestLogOptions): void {
     // Skip successful health probes - see method-level docstring.
     // Matches: GET /health, /scim/health (with optional trailing slash or
@@ -184,6 +188,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         errorMessage,
         errorStack,
         identifier: identifier ?? null,
+        requestId: requestId ?? null,
       });
       return;
     }
@@ -216,6 +221,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       errorStack,
       _identifier: identifier,
       endpointId: endpointId ?? null,
+      requestId: requestId ?? null,
     };
 
     this.logBuffer.push(data);
@@ -347,6 +353,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     minDurationMs?: number;
     /** Filter by indexed endpointId column (preferred over urlContains) */
     endpointId?: string;
+    /** P3 - filter by the X-Request-Id correlation id (auth-decision bridge). */
+    requestId?: string;
   } = {}) {
     if (this.isInMemoryBackend) {
       const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
@@ -360,6 +368,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // branch's filter set 1:1.
       if (filters.endpointId) {
         filtered = filtered.filter((r) => r.endpointId === filters.endpointId);
+      }
+      if (filters.requestId) {
+        filtered = filtered.filter((r) => r.requestId === filters.requestId);
       }
       if (filters.method) {
         const m = filters.method.toUpperCase();
@@ -419,6 +430,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         createdAt: r.createdAt,
         errorMessage: r.errorMessage ?? undefined,
         reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
+        requestId: r.requestId ?? undefined,
       }));
 
       const total = filtered.length;
@@ -438,6 +450,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
   const where: Prisma.RequestLogWhereInput = {};
     if (filters.endpointId) where.endpointId = filters.endpointId;
+    if (filters.requestId) where.requestId = filters.requestId;
     if (filters.method) where.method = filters.method.toUpperCase();
     if (typeof filters.status === 'number') where.status = filters.status;
     if (filters.hasError === true) where.errorMessage = { not: null };
@@ -534,6 +547,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       durationMs: number | null;
       createdAt: Date;
       errorMessage: string | null;
+      requestId: string | null;
     };
     let records: RequestLogRow[] = [];
     try {
@@ -552,7 +566,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
             status: true,
             durationMs: true,
             createdAt: true,
-            errorMessage: true
+            errorMessage: true,
+            requestId: true
           }
         })
       ]);
@@ -609,6 +624,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     durationMs: number | null;
     createdAt: Date;
     errorMessage: string | null;
+    requestId?: string | null;
   }, identifierMap?: Record<string, string | null>) {
     let identifier = identifierMap?.[r.id] || this.deriveIdentifierFromUrl(r.url);
 
@@ -629,7 +645,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       durationMs: r.durationMs ?? undefined,
       createdAt: r.createdAt,
       errorMessage: r.errorMessage ?? undefined,
-      reportableIdentifier: identifier
+      reportableIdentifier: identifier,
+      requestId: r.requestId ?? undefined
     };
   }
 
@@ -748,6 +765,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         responseBody: parsedResponse,
         errorMessage: row.errorMessage ?? undefined,
         reportableIdentifier: rid,
+        requestId: row.requestId ?? undefined,
       };
     }
 
@@ -775,7 +793,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
       responseBody: parsedResponse,
       errorMessage: row.errorMessage ?? undefined,
-      reportableIdentifier: rid
+      reportableIdentifier: rid,
+      requestId: row.requestId ?? undefined,
     };
   }
 

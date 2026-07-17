@@ -156,4 +156,74 @@ describe('AuthDiagnosticsPanel (WI-D6)', () => {
     renderWithFluent(<AuthDiagnosticsPanel />);
     expect(mockUseAuthDecisions).toHaveBeenCalledWith({ endpointId: undefined, limit: 25 });
   });
+
+  // ── Phase 3 (auth-obs) - correlationId <-> requestId bridge ──
+  describe('Phase 3: request-log correlation bridge', () => {
+    it('"View request log" navigates to /logs filtered by the correlation id', () => {
+      mockUseAuthDecisions.mockReturnValue({
+        data: response([rejectRecord({ correlationId: 'corr-xyz' })]),
+        isLoading: false,
+        error: null,
+      });
+      renderWithFluent(<AuthDiagnosticsPanel endpointId="ep-1" />);
+      expandRow('auth-decision-row-adr_1');
+      fireEvent.click(screen.getByTestId('auth-decision-view-request-log-adr_1'));
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.objectContaining({ to: '/logs' }),
+      );
+      // The search updater must inject the requestId filter.
+      const call = mockNavigate.mock.calls.find(
+        (c) => (c[0] as { to?: string }).to === '/logs',
+      );
+      const searchFn = (call?.[0] as { search?: (p: Record<string, unknown>) => unknown }).search;
+      expect(typeof searchFn).toBe('function');
+      expect(searchFn?.({})).toMatchObject({ requestId: 'corr-xyz', detail: undefined });
+    });
+
+    it('focusCorrelationId narrows the list to the matching decision only', () => {
+      const matching = rejectRecord({ id: 'adr_match', correlationId: 'corr-match' });
+      const other = rejectRecord({ id: 'adr_other', correlationId: 'corr-other' });
+      mockUseAuthDecisions.mockReturnValue({
+        data: response([matching, other]),
+        isLoading: false,
+        error: null,
+      });
+      renderWithFluent(
+        <AuthDiagnosticsPanel endpointId="ep-1" focusCorrelationId="corr-match" />,
+      );
+      expect(screen.getByTestId('auth-decision-row-adr_match')).toBeInTheDocument();
+      expect(screen.queryByTestId('auth-decision-row-adr_other')).not.toBeInTheDocument();
+      expect(screen.getByTestId('auth-diagnostics-panel-focus')).toBeInTheDocument();
+    });
+
+    it('focusCorrelationId with no match renders the focused empty state', () => {
+      mockUseAuthDecisions.mockReturnValue({
+        data: response([rejectRecord({ correlationId: 'corr-other' })]),
+        isLoading: false,
+        error: null,
+      });
+      renderWithFluent(
+        <AuthDiagnosticsPanel endpointId="ep-1" focusCorrelationId="corr-absent" />,
+      );
+      expect(screen.getByTestId('auth-diagnostics-panel-empty')).toBeInTheDocument();
+    });
+
+    it('"Show all" clears the focus filter via onClearFocus', () => {
+      const onClearFocus = vi.fn();
+      mockUseAuthDecisions.mockReturnValue({
+        data: response([rejectRecord({ correlationId: 'corr-match' })]),
+        isLoading: false,
+        error: null,
+      });
+      renderWithFluent(
+        <AuthDiagnosticsPanel
+          endpointId="ep-1"
+          focusCorrelationId="corr-match"
+          onClearFocus={onClearFocus}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('auth-diagnostics-panel-focus-clear'));
+      expect(onClearFocus).toHaveBeenCalledTimes(1);
+    });
+  });
 });

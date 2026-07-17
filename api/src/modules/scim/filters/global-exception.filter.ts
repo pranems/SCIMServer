@@ -133,6 +133,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       responseBody,
       error,
       endpointId: meta?.endpointId,
+      requestId: meta?.requestId,
     });
   }
 }

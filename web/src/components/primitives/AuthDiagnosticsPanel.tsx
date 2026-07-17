@@ -130,6 +130,20 @@ const DecisionDetail: React.FC<{ record: AuthDecisionRecord; endpointId?: string
     }
   }, [navigate, remediation, endpointId]);
 
+  // Phase 3 (auth-obs) - deep-link from an auth decision to the request
+  // log that produced it, using the shared X-Request-Id correlation id.
+  const viewRequestLog = React.useCallback(() => {
+    if (!record.correlationId) return;
+    void navigate({
+      to: '/logs',
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        requestId: record.correlationId,
+        detail: undefined,
+      }),
+    });
+  }, [navigate, record.correlationId]);
+
   const allChecks: AuthCheck[] = [
     ...record.checks,
     ...(record.subTraces ?? []).flatMap((s) => s.checks),
@@ -179,6 +193,12 @@ const DecisionDetail: React.FC<{ record: AuthDecisionRecord; endpointId?: string
             monospace
             data-testid={`auth-decision-correlation-${record.id}`}
           />
+          <Link
+            data-testid={`auth-decision-view-request-log-${record.id}`}
+            onClick={viewRequestLog}
+          >
+            View request log
+          </Link>
         </div>
       )}
 
@@ -196,16 +216,34 @@ export interface AuthDiagnosticsPanelProps {
   endpointId?: string;
   /** Optional max rows (default 25). */
   limit?: number;
+  /**
+   * Phase 3 (auth-obs) - when set, filter the list to the decision(s)
+   * whose correlationId matches (the X-Request-Id of a request log the
+   * operator drilled in from). The matching rows are auto-expanded.
+   */
+  focusCorrelationId?: string;
+  /** Called when the operator clears the focus filter. */
+  onClearFocus?: () => void;
   'data-testid'?: string;
 }
 
 export const AuthDiagnosticsPanel: React.FC<AuthDiagnosticsPanelProps> = ({
   endpointId,
   limit = 25,
+  focusCorrelationId,
+  onClearFocus,
   'data-testid': testId = 'auth-diagnostics-panel',
 }) => {
   const classes = useStyles();
   const { data, isLoading, error } = useAuthDecisions({ endpointId, limit });
+
+  // Phase 3 (auth-obs) - when focused from a request log, narrow the list
+  // to the decision(s) that share the request's correlation id.
+  const allRecords = data?.records ?? [];
+  const records = focusCorrelationId
+    ? allRecords.filter((r) => r.correlationId === focusCorrelationId)
+    : allRecords;
+  const openItems = focusCorrelationId ? records.map((r) => r.id) : undefined;
 
   return (
     <div className={classes.root} data-testid={testId}>
@@ -216,6 +254,16 @@ export const AuthDiagnosticsPanel: React.FC<AuthDiagnosticsPanelProps> = ({
           A rejected attempt shows exactly which check failed (expected vs received) and how to fix it.
           All values are non-secret; short-lived diagnostics only.
         </Caption1>
+        {focusCorrelationId && (
+          <div className={classes.rowHeader} data-testid={`${testId}-focus`}>
+            <Caption1 className={classes.hint}>
+              Filtered to the request&apos;s auth decision.
+            </Caption1>
+            <Link data-testid={`${testId}-focus-clear`} onClick={() => onClearFocus?.()}>
+              Show all
+            </Link>
+          </div>
+        )}
       </div>
 
       {isLoading && <LoadingSkeleton count={3} height="28px" />}
@@ -228,17 +276,21 @@ export const AuthDiagnosticsPanel: React.FC<AuthDiagnosticsPanelProps> = ({
         />
       )}
 
-      {!isLoading && !error && (!data || data.count === 0) && (
+      {!isLoading && !error && records.length === 0 && (
         <EmptyState
-          title="No recent auth decisions"
-          body="Auth decisions appear here as clients attempt to obtain a token. Try a connection from your IdP."
+          title={focusCorrelationId ? 'No auth decision for this request' : 'No recent auth decisions'}
+          body={
+            focusCorrelationId
+              ? 'This request did not produce a recorded auth decision (it may have authenticated earlier or used a non-auth route).'
+              : 'Auth decisions appear here as clients attempt to obtain a token. Try a connection from your IdP.'
+          }
           data-testid={`${testId}-empty`}
         />
       )}
 
-      {!isLoading && !error && data && data.count > 0 && (
-        <Accordion multiple collapsible data-testid={`${testId}-list`}>
-          {data.records.map((record) => (
+      {!isLoading && !error && records.length > 0 && (
+        <Accordion multiple collapsible openItems={openItems} data-testid={`${testId}-list`}>
+          {records.map((record) => (
             <AccordionItem value={record.id} key={record.id}>
               <AccordionHeader data-testid={`auth-decision-row-${record.id}`}>
                 <div className={classes.rowHeader}>

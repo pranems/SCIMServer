@@ -194,6 +194,7 @@ export class ScimExceptionFilter implements ExceptionFilter {
       responseBody,
       error,
       endpointId: meta?.endpointId,
+      requestId: meta?.requestId,
     });
   }
 

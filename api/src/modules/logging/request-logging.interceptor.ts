@@ -23,6 +23,8 @@ export interface RequestLoggingMeta {
   requestHeaders: Record<string, unknown>;
   requestBody: unknown;
   endpointId?: string;
+  /** P3 - the X-Request-Id correlation id, for the auth-decision bridge. */
+  requestId?: string;
 }
 
 /** Key used to stash RequestLoggingMeta on the Express request object. */
@@ -81,6 +83,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             requestHeaders: { ...request.headers },
             requestBody: request.body,
             endpointId,
+            requestId,
           } as RequestLoggingMeta;
 
           next.handle().pipe(
@@ -119,6 +122,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
                 responseHeaders: response.getHeaders() as Record<string, unknown>,
                 responseBody,
                 endpointId,
+                requestId,
               });
             }),
             catchError((error: unknown) => {

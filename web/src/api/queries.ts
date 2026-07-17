@@ -548,6 +548,12 @@ export interface GlobalLogsParams {
   since?: string;
   /** ISO 8601 upper bound. Currently unused by the picker but accepted. */
   until?: string;
+  /**
+   * Phase 3 (auth-obs) - filter to the single request log that carries
+   * this X-Request-Id. Powers the "View request log" deep-link from an
+   * auth decision to its originating request.
+   */
+  requestId?: string;
 }
 
 export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
@@ -558,6 +564,7 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
   if (typeof params.status === 'number') qs.set('status', String(params.status));
   if (params.since) qs.set('since', params.since);
   if (params.until) qs.set('until', params.until);
+  if (params.requestId) qs.set('requestId', params.requestId);
   return {
     // Cache key includes every filter dimension so changing one of
     // them yields a distinct cache entry (no accidental stale-data
@@ -569,6 +576,7 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
       params.status ?? '',
       params.since ?? '',
       params.until ?? '',
+      params.requestId ?? '',
       pageSize,
     ] as const,
     queryFn: () => fetchWithAuth<AdminLogsResponse>(`/scim/admin/logs?${qs.toString()}`),
@@ -603,6 +611,12 @@ export interface GlobalLogDetail {
   responseBody?: unknown;
   errorMessage?: string;
   reportableIdentifier?: string;
+  /**
+   * Phase 3 (auth-obs) - the X-Request-Id correlation id that ties this
+   * request log to any auth decision recorded for the same request. Used
+   * to cross-link the Logs surfaces with the Auth Audit surfaces.
+   */
+  requestId?: string;
 }
 
 export const globalLogDetailQueryOptions = (id: string | undefined) => ({

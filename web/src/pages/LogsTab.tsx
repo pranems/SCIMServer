@@ -24,6 +24,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { DocumentSearch24Regular } from '@fluentui/react-icons';
 import { endpointLogsQueryOptions, useEndpointLog } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, CopyableJsonBlock, DetailDrawer, AuthDiagnosticsPanel } from '../components/primitives';
@@ -91,6 +92,19 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   // Clickable log detail (mirrors the SCIMServer-level Logs page).
   const [detailId, setDetailId] = React.useState<string | undefined>(undefined);
   const detailQuery = useEndpointLog(endpointId, detailId);
+
+  // Phase 3 (auth-obs) - focus the embedded AuthDiagnosticsPanel on a
+  // request's correlation id when the operator clicks "View auth decision".
+  const [authFocus, setAuthFocus] = React.useState<string | undefined>(undefined);
+  const authPanelRef = React.useRef<HTMLDivElement | null>(null);
+
+  const viewAuthDecision = (correlationId: string): void => {
+    setAuthFocus(correlationId);
+    setDetailId(undefined);
+    requestAnimationFrame(() => {
+      authPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   const updateSearch = (next: { page?: number; urlContains?: string }): void => {
     navigate({
@@ -163,7 +177,14 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
 
   return (
     <div className={classes.container} data-testid="logs-tab">
-      <AuthDiagnosticsPanel endpointId={endpointId} data-testid="logs-tab-auth-diagnostics" />
+      <div ref={authPanelRef}>
+        <AuthDiagnosticsPanel
+          endpointId={endpointId}
+          data-testid="logs-tab-auth-diagnostics"
+          focusCorrelationId={authFocus}
+          onClearFocus={() => setAuthFocus(undefined)}
+        />
+      </div>
       <div className={classes.header}>
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
         <ExportSplitButton
@@ -270,6 +291,20 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
               </Badge>
               <Caption1>{detailQuery.data.durationMs ?? 0}ms</Caption1>
             </div>
+            {detailQuery.data.requestId && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }} data-testid="logs-tab-detail-correlation">
+                <Caption1>Correlation id</Caption1>
+                <CopyableField value={detailQuery.data.requestId} monospace maxWidth="100%" data-testid="logs-tab-detail-request-id" />
+                <Button
+                  appearance="subtle"
+                  icon={<DocumentSearch24Regular />}
+                  onClick={() => viewAuthDecision(detailQuery.data!.requestId!)}
+                  data-testid="logs-tab-detail-view-auth-decision"
+                >
+                  View auth decision
+                </Button>
+              </div>
+            )}
             <CopyableJsonBlock value={detailQuery.data.requestHeaders ?? {}} label="Request headers" data-testid="logs-tab-detail-request-headers" />
             <CopyableJsonBlock value={detailQuery.data.requestBody ?? null} label="Request body" data-testid="logs-tab-detail-request-body" />
             <CopyableJsonBlock value={detailQuery.data.responseHeaders ?? {}} label="Response headers" data-testid="logs-tab-detail-response-headers" />
