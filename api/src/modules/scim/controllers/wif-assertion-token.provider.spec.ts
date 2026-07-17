@@ -56,7 +56,27 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       providers: [
         WifAssertionTokenProvider,
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: { findActiveByEndpoint } },
-        { provide: WifAssertionValidatorService, useValue: { validate } },
+        {
+          provide: WifAssertionValidatorService,
+          // Phase 1: the provider calls validateWithTrace(); wrap the existing
+          // `validate` mock so all its call-assertions still hold, and return
+          // the {claims, trace} shape the provider now consumes.
+          useValue: {
+            validate,
+            validateWithTrace: jest.fn(async (a: string, t: unknown) => ({
+              claims: await validate(a, t),
+              trace: {
+                plane: 'token-mint',
+                method: 'wif',
+                outcome: 'accept',
+                checks: [
+                  { id: 'issuer_match', status: 'pass', expected: 'iss', received: 'iss' },
+                  { id: 'audience_match', status: 'pass', expected: 'aud', received: 'aud' },
+                ],
+              },
+            })),
+          },
+        },
         { provide: OAuthService, useValue: { generateEndpointAccessToken } },
         { provide: ScimLogger, useValue: logger },
         AuthDecisionRecordStore,

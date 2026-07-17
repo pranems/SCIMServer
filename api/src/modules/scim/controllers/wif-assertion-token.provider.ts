@@ -13,7 +13,6 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { computeShadowDecision } from '../../../oauth/wif-shadow-telemetry';
 import {
-  AuthDecisionTraceBuilder,
   emitAuthDecisionEvent,
   type AuthDecisionTrace,
 } from '../../../oauth/auth-decision-trace';
@@ -94,8 +93,11 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       }
 
       let claims: WifValidatedClaims;
+      let validatorTrace: AuthDecisionTrace;
       try {
-        claims = await this.validator.validate(clientAssertion, trust);
+        const result = await this.validator.validateWithTrace(clientAssertion, trust);
+        claims = result.claims;
+        validatorTrace = result.trace;
       } catch (err) {
         lastError = err;
         // WI-D3 - collect each rejected trust's sub-trace (tagged with which
@@ -133,16 +135,16 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       });
 
       // WI-D4 - one canonical AUTH decision event for this accepted attempt.
-      const acceptTrace = new AuthDecisionTraceBuilder('token-mint', 'wif', {
+      // Phase 1: record the validator's FULL trace (every claim check with
+      // expected + received) enriched with the request context, instead of a
+      // lossy 2-check summary, so the diagnostics table shows the real per-claim
+      // expected-vs-received on the accept path too.
+      const acceptTrace: AuthDecisionTrace = {
+        ...validatorTrace,
         correlationId: getCorrelationContext()?.requestId,
         endpointId,
-      })
-        .setSelectedTrustId(wif.id)
-        .setDecodedClaims(claims)
-        .pass('jwks_signature')
-        .pass('claim_checks', { expected: trust.expectedIssuer })
-        .accept()
-        .build();
+        selectedTrustId: wif.id,
+      };
       this.recordAndEmit(acceptTrace);
 
       return token;

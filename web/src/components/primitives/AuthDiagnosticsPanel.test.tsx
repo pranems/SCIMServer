@@ -90,6 +90,30 @@ describe('AuthDiagnosticsPanel (WI-D6)', () => {
     expect(failedCheck).toHaveTextContent('api://b');
   });
 
+  it('Phase 1: a PASSING check renders its populated received value (not "-")', () => {
+    const acceptRecord: AuthDecisionRecord = {
+      id: 'adr_ok',
+      recordedAt: new Date().toISOString(),
+      plane: 'token-mint',
+      method: 'wif',
+      outcome: 'accept',
+      endpointId: 'ep-1',
+      correlationId: 'req-ok',
+      checks: [
+        { id: 'issuer_match', status: 'pass', expected: 'https://idp/v2.0', received: 'https://idp/v2.0' },
+        { id: 'audience_match', status: 'pass', expected: 'api://app', received: 'api://app' },
+      ],
+    };
+    mockUseAuthDecisions.mockReturnValue({ data: response([acceptRecord]), isLoading: false, error: null });
+    renderWithFluent(<AuthDiagnosticsPanel endpointId="ep-1" />);
+    expandRow('auth-decision-row-adr_ok');
+    const issuer = screen.getByTestId('auth-decision-check-issuer_match');
+    // Both expected AND received are shown for the passing check.
+    expect(issuer).toHaveTextContent('https://idp/v2.0');
+    // The received cell is the matched value, not the "-" placeholder.
+    expect(issuer.textContent).not.toMatch(/-\s*$/);
+  });
+
   it('shows a remediation hint + fix link for a known reason code', () => {
     mockUseAuthDecisions.mockReturnValue({ data: response([rejectRecord()]), isLoading: false, error: null });
     renderWithFluent(<AuthDiagnosticsPanel endpointId="ep-1" />);

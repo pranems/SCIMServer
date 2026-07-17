@@ -200,6 +200,34 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(JSON.stringify(scoped.body)).not.toContain('wrong-secret');
   });
 
+  it('Phase 1: the recorded oauth_client reject carries populated per-check expected/received (no secret)', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'definitely-wrong').expect(401);
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}/auth-decisions?outcome=reject&limit=50`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const rec = (res.body.records as Array<Record<string, unknown>>).find(
+      (r) => r.reasonCode === 'oauth_client_auth_failed',
+    );
+    expect(rec).toBeDefined();
+    const checks = rec!.checks as Array<{ id: string; status: string; expected?: string; received?: string }>;
+    // The oauth_client decision now has real per-step checks (not an empty array).
+    expect(checks.length).toBeGreaterThanOrEqual(5);
+    const secretCheck = checks.find((c) => c.id === 'secret_match');
+    expect(secretCheck).toBeDefined();
+    expect(secretCheck!.status).toBe('fail');
+    expect(secretCheck!.received).toBe('mismatch');
+    // Every check carries BOTH expected and received (no "-" in the UI table).
+    for (const c of checks) {
+      expect(c.expected).toBeDefined();
+      expect(c.received).toBeDefined();
+    }
+    // The secret value itself is never present.
+    expect(JSON.stringify(checks)).not.toContain('definitely-wrong');
+  });
+
   it('WI-D5: the auth-decisions endpoints require admin auth (401 without a bearer)', async () => {
     await request(app.getHttpServer()).get('/scim/admin/auth-decisions').expect(401);
     await request(app.getHttpServer())

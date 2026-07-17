@@ -233,6 +233,57 @@ describe('WifAssertionValidatorService (Q6.3)', () => {
       expect(JSON.stringify(result.trace)).not.toContain('a.b.c');
     });
   });
+
+  // Phase 1 (auth observability) - every PASS check must carry BOTH expected
+  // AND received so the diagnostics table never shows a "-" for a passing
+  // check. On a pass, received == the actual value that matched.
+  describe('Phase 1: pass checks carry expected + received', () => {
+    it('the accept trace populates received on EVERY passing claim check', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256', kid: 'k1' } });
+      const { trace } = await service.validateWithTrace('assertion.jwt.value', TRUST);
+      expect(trace.outcome).toBe('accept');
+      const byId = Object.fromEntries(trace.checks.map((c) => [c.id, c]));
+      // Each passing check shows expected AND the matched received value.
+      expect(byId['issuer_match'].expected).toBe(TRUST.expectedIssuer);
+      expect(byId['issuer_match'].received).toBe(TRUST.expectedIssuer);
+      expect(byId['subject_match'].received).toBe(TRUST.expectedSubject);
+      expect(byId['audience_match'].received).toBe(TRUST.expectedAudience);
+      expect(byId['tenant_match'].received).toBe(TRUST.allowedTenantId);
+      expect(byId['jwks_signature'].received).toBeDefined();
+      // No passing check leaves received undefined.
+      for (const c of trace.checks) {
+        if (c.status === 'pass') expect(c.received).toBeDefined();
+      }
+    });
+
+    it('validateWithTrace returns the SAME claims validate() returns, plus the full trace', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      const { claims, trace } = await service.validateWithTrace('a', TRUST);
+      expect(claims.sub).toBe(TRUST.expectedSubject);
+      expect(trace.checks.length).toBeGreaterThanOrEqual(4);
+      expect(trace.decodedClaims?.iss).toBe(TRUST.expectedIssuer);
+    });
+
+    it('debug() reuses the full validator trace on accept (not a 2-check summary)', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      const result = await service.debug('a', TRUST);
+      expect(result.outcome).toBe('accept');
+      // The real trace has the per-claim checks, each with received populated.
+      const ids = result.trace.checks.map((c) => c.id);
+      expect(ids).toContain('issuer_match');
+      expect(ids).toContain('audience_match');
+      const aud = result.trace.checks.find((c) => c.id === 'audience_match');
+      expect(aud?.received).toBe(TRUST.expectedAudience);
+    });
+
+    it('a passing required_roles check shows the matched roles as received', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      const { trace } = await service.validateWithTrace('a', TRUST);
+      const roles = trace.checks.find((c) => c.id === 'required_roles');
+      expect(roles?.status).toBe('pass');
+      expect(roles?.received).toContain('Scim.Provision');
+    });
+  });
 });
 
 

@@ -849,6 +849,20 @@ Cross-cutting parity: every backend branch (`isInMemoryBackend`) that touches cr
 
 ---
 
+## 14a. Auth observability epic (operator-approved 2026-07-17) - "populate expected/received + all flows + congruent-with-logs + merge Connect/Credentials"
+
+A follow-on epic beyond WI-D1..D8, approved after the operator observed (a) the expected/received table showing "-", (b) the auth-audit feeling dissonant from the Logs surface, and (c) the Connect + Credentials tabs being two halves of one job. Delivered in phases, each its own commit chain with the full test matrix + dev-deploy gate.
+
+| Phase | Scope | Status |
+|---|---|---|
+| **P1** | Populate `expected` + `received` on EVERY auth check (pass and fail). WIF validator sets `received` on passing checks (`validateWithTrace()` + shared `runChecks()` core); the token provider records the validator's FULL trace (not a 2-check summary); the oauth_client path emits real checks (`grant_type`, `credential_location`, `client_id_present`, `client_found`, `secret_match` [never the secret], `token_ttl`). | **DONE (v0.54.24).** Validator unit +5; oauth unit +1; E2E +2; panel vitest +1; live `9z-AZ.T9b`. API unit 4298 -> 4303. |
+| **P2** | Resource-plane tracing in the auth guard (per-endpoint bearer, OAuth-JWT bearer + endpoint-scope check, global shared secret) + an **auth-method-selection** trace ("enabled = […], presented = bearer/basic/none, selected = X because Y, others skipped because Z"). | Planned |
+| **P3** | Unify the UI: auth decisions become a first-class **"Auth"** view/filter in the Logs surface (`LogCategory.AUTH`), same table + `DetailDrawer` chrome; `correlationId ↔ requestId` bridge ("View request" / "View auth decision"); the embedded Connect chip deep-links into the Logs/Auth detail. | Planned |
+| **P4** | Config-time auth events via `LogCategory.AUTH`: credential create / reveal / rotate / revoke, WIF trust create / edit / delete, WIF verify + debug **recorded** (dry-run flag), JWKS host allowlist add / edit / remove, auth-affecting flag changes. | Planned |
+| **P5** | Merge Credentials + Connect into one **method-centric "Connect" tab** (Option 1): method is the top-level axis (collapsing the duplicated Connect-radio + Credentials sub-tabs); per method Setup → Connect → Health; WIF form/debugger/JWKS behind an "Advanced" accordion. The unified tab MUST surface the actual secret for ALL auth methods when `CredentialSecretVisibility=always`, so the operator gets the complete IdP-config bundle in one place. | Planned |
+
+---
+
 ## 15. Security + privacy considerations
 
 | Concern | Mitigation |

@@ -171,6 +171,10 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     expect(events[0][2]).toEqual(
       expect.objectContaining({ outcome: 'accept', method: 'oauth_client', endpointId: ENDPOINT_ID }),
     );
+    // Phase 1: the accept decision now carries per-step checks (grant_type,
+    // credential_location, client_id_present, client_found, secret_match,
+    // token_ttl), not an empty checks array.
+    expect((events[0][2] as { checkCount: number }).checkCount).toBeGreaterThanOrEqual(6);
   });
 
   it('WI-D4: emits exactly one AUTH decision event (reject, merged reason) on a wrong secret', async () => {
@@ -194,5 +198,29 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     expect(events[0][2]).toEqual(
       expect.objectContaining({ outcome: 'reject', method: 'oauth_client', reasonCode: 'oauth_client_auth_failed' }),
     );
+    // Phase 1: the reject decision names WHICH check failed (secret_match) so
+    // the diagnostics table + failedChecks explain the "why", not just a code.
+    expect((events[0][2] as { failedChecks: string[] }).failedChecks).toContain('secret_match');
+  });
+
+  it('Phase 1: an UNKNOWN client_id reject names client_found as the failed check', async () => {
+    logger.warn.mockClear();
+    const { controller } = makeController({
+      credentials: [{ credentialType: 'oauth_client', credentialHash: 'x', metadata: { clientId: 'epc_real' } }],
+    });
+    await expectStatus(
+      controller.getToken(ENDPOINT_ID, {
+        grant_type: 'client_credentials',
+        client_id: 'epc_does_not_exist',
+        client_secret: 'whatever',
+      }),
+      401,
+      'invalid_client',
+    );
+    const events = logger.warn.mock.calls.filter((c: unknown[]) => c[1] === 'Auth decision');
+    expect(events).toHaveLength(1);
+    const failed = (events[0][2] as { failedChecks: string[] }).failedChecks;
+    expect(failed).toContain('client_found');
+    expect(failed).toContain('secret_match');
   });
 });

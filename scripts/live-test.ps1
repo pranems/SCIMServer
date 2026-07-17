@@ -12587,6 +12587,20 @@ try {
         }
         Test-Result -Success ($null -ne $azGlobalHit) -Message "9z-AZ.T9: rejected oauth_client queryable at GLOBAL /admin/auth-decisions"
 
+        # T9b (Phase 1): the recorded oauth_client reject carries populated
+        # per-check expected/received (secret_match=fail, received=mismatch) and
+        # never the secret value.
+        $azChecks = $null
+        if ($null -ne $azGlobalHit) { $azChecks = $azGlobalHit.checks }
+        $azSecretCheck = $null
+        if ($null -ne $azChecks) { $azSecretCheck = $azChecks | Where-Object { $_.id -eq 'secret_match' } | Select-Object -First 1 }
+        $azChecksOk = ($null -ne $azSecretCheck -and $azSecretCheck.status -eq 'fail' -and $azSecretCheck.received -eq 'mismatch')
+        if ($azChecksOk) {
+            # Every check carries BOTH expected and received (no "-" placeholder in the UI).
+            foreach ($c in $azChecks) { if ($null -eq $c.expected -or $null -eq $c.received) { $azChecksOk = $false } }
+        }
+        Test-Result -Success $azChecksOk -Message "9z-AZ.T9b: oauth_client reject records populated per-check expected/received (secret_match=mismatch, no secret)"
+
         $azScoped = $null
         try { $azScoped = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$azWifId/auth-decisions?limit=100" -Method GET -Headers $headers } catch {}
         $azScopedOk = ($null -ne $azScoped -and $azScoped.count -gt 0)

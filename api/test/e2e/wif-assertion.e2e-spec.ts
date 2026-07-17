@@ -655,6 +655,17 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       const accepted = res.body.results.find((r: { outcome: string }) => r.outcome === 'accept');
       expect(accepted).toBeDefined();
       expect(accepted.trace.outcome).toBe('accept');
+      // Phase 1: the accept trace's passing claim checks carry BOTH expected
+      // AND received (the matched value), not "-" for received.
+      const checks = accepted.trace.checks as Array<{ id: string; status: string; expected?: string; received?: string }>;
+      const iss = checks.find((c) => c.id === 'issuer_match');
+      const aud = checks.find((c) => c.id === 'audience_match');
+      expect(iss?.status).toBe('pass');
+      expect(iss?.received).toBe(ISSUER);
+      expect(aud?.received).toBe(AUDIENCE);
+      for (const c of checks) {
+        if (c.status === 'pass') expect(c.received).toBeDefined();
+      }
       // No access_token is ever present in the debug response.
       expect(JSON.stringify(res.body)).not.toContain('access_token');
     });

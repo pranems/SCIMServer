@@ -23,7 +23,7 @@ import {
   type IAssertionTokenProvider,
 } from './assertion-token-provider';
 import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
-import { emitAuthDecisionEvent, type AuthDecisionTrace } from '../../../oauth/auth-decision-trace';
+import { emitAuthDecisionEvent, type AuthDecisionTrace, type AuthCheck } from '../../../oauth/auth-decision-trace';
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 
@@ -79,6 +79,15 @@ export class EndpointOAuthController {
       { clientId: body.client_id, clientSecret: body.client_secret },
       authorization,
     );
+    // Phase 1 - record WHERE the credentials came from for the auth trace:
+    // the body (client_secret_post), the Authorization: Basic header
+    // (client_secret_basic), or neither. Body wins when both are present.
+    const bodyHadSecret = typeof body.client_secret === 'string' && body.client_secret.length > 0;
+    const credentialLocation: 'client_secret_post' | 'client_secret_basic' | 'none' = bodyHadSecret
+      ? 'client_secret_post'
+      : authorization
+        ? 'client_secret_basic'
+        : 'none';
     body = { ...body, client_id: resolved.clientId, client_secret: resolved.clientSecret };
 
     if (body.grant_type !== 'client_credentials') {
@@ -113,7 +122,7 @@ export class EndpointOAuthController {
       return this.handleAssertion(endpointId, body);
     }
 
-    return this.handleClientSecret(endpointId, body);
+    return this.handleClientSecret(endpointId, body, credentialLocation);
   }
 
   /** A3 - WIF assertion route: dispatch to the assertion provider (Q6 binds it). */
@@ -170,7 +179,11 @@ export class EndpointOAuthController {
   }
 
   /** Q1 - oauth_client (client_id + client_secret) route. */
-  private async handleClientSecret(endpointId: string, body: EndpointTokenRequest) {
+  private async handleClientSecret(
+    endpointId: string,
+    body: EndpointTokenRequest,
+    credentialLocation: 'client_secret_post' | 'client_secret_basic' | 'none' = 'none',
+  ) {
     if (!body.client_id || !body.client_secret) {
       throw new HttpException(
         {
@@ -190,6 +203,45 @@ export class EndpointOAuthController {
     const secretValid =
       candidate != null && (await bcrypt.compare(body.client_secret, candidate.credentialHash));
 
+    // Phase 1 - build the per-check trace for the oauth_client decision so the
+    // diagnostics table shows real expected-vs-received (never the secret
+    // value). `credential_location` answers "how did the client present its
+    // secret" (basic vs post); `client_found` + `secret_match` answer why the
+    // decision went the way it did.
+    const oauthChecks: AuthCheck[] = [
+      {
+        id: 'grant_type',
+        status: 'pass',
+        expected: 'client_credentials',
+        received: 'client_credentials',
+      },
+      {
+        id: 'credential_location',
+        status: credentialLocation === 'none' ? 'fail' : 'pass',
+        expected: 'client_secret_basic | client_secret_post',
+        received: credentialLocation,
+      },
+      {
+        id: 'client_id_present',
+        status: body.client_id ? 'pass' : 'fail',
+        expected: 'present',
+        received: body.client_id ? 'present' : 'absent',
+      },
+      {
+        id: 'client_found',
+        status: candidate != null ? 'pass' : 'fail',
+        expected: '(a registered oauth_client for this endpoint)',
+        received: candidate != null ? 'found' : 'not found',
+      },
+      {
+        id: 'secret_match',
+        status: secretValid ? 'pass' : 'fail',
+        expected: '(the registered client secret)',
+        // Never echo the secret; only whether the bcrypt compare matched.
+        received: secretValid ? 'match' : 'mismatch',
+      },
+    ];
+
     if (!candidate || !secretValid) {
       this.logger.warn(LogCategory.OAUTH, 'Per-endpoint oauth_client authentication failed', {
         endpointId,
@@ -198,8 +250,12 @@ export class EndpointOAuthController {
       });
       // WI-D4 - one canonical AUTH decision event (reject). The distinguishing
       // fact (credentialFound) stays in the diagnostic warn above; the decision
-      // event carries only the merged (T3) reason code.
-      this.emitOauthClientDecision(endpointId, 'reject', 'oauth_client_auth_failed');
+      // event carries only the merged (T3) reason code - but the per-check trace
+      // still shows client_found vs secret_match so the operator sees the step.
+      this.emitOauthClientDecision(endpointId, 'reject', {
+        reasonCode: 'oauth_client_auth_failed',
+        checks: oauthChecks,
+      });
       throw this.invalidClient('oauth_client_auth_failed');
     }
 
@@ -213,7 +269,13 @@ export class EndpointOAuthController {
       endpointId,
       clientId: body.client_id,
     });
-    this.emitOauthClientDecision(endpointId, 'accept');
+    oauthChecks.push({
+      id: 'token_ttl',
+      status: 'pass',
+      expected: 'clamped to endpoint policy',
+      received: `${token.expiresIn}s`,
+    });
+    this.emitOauthClientDecision(endpointId, 'accept', { checks: oauthChecks });
 
     return {
       access_token: token.accessToken,
@@ -227,7 +289,7 @@ export class EndpointOAuthController {
   private emitOauthClientDecision(
     endpointId: string,
     outcome: 'accept' | 'reject',
-    reasonCode?: string,
+    opts: { reasonCode?: string; checks?: AuthCheck[] } = {},
   ): void {
     const trace: AuthDecisionTrace = {
       plane: 'token-mint',
@@ -235,9 +297,9 @@ export class EndpointOAuthController {
       outcome,
       endpointId,
       correlationId: getCorrelationContext()?.requestId,
-      checks: [],
+      checks: opts.checks ?? [],
     };
-    if (reasonCode) trace.reasonCode = reasonCode;
+    if (opts.reasonCode) trace.reasonCode = opts.reasonCode;
     emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
     this.decisionStore?.record(trace);
   }

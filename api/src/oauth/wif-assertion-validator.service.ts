@@ -82,6 +82,34 @@ export class WifAssertionValidatorService {
   ) {}
 
   async validate(assertion: string, trust: WifTrust): Promise<WifValidatedClaims> {
+    const { claims } = await this.runChecks(assertion, trust);
+    return claims;
+  }
+
+  /**
+   * Phase 1 (auth observability) - run the full validation and return BOTH the
+   * verified claims AND the complete accept `AuthDecisionTrace` (every check
+   * with expected + received populated). The token provider records THIS trace
+   * instead of synthesizing a lossy 2-check summary, so the diagnostics table
+   * shows the real per-claim expected-vs-received on the accept path too.
+   */
+  async validateWithTrace(
+    assertion: string,
+    trust: WifTrust,
+  ): Promise<{ claims: WifValidatedClaims; trace: AuthDecisionTrace }> {
+    return this.runChecks(assertion, trust);
+  }
+
+  /**
+   * The single validation core. Builds an ordered decision trace as it runs the
+   * checks, so the reject reason_code, the log, and the UI diff all derive from
+   * one object. Throws `WifAssertionInvalidError` (carrying the reject trace) on
+   * any failed check; returns the verified claims + the accept trace on success.
+   */
+  private async runChecks(
+    assertion: string,
+    trust: WifTrust,
+  ): Promise<{ claims: WifValidatedClaims; trace: AuthDecisionTrace }> {
     // WI-D3 - build an ordered decision trace as we run the checks, so the
     // reject reason_code, the log, and the UI diff all derive from one object.
     const trace = new AuthDecisionTraceBuilder('token-mint', 'wif', {
@@ -96,11 +124,16 @@ export class WifAssertionValidatorService {
       const verified = await this.jwks.verify(assertion, trust.jwksUri);
       payload = verified.payload;
       trace.setJoseHeader(verified.protectedHeader);
-      trace.pass('jwks_signature', { expected: trust.jwksUri, detail: 'signature + alg + time window verified' });
+      trace.pass('jwks_signature', {
+        expected: trust.jwksUri,
+        received: 'signature verified',
+        detail: 'signature + alg + time window verified',
+      });
     } catch (err) {
       const reasonCode = mapJwksErrorToReason(err);
       trace.fail('jwks_signature', {
         expected: trust.jwksUri,
+        received: 'verification failed',
         detail: (err as Error).message,
       });
       this.failTraced(reasonCode, (err as Error).message, trust, trace);
@@ -108,17 +141,19 @@ export class WifAssertionValidatorService {
     const claims = payload! as unknown as WifValidatedClaims;
     trace.setDecodedClaims(payload!);
 
-    // Step 2 - issuer / subject / audience / tenant must match the trust.
+    // Step 2 - issuer / subject / audience / tenant must match the trust. On a
+    // PASS, received == the matched value (not omitted) so the diagnostics
+    // table shows "expected: X · received: X" instead of "expected: X · -".
     if (claims.iss !== trust.expectedIssuer) {
       trace.fail('issuer_match', { expected: trust.expectedIssuer, received: String(claims.iss ?? '') });
       this.failTraced('wif_issuer_mismatch', 'issuer mismatch', trust, trace);
     }
-    trace.pass('issuer_match', { expected: trust.expectedIssuer });
+    trace.pass('issuer_match', { expected: trust.expectedIssuer, received: String(claims.iss ?? '') });
     if (claims.sub !== trust.expectedSubject) {
       trace.fail('subject_match', { expected: trust.expectedSubject, received: String(claims.sub ?? '') });
       this.failTraced('wif_subject_mismatch', 'subject mismatch', trust, trace);
     }
-    trace.pass('subject_match', { expected: trust.expectedSubject });
+    trace.pass('subject_match', { expected: trust.expectedSubject, received: String(claims.sub ?? '') });
     if (!this.audienceMatches(claims.aud, trust.expectedAudience)) {
       trace.fail('audience_match', {
         expected: trust.expectedAudience,
@@ -126,14 +161,17 @@ export class WifAssertionValidatorService {
       });
       this.failTraced('wif_audience_mismatch', 'audience mismatch', trust, trace);
     }
-    trace.pass('audience_match', { expected: trust.expectedAudience });
+    trace.pass('audience_match', {
+      expected: trust.expectedAudience,
+      received: Array.isArray(claims.aud) ? claims.aud.join(',') : String(claims.aud ?? ''),
+    });
     // Cross-tenant isolation: when a tenant id is configured, the assertion's
     // `tid` MUST match it exactly.
     if (claims.tid !== trust.allowedTenantId) {
       trace.fail('tenant_match', { expected: trust.allowedTenantId, received: String(claims.tid ?? '') });
       this.failTraced('wif_tenant_mismatch', 'tenant mismatch', trust, trace);
     }
-    trace.pass('tenant_match', { expected: trust.allowedTenantId });
+    trace.pass('tenant_match', { expected: trust.allowedTenantId, received: String(claims.tid ?? '') });
 
     // Step 3 - roles are ADVISORY by default. A missing required role is
     // logged but does NOT block token issuance, so a provisioning flow always
@@ -150,7 +188,11 @@ export class WifAssertionValidatorService {
           trace.fail('required_roles', { expected: required.join(','), received: present.join(',') });
           this.failTraced('wif_missing_role', `missing required role(s): ${missing.join(', ')}`, trust, trace);
         } else {
-          trace.skip('required_roles', { detail: 'advisory (roleEnforcement not enforce)' });
+          trace.skip('required_roles', {
+            expected: required.join(','),
+            received: present.join(','),
+            detail: 'advisory (roleEnforcement not enforce)',
+          });
           this.logger.warn(
             LogCategory.AUTH,
             'WIF assertion missing required role(s) - advisory, allowed (set roleEnforcement:enforce to reject)',
@@ -162,11 +204,11 @@ export class WifAssertionValidatorService {
           );
         }
       } else {
-        trace.pass('required_roles', { expected: required.join(',') });
+        trace.pass('required_roles', { expected: required.join(','), received: present.join(',') });
       }
     }
 
-    return claims;
+    return { claims, trace: trace.accept().build() };
   }
 
   /** Accept a string `aud` equal to the expected value, or an array containing it. */
@@ -190,16 +232,10 @@ export class WifAssertionValidatorService {
     trust: WifTrust,
   ): Promise<{ outcome: 'accept' | 'reject'; reasonCode?: string; trace: AuthDecisionTrace }> {
     try {
-      const claims = await this.validate(assertion, trust);
-      // Build an accept trace from the verified claims (validate() returns the
-      // claims but not the accept trace; reconstruct a compact one here).
-      const accept = new AuthDecisionTraceBuilder('token-mint', 'wif')
-        .setDecodedClaims(claims as Record<string, unknown>)
-        .pass('jwks_signature', { expected: trust.jwksUri })
-        .pass('claim_checks', { expected: trust.expectedIssuer })
-        .accept()
-        .build();
-      return { outcome: 'accept', trace: accept };
+      // Reuse the REAL validation trace (full per-claim checks, each with
+      // expected + received) instead of synthesizing a lossy 2-check summary.
+      const { trace } = await this.validateWithTrace(assertion, trust);
+      return { outcome: 'accept', trace };
     } catch (err) {
       if (err instanceof WifAssertionInvalidError && err.trace) {
         return { outcome: 'reject', reasonCode: err.reasonCode, trace: err.trace };
