@@ -25,6 +25,8 @@ describe('ActivityController', () => {
     errorStack: overrides.errorStack || null,
     createdAt: overrides.createdAt || new Date('2024-01-01T10:00:00Z'),
     identifier: overrides.identifier !== undefined ? overrides.identifier : null,
+    // P3 - RequestLog gained a nullable requestId (X-Request-Id correlation id).
+    requestId: overrides.requestId !== undefined ? overrides.requestId : null,
   });
 
   const mockActivitySummary = (log: any) => ({
