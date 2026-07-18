@@ -263,6 +263,51 @@ function Test-Result {
     }
 }
 
+# ── HTTP-error introspection helpers (PowerShell 5.1 + 7.x compatible) ──
+# Invoke-WebRequest on a 4xx throws; how the response is exposed differs by
+# PowerShell edition. PS 5.1 exposes an HttpWebResponse (GetResponseStream() +
+# .ContentType); PS 7.x throws HttpResponseException whose body is on
+# $_.ErrorDetails.Message and whose response is an HttpResponseMessage. These
+# helpers normalize both so a test can read the error status/body/content-type
+# regardless of the host PowerShell version. (PS 7.4+ also removed the
+# -UseBasicParsing switch entirely, so it must not be passed.)
+function Get-HttpErrorStatus {
+    param($ErrorRecord)
+    try {
+        $resp = $ErrorRecord.Exception.Response
+        if ($null -eq $resp) { return $null }
+        return [int]$resp.StatusCode
+    } catch { return $null }
+}
+function Get-HttpErrorBody {
+    param($ErrorRecord)
+    # PS 7.x: the response body is captured on ErrorDetails.Message.
+    if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
+        return $ErrorRecord.ErrorDetails.Message
+    }
+    # PS 5.1: read the raw response stream.
+    try {
+        $stream = $ErrorRecord.Exception.Response.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($stream)
+        $body = $reader.ReadToEnd()
+        $reader.Close()
+        return $body
+    } catch { return $null }
+}
+function Get-HttpErrorContentType {
+    param($ErrorRecord)
+    try {
+        $resp = $ErrorRecord.Exception.Response
+        if ($null -eq $resp) { return $null }
+        # PS 7.x HttpResponseMessage
+        if ($resp.PSObject.Properties.Name -contains 'Content' -and $resp.Content -and $resp.Content.Headers -and $resp.Content.Headers.ContentType) {
+            return $resp.Content.Headers.ContentType.ToString()
+        }
+        # PS 5.1 HttpWebResponse
+        return $resp.ContentType
+    } catch { return $null }
+}
+
 function Invoke-OrphanReconciliation {
     # Belt-and-suspenders leak sweep. Deletes every endpoint that exists now but
     # did NOT exist when the run started (i.e. created by this run and never
@@ -9335,8 +9380,8 @@ Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId" -Method PATCH -He
 # ─── 9z-V.1: Empty-state overview (no creds, no users) ─────────────
 $overview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
 $overviewKeys = ($overview.PSObject.Properties.Name | Sort-Object) -join ','
-Test-Result -Success ($overviewKeys -eq 'configFlags,credentials,endpoint,recentActivity,stats') `
-    -Message "9z-V.1: top-level keys are exactly {configFlags, credentials, endpoint, recentActivity, stats} (got: $overviewKeys)"
+Test-Result -Success ($overviewKeys -eq 'configFlags,connectionInfo,credentials,endpoint,recentActivity,stats') `
+    -Message "9z-V.1: top-level keys are exactly {configFlags, connectionInfo, credentials, endpoint, recentActivity, stats} (got: $overviewKeys)"
 Test-Result -Success ($overview.endpoint.id -eq $ovEpId) -Message "9z-V.2: endpoint.id matches the URL parameter"
 # preset comes from profile.preset which is NOT persisted on endpoint records (only used as
 # audit-log metadata). The BFF emits null when absent. Frontend can use the existing endpoint
@@ -12483,15 +12528,11 @@ try {
     try {
         Invoke-WebRequest -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
             grant_type = "client_credentials"; client_id = "no-such-client"; client_secret = "wrong-secret"
-        } -UseBasicParsing | Out-Null
+        } | Out-Null
     } catch {
-        $ayStatus = $_.Exception.Response.StatusCode.value__
-        try { $ayContentType = $_.Exception.Response.ContentType } catch {}
-        try {
-            $ayReader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-            $ayRaw = $ayReader.ReadToEnd()
-            $ayReader.Close()
-        } catch {}
+        $ayStatus = Get-HttpErrorStatus $_
+        $ayContentType = Get-HttpErrorContentType $_
+        $ayRaw = Get-HttpErrorBody $_
         if ($ayRaw) { try { $ayResp = $ayRaw | ConvertFrom-Json } catch {} }
     }
 
@@ -12556,13 +12597,10 @@ try {
         try {
             Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$azWifId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
                 grant_type = "client_credentials"; client_id = $azCred.clientId; client_secret = "client-secret-wrong"
-            } -UseBasicParsing | Out-Null
+            } | Out-Null
         } catch {
-            try {
-                $azReader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-                $azErrBody = $azReader.ReadToEnd() | ConvertFrom-Json
-                $azReader.Close()
-            } catch {}
+            $azRaw = Get-HttpErrorBody $_
+            if ($azRaw) { try { $azErrBody = $azRaw | ConvertFrom-Json } catch {} }
         }
         Test-Result -Success ($null -ne $azErrBody -and $azErrBody.reason_code -eq 'oauth_client_auth_failed') -Message "9z-AZ.T7: wrong oauth_client secret -> reason_code oauth_client_auth_failed on the wire"
 
@@ -12723,7 +12761,7 @@ try {
         try {
             Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$bbEpId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
                 grant_type = "client_credentials"; client_id = $bbCred.clientId; client_secret = "wrong-secret-wid8"
-            } -UseBasicParsing | Out-Null
+            } | Out-Null
         } catch {}
 
         $bbInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bbEpId/connection-info" -Method GET -Headers $headers
@@ -12765,7 +12803,7 @@ try {
         # Bad bearer on the endpoint's SCIM Users route -> 401.
         $bcProbe = "p2-live-reject-probe-$(Get-Random)"
         try {
-            Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bcEpId/Users" -Method GET -Headers @{ Authorization = "Bearer $bcProbe" } -UseBasicParsing | Out-Null
+            Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bcEpId/Users" -Method GET -Headers @{ Authorization = "Bearer $bcProbe" } | Out-Null
         } catch {}
 
         $bcDec = $null
@@ -12808,12 +12846,13 @@ try {
     $bdEpId = $bdEp.id
     try {
         # Drive a SCIM request and capture the X-Request-Id it returns.
-        $bdResp = Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bdEpId/Users" -Method GET -Headers $headers -UseBasicParsing
+        $bdResp = Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bdEpId/Users" -Method GET -Headers $headers
         $bdRid = if ($bdResp.Headers['X-Request-Id'] -is [array]) { $bdResp.Headers['X-Request-Id'][0] } else { $bdResp.Headers['X-Request-Id'] }
         Test-Result -Success ($null -ne $bdRid -and $bdRid.Length -gt 10) -Message "9z-BD.T1: SCIM request returns an X-Request-Id correlation header ($bdRid)"
 
-        # Allow the buffered logger to flush (Prisma backend writes in batches).
-        Start-Sleep -Milliseconds 3500
+        # Allow the buffered logger to flush (Prisma backend writes in batches
+        # every ~3s; give it a generous margin for dev network + flush latency).
+        Start-Sleep -Milliseconds 6000
 
         $bdList = $null
         try { $bdList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bdRid))" -Method GET -Headers $headers } catch {}
