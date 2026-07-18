@@ -127,6 +127,13 @@ export interface ConnectionPanelProps {
   retainedSecrets?: Partial<Record<ConnectionMethod, string>> | null;
   /** Initially-selected method; defaults to the first enabled method. */
   defaultMethod?: ConnectionMethod;
+  /**
+   * P5 - when true, hide the internal method-selector radio and pin the panel
+   * to `defaultMethod`. Used by the unified Connect tab, where a tab-level
+   * method axis is the single selector (so the panel must not render a second,
+   * competing method selector).
+   */
+  hideMethodSelector?: boolean;
   /** Optional `data-testid` root; children derive `<id>-*`. */
   'data-testid'?: string;
 }
@@ -169,6 +176,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   oneTimeSecret,
   retainedSecrets,
   defaultMethod,
+  hideMethodSelector = false,
   'data-testid': testId = 'connection-panel',
 }) => {
   const classes = useStyles();
@@ -180,6 +188,9 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       ? defaultMethod
       : (enabled[0]?.method ?? null);
   const [selected, setSelected] = useState<ConnectionMethod | null>(initial);
+  // P5 - when the selector is hidden the panel is pinned to `defaultMethod`
+  // (the tab-level axis is authoritative), so internal `selected` is ignored.
+  const effectiveSelected = hideMethodSelector ? initial : selected;
 
   if (enabled.length === 0) {
     return (
@@ -196,7 +207,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     );
   }
 
-  const method = enabled.find((m) => m.method === selected) ?? enabled[0];
+  const method = enabled.find((m) => m.method === effectiveSelected) ?? enabled[0];
   const payload = buildPayload(method, oneTimeSecret, retainedSecrets);
   const oneTimeForMethod =
     oneTimeSecret && oneTimeSecret.method === method.method ? oneTimeSecret.secret : null;
@@ -222,23 +233,25 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         <CopyJsonButton value={payload} data-testid={`${testId}-copy-json`} label="Copy all as JSON" />
       </div>
 
-      <div className={classes.methodRow} data-testid={`${testId}-method-selector`}>
-        <Caption1>Method:</Caption1>
-        <RadioGroup
-          layout="horizontal"
-          value={method.method}
-          onChange={(_e, d) => setSelected(d.value as ConnectionMethod)}
-        >
-          {enabled.map((m) => (
-            <Radio
-              key={m.method}
-              value={m.method}
-              label={m.label}
-              data-testid={`${testId}-method-${m.method}`}
-            />
-          ))}
-        </RadioGroup>
-      </div>
+      {!hideMethodSelector && (
+        <div className={classes.methodRow} data-testid={`${testId}-method-selector`}>
+          <Caption1>Method:</Caption1>
+          <RadioGroup
+            layout="horizontal"
+            value={method.method}
+            onChange={(_e, d) => setSelected(d.value as ConnectionMethod)}
+          >
+            {enabled.map((m) => (
+              <Radio
+                key={m.method}
+                value={m.method}
+                label={m.label}
+                data-testid={`${testId}-method-${m.method}`}
+              />
+            ))}
+          </RadioGroup>
+        </div>
+      )}
 
       <Text className={classes.authMethod} data-testid={`${testId}-auth-method`}>
         Authentication Method: {method.entraAuthenticationMethod}

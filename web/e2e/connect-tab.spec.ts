@@ -44,7 +44,7 @@ async function openFirstEndpointConnect(page: Page): Promise<void> {
   await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
 
   await page.goto(`/endpoints/${endpointId}/connect`);
-  await expect(page.getByTestId('connect-tab')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('Endpoint detail - Connect tab (WI-5)', () => {
@@ -165,7 +165,7 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
     });
 
     await page.goto(`/endpoints/${ID}/connect`);
-    await expect(page.getByTestId('connect-tab')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
     // R10: assert the RENDERED secret value + the re-viewable note, not just presence.
     await expect(page.getByTestId('connect-tab-panel-value-clientSecret')).toContainText('retained-secret-r3');
     await expect(page.getByTestId('connect-tab-panel-secret-retained-note')).toBeVisible();

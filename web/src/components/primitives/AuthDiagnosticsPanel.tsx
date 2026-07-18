@@ -123,7 +123,7 @@ const DecisionDetail: React.FC<{ record: AuthDecisionRecord; endpointId?: string
     } else if (endpointId) {
       void navigate({
         to: remediation.fix === 'credentials'
-          ? '/endpoints/$endpointId/credentials'
+          ? '/endpoints/$endpointId/connect'
           : '/endpoints/$endpointId/settings',
         params: { endpointId },
       });
@@ -164,7 +164,7 @@ const DecisionDetail: React.FC<{ record: AuthDecisionRecord; endpointId?: string
               {remediation.fix === 'jwks'
                 ? 'Fix in Settings > JWKS host allowlist'
                 : remediation.fix === 'credentials'
-                  ? 'Fix in Credentials'
+                  ? 'Fix in Connect'
                   : 'Fix in Settings'}
             </Link>
           )}

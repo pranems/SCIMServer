@@ -30,6 +30,7 @@ const mockUpdateWif = vi.fn();
 const mockVerifyWif = vi.fn();
 const mockDebugWif = vi.fn();
 const mockNavigate = vi.fn();
+let mockRetainedSecrets: Record<string, string> = {};
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router');
   return { ...actual, useNavigate: () => mockNavigate };
@@ -71,6 +72,10 @@ vi.mock('../api/queries', async () => {
     useUpdateWifCredential: () => ({ mutate: mockUpdateWif, isPending: false }),
     useVerifyWifTrust: () => ({ mutate: mockVerifyWif, isPending: false, isError: false, error: null }),
     useDebugWifAssertion: () => ({ mutate: mockDebugWif, isPending: false, isError: false, error: null }),
+    // P5 - the unified Connect tab embeds ConnectionPanel + AuthDiagnosticsPanel;
+    // stub their hooks so these tests need no live network.
+    useConnectionRetainedSecrets: () => mockRetainedSecrets,
+    useAuthDecisions: () => ({ data: { count: 0, records: [] }, isLoading: false, error: null }),
   };
 });
 const baseOverview: EndpointOverviewResponse = {
@@ -209,8 +214,8 @@ describe('CredentialsTab', () => {
     // Active vs Revoked badges
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Revoked')).toBeInTheDocument();
-    // Headline shows the count
-    expect(screen.getByText(/Credentials \(2\)/)).toBeInTheDocument();
+    // Headline shows the count (P5 - the tab is now titled "Connect")
+    expect(screen.getByText(/Connect \(2\)/)).toBeInTheDocument();
   });
 
   // ─── Create flow ───────────────────────────────────────────────────
@@ -316,12 +321,12 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credentials-oauth-copy-json')).toBeInTheDocument();
   });
 
-  it('R8: cross-links to the Connect tab of the same endpoint', () => {
+  it('R8: cross-links to Settings to enable/disable auth methods', () => {
     mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     mockNavigate.mockClear();
-    screen.getByTestId('credentials-link-connect').click();
-    expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/endpoints/$endpointId/connect' }));
+    screen.getByTestId('connect-tab-link-settings').click();
+    expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/endpoints/$endpointId/settings' }));
   });
 
   it('surfaces mutation error in the dialog (no silent failure)', () => {
@@ -1187,5 +1192,75 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(screen.getByTestId('wif-section')).toBeInTheDocument();
     // The generic credential rows are not shown under the WIF tab.
     expect(screen.queryByTestId('credential-row-br-1')).not.toBeInTheDocument();
+  });
+});
+
+// ─── P5: unified Connect tab (merged Connect + Health per method) ───────
+
+describe('CredentialsTab - unified Connect surface (P5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createMutationState = { isPending: false };
+    deleteMutationState = { isPending: false };
+    mockRetainedSecrets = {};
+  });
+
+  /** An overview with one enabled bearer method carrying entra fields. */
+  function bearerOverview(retained = false): EndpointOverviewResponse {
+    return {
+      ...baseOverview,
+      configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true },
+      connectionInfo: {
+        ...baseOverview.connectionInfo!,
+        enabledMethods: [
+          {
+            method: 'bearer',
+            label: 'Bearer token',
+            entraAuthenticationMethod: 'Secret Token',
+            entraFields: {
+              tenantUrl: 'https://x/scim/v2/endpoints/ep-1',
+              secretToken: retained ? null : null,
+            },
+            clientSecretState: 'set-shown-once',
+            credentialId: 'cred-b1',
+            secretRetained: retained,
+          },
+        ],
+        disabledMethods: [],
+      },
+      credentials: [
+        { id: 'cred-b1', credentialType: 'bearer', label: 'Bearer one', active: true, createdAt: '2026-04-01T10:00:00Z', expiresAt: null },
+      ],
+    } as EndpointOverviewResponse;
+  }
+
+  it('renders the merged Connect panel + Health (auth diagnostics) on the unified tab', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // Setup (credential management) is present...
+    expect(screen.getByTestId('credentials-list')).toBeInTheDocument();
+    // ...alongside Connect (connection bundle)...
+    expect(screen.getByTestId('connect-tab-panel')).toBeInTheDocument();
+    // ...and Health (auth diagnostics).
+    expect(screen.getByTestId('connect-tab-auth-diagnostics')).toBeInTheDocument();
+  });
+
+  it('scopes the Connect panel to the active method (single axis - no competing method selector)', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // Select the bearer method sub-tab (the single method axis).
+    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    expect(screen.getByTestId('connect-tab-panel')).toBeInTheDocument();
+    // The panel's own method-selector radio is hidden (the sub-tabs drive it).
+    expect(screen.queryByTestId('connect-tab-panel-method-selector')).not.toBeInTheDocument();
+  });
+
+  it('shows the actual secret in the Connect panel when the effective visibility is Always (retained)', () => {
+    mockRetainedSecrets = { bearer: 'super-secret-token-value' };
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(true), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    // The retained secret is rendered inline (re-viewable) rather than hidden.
+    expect(screen.getByTestId('connect-tab-panel').textContent).toContain('super-secret-token-value');
   });
 });

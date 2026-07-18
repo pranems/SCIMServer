@@ -120,9 +120,9 @@ describe('AuthDiagnosticsPanel (WI-D6)', () => {
     expandRow('auth-decision-row-adr_1');
     expect(screen.getByTestId('auth-decision-remediation-adr_1')).toHaveTextContent('wif_audience_mismatch');
     fireEvent.click(screen.getByTestId('auth-decision-fix-adr_1'));
-    // R8 cross-link routes to the endpoint's Credentials tab for a WIF reason.
+    // R8 cross-link routes to the endpoint's unified Connect tab for a WIF reason.
     expect(mockNavigate).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '/endpoints/$endpointId/credentials', params: { endpointId: 'ep-1' } }),
+      expect.objectContaining({ to: '/endpoints/$endpointId/connect', params: { endpointId: 'ep-1' } }),
     );
   });
 

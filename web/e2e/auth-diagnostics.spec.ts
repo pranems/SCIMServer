@@ -132,11 +132,11 @@ test.describe('Auth Diagnostics panel (WI-D6)', () => {
     await expect(page.getByTestId('auth-decision-json-adr_e2e_1')).toBeVisible();
   });
 
-  test('the fix link navigates to the endpoint Credentials tab', async ({ page }) => {
+  test('the fix link navigates to the endpoint Connect tab', async ({ page }) => {
     await page.goto(`/endpoints/${ID}/connect`);
     await expect(page.getByTestId('connect-tab-auth-diagnostics')).toBeVisible({ timeout: 30_000 });
     await page.getByTestId('auth-decision-row-adr_e2e_1').click();
     await page.getByTestId('auth-decision-fix-adr_e2e_1').click();
-    await expect(page).toHaveURL(new RegExp(`/endpoints/${ID}/credentials`));
+    await expect(page).toHaveURL(new RegExp(`/endpoints/${ID}/connect`));
   });
 });

@@ -70,6 +70,20 @@ describe('ConnectionPanel (WI-4)', () => {
     expect(screen.getByTestId('connection-panel-copy-json')).toBeInTheDocument();
   });
 
+  // P5 - the unified Connect tab drives the method via a tab-level axis, so it
+  // hides the panel's own selector and pins the panel to `defaultMethod`.
+  it('hideMethodSelector: hides the internal method radio and pins to defaultMethod', () => {
+    renderWithFluent(
+      <ConnectionPanel connectionInfo={info()} hideMethodSelector defaultMethod="wif" />,
+    );
+    // No competing method selector.
+    expect(screen.queryByTestId('connection-panel-method-selector')).not.toBeInTheDocument();
+    // Pinned to the WIF method (its expected audience field is shown).
+    expect(screen.getByTestId('connection-panel-value-expectedAudience')).toHaveTextContent(
+      `api://scimserver/${ID}`,
+    );
+  });
+
   it('shows the first enabled method fields by default (oauth_client)', () => {
     renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
     expect(screen.getByTestId('connection-panel-value-tenantUrl')).toBeInTheDocument();

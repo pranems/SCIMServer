@@ -1,23 +1,25 @@
 /**
- * endpoints.$endpointId.connect.tsx - per-endpoint Connect tab route (WI-5).
+ * endpoints.$endpointId.connect.tsx - per-endpoint unified "Connect" tab route.
  *
- * The ConnectTab consumes useEndpointOverview (which embeds the WI-3
- * connectionInfo) already pre-fetched by the endpoint detail route loader; we
- * re-ensure here for deep-links straight to /connect.
+ * P5 - the Connect tab now hosts the UNIFIED method-centric surface (merged
+ * Credentials + Connect): per method Setup (create/rotate/reveal/WIF-config) ->
+ * Connect (copyable bundle + export, secret when visibility Always) -> Health
+ * (recent auth decisions). It is the single auth-management surface; the old
+ * separate Credentials tab redirects here.
  */
 import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
 import { endpointOverviewQueryOptions } from '../api/queries';
 
-// Lazy-load ConnectTab into its own chunk (a new lazy route -> new size budget).
-const ConnectTab = React.lazy(() =>
-  import('../pages/ConnectTab').then((m) => ({ default: m.ConnectTab })),
+// Lazy-load the unified tab (CredentialsTab is the merged Connect surface).
+const CredentialsTab = React.lazy(() =>
+  import('../pages/CredentialsTab').then((m) => ({ default: m.CredentialsTab })),
 );
 
 function ConnectTabRouteComponent(): React.JSX.Element {
   const { endpointId } = endpointDetailRoute.useParams();
-  return <ConnectTab endpointId={endpointId} />;
+  return <CredentialsTab endpointId={endpointId} />;
 }
 
 export const connectTabRoute = createRoute({

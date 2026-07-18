@@ -111,7 +111,7 @@ test.describe('EndpointDetailPage - tab matrix', () => {
     { key: 'bulk', label: /^Bulk$/i, panelTestId: 'bulk-page' },
     { key: 'resource-types', label: /Resource Types/i, panelTestId: 'resource-types-tab' },
     { key: 'schemas', label: /^Schemas$/i, panelTestId: 'tab-schemas' },
-    { key: 'credentials', label: /^Credentials$/i, panelTestId: 'tab-credentials' },
+    { key: 'connect', label: /^Connect$/i, panelTestId: 'tab-credentials' },
     { key: 'settings', label: /^Settings$/i, panelTestId: 'settings-tab' },
   ];
 

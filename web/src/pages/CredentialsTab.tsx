@@ -67,8 +67,10 @@ import {
   type WifVerifyResult,
   useDebugWifAssertion,
   type WifDebugAssertionResponse,
+  useConnectionRetainedSecrets,
 } from '../api/queries';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
+import type { ConnectionInfo, ConnectionMethod } from '@scim/types/connection-info.types';
 import {
   EmptyState,
   FormDialog,
@@ -77,7 +79,54 @@ import {
   CopyableField,
   CopyJsonButton,
   CopyableJsonBlock,
+  ConnectionPanel,
+  AuthDiagnosticsPanel,
 } from '../components/primitives';
+
+/**
+ * P5 - the "Connect" half of the unified tab. For a specific method it renders
+ * the connection-details bundle (copyable values + export) scoped to that ONE
+ * method (the tab-level method sub-tabs are the single method axis, so the
+ * panel's own selector is hidden). For the "All" overview it renders the full
+ * panel with its selector. Retained secrets are fetched here (after the parent
+ * guards) so the secret is ALWAYS shown when the effective visibility is
+ * `always`, for every method. This is the operator's complete IdP-config bundle
+ * in one place.
+ */
+const UnifiedConnectSection: React.FC<{
+  endpointId: string;
+  connectionInfo: ConnectionInfo;
+  /** The active method sub-tab ('all' shows the full panel with selector). */
+  activeMethod: 'all' | ConnectionMethod;
+}> = ({ endpointId, connectionInfo, activeMethod }) => {
+  const retainedSecrets = useConnectionRetainedSecrets(endpointId, connectionInfo.enabledMethods);
+
+  if (activeMethod === 'all') {
+    return (
+      <ConnectionPanel
+        connectionInfo={connectionInfo}
+        retainedSecrets={retainedSecrets}
+        data-testid="connect-tab-panel"
+      />
+    );
+  }
+
+  // Scope the panel to the single active method (no competing selector).
+  const scoped: ConnectionInfo = {
+    ...connectionInfo,
+    enabledMethods: connectionInfo.enabledMethods.filter((m) => m.method === activeMethod),
+  };
+  if (scoped.enabledMethods.length === 0) return null;
+  return (
+    <ConnectionPanel
+      connectionInfo={scoped}
+      retainedSecrets={retainedSecrets}
+      defaultMethod={activeMethod}
+      hideMethodSelector
+      data-testid="connect-tab-panel"
+    />
+  );
+};
 
 const useStyles = makeStyles({
   root: {
@@ -1345,7 +1394,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   return (
     <div className={classes.root} data-testid="tab-credentials">
       <div className={classes.header}>
-        <Subtitle1>Credentials ({credentials.length})</Subtitle1>
+        <Subtitle1>Connect ({credentials.length})</Subtitle1>
         {showGenericList && (
           <Button
             appearance="primary"
@@ -1360,17 +1409,19 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
       </div>
 
       <Caption1>
-        After creating a credential,{' '}
+        Set up, connect, and monitor authentication for this endpoint. Pick a method below to
+        create/rotate its credential (Setup), copy the exact values to paste into your identity
+        provider (Connect), and see its recent auth outcomes (Health). Secrets are shown here when
+        the credential secret visibility is set to Always.{' '}
         <Link
-          data-testid="credentials-link-connect"
-          onClick={() => void navigate({ to: '/endpoints/$endpointId/connect', params: { endpointId } })}
+          data-testid="connect-tab-link-settings"
+          onClick={() => void navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } })}
         >
-          view the connection details on the Connect tab
-        </Link>{' '}
-        to see exactly what to paste into your identity provider.
+          Enable / disable auth methods (Settings)
+        </Link>
       </Caption1>
 
-      {/* R6 - per-method sub-tabs (only enabled methods) */}
+      {/* R6 - per-method sub-tabs (only enabled methods) - the single method axis */}
       <TabList
         selectedValue={activeTab}
         onTabSelect={(_, d) => setMethodTab(d.value as MethodTab)}
@@ -1494,6 +1545,22 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           deleteMutation={deleteMutation}
         />
       )}
+
+      {/* P5 - Connect: the copyable connection bundle for the active method
+          (the "what to paste into your IdP" values + secret when visibility is
+          Always + export). Scoped to the active method so the tab-level method
+          axis is the single selector. */}
+      {data?.connectionInfo && (
+        <UnifiedConnectSection
+          endpointId={endpointId}
+          connectionInfo={data.connectionInfo}
+          activeMethod={activeTab === 'all' ? 'all' : (activeTab as ConnectionMethod)}
+        />
+      )}
+
+      {/* P5 - Health: the recent auth decisions for this endpoint, with the
+          expected-vs-received diff + the P3 request-log deep-link. */}
+      <AuthDiagnosticsPanel endpointId={endpointId} data-testid="connect-tab-auth-diagnostics" />
 
       {/* Create dialog */}
       <FormDialog
