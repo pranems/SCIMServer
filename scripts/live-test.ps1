@@ -12852,13 +12852,19 @@ try {
 
         # Allow the buffered logger to flush (Prisma backend writes in batches
         # every ~3s; give it a generous margin for dev network + flush latency).
-        Start-Sleep -Milliseconds 6000
-
+        # Poll for the matching request log rather than a single fixed wait:
+        # the Prisma logger writes in ~3s batches, and under the full live-test
+        # load the flush for this specific row can lag several seconds. Retry
+        # the requestId query up to ~24s so the assertion is load-robust.
         $bdList = $null
-        try { $bdList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bdRid))" -Method GET -Headers $headers } catch {}
         $bdMatch = $null
-        if ($null -ne $bdList -and $null -ne $bdList.items) {
-            $bdMatch = $bdList.items | Where-Object { $_.requestId -eq $bdRid } | Select-Object -First 1
+        for ($bdTry = 0; $bdTry -lt 12; $bdTry++) {
+            Start-Sleep -Milliseconds 2000
+            try { $bdList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bdRid))" -Method GET -Headers $headers } catch { $bdList = $null }
+            if ($null -ne $bdList -and $null -ne $bdList.items) {
+                $bdMatch = $bdList.items | Where-Object { $_.requestId -eq $bdRid } | Select-Object -First 1
+                if ($null -ne $bdMatch) { break }
+            }
         }
         Test-Result -Success ($null -ne $bdMatch) -Message "9z-BD.T2: GET /admin/logs?requestId=<id> returns the matching request log"
 
