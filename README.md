@@ -1250,6 +1250,7 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 | `LOG_INCLUDE_PAYLOADS` | `false` (prod) / `true` (dev) | Include request/response bodies in logs |
 | `LOG_INCLUDE_STACKS` | `true` | Include stack traces in error logs |
 | `LOG_MAX_PAYLOAD_SIZE` | `8192` | Max payload size in log entries (bytes) |
+| `PERSIST_REQUEST_SECRETS` | `true` | Server-level default for whether the RequestLog stores + displays the COMPLETE request/response (headers + body, secrets included) for fast RCA. Set `false` to redact secret-bearing values (Authorization, client_secret, access_token, ...) before persist/display. Per-endpoint override: the `PersistRequestSecrets` config flag (endpoint overrides server). Console/file structured logs always redact regardless. |
 | `LOG_SLOW_REQUEST_MS` | `2000` | Slow request threshold (ms) |
 | `LOG_CATEGORY_LEVELS` | (none) | Per-category level overrides |
 | `LOG_RETENTION_DAYS` | `30` | Auto-prune retention period |

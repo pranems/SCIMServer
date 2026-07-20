@@ -190,6 +190,17 @@ export class EndpointService implements OnModuleInit {
   }
 
   /**
+   * Synchronous, cache-only read of an endpoint's `profile.settings` (the config
+   * flags). Returns `undefined` on a cache miss WITHOUT hitting the database, so
+   * hot paths (e.g. the request-log privacy decision in LoggingService) can read
+   * a config flag without an async round trip. Callers MUST tolerate `undefined`
+   * (fall back to the server-level default).
+   */
+  getCachedProfileSettings(endpointId: string): Record<string, unknown> | undefined {
+    return this.cacheById.get(endpointId)?.profile?.settings;
+  }
+
+  /**
    * On module init: warm the endpoint cache from the database and restore
    * per-endpoint log levels. For InMemory backend, cache starts empty.
    */

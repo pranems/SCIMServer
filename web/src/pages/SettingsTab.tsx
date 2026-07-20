@@ -77,6 +77,7 @@ type FlagCategory =
   | 'Lifecycle & deletes'
   | 'PATCH semantics'
   | 'Discovery'
+  | 'Logging & privacy'
   | 'Authentication methods';
 
 const CATEGORY_ORDER: readonly FlagCategory[] = [
@@ -86,6 +87,7 @@ const CATEGORY_ORDER: readonly FlagCategory[] = [
   'Lifecycle & deletes',
   'Concurrency & ETags',
   'Discovery',
+  'Logging & privacy',
 ];
 
 const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
@@ -226,6 +228,15 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     description: 'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',
     defaultValue: false,
     category: 'Authentication methods',
+  },
+  // ── Logging & privacy ─────────────────────────────────────────────
+  {
+    key: 'PersistRequestSecrets',
+    label: 'PersistRequestSecrets',
+    description:
+      'When ON (default, inherits the server PERSIST_REQUEST_SECRETS env when unset), the request log stores + displays the COMPLETE request/response for this endpoint - headers and body, secrets included - for fast RCA. Turn OFF to redact secret-bearing values (Authorization, client_secret, access_token, ...) before they are persisted or shown. Console/file logs always redact regardless.',
+    defaultValue: true,
+    category: 'Logging & privacy',
   },
 ];
 

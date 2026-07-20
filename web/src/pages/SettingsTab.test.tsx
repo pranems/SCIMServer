@@ -351,6 +351,33 @@ describe('SettingsTab', () => {
     expect(authCard.querySelector('[aria-label="WifCredentialsEnabled"]')).not.toBeNull();
   });
 
+  it('renders the PersistRequestSecrets switch under Logging & privacy (defaults ON)', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const card = screen.getByTestId('settings-category-logging-privacy');
+    expect(card).toBeInTheDocument();
+    const sw = screen.getByRole('switch', { name: /PersistRequestSecrets/i });
+    expect(sw).toBeInTheDocument();
+    // Default (unset) shows ON - the request log keeps the full request for RCA.
+    expect(sw).toBeChecked();
+  });
+
+  it('toggling PersistRequestSecrets OFF fires the config update with false', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ PersistRequestSecrets: true }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    await user.click(screen.getByRole('switch', { name: /PersistRequestSecrets/i }));
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({ profile: { settings: { PersistRequestSecrets: false } } });
+    });
+  });
+
   it('logLevel renders as an enum Dropdown with the log levels', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({ logLevel: 'WARN' }),

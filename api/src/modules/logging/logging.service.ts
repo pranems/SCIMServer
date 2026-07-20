@@ -1,10 +1,14 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from './scim-logger.service';
 import { LogCategory } from './log-levels';
+import { redactSensitiveDeep } from '../../security/redact-sensitive';
+import { EndpointService } from '../endpoint/services/endpoint.service';
+import { getEffectivePersistRequestSecrets } from '../endpoint/endpoint-config.interface';
 
 export interface CreateRequestLogOptions {
   method: string;
@@ -63,7 +67,40 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: ScimLogger,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  /**
+   * The server-level default for PersistRequestSecrets (env, default true). When
+   * true the RequestLog keeps the complete request/response (secrets included);
+   * an endpoint may override it per-endpoint via the `PersistRequestSecrets`
+   * config flag.
+   */
+  private readonly persistRequestSecretsServerDefault =
+    (process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false';
+
+  /** Lazily-resolved EndpointService (cycle-safe via ModuleRef; cached). */
+  private endpointServiceRef?: EndpointService | null;
+
+  /**
+   * Resolve the EFFECTIVE PersistRequestSecrets for a request: the endpoint's
+   * explicit config flag OVERRIDES the server-level default; an endpoint that
+   * leaves it unset (or a global/unknown route) inherits the server default.
+   * Cache-only endpoint read (no async/DB) so this stays cheap on the log path;
+   * a cache miss falls back to the server default.
+   */
+  private resolvePersistSecrets(endpointId?: string): boolean {
+    if (!endpointId) return this.persistRequestSecretsServerDefault;
+    if (this.endpointServiceRef === undefined) {
+      try {
+        this.endpointServiceRef = this.moduleRef.get(EndpointService, { strict: false });
+      } catch {
+        this.endpointServiceRef = null;
+      }
+    }
+    const settings = this.endpointServiceRef?.getCachedProfileSettings(endpointId);
+    return getEffectivePersistRequestSecrets(settings, this.persistRequestSecretsServerDefault);
+  }
 
   // ── Auto-prune lifecycle ──
 
@@ -158,6 +195,19 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       return;
     }
 
+    // F1 - request-log privacy. By DEFAULT the RequestLog keeps the complete
+    // request/response (headers + body, secrets included) for fast RCA. When the
+    // effective PersistRequestSecrets flag is OFF (server env or per-endpoint
+    // override), secret-bearing header/body values are redacted BEFORE the row is
+    // persisted, so they never reach the DB or the API/UI. Identifier derivation
+    // still runs on the raw payload (userName/displayName/externalId are not
+    // secrets). Console/file structured logs are always redacted separately.
+    const persistSecrets = this.resolvePersistSecrets(endpointId);
+    const storedRequestHeaders = persistSecrets ? requestHeaders : redactSensitiveDeep(requestHeaders);
+    const storedRequestBody = persistSecrets ? requestBody : redactSensitiveDeep(requestBody);
+    const storedResponseHeaders = persistSecrets ? responseHeaders : redactSensitiveDeep(responseHeaders);
+    const storedResponseBody = persistSecrets ? responseBody : redactSensitiveDeep(responseBody);
+
     if (this.isInMemoryBackend) {
       const errorMessage = this.extractErrorMessage(error);
       const errorStack = this.extractErrorStack(error);
@@ -181,10 +231,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         status: status ?? null,
         durationMs: durationMs ?? null,
         createdAt: new Date(),
-        requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
-        requestBody: this.stringifyValue(requestBody),
-        responseHeaders: this.stringifyValue(responseHeaders),
-        responseBody: this.stringifyValue(responseBody),
+        requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
+        requestBody: this.stringifyValue(storedRequestBody),
+        responseHeaders: this.stringifyValue(storedResponseHeaders),
+        responseBody: this.stringifyValue(storedResponseBody),
         errorMessage,
         errorStack,
         identifier: identifier ?? null,
@@ -213,10 +263,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       url,
       status: status ?? null,
       durationMs: durationMs ?? null,
-      requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
-      requestBody: this.stringifyValue(requestBody),
-      responseHeaders: this.stringifyValue(responseHeaders),
-      responseBody: this.stringifyValue(responseBody),
+      requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
+      requestBody: this.stringifyValue(storedRequestBody),
+      responseHeaders: this.stringifyValue(storedResponseHeaders),
+      responseBody: this.stringifyValue(storedResponseBody),
       errorMessage,
       errorStack,
       _identifier: identifier,

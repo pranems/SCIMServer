@@ -214,6 +214,12 @@ describe('WI-D8 - auth reason_code catalog + parsing', () => {
     'mutually_exclusive_credentials',
     'unsupported_assertion_type',
     'bearer_missing',
+    // F3/F4 - resource-plane bearer sub-reasons
+    'bearer_token_scoped_other_endpoint',
+    'bearer_shared_secret_refused',
+    'bearer_oauth_expired',
+    'bearer_oauth_signature_invalid',
+    'bearer_invalid',
   ] as const;
 
   it('every auth reason code has a catalog entry with a title + explanation', () => {

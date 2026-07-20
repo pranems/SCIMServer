@@ -112,6 +112,72 @@ describe('SharedSecretGuard', () => {
     expect(guard).toBeDefined();
   });
 
+  // F3 + F4 - resource-plane bearer sub-reason + reason_code on the wire.
+  describe('F3/F4 - bearer reason codes', () => {
+    const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    let record: jest.Mock;
+    let g: SharedSecretGuard;
+
+    beforeEach(() => {
+      record = jest.fn();
+      g = new SharedSecretGuard(
+        mockConfigService,
+        mockOAuthService,
+        mockReflector,
+        mockLogger,
+        mockCredentialRepo,
+        mockEndpointService,
+        { record } as unknown as AuthDecisionRecordStore,
+      );
+    });
+
+    async function expectReject(context: any): Promise<any> {
+      try {
+        await g.canActivate(context);
+        throw new Error('expected reject');
+      } catch (err) {
+        return (err as UnauthorizedException).getResponse();
+      }
+    }
+
+    it('F3: an EXPIRED OAuth JWT surfaces bearer_oauth_expired (not bearer_invalid)', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(Object.assign(new Error('jwt expired'), { code: 'ERR_JWT_EXPIRED' }));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer not-the-shared-secret.jwt.value');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_oauth_expired');
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'reject', reasonCode: 'bearer_oauth_expired' }));
+    });
+
+    it('F3: a bad-signature OAuth JWT surfaces bearer_oauth_signature_invalid', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(Object.assign(new Error('bad sig'), { code: 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' }));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer not-the-shared-secret.jwt.value');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_oauth_signature_invalid');
+    });
+
+    it('F3: a non-JWT junk token still collapses to bearer_invalid', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(new Error('Invalid Compact JWS'));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer randomjunk');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_invalid');
+    });
+
+    it('F4: a missing bearer carries reason_code bearer_missing in diagnostics', async () => {
+      const { context } = createEndpointMockContext(endpointId, undefined);
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_missing');
+      expect(body.scimType).toBe('invalidToken');
+    });
+
+    it('F4: a token scoped to another endpoint carries bearer_token_scoped_other_endpoint', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({ endpoint_id: 'other-endpoint', client_id: 'c' });
+      const { context } = createEndpointMockContext(endpointId, 'Bearer scoped.elsewhere');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_token_scoped_other_endpoint');
+    });
+  });
+
   describe('WI-11 - SharedSecretBearerAuthEnabled gate on the global secret', () => {
     const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 

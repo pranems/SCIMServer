@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 
-import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
+import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../scim/common/scim-constants';
 import * as crypto from 'node:crypto';
 import { safeCompare } from '../../security/safe-compare';
 import { OAuthService } from '../../oauth/oauth.service';
@@ -45,6 +45,24 @@ interface AuthenticatedRequest extends Request {
   oauth?: Record<string, unknown>;
   authType?: 'oauth' | 'legacy' | 'endpoint_credential';
   authCredentialId?: string;
+}
+
+/**
+ * F3 - classify a swallowed OAuth-JWT validation error into the specific
+ * resource-plane bearer sub-reason, so a rejected bearer token surfaces
+ * `bearer_oauth_expired` / `bearer_oauth_signature_invalid` instead of the
+ * generic `bearer_invalid`. Returns undefined for anything that is not clearly
+ * an expiry or signature failure (e.g. a random non-JWT string), so those still
+ * fall through to the generic reason.
+ */
+export function mapBearerJwtErrorToReason(err: unknown): string | undefined {
+  const code = typeof (err as { code?: unknown })?.code === 'string' ? (err as { code: string }).code : '';
+  if (code === 'ERR_JWT_EXPIRED') return 'bearer_oauth_expired';
+  if (code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED') return 'bearer_oauth_signature_invalid';
+  if (code === 'ERR_JWKS_NO_MATCHING_KEY') return 'bearer_oauth_signature_invalid';
+  // No reliable category (e.g. a malformed / non-JWT token) - keep the generic
+  // bearer_invalid rather than guessing from a flattened error message.
+  return undefined;
 }
 
 @Injectable()
@@ -110,6 +128,10 @@ export class SharedSecretGuard implements CanActivate {
     // changes the auth outcome and never throws.
     const endpointId = this.extractEndpointId(request);
     const checks: AuthCheck[] = [];
+    // F3 - the specific OAuth-JWT failure sub-reason, captured when validation
+    // throws so a final reject can surface bearer_oauth_expired /
+    // bearer_oauth_signature_invalid instead of the generic bearer_invalid.
+    let oauthJwtReason: string | undefined;
     const recordDecision = (
       outcome: 'accept' | 'reject',
       method: AuthMethodKind,
@@ -147,7 +169,7 @@ export class SharedSecretGuard implements CanActivate {
       });
       recordDecision('reject', 'bearer_jwt', 'bearer_missing');
       this.logger.warn(LogCategory.AUTH, 'Missing or malformed Authorization header');
-      this.reject(response, 'Missing bearer token.');
+      this.reject(response, 'Missing bearer token.', undefined, 'bearer_missing');
     }
 
     const token = header?.slice(7) ?? '';
@@ -182,8 +204,15 @@ export class SharedSecretGuard implements CanActivate {
       let payload: Record<string, unknown> | undefined;
       try {
         payload = await this.oauthService.validateAccessToken(token);
-      } catch (_oauthError) {
-        this.logger.debug(LogCategory.AUTH, 'OAuth 2.0 validation failed, falling back to legacy token');
+      } catch (oauthError) {
+        // F3 - keep the specific sub-reason (expired vs signature) instead of
+        // discarding it, so a subsequent reject can surface it. Still falls
+        // through to the legacy-secret acceptor (a token that IS the shared
+        // secret is not a JWT and would not set a sub-reason).
+        oauthJwtReason = mapBearerJwtErrorToReason(oauthError);
+        this.logger.debug(LogCategory.AUTH, 'OAuth 2.0 validation failed, falling back to legacy token', {
+          reasonCode: oauthJwtReason,
+        });
         payload = undefined; // fall through to legacy token check
       }
 
@@ -216,6 +245,7 @@ export class SharedSecretGuard implements CanActivate {
               response,
               'OAuth token is scoped to a different endpoint.',
               'invalid_token',
+              'bearer_token_scoped_other_endpoint',
             );
           }
         }
@@ -277,7 +307,7 @@ export class SharedSecretGuard implements CanActivate {
             'Global shared secret refused: SharedSecretBearerAuthEnabled is off for this endpoint',
             { endpointId },
           );
-          this.reject(response, 'This endpoint does not accept the global shared secret.', 'invalid_token');
+          this.reject(response, 'This endpoint does not accept the global shared secret.', 'invalid_token', 'bearer_shared_secret_refused');
         }
       }
       checks.push({
@@ -300,9 +330,20 @@ export class SharedSecretGuard implements CanActivate {
     });
 
     // Both per-endpoint, OAuth, and legacy validation failed
-    recordDecision('reject', 'bearer_jwt', 'bearer_invalid');
-    this.logger.warn(LogCategory.AUTH, 'Authentication failed – per-endpoint, OAuth, and legacy token all invalid');
-    this.reject(response, 'Invalid bearer token.', 'invalid_token');
+    // F3 - prefer the specific OAuth-JWT sub-reason (expired / signature) over
+    // the generic bearer_invalid when we captured one during validation.
+    const finalReason = oauthJwtReason ?? 'bearer_invalid';
+    const finalDetail =
+      finalReason === 'bearer_oauth_expired'
+        ? 'The bearer token is expired.'
+        : finalReason === 'bearer_oauth_signature_invalid'
+          ? 'The bearer token signature did not verify.'
+          : 'Invalid bearer token.';
+    recordDecision('reject', 'bearer_jwt', finalReason);
+    this.logger.warn(LogCategory.AUTH, 'Authentication failed – per-endpoint, OAuth, and legacy token all invalid', {
+      reasonCode: finalReason,
+    });
+    this.reject(response, finalDetail, 'invalid_token', finalReason);
   }
 
   // ── Per-endpoint credential helpers ────────────────────────────────
@@ -421,6 +462,7 @@ export class SharedSecretGuard implements CanActivate {
     response: Response,
     detail: string,
     errorCode?: 'invalid_token' | 'invalid_request' | 'insufficient_scope',
+    reasonCode?: string,
   ): never {
     // RFC 6750 section 3: a 401 carries a WWW-Authenticate challenge. When a
     // token was presented but rejected, include error + error_description so
@@ -432,11 +474,19 @@ export class SharedSecretGuard implements CanActivate {
       header += `, error="${errorCode}", error_description="${safeDescription}"`;
     }
     response.setHeader('WWW-Authenticate', header);
-    throw new UnauthorizedException({
+    const body: Record<string, unknown> = {
       schemas: [SCIM_ERROR_SCHEMA],
       detail,
       status: 401,
-      scimType: 'invalidToken'
-    });
+      scimType: 'invalidToken',
+    };
+    // F4 - carry the catalog reason_code in the SCIM Diagnostics extension URN
+    // (a documented member, so the SCIM error contract stays intact) so API
+    // clients + the UI can key on the SPECIFIC resource-plane reason, not just a
+    // generic 401. requestId/endpointId/logsUrl are merged in by ScimExceptionFilter.
+    if (reasonCode) {
+      body[SCIM_DIAGNOSTICS_URN] = { reason_code: reasonCode };
+    }
+    throw new UnauthorizedException(body);
   }
 }

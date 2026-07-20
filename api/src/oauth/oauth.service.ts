@@ -217,7 +217,19 @@ export class OAuthService {
       this.logger.debug(LogCategory.OAUTH, 'Token validation failed', {
         reason: error instanceof Error ? error.message : String(error),
       });
-      throw new UnauthorizedException('Invalid or expired token');
+      // F3 - preserve the specific failure category so the resource guard can
+      // surface bearer_oauth_expired vs bearer_oauth_signature_invalid instead
+      // of the generic bearer_invalid. jsonwebtoken throws TokenExpiredError /
+      // NotBeforeError / JsonWebTokenError('invalid signature'); map those to a
+      // jose-style `code` on the thrown exception (the wire message stays generic).
+      const name = error instanceof Error ? error.name : '';
+      const message = error instanceof Error ? error.message : '';
+      let code: string | undefined;
+      if (name === 'TokenExpiredError' || name === 'NotBeforeError') code = 'ERR_JWT_EXPIRED';
+      else if (name === 'JsonWebTokenError' && /signature/i.test(message)) code = 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED';
+      const unauthorized = new UnauthorizedException('Invalid or expired token');
+      if (code) (unauthorized as unknown as { code: string }).code = code;
+      throw unauthorized;
     }
   }
 

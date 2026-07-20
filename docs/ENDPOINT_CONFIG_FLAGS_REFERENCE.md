@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Version:** 0.54.29 - **Updated:** July 20, 2026  
+> **Version:** 0.54.30 - **Updated:** July 20, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 26 flags: 18 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`) + 1 boolean (`EnforceResourceTypes`) + 4 numeric runtime-egress overrides.  
+> 27 flags: 19 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`) + 4 numeric runtime-egress overrides + 1 request-log privacy boolean (`PersistRequestSecrets`).  
 > 5 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
 
 ---
@@ -141,6 +141,7 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 24 | [`JwksFetchRetries`](#runtime-egress-wif-jwks-fetch) | number | (server: 2) | Runtime egress |
 | 25 | [`JwksFetchRetryBackoffMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 200) | Runtime egress |
 | 26 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 600000) | Runtime egress |
+| 27 | [`PersistRequestSecrets`](#persistrequestsecrets) | boolean | (server: `true`) | Logging & privacy |
 
 ### CredentialSecretVisibility
 
@@ -260,6 +261,38 @@ server default:
 **Scope note:** these tune the **runtime** token-mint JWKS fetch only. The
 config-time discovery/verify paths (admin "Verify WIF trust" / discovery
 resolver) are unaffected by these flags.
+
+---
+
+### PersistRequestSecrets
+
+Governs **request-log privacy** for this endpoint. When `true` (the **default**,
+inherited from the server-level `PERSIST_REQUEST_SECRETS` env when unset here),
+the RequestLog stores AND displays (in the admin API + UI) the **complete**
+request/response for this endpoint - headers and body, secrets included - for
+fast, complete RCA. When `false`, secret-bearing header and body values
+(`Authorization`, `Cookie`, `client_secret`, `client_assertion`, `password`,
+`access_token`, ...) are redacted to `[REDACTED]` **before the row is persisted**
+(and therefore before it is shown anywhere).
+
+Precedence: the endpoint value **overrides** the server default
+(`endpoint ?? server-env ?? true`). The server default is the env var
+`PERSIST_REQUEST_SECRETS` (default `true`; set to `false` to redact by default
+across all endpoints).
+
+Independent of this flag, the shipped **console/file structured logs always
+redact** secrets (defense in depth for log aggregation) - the RequestLog is the
+deliberate full-fidelity RCA surface this flag governs.
+
+```json
+{
+  "profile": {
+    "settings": {
+      "PersistRequestSecrets": false
+    }
+  }
+}
+```
 
 ---
 

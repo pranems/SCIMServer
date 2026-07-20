@@ -215,6 +215,28 @@ export const SCIM_ERROR_CATALOG: Record<string, ScimErrorCatalogEntry> = {
     title: 'No bearer token presented',
     explanation: 'Send an Authorization: Bearer <token> header.',
   },
+  bearer_token_scoped_other_endpoint: {
+    title: 'Token scoped to a different endpoint',
+    explanation:
+      'This bearer token was minted for another endpoint (its endpoint_id claim does not match this URL). Use a token minted for THIS endpoint from its Connect tab.',
+  },
+  bearer_shared_secret_refused: {
+    title: 'Global shared secret refused here',
+    explanation:
+      'This endpoint does not accept the global SCIM shared secret (SharedSecretBearerAuthEnabled is off). Use a per-endpoint bearer or OAuth token, or re-enable the flag in Settings.',
+  },
+  bearer_oauth_expired: {
+    title: 'Bearer token expired',
+    explanation: 'The bearer token is expired. Mint a fresh token at the token endpoint and retry.',
+  },
+  bearer_oauth_signature_invalid: {
+    title: 'Bearer token signature did not verify',
+    explanation: 'The bearer token signature did not verify (the signing key may have rotated). Mint a fresh token and retry.',
+  },
+  bearer_invalid: {
+    title: 'Invalid bearer token',
+    explanation: 'The bearer token is not valid. Mint a fresh token at the token endpoint and retry.',
+  },
 
   // ─── Numeric-status fallbacks (no scimType present) ──────────────
   '__http_401__': {

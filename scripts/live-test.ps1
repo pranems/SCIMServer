@@ -13027,6 +13027,73 @@ Write-Host "`n--- 9z-BF: Runtime Egress Config Flags Complete ---" -ForegroundCo
 
 
 # ============================================
+$script:currentSection = "9z-BG: auth reason codes + request-log privacy"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BG: auth reason codes (F2/F4) + request-log privacy (F1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # F2 - the GLOBAL client-credentials token endpoint carries a stable
+    # reason_code on every RFC-6749 error body (parity with per-endpoint).
+    $bgGrant = $false; $bgGrantCode = $null
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType 'application/json' -Body (@{ grant_type = 'authorization_code'; client_id = 'x'; client_secret = 'y' } | ConvertTo-Json) | Out-Null
+    } catch {
+        if ($_.Exception.Response.StatusCode.value__ -eq 400) {
+            $bgGrant = $true
+            try { $bgGrantCode = ($_.ErrorDetails.Message | ConvertFrom-Json).reason_code } catch {}
+        }
+    }
+    Test-Result -Success ($bgGrant -and $bgGrantCode -eq 'grant_type_unsupported') -Message "9z-BG.T1: global /oauth/token bad grant_type -> 400 + reason_code grant_type_unsupported"
+
+    $bgBadClient = $false; $bgBadCode = $null
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType 'application/json' -Body (@{ grant_type = 'client_credentials'; client_id = 'nope'; client_secret = 'wrong' } | ConvertTo-Json) | Out-Null
+    } catch {
+        if ($_.Exception.Response.StatusCode.value__ -eq 401) {
+            $bgBadClient = $true
+            try { $bgBadCode = ($_.ErrorDetails.Message | ConvertFrom-Json).reason_code } catch {}
+        }
+    }
+    Test-Result -Success ($bgBadClient -and $bgBadCode -eq 'oauth_client_auth_failed') -Message "9z-BG.T2: global /oauth/token bad credentials -> 401 + reason_code oauth_client_auth_failed"
+
+    # F4 - the RESOURCE plane carries reason_code inside the SCIM Diagnostics
+    # extension URN. Create an endpoint, then hit a protected route with a bogus
+    # bearer and read the reason_code from the diagnostics block.
+    $bgEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = "live-test-reason-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json)
+    $bgEpId = $bgEp.id
+    try {
+        $bgBase = "$baseUrl/scim/endpoints/$bgEpId/v2"
+        $bgReason = $null
+        try {
+            Invoke-RestMethod -Uri "$bgBase/Users" -Method GET -Headers @{ Authorization = 'Bearer totally-bogus-token' } | Out-Null
+        } catch {
+            try { $bgReason = ($_.ErrorDetails.Message | ConvertFrom-Json).'urn:scimserver:api:messages:2.0:Diagnostics'.reason_code } catch {}
+        }
+        Test-Result -Success ($bgReason -eq 'bearer_invalid') -Message "9z-BG.T3: resource-plane bogus bearer -> 401 + diagnostics.reason_code bearer_invalid"
+
+        $bgMissing = $null
+        try {
+            Invoke-RestMethod -Uri "$bgBase/Users" -Method GET | Out-Null
+        } catch {
+            try { $bgMissing = ($_.ErrorDetails.Message | ConvertFrom-Json).'urn:scimserver:api:messages:2.0:Diagnostics'.reason_code } catch {}
+        }
+        Test-Result -Success ($bgMissing -eq 'bearer_missing') -Message "9z-BG.T4: resource-plane missing bearer -> 401 + diagnostics.reason_code bearer_missing"
+
+        # F1 - the PersistRequestSecrets flag persists (default ON = store all).
+        $bgPatch = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bgEpId" -Method PATCH -Headers $headers -Body (@{ profile = @{ settings = @{ PersistRequestSecrets = $false } } } | ConvertTo-Json -Depth 5)
+        $bgFlag = $bgPatch.profile.settings.PersistRequestSecrets
+        Test-Result -Success ($bgFlag -eq $false -or $bgFlag -eq 'False') -Message "9z-BG.T5: PersistRequestSecrets=false persists on the endpoint (F1 privacy opt-out)"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bgEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BG: auth reason codes + request-log privacy section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BG: Auth Reason Codes + Request-Log Privacy Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

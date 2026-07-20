@@ -14,6 +14,19 @@
 
 ---
 
+## Gap-closure audit (2026-07-20, v0.54.30)
+
+A norms audit of every auth flow (API + UI) found four residual gaps beyond the shipped WI-D1..D8 / P1-P5 epic; all four are now **CLOSED**:
+
+- **F1 - RequestLog secret persistence (now flag-governed).** The RequestLog previously stored request/response headers + bodies (including `Authorization`, `client_secret`, `access_token`) verbatim with no redaction. This is now a deliberate, configurable behavior: a new server env `PERSIST_REQUEST_SECRETS` (default `true`) + per-endpoint `PersistRequestSecrets` config flag (endpoint overrides server) keep the **complete** request/response for fast RCA by DEFAULT, and redact secret-bearing values before persist/display when set to `false`. A shared recursive redactor ([redact-sensitive.ts](../../api/src/security/redact-sensitive.ts)) is now also applied by `ScimLogger.sanitizeData` so shipped console/file structured logs ALWAYS redact nested secrets (defense in depth) regardless of the flag.
+- **F2 - global `/scim/oauth/token` reason_code + observability.** The global client-credentials token endpoint ([oauth.controller.ts](../../api/src/oauth/oauth.controller.ts)) now carries a stable `reason_code` on every RFC-6749 error body (`grant_type_unsupported` / `missing_credentials` / `oauth_client_auth_failed`) and emits the canonical `Auth decision` event + short-TTL record - parity with the per-endpoint token endpoint.
+- **F3 - resource-plane OAuth-JWT sub-reason preserved.** `OAuthService.validateAccessToken` now attaches a jose-style `code` to its thrown error, and the guard ([shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts)) classifies it into `bearer_oauth_expired` / `bearer_oauth_signature_invalid` instead of collapsing every bearer failure to `bearer_invalid`.
+- **F4 - resource-plane reason_code on the wire.** The bearer guard now carries the specific `reason_code` inside the SCIM `Diagnostics` extension URN (a documented member, so the SCIM error contract stays intact); `ScimExceptionFilter` merges it with the auto-enriched `requestId`, and the UI ([queries.ts](../../web/src/api/queries.ts) + [scim-error.ts](../../web/src/api/scim-error.ts)) reads it and renders the specific bearer remediation.
+
+Known follow-up (out of F1-F4 scope): the `requestId` correlator is not yet enriched for GUARD-level rejections (the request-logging interceptor runs after guards), so a guard-rejected 401 carries the `reason_code` but not the `requestId` in its diagnostics block. Handler-level errors are unaffected.
+
+---
+
 ## Table of contents
 
 1. [The problem, in one real failure (re-diagnosed on the latest sources)](#1-the-problem-in-one-real-failure-re-diagnosed-on-the-latest-sources)

@@ -92,6 +92,15 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
           if (typeof body.reason_code === 'string') reasonCode = body.reason_code;
           if (!detail && typeof body.error_description === 'string') detail = body.error_description;
           if (!detail && typeof body.error === 'string') detail = body.error;
+          // F4: the resource-plane (SCIM) 401 carries the specific auth
+          // reason_code inside the Diagnostics extension URN, not at top level.
+          // Read it so parseScimError renders the specific bearer remediation.
+          if (!reasonCode) {
+            const diag = body['urn:scimserver:api:messages:2.0:Diagnostics'];
+            if (diag && typeof diag === 'object' && typeof (diag as Record<string, unknown>).reason_code === 'string') {
+              reasonCode = (diag as Record<string, unknown>).reason_code as string;
+            }
+          }
         }
       } catch {
         // Server claimed JSON but body did not parse - fall through to text fallback.

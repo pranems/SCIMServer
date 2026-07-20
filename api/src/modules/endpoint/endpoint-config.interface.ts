@@ -261,6 +261,18 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.cacheMaxAgeMs
    */
   JWKS_CACHE_MAX_AGE_MS: 'JwksCacheMaxAgeMs',
+
+  /**
+   * Request-log privacy. When true (the default, inherited from the server-level
+   * `PERSIST_REQUEST_SECRETS` env when unset here), the RequestLog stores and
+   * displays the COMPLETE request/response for this endpoint - headers and body,
+   * secrets included - for fast, complete RCA. When false, secret-bearing header
+   * and body values (`Authorization`, `client_secret`, `client_assertion`,
+   * `password`, `access_token`, ...) are redacted before the row is persisted
+   * (and therefore before it is shown in the API/UI). Endpoint value OVERRIDES
+   * the server default. Shipped console/file logs always redact regardless.
+   */
+  PERSIST_REQUEST_SECRETS: 'PersistRequestSecrets',
 } as const;
 /**
  * Type for endpoint config flag values (the runtime string keys).
@@ -573,6 +585,19 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'Overrides the server default (env JWKS_CACHE_MAX_AGE_MS, default 600000) when set. ' +
       'Bounds: 0 - 86400000 ms (0 = always refetch).',
   },
+  PERSIST_REQUEST_SECRETS: {
+    key: ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS,
+    type: 'boolean',
+    // Unset -> inherit the server-level PERSIST_REQUEST_SECRETS env (default true).
+    // NOT baked into DEFAULT_ENDPOINT_CONFIG so "unset" stays distinguishable.
+    default: undefined,
+    description:
+      'When true (default, inherited from server env PERSIST_REQUEST_SECRETS when unset), the ' +
+      'RequestLog stores + displays the COMPLETE request/response (headers + body, secrets ' +
+      'included) for fast RCA. When false, secret-bearing values are redacted before persist ' +
+      '(and API/UI display). Endpoint value overrides the server default; console/file logs ' +
+      'always redact regardless.',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -610,6 +635,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES]?: number | string;
   [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS]?: number | string;
   [ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS]?: boolean | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -729,6 +755,20 @@ export function resolveEndpointEgressOverrides(
   const cacheMaxAgeMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS);
   if (cacheMaxAgeMs !== undefined) overrides.cacheMaxAgeMs = cacheMaxAgeMs;
   return overrides;
+}
+
+/**
+ * Resolve the EFFECTIVE `PersistRequestSecrets` for an endpoint (RequestLog RCA
+ * privacy). Precedence: the endpoint's explicit value OVERRIDES the server-level
+ * default; when the endpoint leaves it unset it inherits `serverDefault`. When
+ * the result is `true` the RequestLog keeps the full request/response (secrets
+ * included); when `false` the persisted + displayed row is redacted.
+ */
+export function getEffectivePersistRequestSecrets(
+  config: EndpointConfig | undefined,
+  serverDefault: boolean,
+): boolean {
+  return getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS) ?? serverDefault;
 }
 
 /**

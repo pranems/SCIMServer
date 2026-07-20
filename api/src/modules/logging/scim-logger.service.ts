@@ -10,6 +10,7 @@ import {
   parseLogLevel,
 } from './log-levels';
 import { FileLogTransport } from './file-log-transport';
+import { redactSensitiveDeep } from '../../security/redact-sensitive';
 
 /**
  * Correlation context attached to every log entry within a single request.
@@ -478,16 +479,16 @@ export class ScimLogger {
     }
   }
 
-  /** Sanitize data: truncate large payloads, redact secrets. */
+  /** Sanitize data: redact secrets (recursively), then truncate large payloads. */
   private sanitizeData(data: Record<string, unknown>): Record<string, unknown> {
+    // Deep-redact secret-named values at ANY depth first (a nested
+    // `body.client_secret` or `headers.authorization` must never reach the
+    // console/file sink). The persisted RequestLog is the full-fidelity RCA
+    // surface governed by the PersistRequestSecrets flag; shipped structured
+    // logs are always redacted (defense in depth for log aggregation).
+    const redacted = redactSensitiveDeep(data);
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data)) {
-      // Redact sensitive fields
-      if (/secret|password|token|authorization|bearer|jwt/i.test(key)) {
-        result[key] = '[REDACTED]';
-        continue;
-      }
-
+    for (const [key, value] of Object.entries(redacted)) {
       if (typeof value === 'string' && value.length > this.config.maxPayloadSizeBytes) {
         result[key] = value.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated ${value.length - this.config.maxPayloadSizeBytes}B]`;
       } else if (typeof value === 'object' && value !== null) {

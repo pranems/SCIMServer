@@ -10,6 +10,7 @@ import {
   getEffectiveCredentialSecretVisibility,
   normalizeCredentialSecretVisibility,
   resolveEndpointEgressOverrides,
+  getEffectivePersistRequestSecrets,
   validateEndpointConfig,
   validateStructuredFlag,
   DEFAULT_ENDPOINT_CONFIG,
@@ -1512,6 +1513,34 @@ describe('endpoint-config.interface', () => {
             JwksCacheMaxAgeMs: '30000',
           }),
         ).toEqual({ retryBackoffMs: 50, cacheMaxAgeMs: 30000 });
+      });
+    });
+
+    describe('getEffectivePersistRequestSecrets', () => {
+      it('inherits the server default when the endpoint leaves it unset', () => {
+        expect(getEffectivePersistRequestSecrets(undefined, true)).toBe(true);
+        expect(getEffectivePersistRequestSecrets({}, true)).toBe(true);
+        expect(getEffectivePersistRequestSecrets({}, false)).toBe(false);
+      });
+
+      it('endpoint value OVERRIDES the server default (both directions)', () => {
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: false }, true)).toBe(false);
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: true }, false)).toBe(true);
+      });
+
+      it('accepts string boolean values (Entra-style)', () => {
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'False' }, true)).toBe(false);
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'True' }, false)).toBe(true);
+      });
+
+      it('is NOT baked into DEFAULT_ENDPOINT_CONFIG (stays inheritable)', () => {
+        expect(DEFAULT_ENDPOINT_CONFIG.PersistRequestSecrets).toBeUndefined();
+      });
+
+      it('is validated as a boolean flag', () => {
+        expect(() => validateEndpointConfig({ PersistRequestSecrets: true })).not.toThrow();
+        expect(() => validateEndpointConfig({ PersistRequestSecrets: 'False' })).not.toThrow();
+        expect(() => validateEndpointConfig({ PersistRequestSecrets: 'Maybe' })).toThrow();
       });
     });
   });

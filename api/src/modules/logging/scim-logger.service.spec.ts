@@ -351,6 +351,21 @@ describe('ScimLogger', () => {
       expect(entry.data!.authorization).toBe('[REDACTED]');
     });
 
+    it('should redact NESTED secret fields (body.client_secret, headers.authorization)', () => {
+      logger.info(LogCategory.HTTP, 'Request body', {
+        body: { grant_type: 'client_credentials', client_id: 'x', client_secret: 'shhh' },
+        headers: { authorization: 'Basic abc', 'content-type': 'application/json' },
+      });
+
+      const entry = JSON.parse(stdoutSpy.mock.calls[0][0]) as StructuredLogEntry;
+      const body = entry.data!.body as Record<string, unknown>;
+      const headers = entry.data!.headers as Record<string, unknown>;
+      expect(body.client_id).toBe('x');
+      expect(body.client_secret).toBe('[REDACTED]');
+      expect(headers.authorization).toBe('[REDACTED]');
+      expect(headers['content-type']).toBe('application/json');
+    });
+
     it('should truncate large string values', () => {
       const longString = 'x'.repeat(200);
       logger.info(LogCategory.HTTP, 'Large body', { body: longString });

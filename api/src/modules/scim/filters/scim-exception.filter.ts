@@ -142,21 +142,24 @@ export class ScimExceptionFilter implements ExceptionFilter {
       body.status = String(body.status);
     }
 
-    // G.4: Auto-enrich with diagnostics extension when not already present
-    if (!body[SCIM_DIAGNOSTICS_URN]) {
+    // G.4: Auto-enrich the diagnostics extension. MERGE into any existing block
+    // (e.g. the resource-plane guard sets `reason_code`) so requestId/endpointId/
+    // logsUrl are added alongside it rather than being skipped.
+    {
       const ctx = getCorrelationContext();
+      const diag: Record<string, unknown> =
+        (body[SCIM_DIAGNOSTICS_URN] as Record<string, unknown> | undefined) ?? {};
       if (ctx) {
-        const diag: Record<string, unknown> = {};
-        if (ctx.requestId) diag.requestId = ctx.requestId;
-        if (ctx.endpointId) diag.endpointId = ctx.endpointId;
-        if (ctx.requestId) {
+        if (ctx.requestId && diag.requestId === undefined) diag.requestId = ctx.requestId;
+        if (ctx.endpointId && diag.endpointId === undefined) diag.endpointId = ctx.endpointId;
+        if (ctx.requestId && diag.logsUrl === undefined) {
           diag.logsUrl = ctx.endpointId
             ? `/scim/endpoints/${ctx.endpointId}/logs/recent?requestId=${ctx.requestId}`
             : `/scim/admin/log-config/recent?requestId=${ctx.requestId}`;
         }
-        if (Object.keys(diag).length > 0) {
-          body[SCIM_DIAGNOSTICS_URN] = diag;
-        }
+      }
+      if (Object.keys(diag).length > 0) {
+        body[SCIM_DIAGNOSTICS_URN] = diag;
       }
     }
 
