@@ -5,6 +5,7 @@ import { OAuthService } from '../../../oauth/oauth.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
 
 /**
@@ -15,7 +16,9 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
   let provider: WifAssertionTokenProvider;
   let findActiveByEndpoint: jest.Mock;
   let validate: jest.Mock;
+  let validateWithTrace: jest.Mock;
   let generateEndpointAccessToken: jest.Mock;
+  let getEndpoint: jest.Mock;
   let logger: { warn: jest.Mock; info: jest.Mock; debug: jest.Mock; error: jest.Mock };
   let decisionStore: AuthDecisionRecordStore;
 
@@ -50,7 +53,21 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     findActiveByEndpoint = jest.fn();
     validate = jest.fn();
     generateEndpointAccessToken = jest.fn();
+    getEndpoint = jest.fn().mockResolvedValue({ profile: { settings: {} } });
     logger = { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn() };
+
+    validateWithTrace = jest.fn(async (a: string, t: unknown) => ({
+      claims: await validate(a, t),
+      trace: {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'accept',
+        checks: [
+          { id: 'issuer_match', status: 'pass', expected: 'iss', received: 'iss' },
+          { id: 'audience_match', status: 'pass', expected: 'aud', received: 'aud' },
+        ],
+      },
+    }));
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -63,22 +80,12 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
           // the {claims, trace} shape the provider now consumes.
           useValue: {
             validate,
-            validateWithTrace: jest.fn(async (a: string, t: unknown) => ({
-              claims: await validate(a, t),
-              trace: {
-                plane: 'token-mint',
-                method: 'wif',
-                outcome: 'accept',
-                checks: [
-                  { id: 'issuer_match', status: 'pass', expected: 'iss', received: 'iss' },
-                  { id: 'audience_match', status: 'pass', expected: 'aud', received: 'aud' },
-                ],
-              },
-            })),
+            validateWithTrace,
           },
         },
         { provide: OAuthService, useValue: { generateEndpointAccessToken } },
         { provide: ScimLogger, useValue: logger },
+        { provide: EndpointService, useValue: { getEndpoint } },
         AuthDecisionRecordStore,
       ],
     }).compile();
@@ -127,6 +134,43 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     const accepted = decisionStore.query({ endpointId: 'ep-1' });
     expect(accepted).toHaveLength(1);
     expect(accepted[0].outcome).toBe('accept');
+  });
+
+  it('threads the endpoint-level egress overrides into the validator', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+    // Endpoint carries explicit runtime egress overrides in its profile settings.
+    getEndpoint.mockResolvedValue({
+      profile: {
+        settings: {
+          JwksFetchTimeoutMs: 1500,
+          JwksFetchRetries: 4,
+          JwksFetchRetryBackoffMs: 50,
+          JwksCacheMaxAgeMs: 30000,
+        },
+      },
+    });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    // The validator receives the resolved overrides as its 3rd argument, so the
+    // endpoint values override the server defaults for THIS mint.
+    expect(validateWithTrace).toHaveBeenCalledWith(
+      'assertion.jwt',
+      expect.objectContaining({ jwksUri: wifMetadata.jwksUri }),
+      { timeoutMs: 1500, retries: 4, retryBackoffMs: 50, cacheMaxAgeMs: 30000 },
+    );
+  });
+
+  it('passes empty overrides (server defaults) when the endpoint sets no egress flags', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    expect(validateWithTrace).toHaveBeenCalledWith('assertion.jwt', expect.any(Object), {});
   });
 
   it('throws when the assertion is for this endpoint but invalid (mine-but-invalid-stop)', async () => {

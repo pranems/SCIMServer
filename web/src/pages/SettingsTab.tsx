@@ -37,6 +37,7 @@ import {
   RadioGroup,
   Dropdown,
   Option,
+  Input,
   Spinner,
   Badge,
   Text,
@@ -271,6 +272,63 @@ const ENUM_SETTINGS: ReadonlyArray<EnumSetting> = [
   },
 ];
 
+// ─── Numeric (bounded) settings ───────────────────────────────────────
+// Runtime egress robustness knobs for the WIF JWKS fetch (token-mint path).
+// Each OVERRIDES the server-level env default when set; leave blank to
+// inherit the server default. Bounds mirror EGRESS_POLICY_BOUNDS in
+// api/src/oauth/egress-policy.ts and the endpoint-config validator.
+
+interface NumberSetting {
+  key: string;
+  label: string;
+  description: string;
+  min: number;
+  max: number;
+  /** Server-level default shown as the input placeholder (inherited when unset). */
+  serverDefault: number;
+}
+
+const NUMBER_SETTINGS: ReadonlyArray<NumberSetting> = [
+  {
+    key: 'JwksFetchTimeoutMs',
+    label: 'JwksFetchTimeoutMs',
+    description:
+      'Runtime egress: JWKS fetch timeout in milliseconds for the WIF token-mint path. ' +
+      'Overrides the server default when set; leave blank to inherit. Bounds 100 - 60000.',
+    min: 100,
+    max: 60000,
+    serverDefault: 5000,
+  },
+  {
+    key: 'JwksFetchRetries',
+    label: 'JwksFetchRetries',
+    description:
+      'Runtime egress: number of retries for a failed JWKS fetch (total tries = retries + 1). Bounds 0 - 10.',
+    min: 0,
+    max: 10,
+    serverDefault: 2,
+  },
+  {
+    key: 'JwksFetchRetryBackoffMs',
+    label: 'JwksFetchRetryBackoffMs',
+    description:
+      'Runtime egress: base retry backoff in milliseconds (exponential with jitter). Bounds 0 - 10000.',
+    min: 0,
+    max: 10000,
+    serverDefault: 200,
+  },
+  {
+    key: 'JwksCacheMaxAgeMs',
+    label: 'JwksCacheMaxAgeMs',
+    description:
+      'Runtime egress: JWKS cache max-age in milliseconds - how long a cached key set is served ' +
+      'without refetch. Bounds 0 - 86400000 (0 = always refetch).',
+    min: 0,
+    max: 86400000,
+    serverDefault: 600000,
+  },
+];
+
 // ─── Helpers ───────────────────────────────────────────────────────────
 
 /** Coerce 'True'/'False' (Entra style) and booleans into a JS boolean. */
@@ -282,6 +340,16 @@ function coerceFlag(raw: unknown, fallback: boolean): boolean {
     if (lower === 'false') return false;
   }
   return fallback;
+}
+
+/** Read a finite number from a config value (native number or numeric string). */
+function getNumberFlag(raw: unknown): number | undefined {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
 }
 
 /** Return the flag key currently in flight (for Switch.disabled state). */
@@ -395,7 +463,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   // Build the effective settings in the exact PATCH-body shape so the export
   // JSON can be pasted straight back into an API request, saved as a backup,
   // or diffed against an earlier capture.
-  const effectiveSettings: Record<string, boolean | string> = {};
+  const effectiveSettings: Record<string, boolean | string | number> = {};
   for (const flag of BOOLEAN_FLAGS) {
     effectiveSettings[flag.key] = coerceFlag(flags[flag.key], flag.defaultValue);
   }
@@ -407,6 +475,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   for (const s of ENUM_SETTINGS) {
     const v = flags[s.key];
     effectiveSettings[s.key] = typeof v === 'string' && v !== '' ? v : s.defaultValue;
+  }
+  // Number settings are OPTIONAL overrides - include only the ones explicitly
+  // set so the exported PATCH body reflects "unset = inherit server default".
+  for (const s of NUMBER_SETTINGS) {
+    const v = getNumberFlag(flags[s.key]);
+    if (v !== undefined) effectiveSettings[s.key] = v;
   }
   const settingsExport = { profile: { settings: effectiveSettings } };
 
@@ -459,6 +533,35 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
         profile: { settings: { [setting.key]: next } },
       });
       setFeedback({ type: 'success', message: `${setting.label} set to ${next}.` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update failed.';
+      setFeedback({ type: 'error', message: `Failed to update ${setting.label}: ${msg}` });
+    }
+  }
+
+  async function handleNumberChange(setting: NumberSetting, raw: string) {
+    const trimmed = raw.trim();
+    // Blank = inherit the server default (no-op; keep the existing value).
+    if (trimmed === '') return;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      setFeedback({ type: 'error', message: `${setting.label} must be a whole number.` });
+      return;
+    }
+    if (n < setting.min || n > setting.max) {
+      setFeedback({
+        type: 'error',
+        message: `${setting.label} must be between ${setting.min} and ${setting.max}.`,
+      });
+      return;
+    }
+    if (getNumberFlag(flags[setting.key]) === n) return;
+    setFeedback(null);
+    try {
+      await updateMutation.mutateAsync({
+        profile: { settings: { [setting.key]: n } },
+      });
+      setFeedback({ type: 'success', message: `${setting.label} set to ${n}.` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Update failed.';
       setFeedback({ type: 'error', message: `Failed to update ${setting.label}: ${msg}` });
@@ -600,6 +703,38 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                       </Option>
                     ))}
                   </Dropdown>
+                </div>
+                <Caption1 className={classes.flagDescription}>{setting.description}</Caption1>
+              </div>
+            );
+          })}
+        </Card>
+
+        {/* ── Runtime egress (WIF JWKS fetch) numeric overrides ─── */}
+        <Card className={classes.card} data-testid="settings-number-settings">
+          <Caption1>Runtime egress (WIF JWKS fetch)</Caption1>
+          {NUMBER_SETTINGS.map((setting) => {
+            const current = getNumberFlag(flags[setting.key]);
+            const currentDisplay = current !== undefined ? String(current) : '';
+            const disabled = isPending && pendingKey === setting.key;
+            return (
+              <div key={setting.key} className={classes.flagRow} data-testid={`settings-number-${setting.key}`}>
+                <div className={classes.flagHeader}>
+                  <Text className={classes.monospace}>{setting.label}</Text>
+                  <Input
+                    // Re-mount when the persisted value changes so the field
+                    // reflects the latest server state (blank = inherit default).
+                    key={`${setting.key}-${currentDisplay}`}
+                    type="number"
+                    defaultValue={currentDisplay}
+                    placeholder={`server default: ${setting.serverDefault}`}
+                    min={setting.min}
+                    max={setting.max}
+                    disabled={disabled}
+                    aria-label={setting.label}
+                    onBlur={(e) => { void handleNumberChange(setting, e.target.value); }}
+                    data-testid={`settings-number-${setting.key}-input`}
+                  />
                 </div>
                 <Caption1 className={classes.flagDescription}>{setting.description}</Caption1>
               </div>

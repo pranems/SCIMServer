@@ -60,7 +60,15 @@ describe('WifAssertionValidatorService (Q6.3)', () => {
   it('delegates the signature/JWKS check to the Q2 validator with the configured jwksUri', async () => {
     verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
     await service.validate('assertion.jwt.value', TRUST);
-    expect(verify).toHaveBeenCalledWith('assertion.jwt.value', TRUST.jwksUri);
+    // The 3rd arg is the optional per-endpoint egress overrides (undefined here).
+    expect(verify).toHaveBeenCalledWith('assertion.jwt.value', TRUST.jwksUri, undefined);
+  });
+
+  it('forwards per-endpoint egress overrides to the Q2 validator', async () => {
+    verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+    const overrides = { timeoutMs: 1200, retries: 1 };
+    await service.validate('assertion.jwt.value', TRUST, overrides);
+    expect(verify).toHaveBeenCalledWith('assertion.jwt.value', TRUST.jwksUri, overrides);
   });
 
   it('rejects a wrong issuer', async () => {

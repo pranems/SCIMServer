@@ -76,4 +76,25 @@ test.describe('SettingsTab - CredentialSecretVisibility (WI-7)', () => {
     await expect(page.getByTestId('settings-tab-export-copy')).toBeVisible();
     await expect(page.getByTestId('settings-tab-export-download')).toBeVisible();
   });
+
+  test('the runtime-egress card renders 4 bounded number inputs (WIF JWKS fetch)', async ({ page }) => {
+    await openFirstEndpointSettings(page);
+    await expect(page.getByTestId('settings-number-settings')).toBeVisible();
+
+    // R10 - assert the OUTCOME (each input is present AND carries its bounds
+    // contract), not merely that the card exists.
+    const bounds: Record<string, { min: string; max: string }> = {
+      JwksFetchTimeoutMs: { min: '100', max: '60000' },
+      JwksFetchRetries: { min: '0', max: '10' },
+      JwksFetchRetryBackoffMs: { min: '0', max: '10000' },
+      JwksCacheMaxAgeMs: { min: '0', max: '86400000' },
+    };
+    for (const [key, b] of Object.entries(bounds)) {
+      const input = page.getByTestId(`settings-number-${key}-input`);
+      await expect(input).toBeVisible();
+      await expect(input).toHaveAttribute('type', 'number');
+      await expect(input).toHaveAttribute('min', b.min);
+      await expect(input).toHaveAttribute('max', b.max);
+    }
+  });
 });

@@ -20,6 +20,8 @@ import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.sto
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider } from './assertion-token-provider';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
+import { resolveEndpointEgressOverrides } from '../../endpoint/endpoint-config.interface';
 
 /**
  * WifAssertionTokenProvider (Q6.4) - binds the A3 `IAssertionTokenProvider`
@@ -50,6 +52,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     private readonly oauthService: OAuthService,
     private readonly logger: ScimLogger,
     private readonly decisionStore: AuthDecisionRecordStore,
+    private readonly endpointService: EndpointService,
   ) {}
 
   /** WI-D4 + WI-D5: emit the canonical AUTH log event AND capture the record. */
@@ -66,6 +69,16 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     if (wifCredentials.length === 0) {
       return null;
     }
+
+    // Resolve the ENDPOINT-level runtime egress overrides (JWKS fetch timeout /
+    // retries / backoff / cache max-age) once for this mint. Any field the
+    // endpoint sets OVERRIDES the server-level default; unset fields fall
+    // through to the server. A missing/unreadable endpoint is non-fatal - we
+    // simply mint with the server defaults.
+    const endpoint = await this.endpointService
+      .getEndpoint(endpointId)
+      .catch(() => undefined);
+    const egressOverrides = resolveEndpointEgressOverrides(endpoint?.profile?.settings);
 
     // From here on the assertion is "mine": one of the configured WIF trusts
     // must accept it. WI-17 orders the trusts issuer-first - decode the
@@ -95,7 +108,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       let claims: WifValidatedClaims;
       let validatorTrace: AuthDecisionTrace;
       try {
-        const result = await this.validator.validateWithTrace(clientAssertion, trust);
+        const result = await this.validator.validateWithTrace(clientAssertion, trust, egressOverrides);
         claims = result.claims;
         validatorTrace = result.trace;
       } catch (err) {

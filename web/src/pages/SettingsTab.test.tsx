@@ -361,4 +361,75 @@ describe('SettingsTab', () => {
     expect(dropdown).toBeInTheDocument();
     expect(dropdown.textContent).toContain('WARN');
   });
+
+  // ── Runtime egress (WIF JWKS fetch) numeric overrides ─────────────
+  describe('runtime egress number settings', () => {
+    it('renders a number input for each of the 4 egress params', () => {
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({}),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      expect(screen.getByTestId('settings-number-settings')).toBeInTheDocument();
+      // Each input carries its type + bounds contract (validates the Playwright
+      // bounded-input assertions run against the same rendered DOM).
+      const bounds: Record<string, { min: string; max: string }> = {
+        JwksFetchTimeoutMs: { min: '100', max: '60000' },
+        JwksFetchRetries: { min: '0', max: '10' },
+        JwksFetchRetryBackoffMs: { min: '0', max: '10000' },
+        JwksCacheMaxAgeMs: { min: '0', max: '86400000' },
+      };
+      for (const [key, b] of Object.entries(bounds)) {
+        const input = screen.getByTestId(`settings-number-${key}-input`);
+        expect(input).toHaveAttribute('type', 'number');
+        expect(input).toHaveAttribute('min', b.min);
+        expect(input).toHaveAttribute('max', b.max);
+      }
+    });
+
+    it('reflects the persisted value and leaves unset fields blank (inherit default)', () => {
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({ JwksFetchTimeoutMs: 1500 }),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      const setInput = screen.getByTestId('settings-number-JwksFetchTimeoutMs-input') as HTMLInputElement;
+      expect(setInput.value).toBe('1500');
+      const unsetInput = screen.getByTestId('settings-number-JwksFetchRetries-input') as HTMLInputElement;
+      expect(unsetInput.value).toBe('');
+    });
+
+    it('fires the config update with the new numeric value on blur', async () => {
+      const user = userEvent.setup();
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({}),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      const input = screen.getByTestId('settings-number-JwksFetchTimeoutMs-input');
+      await user.click(input);
+      await user.type(input, '2500');
+      await user.tab(); // blur
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith({ profile: { settings: { JwksFetchTimeoutMs: 2500 } } });
+      });
+    });
+
+    it('rejects an out-of-range value with an error message and no update', async () => {
+      const user = userEvent.setup();
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({}),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      const input = screen.getByTestId('settings-number-JwksFetchRetries-input');
+      await user.click(input);
+      await user.type(input, '99'); // max is 10
+      await user.tab();
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-feedback-error')).toBeInTheDocument();
+      });
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+  });
 });

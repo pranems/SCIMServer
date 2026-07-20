@@ -12955,6 +12955,78 @@ Write-Host "`n--- 9z-BE: Phase 4 Config-time Auth Events Complete ---" -Foregrou
 
 
 # ============================================
+$script:currentSection = "9z-BF: runtime egress config flags"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BF: runtime egress (WIF JWKS fetch) config flags" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # Runtime egress robustness knobs (WIF JWKS fetch): JwksFetchTimeoutMs /
+    # JwksFetchRetries / JwksFetchRetryBackoffMs / JwksCacheMaxAgeMs are
+    # per-endpoint numeric OVERRIDES of the server env defaults, bounds-checked
+    # by the admin config validator (endpoint OVERRIDES server).
+    $bfEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-egress-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bfEpId = $bfEp.id
+    try {
+        # (1) In-range overrides persist and round-trip on GET.
+        $bfPatch = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bfEpId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{
+                JwksFetchTimeoutMs = 1500
+                JwksFetchRetries = 4
+                JwksFetchRetryBackoffMs = 50
+                JwksCacheMaxAgeMs = 30000
+            } }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($bfPatch.profile.settings.JwksFetchTimeoutMs -eq 1500) -Message "9z-BF.T1: JwksFetchTimeoutMs override persists via PATCH (1500)"
+        Test-Result -Success ($bfPatch.profile.settings.JwksFetchRetries -eq 4) -Message "9z-BF.T2: JwksFetchRetries override persists via PATCH (4)"
+
+        $bfGet = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bfEpId" -Method GET -Headers $headers
+        Test-Result -Success ($bfGet.profile.settings.JwksCacheMaxAgeMs -eq 30000) -Message "9z-BF.T3: GET re-reads the persisted JwksCacheMaxAgeMs (30000)"
+
+        # (2) Below-minimum timeout is rejected with 400.
+        $bfMinRejected = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bfEpId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ settings = @{ JwksFetchTimeoutMs = 50 } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -eq 400) { $bfMinRejected = $true }
+        }
+        Test-Result -Success $bfMinRejected -Message "9z-BF.T4: a below-minimum JwksFetchTimeoutMs (50) is rejected with 400"
+
+        # (3) Above-maximum retries is rejected with 400.
+        $bfMaxRejected = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bfEpId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ settings = @{ JwksFetchRetries = 11 } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -eq 400) { $bfMaxRejected = $true }
+        }
+        Test-Result -Success $bfMaxRejected -Message "9z-BF.T5: an above-maximum JwksFetchRetries (11) is rejected with 400"
+
+        # (4) A non-numeric egress value is rejected with 400.
+        $bfBadRejected = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bfEpId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ settings = @{ JwksCacheMaxAgeMs = 'soon' } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -eq 400) { $bfBadRejected = $true }
+        }
+        Test-Result -Success $bfBadRejected -Message "9z-BF.T6: a non-numeric JwksCacheMaxAgeMs is rejected with 400"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bfEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BF: runtime egress config flags section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BF: Runtime Egress Config Flags Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

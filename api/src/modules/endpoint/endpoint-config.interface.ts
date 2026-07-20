@@ -226,6 +226,41 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * wins). See docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md section 6A.
    */
   CREDENTIAL_SECRET_VISIBILITY: 'CredentialSecretVisibility',
+
+  /**
+   * Runtime egress robustness (WIF JWKS fetch during token mint). Per-endpoint
+   * override of the JWKS fetch TIMEOUT in milliseconds. When set, it OVERRIDES
+   * the server-level default (env `JWKS_FETCH_TIMEOUT_MS`, default 5000). When
+   * unset, the server default applies. Bounds: 100 - 60000 ms.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.timeoutMs
+   */
+  JWKS_FETCH_TIMEOUT_MS: 'JwksFetchTimeoutMs',
+
+  /**
+   * Runtime egress robustness. Per-endpoint override of the number of RETRIES
+   * for a failed JWKS fetch (total tries = retries + 1). Overrides the server
+   * default (env `JWKS_FETCH_RETRIES`, default 2) when set. Bounds: 0 - 10.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.retries
+   */
+  JWKS_FETCH_RETRIES: 'JwksFetchRetries',
+
+  /**
+   * Runtime egress robustness. Per-endpoint override of the base retry BACKOFF
+   * in milliseconds (exponential: backoff * 2^(attempt-1) + jitter). Overrides
+   * the server default (env `JWKS_FETCH_RETRY_BACKOFF_MS`, default 200) when
+   * set. Bounds: 0 - 10000 ms.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.retryBackoffMs
+   */
+  JWKS_FETCH_RETRY_BACKOFF_MS: 'JwksFetchRetryBackoffMs',
+
+  /**
+   * Runtime egress robustness. Per-endpoint override of the JWKS cache max-age
+   * in milliseconds (how long a cached key set is served without refetch).
+   * Overrides the server default (env `JWKS_CACHE_MAX_AGE_MS`, default 600000)
+   * when set. Bounds: 0 - 86400000 ms (0 = always refetch).
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.cacheMaxAgeMs
+   */
+  JWKS_CACHE_MAX_AGE_MS: 'JwksCacheMaxAgeMs',
 } as const;
 /**
  * Type for endpoint config flag values (the runtime string keys).
@@ -235,7 +270,7 @@ export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPO
 // ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
-type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'credentialVisibility' | 'structured';
+type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'credentialVisibility' | 'structured' | 'number';
 
 /**
  * Shape contract for a `structured` config flag value (Pre-Q.A).
@@ -254,7 +289,7 @@ export interface EndpointConfigFlagDefinition {
   /** Data type of the flag. */
   readonly type: FlagType;
   /** Default value when not set (undefined = no default). */
-  readonly default: boolean | undefined;
+  readonly default: boolean | number | undefined;
   /** Human-readable description. */
   readonly description: string;
   /**
@@ -262,6 +297,10 @@ export interface EndpointConfigFlagDefinition {
    * {@link validateStructuredFlag}. Ignored for other flag types.
    */
   readonly structuredSchema?: StructuredFlagSchema;
+  /** For `number` flags only: inclusive lower bound (clamp/validate floor). */
+  readonly min?: number;
+  /** For `number` flags only: inclusive upper bound (clamp/validate ceiling). */
+  readonly max?: number;
 }
 
 /**
@@ -491,6 +530,49 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'urn:scimserver:api:messages:2.0:Warning body member + X-SCIM-Warning header). Item-by-id reads ' +
       'and all writes still reject with 404. Set false for Entra provisioning of user-only (no Group) endpoints.',
   },
+  JWKS_FETCH_TIMEOUT_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS,
+    type: 'number',
+    default: undefined,
+    min: 100,
+    max: 60000,
+    description:
+      'Runtime egress: JWKS fetch timeout (ms) for the WIF token-mint path. Overrides the server ' +
+      'default (env JWKS_FETCH_TIMEOUT_MS, default 5000) when set; unset falls through to the server. ' +
+      'Bounds: 100 - 60000 ms.',
+  },
+  JWKS_FETCH_RETRIES: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 10,
+    description:
+      'Runtime egress: number of retries for a failed JWKS fetch (total tries = retries + 1). ' +
+      'Overrides the server default (env JWKS_FETCH_RETRIES, default 2) when set. Bounds: 0 - 10.',
+  },
+  JWKS_FETCH_RETRY_BACKOFF_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 10000,
+    description:
+      'Runtime egress: base retry backoff (ms); exponential backoff * 2^(attempt-1) + jitter. ' +
+      'Overrides the server default (env JWKS_FETCH_RETRY_BACKOFF_MS, default 200) when set. ' +
+      'Bounds: 0 - 10000 ms.',
+  },
+  JWKS_CACHE_MAX_AGE_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 86400000,
+    description:
+      'Runtime egress: JWKS cache max-age (ms) - how long a cached key set is served without refetch. ' +
+      'Overrides the server default (env JWKS_CACHE_MAX_AGE_MS, default 600000) when set. ' +
+      'Bounds: 0 - 86400000 ms (0 = always refetch).',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -524,6 +606,10 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY]?: string;
   [ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS]?: number | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -603,6 +689,46 @@ export function getConfigString(config: EndpointConfig | undefined, key: string)
   const value = config[key];
   if (typeof value === 'string') return value;
   return undefined;
+}
+
+/**
+ * Get a finite numeric config value, or `undefined` when the key is absent /
+ * not a parseable finite number. Accepts native numbers and numeric strings
+ * (Entra and the admin UI both serialize config values as strings). This is the
+ * primitive the per-endpoint egress overrides are read through, so an unset key
+ * cleanly falls through to the server-level default.
+ */
+export function getConfigNumber(config: EndpointConfig | undefined, key: string): number | undefined {
+  if (!config) return undefined;
+  const value = config[key];
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the ENDPOINT-level runtime egress overrides (WIF JWKS fetch) from an
+ * endpoint's stored config. Only keys that are explicitly set are returned, so
+ * the merge in the oauth layer keeps the server default for every unset field.
+ * The returned object is structurally compatible with the oauth
+ * `EgressPolicyOverrides` type (kept decoupled to avoid a module cycle).
+ */
+export function resolveEndpointEgressOverrides(
+  config: EndpointConfig | undefined,
+): { timeoutMs?: number; retries?: number; retryBackoffMs?: number; cacheMaxAgeMs?: number } {
+  const overrides: { timeoutMs?: number; retries?: number; retryBackoffMs?: number; cacheMaxAgeMs?: number } = {};
+  const timeoutMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS);
+  if (timeoutMs !== undefined) overrides.timeoutMs = timeoutMs;
+  const retries = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES);
+  if (retries !== undefined) overrides.retries = retries;
+  const retryBackoffMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS);
+  if (retryBackoffMs !== undefined) overrides.retryBackoffMs = retryBackoffMs;
+  const cacheMaxAgeMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS);
+  if (cacheMaxAgeMs !== undefined) overrides.cacheMaxAgeMs = cacheMaxAgeMs;
+  return overrides;
 }
 
 /**
@@ -830,6 +956,48 @@ function validateCredentialVisibilityFlag(config: Record<string, any>, flagName:
 }
 
 /**
+ * Validate a `number`-typed config flag value against its inclusive [min, max]
+ * bounds. Accepts native numbers and numeric strings (the admin UI / Entra
+ * serialize config values as strings). An absent value passes (falls through to
+ * the server default). A non-numeric, non-finite, or out-of-range value throws.
+ */
+function validateNumberFlag(
+  config: Record<string, unknown>,
+  flagName: string,
+  min?: number,
+  max?: number,
+): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  let n: number;
+  if (typeof value === 'number') {
+    n = value;
+  } else if (typeof value === 'string' && value.trim() !== '') {
+    n = Number(value);
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected a number or numeric string, got ${typeof value}.`,
+    );
+  }
+  if (!Number.isFinite(n)) {
+    throw new Error(
+      `Invalid value "${value}" for config flag "${flagName}". Expected a finite number.`,
+    );
+  }
+  if (min !== undefined && n < min) {
+    throw new Error(
+      `Value ${n} for config flag "${flagName}" is below the minimum ${min}.`,
+    );
+  }
+  if (max !== undefined && n > max) {
+    throw new Error(
+      `Value ${n} for config flag "${flagName}" exceeds the maximum ${max}.`,
+    );
+  }
+}
+
+/**
  * Validate a `structured` (object-valued) config flag against its shape contract.
  *
  * - Absent value: passes.
@@ -902,6 +1070,8 @@ export function validateEndpointConfig(
       validateCredentialVisibilityFlag(config, def.key);
     } else if (def.type === 'structured') {
       validateStructuredFlag(config, def.key, def.structuredSchema);
+    } else if (def.type === 'number') {
+      validateNumberFlag(config, def.key, def.min, def.max);
     }
   }
 }

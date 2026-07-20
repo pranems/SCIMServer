@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ExternalJwksValidatorService } from './external-jwks-validator.service';
+import type { EgressPolicyOverrides } from './egress-policy';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 import type { IdentityModel, RoleEnforcementMode } from './wif-shadow-telemetry';
@@ -81,8 +82,12 @@ export class WifAssertionValidatorService {
     private readonly logger: ScimLogger,
   ) {}
 
-  async validate(assertion: string, trust: WifTrust): Promise<WifValidatedClaims> {
-    const { claims } = await this.runChecks(assertion, trust);
+  async validate(
+    assertion: string,
+    trust: WifTrust,
+    egressOverrides?: EgressPolicyOverrides,
+  ): Promise<WifValidatedClaims> {
+    const { claims } = await this.runChecks(assertion, trust, egressOverrides);
     return claims;
   }
 
@@ -96,8 +101,9 @@ export class WifAssertionValidatorService {
   async validateWithTrace(
     assertion: string,
     trust: WifTrust,
+    egressOverrides?: EgressPolicyOverrides,
   ): Promise<{ claims: WifValidatedClaims; trace: AuthDecisionTrace }> {
-    return this.runChecks(assertion, trust);
+    return this.runChecks(assertion, trust, egressOverrides);
   }
 
   /**
@@ -109,6 +115,7 @@ export class WifAssertionValidatorService {
   private async runChecks(
     assertion: string,
     trust: WifTrust,
+    egressOverrides?: EgressPolicyOverrides,
   ): Promise<{ claims: WifValidatedClaims; trace: AuthDecisionTrace }> {
     // WI-D3 - build an ordered decision trace as we run the checks, so the
     // reject reason_code, the log, and the UI diff all derive from one object.
@@ -121,7 +128,7 @@ export class WifAssertionValidatorService {
     // or a JWKS outage all throw here (propagated as mine-but-invalid-stop).
     let payload: Record<string, unknown>;
     try {
-      const verified = await this.jwks.verify(assertion, trust.jwksUri);
+      const verified = await this.jwks.verify(assertion, trust.jwksUri, egressOverrides);
       payload = verified.payload;
       trace.setJoseHeader(verified.protectedHeader);
       trace.pass('jwks_signature', {

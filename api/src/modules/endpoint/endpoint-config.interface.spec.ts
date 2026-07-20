@@ -4,10 +4,12 @@ import {
   getConfigBooleanWithDefault,
   getConfigString,
   getConfigStructured,
+  getConfigNumber,
   getOptionalConfigBoolean,
   getEffectiveAuthEnablement,
   getEffectiveCredentialSecretVisibility,
   normalizeCredentialSecretVisibility,
+  resolveEndpointEgressOverrides,
   validateEndpointConfig,
   validateStructuredFlag,
   DEFAULT_ENDPOINT_CONFIG,
@@ -1443,6 +1445,73 @@ describe('endpoint-config.interface', () => {
         expect(() => validateEndpointConfig({ CredentialSecretVisibility: true })).toThrow(
           /Expected string/,
         );
+      });
+    });
+
+    // Runtime egress robustness - number-typed flags (JWKS fetch tuning).
+    describe('validateEndpointConfig - egress number flags', () => {
+      it('accepts in-range numbers and numeric strings', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 1500 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: '1500' })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchRetries: 0 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchRetries: 10 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchRetryBackoffMs: 0 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksCacheMaxAgeMs: 86400000 })).not.toThrow();
+      });
+
+      it('rejects a value below the minimum', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 50 })).toThrow(/below the minimum 100/);
+        expect(() => validateEndpointConfig({ JwksFetchRetries: -1 })).toThrow(/below the minimum 0/);
+      });
+
+      it('rejects a value above the maximum', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 60001 })).toThrow(/exceeds the maximum 60000/);
+        expect(() => validateEndpointConfig({ JwksFetchRetries: 11 })).toThrow(/exceeds the maximum 10/);
+      });
+
+      it('rejects a non-numeric value', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 'abc' })).toThrow(/finite number/);
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: true })).toThrow(/Expected a number or numeric string/);
+      });
+
+      it('leaves the egress flags OUT of DEFAULT_ENDPOINT_CONFIG (fall through to server)', () => {
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksFetchTimeoutMs).toBeUndefined();
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksFetchRetries).toBeUndefined();
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksFetchRetryBackoffMs).toBeUndefined();
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksCacheMaxAgeMs).toBeUndefined();
+      });
+    });
+
+    describe('getConfigNumber', () => {
+      it('reads native numbers and numeric strings, undefined otherwise', () => {
+        expect(getConfigNumber({ JwksFetchTimeoutMs: 1500 }, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBe(1500);
+        expect(getConfigNumber({ JwksFetchTimeoutMs: '1500' }, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBe(1500);
+        expect(getConfigNumber({}, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBeUndefined();
+        expect(getConfigNumber({ JwksFetchTimeoutMs: 'x' }, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBeUndefined();
+        expect(getConfigNumber(undefined, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBeUndefined();
+      });
+    });
+
+    describe('resolveEndpointEgressOverrides', () => {
+      it('returns only the explicitly-set fields', () => {
+        expect(resolveEndpointEgressOverrides({ JwksFetchTimeoutMs: 1500, JwksFetchRetries: 4 })).toEqual({
+          timeoutMs: 1500,
+          retries: 4,
+        });
+      });
+
+      it('returns an empty object when nothing is set (server defaults apply)', () => {
+        expect(resolveEndpointEgressOverrides({})).toEqual({});
+        expect(resolveEndpointEgressOverrides(undefined)).toEqual({});
+      });
+
+      it('coerces numeric strings', () => {
+        expect(
+          resolveEndpointEgressOverrides({
+            JwksFetchRetryBackoffMs: '50',
+            JwksCacheMaxAgeMs: '30000',
+          }),
+        ).toEqual({ retryBackoffMs: 50, cacheMaxAgeMs: 30000 });
       });
     });
   });

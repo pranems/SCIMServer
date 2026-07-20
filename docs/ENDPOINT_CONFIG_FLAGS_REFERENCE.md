@@ -1,9 +1,9 @@
 # Endpoint Configuration Flags Reference
 
-> **Version:** 0.54.0-alpha.7 - **Updated:** June 18, 2026  
+> **Version:** 0.54.29 - **Updated:** July 20, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 21 flags: 18 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`).  
-> 4 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `structured` (the last added Pre-Q.A, reserved for the WIF trust object).
+> 26 flags: 18 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`) + 1 boolean (`EnforceResourceTypes`) + 4 numeric runtime-egress overrides.  
+> 5 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
 
 ---
 
@@ -56,6 +56,8 @@ Every flag declares a `type` in the registry ([endpoint-config.interface.ts](../
 | `boolean` | `true`/`false`, or the strings `"True"`/`"False"`/`"1"`/`"0"` (case-insensitive) | `getConfigBoolean` | `validateBooleanFlag` |
 | `logLevel` | `"TRACE"`..`"OFF"` (case-insensitive) or `0`-`6` | `getConfigString` | `validateLogLevelFlag` |
 | `primaryEnforcement` | `"passthrough"` / `"normalize"` / `"reject"` | `getConfigString` | `validatePrimaryEnforcementFlag` |
+| `credentialVisibility` | `"always"` / `"once"` (case-insensitive) | `getConfigString` | `validateCredentialVisibilityFlag` |
+| `number` | a whole number (or numeric string) within the flag's `[min, max]` bounds | `getConfigNumber` | `validateNumberFlag` |
 | `structured` | a JSON object, optionally constrained by a `structuredSchema` | `getConfigStructured` | `validateStructuredFlag` |
 
 ### The `structured` value-type (Pre-Q.A)
@@ -135,6 +137,10 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 20 | [`SharedSecretBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `true` | Authentication |
 | 21 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | enum (`always`/`once`) | `always` | Authentication |
 | 22 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
+| 23 | [`JwksFetchTimeoutMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 5000) | Runtime egress |
+| 24 | [`JwksFetchRetries`](#runtime-egress-wif-jwks-fetch) | number | (server: 2) | Runtime egress |
+| 25 | [`JwksFetchRetryBackoffMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 200) | Runtime egress |
+| 26 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 600000) | Runtime egress |
 
 ### CredentialSecretVisibility
 
@@ -199,6 +205,61 @@ only LIST/query is relaxed. Applies symmetrically to `/Users` and `/Groups`.
 endpoint**: Entra's Test Connection probes both `/Users` and `/Groups` and treats
 a `/Groups` 404 as `SystemForCrossDomainIdentityManagementServiceIncompatible`.
 See [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.1a](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md#81a-enforceresourcetypes-flag---relax-listquery-to-200-empty-entra-test-connection).
+
+---
+
+### Runtime egress (WIF JWKS fetch)
+
+These four `number` flags tune the **runtime** egress the server makes when it
+fetches an identity provider's JWKS to verify a WIF (RFC 7523 `jwt-bearer`)
+client assertion during the endpoint token-mint. They are **per-endpoint
+overrides of the server-level defaults**; the precedence is:
+
+```text
+effective = endpoint setting  ??  server env default  ??  hardcoded default
+```
+
+An endpoint value **overrides** the server value; when an endpoint leaves a flag
+unset it inherits the server env default (and, absent the env var, the hardcoded
+default). Each is bounds-checked by `validateNumberFlag` at admin create/update
+time - an out-of-range or non-numeric value is rejected with `400`.
+
+| Flag | Server env default | Bounds | Meaning |
+|---|---|---|---|
+| `JwksFetchTimeoutMs` | `JWKS_FETCH_TIMEOUT_MS` (5000) | 100 - 60000 | Per-attempt fetch timeout (ms). A hung IdP is aborted rather than blocking the mint (**G1**). |
+| `JwksFetchRetries` | `JWKS_FETCH_RETRIES` (2) | 0 - 10 | Retries for a failed fetch; total tries = `retries + 1` (**G5**). |
+| `JwksFetchRetryBackoffMs` | `JWKS_FETCH_RETRY_BACKOFF_MS` (200) | 0 - 10000 | Base retry backoff (ms); exponential `backoff * 2^(attempt-1)` + jitter. |
+| `JwksCacheMaxAgeMs` | `JWKS_CACHE_MAX_AGE_MS` (600000) | 0 - 86400000 | How long a cached JWKS is served before a refetch (`0` = always refetch). |
+
+Alongside these knobs the runtime fetch also enforces **single-flight** (G3 -
+concurrent fetches for the same URI are coalesced into one) and **redirect
+re-validation** (G2 - each 3xx `Location` is re-checked against the JWKS host
+allowlist before it is followed, so a trusted host cannot redirect the fetch to
+an internal address). These behaviors are not configurable; only the four
+numeric knobs above are. On exhaustion the fetch **fails to a still-usable
+cached copy** if one exists, otherwise it **fails closed** - it never skips the
+signature check. See [egress-policy.ts](../api/src/oauth/egress-policy.ts) and
+[external-jwks-validator.service.ts](../api/src/oauth/external-jwks-validator.service.ts).
+
+Example - give a slow IdP more headroom on one endpoint without changing the
+server default:
+
+```json
+{
+  "profile": {
+    "settings": {
+      "JwksFetchTimeoutMs": 12000,
+      "JwksFetchRetries": 4,
+      "JwksFetchRetryBackoffMs": 300,
+      "JwksCacheMaxAgeMs": 1800000
+    }
+  }
+}
+```
+
+**Scope note:** these tune the **runtime** token-mint JWKS fetch only. The
+config-time discovery/verify paths (admin "Verify WIF trust" / discovery
+resolver) are unaffected by these flags.
 
 ---
 

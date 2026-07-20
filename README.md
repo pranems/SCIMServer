@@ -1236,7 +1236,10 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 | `OAUTH_CLIENT_SCOPES` | `scim.read,scim.write,scim.manage` | Comma-separated allowed scopes |
 | `CREDENTIAL_KEK` | `changeme-credential-kek` | Key-encryption-key for the re-viewable-credential-secret feature (WI-6 active - envelope-encryption foundation). Must match across all instances/redeploys; not on the auth path; default is cosmetic until rotated. See [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 6A |
 | `JWKS_HOST_ALLOWLIST` | (empty = all rejected) | Comma-separated IdP hostnames SCIMServer may fetch JWKS from (anti-SSRF choke point). **Required before WIF** can validate an assertion; empty fails closed. e.g. `login.microsoftonline.com`. Forthcoming (WI-15): prepopulated well-known seed + persisted, admin-editable hot-reload layer. See [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 5D |
-| `JWKS_CACHE_MAX_AGE_MS` | `600000` | Max age (ms) of a cached JWKS before it is refetched |
+| `JWKS_CACHE_MAX_AGE_MS` | `600000` | Max age (ms) of a cached JWKS before it is refetched. Server-level default; per-endpoint override `JwksCacheMaxAgeMs`. Bounds 0 - 86400000 |
+| `JWKS_FETCH_TIMEOUT_MS` | `5000` | Per-attempt timeout (ms) for the runtime WIF JWKS fetch (a hung IdP is aborted). Server-level default; per-endpoint override `JwksFetchTimeoutMs`. Bounds 100 - 60000 |
+| `JWKS_FETCH_RETRIES` | `2` | Retries for a failed runtime JWKS fetch (total tries = retries + 1). Server-level default; per-endpoint override `JwksFetchRetries`. Bounds 0 - 10 |
+| `JWKS_FETCH_RETRY_BACKOFF_MS` | `200` | Base retry backoff (ms); exponential with jitter. Server-level default; per-endpoint override `JwksFetchRetryBackoffMs`. Bounds 0 - 10000 |
 
 ### Logging
 

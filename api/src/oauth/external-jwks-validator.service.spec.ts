@@ -151,3 +151,111 @@ describe('ExternalJwksValidatorService (Q2)', () => {
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(1);
   });
 });
+
+// ─── Runtime egress robustness (timeout / retries / redirect / single-flight) ──
+
+describe('ExternalJwksValidatorService - runtime egress robustness', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const ok = (jwks: unknown) => ({
+    status: 200,
+    ok: true,
+    headers: { get: () => null },
+    json: async () => jwks,
+  });
+  const redirect = (location: string) => ({
+    status: 302,
+    ok: false,
+    headers: { get: (h: string) => (h.toLowerCase() === 'location' ? location : null) },
+    json: async () => ({}),
+  });
+
+  it('G1/G2: passes an AbortSignal timeout + redirect:manual to fetch', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest.fn().mockResolvedValue(ok(fx.jwks));
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+
+    await svc.verify(token, 'https://idp.example.com/keys');
+    const opts = fetchMock.mock.calls[0][1];
+    expect(opts.redirect).toBe('manual');
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('G5: retries a transient fetch failure then succeeds', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockResolvedValue(ok(fx.jwks));
+    // backoff 0 keeps the test fast; server default retries=2 -> 3 tries total.
+    const svc = new ExternalJwksValidatorService(makeConfig({ JWKS_FETCH_RETRY_BACKOFF_MS: '0' }), logger, fetchMock as any);
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+
+    const res = await svc.verify(token, 'https://idp.example.com/keys');
+    expect(res.payload.iss).toBe('a');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('G5: an endpoint override of retries=0 disables retry (one try, fail closed)', async () => {
+    const fetchMock = jest.fn().mockRejectedValue(new Error('down'));
+    const svc = new ExternalJwksValidatorService(makeConfig({ JWKS_FETCH_RETRY_BACKOFF_MS: '0' }), logger, fetchMock as any);
+
+    await expect(
+      svc.verify('a.b.c', 'https://idp.example.com/keys', { retries: 0 }),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('G2 SSRF: a redirect to a DISALLOWED host is rejected (never fetched)', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(redirect('https://169.254.169.254/latest/'));
+    // allowlist has idp.example.com but NOT 169.254.169.254
+    const svc = new ExternalJwksValidatorService(makeConfig({ JWKS_FETCH_RETRY_BACKOFF_MS: '0' }), logger, fetchMock as any);
+
+    await expect(
+      svc.verify('a.b.c', 'https://idp.example.com/keys', { retries: 0 }),
+    ).rejects.toThrow();
+    // Only the ORIGINAL allowlisted URL was fetched; the redirect target was blocked
+    // BEFORE any request to it.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://idp.example.com/keys');
+  });
+
+  it('G2: a redirect to an ALLOWED host is followed', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(redirect('https://login.microsoftonline.com/keys'))
+      .mockResolvedValueOnce(ok(fx.jwks));
+    const svc = new ExternalJwksValidatorService(makeConfig({ JWKS_FETCH_RETRY_BACKOFF_MS: '0' }), logger, fetchMock as any);
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+
+    const res = await svc.verify(token, 'https://idp.example.com/keys');
+    expect(res.payload.iss).toBe('a');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toBe('https://login.microsoftonline.com/keys');
+  });
+
+  it('G3 single-flight: concurrent verifies for the same URI fetch once', async () => {
+    const fx = await makeRsaKey('kid-1');
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    const fetchMock = jest.fn(async () => {
+      await gate;
+      return ok(fx.jwks);
+    });
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+    const t1 = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+    const t2 = await signRs256(fx.privateKey, 'kid-1', { iss: 'b' });
+
+    const p1 = svc.verify(t1, 'https://idp.example.com/keys');
+    const p2 = svc.verify(t2, 'https://idp.example.com/keys');
+    // let both enter fetchJwks before the fetch resolves
+    await new Promise((r) => setTimeout(r, 20));
+    release!();
+    await Promise.all([p1, p2]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
