@@ -197,6 +197,35 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
     await expect(page.getByTestId('wif-debug-assertion')).toBeVisible();
   });
 
+  test('V8: the WIF trust card Verify button verifies that trust in-card', async ({ page }) => {
+    await openCredentials(page);
+    await page.route('**/scim/admin/endpoints/*/wif/verify', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          checks: [{ id: 'jwksServesKeys', label: 'JWKS serves a non-empty key set', ok: true, detail: '5 keys' }],
+          lastVerifiedAt: body.credentialId ? '2026-07-21T00:00:00.000Z' : undefined,
+        }),
+      });
+    });
+    await page.getByTestId('wif-credential-verify-wt-a').click();
+    await expect(page.getByTestId('wif-credential-verify-result-wt-a')).toBeVisible();
+    await expect(page.getByTestId('wif-credential-verify-result-wt-a')).toContainText('Verified');
+  });
+
+  test('V9: the WIF Edit button toggles the in-card edit form open and closed', async ({ page }) => {
+    await openCredentials(page);
+    await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeHidden();
+    await page.getByTestId('wif-credential-edit-wt-a').click();
+    await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeVisible();
+    await page.getByTestId('wif-credential-edit-wt-a').click();
+    await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeHidden();
+  });
+
   test('item 7: the JWKS allowlist notice lists hosts + warns on a non-allowed host with inline add', async ({ page }) => {
     await openCredentials(page);
     await page.getByTestId('wif-add-trust-button').click();

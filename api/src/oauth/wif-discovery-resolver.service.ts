@@ -68,6 +68,12 @@ export interface WifVerifyRequest {
 export interface WifVerifyResult {
   ok: boolean;
   checks: WifVerifyCheck[];
+  /**
+   * V7 - set when the verify targeted a SAVED trust (credentialId supplied) and
+   * passed, so the caller persisted this ISO timestamp as the trust's
+   * `lastVerifiedAt` and the UI can flip the card to Verified without a reload.
+   */
+  lastVerifiedAt?: string;
 }
 
 @Injectable()

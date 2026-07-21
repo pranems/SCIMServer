@@ -230,7 +230,7 @@ export class AdminCredentialController {
   @HttpCode(200)
   async verifyWifTrust(
     @Param('endpointId') endpointId: string,
-    @Body() body: WifVerifyRequest,
+    @Body() body: WifVerifyRequest & { credentialId?: string },
   ): Promise<WifVerifyResult> {
     const endpoint = await this.requireEndpoint(endpointId);
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
@@ -241,6 +241,19 @@ export class AdminCredentialController {
       );
     }
     const result = await this.wifResolver.verifyTrust(body ?? {});
+    // V7 - when the verify targets a SAVED trust (credentialId supplied) and it
+    // passes, persist lastVerifiedAt onto that credential so the trust card
+    // flips Unverified -> Verified. A verify with no credentialId stays a pure
+    // dry-run (the add-form / ad-hoc case), unchanged.
+    let verifiedAt: string | undefined;
+    if (result.ok && typeof body?.credentialId === 'string' && body.credentialId.length > 0) {
+      const credential = await this.credentialRepo.findById(body.credentialId);
+      if (credential && credential.endpointId === endpointId && credential.credentialType === 'wif') {
+        verifiedAt = new Date().toISOString();
+        const nextMetadata: Record<string, unknown> = { ...(credential.metadata ?? {}), lastVerifiedAt: verifiedAt };
+        await this.credentialRepo.updateMetadata(body.credentialId, nextMetadata);
+      }
+    }
     // Phase 4 - config-time auth audit event for a WIF trust verification.
     emitAuthAdminEvent(
       this.logger,
@@ -249,11 +262,12 @@ export class AdminCredentialController {
         outcome: result.ok ? 'success' : 'failure',
         endpointId,
         method: 'wif',
+        credentialId: body?.credentialId,
         correlationId: getCorrelationContext()?.requestId,
       },
       LogCategory.AUTH,
     );
-    return result;
+    return verifiedAt ? { ...result, lastVerifiedAt: verifiedAt } : result;
   }
 
   /**

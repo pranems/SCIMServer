@@ -532,6 +532,47 @@ describe('AdminCredentialController', () => {
     });
   });
 
+  describe('V7 - verify persists lastVerifiedAt on a saved trust', () => {
+    const wifEndpoint = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: true } } };
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue(wifEndpoint);
+    });
+
+    it('stamps lastVerifiedAt on the credential when a passing verify supplies its credentialId', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'wif-v7', credentialType: 'wif', credentialHash: '', metadata: { expectedIssuer: 'https://idp/v2.0' } });
+      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys', credentialId: 'wif-v7' } as never);
+      const meta = mockCredentialRepo.updateMetadata.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+      expect(typeof meta.lastVerifiedAt).toBe('string');
+      expect(res.lastVerifiedAt).toBe(meta.lastVerifiedAt);
+      // The prior metadata is preserved.
+      expect(meta.expectedIssuer).toBe('https://idp/v2.0');
+    });
+
+    it('does NOT persist when no credentialId is supplied (pure dry-run)', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
+      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys' } as never);
+      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
+      expect(res.lastVerifiedAt).toBeUndefined();
+    });
+
+    it('does NOT persist when the verify fails even with a credentialId', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: false, checks: [{ id: 'jwksReachable', label: 'x', ok: false }] });
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'wif-v7', credentialType: 'wif', credentialHash: '' });
+      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys', credentialId: 'wif-v7' } as never);
+      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
+      expect(res.lastVerifiedAt).toBeUndefined();
+    });
+
+    it('does NOT persist when the credentialId is not a wif credential of this endpoint', async () => {
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'br-1', credentialType: 'bearer' });
+      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys', credentialId: 'br-1' } as never);
+      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
+      expect(res.lastVerifiedAt).toBeUndefined();
+    });
+  });
+
   describe('WI-13 - WIF trust claim-name input aliases + expectedTenantId', () => {
     beforeEach(() => {
       mockEndpointService.getEndpoint.mockResolvedValue({

@@ -13255,6 +13255,59 @@ Write-Host "`n--- 9z-BJ: per-oauth_client Connect (U2) Complete ---" -Foreground
 
 
 # ============================================
+# TEST SECTION 9z-BK: WIF verify persists lastVerifiedAt (V7 + V8)
+# ============================================
+$script:currentSection = "9z-BK: WIF verify persistence (V7/V8)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BK: WIF verify with credentialId persists lastVerifiedAt (V7/V8)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $bkTenant = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+    $bkIssuer = "https://login.microsoftonline.com/$bkTenant/v2.0"
+    $bkJwks   = "https://login.windows.net/$bkTenant/discovery/v2.0/keys"
+    $bkEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wifverify-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bkId = $bkEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bkId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # Create a WIF trust (no verify-on-save) against a real reachable Entra tenant.
+    $bkWif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bkId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "verify-me"
+        wif = @{ expectedIssuer = $bkIssuer; expectedSubject = "sp"; expectedAudience = "api://x"; jwksUri = $bkJwks; allowedTenantId = $bkTenant }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success (-not $bkWif.wif.lastVerifiedAt) -Message "9z-BK.T1: fresh trust has NO lastVerifiedAt (unverified)"
+
+    # V7 - verify WITH the credentialId against a reachable Entra tenant -> persists lastVerifiedAt.
+    $bkVerify = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bkId/wif/verify" -Method POST -Headers $headers -Body (@{
+        expectedIssuer = $bkIssuer; jwksUri = $bkJwks; credentialId = $bkWif.id
+    } | ConvertTo-Json)
+    Test-Result -Success ($bkVerify.ok -eq $true) -Message "9z-BK.T2: verify a reachable Entra trust -> ok=true"
+    Test-Result -Success ($bkVerify.lastVerifiedAt -and $bkVerify.lastVerifiedAt.Length -gt 0) -Message "9z-BK.T3: verify response carries the persisted lastVerifiedAt"
+
+    # V7 - re-read the trust via overview: lastVerifiedAt is now persisted (card flips Verified).
+    $bkOverview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bkId/overview" -Method GET -Headers $headers
+    $bkRow = @($bkOverview.credentials | Where-Object { $_.id -eq $bkWif.id })[0]
+    Test-Result -Success ($bkRow.wif.lastVerifiedAt -and $bkRow.wif.lastVerifiedAt.Length -gt 0) -Message "9z-BK.T4: overview trust now shows lastVerifiedAt (Verified)"
+
+    # V7 - a verify WITHOUT credentialId is a pure dry-run (does not persist).
+    $bkDry = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bkId/wif/verify" -Method POST -Headers $headers -Body (@{
+        expectedIssuer = $bkIssuer; jwksUri = $bkJwks
+    } | ConvertTo-Json)
+    Test-Result -Success (-not $bkDry.lastVerifiedAt) -Message "9z-BK.T5: verify without credentialId does NOT carry lastVerifiedAt (dry-run)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bkId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BK: WIF verify persistence section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BK: WIF verify persistence (V7/V8) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

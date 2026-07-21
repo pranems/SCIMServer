@@ -784,6 +784,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   // Item 6 - server-side reachability/liveness verification.
   const verifyMutation = useVerifyWifTrust(endpointId);
   const [verifyResult, setVerifyResult] = React.useState<WifVerifyResult | null>(null);
+  // V8 - per-card verify result (keyed by the trust's credential id).
+  const [cardVerify, setCardVerify] = React.useState<{ id: string; result: WifVerifyResult | null } | null>(null);
   // Item C - when a verify-gated save fails, offer an explicit override.
   const [needsOverride, setNeedsOverride] = React.useState(false);
 
@@ -921,10 +923,15 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     );
   };
 
-  // Item 4 - load a saved trust into the form for editing.
+  // Item 4 - load a saved trust into the form for editing. V9 - togglable: a
+  // second click on Edit for the trust already being edited closes the form.
   const onEditTrust = (cred: EndpointOverviewCredential): void => {
     const t = cred.wif;
     if (!t) return;
+    if (editingId === cred.id) {
+      onCancelEdit();
+      return;
+    }
     setSaved(null);
     setSaveError(null);
     setTestSteps(null);
@@ -991,11 +998,34 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   };
 
   // Item 6 - server-side reachability + liveness verification of issuer + JWKS.
+  // V7 - when editing a saved trust, pass its credentialId so a passing verify
+  // persists lastVerifiedAt and the card flips Unverified -> Verified.
   const onVerify = (): void => {
     setVerifyResult(null);
     verifyMutation.mutate(
-      { expectedIssuer: trustPayload.expectedIssuer, jwksUri: trustPayload.jwksUri },
+      {
+        expectedIssuer: trustPayload.expectedIssuer,
+        jwksUri: trustPayload.jwksUri,
+        credentialId: editingId ?? undefined,
+      },
       { onSuccess: (res) => setVerifyResult(res) },
+    );
+  };
+
+  // V8 - verify a specific saved trust straight from its card (no Edit needed).
+  // Uses the trust's stored issuer/JWKS + its credentialId so a pass persists
+  // lastVerifiedAt (V7) and the card status refreshes.
+  const onVerifyTrust = (cred: EndpointOverviewCredential): void => {
+    const t = cred.wif;
+    if (!t) return;
+    setCardVerify({ id: cred.id, result: null });
+    verifyMutation.mutate(
+      {
+        expectedIssuer: t.expectedIssuer ?? undefined,
+        jwksUri: t.jwksUri ?? undefined,
+        credentialId: cred.id,
+      },
+      { onSuccess: (res) => setCardVerify({ id: cred.id, result: res }) },
     );
   };
 
@@ -1384,6 +1414,16 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         </Button>
                         <Button
                           appearance="subtle"
+                          icon={<PlugConnected24Regular />}
+                          onClick={() => onVerifyTrust(cred)}
+                          disabled={verifyMutation.isPending && cardVerify?.id === cred.id}
+                          aria-label={`Verify WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-verify-${cred.id}`}
+                        >
+                          {verifyMutation.isPending && cardVerify?.id === cred.id ? 'Verifying...' : 'Verify'}
+                        </Button>
+                        <Button
+                          appearance="subtle"
                           icon={<Delete24Regular />}
                           onClick={() => deleteMutation.mutate(cred.id)}
                           aria-label={`Revoke WIF credential ${cred.label ?? cred.id}`}
@@ -1392,6 +1432,31 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                       </div>
                     </div>
                     <WifTrustDetails credId={cred.id} trust={cred.wif} styles={wif} />
+
+                    {/* V8 - per-card verify result (in-card checklist). */}
+                    {cardVerify?.id === cred.id && cardVerify.result != null && (
+                      <div className={wif.jwksNotice} data-testid={`wif-credential-verify-result-${cred.id}`}>
+                        <MessageBar intent={cardVerify.result.ok ? 'success' : 'warning'}>
+                          <MessageBarBody>
+                            <MessageBarTitle>
+                              {cardVerify.result.ok
+                                ? 'Verified - issuer + JWKS reachable and serving keys'
+                                : 'Some reachability checks failed - fix these before relying on this trust'}
+                            </MessageBarTitle>
+                          </MessageBarBody>
+                        </MessageBar>
+                        {cardVerify.result.checks.map((c) => (
+                          <div key={c.id} className={wif.testStep} data-testid={`wif-credential-${cred.id}-verify-check-${c.id}`}>
+                            <Badge appearance="filled" color={c.ok ? 'success' : 'danger'}>
+                              {c.ok ? 'PASS' : 'FAIL'}
+                            </Badge>
+                            <Caption1>
+                              <strong>{c.label}</strong> - {c.detail}
+                            </Caption1>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* U6 - per-trust Connect-to-Entra params (in-card). */}
                     {connectTrustId === cred.id && (
@@ -1535,7 +1600,7 @@ function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
   const tabs: MethodTabDef[] = [{ value: 'all', label: 'All', credentialType: null }];
   if (sharedSecret) tabs.push({ value: 'shared_secret', label: 'Shared secret', credentialType: null });
   if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
-  if (oauthClient) tabs.push({ value: 'oauth_client', label: 'OAuth2 client', credentialType: 'oauth_client' });
+  if (oauthClient) tabs.push({ value: 'oauth_client', label: 'OAuth2 Client-Credential', credentialType: 'oauth_client' });
   if (wif) tabs.push({ value: 'wif', label: 'WIF', credentialType: 'wif' });
   return tabs;
 }

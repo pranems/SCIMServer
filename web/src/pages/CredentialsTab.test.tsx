@@ -668,6 +668,65 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credential-connect-tokenurl-oc-1')).toBeInTheDocument();
   });
 
+  function wifTrustOverview(id: string): EndpointOverviewResponse {
+    return {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id,
+          credentialType: 'wif',
+          label: 'Trust',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
+            expectedSubject: 'sp',
+            expectedAudience: 'api://x',
+            jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
+            allowedTenantId: 't',
+            requiredRoles: null,
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+  }
+
+  it('V8: the WIF trust card Verify button verifies that trust and shows the result', () => {
+    mockVerifyWif.mockClear();
+    mockVerifyWif.mockImplementation((_body: unknown, opts?: { onSuccess?: (r: unknown) => void }) =>
+      opts?.onSuccess?.({
+        ok: true,
+        checks: [{ id: 'jwksServesKeys', label: 'JWKS serves keys', ok: true, detail: '5 keys' }],
+        lastVerifiedAt: '2026-07-21T00:00:00Z',
+      }),
+    );
+    mockUseEndpointOverview.mockReturnValue({ data: wifTrustOverview('wt-8'), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('wif-credential-verify-wt-8'));
+    // Verify was called with the trust's credentialId + its stored issuer/JWKS.
+    const body = mockVerifyWif.mock.calls[0][0] as { credentialId?: string; expectedIssuer?: string };
+    expect(body.credentialId).toBe('wt-8');
+    expect(body.expectedIssuer).toBe('https://login.microsoftonline.com/t/v2.0');
+    // The in-card verify result renders.
+    expect(screen.getByTestId('wif-credential-verify-result-wt-8')).toBeInTheDocument();
+  });
+
+  it('V9: the WIF Edit button toggles the in-card edit form open and closed', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: wifTrustOverview('wt-9'), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('wif-trust-edit-form-wt-9')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('wif-credential-edit-wt-9'));
+    expect(screen.getByTestId('wif-trust-edit-form-wt-9')).toBeInTheDocument();
+    // A second click on Edit toggles the form closed (V9).
+    fireEvent.click(screen.getByTestId('wif-credential-edit-wt-9'));
+    expect(screen.queryByTestId('wif-trust-edit-form-wt-9')).not.toBeInTheDocument();
+  });
+
   it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
     mockUpdateWif.mockClear();
     const overview: EndpointOverviewResponse = {
@@ -1269,6 +1328,18 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
     expect(screen.getByTestId('credentials-method-tab-oauth_client')).toBeInTheDocument();
     expect(screen.getByTestId('credentials-method-tab-wif')).toBeInTheDocument();
+  });
+
+  it('V6: the OAuth2 sub-tab is labelled "OAuth2 Client-Credential"', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { OAuthClientCredentialsAuthEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credentials-method-tab-oauth_client').textContent).toContain(
+      'OAuth2 Client-Credential',
+    );
   });
 
   it('omits the tab for a disabled method (WIF off -> no WIF tab)', () => {

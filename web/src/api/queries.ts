@@ -1474,6 +1474,8 @@ export interface WifVerifyCheck {
 export interface WifVerifyResult {
   ok: boolean;
   checks: WifVerifyCheck[];
+  /** V7 - present when the verify targeted a saved trust and persisted it. */
+  lastVerifiedAt?: string;
 }
 
 /**
@@ -1482,12 +1484,20 @@ export interface WifVerifyResult {
  * per-check checklist for the UI to render.
  */
 export function useVerifyWifTrust(endpointId: string) {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { expectedIssuer?: string; jwksUri?: string }) =>
+    mutationFn: (body: { expectedIssuer?: string; jwksUri?: string; credentialId?: string }) =>
       fetchWithAuth<WifVerifyResult>(`/scim/admin/endpoints/${endpointId}/wif/verify`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    onSuccess: (result, body) => {
+      // V7 - when the verify targeted a SAVED trust and persisted lastVerifiedAt,
+      // refresh the overview so the trust card flips Unverified -> Verified.
+      if (body.credentialId && result?.lastVerifiedAt) {
+        void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      }
+    },
   });
 }
 
