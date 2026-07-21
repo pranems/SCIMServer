@@ -211,12 +211,12 @@ describe('LogsTab', () => {
   });
 
   // ==========================================================================
-  // Phase 3 (auth-obs) - correlationId <-> requestId bridge in the drawer
+  // U11 - the auth decision renders inline inside the request-log drawer
   // ==========================================================================
-  it('drawer shows correlation id + "View auth decision" and focuses the panel on click', async () => {
+  it('drawer shows the correlation id + the inline auth decision section', async () => {
     // mockUseQuery returns the same object for the list, the detail, and the
-    // AuthDiagnosticsPanel queries. Carrying requestId on it drives the detail
-    // drawer's correlation section without a distinct per-query mock.
+    // auth-decisions query. Carrying requestId on it drives the detail drawer's
+    // correlation section without a distinct per-query mock.
     mockUseQuery.mockReturnValue({
       data: {
         total: 1,
@@ -239,10 +239,7 @@ describe('LogsTab', () => {
     fireEvent.click(await screen.findByTestId('logs-tab-row-l1'));
     expect(await screen.findByTestId('logs-tab-detail-correlation')).toBeInTheDocument();
     expect(screen.getByTestId('logs-tab-detail-request-id')).toHaveTextContent('corr-xyz');
-
-    fireEvent.click(screen.getByTestId('logs-tab-detail-view-auth-decision'));
-    expect(
-      await screen.findByTestId('logs-tab-auth-diagnostics-focus'),
-    ).toBeInTheDocument();
+    // U11 - the auth decision section is embedded inline (no focus-jump panel).
+    expect(screen.getByTestId('log-detail-auth-section')).toBeInTheDocument();
   });
 });

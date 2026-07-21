@@ -24,10 +24,9 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { DocumentSearch24Regular } from '@fluentui/react-icons';
-import { endpointLogsQueryOptions, useEndpointLog } from '../api/queries';
+import { endpointLogsQueryOptions, useEndpointLog, useAuthDecisions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
-import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, CopyableJsonBlock, DetailDrawer, AuthDiagnosticsPanel } from '../components/primitives';
+import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, CopyableJsonBlock, DetailDrawer, AuthDecisionForRequest } from '../components/primitives';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -93,18 +92,18 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const [detailId, setDetailId] = React.useState<string | undefined>(undefined);
   const detailQuery = useEndpointLog(endpointId, detailId);
 
-  // Phase 3 (auth-obs) - focus the embedded AuthDiagnosticsPanel on a
-  // request's correlation id when the operator clicks "View auth decision".
-  const [authFocus, setAuthFocus] = React.useState<string | undefined>(undefined);
-  const authPanelRef = React.useRef<HTMLDivElement | null>(null);
-
-  const viewAuthDecision = (correlationId: string): void => {
-    setAuthFocus(correlationId);
-    setDetailId(undefined);
-    requestAnimationFrame(() => {
-      authPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-    });
-  };
+  // U12 - recent auth decisions for this endpoint, keyed by correlation id, so
+  // each request-log row can show a glanceable auth-outcome chip.
+  const authDecisions = useAuthDecisions({ endpointId, limit: 100 });
+  const authByCorrelation = React.useMemo(() => {
+    const map = new Map<string, { outcome: 'accept' | 'reject'; reasonCode?: string }>();
+    for (const r of authDecisions.data?.records ?? []) {
+      if (r.correlationId && !map.has(r.correlationId)) {
+        map.set(r.correlationId, { outcome: r.outcome, reasonCode: r.reasonCode });
+      }
+    }
+    return map;
+  }, [authDecisions.data]);
 
   const updateSearch = (next: { page?: number; urlContains?: string }): void => {
     navigate({
@@ -165,7 +164,6 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
       />
     ) : (
       <div className={classes.container} data-testid="logs-tab-empty-wrap">
-        <AuthDiagnosticsPanel endpointId={endpointId} data-testid="logs-tab-auth-diagnostics" />
         <EmptyState
           data-testid="logs-tab-empty"
           title="No request logs yet"
@@ -177,14 +175,9 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
 
   return (
     <div className={classes.container} data-testid="logs-tab">
-      <div ref={authPanelRef}>
-        <AuthDiagnosticsPanel
-          endpointId={endpointId}
-          data-testid="logs-tab-auth-diagnostics"
-          focusCorrelationId={authFocus}
-          onClearFocus={() => setAuthFocus(undefined)}
-        />
-      </div>
+      {/* U12 - the endpoint auth-diagnostics panel is re-scoped to Connect ->
+          Health. Per-request auth now renders inline in the log detail (U11)
+          and as a per-row chip below. */}
       <div className={classes.header}>
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
         <ExportSplitButton
@@ -214,6 +207,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
             <th className={mergeClasses(classes.th, classes.colMethod)}>Method</th>
             <th className={mergeClasses(classes.th, classes.colUrl)}>URL</th>
             <th className={mergeClasses(classes.th, classes.colStatus)}>Status</th>
+            <th className={mergeClasses(classes.th, classes.colStatus)}>Auth</th>
             <th className={mergeClasses(classes.th, classes.colDuration)}>Duration</th>
             <th className={mergeClasses(classes.th, classes.colTime)}>Time</th>
           </tr>
@@ -245,6 +239,24 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
                 <Badge appearance="outline" color={log.status >= 400 ? 'danger' : 'success'}>
                   {log.status}
                 </Badge>
+              </td>
+              <td className={classes.td}>
+                {(() => {
+                  const auth = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                  if (!auth) {
+                    return <Caption1 data-testid={`log-row-auth-${log.id}`}>-</Caption1>;
+                  }
+                  return (
+                    <Badge
+                      appearance="filled"
+                      color={auth.outcome === 'accept' ? 'success' : 'danger'}
+                      title={auth.reasonCode ?? auth.outcome}
+                      data-testid={`log-row-auth-${log.id}`}
+                    >
+                      {auth.outcome === 'accept' ? 'auth ok' : auth.reasonCode ?? 'auth fail'}
+                    </Badge>
+                  );
+                })()}
               </td>
               <td className={classes.td}>
                 <Caption1>{log.durationMs}ms</Caption1>
@@ -295,15 +307,15 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }} data-testid="logs-tab-detail-correlation">
                 <Caption1>Correlation id</Caption1>
                 <CopyableField value={detailQuery.data.requestId} monospace maxWidth="100%" data-testid="logs-tab-detail-request-id" />
-                <Button
-                  appearance="subtle"
-                  icon={<DocumentSearch24Regular />}
-                  onClick={() => viewAuthDecision(detailQuery.data!.requestId!)}
-                  data-testid="logs-tab-detail-view-auth-decision"
-                >
-                  View auth decision
-                </Button>
               </div>
+            )}
+            {/* U11 - the authentication decision for this request, inline. */}
+            {detailQuery.data.requestId && (
+              <AuthDecisionForRequest
+                correlationId={detailQuery.data.requestId}
+                endpointId={endpointId}
+                data-testid="log-detail-auth-section"
+              />
             )}
             <CopyableJsonBlock value={detailQuery.data.requestHeaders ?? {}} label="Request headers" data-testid="logs-tab-detail-request-headers" />
             <CopyableJsonBlock value={detailQuery.data.requestBody ?? null} label="Request body" data-testid="logs-tab-detail-request-body" />

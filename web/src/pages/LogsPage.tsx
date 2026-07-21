@@ -42,11 +42,12 @@ import {
   useGlobalLogs,
   useGlobalLog,
   useEndpoints,
+  useAuthDecisions,
   type GlobalLogsParams,
 } from '../api/queries';
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
 import { TIME_RANGE_VALUES } from '../routes/search-schemas';
-import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton, AuthDiagnosticsPanel } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton, AuthDecisionForRequest } from '../components/primitives';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -213,6 +214,8 @@ interface LogRow {
   status?: number;
   durationMs?: number;
   createdAt: string | Date;
+  /** P3 - the X-Request-Id correlation id echoed on each list item (U12). */
+  requestId?: string;
 }
 
 export const LogsPage: React.FC = () => {
@@ -245,20 +248,18 @@ export const LogsPage: React.FC = () => {
   const { data, isLoading, error } = useGlobalLogs(params);
   const detailQuery = useGlobalLog(detailId);
 
-  // Phase 3 (auth-obs) - when the operator clicks "View auth decision"
-  // in a request-log drawer, focus the embedded AuthDiagnosticsPanel on
-  // that request's correlation id and scroll it into view.
-  const [authFocus, setAuthFocus] = React.useState<string | undefined>(undefined);
-  const authPanelRef = React.useRef<HTMLDivElement | null>(null);
-
-  const viewAuthDecision = (correlationId: string): void => {
-    setAuthFocus(correlationId);
-    closeDetail();
-    // Defer the scroll until after the drawer close re-render.
-    requestAnimationFrame(() => {
-      authPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-    });
-  };
+  // U12 - the recent auth decisions, keyed by correlation id, so each request
+  // log row can show a glanceable auth-outcome chip without opening the row.
+  const authDecisions = useAuthDecisions({ limit: 100 });
+  const authByCorrelation = React.useMemo(() => {
+    const map = new Map<string, { outcome: 'accept' | 'reject'; reasonCode?: string }>();
+    for (const r of authDecisions.data?.records ?? []) {
+      if (r.correlationId && !map.has(r.correlationId)) {
+        map.set(r.correlationId, { outcome: r.outcome, reasonCode: r.reasonCode });
+      }
+    }
+    return map;
+  }, [authDecisions.data]);
 
   // Helper that merges a partial filter patch into the current URL,
   // resetting page to 1 (we don't track page in this view yet but the
@@ -329,14 +330,10 @@ export const LogsPage: React.FC = () => {
         )}
       </div>
 
-      {/* WI-D6 - global auth diagnostics (all endpoints). */}
-      <div ref={authPanelRef}>
-        <AuthDiagnosticsPanel
-          data-testid="global-logs-auth-diagnostics"
-          focusCorrelationId={authFocus}
-          onClearFocus={() => setAuthFocus(undefined)}
-        />
-      </div>
+      {/* U12 - the standalone auth-diagnostics panel is re-scoped to the
+          endpoint Connect -> Health surface. Per-request auth now lives inside
+          the request's own DetailDrawer (U11). The logs surface shows an auth
+          chip per row + the full decision inline in the drawer. */}
 
       {/* Phase D5 toolbar: endpoint + status + time range + free-text */}
       <div className={classes.toolbar} data-testid="logs-toolbar">
@@ -438,6 +435,7 @@ export const LogsPage: React.FC = () => {
               <th className={mergeClasses(classes.th, classes.colMethod)}>Method</th>
               <th className={mergeClasses(classes.th, classes.colUrl)}>URL</th>
               <th className={mergeClasses(classes.th, classes.colStatus)}>Status</th>
+              <th className={mergeClasses(classes.th, classes.colStatus)}>Auth</th>
               <th className={mergeClasses(classes.th, classes.colDuration)}>Duration</th>
               <th className={mergeClasses(classes.th, classes.colTime)}>Time</th>
             </tr>
@@ -472,6 +470,24 @@ export const LogsPage: React.FC = () => {
                   <Badge appearance="outline" color={statusColor(log.status)}>
                     {log.status ?? '-'}
                   </Badge>
+                </td>
+                <td className={classes.td}>
+                  {(() => {
+                    const auth = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                    if (!auth) {
+                      return <Caption1 data-testid={`log-row-auth-${log.id}`}>-</Caption1>;
+                    }
+                    return (
+                      <Badge
+                        appearance="filled"
+                        color={auth.outcome === 'accept' ? 'success' : 'danger'}
+                        title={auth.reasonCode ?? auth.outcome}
+                        data-testid={`log-row-auth-${log.id}`}
+                      >
+                        {auth.outcome === 'accept' ? 'auth ok' : auth.reasonCode ?? 'auth fail'}
+                      </Badge>
+                    );
+                  })()}
                 </td>
                 <td className={classes.td}>
                   <Caption1>{log.durationMs}ms</Caption1>
@@ -551,14 +567,16 @@ export const LogsPage: React.FC = () => {
                   maxWidth="100%"
                   data-testid="log-detail-request-id"
                 />
-                <Button
-                  appearance="subtle"
-                  icon={<DocumentSearch24Regular />}
-                  onClick={() => viewAuthDecision(detailQuery.data!.requestId!)}
-                  data-testid="log-detail-view-auth-decision"
-                >
-                  View auth decision
-                </Button>
+              </div>
+            )}
+
+            {/* U11 - the authentication decision for this request, inline. */}
+            {detailQuery.data.requestId && (
+              <div className={classes.drawerSection}>
+                <AuthDecisionForRequest
+                  correlationId={detailQuery.data.requestId}
+                  data-testid="log-detail-auth-section"
+                />
               </div>
             )}
 

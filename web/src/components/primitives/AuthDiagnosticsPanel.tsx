@@ -227,6 +227,67 @@ export interface AuthDiagnosticsPanelProps {
   'data-testid'?: string;
 }
 
+/**
+ * U11 - a compact, single-decision auth view for embedding INSIDE a request
+ * log's DetailDrawer. Given the log's `correlationId` (its X-Request-Id), it
+ * finds the matching recent auth decision and renders its outcome + the
+ * expected-vs-received check diff + reason + remediation inline, so the auth
+ * step of a request is part of the request's own detail (not a sibling panel).
+ */
+export const AuthDecisionForRequest: React.FC<{
+  correlationId: string;
+  endpointId?: string;
+  'data-testid'?: string;
+}> = ({ correlationId, endpointId, 'data-testid': testId = 'log-detail-auth-section' }) => {
+  const classes = useStyles();
+  const { data, isLoading, error } = useAuthDecisions({ endpointId, limit: 50 });
+  const record = (data?.records ?? []).find((r) => r.correlationId === correlationId);
+
+  return (
+    <div className={classes.root} data-testid={testId}>
+      <div className={classes.header}>
+        <Subtitle2>Authentication</Subtitle2>
+        <Caption1 className={classes.hint}>
+          The authentication decision for this request, joined by request id. Non-secret;
+          short-lived diagnostics.
+        </Caption1>
+      </div>
+
+      {isLoading && <LoadingSkeleton count={2} height="28px" />}
+
+      {error && (
+        <EmptyState
+          title="Could not load the auth decision"
+          body="The recent auth decisions could not be retrieved."
+          data-testid={`${testId}-error`}
+        />
+      )}
+
+      {!isLoading && !error && !record && (
+        <EmptyState
+          title="No auth decision for this request"
+          body="This request produced no recorded auth decision - it may have authenticated on an earlier request, used a non-auth route, or the short-lived record has expired."
+          data-testid={`${testId}-empty`}
+        />
+      )}
+
+      {!isLoading && !error && record && (
+        <div data-testid={`${testId}-record`}>
+          <div className={classes.rowHeader}>
+            {outcomeBadge(record)}
+            <Text className={classes.mono}>{record.method}</Text>
+            {record.reasonCode && <Caption1 className={classes.mono}>{record.reasonCode}</Caption1>}
+            <Caption1 className={classes.hint}>
+              {new Date(record.recordedAt).toLocaleTimeString()}
+            </Caption1>
+          </div>
+          <DecisionDetail record={record} endpointId={endpointId} />
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const AuthDiagnosticsPanel: React.FC<AuthDiagnosticsPanelProps> = ({
   endpointId,
   limit = 25,

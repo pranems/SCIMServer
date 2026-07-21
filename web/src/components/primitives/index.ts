@@ -41,6 +41,7 @@ export type { SettingsJsonExportProps } from './SettingsJsonExport';
 
 export { AuthDiagnosticsPanel } from './AuthDiagnosticsPanel';
 export type { AuthDiagnosticsPanelProps } from './AuthDiagnosticsPanel';
+export { AuthDecisionForRequest } from './AuthDiagnosticsPanel';
 
 export { EditableField } from './EditableField';
 export type { EditableFieldProps } from './EditableField';

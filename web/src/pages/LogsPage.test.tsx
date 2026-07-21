@@ -6,13 +6,14 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithRouter } from '../test/router-test-utils';
 import { globalLogsSearchSchema } from '../routes/search-schemas';
 
 const mockUseGlobalLogs = vi.fn();
 const mockUseGlobalLog = vi.fn();
 const mockUseEndpoints = vi.fn();
+const mockUseAuthDecisions = vi.fn((..._args: unknown[]) => ({ data: { count: 0, records: [] }, isLoading: false, error: null }));
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -21,9 +22,9 @@ vi.mock('../api/queries', async () => {
     useGlobalLogs: (...args: unknown[]) => mockUseGlobalLogs(...args),
     useGlobalLog: (...args: unknown[]) => mockUseGlobalLog(...args),
     useEndpoints: (...args: unknown[]) => mockUseEndpoints(...args),
-    // WI-D6: LogsPage now embeds the global AuthDiagnosticsPanel; stub its hook
-    // so these tests need no QueryClientProvider.
-    useAuthDecisions: () => ({ data: { count: 0, records: [] }, isLoading: false, error: null }),
+    // U11/U12: the log row chip + the in-drawer auth section read recent
+    // decisions; stub the hook so these tests need no QueryClientProvider.
+    useAuthDecisions: (...args: unknown[]) => mockUseAuthDecisions(...args),
   };
 });
 
@@ -65,6 +66,7 @@ describe('LogsPage', () => {
     // Sensible defaults for every test - individual tests override.
     mockUseEndpoints.mockReturnValue({ data: sampleEndpoints, isLoading: false, error: null });
     mockUseGlobalLog.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    mockUseAuthDecisions.mockReturnValue({ data: { count: 0, records: [] }, isLoading: false, error: null });
   });
 
   // ─── Existing baseline behaviors ─────────────────────────────────
@@ -226,10 +228,11 @@ describe('LogsPage', () => {
       wrap(<LogsPage />, '/logs?detail=l1');
       expect(await screen.findByTestId('log-detail-correlation')).toBeInTheDocument();
       expect(screen.getByTestId('log-detail-request-id')).toHaveTextContent('corr-xyz');
-      expect(screen.getByTestId('log-detail-view-auth-decision')).toBeInTheDocument();
+      // U11 - the auth decision now renders inline inside the drawer.
+      expect(screen.getByTestId('log-detail-auth-section')).toBeInTheDocument();
     });
 
-    it('clicking "View auth decision" focuses the embedded auth panel on the correlation id', async () => {
+    it('U11: the in-drawer auth section renders the matching decision inline', async () => {
       mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
       mockUseGlobalLog.mockReturnValue({
         data: {
@@ -244,12 +247,55 @@ describe('LogsPage', () => {
         isLoading: false,
         error: null,
       });
+      mockUseAuthDecisions.mockReturnValue({
+        data: {
+          count: 1,
+          records: [
+            {
+              id: 'adr-1',
+              outcome: 'reject',
+              reasonCode: 'wif_audience_mismatch',
+              method: 'wif',
+              plane: 'token-mint',
+              correlationId: 'corr-xyz',
+              recordedAt: '2026-05-01T10:00:00Z',
+              checks: [{ id: 'audience_match', status: 'fail', expected: 'api://app', received: 'api://wrong' }],
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      } as never);
       wrap(<LogsPage />, '/logs?detail=l1');
-      fireEvent.click(await screen.findByTestId('log-detail-view-auth-decision'));
-      // The global AuthDiagnosticsPanel now shows its focus indicator.
-      expect(
-        await screen.findByTestId('global-logs-auth-diagnostics-focus'),
-      ).toBeInTheDocument();
+      // The inline section shows the matched decision's reason + check diff.
+      expect(await screen.findByTestId('log-detail-auth-section-record')).toBeInTheDocument();
+      expect(screen.getByTestId('auth-decision-check-audience_match')).toBeInTheDocument();
+    });
+
+    it('U12: a request-log row shows an auth-outcome chip when a decision matches', async () => {
+      mockUseGlobalLogs.mockReturnValue({
+        data: {
+          total: 1,
+          items: [
+            { id: 'l1', method: 'GET', url: '/scim/endpoints/ep-prod/Users', status: 401, durationMs: 3, createdAt: '2026-05-01T10:00:00Z', requestId: 'corr-xyz' },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      });
+      mockUseAuthDecisions.mockReturnValue({
+        data: {
+          count: 1,
+          records: [
+            { id: 'adr-1', outcome: 'reject', reasonCode: 'wif_audience_mismatch', method: 'wif', plane: 'token-mint', correlationId: 'corr-xyz', recordedAt: '2026-05-01T10:00:00Z', checks: [] },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      } as never);
+      wrap(<LogsPage />, '/logs');
+      const chip = await screen.findByTestId('log-row-auth-l1');
+      expect(chip.textContent).toContain('wif_audience_mismatch');
     });
 
     it('does not render the correlation section when the log has no requestId', async () => {
