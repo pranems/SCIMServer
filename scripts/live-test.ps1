@@ -13073,13 +13073,13 @@ try {
         Test-Result -Success ($bgReason -eq 'bearer_invalid') -Message "9z-BG.T3: resource-plane bogus bearer -> 401 + diagnostics.reason_code bearer_invalid"
 
         # F4 follow-up - a GUARD-rejected 401 also carries the requestId correlator
-        # (the early correlation middleware runs before guards).
-        $bgReqId = $null; $bgHdrId = $null
+        # (the early correlation middleware runs before guards). Use Invoke-RestMethod
+        # so the error body lands in $_.ErrorDetails.Message (consistent with T3/T4).
+        $bgReqId = $null
         try {
-            Invoke-WebRequest -Uri "$bgBase/Users" -Method GET -Headers @{ Authorization = 'Bearer bogus' } -UseBasicParsing | Out-Null
+            Invoke-RestMethod -Uri "$bgBase/Users" -Method GET -Headers @{ Authorization = 'Bearer bogus' } | Out-Null
         } catch {
             try { $bgReqId = ($_.ErrorDetails.Message | ConvertFrom-Json).'urn:scimserver:api:messages:2.0:Diagnostics'.requestId } catch {}
-            try { $bgHdrId = $_.Exception.Response.Headers['X-Request-Id'] } catch {}
         }
         Test-Result -Success ($null -ne $bgReqId -and $bgReqId.Length -gt 10) -Message "9z-BG.T3b: a guard-rejected 401 carries the requestId correlator in diagnostics ($bgReqId)"
 
