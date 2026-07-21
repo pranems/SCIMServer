@@ -2,7 +2,7 @@
 
 > **What this is.** A design + planning document that (1) audits what is already **completed** vs **remaining** on the endpoint **Connect** tab and the **Logs** surfaces, (2) answers three design questions the operator raised (the deferred "Advanced accordion", the "disjointed" auth-diagnostics-in-logs, and "auth is a first-class step of a request"), and (3) captures every operator-requested item as a numbered work item (U1..U12) with concrete API + UI changes, field orderings, testids, and acceptance criteria - all as explanatory tables and Mermaid diagrams per the house documentation norms.
 >
-> **Status.** IN IMPLEMENTATION. This document is the authoritative requirements + design capture; implementation follows per the standard feature checklist (unit + E2E + live + Playwright + docs + version bump + one dev deploy).
+> **Status.** IMPLEMENTED (v0.54.32 -> v0.54.37). All 12 work items U1..U12 shipped across four tracks (Track 1 API foundations U8/U7; Track 2 WIF UX U9/U10/U5/U3/U4/U6/U1; Track 3 U2; Track 4 U11/U12), each its own commit with unit + E2E + live-test + vitest + Playwright coverage. This document is the authoritative requirements + design capture.
 >
 > **Decision (2026-07-21, operator).** For [Q1](#2-q1--what-happened-to-the-advanced-accordion) the operator approved **option (b): targeted progressive disclosure** (NOT the single monolithic "Advanced accordion"). U1 is therefore implemented as per-object disclosure (add-trust behind a button, Edit/Connect in-card, and only the debugger + JWKS notice behind a small "Advanced / troubleshooting" accordion). Implementation proceeds across the four tracks in [section 6](#6-sequencing--dependencies).
 >
@@ -33,17 +33,17 @@ The table below maps each operator request to its current state.
 | # | Requested capability | Current state | Gap |
 |---|---|---|---|
 | A | OAuth2 client credentials: add a new credential via a button | **DONE** - `credentials-create-button` opens the `FormDialog` (type dropdown Bearer / OAuth2) ([CredentialsTab.tsx L1395](../../web/src/pages/CredentialsTab.tsx)) | none |
-| B | OAuth2 client credentials: per-already-added-credential "show connection parameters (Connect to Entra)" button | **MISSING** - the `ConnectionPanel` is shown ONCE per method at the bottom (`UnifiedConnectSection`), not per credential row | U2 |
-| C | WIF: open the add-trust form via a button (not always shown) | **MISSING** - the WIF form renders inline and always ([CredentialsTab.tsx L804-L889](../../web/src/pages/CredentialsTab.tsx)) | U3 |
-| D | WIF: already-added trusts indicate which params are OK vs not | **MISSING** - trust rows (`wif-credential-row-{id}`) show raw values with no per-field validity indicator | U5 |
-| E | WIF: Edit opens the edit form BELOW that trust in the same card | **PARTIAL / WRONG PLACE** - Edit (`wif-credential-edit-{id}`) loads the trust into the SHARED top form via `onEditTrust` ([L697](../../web/src/pages/CredentialsTab.tsx)); it does not open in-card | U4 |
-| F | WIF: per-trust "show connection parameters (Connect to Entra)" below that trust | **MISSING** - no per-trust connect view | U6 |
-| G | Every credential / trust + "Connect to Entra": show last successfully verified + last used date-time; flag invalid/unverified visually; API surfaces the same | **PARTIAL** - `authHealth` (last runtime attempt outcome + time) exists on `ConnectionEnabledMethod` ([connection-info.types.ts](../../api/src/shared/types/connection-info.types.ts)) and renders a chip in `ConnectionPanel`. There is NO persisted "last **verified**" (config-time reachability) timestamp, no per-credential/per-trust health, and no "last **used**" distinct from `authHealth.lastAttemptAt` | U7 |
-| H | WIF: glean `allowedTenantId` from issuer / JWKS URI when not provided, and indicate the source | **MISSING** - no inference logic exists anywhere in the API | U8 |
-| I | WIF form input sequence: Token Issuer (iss), JWKS URI, Subject (sub), Audience (aud) | **WRONG ORDER** - current order is Issuer, Subject, Audience, JWKS, Tenant, ... ([L804-L839](../../web/src/pages/CredentialsTab.tsx)) | U9 |
-| J | Entra WIF connection-setup param sequence: Application API URL / SCIM url, OAuth token endpoint, Client identifier | **ORDER OK, LABEL DRIFT** - assembler emits `{ tenantUrl, tokenEndpoint, clientIdentifier }` for WIF ([connection-info.service.ts L258-L263](../../api/src/modules/scim/services/connection-info.service.ts)); the order is already SCIM-url -> token-endpoint -> client-identifier, but the first key is labelled `tenantUrl` (should read "Application API URL" for WIF) | U10 |
-| K | The "Advanced accordion" | **DEFERRED, never built** - see [Q1](#2-q1--what-happened-to-the-advanced-accordion) | U1 |
-| L | Auth diagnostics feels disjointed in the Logs sections | **PARTIAL** - a separate `AuthDiagnosticsPanel` sits beside the request-log list; the log `DetailDrawer` has a "View auth decision" button that FOCUSES that separate panel rather than showing the decision inline | U11 + U12 |
+| B | OAuth2 client credentials: per-already-added-credential "show connection parameters (Connect to Entra)" button | **DONE (U2, v0.54.36)** - each `oauth_client` row has `credential-connect-{id}` expanding an in-card params panel | U2 |
+| C | WIF: open the add-trust form via a button (not always shown) | **DONE (U3, v0.54.35)** - `wif-add-trust-button` / `wif-add-trust-form` | U3 |
+| D | WIF: already-added trusts indicate which params are OK vs not | **DONE (U5, v0.54.34)** - per-field `wif-credential-{id}-{field}-status` badges | U5 |
+| E | WIF: Edit opens the edit form BELOW that trust in the same card | **DONE (U4, v0.54.35)** - in-card `wif-trust-edit-form-{id}` | U4 |
+| F | WIF: per-trust "show connection parameters (Connect to Entra)" below that trust | **DONE (U6, v0.54.35)** - `wif-credential-connect-{id}` -> `wif-credential-connect-panel-{id}` | U6 |
+| G | Every credential / trust + "Connect to Entra": show last successfully verified + last used date-time; flag invalid/unverified visually; API surfaces the same | **DONE (U7, v0.54.33/34)** - `validity` + `lastVerifiedAt` + `lastUsedAt` on the connection-info contract + a Verified/Unverified badge per trust | U7 |
+| H | WIF: glean `allowedTenantId` from issuer / JWKS URI when not provided, and indicate the source | **DONE (U8, v0.54.32)** - `inferAllowedTenantId` + `allowedTenantIdSource` marker + "Inferred from ..." UI | U8 |
+| I | WIF form input sequence: Token Issuer (iss), JWKS URI, Subject (sub), Audience (aud) | **DONE (U9, v0.54.34)** - form reordered | U9 |
+| J | Entra WIF connection-setup param sequence: Application API URL / SCIM url, OAuth token endpoint, Client identifier | **DONE (U10, v0.54.34)** - relabelled `tenantUrl` -> "Application API URL" for WIF | U10 |
+| K | The "Advanced accordion" | **DONE (U1, v0.54.35)** - replaced by targeted progressive disclosure; debugger + JWKS notice behind `wif-advanced-accordion` | U1 |
+| L | Auth diagnostics feels disjointed in the Logs sections | **DONE (U11 + U12, v0.54.37)** - auth decision inline in the log `DetailDrawer` (`log-detail-auth-section`) + `log-row-auth-{id}` chip; standalone panel re-scoped to Connect -> Health | U11 + U12 |
 
 ---
 
