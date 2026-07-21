@@ -511,6 +511,78 @@ describe('CredentialsTab', () => {
     );
   });
 
+  it('U7/U5/U8: shows verified state, per-field status, and inferred-tenant marker', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-wif',
+          credentialType: 'wif',
+          label: 'Contoso Entra',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://login.microsoftonline.com/contoso/v2.0',
+            expectedSubject: 'sp-object-id-123',
+            expectedAudience: 'api://scim-app',
+            jwksUri: 'https://login.microsoftonline.com/contoso/discovery/v2.0/keys',
+            allowedTenantId: 'contoso-tenant-guid',
+            allowedTenantIdSource: 'issuer',
+            lastVerifiedAt: '2026-06-01T00:00:00Z',
+            requiredRoles: [],
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // U7 - the trust shows a Verified badge because lastVerifiedAt is set.
+    expect(screen.getByTestId('wif-credential-cred-wif-validity').textContent).toContain('Verified');
+    // U5 - the issuer + jwks + tenant fields carry a per-field status badge.
+    expect(screen.getByTestId('wif-credential-cred-wif-issuer-status')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-credential-cred-wif-jwks-status')).toBeInTheDocument();
+    // U8 - the tenant status marks it inferred from the issuer.
+    const tenantStatus = screen.getByTestId('wif-credential-cred-wif-tenant-status');
+    expect(tenantStatus.getAttribute('title')).toContain('Inferred');
+  });
+
+  it('U7: an un-verified trust shows the Unverified badge', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-wif2',
+          credentialType: 'wif',
+          label: 'Fabrikam',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://login.microsoftonline.com/fabrikam/v2.0',
+            expectedSubject: 'sp',
+            expectedAudience: 'api://x',
+            jwksUri: 'https://login.microsoftonline.com/fabrikam/discovery/v2.0/keys',
+            allowedTenantId: 'fabrikam-tid',
+            requiredRoles: [],
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('wif-credential-cred-wif2-validity').textContent).toContain('Unverified');
+  });
+
   it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
     mockUpdateWif.mockClear();
     const overview: EndpointOverviewResponse = {

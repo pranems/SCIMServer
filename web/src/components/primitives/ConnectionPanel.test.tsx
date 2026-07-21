@@ -117,6 +117,14 @@ describe('ConnectionPanel (WI-4)', () => {
     expect(screen.getByTestId('connection-panel-desc-clientIdentifier')).toHaveTextContent(/sub.*claim/i);
   });
 
+  it('WIF (U10): the tenantUrl field is labelled "Application API URL", not "Tenant URL"', () => {
+    renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
+    fireEvent.click(screen.getByTestId('connection-panel-method-wif'));
+    const row = screen.getByTestId('connection-panel-field-tenantUrl');
+    expect(row).toHaveTextContent('Application API URL');
+    expect(row).not.toHaveTextContent('Tenant URL');
+  });
+
   it('shared_secret: renders the inline secretToken value (visibility=always)', () => {
     const ci = info({
       enabledMethods: [

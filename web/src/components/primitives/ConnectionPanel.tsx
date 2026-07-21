@@ -288,12 +288,20 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           // a WIF-specific label + description there (generic OAuth wording is
           // wrong for WIF). All other keys use the shared labels.
           const isWifSubject = method.method === 'wif' && key === 'clientIdentifier';
+          // U10 - for WIF the first field is the endpoint's SCIM/API URL that
+          // the source application calls; Entra labels it "Application API URL",
+          // not the generic "Tenant URL".
+          const isWifAppUrl = method.method === 'wif' && key === 'tenantUrl';
           const label = isWifSubject
             ? 'Client identifier (sub claim)'
-            : (FIELD_LABELS[key] ?? key);
+            : isWifAppUrl
+              ? 'Application API URL'
+              : (FIELD_LABELS[key] ?? key);
           const desc = isWifSubject
             ? 'For Workload Identity Federation: Entra\'s "Client identifier" field takes the subject (sub) claim the source IdP token must carry - i.e. the service-principal object id this endpoint expects.'
-            : FIELD_DESCRIPTIONS[key];
+            : isWifAppUrl
+              ? 'The SCIM base URL for this endpoint - the "Application API URL" the source application calls. Paste it into your IdP\'s SCIM connector / Application API URL field.'
+              : FIELD_DESCRIPTIONS[key];
           const isSecret = key === 'clientSecret' || key === 'secretToken';
           return (
             <div key={key} className={classes.fieldRow} data-testid={`${testId}-field-${key}`}>

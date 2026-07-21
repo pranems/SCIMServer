@@ -271,6 +271,18 @@ const useWifStyles = makeStyles({
   wifDetailLabel: {
     color: tokens.colorNeutralForeground3,
   },
+  wifDetailValueCell: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    minWidth: 0,
+  },
+  wifValidityRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginTop: '10px',
+  },
   wifListHeader: {
     display: 'flex',
     flexDirection: 'column',
@@ -369,12 +381,64 @@ const WifTrustDetails: React.FC<{
   trust: EndpointOverviewCredential['wif'];
   styles: ReturnType<typeof useWifStyles>;
 }> = ({ credId, trust, styles }) => {
+  const { data: allowlist } = useJwksHostAllowlist();
   if (!trust) return null;
+  const effective = allowlist?.effective ?? [];
+  const verified = typeof trust.lastVerifiedAt === 'string' && trust.lastVerifiedAt !== '';
+
+  // U5 - compute a per-field validity status (ok | warning | error) for the
+  // five identity fields, from client-side format + allowlist + gleaned-source
+  // + last-verified signals (the authoritative check remains server-side).
+  const fieldStatus = (key: string): { level: 'ok' | 'warning' | 'error'; hint: string } | null => {
+    switch (key) {
+      case 'issuer': {
+        const err = httpsUrlError(trust.expectedIssuer ?? '');
+        if (!trust.expectedIssuer) return { level: 'warning', hint: 'Missing issuer.' };
+        if (err) return { level: 'error', hint: err };
+        return verified
+          ? { level: 'ok', hint: 'Verified reachable.' }
+          : { level: 'warning', hint: 'Not yet verified - run Verify.' };
+      }
+      case 'jwks': {
+        const err = httpsUrlError(trust.jwksUri ?? '');
+        if (!trust.jwksUri) return { level: 'warning', hint: 'Missing JWKS URI.' };
+        if (err) return { level: 'error', hint: err };
+        const host = hostOf(trust.jwksUri);
+        if (host != null && effective.length > 0 && !effective.includes(host)) {
+          return { level: 'error', hint: 'JWKS host is not on the allowlist (SSRF guard).' };
+        }
+        return verified
+          ? { level: 'ok', hint: 'Verified serving keys.' }
+          : { level: 'warning', hint: 'Not yet verified - run Verify.' };
+      }
+      case 'subject':
+        return trust.expectedSubject
+          ? { level: 'ok', hint: 'Set.' }
+          : { level: 'warning', hint: 'Missing subject.' };
+      case 'audience':
+        return trust.expectedAudience
+          ? { level: 'ok', hint: 'Set.' }
+          : { level: 'warning', hint: 'Missing audience.' };
+      case 'tenant':
+        if (trust.allowedTenantIdSource) {
+          return {
+            level: 'warning',
+            hint: `Inferred from ${trust.allowedTenantIdSource === 'issuer' ? 'the issuer' : 'the JWKS URI'}.`,
+          };
+        }
+        return trust.allowedTenantId
+          ? { level: 'ok', hint: 'Set explicitly.' }
+          : { level: 'warning', hint: 'Missing tenant id.' };
+      default:
+        return null;
+    }
+  };
+
   const rows: Array<{ key: string; label: string; value: string | null }> = [
     { key: 'issuer', label: 'Issuer (iss)', value: trust.expectedIssuer ?? null },
+    { key: 'jwks', label: 'JWKS URI', value: trust.jwksUri ?? null },
     { key: 'subject', label: 'Subject (sub)', value: trust.expectedSubject ?? null },
     { key: 'audience', label: 'Audience (aud)', value: trust.expectedAudience ?? null },
-    { key: 'jwks', label: 'JWKS URI', value: trust.jwksUri ?? null },
     { key: 'tenant', label: 'Allowed tenant', value: trust.allowedTenantId ?? null },
     {
       key: 'roles',
@@ -392,24 +456,52 @@ const WifTrustDetails: React.FC<{
     },
   ];
   return (
-    <div className={styles.wifDetailGrid} data-testid={`wif-credential-details-${credId}`}>
-      {rows.map((r) => (
-        <React.Fragment key={r.key}>
-          <Caption1 className={styles.wifDetailLabel}>{r.label}</Caption1>
-          {r.value ? (
-            <CopyableField
-              value={r.value}
-              monospace
-              truncate
-              maxWidth="100%"
-              data-testid={`wif-credential-${credId}-${r.key}`}
-            />
-          ) : (
-            <Caption1 data-testid={`wif-credential-${credId}-${r.key}`}>-</Caption1>
-          )}
-        </React.Fragment>
-      ))}
-    </div>
+    <>
+      {/* U7 - last-verified line + overall validity for this trust. */}
+      <div className={styles.wifValidityRow} data-testid={`wif-credential-${credId}-validity`}>
+        <Badge appearance="filled" color={verified ? 'success' : 'warning'}>
+          {verified ? 'Verified' : 'Unverified'}
+        </Badge>
+        <Caption1>
+          {verified
+            ? `Last verified ${new Date(trust.lastVerifiedAt as string).toLocaleString()}`
+            : 'Never verified - run Verify to confirm the issuer + JWKS are reachable.'}
+        </Caption1>
+      </div>
+      <div className={styles.wifDetailGrid} data-testid={`wif-credential-details-${credId}`}>
+        {rows.map((r) => {
+          const status = fieldStatus(r.key);
+          return (
+            <React.Fragment key={r.key}>
+              <Caption1 className={styles.wifDetailLabel}>{r.label}</Caption1>
+              <div className={styles.wifDetailValueCell}>
+                {r.value ? (
+                  <CopyableField
+                    value={r.value}
+                    monospace
+                    truncate
+                    maxWidth="100%"
+                    data-testid={`wif-credential-${credId}-${r.key}`}
+                  />
+                ) : (
+                  <Caption1 data-testid={`wif-credential-${credId}-${r.key}`}>-</Caption1>
+                )}
+                {status && (
+                  <Badge
+                    appearance="tint"
+                    color={status.level === 'ok' ? 'success' : status.level === 'warning' ? 'warning' : 'danger'}
+                    title={status.hint}
+                    data-testid={`wif-credential-${credId}-${r.key}-status`}
+                  >
+                    {status.level === 'ok' ? 'OK' : status.level === 'warning' ? '!' : 'ERR'}
+                  </Badge>
+                )}
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </>
   );
 };
 
@@ -811,6 +903,16 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 data-testid="wif-field-issuer"
               />
               <EditableField
+                label="JWKS URI"
+                value={form.jwksUri}
+                onChange={setField('jwksUri')}
+                placeholder="https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys"
+                monospace
+                validationMessage={httpsUrlError(form.jwksUri)}
+                data-testid="wif-field-jwks"
+              />
+              <JwksAllowlistNotice jwksUri={form.jwksUri} styles={wif} />
+              <EditableField
                 label="Subject (sub)"
                 value={form.expectedSubject}
                 onChange={setField('expectedSubject')}
@@ -827,20 +929,10 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 data-testid="wif-field-audience"
               />
               <EditableField
-                label="JWKS URI"
-                value={form.jwksUri}
-                onChange={setField('jwksUri')}
-                placeholder="https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys"
-                monospace
-                validationMessage={httpsUrlError(form.jwksUri)}
-                data-testid="wif-field-jwks"
-              />
-              <JwksAllowlistNotice jwksUri={form.jwksUri} styles={wif} />
-              <EditableField
                 label="Allowed tenant id (tid / expectedTenantId)"
                 value={form.allowedTenantId}
                 onChange={setField('allowedTenantId')}
-                placeholder="tenant guid"
+                placeholder="tenant guid - inferred from Issuer / JWKS when left blank"
                 monospace
                 data-testid="wif-field-tenant"
               />
