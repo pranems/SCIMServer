@@ -302,6 +302,8 @@ export interface EndpointOverviewWifTrust {
   expectedAudience?: string | null;
   jwksUri?: string | null;
   allowedTenantId?: string | null;
+  /** U8 - which input `allowedTenantId` was gleaned from, or null when explicit. */
+  allowedTenantIdSource?: 'issuer' | 'jwksUri' | null;
   requiredRoles?: string[] | null;
   scope?: string | null;
   assertionProfile?: string | null;

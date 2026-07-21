@@ -44,6 +44,7 @@ import {
   WifAssertionValidatorService,
   type WifTrust,
 } from '../../../oauth/wif-assertion-validator.service';
+import { inferAllowedTenantId } from '../../../oauth/infer-allowed-tenant-id';
 import type {
   WifDebugAssertionRequest,
   WifDebugAssertionResponse,
@@ -94,6 +95,12 @@ interface WifTrustInput {
   expectedAudience: string;
   jwksUri: string;
   allowedTenantId: string;
+  /**
+   * U8 - when `allowedTenantId` was gleaned from the issuer/JWKS URI rather than
+   * supplied explicitly, this non-secret marker records which input it came from
+   * so the UI can show "Inferred from {issuer|JWKS URI}". Absent when explicit.
+   */
+  allowedTenantIdSource?: 'issuer' | 'jwksUri';
   requiredRoles?: string[];
   scope?: string;
   issuedTokenTtlSec?: number;
@@ -108,6 +115,7 @@ interface WifTrustInput {
 const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
   'assertionProfile', 'subjectTokenType', 'expectedResource', 'expectedIssuer',
   'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId',
+  'allowedTenantIdSource',
   'requiredRoles', 'scope', 'issuedTokenTtlSec',
   // A4 seams
   'identityModel', 'roleScopeMap', 'grantedScopes', 'roleEnforcement',
@@ -622,6 +630,7 @@ export class AdminCredentialController {
       throw new BadRequestException('A "wif" credential update requires a "wif" trust object.');
     }
     const trust = normalizeWifTrustAliases(rawTrust as unknown as Record<string, unknown>);
+    this.applyTenantGleaning(trust);
     for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
       if (!trust[required] || typeof trust[required] !== 'string') {
         throw new BadRequestException(`WIF trust is missing required field "${required}".`);
@@ -823,6 +832,27 @@ export class AdminCredentialController {
   }
 
   /**
+   * U8 - when the caller did not supply `allowedTenantId`, try to glean it from
+   * the trust's issuer or JWKS URI (Entra embeds the directory tenant GUID in
+   * both). On success the gleaned value + its source marker are written onto the
+   * trust so the stored metadata records both and the UI can show the source; on
+   * failure the trust is left unchanged and the normal required-field validation
+   * will reject a still-missing tenant, so a non-inferable issuer still requires
+   * the operator to supply `allowedTenantId` explicitly. Pure + no network.
+   */
+  private applyTenantGleaning(trust: Record<string, unknown>): void {
+    const existing = trust.allowedTenantId;
+    if (typeof existing === 'string' && existing.trim().length > 0) return;
+    const issuer = typeof trust.expectedIssuer === 'string' ? trust.expectedIssuer : undefined;
+    const jwksUri = typeof trust.jwksUri === 'string' ? trust.jwksUri : undefined;
+    const inferred = inferAllowedTenantId(issuer, jwksUri);
+    if (inferred) {
+      trust.allowedTenantId = inferred.tenantId;
+      trust.allowedTenantIdSource = inferred.source;
+    }
+  }
+
+  /**
    * Item C: when `verify` is true, run the server-side reachability + liveness
    * verification (issuer OIDC discovery + JWKS serves a non-empty key set) and
    * throw 422 with the failed checks if it does not pass, so a trust that would
@@ -862,6 +892,7 @@ export class AdminCredentialController {
     // onto their canonical keys BEFORE validation, so a pasted decoded-token
     // shape is accepted. A canonical key set explicitly always wins.
     const trust = normalizeWifTrustAliases(rawTrust as unknown as Record<string, unknown>);
+    this.applyTenantGleaning(trust);
     for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
       if (!trust[required] || typeof trust[required] !== 'string') {
         throw new BadRequestException(`WIF trust is missing required field "${required}".`);

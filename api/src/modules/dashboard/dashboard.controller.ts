@@ -54,6 +54,10 @@ function projectWifTrust(
     expectedAudience: asString(metadata.expectedAudience),
     jwksUri: asString(metadata.jwksUri),
     allowedTenantId: asString(metadata.allowedTenantId),
+    allowedTenantIdSource:
+      metadata.allowedTenantIdSource === 'issuer' || metadata.allowedTenantIdSource === 'jwksUri'
+        ? metadata.allowedTenantIdSource
+        : null,
     requiredRoles: Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : null,
     scope: asString(metadata.scope),
     assertionProfile: asString(metadata.assertionProfile),

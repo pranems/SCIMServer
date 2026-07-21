@@ -602,6 +602,81 @@ describe('AdminCredentialController', () => {
     });
   });
 
+  describe('U8 - glean allowedTenantId from issuer / JWKS URI when omitted', () => {
+    const TENANT = '72f988bf-86f1-41af-91ab-2d7cd011db47';
+
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+    });
+
+    it('gleans allowedTenantId from the issuer and records the source when omitted', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: `https://login.microsoftonline.com/${TENANT}/v2.0`,
+          expectedSubject: 'sp-obj-id',
+          expectedAudience: 'api://appid',
+          jwksUri: `https://login.microsoftonline.com/${TENANT}/discovery/v2.0/keys`,
+        },
+      } as never);
+
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata.allowedTenantId).toBe(TENANT);
+      expect(created.metadata.allowedTenantIdSource).toBe('issuer');
+    });
+
+    it('falls back to the JWKS URI when the issuer carries no tenant GUID', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: 'https://accounts.google.com',
+          expectedSubject: 'sub',
+          expectedAudience: 'appid',
+          jwksUri: `https://login.microsoftonline.com/${TENANT}/discovery/v2.0/keys`,
+        },
+      } as never);
+
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata.allowedTenantId).toBe(TENANT);
+      expect(created.metadata.allowedTenantIdSource).toBe('jwksUri');
+    });
+
+    it('does NOT override an explicitly supplied allowedTenantId and records no source', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: `https://login.microsoftonline.com/${TENANT}/v2.0`,
+          expectedSubject: 'sub',
+          expectedAudience: 'appid',
+          jwksUri: `https://login.microsoftonline.com/${TENANT}/discovery/v2.0/keys`,
+          allowedTenantId: 'explicit-tenant',
+        },
+      } as never);
+
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata.allowedTenantId).toBe('explicit-tenant');
+      expect(created.metadata).not.toHaveProperty('allowedTenantIdSource');
+    });
+
+    it('rejects when the tenant is neither supplied nor inferable', async () => {
+      await expect(
+        controller.createCredential(mockEndpoint.id, {
+          credentialType: 'wif',
+          wif: {
+            expectedIssuer: 'https://accounts.google.com',
+            expectedSubject: 'sub',
+            expectedAudience: 'appid',
+            jwksUri: 'https://www.googleapis.com/oauth2/v3/certs',
+          },
+        } as never),
+      ).rejects.toThrow(/allowedTenantId/);
+    });
+  });
+
   describe('listCredentials', () => {
     it('should list credentials without hashes', async () => {
       const result = await controller.listCredentials(mockEndpoint.id);

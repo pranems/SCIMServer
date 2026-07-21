@@ -13105,6 +13105,82 @@ Write-Host "`n--- 9z-BG: Auth Reason Codes + Request-Log Privacy Complete ---" -
 
 
 # ============================================
+# TEST SECTION 9z-BH: WIF tenant gleaning (U8)
+# ============================================
+$script:currentSection = "9z-BH: WIF tenant gleaning (U8)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BH: WIF allowedTenantId gleaning from issuer/JWKS (U8)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $bhTenant = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+    $bhEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wifglean-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bhId = $bhEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bhId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: create a WIF trust WITHOUT allowedTenantId -> gleaned from the issuer.
+    $bhIssuer = "https://login.microsoftonline.com/$bhTenant/v2.0"
+    $bhJwks   = "https://login.microsoftonline.com/$bhTenant/discovery/v2.0/keys"
+    $bhGleaned = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bhId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "gleaned"
+        wif = @{
+            expectedIssuer   = $bhIssuer
+            expectedSubject  = "sp-obj-id"
+            expectedAudience = "api://appid"
+            jwksUri          = $bhJwks
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($bhGleaned.wif.allowedTenantId -eq $bhTenant) -Message "9z-BH.T1: allowedTenantId gleaned from the issuer"
+    Test-Result -Success ($bhGleaned.wif.allowedTenantIdSource -eq "issuer") -Message "9z-BH.T2: gleaned source recorded as 'issuer'"
+
+    # T3: create a trust whose issuer has no tenant GUID -> gleaned from the JWKS URI.
+    $bhJwksOnly = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bhId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "jwks-gleaned"
+        wif = @{
+            expectedIssuer   = "https://accounts.google.com"
+            expectedSubject  = "sub"
+            expectedAudience = "appid"
+            jwksUri          = $bhJwks
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($bhJwksOnly.wif.allowedTenantId -eq $bhTenant -and $bhJwksOnly.wif.allowedTenantIdSource -eq "jwksUri") -Message "9z-BH.T3: allowedTenantId gleaned from the JWKS URI when the issuer has no GUID"
+
+    # T4: an explicit allowedTenantId is NOT overridden and carries no source marker.
+    $bhExplicit = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bhId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "explicit"
+        wif = @{
+            expectedIssuer   = $bhIssuer
+            expectedSubject  = "sub"
+            expectedAudience = "appid"
+            jwksUri          = $bhJwks
+            allowedTenantId  = "explicit-tenant"
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($bhExplicit.wif.allowedTenantId -eq "explicit-tenant" -and -not $bhExplicit.wif.allowedTenantIdSource) -Message "9z-BH.T4: explicit allowedTenantId preserved, no source marker"
+
+    # T5: a non-inferable trust (no GUID anywhere, no explicit tenant) is rejected (400).
+    $bhRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bhId/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "wif"; label = "no-tenant"
+            wif = @{ expectedIssuer = "https://accounts.google.com"; expectedSubject = "s"; expectedAudience = "a"; jwksUri = "https://www.googleapis.com/oauth2/v3/certs" }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    } catch { $bhRejected = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $bhRejected -Message "9z-BH.T5: non-inferable trust without an explicit tenant rejected (400)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bhId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BH: WIF tenant gleaning section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BH: WIF tenant gleaning (U8) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

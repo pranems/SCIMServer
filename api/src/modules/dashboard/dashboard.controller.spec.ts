@@ -442,6 +442,7 @@ describe('DashboardController', () => {
       expect(Object.keys(trust).sort()).toEqual(
         [
           'allowedTenantId',
+          'allowedTenantIdSource',
           'assertionProfile',
           'expectedAudience',
           'expectedIssuer',
