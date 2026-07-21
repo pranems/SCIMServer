@@ -70,15 +70,20 @@ test.beforeEach(async ({ page }) => {
     ({ key, value }) => window.localStorage.setItem(key, value),
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
-  await page.route('**/scim/admin/logs/log-u11-1', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(logDetail) });
-  });
-  await page.route('**/scim/admin/logs**', async (route) => {
-    if (route.request().url().includes('/logs/log-u11-1')) return route.continue();
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(logsList) });
-  });
   await page.route('**/scim/admin/auth-decisions**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(decisions) });
+  });
+  // The list route is registered BEFORE the detail route so that - because
+  // Playwright checks handlers in reverse registration order - the more specific
+  // detail route (registered last) wins for `/logs/log-u11-1`, while the list
+  // route serves `/logs?...`. (An earlier version used route.continue() as a
+  // guard, which sent the detail request to the live network instead of the
+  // detail mock - the U11 dev-run failure.)
+  await page.route('**/scim/admin/logs**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(logsList) });
+  });
+  await page.route('**/scim/admin/logs/log-u11-1', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(logDetail) });
   });
 });
 

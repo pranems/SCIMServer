@@ -400,10 +400,15 @@ if (-not $SkipDeploy) {
     # 4.3 - GHCR push via CI workflow (uses GITHUB_TOKEN; no local PAT needed)
     $pkgJsonPath = Join-Path $repoRoot 'api/package.json'
     $version = (Get-Content $pkgJsonPath -Raw | ConvertFrom-Json).version
-    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml)" {
-        gh workflow run publish-ghcr.yml -f version=$version -f pushLatest=true
+    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $gitBranch)" {
+        # CRITICAL (2026-05-29 false-green lesson): pin the workflow to the
+        # CURRENT branch. Without --ref, `gh workflow run` dispatches on the
+        # repo default branch (master) and publishes the WRONG code, while the
+        # ACR/dev path ships the right code - a silent split that shipped a
+        # stale GHCR image (calmsand path) undetected until Playwright caught it.
+        gh workflow run publish-ghcr.yml --ref $gitBranch -f version=$version -f pushLatest=true
         Start-Sleep -Seconds 6
-        $runId = (gh run list --workflow=publish-ghcr.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+        $runId = (gh run list --workflow=publish-ghcr.yml --branch $gitBranch --limit 1 --json databaseId --jq '.[0].databaseId')
         gh run watch $runId --exit-status
     } | Out-Null
 
