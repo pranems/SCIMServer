@@ -5,6 +5,8 @@
 
 This document covers the 2026-07 batch of operator-requested WIF improvements and the closure work that followed a deep self-audit. It complements the original WIF epic docs ([CONNECTION_INFO_AND_ENTRA_SETUP.md](CONNECTION_INFO_AND_ENTRA_SETUP.md), [EXECUTION_ISSUES_AND_RCA.md](EXECUTION_ISSUES_AND_RCA.md)).
 
+> **Planned follow-up (2026-07-21, not yet implemented).** A second operator batch is captured in [CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md](CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md) and refines this WIF surface further: open the add-trust form behind a button (U3), edit a trust **in-card below the trust itself** rather than in the shared top form (U4), show **per-field validity indicators** on each saved trust (U5), add a per-trust **Connect-to-Entra** view in-card (U6), **glean `allowedTenantId`** from the issuer/JWKS URI when omitted and indicate the source (U8), reorder the form inputs to **Token Issuer -> JWKS URI -> Subject -> Audience** (U9), and replace the deferred single "Advanced accordion" with targeted progressive disclosure (U1). See the plan doc for the design + acceptance criteria.
+
 ## Motivation
 
 Operators reported that the WIF trust UI was hard to use and that a trust could be saved with URLs that were never actually checked, producing runtime surprises later. The batch delivers:
