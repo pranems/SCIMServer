@@ -583,6 +583,63 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-credential-cred-wif2-validity').textContent).toContain('Unverified');
   });
 
+  it('U3: the add-trust form is behind a button and Cancel collapses it', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // The form is hidden by default; only the Add trust button is shown.
+    expect(screen.queryByTestId('wif-add-trust-form')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wif-field-issuer')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('wif-add-trust-button'));
+    expect(screen.getByTestId('wif-add-trust-form')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-field-issuer')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('wif-cancel-add-button'));
+    expect(screen.queryByTestId('wif-add-trust-form')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wif-add-trust-button')).toBeInTheDocument();
+  });
+
+  it('U6: Connect reveals the per-trust connection params with the subject as the client id', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-conn',
+          credentialType: 'wif',
+          label: 'Trust',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
+            expectedSubject: 'sp-sub-xyz',
+            expectedAudience: 'api://x',
+            jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
+            allowedTenantId: 'tid',
+            requiredRoles: null,
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // The connect panel is hidden until Connect is clicked.
+    expect(screen.queryByTestId('wif-credential-connect-panel-cred-conn')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('wif-credential-connect-cred-conn'));
+    const panel = screen.getByTestId('wif-credential-connect-panel-cred-conn');
+    expect(panel).toBeInTheDocument();
+    // U6/U10 - the client identifier is the trust's subject; the app URL is shown.
+    expect(screen.getByTestId('wif-connect-clientid-cred-conn').textContent).toContain('sp-sub-xyz');
+    expect(screen.getByTestId('wif-connect-appurl-cred-conn')).toBeInTheDocument();
+    expect(screen.getByTestId('wif-connect-tokenurl-cred-conn')).toBeInTheDocument();
+  });
+
   it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
     mockUpdateWif.mockClear();
     const overview: EndpointOverviewResponse = {
@@ -613,19 +670,19 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
-    // Click Edit on the saved trust row.
+    // Click Edit on the saved trust row -> the edit form opens in-card (U4).
     fireEvent.click(screen.getByTestId('wif-credential-edit-cred-edit'));
-    // The form is now populated with the saved values (R10: assert the value).
+    // The in-card edit form is populated with the saved values (R10).
+    expect(screen.getByTestId('wif-trust-edit-form-cred-edit')).toBeInTheDocument();
     expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('https://old.example/v2.0');
     expect((wifInput('wif-field-subject') as HTMLInputElement).value).toBe('old-sub');
     expect((wifInput('wif-field-tenant') as HTMLInputElement).value).toBe('old-tid');
-    // The editing banner + Save changes label appear.
-    expect(screen.getByTestId('wif-editing-banner')).toBeInTheDocument();
-    expect(screen.getByTestId('wif-save-button').textContent).toContain('Save changes');
+    // The in-card Save changes button appears.
+    expect(screen.getByTestId('wif-trust-edit-save-cred-edit').textContent).toContain('Save changes');
 
     // Change the issuer and save -> update mutation fires with the credential id.
     fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://new.example/v2.0' } });
-    fireEvent.click(screen.getByTestId('wif-save-button'));
+    fireEvent.click(screen.getByTestId('wif-trust-edit-save-cred-edit'));
     expect(mockUpdateWif).toHaveBeenCalledTimes(1);
     const arg = mockUpdateWif.mock.calls[0][0];
     expect(arg.credentialId).toBe('cred-edit');
@@ -662,12 +719,13 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     fireEvent.click(screen.getByTestId('wif-credential-edit-cred-cancel'));
+    expect(screen.getByTestId('wif-trust-edit-form-cred-cancel')).toBeInTheDocument();
     expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('https://x.example/v2.0');
-    fireEvent.click(screen.getByTestId('wif-cancel-edit-button'));
-    // Back to create mode: form cleared, banner gone.
-    expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('');
-    expect(screen.queryByTestId('wif-editing-banner')).not.toBeInTheDocument();
-    expect(screen.getByTestId('wif-save-button').textContent).toContain('Save WIF trust');
+    fireEvent.click(screen.getByTestId('wif-trust-edit-cancel-cred-cancel'));
+    // Edit form closed: no field visible and the Add trust button is back.
+    expect(screen.queryByTestId('wif-trust-edit-form-cred-cancel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wif-field-issuer')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wif-add-trust-button')).toBeInTheDocument();
   });
 
   it('renders a dash for absent optional trust fields (stable grid shape)', () => {
@@ -712,6 +770,11 @@ describe('CredentialsTab', () => {
     return root.querySelector('input') ?? root.querySelector('textarea') ?? root;
   }
 
+  // U3 - the add-trust form is now collapsed behind an "Add trust" button.
+  function openAddForm(): void {
+    fireEvent.click(screen.getByTestId('wif-add-trust-button'));
+  }
+
   it('shows the WIF disabled banner when WifCredentialsEnabled is off', () => {
     mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
@@ -728,6 +791,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
     expect(screen.getByTestId('wif-field-issuer')).toBeInTheDocument();
     expect(screen.getByTestId('wif-field-subject')).toBeInTheDocument();
     expect(screen.getByTestId('wif-field-audience')).toBeInTheDocument();
@@ -745,6 +809,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
     const hint = screen.getByTestId('wif-field-alias-hint');
     expect(hint).toBeInTheDocument();
     expect(hint.textContent).toMatch(/iss/);
@@ -765,6 +830,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
 
     // The allowlist is shown as relevant context (R10: assert the rendered host).
     expect(screen.getByTestId('wif-jwks-allowlist-notice')).toBeInTheDocument();
@@ -794,6 +860,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
     fireEvent.change(wifInput('wif-field-jwks'), {
       target: { value: 'https://login.microsoftonline.com/t/discovery/v2.0/keys' },
     });
@@ -822,6 +889,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
 
     fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://idp.example/v2.0' } });
     fireEvent.change(wifInput('wif-field-jwks'), { target: { value: 'https://idp.example/keys' } });
@@ -876,6 +944,9 @@ describe('CredentialsTab', () => {
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
+    // U1 - the debugger lives behind the Advanced / troubleshooting accordion.
+    const advToggle = screen.getByTestId('wif-advanced-toggle');
+    fireEvent.click(advToggle.querySelector('button') ?? advToggle);
     // The debugger surface + input + button render.
     expect(screen.getByTestId('wif-debug-assertion')).toBeInTheDocument();
     const btn = screen.getByTestId('wif-debug-assertion-button');
@@ -911,6 +982,7 @@ describe('CredentialsTab', () => {
     });
     mockResolveMutate.mockClear();
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
 
     // The resolver row + tenant input + button render.
     expect(screen.getByTestId('wif-resolve-row')).toBeInTheDocument();
@@ -939,6 +1011,7 @@ describe('CredentialsTab', () => {
 
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
+    openAddForm();
     fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://login.microsoftonline.com/t/v2.0' } });
     fireEvent.change(wifInput('wif-field-subject'), { target: { value: 'sp-obj-id' } });
     fireEvent.change(wifInput('wif-field-audience'), { target: { value: 'api://app' } });
@@ -1013,6 +1086,7 @@ describe('CredentialsTab', () => {
     });
 
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
     fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://idp.example/v2.0' } });
     fireEvent.change(wifInput('wif-field-subject'), { target: { value: 'sub' } });
     fireEvent.change(wifInput('wif-field-audience'), { target: { value: 'aud' } });
@@ -1040,6 +1114,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
     // A non-https issuer surfaces the inline error via the Fluent Field.
     fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'http://insecure/v2.0' } });
     expect(screen.getByText(/Must use https/i)).toBeInTheDocument();
@@ -1057,6 +1132,7 @@ describe('CredentialsTab', () => {
     mockCreateMutate.mockClear();
     mockCreateMutate.mockImplementation((_body, opts) => opts?.onSuccess?.({ id: 'x', credentialType: 'wif' }));
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
     fireEvent.change(wifInput('wif-field-issuer'), { target: { value: 'https://idp/v2.0' } });
     fireEvent.change(wifInput('wif-field-subject'), { target: { value: 's' } });
     fireEvent.change(wifInput('wif-field-audience'), { target: { value: 'a' } });
@@ -1078,6 +1154,7 @@ describe('CredentialsTab', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    openAddForm();
 
     // With empty fields, Test Connection shows FAIL steps (still renders).
     fireEvent.click(screen.getByTestId('wif-test-button'));

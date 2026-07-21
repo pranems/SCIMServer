@@ -156,23 +156,50 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
   test('item 4: Edit loads the saved trust into the form (edit mode)', async ({ page }) => {
     await openCredentials(page);
     await page.getByTestId('wif-credential-edit-wt-a').click();
-    // The form populates with the saved values.
+    // The in-card edit form (U4) opens below the trust, populated with values.
+    await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeVisible();
     await expect(page.getByTestId('wif-field-issuer').getByRole('textbox')).toHaveValue(
       'https://login.microsoftonline.com/contoso/v2.0',
     );
     await expect(page.getByTestId('wif-field-tenant').getByRole('textbox')).toHaveValue('contoso-tenant-guid');
-    // Edit-mode affordances appear.
-    await expect(page.getByTestId('wif-editing-banner')).toBeVisible();
-    await expect(page.getByTestId('wif-save-button')).toContainText('Save changes');
-    await expect(page.getByTestId('wif-cancel-edit-button')).toBeVisible();
-    // Cancel returns to create mode.
-    await page.getByTestId('wif-cancel-edit-button').click();
-    await expect(page.getByTestId('wif-editing-banner')).toBeHidden();
-    await expect(page.getByTestId('wif-save-button')).toContainText('Save WIF trust');
+    // In-card Save changes + Cancel appear.
+    await expect(page.getByTestId('wif-trust-edit-save-wt-a')).toContainText('Save changes');
+    await expect(page.getByTestId('wif-trust-edit-cancel-wt-a')).toBeVisible();
+    // Cancel closes the in-card edit form and restores the Add trust button.
+    await page.getByTestId('wif-trust-edit-cancel-wt-a').click();
+    await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeHidden();
+    await expect(page.getByTestId('wif-add-trust-button')).toBeVisible();
+  });
+
+  test('U3: the add-trust form is collapsed behind an "Add trust" button', async ({ page }) => {
+    await openCredentials(page);
+    await expect(page.getByTestId('wif-add-trust-form')).toBeHidden();
+    await page.getByTestId('wif-add-trust-button').click();
+    await expect(page.getByTestId('wif-add-trust-form')).toBeVisible();
+    await page.getByTestId('wif-cancel-add-button').click();
+    await expect(page.getByTestId('wif-add-trust-form')).toBeHidden();
+  });
+
+  test('U6: Connect reveals the per-trust connection params in-card (subject = client id)', async ({ page }) => {
+    await openCredentials(page);
+    await expect(page.getByTestId('wif-credential-connect-panel-wt-a')).toBeHidden();
+    await page.getByTestId('wif-credential-connect-wt-a').click();
+    await expect(page.getByTestId('wif-credential-connect-panel-wt-a')).toBeVisible();
+    await expect(page.getByTestId('wif-connect-clientid-wt-a')).toContainText('sp-object-id-123');
+    await expect(page.getByTestId('wif-connect-appurl-wt-a')).toBeVisible();
+  });
+
+  test('U1: the assertion debugger lives behind the Advanced accordion', async ({ page }) => {
+    await openCredentials(page);
+    // Collapsed by default: the debugger input is not shown until expanded.
+    await expect(page.getByTestId('wif-debug-assertion-input')).toBeHidden();
+    await page.getByTestId('wif-advanced-toggle').click();
+    await expect(page.getByTestId('wif-debug-assertion')).toBeVisible();
   });
 
   test('item 7: the JWKS allowlist notice lists hosts + warns on a non-allowed host with inline add', async ({ page }) => {
     await openCredentials(page);
+    await page.getByTestId('wif-add-trust-button').click();
     await expect(page.getByTestId('wif-jwks-allowlist-notice')).toBeVisible();
     await expect(page.getByTestId('wif-jwks-host-login.microsoftonline.com')).toBeVisible();
     // Type a JWKS host that is NOT on the allowlist -> warning + inline add.
@@ -185,12 +212,14 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
 
   test('item D: a non-https issuer URL surfaces an inline validation message', async ({ page }) => {
     await openCredentials(page);
+    await page.getByTestId('wif-add-trust-button').click();
     await page.getByTestId('wif-field-issuer').getByRole('textbox').fill('http://insecure/v2.0');
     await expect(page.getByText(/Must use https/i)).toBeVisible();
   });
 
   test('item E: the role-enforcement dropdown is present (advisory default)', async ({ page }) => {
     await openCredentials(page);
+    await page.getByTestId('wif-add-trust-button').click();
     await expect(page.getByTestId('wif-field-role-enforcement')).toBeVisible();
   });
 
@@ -202,6 +231,7 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await openCredentials(page);
+    await page.getByTestId('wif-add-trust-button').click();
     await expect(issuerInput).toBeVisible();
     const wide = await issuerInput.evaluate((el) => el.getBoundingClientRect().width);
 
@@ -235,7 +265,8 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
         }),
       });
     });
-    // Fill the fields then click Verify.
+    // Open the add form (U3), fill the fields, then click Verify.
+    await page.getByTestId('wif-add-trust-button').click();
     await page.getByTestId('wif-field-issuer').getByRole('textbox').fill('https://idp.example/v2.0');
     await page.getByTestId('wif-field-jwks').getByRole('textbox').fill('https://idp.example/keys');
     await page.getByTestId('wif-verify-button').click();
@@ -271,6 +302,7 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
       }
     });
 
+    await page.getByTestId('wif-add-trust-button').click();
     await page.getByTestId('wif-field-issuer').getByRole('textbox').fill('https://idp.example/v2.0');
     await page.getByTestId('wif-field-subject').getByRole('textbox').fill('sub');
     await page.getByTestId('wif-field-audience').getByRole('textbox').fill('aud');

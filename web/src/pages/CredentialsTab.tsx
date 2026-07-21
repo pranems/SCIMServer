@@ -39,6 +39,10 @@ import {
   Link,
   TabList,
   Tab,
+  Accordion,
+  AccordionItem,
+  AccordionHeader,
+  AccordionPanel,
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -282,6 +286,14 @@ const useWifStyles = makeStyles({
     alignItems: 'center',
     gap: '8px',
     marginTop: '10px',
+  },
+  editInCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginTop: '10px',
+    paddingTop: '10px',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   wifListHeader: {
     display: 'flex',
@@ -615,6 +627,111 @@ interface WifCredentialsSectionProps {
 }
 
 /**
+ * The WIF trust form field grid (issuer / JWKS / subject / audience / tenant +
+ * optional roles / scope / enforcement). Extracted so it can be rendered both
+ * in the collapsed add-trust form (U3) and in the in-card edit form (U4) that
+ * opens below a specific trust, from a single source of truth.
+ */
+const WifTrustFieldGrid: React.FC<{
+  form: WifTrustForm;
+  setField: (key: keyof WifTrustForm) => (next: string) => void;
+  setForm: React.Dispatch<React.SetStateAction<WifTrustForm>>;
+  styles: ReturnType<typeof useWifStyles>;
+}> = ({ form, setField, setForm, styles }) => (
+  <div className={styles.fieldGrid}>
+    <EditableField
+      label="Issuer (iss)"
+      value={form.expectedIssuer}
+      onChange={setField('expectedIssuer')}
+      placeholder="https://login.microsoftonline.com/<tenant>/v2.0"
+      monospace
+      validationMessage={httpsUrlError(form.expectedIssuer)}
+      data-testid="wif-field-issuer"
+    />
+    <EditableField
+      label="JWKS URI"
+      value={form.jwksUri}
+      onChange={setField('jwksUri')}
+      placeholder="https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys"
+      monospace
+      validationMessage={httpsUrlError(form.jwksUri)}
+      data-testid="wif-field-jwks"
+    />
+    <JwksAllowlistNotice jwksUri={form.jwksUri} styles={styles} />
+    <EditableField
+      label="Subject (sub)"
+      value={form.expectedSubject}
+      onChange={setField('expectedSubject')}
+      placeholder="service-principal object id"
+      monospace
+      data-testid="wif-field-subject"
+    />
+    <EditableField
+      label="Audience (aud)"
+      value={form.expectedAudience}
+      onChange={setField('expectedAudience')}
+      placeholder="api://<your-app-id>"
+      monospace
+      data-testid="wif-field-audience"
+    />
+    <EditableField
+      label="Allowed tenant id (tid / expectedTenantId)"
+      value={form.allowedTenantId}
+      onChange={setField('allowedTenantId')}
+      placeholder="tenant guid - inferred from Issuer / JWKS when left blank"
+      monospace
+      data-testid="wif-field-tenant"
+    />
+    <EditableField
+      label="Required roles (comma-separated, optional)"
+      value={form.requiredRoles}
+      onChange={setField('requiredRoles')}
+      placeholder="Scim.Provision"
+      data-testid="wif-field-roles"
+    />
+    <EditableField
+      label="Issued-token scope (optional)"
+      value={form.scope}
+      onChange={setField('scope')}
+      placeholder="scim.read scim.write"
+      data-testid="wif-field-scope"
+    />
+    <Field
+      label="Required-role enforcement"
+      hint="Roles are advisory by default: a missing required role is logged but still authenticates so the flow continues. Choose Enforce to reject an assertion that lacks a required role."
+    >
+      <Dropdown
+        value={
+          form.roleEnforcement === 'enforce'
+            ? 'Enforce - reject a missing required role'
+            : form.roleEnforcement === 'shadow'
+              ? 'Shadow - log only (advisory)'
+              : 'Advisory (default) - allow + log'
+        }
+        selectedOptions={[form.roleEnforcement]}
+        onOptionSelect={(_e, d) =>
+          setForm((prev) => ({
+            ...prev,
+            roleEnforcement: (d.optionValue as WifTrustForm['roleEnforcement']) ?? 'off',
+          }))
+        }
+        data-testid="wif-field-role-enforcement"
+      >
+        <Option value="off" text="Advisory (default) - allow + log">
+          Advisory (default) - allow + log
+        </Option>
+        <Option value="shadow" text="Shadow - log only (advisory)">
+          Shadow - log only (advisory)
+        </Option>
+        <Option value="enforce" text="Enforce - reject a missing required role">
+          Enforce - reject a missing required role
+        </Option>
+      </Dropdown>
+    </Field>
+  </div>
+);
+
+/**
  * Federated Identity (WIF) section (Q6.5). Mirrors the three-step setup:
  *   1. Enter the Entra trust values (issuer / subject / audience / JWKS /
  *      tenant + optional required roles + scope).
@@ -644,6 +761,11 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   // Item 4 - edit mode: when set, the form edits an existing trust (PUT)
   // instead of creating a new one.
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  // U3 - the add-trust form is collapsed behind an "Add trust" button so the
+  // list of configured trusts is not buried under a form.
+  const [addFormOpen, setAddFormOpen] = React.useState(false);
+  // U6 - which trust's "Connect to Entra" params are expanded in-card.
+  const [connectTrustId, setConnectTrustId] = React.useState<string | null>(null);
   const updateMutation = useUpdateWifCredential(endpointId);
   // Item 6 - server-side reachability/liveness verification.
   const verifyMutation = useVerifyWifTrust(endpointId);
@@ -793,6 +915,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     setSaveError(null);
     setTestSteps(null);
     setEditingId(cred.id);
+    setAddFormOpen(false);
+    setConnectTrustId(null);
     setForm({
       expectedIssuer: t.expectedIssuer ?? '',
       expectedSubject: t.expectedSubject ?? '',
@@ -803,14 +927,36 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       scope: t.scope ?? '',
       roleEnforcement: (t.roleEnforcement as WifTrustForm['roleEnforcement']) ?? 'off',
     });
-    // Bring the form into view for the operator.
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    // U4 - the edit form now opens in-card below the trust, so no scroll-to-top.
   };
 
   const onCancelEdit = (): void => {
     setEditingId(null);
     setForm(EMPTY_WIF_FORM);
     setSaveError(null);
+    setVerifyResult(null);
+    setNeedsOverride(false);
+  };
+
+  // U3 - open the collapsed add-trust form (fresh, not an edit).
+  const onOpenAddForm = (): void => {
+    setEditingId(null);
+    setForm(EMPTY_WIF_FORM);
+    setSaved(null);
+    setSaveError(null);
+    setVerifyResult(null);
+    setNeedsOverride(false);
+    setTestSteps(null);
+    setAddFormOpen(true);
+  };
+
+  // U3 - close the add-trust form and discard its contents.
+  const onCancelAdd = (): void => {
+    setAddFormOpen(false);
+    setForm(EMPTY_WIF_FORM);
+    setSaveError(null);
+    setVerifyResult(null);
+    setNeedsOverride(false);
   };
 
   // Client-side readiness dry-run (the real validation is server-side).
@@ -862,6 +1008,20 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
           </MessageBar>
         ) : (
           <>
+            {editingId == null && !addFormOpen && (
+              <div className={wif.actions}>
+                <Button
+                  appearance="primary"
+                  icon={<Add24Regular />}
+                  onClick={onOpenAddForm}
+                  data-testid="wif-add-trust-button"
+                >
+                  Add trust
+                </Button>
+              </div>
+            )}
+            {addFormOpen && editingId == null && (
+            <div data-testid="wif-add-trust-form">
             <div className={wif.resolveRow} data-testid="wif-resolve-row">
               <EditableField
                 label="Resolve from Entra tenant id (WI-14 discovery)"
@@ -892,97 +1052,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
               Tip: you can paste a decoded token&apos;s bare claim names - `iss`, `sub`, `aud`,
               `tid`, `roles` (or `expectedTenantId`) are accepted and normalize to these fields.
             </Caption1>
-            <div className={wif.fieldGrid}>
-              <EditableField
-                label="Issuer (iss)"
-                value={form.expectedIssuer}
-                onChange={setField('expectedIssuer')}
-                placeholder="https://login.microsoftonline.com/<tenant>/v2.0"
-                monospace
-                validationMessage={httpsUrlError(form.expectedIssuer)}
-                data-testid="wif-field-issuer"
-              />
-              <EditableField
-                label="JWKS URI"
-                value={form.jwksUri}
-                onChange={setField('jwksUri')}
-                placeholder="https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys"
-                monospace
-                validationMessage={httpsUrlError(form.jwksUri)}
-                data-testid="wif-field-jwks"
-              />
-              <JwksAllowlistNotice jwksUri={form.jwksUri} styles={wif} />
-              <EditableField
-                label="Subject (sub)"
-                value={form.expectedSubject}
-                onChange={setField('expectedSubject')}
-                placeholder="service-principal object id"
-                monospace
-                data-testid="wif-field-subject"
-              />
-              <EditableField
-                label="Audience (aud)"
-                value={form.expectedAudience}
-                onChange={setField('expectedAudience')}
-                placeholder="api://<your-app-id>"
-                monospace
-                data-testid="wif-field-audience"
-              />
-              <EditableField
-                label="Allowed tenant id (tid / expectedTenantId)"
-                value={form.allowedTenantId}
-                onChange={setField('allowedTenantId')}
-                placeholder="tenant guid - inferred from Issuer / JWKS when left blank"
-                monospace
-                data-testid="wif-field-tenant"
-              />
-              <EditableField
-                label="Required roles (comma-separated, optional)"
-                value={form.requiredRoles}
-                onChange={setField('requiredRoles')}
-                placeholder="Scim.Provision"
-                data-testid="wif-field-roles"
-              />
-              <EditableField
-                label="Issued-token scope (optional)"
-                value={form.scope}
-                onChange={setField('scope')}
-                placeholder="scim.read scim.write"
-                data-testid="wif-field-scope"
-              />
-              <Field
-                label="Required-role enforcement"
-                hint="Roles are advisory by default: a missing required role is logged but still authenticates so the flow continues. Choose Enforce to reject an assertion that lacks a required role."
-              >
-                <Dropdown
-                  value={
-                    form.roleEnforcement === 'enforce'
-                      ? 'Enforce - reject a missing required role'
-                      : form.roleEnforcement === 'shadow'
-                        ? 'Shadow - log only (advisory)'
-                        : 'Advisory (default) - allow + log'
-                  }
-                  selectedOptions={[form.roleEnforcement]}
-                  onOptionSelect={(_e, d) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      roleEnforcement: (d.optionValue as WifTrustForm['roleEnforcement']) ?? 'off',
-                    }))
-                  }
-                  data-testid="wif-field-role-enforcement"
-                >
-                  <Option value="off" text="Advisory (default) - allow + log">
-                    Advisory (default) - allow + log
-                  </Option>
-                  <Option value="shadow" text="Shadow - log only (advisory)">
-                    Shadow - log only (advisory)
-                  </Option>
-                  <Option value="enforce" text="Enforce - reject a missing required role">
-                    Enforce - reject a missing required role
-                  </Option>
-                </Dropdown>
-              </Field>
-            </div>
+            <WifTrustFieldGrid form={form} setField={setField} setForm={setForm} styles={wif} />
 
             <div className={wif.actions}>
               <Button
@@ -1137,7 +1207,27 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 ))}
               </div>
             )}
+            <div className={wif.actions}>
+              <Button
+                appearance="secondary"
+                onClick={onCancelAdd}
+                data-testid="wif-cancel-add-button"
+              >
+                Cancel
+              </Button>
+            </div>
+            </div>
+            )}
 
+            {/* U1 - the assertion debugger lives behind an Advanced /
+                troubleshooting accordion so the common case (viewing the
+                configured trusts) is not buried under an occasional tool. */}
+            <Accordion collapsible multiple data-testid="wif-advanced-accordion">
+              <AccordionItem value="advanced">
+                <AccordionHeader data-testid="wif-advanced-toggle">
+                  Advanced / troubleshooting
+                </AccordionHeader>
+                <AccordionPanel>
             {/* WI-D7 - assertion debugger: paste a client_assertion, dry-run it
                 against the configured trusts (real server checks, no mint). */}
             <div className={wif.jwksNotice} data-testid="wif-debug-assertion">
@@ -1231,6 +1321,9 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 </div>
               )}
             </div>
+                </AccordionPanel>
+              </AccordionItem>
+            </Accordion>
 
             {wifCredentials.length > 0 && (
               <div className={classes.list} data-testid="wif-credentials-list">
@@ -1266,6 +1359,17 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         </Button>
                         <Button
                           appearance="subtle"
+                          icon={<PlugConnected24Regular />}
+                          onClick={() =>
+                            setConnectTrustId(connectTrustId === cred.id ? null : cred.id)
+                          }
+                          aria-label={`Show connection parameters for WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-connect-${cred.id}`}
+                        >
+                          Connect
+                        </Button>
+                        <Button
+                          appearance="subtle"
                           icon={<Delete24Regular />}
                           onClick={() => deleteMutation.mutate(cred.id)}
                           aria-label={`Revoke WIF credential ${cred.label ?? cred.id}`}
@@ -1274,6 +1378,96 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                       </div>
                     </div>
                     <WifTrustDetails credId={cred.id} trust={cred.wif} styles={wif} />
+
+                    {/* U6 - per-trust Connect-to-Entra params (in-card). */}
+                    {connectTrustId === cred.id && (
+                      <div className={wif.editInCard} data-testid={`wif-credential-connect-panel-${cred.id}`}>
+                        <Caption1>
+                          <strong>Connect to Entra</strong> - paste these into your identity
+                          provider&apos;s Workload Identity Federation connection form.
+                        </Caption1>
+                        <div className={wif.returnRow}>
+                          <Caption1>Application API URL</Caption1>
+                          <CopyableField value={scimUrl} monospace truncate data-testid={`wif-connect-appurl-${cred.id}`} />
+                        </div>
+                        <div className={wif.returnRow}>
+                          <Caption1>OAuth token endpoint</Caption1>
+                          <CopyableField value={tokenUrl} monospace truncate data-testid={`wif-connect-tokenurl-${cred.id}`} />
+                        </div>
+                        <div className={wif.returnRow}>
+                          <Caption1>Client identifier (sub)</Caption1>
+                          <CopyableField
+                            value={cred.wif?.expectedSubject ?? '-'}
+                            monospace
+                            truncate
+                            data-testid={`wif-connect-clientid-${cred.id}`}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* U4 - edit this trust in-card, below its displayed values. */}
+                    {editingId === cred.id && (
+                      <div className={wif.editInCard} data-testid={`wif-trust-edit-form-${cred.id}`}>
+                        <Caption1>
+                          <strong>Edit this trust</strong> - change any value and Save changes.
+                        </Caption1>
+                        <WifTrustFieldGrid form={form} setField={setField} setForm={setForm} styles={wif} />
+                        <div className={wif.actions}>
+                          <Button
+                            appearance="primary"
+                            onClick={onSave}
+                            disabled={!requiredOk || updateMutation.isPending}
+                            data-testid={`wif-trust-edit-save-${cred.id}`}
+                          >
+                            {updateMutation.isPending ? 'Saving changes...' : 'Save changes'}
+                          </Button>
+                          <Button
+                            appearance="secondary"
+                            onClick={onCancelEdit}
+                            data-testid={`wif-trust-edit-cancel-${cred.id}`}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            icon={<PlugConnected24Regular />}
+                            onClick={onVerify}
+                            disabled={verifyMutation.isPending}
+                            data-testid={`wif-trust-edit-verify-${cred.id}`}
+                          >
+                            {verifyMutation.isPending ? 'Verifying...' : 'Verify'}
+                          </Button>
+                          {needsOverride && (
+                            <Button
+                              appearance="secondary"
+                              onClick={() => doSave(false)}
+                              disabled={updateMutation.isPending}
+                              data-testid={`wif-trust-edit-save-anyway-${cred.id}`}
+                            >
+                              Save anyway
+                            </Button>
+                          )}
+                        </div>
+                        {saveError != null && (
+                          <MessageBar intent="error" data-testid={`wif-trust-edit-error-${cred.id}`}>
+                            <MessageBarBody>{(saveError as Error).message}</MessageBarBody>
+                          </MessageBar>
+                        )}
+                        {verifyResult != null && (
+                          <div className={wif.jwksNotice} data-testid={`wif-trust-edit-verify-result-${cred.id}`}>
+                            <MessageBar intent={verifyResult.ok ? 'success' : 'warning'}>
+                              <MessageBarBody>
+                                <MessageBarTitle>
+                                  {verifyResult.ok
+                                    ? 'Issuer + JWKS verified reachable and serving keys'
+                                    : 'Some reachability checks failed - fix these before saving'}
+                                </MessageBarTitle>
+                              </MessageBarBody>
+                            </MessageBar>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>

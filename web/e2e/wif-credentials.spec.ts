@@ -75,7 +75,8 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
       await expect(banner).toBeVisible();
       await expect(issuer).toHaveCount(0);
     } else {
-      // Flag is on: the form + actions render.
+      // Flag is on: the Add trust button opens the collapsed form (U3).
+      await page.getByTestId('wif-add-trust-button').click();
       await expect(issuer).toBeVisible();
       await expect(page.getByTestId('wif-field-subject')).toBeVisible();
       await expect(page.getByTestId('wif-field-audience')).toBeVisible();
@@ -90,9 +91,10 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   test('Test Connection renders a per-step readiness result when WIF is enabled', async ({ page }) => {
     await openFirstEndpointCredentials(page);
 
-    const issuer = page.getByTestId('wif-field-issuer');
-    const formVisible = await issuer.isVisible().catch(() => false);
+    const addBtn = page.getByTestId('wif-add-trust-button');
+    const formVisible = await addBtn.isVisible().catch(() => false);
     test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    await addBtn.click();
 
     // Save is gated until the required fields are present.
     await expect(page.getByTestId('wif-save-button')).toBeDisabled();
@@ -108,9 +110,10 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   test('WI-13: the claim-name alias hint renders when WIF is enabled', async ({ page }) => {
     await openFirstEndpointCredentials(page);
 
-    const issuer = page.getByTestId('wif-field-issuer');
-    const formVisible = await issuer.isVisible().catch(() => false);
+    const addBtn = page.getByTestId('wif-add-trust-button');
+    const formVisible = await addBtn.isVisible().catch(() => false);
     test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    await addBtn.click();
 
     const hint = page.getByTestId('wif-field-alias-hint');
     await expect(hint).toBeVisible();
@@ -121,9 +124,10 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   test('WI-14: the WIF discovery resolver row renders when WIF is enabled', async ({ page }) => {
     await openFirstEndpointCredentials(page);
 
-    const issuer = page.getByTestId('wif-field-issuer');
-    const formVisible = await issuer.isVisible().catch(() => false);
+    const addBtn = page.getByTestId('wif-add-trust-button');
+    const formVisible = await addBtn.isVisible().catch(() => false);
     test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    await addBtn.click();
 
     await expect(page.getByTestId('wif-resolve-row')).toBeVisible();
     await expect(page.getByTestId('wif-resolve-button')).toBeVisible();
@@ -157,9 +161,11 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await page.goto(`/endpoints/${endpointId}/credentials`);
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 
-    const issuer = page.getByTestId('wif-field-issuer');
-    const formVisible = await issuer.isVisible().catch(() => false);
+    const addBtn = page.getByTestId('wif-add-trust-button');
+    const formVisible = await addBtn.isVisible().catch(() => false);
     test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    await addBtn.click();
+    const issuer = page.getByTestId('wif-field-issuer');
 
     // Intercept the credential-create POST and fulfill it with a mock success
     // so the return box renders but NO server-side credential is created.
