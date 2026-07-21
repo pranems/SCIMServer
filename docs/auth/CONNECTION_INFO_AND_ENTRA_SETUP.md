@@ -8,7 +8,7 @@
 >
 > **Provenance.** RFC and industry-norm facts in [Part 1](#1-how-auth-token-endpoint-urls-work-in-rfcs--industry) are cited to [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749), and the [Microsoft Entra SCIM tutorial](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups). SCIMServer behavior is cited to the actual sources ([api/src/main.ts](../../api/src/main.ts), [endpoint-oauth.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts), [admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts), [authentication-schemes.ts](../../api/src/modules/scim/discovery/authentication-schemes.ts), [wif-assertion-validator.service.ts](../../api/src/oauth/wif-assertion-validator.service.ts)).
 >
-> **Planned follow-up (2026-07-21, not yet implemented).** A second operator batch in [CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md](CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md) refines the connection-info surfacing: a per-oauth_client-credential **Connect-to-Entra** button (U2) and a per-WIF-trust Connect view (U6), so the copyable bundle is shown per credential/trust rather than once per method; **last-verified + last-used + validity** on every credential/trust surfaced in both the UI and the API (U7); and the WIF connection-setup field order **Application API URL / SCIM url -> OAuth token endpoint -> Client identifier** with the WIF-specific "Application API URL" label (U10, replacing the current `tenantUrl` label for the WIF method). See the plan doc for the design + acceptance criteria.
+> **Follow-up (IMPLEMENTED 2026-07-21, v0.54.32-0.54.37).** The second operator batch in [CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md](CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md) shipped: a per-oauth_client-credential **Connect-to-Entra** button (`credential-connect-{id}`, U2) and a per-WIF-trust Connect view (`wif-credential-connect-{id}`, U6), so the copyable bundle is shown per credential/trust rather than once per method; **last-verified + last-used + validity** on every credential/trust surfaced in both the UI and the connection-info API (`lastVerifiedAt` / `lastUsedAt` / `validity`, U7); and the WIF connection-setup field order **Application API URL / SCIM url -> OAuth token endpoint -> Client identifier** with the WIF-specific "Application API URL" label (U10, replacing the `tenantUrl` label for the WIF method). See the plan doc for the design + acceptance criteria.
 
 ---
 
@@ -1177,7 +1177,7 @@ Accept: application/json
 }
 ```
 
-The `clientSecret` is `null` because it is never retrievable after creation; `clientSecretState` tells the UI whether to show a "shown once at creation" placeholder or a "create a credential" call to action. Schematic shape (placeholders) for reference:
+The `clientSecret` is `null` because it is never retrievable after creation; `clientSecretState` tells the UI whether to show a "shown once at creation" placeholder or a "create a credential" call to action. Each enabled method also carries the U7 status trio (`validity` / `lastVerifiedAt` / `lastUsedAt`) so the UI can flag an unverified or failing credential at the point of display. Schematic shape (placeholders) for reference:
 
 ```jsonc
 {
@@ -1190,9 +1190,12 @@ The `clientSecret` is `null` because it is never retrievable after creation; `cl
   "enabledMethods": [
     {
       "method": "bearer|oauth_client|wif",
-      "entraAuthenticationMethod": "Secret Token|OAuth2 Client Credentials Grant",
-      "entraFields": { /* only the fields that method needs */ },
-      "clientSecretState": "set-shown-once|none|create-required"
+      "entraAuthenticationMethod": "Secret Token|OAuth2 Client Credentials Grant|Workload Identity based authentication",
+      "entraFields": { /* only the fields that method needs; WIF's first field is labelled "Application API URL" (U10) */ },
+      "clientSecretState": "set-shown-once|none|create-required",
+      "validity": "ok|unverified|invalid|failing", // U7 - operator-facing health
+      "lastVerifiedAt": "<iso|null>",               // U7 - last passing verify-on-save
+      "lastUsedAt": "<iso|null>"                    // U7 - last runtime auth accept
     }
   ]
 }

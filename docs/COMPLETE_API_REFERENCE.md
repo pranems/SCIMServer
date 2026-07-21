@@ -495,6 +495,10 @@ Content-Type: application/scim+json
 
 **Response:** 200 with the updated public trust (no secret). `422` when `verify:true` and the reachability checks fail (body carries `scimType: "invalidValue"` + `checks[]`).
 
+> **U8 tenant gleaning (v0.54.32):** if `allowedTenantId` is omitted on create/edit, the server infers it from the Entra directory tenant GUID embedded in `expectedIssuer` (preferred) or `jwksUri`, and records a non-secret `allowedTenantIdSource` (`issuer` | `jwksUri`) on the stored trust. A trust with no inferable GUID and no explicit tenant is still rejected `400`.
+>
+> **U7 last-verified (v0.54.33):** a passing `verify:true` create/edit stamps a `lastVerifiedAt` ISO timestamp on the trust metadata (carried forward across non-verifying edits), surfaced on the endpoint overview + connection-info so the UI can show a Verified/Unverified state per trust.
+
 ---
 
 ### POST /scim/admin/endpoints/:endpointId/wif/verify
