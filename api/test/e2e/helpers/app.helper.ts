@@ -11,6 +11,7 @@ import { AppModule } from '@app/modules/app/app.module';
 import { applySpaFallback } from '@app/bootstrap/spa-fallback';
 import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from '@app/security/helmet-config';
 import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
+import { applyCorrelationMiddleware } from '@app/bootstrap/correlation-middleware';
 
 /**
  * Bootstraps a full NestJS application for E2E testing.
@@ -71,6 +72,10 @@ export async function createTestApp(
     }
     next();
   });
+
+  // Early correlation middleware (main.ts parity) - X-Request-Id + ALS context
+  // + base RequestLoggingMeta before guards, so guard-rejected 401s are traceable.
+  applyCorrelationMiddleware(app);
 
   // Phase N3a (2026-05-18): mirror the production helmet middleware so
   // the security-headers E2E spec sees what production sees. See

@@ -81,5 +81,18 @@ describe('Auth reason codes on the wire (F2 + F4)', () => {
       expect(res.body[DIAG]?.reason_code).toBe('bearer_invalid');
       expect(res.headers['www-authenticate']).toMatch(/error="invalid_token"/);
     });
+
+    it('a GUARD-rejected 401 also carries the requestId correlator (diagnostics + header)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', 'Bearer bogus')
+        .expect(401);
+      // The early correlation middleware establishes the requestId + context
+      // BEFORE the guard runs, so a guard rejection is now fully traceable.
+      expect(res.body[DIAG]?.reason_code).toBe('bearer_invalid');
+      expect(typeof res.body[DIAG]?.requestId).toBe('string');
+      expect(res.headers['x-request-id']).toBeDefined();
+      expect(res.body[DIAG]?.requestId).toBe(res.headers['x-request-id']);
+    });
   });
 });

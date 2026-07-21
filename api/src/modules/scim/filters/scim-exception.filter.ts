@@ -144,19 +144,25 @@ export class ScimExceptionFilter implements ExceptionFilter {
 
     // G.4: Auto-enrich the diagnostics extension. MERGE into any existing block
     // (e.g. the resource-plane guard sets `reason_code`) so requestId/endpointId/
-    // logsUrl are added alongside it rather than being skipped.
+    // logsUrl are added alongside it rather than being skipped. The requestId +
+    // endpointId are taken from the correlation context when present, else from
+    // the base RequestLoggingMeta the early correlation middleware stashed on the
+    // request - the meta path is what makes a GUARD-rejected 401 (which throws
+    // before the interceptor runs, and outside the ALS context) still carry the
+    // requestId correlator.
     {
       const ctx = getCorrelationContext();
+      const meta = (request as unknown as Record<string, RequestLoggingMeta | undefined>)[REQUEST_LOGGING_META_KEY];
+      const requestId = ctx?.requestId ?? meta?.requestId;
+      const diagEndpointId = ctx?.endpointId ?? meta?.endpointId;
       const diag: Record<string, unknown> =
         (body[SCIM_DIAGNOSTICS_URN] as Record<string, unknown> | undefined) ?? {};
-      if (ctx) {
-        if (ctx.requestId && diag.requestId === undefined) diag.requestId = ctx.requestId;
-        if (ctx.endpointId && diag.endpointId === undefined) diag.endpointId = ctx.endpointId;
-        if (ctx.requestId && diag.logsUrl === undefined) {
-          diag.logsUrl = ctx.endpointId
-            ? `/scim/endpoints/${ctx.endpointId}/logs/recent?requestId=${ctx.requestId}`
-            : `/scim/admin/log-config/recent?requestId=${ctx.requestId}`;
-        }
+      if (requestId && diag.requestId === undefined) diag.requestId = requestId;
+      if (diagEndpointId && diag.endpointId === undefined) diag.endpointId = diagEndpointId;
+      if (requestId && diag.logsUrl === undefined) {
+        diag.logsUrl = diagEndpointId
+          ? `/scim/endpoints/${diagEndpointId}/logs/recent?requestId=${requestId}`
+          : `/scim/admin/log-config/recent?requestId=${requestId}`;
       }
       if (Object.keys(diag).length > 0) {
         body[SCIM_DIAGNOSTICS_URN] = diag;

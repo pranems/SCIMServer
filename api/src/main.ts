@@ -3,7 +3,6 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { json, urlencoded } from 'express';
-import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -12,6 +11,7 @@ import { parseCorsOrigin } from './security/cors-origin';
 import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from './security/helmet-config';
 import { applySpaFallback } from './bootstrap/spa-fallback';
 import { OAUTH_METADATA_PATH } from './oauth/oauth.constants';
+import { applyCorrelationMiddleware } from './bootstrap/correlation-middleware';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -51,13 +51,13 @@ async function bootstrap(): Promise<void> {
     next();
   });
 
-  // Early X-Request-Id middleware - runs before guards and interceptors so that
-  // 401/403/415 error responses also carry the correlation header.
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
-    res.setHeader('X-Request-Id', requestId);
-    next();
-  });
+  // Early correlation middleware - runs BEFORE guards + interceptors + body
+  // parsing so that EVERY response (including 401/403/415 short-circuits thrown
+  // by guards) carries the X-Request-Id header, runs inside a correlation
+  // context, and stashes a base RequestLoggingMeta the exception filters read
+  // (so a guard-rejected request is still fully traceable). Shared with the E2E
+  // harness via applyCorrelationMiddleware.
+  applyCorrelationMiddleware(app);
 
   // Phase N3a (2026-05-18): helmet middleware - locks in the standard
   // browser-enforced defense-in-depth response headers (CSP, X-Frame-Options,
