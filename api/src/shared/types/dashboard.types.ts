@@ -289,6 +289,12 @@ export interface EndpointOverviewCredential {
    * secret/hash material (a WIF credential has none).
    */
   wif?: EndpointOverviewWifTrust | null;
+  /**
+   * U2 - the public client id for an `oauth_client` credential (from
+   * metadata.clientId), so each credential row can render its own
+   * Connect-to-Entra bundle. Absent for other credential types. Never a secret.
+   */
+  oauthClientId?: string | null;
 }
 
 /**

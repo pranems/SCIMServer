@@ -133,6 +133,22 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(page.getByTestId('wif-resolve-button')).toBeVisible();
   });
 
+  // U2 - an oauth_client credential exposes an in-card Connect-to-Entra params
+  // panel with the Application API URL + token endpoint + this credential's
+  // client id. Skips when the first endpoint holds no oauth_client credential.
+  test('U2: an oauth_client credential exposes an in-card Connect params panel', async ({ page }) => {
+    await openFirstEndpointCredentials(page);
+    const connectBtn = page.locator('button[data-testid^="credential-connect-"]').first();
+    const hasOc = await connectBtn.isVisible().catch(() => false);
+    test.skip(!hasOc, 'No oauth_client credential on the first endpoint.');
+    const testId = (await connectBtn.getAttribute('data-testid')) ?? '';
+    const credId = testId.replace(/^credential-connect-/, '');
+    await connectBtn.click();
+    await expect(page.getByTestId(`credential-connect-panel-${credId}`)).toBeVisible();
+    await expect(page.getByTestId(`credential-connect-appurl-${credId}`)).toBeVisible();
+    await expect(page.getByTestId(`credential-connect-clientid-${credId}`)).toBeVisible();
+  });
+
   // WI-1 regression: the WIF return-values box must present the SCIM base URL
   // in the spec form `/scim/v2/endpoints/{id}` (the `/scim/v2` version segment
   // is a LEADING prefix the server rewrites), NOT the buggy tail form

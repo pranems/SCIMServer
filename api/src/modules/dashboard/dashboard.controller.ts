@@ -232,6 +232,11 @@ export class DashboardController {
       // the full trust. projectWifTrust returns null for non-wif rows and
       // hard-allowlists the keys so no secret/internal field can leak.
       ...(c.credentialType === 'wif' ? { wif: projectWifTrust(c.metadata) } : {}),
+      // U2 - the public client id for an oauth_client credential, so each
+      // credential row can show its own Connect-to-Entra bundle. Never a secret.
+      ...(c.credentialType === 'oauth_client' && typeof c.metadata?.clientId === 'string'
+        ? { oauthClientId: c.metadata.clientId }
+        : {}),
     }));
 
     // Recent activity projection - same shape as DashboardActivity but

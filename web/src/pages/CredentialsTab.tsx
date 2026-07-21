@@ -163,6 +163,20 @@ const useStyles = makeStyles({
     fontFamily: 'monospace',
     fontSize: '12px',
   },
+  connectPanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginTop: '10px',
+    paddingTop: '10px',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  connectRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(120px, 180px) 1fr',
+    columnGap: '12px',
+    alignItems: 'center',
+  },
   formCol: {
     display: 'flex',
     flexDirection: 'column',
@@ -1556,6 +1570,12 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // WI-9: rotate result (the one-time new secret).
   const [rotateResult, setRotateResult] = React.useState<RotateResult | null>(null);
 
+  // U2 - which oauth_client credential's Connect-to-Entra params are expanded.
+  const [connectCredId, setConnectCredId] = React.useState<string | null>(null);
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const connectScimUrl = `${origin}/scim/v2/endpoints/${endpointId}`;
+  const connectTokenUrl = `${origin}/scim/endpoints/${endpointId}/oauth/token`;
+
   const [copyState, setCopyState] = React.useState<'idle' | 'copied' | 'error'>('idle');
 
   const onOpenCreate = (type: 'bearer' | 'oauth_client' = 'bearer'): void => {
@@ -1805,6 +1825,19 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     Rotate
                   </Button>
                 )}
+                {cred.credentialType === 'oauth_client' && (
+                  <Button
+                    appearance="subtle"
+                    icon={<PlugConnected24Regular />}
+                    onClick={() =>
+                      setConnectCredId(connectCredId === cred.id ? null : cred.id)
+                    }
+                    aria-label={`Show connection parameters for ${cred.label ?? cred.id}`}
+                    data-testid={`credential-connect-${cred.id}`}
+                  >
+                    Connect
+                  </Button>
+                )}
                 <Button
                   appearance="subtle"
                   icon={<Delete24Regular />}
@@ -1816,6 +1849,36 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   data-testid={`credential-delete-${cred.id}`}
                 />
               </div>
+              {/* U2 - per-oauth_client Connect-to-Entra params (in-card). */}
+              {cred.credentialType === 'oauth_client' && connectCredId === cred.id && (
+                <div className={classes.connectPanel} data-testid={`credential-connect-panel-${cred.id}`}>
+                  <Caption1>
+                    <strong>Connect to Entra</strong> - paste these into your identity
+                    provider&apos;s OAuth2 client-credentials connection form.
+                  </Caption1>
+                  <div className={classes.connectRow}>
+                    <Caption1>Application API URL</Caption1>
+                    <CopyableField value={connectScimUrl} monospace truncate data-testid={`credential-connect-appurl-${cred.id}`} />
+                  </div>
+                  <div className={classes.connectRow}>
+                    <Caption1>OAuth token endpoint</Caption1>
+                    <CopyableField value={connectTokenUrl} monospace truncate data-testid={`credential-connect-tokenurl-${cred.id}`} />
+                  </div>
+                  <div className={classes.connectRow}>
+                    <Caption1>Client identifier</Caption1>
+                    <CopyableField
+                      value={cred.oauthClientId ?? '-'}
+                      monospace
+                      truncate
+                      data-testid={`credential-connect-clientid-${cred.id}`}
+                    />
+                  </div>
+                  <Caption1>
+                    Use <strong>Reveal</strong> above to view the client secret when the endpoint
+                    retains it (visibility Always).
+                  </Caption1>
+                </div>
+              )}
             </Card>
           ))}
         </div>

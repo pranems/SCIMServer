@@ -13215,6 +13215,46 @@ Write-Host "`n--- 9z-BI: connection-info validity (U7) Complete ---" -Foreground
 
 
 # ============================================
+# TEST SECTION 9z-BJ: per-oauth_client Connect (U2)
+# ============================================
+$script:currentSection = "9z-BJ: per-oauth_client Connect (U2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BJ: overview surfaces oauthClientId per oauth_client credential (U2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $bjEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-occonnect-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bjId = $bjEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bjId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: create an oauth_client credential -> it returns a public clientId.
+    $bjCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bjId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "isv-client"
+    } | ConvertTo-Json)
+    Test-Result -Success ($bjCred.clientId -and $bjCred.clientId.Length -gt 0) -Message "9z-BJ.T1: oauth_client credential created with a public clientId"
+
+    # T2: the endpoint overview surfaces that credential's oauthClientId (U2).
+    $bjOverview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bjId/overview" -Method GET -Headers $headers
+    $bjRow = @($bjOverview.credentials | Where-Object { $_.id -eq $bjCred.id })[0]
+    Test-Result -Success ($bjRow.oauthClientId -eq $bjCred.clientId) -Message "9z-BJ.T2: overview credential row surfaces oauthClientId matching the client id"
+
+    # T3: the oauthClientId is a PUBLIC value - no secret leaks alongside it.
+    $bjRowJson = $bjRow | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($bjRowJson -match '"clientSecret"|"credentialHash"|"secretEnvelope"')) -Message "9z-BJ.T3: overview credential row carries NO secret material"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bjId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BJ: per-oauth_client Connect section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BJ: per-oauth_client Connect (U2) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

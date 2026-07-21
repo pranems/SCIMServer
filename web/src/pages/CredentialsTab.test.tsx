@@ -640,6 +640,34 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-connect-tokenurl-cred-conn')).toBeInTheDocument();
   });
 
+  it('U2: an oauth_client credential row has a Connect button that reveals its params', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { OAuthClientCredentialsAuthEnabled: true },
+      credentials: [
+        {
+          id: 'oc-1',
+          credentialType: 'oauth_client',
+          label: 'ISV client',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          oauthClientId: 'client-id-ep-1',
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // The connect panel is hidden until Connect is clicked.
+    expect(screen.queryByTestId('credential-connect-panel-oc-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('credential-connect-oc-1'));
+    expect(screen.getByTestId('credential-connect-panel-oc-1')).toBeInTheDocument();
+    // The client identifier is this credential's client id; the app URL is shown.
+    expect(screen.getByTestId('credential-connect-clientid-oc-1').textContent).toContain('client-id-ep-1');
+    expect(screen.getByTestId('credential-connect-appurl-oc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-connect-tokenurl-oc-1')).toBeInTheDocument();
+  });
+
   it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
     mockUpdateWif.mockClear();
     const overview: EndpointOverviewResponse = {
