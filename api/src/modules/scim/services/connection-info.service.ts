@@ -37,6 +37,7 @@ import type {
   ConnectionInfo,
   ConnectionInfoUrls,
   ConnectionMethod,
+  ConnectionValidity,
 } from '../../../shared/types/connection-info.types';
 
 // Re-export the shared connection-info types so existing importers of this
@@ -266,6 +267,7 @@ export class ConnectionInfoService {
         },
         clientSecretState: 'none',
         expectedAudience: audience,
+        credentialId: wifCred?.id ?? null,
       });
     } else {
       disabledMethods.push({
@@ -279,12 +281,42 @@ export class ConnectionInfoService {
       endpointId,
       displayName: endpoint.displayName ?? endpoint.name,
       urls,
-      enabledMethods: authHealth
-        ? enabledMethods.map((m) =>
-            authHealth[m.method] ? { ...m, authHealth: authHealth[m.method] } : m,
-          )
-        : enabledMethods,
+      enabledMethods: enabledMethods.map((m) =>
+        this.enrichMethodStatus(m, credentials, authHealth?.[m.method]),
+      ),
       disabledMethods,
+    };
+  }
+
+  /**
+   * U7: attach the operator-facing status trio (`validity`, `lastUsedAt`,
+   * `lastVerifiedAt`) - and the WI-D8 `authHealth` chip when present - to a
+   * single enabled method. `lastVerifiedAt` is read from the backing
+   * credential's metadata (stamped on a passing verify-on-save); `lastUsedAt`
+   * is the last runtime ACCEPT we still hold in the short-TTL decision store;
+   * `validity` prefers the most-recent runtime outcome, falling back to whether
+   * the trust was ever verified.
+   */
+  private enrichMethodStatus(
+    m: ConnectionEnabledMethod,
+    credentials: EndpointCredentialModel[],
+    health?: ConnectionAuthHealth,
+  ): ConnectionEnabledMethod {
+    const cred = m.credentialId ? credentials.find((c) => c.id === m.credentialId) : undefined;
+    const lastVerifiedAt =
+      cred && typeof cred.metadata?.lastVerifiedAt === 'string' ? cred.metadata.lastVerifiedAt : null;
+    const lastUsedAt = health?.lastOutcome === 'accept' ? health.lastAttemptAt : null;
+    let validity: ConnectionValidity;
+    if (health?.lastOutcome === 'reject') validity = 'failing';
+    else if (health?.lastOutcome === 'accept') validity = 'ok';
+    else if (lastVerifiedAt) validity = 'ok';
+    else validity = 'unverified';
+    return {
+      ...m,
+      ...(health ? { authHealth: health } : {}),
+      lastVerifiedAt,
+      lastUsedAt,
+      validity,
     };
   }
 }

@@ -338,4 +338,52 @@ describe('ConnectionInfoService', () => {
       expect((map as Record<string, unknown>).bearer_jwt).toBeUndefined();
     });
   });
+
+  // U7 - validity + lastUsedAt + lastVerifiedAt enrichment on every method.
+  describe('validity + lastUsedAt + lastVerifiedAt (U7)', () => {
+    it('marks a method failing with no lastUsedAt when the last runtime outcome was a reject', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True' }),
+        [],
+        'https://x',
+        undefined,
+        { wif: { lastOutcome: 'reject', lastReasonCode: 'wif_audience_mismatch', lastAttemptAt: '2026-07-14T00:00:00Z' } },
+      );
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.validity).toBe('failing');
+      expect(wif?.lastUsedAt).toBeNull();
+    });
+
+    it('marks a method ok with lastUsedAt when the last runtime outcome was an accept', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True' }),
+        [],
+        'https://x',
+        undefined,
+        { wif: { lastOutcome: 'accept', lastAttemptAt: '2026-07-14T01:00:00Z' } },
+      );
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.validity).toBe('ok');
+      expect(wif?.lastUsedAt).toBe('2026-07-14T01:00:00Z');
+    });
+
+    it('marks a never-verified, never-used method unverified', () => {
+      const info = service.assemble(endpoint({ WifCredentialsEnabled: 'True' }), [], 'https://x');
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.validity).toBe('unverified');
+      expect(wif?.lastVerifiedAt).toBeNull();
+      expect(wif?.lastUsedAt).toBeNull();
+    });
+
+    it('surfaces the wif credential lastVerifiedAt and marks it ok when it was verified but never used', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True' }),
+        [cred({ id: 'w-1', credentialType: 'wif', metadata: { expectedAudience: 'aud', lastVerifiedAt: '2026-07-14T02:00:00Z' } })],
+        'https://x',
+      );
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      expect(wif?.lastVerifiedAt).toBe('2026-07-14T02:00:00Z');
+      expect(wif?.validity).toBe('ok');
+    });
+  });
 });

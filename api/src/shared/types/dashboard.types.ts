@@ -310,6 +310,8 @@ export interface EndpointOverviewWifTrust {
   issuedTokenTtlSec?: number | null;
   /** Item E - role-enforcement posture (off default | shadow | enforce). */
   roleEnforcement?: 'off' | 'shadow' | 'enforce' | null;
+  /** U7 - ISO timestamp of the last successful verify-on-save, or null. */
+  lastVerifiedAt?: string | null;
 }
 
 /** Recent activity row with display-name resolution. */

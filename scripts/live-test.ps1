@@ -13181,6 +13181,40 @@ Write-Host "`n--- 9z-BH: WIF tenant gleaning (U8) Complete ---" -ForegroundColor
 
 
 # ============================================
+# TEST SECTION 9z-BI: connection-info validity / last-verified / last-used (U7)
+# ============================================
+$script:currentSection = "9z-BI: connection-info validity (U7)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BI: connection-info validity + lastVerifiedAt + lastUsedAt (U7)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $biEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-validity-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $biId = $biEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$biId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # T1: a fresh enabled method (no runtime use, never verified) reports validity=unverified.
+    $biInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$biId/connection-info" -Method GET -Headers $headers
+    $biOauth = @($biInfo.enabledMethods | Where-Object { $_.method -eq "oauth_client" })[0]
+    Test-Result -Success ($biOauth.validity -eq "unverified") -Message "9z-BI.T1: fresh oauth_client method validity=unverified"
+    Test-Result -Success ($null -eq $biOauth.lastUsedAt) -Message "9z-BI.T2: fresh method has null lastUsedAt"
+    # T3: the validity/lastVerifiedAt/lastUsedAt fields are part of the contract for every enabled method.
+    $biAllHaveValidity = (@($biInfo.enabledMethods | Where-Object { $_.PSObject.Properties.Name -contains 'validity' }).Count -eq @($biInfo.enabledMethods).Count)
+    Test-Result -Success $biAllHaveValidity -Message "9z-BI.T3: every enabled method carries a validity field"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$biId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BI: connection-info validity section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BI: connection-info validity (U7) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

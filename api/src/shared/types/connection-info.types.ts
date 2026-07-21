@@ -18,6 +18,17 @@ export type ClientSecretState =
   | 'create-required' // the method is enabled but no credential exists yet
   | 'none'; // the method has no per-endpoint secret to show (shared_secret, wif)
 
+/**
+ * U7 - the operator-facing health of a credential / trust at the point of
+ * display:
+ *  - `ok`         verified reachable OR the most recent runtime auth accepted
+ *  - `failing`    the most recent runtime auth attempt was rejected
+ *  - `unverified` never verified and no recent successful runtime auth
+ *  - `invalid`    structurally invalid (reserved; today create-time validation
+ *                 prevents an invalid trust from persisting)
+ */
+export type ConnectionValidity = 'ok' | 'unverified' | 'invalid' | 'failing';
+
 /** All absolute URLs for the endpoint. */
 export interface ConnectionInfoUrls {
   /** Customer-facing SCIM base (LEADING /scim/v2 form). Entra's "Tenant URL". */
@@ -70,6 +81,19 @@ export interface ConnectionEnabledMethod {
    * code + deep link. Absent when no recent decision exists for this method.
    */
   authHealth?: ConnectionAuthHealth;
+  /**
+   * U7: ISO timestamp of the last SUCCESSFUL config-time verification (a
+   * passing `POST /wif/verify` on save). Null when never verified / not
+   * applicable (bearer + oauth_client + shared_secret have no verify step yet).
+   */
+  lastVerifiedAt?: string | null;
+  /**
+   * U7: ISO timestamp of the last runtime auth ACCEPT for this method (from the
+   * short-TTL decision store). Null when there is no recent successful use.
+   */
+  lastUsedAt?: string | null;
+  /** U7: the operator-facing validity of this credential / trust at display. */
+  validity?: ConnectionValidity;
 }
 
 /**

@@ -646,6 +646,13 @@ export class AdminCredentialController {
     }
     metadata.assertionProfile = trust.assertionProfile ?? 'jwt-bearer';
 
+    // U7: refresh the last-verified time when this edit re-verified; otherwise
+    // carry forward the credential's prior verification timestamp.
+    const priorVerifiedAt =
+      typeof credential.metadata?.lastVerifiedAt === 'string' ? credential.metadata.lastVerifiedAt : undefined;
+    if (dto.verify) metadata.lastVerifiedAt = new Date().toISOString();
+    else if (priorVerifiedAt) metadata.lastVerifiedAt = priorVerifiedAt;
+
     const updated = await this.credentialRepo.updateMetadata(credentialId, metadata);
     if (!updated) {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
@@ -909,6 +916,9 @@ export class AdminCredentialController {
       if (trust[key] !== undefined) metadata[key] = trust[key];
     }
     metadata.assertionProfile = trust.assertionProfile ?? 'jwt-bearer';
+
+    // U7: stamp the last-verified time when this create passed verify-on-save.
+    if (dto.verify) metadata.lastVerifiedAt = new Date().toISOString();
 
     const credential = await this.credentialRepo.create({
       endpointId,

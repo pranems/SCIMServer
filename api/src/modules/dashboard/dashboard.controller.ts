@@ -64,6 +64,7 @@ function projectWifTrust(
     issuedTokenTtlSec: typeof metadata.issuedTokenTtlSec === 'number' ? metadata.issuedTokenTtlSec : null,
     roleEnforcement:
       enforcement === 'off' || enforcement === 'shadow' || enforcement === 'enforce' ? enforcement : null,
+    lastVerifiedAt: asString(metadata.lastVerifiedAt),
   };
 }
 

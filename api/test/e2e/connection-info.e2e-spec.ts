@@ -27,7 +27,7 @@ describe('Connection-info API (E2E)', () => {
 
   const TOP_KEYS = ['endpointId', 'displayName', 'urls', 'enabledMethods', 'disabledMethods'];
   const URL_KEYS = ['scimBaseUrl', 'scimBaseUrlBare', 'tokenEndpoint', 'serviceProviderConfig', 'oauthMetadata'];
-  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth'];
+  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity'];
   const DISABLED_KEYS = ['method', 'reason', 'enableHint'];
 
   it('assembles the connection-info shape with only documented top-level keys', async () => {
@@ -57,6 +57,22 @@ describe('Connection-info API (E2E)', () => {
     for (const m of res.body.disabledMethods) {
       for (const key of Object.keys(m)) expect(DISABLED_KEYS).toContain(key);
     }
+  });
+
+  it('surfaces a U7 validity of "unverified" on a fresh, never-used method', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      OAuthClientCredentialsAuthEnabled: true,
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const oauth = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
+    expect(oauth.validity).toBe('unverified');
+    expect(oauth.lastVerifiedAt).toBeNull();
+    expect(oauth.lastUsedAt).toBeNull();
   });
 
   it('builds absolute URLs honoring X-Forwarded-Proto / X-Forwarded-Host', async () => {

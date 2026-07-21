@@ -449,6 +449,7 @@ describe('DashboardController', () => {
           'expectedSubject',
           'issuedTokenTtlSec',
           'jwksUri',
+          'lastVerifiedAt',
           'requiredRoles',
           'roleEnforcement',
           'scope',

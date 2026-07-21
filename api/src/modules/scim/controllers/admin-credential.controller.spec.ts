@@ -677,6 +677,49 @@ describe('AdminCredentialController', () => {
     });
   });
 
+  describe('U7 - lastVerifiedAt stamped on verify-on-save', () => {
+    const TENANT = '72f988bf-86f1-41af-91ab-2d7cd011db47';
+
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { WifCredentialsEnabled: true } },
+      });
+      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
+      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
+    });
+
+    it('stamps lastVerifiedAt when a create passes verify-on-save', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        verify: true,
+        wif: {
+          expectedIssuer: `https://login.microsoftonline.com/${TENANT}/v2.0`,
+          expectedSubject: 'sub',
+          expectedAudience: 'appid',
+          jwksUri: `https://login.microsoftonline.com/${TENANT}/discovery/v2.0/keys`,
+        },
+      } as never);
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(typeof created.metadata.lastVerifiedAt).toBe('string');
+      expect(Number.isNaN(Date.parse(created.metadata.lastVerifiedAt as string))).toBe(false);
+    });
+
+    it('does NOT stamp lastVerifiedAt when a create did not request verify', async () => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif',
+        wif: {
+          expectedIssuer: `https://login.microsoftonline.com/${TENANT}/v2.0`,
+          expectedSubject: 'sub',
+          expectedAudience: 'appid',
+          jwksUri: `https://login.microsoftonline.com/${TENANT}/discovery/v2.0/keys`,
+        },
+      } as never);
+      const created = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata: Record<string, unknown> };
+      expect(created.metadata).not.toHaveProperty('lastVerifiedAt');
+    });
+  });
+
   describe('listCredentials', () => {
     it('should list credentials without hashes', async () => {
       const result = await controller.listCredentials(mockEndpoint.id);
