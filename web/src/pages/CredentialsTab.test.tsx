@@ -163,28 +163,32 @@ describe('CredentialsTab', () => {
     );
   });
 
-  // ─── Flag-disabled banner ──────────────────────────────────────────
+  // ─── Per-endpoint method availability (W11 - no "All" tab) ──────────
 
-  it('shows warning banner and disables Add button when flag is off', () => {
+  it('does not offer a bearer/oauth method tab when PerEndpointCredentialsEnabled is off', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: { ...baseOverview, configFlags: { PerEndpointCredentialsEnabled: false } },
       isLoading: false,
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    expect(screen.getByTestId('credentials-flag-disabled-banner')).toBeInTheDocument();
-    const addBtn = screen.getByTestId('credentials-create-button');
-    expect(addBtn).toBeDisabled();
+    // With per-endpoint creds off, only the global shared-secret method tab shows.
+    expect(screen.queryByTestId('credentials-method-tab-bearer')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credentials-method-tab-oauth_client')).not.toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-shared_secret')).toBeInTheDocument();
+    // No per-endpoint create button on the shared-secret tab.
+    expect(screen.queryByTestId('credentials-create-button')).not.toBeInTheDocument();
   });
 
-  it('shows warning banner when flag is missing entirely (treated as off)', () => {
+  it('shows only the shared-secret method tab when no per-endpoint flags are set', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: { ...baseOverview, configFlags: {} },
       isLoading: false,
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    expect(screen.getByTestId('credentials-flag-disabled-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('credentials-method-tab-shared_secret')).toBeInTheDocument();
+    expect(screen.queryByTestId('credentials-method-tab-bearer')).not.toBeInTheDocument();
   });
 
   // ─── List rendering ────────────────────────────────────────────────
@@ -412,6 +416,8 @@ describe('CredentialsTab', () => {
     };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // The oauth_client credential lives on the oauth_client method tab (W11).
+    fireEvent.click(screen.getByTestId('credentials-method-tab-oauth_client'));
     const revealBtn = screen.getByTestId('credential-reveal-cred-r');
     fireEvent.click(revealBtn);
     expect(mockRevealMutate).toHaveBeenCalledTimes(1);
@@ -441,6 +447,8 @@ describe('CredentialsTab', () => {
     };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // The oauth_client credential lives on the oauth_client method tab (W11).
+    fireEvent.click(screen.getByTestId('credentials-method-tab-oauth_client'));
     const rotateBtn = screen.getByTestId('credential-rotate-cred-rot');
     fireEvent.click(rotateBtn);
     expect(mockRotateMutate).toHaveBeenCalledTimes(1);
@@ -957,22 +965,26 @@ describe('CredentialsTab', () => {
   }
 
   // U3 - the add-trust form is now collapsed behind an "Add trust" button.
+  // W11 - the WIF section lives on the wif method tab, so select it first.
   function openAddForm(): void {
+    const wifTab = screen.queryByTestId('credentials-method-tab-wif');
+    if (wifTab) fireEvent.click(wifTab);
     fireEvent.click(screen.getByTestId('wif-add-trust-button'));
   }
 
-  it('shows the WIF disabled banner when WifCredentialsEnabled is off', () => {
+  it('does not show a WIF method tab or section when WifCredentialsEnabled is off', () => {
     mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    expect(screen.getByTestId('wif-section')).toBeInTheDocument();
-    expect(screen.getByTestId('wif-flag-disabled-banner')).toBeInTheDocument();
-    // Inputs are not rendered while disabled.
+    // W11 - a disabled method has no tab (and therefore no section); the operator
+    // enables it in Settings.
+    expect(screen.queryByTestId('credentials-method-tab-wif')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wif-section')).not.toBeInTheDocument();
     expect(screen.queryByTestId('wif-field-issuer')).not.toBeInTheDocument();
   });
 
   it('renders the 4+ Entra input fields when WIF is enabled (G1)', () => {
     mockUseEndpointOverview.mockReturnValue({
-      data: { ...baseOverview, configFlags: { PerEndpointCredentialsEnabled: true, WifCredentialsEnabled: true } },
+      data: { ...baseOverview, configFlags: { WifCredentialsEnabled: true } },
       isLoading: false,
       error: null,
     });
@@ -1410,7 +1422,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     { id: 'oc-1', credentialType: 'oauth_client' as const, label: 'OAuth one', active: true, createdAt: '2026-04-02T10:00:00Z', expiresAt: null },
   ];
 
-  it('shows only tabs for ENABLED auth methods (+ All + shared secret default)', () => {
+  it('shows a tab per ENABLED auth method and NO "All" tab (W11)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
@@ -1422,7 +1434,8 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     expect(screen.getByTestId('credentials-method-tabs')).toBeInTheDocument();
-    expect(screen.getByTestId('credentials-method-tab-all')).toBeInTheDocument();
+    // W11 - there is no "All" tab.
+    expect(screen.queryByTestId('credentials-method-tab-all')).not.toBeInTheDocument();
     expect(screen.getByTestId('credentials-method-tab-shared_secret')).toBeInTheDocument();
     expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
     expect(screen.getByTestId('credentials-method-tab-oauth_client')).toBeInTheDocument();
@@ -1457,7 +1470,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
   });
 
-  it('the All tab lists credentials of every method', () => {
+  it('the default (first per-endpoint) method tab lists only that method (W11 - no All tab)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
@@ -1468,8 +1481,10 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // W11 - the default tab is the first per-endpoint method (bearer); it lists
+    // only bearer credentials, not every method's (there is no "All" view).
     expect(screen.getByTestId('credential-row-br-1')).toBeInTheDocument();
-    expect(screen.getByTestId('credential-row-oc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-row-oc-1')).not.toBeInTheDocument();
   });
 
   it('selecting the OAuth2 client tab filters the list to oauth_client only', () => {
@@ -1561,6 +1576,16 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
         ...baseOverview.connectionInfo!,
         enabledMethods: [
           {
+            method: 'shared_secret',
+            label: 'Shared secret (global bearer)',
+            entraAuthenticationMethod: 'Secret Token',
+            entraFields: {
+              tenantUrl: 'https://x/scim/v2/endpoints/ep-1',
+              secretToken: null,
+            },
+            clientSecretState: 'none',
+          },
+          {
             method: 'bearer',
             label: 'Bearer token',
             entraAuthenticationMethod: 'Secret Token',
@@ -1581,34 +1606,42 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
     } as EndpointOverviewResponse;
   }
 
-  it('renders the merged Connect panel + Health (auth diagnostics) on the unified tab', () => {
+  it('renders the credential list + Health on a per-endpoint tab; the endpoint ConnectionPanel is kept on shared-secret (W12)', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // Setup (credential management) is present...
+    // Default tab = bearer (first per-endpoint): the credential list + Health show,
+    // but the endpoint-level ConnectionPanel is removed here (W12 - the per-card
+    // Connect subpanels cover it).
     expect(screen.getByTestId('credentials-list')).toBeInTheDocument();
-    // ...alongside Connect (connection bundle)...
-    expect(screen.getByTestId('connect-tab-panel')).toBeInTheDocument();
-    // ...and Health (auth diagnostics).
     expect(screen.getByTestId('connect-tab-auth-diagnostics')).toBeInTheDocument();
+    expect(screen.queryByTestId('connect-tab-panel')).not.toBeInTheDocument();
+    // W12 - the ConnectionPanel is kept on the shared-secret tab (no per-cred card there).
+    fireEvent.click(screen.getByTestId('credentials-method-tab-shared_secret'));
+    expect(screen.getByTestId('connect-tab-panel')).toBeInTheDocument();
   });
 
-  it('scopes the Connect panel to the active method (single axis - no competing method selector)', () => {
+  it('W12: the endpoint ConnectionPanel on shared-secret has no competing method selector', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // Select the bearer method sub-tab (the single method axis).
-    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    fireEvent.click(screen.getByTestId('credentials-method-tab-shared_secret'));
     expect(screen.getByTestId('connect-tab-panel')).toBeInTheDocument();
     // The panel's own method-selector radio is hidden (the sub-tabs drive it).
     expect(screen.queryByTestId('connect-tab-panel-method-selector')).not.toBeInTheDocument();
   });
 
-  it('shows the actual secret in the Connect panel when the effective visibility is Always (retained)', () => {
-    mockRetainedSecrets = { bearer: 'super-secret-token-value' };
+  it('W8: shows the retained bearer secret inline in the per-card Connect subpanel when visibility is Always', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(true), isLoading: false, error: null });
+    // The reveal returns the retained secret so the per-card subpanel renders it.
+    mockRevealMutate.mockImplementation(
+      (_id: string, opts: { onSuccess: (r: { retained: boolean; clientSecret: string }) => void }) => {
+        opts.onSuccess({ retained: true, clientSecret: 'super-secret-token-value' });
+      },
+    );
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    // Default tab = bearer; open the card's Connect subpanel.
+    fireEvent.click(screen.getByTestId('credential-connect-cred-b1'));
     // The retained secret is rendered inline (re-viewable) rather than hidden.
-    expect(screen.getByTestId('connect-tab-panel').textContent).toContain('super-secret-token-value');
+    expect(screen.getByTestId('credential-connect-secret-cred-b1').textContent).toContain('super-secret-token-value');
   });
 
   // ─── W3 / W4: Connect export at the endpoint + method levels ─────────
@@ -1622,16 +1655,16 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
     expect(screen.getByTestId('connect-endpoint-export-download')).toBeInTheDocument();
   });
 
-  it('W4: renders a per-method Connect export when a specific method sub-tab is active', () => {
+  it('W4: renders a per-method Connect export on the active method sub-tab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // The "All" overview shows only the endpoint export, not a per-method one.
-    expect(screen.queryByTestId('connect-method-export-bearer')).not.toBeInTheDocument();
-    // Selecting the bearer method reveals its per-method export.
-    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    // W11 - the default tab is bearer (first per-endpoint), so its per-method export shows.
     expect(screen.getByTestId('connect-method-export-bearer')).toBeInTheDocument();
     expect(screen.getByTestId('connect-method-export-bearer-copy')).toBeInTheDocument();
     expect(screen.getByTestId('connect-method-export-bearer-download')).toBeInTheDocument();
+    // Switching to the shared-secret method swaps the per-method export.
+    fireEvent.click(screen.getByTestId('credentials-method-tab-shared_secret'));
+    expect(screen.getByTestId('connect-method-export-shared_secret')).toBeInTheDocument();
   });
 
   // ─── W8 / W9 / W10: bearer Connect subpanel + rename + param tooltips ─

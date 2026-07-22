@@ -54,42 +54,45 @@ async function openFirstEndpointCredentials(page: Page): Promise<void> {
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 }
 
+/**
+ * W11 - the WIF section lives on the `wif` method sub-tab (there is no "All"
+ * tab). Open the Connect tab and select WIF; skip when the endpoint has no WIF
+ * method enabled (the tab is absent).
+ */
+async function openWifSection(page: Page): Promise<void> {
+  await openFirstEndpointCredentials(page);
+  const wifTab = page.getByTestId('credentials-method-tab-wif');
+  test.skip((await wifTab.count()) === 0, 'Endpoint has no WIF method enabled.');
+  await wifTab.click();
+  await expect(page.getByTestId('wif-section')).toBeVisible({ timeout: 15_000 });
+}
+
 test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
-  test('the WIF section is always present on the credentials tab', async ({ page }) => {
-    await openFirstEndpointCredentials(page);
+  test('the WIF section is present on the wif method tab', async ({ page }) => {
+    await openWifSection(page);
     await expect(page.getByTestId('wif-section')).toBeVisible();
     // The endpoint may hold several wif rows (each repeats the heading text), so
     // scope to the first match to avoid a strict-mode violation.
     await expect(page.getByText('Federated Identity (WIF)').first()).toBeVisible();
   });
 
-  test('WIF section shows either the disabled banner or the input form', async ({ page }) => {
-    await openFirstEndpointCredentials(page);
-
-    const banner = page.getByTestId('wif-flag-disabled-banner');
-    const issuer = page.getByTestId('wif-field-issuer');
-
-    // Exactly one branch renders depending on the endpoint flag.
-    const bannerVisible = await banner.isVisible().catch(() => false);
-    if (bannerVisible) {
-      await expect(banner).toBeVisible();
-      await expect(issuer).toHaveCount(0);
-    } else {
-      // Flag is on: the Add trust button opens the collapsed form (U3).
-      await page.getByTestId('wif-add-trust-button').click();
-      await expect(issuer).toBeVisible();
-      await expect(page.getByTestId('wif-field-subject')).toBeVisible();
-      await expect(page.getByTestId('wif-field-audience')).toBeVisible();
-      await expect(page.getByTestId('wif-field-jwks')).toBeVisible();
-      await expect(page.getByTestId('wif-field-tenant')).toBeVisible();
-      await expect(page.getByTestId('wif-save-button')).toBeVisible();
-      await expect(page.getByTestId('wif-test-button')).toBeVisible();
-      await expect(page.getByTestId('wif-copy-json')).toBeVisible();
-    }
+  test('the WIF tab opens the collapsed add-trust form', async ({ page }) => {
+    await openWifSection(page);
+    // W11 - a disabled method has no tab, so reaching this section means WIF is
+    // on: the Add trust button opens the collapsed form (U3).
+    await page.getByTestId('wif-add-trust-button').click();
+    await expect(page.getByTestId('wif-field-issuer')).toBeVisible();
+    await expect(page.getByTestId('wif-field-subject')).toBeVisible();
+    await expect(page.getByTestId('wif-field-audience')).toBeVisible();
+    await expect(page.getByTestId('wif-field-jwks')).toBeVisible();
+    await expect(page.getByTestId('wif-field-tenant')).toBeVisible();
+    await expect(page.getByTestId('wif-save-button')).toBeVisible();
+    await expect(page.getByTestId('wif-test-button')).toBeVisible();
+    await expect(page.getByTestId('wif-copy-json')).toBeVisible();
   });
 
   test('Test Connection renders a per-step readiness result when WIF is enabled', async ({ page }) => {
-    await openFirstEndpointCredentials(page);
+    await openWifSection(page);
 
     const addBtn = page.getByTestId('wif-add-trust-button');
     const formVisible = await addBtn.isVisible().catch(() => false);
@@ -108,7 +111,7 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   // WI-13 regression: the claim-name alias hint is shown when the WIF form is
   // enabled, guiding operators that pasted decoded-token keys are accepted.
   test('WI-13: the claim-name alias hint renders when WIF is enabled', async ({ page }) => {
-    await openFirstEndpointCredentials(page);
+    await openWifSection(page);
 
     const addBtn = page.getByTestId('wif-add-trust-button');
     const formVisible = await addBtn.isVisible().catch(() => false);
@@ -122,7 +125,7 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
 
   // WI-14 regression: the discovery resolver row is present when WIF is enabled.
   test('WI-14: the WIF discovery resolver row renders when WIF is enabled', async ({ page }) => {
-    await openFirstEndpointCredentials(page);
+    await openWifSection(page);
 
     const addBtn = page.getByTestId('wif-add-trust-button');
     const formVisible = await addBtn.isVisible().catch(() => false);
@@ -187,6 +190,11 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
     await page.goto(`/endpoints/${endpointId}/credentials`);
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+    // W11 - the WIF section is on the wif method tab.
+    const wifTab = page.getByTestId('credentials-method-tab-wif');
+    test.skip((await wifTab.count()) === 0, 'WifCredentialsEnabled is off on this endpoint.');
+    await wifTab.click();
 
     const addBtn = page.getByTestId('wif-add-trust-button');
     const formVisible = await addBtn.isVisible().catch(() => false);
@@ -333,6 +341,8 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
 
     await page.goto('/endpoints/ep-multi/credentials');
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+    // W11 - select the wif method tab (it is the default here, but be explicit).
+    await page.getByTestId('credentials-method-tab-wif').click();
 
     // Both trust rows render.
     await expect(page.getByTestId('wif-credential-row-wif-a')).toBeVisible();
@@ -393,15 +403,16 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 
     // R10: assert the RENDERED tabs + filtering behavior, not just presence.
-    await expect(page.getByTestId('credentials-method-tab-all')).toBeVisible();
+    // W11 - a tab per ENABLED method, and NO "All" tab.
+    await expect(page.getByTestId('credentials-method-tab-all')).toHaveCount(0);
     await expect(page.getByTestId('credentials-method-tab-shared_secret')).toBeVisible();
     await expect(page.getByTestId('credentials-method-tab-bearer')).toBeVisible();
     await expect(page.getByTestId('credentials-method-tab-oauth_client')).toBeVisible();
     await expect(page.getByTestId('credentials-method-tab-wif')).toBeVisible();
 
-    // All tab: both method rows visible.
+    // Default tab = bearer (the first per-endpoint method): only the bearer row.
     await expect(page.getByTestId('credential-row-br-1')).toBeVisible();
-    await expect(page.getByTestId('credential-row-oc-1')).toBeVisible();
+    await expect(page.getByTestId('credential-row-oc-1')).toHaveCount(0);
 
     // OAuth2 client tab: only the oauth_client row.
     await page.getByTestId('credentials-method-tab-oauth_client').click();

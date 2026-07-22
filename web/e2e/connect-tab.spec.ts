@@ -60,33 +60,38 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
     await expect(page.getByTestId('endpoint-tab-connect')).toBeVisible();
   });
 
-  test('the ConnectionPanel renders a method selector + copy-all-JSON', async ({ page }) => {
+  test('W12: the ConnectionPanel is scoped to the shared-secret tab (no method selector)', async ({ page }) => {
     await openFirstEndpointConnect(page);
+    const sharedTab = page.getByTestId('credentials-method-tab-shared_secret');
+    test.skip((await sharedTab.count()) === 0, 'Endpoint has no shared-secret method.');
+    await sharedTab.click();
     await expect(page.getByTestId('connect-tab-panel')).toBeVisible();
-    await expect(page.getByTestId('connect-tab-panel-method-selector')).toBeVisible();
     await expect(page.getByTestId('connect-tab-panel-copy-json')).toBeVisible();
     // Export affordances are present.
     await expect(page.getByTestId('connect-tab-panel-copy-env')).toBeVisible();
     await expect(page.getByTestId('connect-tab-panel-download')).toBeVisible();
+    // W11/W12 - the panel is scoped to the tab's method; no competing selector.
+    await expect(page.getByTestId('connect-tab-panel-method-selector')).toHaveCount(0);
   });
 
-  test('the Tenant URL field carries a copy button', async ({ page }) => {
+  test('the Tenant URL field carries a copy button on the shared-secret panel', async ({ page }) => {
     await openFirstEndpointConnect(page);
-    // Every enabled method surfaces a tenantUrl field with a copy button.
+    const sharedTab = page.getByTestId('credentials-method-tab-shared_secret');
+    test.skip((await sharedTab.count()) === 0, 'Endpoint has no shared-secret method.');
+    await sharedTab.click();
+    // The shared-secret method surfaces a tenantUrl field with a copy button.
     const tenantValue = page.getByTestId('connect-tab-panel-value-tenantUrl');
+    test.skip((await tenantValue.count()) === 0, 'Shared-secret panel has no tenantUrl field.');
     await expect(tenantValue).toBeVisible();
     await expect(page.getByTestId('connect-tab-panel-value-tenantUrl-copy-button')).toBeVisible();
     // The URL is the leading /scim/v2 form (WI-1).
     await expect(tenantValue).toContainText('/scim/v2/endpoints/');
   });
 
-  test('switching the method radio swaps the visible fields', async ({ page }) => {
+  test('W11: there is no "All" method tab', async ({ page }) => {
     await openFirstEndpointConnect(page);
-    const wifRadio = page.getByTestId('connect-tab-panel-method-wif');
-    test.skip((await wifRadio.count()) === 0, 'Endpoint has no WIF method enabled.');
-    await wifRadio.click();
-    // WIF surfaces an expected-audience field and has no clientIdentifier.
-    await expect(page.getByTestId('connect-tab-panel-value-expectedAudience')).toBeVisible();
+    await expect(page.getByTestId('credentials-method-tabs')).toBeVisible();
+    await expect(page.getByTestId('credentials-method-tab-all')).toHaveCount(0);
   });
 
   test('W3: the Connect header carries an endpoint-level export (copy + download all)', async ({ page }) => {

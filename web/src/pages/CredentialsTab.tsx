@@ -1661,7 +1661,8 @@ function coerceCredFlag(raw: unknown, fallback: boolean): boolean {
  * Compute the enabled auth-method tabs from the endpoint config flags,
  * mirroring the backend getEffectiveAuthEnablement precedence: the two
  * per-endpoint flags fall back to the legacy PerEndpointCredentialsEnabled,
- * and the shared-secret flag defaults to on.
+ * and the shared-secret flag defaults to on. W11 - there is no "All" tab; the
+ * per-method tabs are the single method axis.
  */
 function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
   const legacy = coerceCredFlag(flags.PerEndpointCredentialsEnabled, false);
@@ -1670,7 +1671,7 @@ function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
   const oauthClient = coerceCredFlag(flags.OAuthClientCredentialsAuthEnabled, legacy);
   const wif = coerceCredFlag(flags.WifCredentialsEnabled, false);
 
-  const tabs: MethodTabDef[] = [{ value: 'all', label: 'All', credentialType: null }];
+  const tabs: MethodTabDef[] = [];
   if (sharedSecret) tabs.push({ value: 'shared_secret', label: 'Shared secret', credentialType: null });
   if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
   if (oauthClient) tabs.push({ value: 'oauth_client', label: 'OAuth2 Client-Credential', credentialType: 'oauth_client' });
@@ -1924,29 +1925,38 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   // 403 surfaces as the overview load succeeding but the credentials
   // array remaining empty + the create attempt later returning 403.
-  // We surface the explanatory banner up front when the underlying
-  // config flag is off.
-  const flagEnabled = Boolean(data?.configFlags?.PerEndpointCredentialsEnabled);
   const wifEnabled = Boolean(data?.configFlags?.WifCredentialsEnabled);
   const credentials = data?.credentials ?? [];
 
-  // R6 - per-method sub-tabs. Only enabled methods get a tab; if the current
-  // selection is no longer enabled, fall back to the "All" overview.
+  // W11 - the per-method sub-tabs are the single method axis; there is no "All"
+  // tab. If the current selection is not among the enabled methods (the initial
+  // state, or a method that was turned off), fall back to the first enabled
+  // method. `noMethods` covers the rare case where every auth method is disabled.
   const configFlags = (data?.configFlags ?? {}) as Record<string, unknown>;
   const methodTabs = enabledMethodTabs(configFlags);
-  const activeTab: MethodTab = methodTabs.some((t) => t.value === methodTab) ? methodTab : 'all';
-  const activeDef = methodTabs.find((t) => t.value === activeTab) ?? methodTabs[0];
-  const showGenericList = activeTab === 'all' || activeTab === 'bearer' || activeTab === 'oauth_client';
-  const showWifSection = activeTab === 'all' || activeTab === 'wif';
-  const showSharedSecretInfo = activeTab === 'shared_secret';
+  const noMethods = methodTabs.length === 0;
+  // Default to the first configured PER-ENDPOINT method (bearer / oauth_client /
+  // wif) when one exists - that is the auth the operator deliberately set up for
+  // this endpoint - otherwise the global shared-secret method. Falls back to the
+  // first tab / shared_secret when nothing matches.
+  const defaultTabValue: MethodTab =
+    methodTabs.find((t) => t.value !== 'shared_secret')?.value ??
+    methodTabs[0]?.value ??
+    'shared_secret';
+  const activeTab: MethodTab = methodTabs.some((t) => t.value === methodTab)
+    ? methodTab
+    : defaultTabValue;
+  const activeDef = methodTabs.find((t) => t.value === activeTab) ?? methodTabs[0] ?? null;
+  const showGenericList = !noMethods && (activeTab === 'bearer' || activeTab === 'oauth_client');
+  const showWifSection = !noMethods && activeTab === 'wif';
+  const showSharedSecretInfo = !noMethods && activeTab === 'shared_secret';
   const createTypeForTab: 'bearer' | 'oauth_client' = activeTab === 'oauth_client' ? 'oauth_client' : 'bearer';
-  const listCredentials =
-    activeTab === 'all'
-      ? credentials
-      : activeDef.credentialType
-        ? credentials.filter((c) => c.credentialType === activeDef.credentialType)
-        : [];
-  const flagEnabledForTab = activeTab === 'all' ? flagEnabled : true;
+  const listCredentials = activeDef?.credentialType
+    ? credentials.filter((c) => c.credentialType === activeDef.credentialType)
+    : [];
+  // A method tab only appears when its method is enabled, so per-tab creation is
+  // always allowed.
+  const flagEnabledForTab = true;
 
   return (
     <div className={classes.root} data-testid="tab-credentials">
@@ -1991,7 +2001,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         </Link>
       </Caption1>
 
-      {/* R6 - per-method sub-tabs (only enabled methods) - the single method axis */}
+      {/* W11 - per-method sub-tabs (only enabled methods) are the single method axis. */}
       <TabList
         selectedValue={activeTab}
         onTabSelect={(_, d) => setMethodTab(d.value as MethodTab)}
@@ -2004,11 +2014,19 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         ))}
       </TabList>
 
+      {noMethods && (
+        <MessageBar intent="warning" data-testid="credentials-no-methods">
+          <MessageBarBody>
+            <MessageBarTitle>No auth methods enabled</MessageBarTitle>
+            This endpoint has no authentication method enabled. Enable one in{' '}
+            <a href={`/endpoints/${endpointId}/settings`}>Settings</a>.
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
       {/* W4 - copy / download all info for the ACTIVE method: its connection
-          info + the credentials/trusts backing it (no secret values). Shown for
-          a specific method sub-tab (the "All" overview uses the W3 endpoint
-          export in the header). */}
-      {activeTab !== 'all' && data?.connectionInfo && (
+          info + the credentials/trusts backing it (no secret values). */}
+      {!noMethods && data?.connectionInfo && (
         <div className={classes.headerActions} data-testid={`connect-method-export-row-${activeTab}`}>
           <SettingsJsonExport
             value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, data.connectionInfo, listCredentials)}
@@ -2031,18 +2049,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         </MessageBar>
       )}
 
-      {showGenericList && !flagEnabledForTab && (
-        <MessageBar intent="warning" data-testid="credentials-flag-disabled-banner">
-          <MessageBarBody>
-            <MessageBarTitle>Per-endpoint credentials are disabled</MessageBarTitle>
-            Enable <code>PerEndpointCredentialsEnabled</code> in the endpoint{' '}
-            <a href={`/endpoints/${endpointId}/settings`}>Settings</a> tab to
-            create per-endpoint bearer credentials.
-          </MessageBarBody>
-        </MessageBar>
-      )}
-
-      {showGenericList && (flagEnabledForTab && listCredentials.length === 0 ? (
+      {showGenericList && (listCredentials.length === 0 ? (
         <EmptyState
           icon={<Key24Regular />}
           title="No credentials configured"
@@ -2310,15 +2317,16 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         />
       )}
 
-      {/* P5 - Connect: the copyable connection bundle for the active method
-          (the "what to paste into your IdP" values + secret when visibility is
-          Always + export). Scoped to the active method so the tab-level method
-          axis is the single selector. */}
-      {data?.connectionInfo && (
+      {/* W12 - the endpoint-level ConnectionPanel is kept ONLY for the
+          shared-secret method, which has no per-credential card + subpanel to
+          carry its connection info. For bearer / oauth_client / wif the per-card
+          Connect subpanels (W6/W8) provide the same values, so the redundant
+          endpoint-level card is removed on those tabs. */}
+      {showSharedSecretInfo && data?.connectionInfo && (
         <UnifiedConnectSection
           endpointId={endpointId}
           connectionInfo={data.connectionInfo}
-          activeMethod={activeTab === 'all' ? 'all' : (activeTab as ConnectionMethod)}
+          activeMethod="shared_secret"
         />
       )}
 
