@@ -13450,11 +13450,20 @@ function Get-DiagRequestId($errRecord) {
 }
 
 function Get-LogDetailByRequestId($rid) {
-    Start-Sleep -Seconds 4
-    $list = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?search=$rid&pageSize=5" -Method GET -Headers $headers
-    $row = @($list.items | Where-Object { $_.requestId -eq $rid })[0]
-    if ($null -eq $row) { return $null }
-    return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
+    # Poll with retry - the Prisma backend buffers request logs and flushes on a
+    # ~3s timer, and the DB write to Azure Postgres can lag past a single fixed
+    # wait on a busy dev node (InMemory is synchronous so this returns fast).
+    for ($try = 0; $try -lt 8; $try++) {
+        Start-Sleep -Seconds 3
+        try {
+            $list = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?search=$rid&pageSize=5" -Method GET -Headers $headers
+            $row = @($list.items | Where-Object { $_.requestId -eq $rid })[0]
+            if ($null -ne $row) {
+                return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
+            }
+        } catch {}
+    }
+    return $null
 }
 
 try {
