@@ -100,8 +100,7 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
     await openFirstEndpointConnect(page);
     // Pick the first non-"All" method sub-tab present on this endpoint.
     const methodTab = page
-      .locator('[data-testid^="credentials-method-tab-"]')
-      .filter({ hasNot: page.locator('[data-testid="credentials-method-tab-all"]') })
+      .locator('[data-testid^="credentials-method-tab-"]:not([data-testid="credentials-method-tab-all"])')
       .first();
     test.skip((await methodTab.count()) === 0, 'Endpoint has no per-method auth tabs enabled.');
     const tabTestId = (await methodTab.getAttribute('data-testid')) ?? '';
