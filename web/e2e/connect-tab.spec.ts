@@ -132,6 +132,12 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
     const base = `https://scim.example.com/scim/v2/endpoints/${ID}`;
     const overview = {
       endpoint: { id: ID, name: 'r3', displayName: 'R3 Connect', active: true },
+      // W11/W12 - enable the oauth_client method (so its tab + card render) and
+      // carry the credential so its per-card Connect subpanel shows the secret.
+      configFlags: { OAuthClientCredentialsAuthEnabled: true },
+      credentials: [
+        { id: 'cred-r3', credentialType: 'oauth_client', label: 'ISV client', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null, oauthClientId: `client-id-${ID}` },
+      ],
       connectionInfo: {
         endpointId: ID,
         displayName: 'R3 Connect',
@@ -193,13 +199,15 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
 
     await page.goto(`/endpoints/${ID}/connect`);
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
-    // R10: assert the RENDERED secret value + the re-viewable note, not just presence.
-    await expect(page.getByTestId('connect-tab-panel-value-clientSecret')).toContainText('retained-secret-r3');
-    await expect(page.getByTestId('connect-tab-panel-secret-retained-note')).toBeVisible();
-    // The one-time "copy now" warning must NOT show for a persistent reveal.
-    await expect(page.getByTestId('connect-tab-panel-secret-warning')).toHaveCount(0);
-    // R4: Entra-accurate labels + generic-IDP helper descriptions are present.
-    await expect(page.getByTestId('connect-tab-panel-intro')).toContainText(/Entra/i);
-    await expect(page.getByTestId('connect-tab-panel-desc-clientIdentifier')).toContainText(/Client ID/i);
+    // W8/W12 - the retained secret now shows in the per-card Connect subpanel
+    // (the endpoint ConnectionPanel is shared-secret-only). The oauth_client tab
+    // is the default (first per-endpoint method); open the card's Connect
+    // subpanel - the auto-reveal returns the retained secret.
+    await page.getByTestId('credential-connect-cred-r3').click();
+    await expect(page.getByTestId('credential-connect-secret-cred-r3')).toContainText('retained-secret-r3');
+    // W9/W10 - the subpanel header names the IdP (Entra as the example) and each
+    // parameter carries an InfoLabel help affordance.
+    await expect(page.getByTestId('credential-connect-panel-cred-r3')).toContainText(/Entra/i);
+    await expect(page.getByTestId('credential-connect-clientid-info-cred-r3')).toBeVisible();
   });
 });
