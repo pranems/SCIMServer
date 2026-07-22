@@ -13482,9 +13482,16 @@ try {
         Invoke-RestMethod -Uri $bnUsers -Method POST -Headers $authHeaderOnly -ContentType "application/scim+json" -Body '{ "userName": "bn-broken", ' | Out-Null
     } catch { $bnMalRid = Get-DiagRequestId $_ ; Test-Result -Success ($_.Exception.Response.StatusCode.value__ -eq 400) -Message "9z-BN.T1: malformed JSON rejected (400)" }
     if ($bnMalRid) {
-        $d = Get-LogDetailByRequestId $bnMalRid
-        Test-Result -Success ($null -ne $d -and $d.requestBody._bodyNotCaptured -eq $true -and $d.requestBody.reason -eq "unparseable") -Message "9z-BN.T2: malformed row stored with an 'unparseable' marker"
-        Test-Result -Success ("$($d.requestBody._rawPreview)" -match "bn-broken") -Message "9z-BN.T3: unparseable marker carries the raw bytes"
+        # Poll until the row's marker is present (flush lag under full-suite load).
+        $d = $null
+        for ($bnTry = 0; $bnTry -lt 10; $bnTry++) {
+            $cand = Get-LogDetailByRequestId $bnMalRid
+            if ($null -ne $cand -and $cand.requestBody._bodyNotCaptured -eq $true) { $d = $cand; break }
+            Start-Sleep -Seconds 2
+        }
+        $bnHas = ($null -ne $d -and $d.requestBody._bodyNotCaptured -eq $true)
+        Test-Result -Success ($bnHas -and $d.requestBody.reason -eq "unparseable") -Message "9z-BN.T2: malformed row stored with an 'unparseable' marker"
+        Test-Result -Success ($bnHas -and ("$($d.requestBody._rawPreview)" -match "bn-broken")) -Message "9z-BN.T3: unparseable marker carries the raw bytes"
     } else {
         Test-Result -Success $false -Message "9z-BN.T2-T3: could not resolve requestId from the malformed-JSON error"
     }
@@ -13540,12 +13547,22 @@ try {
     Test-Result -Success ($null -ne $boRid) -Message "9z-BO.T1: rejected token request returns a correlation_id"
 
     if ($boRid) {
-        $boDetail = Get-LogDetailByRequestId $boRid
-        Test-Result -Success ($null -ne $boDetail -and $null -ne $boDetail.authDecision) -Message "9z-BO.T2: the row detail carries the persisted authDecision trace"
-        Test-Result -Success ($boDetail.authDecision.method -eq "oauth_client" -and $boDetail.authDecision.outcome -eq "reject") -Message "9z-BO.T3: authDecision names the method + outcome"
-        Test-Result -Success (@($boDetail.authDecision.checks).Count -gt 0) -Message "9z-BO.T4: authDecision carries the per-check trace"
-        $boJson = $boDetail.authDecision | ConvertTo-Json -Depth 8
-        Test-Result -Success (-not ($boJson -match "wrong-w1")) -Message "9z-BO.T5: authDecision carries NO secret material"
+        # Poll until the row's authDecision is present (flush + DB write can lag
+        # under the full-suite load even after the row itself is listable).
+        $boDetail = $null
+        for ($boTry = 0; $boTry -lt 10; $boTry++) {
+            $cand = Get-LogDetailByRequestId $boRid
+            if ($null -ne $cand -and $null -ne $cand.authDecision) { $boDetail = $cand; break }
+            Start-Sleep -Seconds 2
+        }
+        $boHas = ($null -ne $boDetail -and $null -ne $boDetail.authDecision)
+        # R10: every assertion is guarded on $boHas so none can pass vacuously
+        # (PowerShell's @($null).Count is 1, and 'null' never matches a secret).
+        Test-Result -Success $boHas -Message "9z-BO.T2: the row detail carries the persisted authDecision trace"
+        Test-Result -Success ($boHas -and $boDetail.authDecision.method -eq "oauth_client" -and $boDetail.authDecision.outcome -eq "reject") -Message "9z-BO.T3: authDecision names the method + outcome"
+        Test-Result -Success ($boHas -and @($boDetail.authDecision.checks).Count -gt 0) -Message "9z-BO.T4: authDecision carries the per-check trace"
+        $boJson = if ($boHas) { $boDetail.authDecision | ConvertTo-Json -Depth 8 } else { "" }
+        Test-Result -Success ($boHas -and (-not ($boJson -match "wrong-w1"))) -Message "9z-BO.T5: authDecision carries NO secret material"
     } else {
         Test-Result -Success $false -Message "9z-BO.T2-T5: could not resolve the correlation id"
     }
