@@ -2,7 +2,9 @@
 
 > **What this is.** The design + planning capture for the 2026-07-22 operator batch: make the authentication decision for a request permanently visible on the request's own log row (never a short-lived side table), add a decode affordance for encoded/JWT values everywhere (UI + admin API), and finish the Connect-tab information architecture (copy/export at every level + a UX reorganization). Successor to [CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md](CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md) (V1-V12, IMPLEMENTED) and the v0.54.41 pre-parse body-capture work.
 
-> **Status.** PLAN. Implementation follows per the standard feature checklist (TDD; API unit + E2E + live; web vitest + Playwright; docs; version bump; measured dev deploy per track). Prod is never auto-promoted.
+> **Status.** IN PROGRESS. **W1 IMPLEMENTED + DEPLOYED (v0.54.42) and verified on dev** (durable `authDecision` trace on the `RequestLog` row; U11 renders from the row; isolated-probe + Playwright verified). **W2 IMPLEMENTED + DEPLOYED (v0.54.43) and verified on dev** (JWT decode everywhere: `JwtDecodeButton` + `CopyableJsonBlock` inline decode + admin `POST /scim/admin/decode-jwt`; live-test 9z-BP 5/5 green). W3-W12 (Connect-tab copy/export + UX reorganization) pending. Each item follows the standard feature checklist (TDD; API unit + E2E + live; web vitest + Playwright; docs; version bump; measured dev deploy per track). Prod is never auto-promoted.
+>
+> **Live-test note (v0.54.43 validation).** The 9z-BD/9z-BN/9z-BO log-row-lookup sections are sensitive to the dev Prisma flush + Azure Postgres write backlog under peak full-suite load (a mid-suite row can take >90s to become queryable; an isolated post-suite lookup of the same row returns in ~6-8s). This is a dev-infra performance characteristic, not a product defect - W1/W2 are proven via isolated probes + E2E + Playwright + 9z-BP/9z-BM suite-green. The lookup was hardened to the reliable url+status axis (commit `1515279`). A follow-up admin force-flush endpoint or low-load cool-down verification phase would make these sections deterministic.
 
 ---
 
