@@ -376,6 +376,40 @@ describe('LogsPage', () => {
       expect(chip.textContent).toContain('auth ok');
     });
 
+    it('W1: the in-drawer auth section renders from the PERSISTED decision with an empty store', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      // The short-TTL store is EMPTY - the persisted authDecision on the row is
+      // the only source, and the diff must still render.
+      mockUseAuthDecisions.mockReturnValue({ data: { count: 0, records: [] }, isLoading: false, error: null });
+      mockUseGlobalLog.mockReturnValue({
+        data: {
+          id: 'l1',
+          method: 'GET',
+          url: '/scim/endpoints/ep-prod/Users',
+          status: 200,
+          durationMs: 5,
+          createdAt: '2026-05-01T10:00:00Z',
+          requestId: 'corr-persisted',
+          authOutcome: 'accept',
+          authMethod: 'bearer_jwt',
+          authDecision: {
+            plane: 'resource',
+            method: 'bearer_jwt',
+            outcome: 'accept',
+            checks: [
+              { id: 'oauth_jwt', status: 'pass', expected: 'ep-prod', received: 'ep-prod' },
+            ],
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs?detail=l1');
+      expect(await screen.findByTestId('log-detail-auth-section-record')).toBeInTheDocument();
+      expect(screen.getByTestId('auth-decision-check-oauth_jwt')).toBeInTheDocument();
+      expect(screen.queryByTestId('log-detail-auth-section-empty')).not.toBeInTheDocument();
+    });
+
     it('V11: drawer shows the durable "Authenticated via" summary from persisted fields', async () => {
       mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
       mockUseGlobalLog.mockReturnValue({

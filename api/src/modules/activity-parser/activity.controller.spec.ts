@@ -32,6 +32,8 @@ describe('ActivityController', () => {
     authMethod: overrides.authMethod !== undefined ? overrides.authMethod : null,
     authReason: overrides.authReason !== undefined ? overrides.authReason : null,
     authCredentialId: overrides.authCredentialId !== undefined ? overrides.authCredentialId : null,
+    // W1 - RequestLog gained the full serialized AuthDecisionTrace (nullable).
+    authDecision: overrides.authDecision !== undefined ? overrides.authDecision : null,
   });
 
   const mockActivitySummary = (log: any) => ({

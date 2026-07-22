@@ -31,6 +31,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import { useAuthDecisions } from '../../api/queries';
+import type { AuthDecisionRecordLike } from '../../api/queries';
 import { CopyableField, CopyableJsonBlock } from './index';
 import { EmptyState } from './EmptyState';
 import { LoadingSkeleton } from './LoadingSkeleton';
@@ -237,25 +238,38 @@ export interface AuthDiagnosticsPanelProps {
 export const AuthDecisionForRequest: React.FC<{
   correlationId: string;
   endpointId?: string;
+  /** W1 - the auth decision PERSISTED on the request-log row (never expires).
+   *  When provided it is the source of truth and the short-TTL store is not
+   *  consulted; the "No auth decision" empty state only shows when this is
+   *  absent AND the store has no matching record. */
+  persistedDecision?: AuthDecisionRecordLike;
   'data-testid'?: string;
-}> = ({ correlationId, endpointId, 'data-testid': testId = 'log-detail-auth-section' }) => {
+}> = ({ correlationId, endpointId, persistedDecision, 'data-testid': testId = 'log-detail-auth-section' }) => {
   const classes = useStyles();
-  const { data, isLoading, error } = useAuthDecisions({ endpointId, limit: 50 });
-  const record = (data?.records ?? []).find((r) => r.correlationId === correlationId);
+  // Only hit the short-TTL store when there is no persisted decision on the row.
+  const { data, isLoading, error } = useAuthDecisions(
+    { endpointId, limit: 50 },
+    { enabled: !persistedDecision },
+  );
+  const isPersisted = !!persistedDecision;
+  const record: AuthDecisionRecord | undefined = persistedDecision
+    ? ({ ...persistedDecision, id: correlationId, recordedAt: '', correlationId } as AuthDecisionRecord)
+    : (data?.records ?? []).find((r) => r.correlationId === correlationId);
 
   return (
     <div className={classes.root} data-testid={testId}>
       <div className={classes.header}>
         <Subtitle2>Authentication</Subtitle2>
         <Caption1 className={classes.hint}>
-          The authentication decision for this request, joined by request id. Non-secret;
-          short-lived diagnostics.
+          {isPersisted
+            ? 'The authentication decision for this request, persisted with the request log. Non-secret; permanent.'
+            : 'The authentication decision for this request, joined by request id. Non-secret; short-lived diagnostics.'}
         </Caption1>
       </div>
 
-      {isLoading && <LoadingSkeleton count={2} height="28px" />}
+      {!isPersisted && isLoading && <LoadingSkeleton count={2} height="28px" />}
 
-      {error && (
+      {!isPersisted && error && (
         <EmptyState
           title="Could not load the auth decision"
           body="The recent auth decisions could not be retrieved."
@@ -266,20 +280,22 @@ export const AuthDecisionForRequest: React.FC<{
       {!isLoading && !error && !record && (
         <EmptyState
           title="No auth decision for this request"
-          body="This request produced no recorded auth decision - it may have authenticated on an earlier request, used a non-auth route, or the short-lived record has expired."
+          body="This request produced no recorded auth decision - it may have used a non-auth route, or (for an older row) the short-lived record has expired."
           data-testid={`${testId}-empty`}
         />
       )}
 
-      {!isLoading && !error && record && (
+      {!error && record && (
         <div data-testid={`${testId}-record`}>
           <div className={classes.rowHeader}>
             {outcomeBadge(record)}
             <Text className={classes.mono}>{record.method}</Text>
             {record.reasonCode && <Caption1 className={classes.mono}>{record.reasonCode}</Caption1>}
-            <Caption1 className={classes.hint}>
-              {new Date(record.recordedAt).toLocaleTimeString()}
-            </Caption1>
+            {record.recordedAt && (
+              <Caption1 className={classes.hint}>
+                {new Date(record.recordedAt).toLocaleTimeString()}
+              </Caption1>
+            )}
           </div>
           <DecisionDetail record={record} endpointId={endpointId} />
         </div>

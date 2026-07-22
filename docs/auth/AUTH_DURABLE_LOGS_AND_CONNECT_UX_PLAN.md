@@ -89,6 +89,8 @@ flowchart TB
 
 ## 4. Track W-A: durable auth diagnostics on the log row
 
+> **Status: W1 IMPLEMENTED v0.54.42.** `RequestLog.authDecision` (migration `20260722120000_add_requestlog_auth_decision`) holds the full redacted trace; `emitAuthDecisionEvent` stamps it, `recordRequest` persists it (both backends), `getLog` returns it, and `AuthDecisionForRequest` renders it via a `persistedDecision` prop (the short-TTL store is only a fallback). The "No auth decision" empty state now shows only when the row genuinely has none.
+
 - **Data model:** add a nullable `authDecision String?` column to `RequestLog` (Prisma migration + InMemory parity) holding the JSON-serialized, redacted `AuthDecisionTrace` (`checks[]` with `expected`/`received`, `decodedClaims`, `joseHeader`, `plane`, `selectedTrustId`, `subTraces`) - the same object the ephemeral store holds, minus any secret (none are stored today either).
 - **Write path:** the trace is already built during auth and stamped onto the correlation context summary in `emitAuthDecisionEvent`. Extend the context stamping to carry the full trace (or a compact form), and `LoggingService.recordRequest` persists it into `authDecision`. Cap + redact via the same body-capture safeties.
 - **Resource plane:** ensure the `SharedSecretGuard` resource-plane accept path records a trace for endpoint-scoped routes (it already does for rejects); persist it so a `200`/`400` on `/Users` carries its auth decision.

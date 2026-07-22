@@ -230,6 +230,33 @@ describe('WI-D3 AuthDecisionTrace', () => {
       });
     });
 
+    it('W1: stamps the FULL trace (checks + expected/received) as authDecision JSON', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'resource',
+        method: 'bearer_jwt',
+        outcome: 'accept',
+        correlationId: 'req-stamp-full',
+        endpointId: 'ep-1',
+        checks: [
+          { id: 'token_presented', status: 'pass', expected: 'present', received: 'present' },
+          { id: 'oauth_jwt', status: 'pass', expected: 'ep-1', received: 'ep-1' },
+        ],
+        decodedClaims: { aud: 'scimserver-scim-api:ep-1' },
+      };
+      scimLogger.runWithContext({ requestId: 'req-stamp-full' } as CorrelationContext, () => {
+        emitAuthDecisionEvent(logger, trace, 'AUTH');
+        const ctx = getCorrelationContext();
+        expect(ctx?.authDecision).toBeDefined();
+        const parsed = JSON.parse(ctx!.authDecision as string);
+        expect(parsed.method).toBe('bearer_jwt');
+        expect(parsed.outcome).toBe('accept');
+        expect(parsed.checks).toHaveLength(2);
+        expect(parsed.checks[1]).toMatchObject({ id: 'oauth_jwt', expected: 'ep-1', received: 'ep-1' });
+        expect(parsed.decodedClaims.aud).toContain('ep-1');
+      });
+    });
+
     it('stamps outcome/method/reason on REJECT', () => {
       const logger = makeLogger();
       const trace: AuthDecisionTrace = {

@@ -636,6 +636,13 @@ export interface GlobalLogDetail {
   authMethod?: string;
   authReason?: string;
   authCredentialId?: string;
+  /**
+   * W1 - the FULL auth decision trace persisted on this request-log row (checks
+   * with expected/received, decoded claims, plane, subTraces). Durable: renders
+   * the expected-vs-received diff permanently, independent of the short-TTL
+   * AuthDecisionRecordStore.
+   */
+  authDecision?: AuthDecisionRecordLike;
 }
 
 export const globalLogDetailQueryOptions = (id: string | undefined) => ({
@@ -2270,8 +2277,8 @@ export const authDecisionsQueryOptions = (params: AuthDecisionsParams = {}) => {
   };
 };
 
-export const useAuthDecisions = (params: AuthDecisionsParams = {}) =>
-  useQuery(authDecisionsQueryOptions(params));
+export const useAuthDecisions = (params: AuthDecisionsParams = {}, options?: { enabled?: boolean }) =>
+  useQuery({ ...authDecisionsQueryOptions(params), enabled: options?.enabled ?? true });
 
 // ─── Server-level connection secrets (shown when visibility=always) ──
 

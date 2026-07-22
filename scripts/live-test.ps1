@@ -13509,6 +13509,55 @@ Write-Host "`n--- 9z-BN: request body capture Complete ---" -ForegroundColor Gre
 
 
 # ============================================
+# TEST SECTION 9z-BO: durable auth decision trace on the request log row (W1)
+# ============================================
+$script:currentSection = "9z-BO: durable auth decision on the log row (W1)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BO: durable auth decision trace on the log row (W1)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# The FULL AuthDecisionTrace (checks[] with expected/received) is persisted on
+# the RequestLog row, so the log detail renders the diff permanently, not from
+# the 30-min ephemeral AuthDecisionRecordStore.
+
+try {
+    $boEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-authdecision-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $boId = $boEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $boCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "oauth_client"; label = "w1" } | ConvertTo-Json)
+
+    # A rejected token request emits a decision trace with checks.
+    $boRid = $null
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$boId/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body "grant_type=client_credentials&client_id=$($boCred.clientId)&client_secret=wrong-w1" | Out-Null
+    } catch {
+        try { $boRid = ($_.ErrorDetails.Message | ConvertFrom-Json).correlation_id } catch {}
+    }
+    Test-Result -Success ($null -ne $boRid) -Message "9z-BO.T1: rejected token request returns a correlation_id"
+
+    if ($boRid) {
+        $boDetail = Get-LogDetailByRequestId $boRid
+        Test-Result -Success ($null -ne $boDetail -and $null -ne $boDetail.authDecision) -Message "9z-BO.T2: the row detail carries the persisted authDecision trace"
+        Test-Result -Success ($boDetail.authDecision.method -eq "oauth_client" -and $boDetail.authDecision.outcome -eq "reject") -Message "9z-BO.T3: authDecision names the method + outcome"
+        Test-Result -Success (@($boDetail.authDecision.checks).Count -gt 0) -Message "9z-BO.T4: authDecision carries the per-check trace"
+        $boJson = $boDetail.authDecision | ConvertTo-Json -Depth 8
+        Test-Result -Success (-not ($boJson -match "wrong-w1")) -Message "9z-BO.T5: authDecision carries NO secret material"
+    } else {
+        Test-Result -Success $false -Message "9z-BO.T2-T5: could not resolve the correlation id"
+    }
+
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BO: durable auth decision section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BO: durable auth decision on the log row (W1) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

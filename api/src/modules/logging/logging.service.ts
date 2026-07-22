@@ -67,6 +67,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     authMethod: string | null;
     authReason: string | null;
     authCredentialId: string | null;
+    authDecision: string | null;
   }> = [];
 
   constructor(
@@ -232,6 +233,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     const authMethod = authCtx?.authMethod ?? null;
     const authReason = authCtx?.authReason ?? null;
     const authCredentialId = authCtx?.authCredentialId ?? null;
+    // W1 - the full redacted AuthDecisionTrace (JSON), so the detail renders the
+    // diff permanently. Capped like any stored body.
+    const authDecision = capStoredBodyString(authCtx?.authDecision) ?? null;
 
     if (this.isInMemoryBackend) {
       const errorMessage = this.extractErrorMessage(error);
@@ -268,6 +272,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         authMethod,
         authReason,
         authCredentialId,
+        authDecision,
       });
       return;
     }
@@ -305,6 +310,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       authMethod,
       authReason,
       authCredentialId,
+      authDecision,
     };
 
     this.logBuffer.push(data);
@@ -873,6 +879,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         authMethod: row.authMethod ?? undefined,
         authReason: row.authReason ?? undefined,
         authCredentialId: row.authCredentialId ?? undefined,
+        authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
       };
     }
 
@@ -906,6 +913,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       authMethod: row.authMethod ?? undefined,
       authReason: row.authReason ?? undefined,
       authCredentialId: row.authCredentialId ?? undefined,
+      authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
     };
   }
 

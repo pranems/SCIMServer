@@ -183,6 +183,38 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(tokenRow!.authReason).toBe('oauth_client_auth_failed');
   });
 
+  it('W1: the request-log row detail carries the FULL auth decision trace (durable, no store)', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret-w1').expect(401);
+
+    const logs = await request(app.getHttpServer())
+      .get('/scim/admin/logs?pageSize=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const tokenRow = (logs.body.items as Array<Record<string, unknown>>).find(
+      (r) =>
+        typeof r.url === 'string' &&
+        r.url.includes(`/scim/endpoints/${endpointA}/oauth/token`) &&
+        r.status === 401,
+    );
+    expect(tokenRow).toBeDefined();
+
+    const detail = await request(app.getHttpServer())
+      .get(`/scim/admin/logs/${tokenRow!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    // W1 - the full trace is persisted on the row, so the expected-vs-received
+    // diff renders permanently (independent of the 30-min decision store).
+    const decision = detail.body.authDecision as Record<string, unknown>;
+    expect(decision).toBeDefined();
+    expect(decision.method).toBe('oauth_client');
+    expect(decision.outcome).toBe('reject');
+    expect(Array.isArray(decision.checks)).toBe(true);
+    expect((decision.checks as unknown[]).length).toBeGreaterThan(0);
+    // Never leaks a secret.
+    expect(JSON.stringify(decision)).not.toContain('wrong-secret-w1');
+  });
+
   it('WI-D5: a rejected oauth_client attempt is queryable at both auth-decisions scopes', async () => {
     const { clientId } = await createOauthClient(endpointA);
     await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);

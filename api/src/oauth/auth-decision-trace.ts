@@ -267,6 +267,28 @@ export function emitAuthDecisionEvent(
     ctx.authMethod = trace.method;
     if (trace.reasonCode) ctx.authReason = trace.reasonCode;
     if (trace.selectedTrustId) ctx.authCredentialId = trace.selectedTrustId;
+    // W1 - persist the FULL non-secret trace on the request row so the log
+    // detail renders the expected-vs-received diff permanently (the ephemeral
+    // store becomes a live-only fallback). expected/received/decodedClaims are
+    // already non-secret by the trace contract; the raw assertion/token never
+    // enters the trace.
+    try {
+      ctx.authDecision = JSON.stringify({
+        correlationId: trace.correlationId,
+        endpointId: trace.endpointId,
+        plane: trace.plane,
+        method: trace.method,
+        outcome: trace.outcome,
+        reasonCode: trace.reasonCode,
+        selectedTrustId: trace.selectedTrustId,
+        checks: trace.checks,
+        decodedClaims: trace.decodedClaims,
+        joseHeader: trace.joseHeader,
+        subTraces: trace.subTraces,
+      });
+    } catch {
+      // Serialization must never break auth or logging.
+    }
   }
   if (trace.outcome === 'accept') {
     logger.info(logCategoryAuth, AUTH_DECISION_EVENT, data);

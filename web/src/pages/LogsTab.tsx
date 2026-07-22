@@ -352,6 +352,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
               <AuthDecisionForRequest
                 correlationId={detailQuery.data.requestId}
                 endpointId={endpointId}
+                persistedDecision={detailQuery.data.authDecision}
                 data-testid="log-detail-auth-section"
               />
             )}

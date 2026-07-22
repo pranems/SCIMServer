@@ -47,6 +47,10 @@ export interface CorrelationContext {
   authMethod?: string;
   /** The catalog reason code (reject) or a short accept note. */
   authReason?: string;
+  /** W1 - the FULL redacted AuthDecisionTrace serialized as JSON (checks[] with
+   *  expected/received, decodedClaims, plane, subTraces) so the log detail can
+   *  render the diff permanently, independent of the short-TTL decision store. */
+  authDecision?: string;
 
   // ── Operation layer (set by service method) ────────────────────────
   /** SCIM resource type being operated on */

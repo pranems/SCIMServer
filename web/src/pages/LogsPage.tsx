@@ -618,6 +618,7 @@ export const LogsPage: React.FC = () => {
               <div className={classes.drawerSection}>
                 <AuthDecisionForRequest
                   correlationId={detailQuery.data.requestId}
+                  persistedDecision={detailQuery.data.authDecision}
                   data-testid="log-detail-auth-section"
                 />
               </div>

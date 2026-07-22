@@ -134,4 +134,31 @@ describe('LoggingService - auth summary on RequestLog (V10)', () => {
     expect(row.authReason).toBeUndefined();
     expect(row.authCredentialId).toBeUndefined();
   });
+
+  it('W1: persists the full auth decision trace and returns it parsed from getLog', async () => {
+    const trace = {
+      plane: 'resource',
+      method: 'bearer_jwt',
+      outcome: 'accept',
+      checks: [
+        { id: 'token_presented', status: 'pass', expected: 'present', received: 'present' },
+        { id: 'oauth_jwt', status: 'pass', expected: 'ep-x', received: 'ep-x' },
+      ],
+      decodedClaims: { aud: 'scimserver-scim-api:ep-x' },
+    };
+    seedWithAuth({
+      authOutcome: 'accept',
+      authMethod: 'bearer_jwt',
+      authReason: 'ok',
+      authDecision: JSON.stringify(trace),
+    } as Partial<CorrelationContext>);
+
+    const list = await service.listLogs({});
+    const detail = await service.getLog(list.items[0].id);
+    const decision = detail?.authDecision as Record<string, unknown>;
+    expect(decision).toBeDefined();
+    expect(decision.method).toBe('bearer_jwt');
+    expect((decision.checks as unknown[])).toHaveLength(2);
+    expect((decision.checks as Array<Record<string, unknown>>)[1]).toMatchObject({ id: 'oauth_jwt', received: 'ep-x' });
+  });
 });

@@ -56,6 +56,10 @@ model RequestLog {
   authMethod       String?                     // wif | oauth_client | shared_secret | bearer_jwt | endpoint_bearer
   authReason       String?                     // catalog reason code (reject) or accept note
   authCredentialId String?  @db.Uuid           // V11 - the winning credential / WIF trust id
+  // W1 - the FULL, redacted AuthDecisionTrace (checks[] with expected/received,
+  // decodedClaims, plane, subTraces) as JSON, so the log detail renders the
+  // expected-vs-received diff permanently, not from the 30-min ephemeral store.
+  authDecision     String?
   createdAt        DateTime @default(now()) @db.Timestamptz
 
   endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
