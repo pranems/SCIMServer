@@ -13401,13 +13401,20 @@ try {
 
     # Wait beyond the 3-second logger flush window (the Prisma backend buffers
     # request logs; the InMemory backend writes synchronously but the wait is
-    # harmless there).
-    Start-Sleep -Seconds 4
-
-    $bmLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=100" -Method GET -Headers $headers
+    # harmless there). Poll with retry because on a busy dev node the flush +
+    # DB write can lag past a single fixed wait.
     $bmUrlFrag = "/scim/endpoints/$bmId/oauth/token"
-    $bmRejectRow = @($bmLogs.items | Where-Object { $_.url -like "*$bmUrlFrag*" -and $_.status -eq 401 })[0]
-    $bmAcceptRow = @($bmLogs.items | Where-Object { $_.url -like "*$bmUrlFrag*" -and ($_.status -eq 200 -or $_.status -eq 201) })[0]
+    $bmRejectRow = $null
+    $bmAcceptRow = $null
+    for ($bmTry = 0; $bmTry -lt 8; $bmTry++) {
+        Start-Sleep -Seconds 3
+        try {
+            $bmLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=100" -Method GET -Headers $headers
+            $bmRejectRow = @($bmLogs.items | Where-Object { $_.url -like "*$bmUrlFrag*" -and $_.status -eq 401 })[0]
+            $bmAcceptRow = @($bmLogs.items | Where-Object { $_.url -like "*$bmUrlFrag*" -and ($_.status -eq 200 -or $_.status -eq 201) })[0]
+        } catch {}
+        if ($null -ne $bmRejectRow -and $null -ne $bmRejectRow.authOutcome -and $null -ne $bmAcceptRow -and $null -ne $bmAcceptRow.authOutcome) { break }
+    }
 
     Test-Result -Success ($null -ne $bmRejectRow -and $bmRejectRow.authOutcome -eq "reject") -Message "9z-BM.T3: rejected token request-log row carries authOutcome=reject (V10)"
     Test-Result -Success ($bmRejectRow.authMethod -eq "oauth_client") -Message "9z-BM.T4: rejected row authMethod=oauth_client (V11)"
