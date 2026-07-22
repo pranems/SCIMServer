@@ -12,6 +12,7 @@ import { wireDescriptionFor } from '../../../oauth/auth-reason-catalog';
 import { LogCategory } from '../../logging/log-levels';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
+import { resolveRequestBodyForLog, type RawBodyRequest } from '../../logging/request-body-capture';
 
 /**
  * Global exception filter for SCIM endpoints.
@@ -198,7 +199,7 @@ export class ScimExceptionFilter implements ExceptionFilter {
       status,
       durationMs,
       requestHeaders: meta?.requestHeaders ?? { ...(request?.headers ?? {}) },
-      requestBody: meta?.requestBody ?? request?.body,
+      requestBody: resolveRequestBodyForLog(request as RawBodyRequest, meta),
       responseHeaders: response.getHeaders() as Record<string, unknown>,
       responseBody,
       error,

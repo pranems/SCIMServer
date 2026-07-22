@@ -177,6 +177,35 @@ A list item from `GET /scim/admin/logs`:
 
 Because the auth outcome lives on the row itself, the logs list renders it instantly and durably (it survives the 30-minute Decision-Record TTL), and `GET /scim/admin/logs?requestId=<id>` pivots straight from any error to its request.
 
+### 5.1 Pre-parse failures: the body is captured or explicitly marked
+
+A request can fail *before* its body is parsed into `request.body` - a malformed JSON body (400) or a wrong `Content-Type` (415). The row is still persisted (the exception filters run), and its stored `requestBody` is never silently empty ([request-body-capture.ts](../api/src/modules/logging/request-body-capture.ts)):
+
+- **Malformed JSON (right content-type).** The body parsers install a `verify` hook ([body-parsers.ts](../api/src/bootstrap/body-parsers.ts)) that stashes the raw buffer *before* parsing, so even when `JSON.parse` throws, the bytes are recovered as a capped preview:
+
+```json
+{
+  "_bodyNotCaptured": true,
+  "reason": "unparseable",
+  "contentType": "application/scim+json",
+  "contentLength": 24,
+  "_rawPreview": "{ \"userName\": \"broken\", "
+}
+```
+
+- **Wrong content-type (415).** The parser is skipped entirely (its type predicate is false), so there are no raw bytes; the row records a marker naming the content-type and length instead:
+
+```json
+{
+  "_bodyNotCaptured": true,
+  "reason": "content-type-rejected",
+  "contentType": "text/plain",
+  "contentLength": 39
+}
+```
+
+Two cross-cutting safeties apply to every stored body: it is **size-capped** (`MAX_STORED_BODY_BYTES`, over-cap bodies become a `{ "_truncated": true, "originalLength": N, "preview": "..." }` marker so a multi-MB payload cannot bloat the table), and the free-text `_rawPreview` is **redacted** (`[REDACTED]`) when the effective `PersistRequestSecrets` flag is off, since a key-based redactor cannot reach a blob's contents.
+
 ---
 
 ## 6. Error handling: envelopes and the diagnostics extension

@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
-import { json, urlencoded } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
@@ -12,6 +11,7 @@ import { applySpaFallback } from '@app/bootstrap/spa-fallback';
 import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from '@app/security/helmet-config';
 import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
 import { applyCorrelationMiddleware } from '@app/bootstrap/correlation-middleware';
+import { applyBodyParsers } from '@app/bootstrap/body-parsers';
 
 /**
  * Bootstraps a full NestJS application for E2E testing.
@@ -93,17 +93,9 @@ export async function createTestApp(
   });
   applySpaFallback(app);
 
-  app.use(
-    json({
-      limit: '5mb',
-      type: (req) => {
-        const ct = req.headers['content-type']?.toLowerCase() ?? '';
-        return ct.includes('application/json') || ct.includes('application/scim+json');
-      },
-    }),
-  );
-  // A3 - mirror the production urlencoded parser for the token endpoints.
-  app.use(urlencoded({ extended: true, limit: '1mb' }));
+  // Body parsers (main.ts parity) - json + scim media type + urlencoded, with
+  // the raw-body verify hook so a malformed body still surfaces on the RequestLog.
+  applyBodyParsers(app);
 
   app.setGlobalPrefix('scim', {
     exclude: ['/', OAUTH_METADATA_PATH],

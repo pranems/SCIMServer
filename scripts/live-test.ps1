@@ -13430,6 +13430,76 @@ Write-Host "`n--- 9z-BM: auth summary on request logs (V10/V11/V12) Complete ---
 
 
 # ============================================
+# TEST SECTION 9z-BN: request body capture on pre-parse failures
+# ============================================
+$script:currentSection = "9z-BN: request body capture on pre-parse failures"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BN: request body capture (malformed JSON + wrong content-type)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# A request that fails BEFORE its body is parsed still persists a RequestLog row
+# whose stored requestBody is a `_bodyNotCaptured` marker (never silently empty):
+#   - malformed JSON (right content-type) -> reason 'unparseable' + raw preview
+#   - wrong content-type (415)            -> reason 'content-type-rejected'
+
+function Get-DiagRequestId($errRecord) {
+    try {
+        $body = $errRecord.ErrorDetails.Message | ConvertFrom-Json
+        return $body.'urn:scimserver:api:messages:2.0:Diagnostics'.requestId
+    } catch { return $null }
+}
+
+function Get-LogDetailByRequestId($rid) {
+    Start-Sleep -Seconds 4
+    $list = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?search=$rid&pageSize=5" -Method GET -Headers $headers
+    $row = @($list.items | Where-Object { $_.requestId -eq $rid })[0]
+    if ($null -eq $row) { return $null }
+    return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
+}
+
+try {
+    $bnEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-bodycapture-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bnId = $bnEp.id
+    $bnUsers = "$baseUrl/scim/endpoints/$bnId/Users"
+    # Auth-only header so the per-request -ContentType override is not overridden
+    # by the shared $headers' Content-Type.
+    $authHeaderOnly = @{ Authorization = "Bearer $Token" }
+
+    # T1 - malformed JSON, correct content-type -> 400 + unparseable marker.
+    $bnMalRid = $null
+    try {
+        Invoke-RestMethod -Uri $bnUsers -Method POST -Headers $authHeaderOnly -ContentType "application/scim+json" -Body '{ "userName": "bn-broken", ' | Out-Null
+    } catch { $bnMalRid = Get-DiagRequestId $_ ; Test-Result -Success ($_.Exception.Response.StatusCode.value__ -eq 400) -Message "9z-BN.T1: malformed JSON rejected (400)" }
+    if ($bnMalRid) {
+        $d = Get-LogDetailByRequestId $bnMalRid
+        Test-Result -Success ($null -ne $d -and $d.requestBody._bodyNotCaptured -eq $true -and $d.requestBody.reason -eq "unparseable") -Message "9z-BN.T2: malformed row stored with an 'unparseable' marker"
+        Test-Result -Success ("$($d.requestBody._rawPreview)" -match "bn-broken") -Message "9z-BN.T3: unparseable marker carries the raw bytes"
+    } else {
+        Test-Result -Success $false -Message "9z-BN.T2-T3: could not resolve requestId from the malformed-JSON error"
+    }
+
+    # T4 - wrong content-type -> 415 + content-type-rejected marker.
+    $bnCtRid = $null
+    try {
+        Invoke-RestMethod -Uri $bnUsers -Method POST -Headers $authHeaderOnly -ContentType "text/plain" -Body "userName=bn-wrongtype@example.com" | Out-Null
+    } catch { $bnCtRid = Get-DiagRequestId $_ ; Test-Result -Success ($_.Exception.Response.StatusCode.value__ -eq 415) -Message "9z-BN.T4: wrong content-type rejected (415)" }
+    if ($bnCtRid) {
+        $d2 = Get-LogDetailByRequestId $bnCtRid
+        Test-Result -Success ($null -ne $d2 -and $d2.requestBody._bodyNotCaptured -eq $true -and $d2.requestBody.reason -eq "content-type-rejected") -Message "9z-BN.T5: 415 row stored with a 'content-type-rejected' marker"
+    } else {
+        Test-Result -Success $false -Message "9z-BN.T5: could not resolve requestId from the 415 error"
+    }
+
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bnId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BN: body-capture section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BN: request body capture Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
-import { json, urlencoded } from 'express';
 import { join } from 'node:path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -12,6 +11,7 @@ import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from './securi
 import { applySpaFallback } from './bootstrap/spa-fallback';
 import { OAUTH_METADATA_PATH } from './oauth/oauth.constants';
 import { applyCorrelationMiddleware } from './bootstrap/correlation-middleware';
+import { applyBodyParsers } from './bootstrap/body-parsers';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -117,21 +117,11 @@ async function bootstrap(): Promise<void> {
   });
 
   app.useLogger(new Logger('SCIMEndpointServer'));
-  // Accept both standard JSON and SCIM media type payloads
-  app.use(
-    json({
-      limit: '5mb',
-      type: (req) => {
-        const ct = req.headers['content-type']?.toLowerCase() ?? '';
-        return ct.includes('application/json') || ct.includes('application/scim+json');
-      }
-    })
-  );
-  // A3 - the OAuth token endpoints accept application/x-www-form-urlencoded
-  // (RFC 6749 section 3.2: the token endpoint client uses form-encoded body).
-  // Explicitly registered so the contract does not depend on the framework
-  // default parser being enabled.
-  app.use(urlencoded({ extended: true, limit: '1mb' }));
+  // Accept both standard JSON and SCIM media type payloads. The shared parser
+  // bootstrap also stashes the raw request buffer (req.rawBody) so a body that
+  // fails to parse (malformed JSON -> 400) can still surface its bytes on the
+  // RequestLog. Shared with the E2E harness via applyBodyParsers.
+  applyBodyParsers(app);
   // S-5: enableImplicitConversion is intentionally enabled.
   // Risk acknowledged and mitigated by mandatory class-validator decorators on
   // every DTO field, the parseSimpleFilter length cap (DTO-1), and a regression

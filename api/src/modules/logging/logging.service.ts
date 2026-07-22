@@ -5,8 +5,9 @@ import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger, getCorrelationContext } from './scim-logger.service';
+import { capStoredBodyString } from './request-body-capture';
 import { LogCategory } from './log-levels';
-import { redactSensitiveDeep } from '../../security/redact-sensitive';
+import { redactSensitiveDeep, REDACTED } from '../../security/redact-sensitive';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { getEffectivePersistRequestSecrets } from '../endpoint/endpoint-config.interface';
 
@@ -208,9 +209,19 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     // secrets). Console/file structured logs are always redacted separately.
     const persistSecrets = this.resolvePersistSecrets(endpointId);
     const storedRequestHeaders = persistSecrets ? requestHeaders : redactSensitiveDeep(requestHeaders);
-    const storedRequestBody = persistSecrets ? requestBody : redactSensitiveDeep(requestBody);
+    let storedRequestBody = persistSecrets ? requestBody : redactSensitiveDeep(requestBody);
     const storedResponseHeaders = persistSecrets ? responseHeaders : redactSensitiveDeep(responseHeaders);
     const storedResponseBody = persistSecrets ? responseBody : redactSensitiveDeep(responseBody);
+    // When secrets are not persisted, mask the free-text raw preview of an
+    // unparseable body - key-based redaction cannot reach a blob's contents.
+    if (
+      !persistSecrets &&
+      storedRequestBody &&
+      typeof storedRequestBody === 'object' &&
+      (storedRequestBody as Record<string, unknown>)._rawPreview !== undefined
+    ) {
+      storedRequestBody = { ...(storedRequestBody as Record<string, unknown>), _rawPreview: REDACTED };
+    }
 
     // V10 - the auth decision for this request is stamped onto the correlation
     // context by emitAuthDecisionEvent / the guard earlier in the same async
@@ -246,9 +257,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         durationMs: durationMs ?? null,
         createdAt: new Date(),
         requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
-        requestBody: this.stringifyValue(storedRequestBody),
+        requestBody: capStoredBodyString(this.stringifyValue(storedRequestBody)) ?? null,
         responseHeaders: this.stringifyValue(storedResponseHeaders),
-        responseBody: this.stringifyValue(storedResponseBody),
+        responseBody: capStoredBodyString(this.stringifyValue(storedResponseBody)) ?? null,
         errorMessage,
         errorStack,
         identifier: identifier ?? null,
@@ -282,9 +293,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       status: status ?? null,
       durationMs: durationMs ?? null,
       requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
-      requestBody: this.stringifyValue(storedRequestBody),
+      requestBody: capStoredBodyString(this.stringifyValue(storedRequestBody)),
       responseHeaders: this.stringifyValue(storedResponseHeaders),
-      responseBody: this.stringifyValue(storedResponseBody),
+      responseBody: capStoredBodyString(this.stringifyValue(storedResponseBody)),
       errorMessage,
       errorStack,
       _identifier: identifier,
