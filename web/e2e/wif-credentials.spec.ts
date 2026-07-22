@@ -407,5 +407,52 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     await expect(page.getByTestId('wif-section')).toBeVisible();
     await expect(page.getByTestId('credential-row-br-1')).toHaveCount(0);
   });
+
+  test('V1/V2/V3/V5/V6: the credential row carries validity + lifecycle + copy controls, OAuth2 tab renamed', async ({ page }) => {
+    await page.route(`**/scim/admin/endpoints/${EP}`, async (route) => {
+      if (route.request().method() !== 'GET' || !route.request().url().endsWith(`/${EP}`)) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: EP, name: 'r6', displayName: 'R6 methods', active: true,
+          scimBasePath: `/scim/v2/endpoints/${EP}`, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+          profile: { schemas: [], resourceTypes: [], serviceProviderConfig: { documentationUri: '', patch: { supported: true } }, settings: {} },
+        }),
+      });
+    });
+    await page.route('**/scim/admin/endpoints/*/overview', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          endpoint: { id: EP, name: 'r6', displayName: 'R6 methods', preset: 'entra-id', active: true, scimBasePath: `/scim/endpoints/${EP}/v2`, createdAt: '2026-01-01T00:00:00Z' },
+          stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
+          credentials: [
+            { id: 'br-1', credentialType: 'bearer', label: 'Bearer one', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+          ],
+          recentActivity: [],
+          configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+          connectionInfo: { endpointId: EP, displayName: 'R6 methods', urls: { scimBaseUrl: `https://dev.example/scim/v2/endpoints/${EP}`, scimBaseUrlBare: `https://dev.example/scim/endpoints/${EP}`, tokenEndpoint: `https://dev.example/scim/endpoints/${EP}/oauth/token`, serviceProviderConfig: `https://dev.example/scim/v2/endpoints/${EP}/ServiceProviderConfig`, oauthMetadata: `https://dev.example/scim/endpoints/${EP}/.well-known/oauth-authorization-server` }, enabledMethods: [], disabledMethods: [] },
+        }),
+      });
+    });
+
+    await page.goto(`/endpoints/${EP}/credentials`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+    // V6 - the OAuth2 sub-tab is renamed.
+    await expect(page.getByTestId('credentials-method-tab-oauth_client')).toContainText('OAuth2 Client-Credential');
+    // V1 - the row shows a validity line.
+    await expect(page.getByTestId('credential-validity-br-1')).toContainText('No expiry');
+    // V2 - the activate/deactivate toggle is present (active -> Deactivate).
+    await expect(page.getByTestId('credential-toggle-active-br-1')).toContainText('Deactivate');
+    // V5 - the row has a Copy-JSON button.
+    await expect(page.getByTestId('credential-copy-json-br-1')).toBeVisible();
+    // V3 - Edit opens the inline label form.
+    await page.getByTestId('credential-edit-label-br-1').click();
+    await expect(page.getByTestId('credential-edit-label-form-br-1')).toBeVisible();
+  });
 });
 

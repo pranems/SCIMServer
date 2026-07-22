@@ -1817,6 +1817,49 @@ export function useDeleteCredential(endpointId: string) {
   });
 }
 
+/** V2 - reactivate a previously revoked credential (POST .../activate). */
+export function useActivateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/activate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** V2 - deactivate a credential without removing it from the list (soft). */
+export function useDeactivateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** V3 - edit a credential's label (PATCH) without rotating the secret. */
+export function useEditCredentialLabel(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { credentialId: string; label: string | null }) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${vars.credentialId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ label: vars.label }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
 /**
  * Update endpoint profile / settings / displayName. Optimistic flag toggle.
  *

@@ -59,6 +59,13 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     return cred;
   }
 
+  async reactivate(id: string): Promise<EndpointCredentialModel | null> {
+    const cred = this.store.get(id);
+    if (!cred) return null;
+    cred.active = true;
+    return cred;
+  }
+
   async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
     let cleared = 0;
     for (const cred of this.store.values()) {

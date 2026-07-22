@@ -76,6 +76,19 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
+  async reactivate(id: string): Promise<EndpointCredentialModel | null> {
+    try {
+      const row = await this.prisma.endpointCredential.update({
+        where: { id },
+        data: { active: true },
+      });
+      return this.toModel(row);
+    } catch {
+      // Record not found or DB error - return null (parity with deactivate).
+      return null;
+    }
+  }
+
   async delete(id: string): Promise<void> {
     try {
       await this.prisma.endpointCredential.delete({ where: { id } });

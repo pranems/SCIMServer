@@ -22,6 +22,7 @@ import {
   Inject,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Put,
   ForbiddenException,
@@ -608,6 +609,82 @@ export class AdminCredentialController {
       label: credential.label ?? undefined,
     };
     this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, credentialEventPayload);
+  }
+
+  /**
+   * POST /admin/endpoints/:endpointId/credentials/:credentialId/activate  (V2)
+   *
+   * Reactivate a previously revoked credential (active=false -> true) - the
+   * inverse of DELETE. Applies to bearer / oauth_client / wif alike (a WIF
+   * trust is a credential). Returns the reactivated credential's public
+   * projection (never a secret). 404 for an unknown / cross-endpoint id.
+   */
+  @Post(':endpointId/credentials/:credentialId/activate')
+  @HttpCode(200)
+  async activateCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+  ): Promise<{ id: string; endpointId: string; credentialType: string; label: string | null; active: boolean }> {
+    await this.requireEndpoint(endpointId);
+
+    const credential = await this.credentialRepo.findById(credentialId);
+    if (!credential || credential.endpointId !== endpointId) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+
+    const updated = await this.credentialRepo.reactivate(credentialId);
+    if (!updated) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    this.logger.info(LogCategory.AUTH, `Reactivated credential "${credentialId}" for endpoint "${endpointId}"`);
+    return {
+      id: updated.id,
+      endpointId: updated.endpointId,
+      credentialType: updated.credentialType,
+      label: updated.label,
+      active: updated.active,
+    };
+  }
+
+  /**
+   * PATCH /admin/endpoints/:endpointId/credentials/:credentialId  (V3)
+   *
+   * Edit a credential's non-secret display field(s) - today the `label` - for
+   * ANY credential type (bearer / oauth_client / wif) WITHOUT rotating the
+   * secret or touching the trust config. The secret/hash/metadata are
+   * untouched. Returns the credential's public projection. 404 for an unknown /
+   * cross-endpoint id; 400 when no editable field is supplied.
+   */
+  @Patch(':endpointId/credentials/:credentialId')
+  async editCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+    @Body() dto: { label?: string | null },
+  ): Promise<{ id: string; endpointId: string; credentialType: string; label: string | null; active: boolean }> {
+    await this.requireEndpoint(endpointId);
+
+    const credential = await this.credentialRepo.findById(credentialId);
+    if (!credential || credential.endpointId !== endpointId) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    if (dto.label === undefined) {
+      throw new BadRequestException('Provide a "label" to edit.');
+    }
+    if (!this.credentialRepo.updateLabel) {
+      throw new BadRequestException('Editing a credential label is not supported by this backend.');
+    }
+    const updated = await this.credentialRepo.updateLabel(credentialId, dto.label);
+    if (!updated) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    this.logger.info(LogCategory.AUTH, `Edited credential "${credentialId}" label for endpoint "${endpointId}"`);
+    return {
+      id: updated.id,
+      endpointId: updated.endpointId,
+      credentialType: updated.credentialType,
+      label: updated.label,
+      active: updated.active,
+    };
   }
 
   /**

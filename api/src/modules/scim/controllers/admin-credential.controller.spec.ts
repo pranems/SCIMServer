@@ -65,6 +65,7 @@ describe('AdminCredentialController', () => {
       findById: jest.fn().mockResolvedValue(mockCredential),
       findActiveByEndpoint: jest.fn().mockResolvedValue([mockCredential]),
       deactivate: jest.fn().mockResolvedValue({ ...mockCredential, active: false }),
+      reactivate: jest.fn().mockResolvedValue({ ...mockCredential, active: true }),
       delete: jest.fn().mockResolvedValue(undefined),
       updateMetadata: jest.fn().mockImplementation((id: string, metadata: Record<string, unknown>) =>
         Promise.resolve({ ...mockCredential, id, metadata }),
@@ -801,6 +802,40 @@ describe('AdminCredentialController', () => {
       await expect(
         controller.revokeCredential(mockEndpoint.id, mockCredential.id),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('V2 - activateCredential (reactivate)', () => {
+    it('reactivates a revoked credential and returns active=true', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, active: false });
+      const res = await controller.activateCredential(mockEndpoint.id, mockCredential.id);
+      expect(mockCredentialRepo.reactivate).toHaveBeenCalledWith(mockCredential.id);
+      expect(res.active).toBe(true);
+      expect(res).not.toHaveProperty('credentialHash');
+    });
+
+    it('throws NotFoundException for an unknown / cross-endpoint credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(null);
+      await expect(controller.activateCredential(mockEndpoint.id, 'nope')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('V3 - editCredential (label edit for any type)', () => {
+    it('updates the label for a bearer credential without rotating', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+      const res = await controller.editCredential(mockEndpoint.id, mockCredential.id, { label: 'renamed' });
+      expect(mockCredentialRepo.updateLabel).toHaveBeenCalledWith(mockCredential.id, 'renamed');
+      expect(res.label).toBe('renamed');
+      expect(res).not.toHaveProperty('credentialHash');
+    });
+
+    it('throws BadRequest when no label is supplied', async () => {
+      await expect(controller.editCredential(mockEndpoint.id, mockCredential.id, {})).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws NotFoundException for an unknown / cross-endpoint credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue(null);
+      await expect(controller.editCredential(mockEndpoint.id, 'nope', { label: 'x' })).rejects.toThrow(NotFoundException);
     });
   });
 

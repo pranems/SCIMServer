@@ -59,6 +59,9 @@ import {
   useEndpointOverview,
   useCreateCredential,
   useDeleteCredential,
+  useActivateCredential,
+  useDeactivateCredential,
+  useEditCredentialLabel,
   useResolveWifDiscovery,
   useRevealCredential,
   type RevealResult,
@@ -559,6 +562,25 @@ function httpsUrlError(value: string): string | undefined {
 }
 
 /**
+ * V1 - a human "how long is this valid" descriptor from a credential's
+ * `expiresAt` (ISO string or null). No expiry => valid until revoked; an
+ * expiry within 14 days is amber; a past expiry is an error.
+ */
+function validityDescriptor(expiresAt?: string | null): { text: string; level: 'ok' | 'warning' | 'error' } {
+  if (!expiresAt) return { text: 'No expiry - valid until revoked', level: 'ok' };
+  const exp = new Date(expiresAt).getTime();
+  if (Number.isNaN(exp)) return { text: 'No expiry - valid until revoked', level: 'ok' };
+  const now = Date.now();
+  const when = new Date(expiresAt).toLocaleDateString();
+  if (exp <= now) return { text: `Expired ${when}`, level: 'error' };
+  const days = Math.floor((exp - now) / (1000 * 60 * 60 * 24));
+  return {
+    text: `Valid until ${when} - ${days} day${days === 1 ? '' : 's'} left`,
+    level: days <= 14 ? 'warning' : 'ok',
+  };
+}
+
+/**
  * JWKS allowlist awareness for the WIF form. Shows the current effective
  * allowlist (relevant context for the operator entering a JWKS URI), and
  * when the entered JWKS host is NOT allowed, surfaces a warning with a
@@ -767,6 +789,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
 }) => {
   const classes = useStyles();
   const wif = useWifStyles();
+  // V2 - reactivate a deactivated WIF trust (deactivate reuses deleteMutation).
+  const activateMutation = useActivateCredential(endpointId);
 
   const [form, setForm] = React.useState<WifTrustForm>(EMPTY_WIF_FORM);
   const [saveError, setSaveError] = React.useState<unknown>(null);
@@ -1422,6 +1446,25 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         >
                           {verifyMutation.isPending && cardVerify?.id === cred.id ? 'Verifying...' : 'Verify'}
                         </Button>
+                        {/* V2 - activate / deactivate this trust (soft). */}
+                        <Button
+                          appearance="subtle"
+                          onClick={() => {
+                            if (cred.active) deleteMutation.mutate(cred.id);
+                            else activateMutation.mutate(cred.id);
+                          }}
+                          disabled={activateMutation.isPending || deleteMutation.isPending}
+                          aria-label={`${cred.active ? 'Deactivate' : 'Activate'} WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-toggle-active-${cred.id}`}
+                        >
+                          {cred.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                        {/* V5 - copy this trust's public object as JSON. */}
+                        <CopyJsonButton
+                          value={{ id: cred.id, label: cred.label ?? null, active: cred.active, ...(cred.wif ?? {}) }}
+                          label="Copy JSON"
+                          data-testid={`wif-credential-copy-json-${cred.id}`}
+                        />
                         <Button
                           appearance="subtle"
                           icon={<Delete24Regular />}
@@ -1431,6 +1474,12 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         />
                       </div>
                     </div>
+                    {/* V1 - validity line (a WIF trust does not expire). */}
+                    <Caption1 className={wif.wifMeta} data-testid={`wif-credential-${cred.id}-expiry`}>
+                      {cred.wif?.issuedTokenTtlSec
+                        ? `Trust does not expire; minted tokens valid ${cred.wif.issuedTokenTtlSec}s`
+                        : 'Trust does not expire; minted tokens use the default TTL'}
+                    </Caption1>
                     <WifTrustDetails credId={cred.id} trust={cred.wif} styles={wif} />
 
                     {/* V8 - per-card verify result (in-card checklist). */}
@@ -1611,8 +1660,15 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const { data, isLoading, error } = useEndpointOverview(endpointId);
   const createMutation = useCreateCredential(endpointId);
   const deleteMutation = useDeleteCredential(endpointId);
+  const activateMutation = useActivateCredential(endpointId);
+  const deactivateMutation = useDeactivateCredential(endpointId);
+  const editLabelMutation = useEditCredentialLabel(endpointId);
   const revealMutation = useRevealCredential(endpointId);
   const rotateMutation = useRotateCredential(endpointId);
+
+  // V3 - which credential's label is being edited inline, + its draft value.
+  const [editLabelId, setEditLabelId] = React.useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = React.useState('');
 
   // Local UI state
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -1637,6 +1693,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   // U2 - which oauth_client credential's Connect-to-Entra params are expanded.
   const [connectCredId, setConnectCredId] = React.useState<string | null>(null);
+  // V4 - the retained secret for the credential whose Connect panel is open
+  // (auto-revealed when visibility is Always), shown inline with the params.
+  const [connectSecret, setConnectSecret] = React.useState<{ id: string; retained: boolean; clientSecret?: string } | null>(null);
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const connectScimUrl = `${origin}/scim/v2/endpoints/${endpointId}`;
   const connectTokenUrl = `${origin}/scim/endpoints/${endpointId}/oauth/token`;
@@ -1894,15 +1953,65 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   <Button
                     appearance="subtle"
                     icon={<PlugConnected24Regular />}
-                    onClick={() =>
-                      setConnectCredId(connectCredId === cred.id ? null : cred.id)
-                    }
+                    onClick={() => {
+                      const next = connectCredId === cred.id ? null : cred.id;
+                      setConnectCredId(next);
+                      setConnectSecret(null);
+                      // V4 - auto-reveal the retained secret so it shows inline
+                      // with the params (a no-op when visibility is `once`).
+                      if (next) {
+                        revealMutation.mutate(next, {
+                          onSuccess: (r) =>
+                            setConnectSecret({ id: next, retained: r.retained, clientSecret: r.clientSecret }),
+                        });
+                      }
+                    }}
                     aria-label={`Show connection parameters for ${cred.label ?? cred.id}`}
                     data-testid={`credential-connect-${cred.id}`}
                   >
                     Connect
                   </Button>
                 )}
+                {/* V3 - edit the label without rotating (any type). */}
+                <Button
+                  appearance="subtle"
+                  icon={<Edit24Regular />}
+                  onClick={() => {
+                    setEditLabelId(editLabelId === cred.id ? null : cred.id);
+                    setEditLabelValue(cred.label ?? '');
+                  }}
+                  aria-label={`Edit label for ${cred.label ?? cred.id}`}
+                  data-testid={`credential-edit-label-${cred.id}`}
+                >
+                  Edit
+                </Button>
+                {/* V2 - activate / deactivate toggle (soft, keeps the row). */}
+                <Button
+                  appearance="subtle"
+                  onClick={() => {
+                    if (cred.active) deactivateMutation.mutate(cred.id);
+                    else activateMutation.mutate(cred.id);
+                  }}
+                  disabled={activateMutation.isPending || deactivateMutation.isPending}
+                  aria-label={`${cred.active ? 'Deactivate' : 'Activate'} credential ${cred.label ?? cred.id}`}
+                  data-testid={`credential-toggle-active-${cred.id}`}
+                >
+                  {cred.active ? 'Deactivate' : 'Activate'}
+                </Button>
+                {/* V5 - copy this credential's public object as JSON. */}
+                <CopyJsonButton
+                  value={{
+                    id: cred.id,
+                    credentialType: cred.credentialType,
+                    label: cred.label ?? null,
+                    active: cred.active,
+                    createdAt: cred.createdAt,
+                    expiresAt: cred.expiresAt ?? null,
+                    ...(cred.oauthClientId ? { oauthClientId: cred.oauthClientId } : {}),
+                  }}
+                  label="Copy JSON"
+                  data-testid={`credential-copy-json-${cred.id}`}
+                />
                 <Button
                   appearance="subtle"
                   icon={<Delete24Regular />}
@@ -1914,6 +2023,55 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   data-testid={`credential-delete-${cred.id}`}
                 />
               </div>
+              {/* V1 - remaining-validity line. */}
+              {(() => {
+                const v = validityDescriptor(cred.expiresAt);
+                return (
+                  <Caption1
+                    className={classes.meta}
+                    style={{
+                      color:
+                        v.level === 'error'
+                          ? tokens.colorPaletteRedForeground1
+                          : v.level === 'warning'
+                            ? tokens.colorPaletteDarkOrangeForeground1
+                            : undefined,
+                    }}
+                    data-testid={`credential-validity-${cred.id}`}
+                  >
+                    {v.text}
+                  </Caption1>
+                );
+              })()}
+              {/* V3 - inline label edit form. */}
+              {editLabelId === cred.id && (
+                <div className={classes.connectPanel} data-testid={`credential-edit-label-form-${cred.id}`}>
+                  <EditableField
+                    label="Label"
+                    value={editLabelValue}
+                    onChange={setEditLabelValue}
+                    data-testid={`credential-edit-label-input-${cred.id}`}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      appearance="primary"
+                      disabled={editLabelMutation.isPending}
+                      onClick={() =>
+                        editLabelMutation.mutate(
+                          { credentialId: cred.id, label: editLabelValue.trim() || null },
+                          { onSuccess: () => setEditLabelId(null) },
+                        )
+                      }
+                      data-testid={`credential-edit-label-save-${cred.id}`}
+                    >
+                      {editLabelMutation.isPending ? 'Saving...' : 'Save label'}
+                    </Button>
+                    <Button appearance="secondary" onClick={() => setEditLabelId(null)} data-testid={`credential-edit-label-cancel-${cred.id}`}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
               {/* U2 - per-oauth_client Connect-to-Entra params (in-card). */}
               {cred.credentialType === 'oauth_client' && connectCredId === cred.id && (
                 <div className={classes.connectPanel} data-testid={`credential-connect-panel-${cred.id}`}>
@@ -1938,10 +2096,24 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       data-testid={`credential-connect-clientid-${cred.id}`}
                     />
                   </div>
-                  <Caption1>
-                    Use <strong>Reveal</strong> above to view the client secret when the endpoint
-                    retains it (visibility Always).
-                  </Caption1>
+                  {/* V4 - the client secret, inline, when the endpoint retains it
+                      (CredentialSecretVisibility=always). */}
+                  {connectSecret?.id === cred.id && connectSecret.retained && connectSecret.clientSecret ? (
+                    <div className={classes.connectRow}>
+                      <Caption1>Client secret</Caption1>
+                      <CopyableField
+                        value={connectSecret.clientSecret}
+                        monospace
+                        truncate
+                        data-testid={`credential-connect-secret-${cred.id}`}
+                      />
+                    </div>
+                  ) : (
+                    <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
+                      The client secret is shown here when the endpoint retains it
+                      (CredentialSecretVisibility=always); otherwise Rotate to get a fresh one.
+                    </Caption1>
+                  )}
                 </div>
               )}
             </Card>

@@ -22,6 +22,9 @@ export interface IEndpointCredentialRepository {
   /** Soft-deactivate (revoke) a credential by setting active=false. */
   deactivate(id: string): Promise<EndpointCredentialModel | null>;
 
+  /** V2 - reactivate a previously deactivated credential (active=true). */
+  reactivate(id: string): Promise<EndpointCredentialModel | null>;
+
   /**
    * WI-7: purge the retained secret envelope for every credential of an
    * endpoint (used when CredentialSecretVisibility flips to `once`). Returns

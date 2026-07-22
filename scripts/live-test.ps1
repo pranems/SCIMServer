@@ -13308,6 +13308,58 @@ Write-Host "`n--- 9z-BK: WIF verify persistence (V7/V8) Complete ---" -Foregroun
 
 
 # ============================================
+# TEST SECTION 9z-BL: credential lifecycle (V2 activate/deactivate, V3 label edit)
+# ============================================
+$script:currentSection = "9z-BL: credential lifecycle (V2/V3)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BL: credential activate/deactivate (V2) + label edit (V3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $blEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-credlifecycle-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $blId = $blEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    $blCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "bearer"; label = "before" } | ConvertTo-Json)
+
+    # V2 - deactivate then reactivate.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials/$($blCred.id)" -Method DELETE -Headers $headers | Out-Null
+    $blListA = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials" -Method GET -Headers $headers
+    $blRowA = @($blListA | Where-Object { $_.id -eq $blCred.id })[0]
+    Test-Result -Success ($blRowA.active -eq $false) -Message "9z-BL.T1: DELETE deactivates the credential (active=false, row retained)"
+
+    $blAct = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials/$($blCred.id)/activate" -Method POST -Headers $headers
+    Test-Result -Success ($blAct.active -eq $true) -Message "9z-BL.T2: POST /activate reactivates the credential (active=true)"
+    $blActJson = $blAct | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($blActJson -match '"credentialHash"|"token"|"clientSecret"')) -Message "9z-BL.T3: activate response carries NO secret material"
+
+    # V3 - PATCH edits the label without rotating.
+    $blEdit = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials/$($blCred.id)" -Method PATCH -Headers $headers -Body (@{ label = "after" } | ConvertTo-Json)
+    Test-Result -Success ($blEdit.label -eq "after") -Message "9z-BL.T4: PATCH edits the credential label"
+    $blListB = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials" -Method GET -Headers $headers
+    $blRowB = @($blListB | Where-Object { $_.id -eq $blCred.id })[0]
+    Test-Result -Success ($blRowB.label -eq "after") -Message "9z-BL.T5: edited label persisted (re-read)"
+
+    # V3 - PATCH with no label -> 400.
+    $blBad = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId/credentials/$($blCred.id)" -Method PATCH -Headers $headers -Body (@{} | ConvertTo-Json) | Out-Null
+    } catch { $blBad = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $blBad -Message "9z-BL.T6: PATCH with no editable field rejected (400)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$blId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BL: credential lifecycle section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BL: credential lifecycle (V2/V3) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

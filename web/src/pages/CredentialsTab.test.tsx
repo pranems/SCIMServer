@@ -22,6 +22,9 @@ import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 const mockUseEndpointOverview = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockActivateMutate = vi.fn();
+const mockDeactivateMutate = vi.fn();
+const mockEditLabelMutate = vi.fn();
 const mockResolveMutate = vi.fn();
 const mockRevealMutate = vi.fn();
 const mockRotateMutate = vi.fn();
@@ -55,6 +58,9 @@ vi.mock('../api/queries', async () => {
       mutate: mockDeleteMutate,
       isPending: deleteMutationState.isPending,
     }),
+    useActivateCredential: () => ({ mutate: mockActivateMutate, isPending: false }),
+    useDeactivateCredential: () => ({ mutate: mockDeactivateMutate, isPending: false }),
+    useEditCredentialLabel: () => ({ mutate: mockEditLabelMutate, isPending: false }),
     useResolveWifDiscovery: () => ({
       mutate: mockResolveMutate,
       isPending: false,
@@ -725,6 +731,89 @@ describe('CredentialsTab', () => {
     // A second click on Edit toggles the form closed (V9).
     fireEvent.click(screen.getByTestId('wif-credential-edit-wt-9'));
     expect(screen.queryByTestId('wif-trust-edit-form-wt-9')).not.toBeInTheDocument();
+  });
+
+  function bearerOverview(over: Partial<{ active: boolean; expiresAt: string | null; label: string }> = {}): EndpointOverviewResponse {
+    return {
+      ...baseOverview,
+      configFlags: { SecretTokenBearerAuthEnabled: true },
+      credentials: [
+        {
+          id: 'bc-1',
+          credentialType: 'bearer',
+          label: over.label ?? 'my bearer',
+          active: over.active ?? true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: over.expiresAt ?? null,
+        },
+      ],
+    };
+  }
+
+  it('V1: a credential row shows its remaining-validity line', () => {
+    const soon = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ expiresAt: soon }), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credential-validity-bc-1').textContent).toMatch(/day.*left/i);
+  });
+
+  it('V1: a credential with no expiry shows "No expiry"', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ expiresAt: null }), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credential-validity-bc-1').textContent).toContain('No expiry');
+  });
+
+  it('V2: the toggle deactivates an active credential and activates an inactive one', () => {
+    mockDeactivateMutate.mockClear();
+    mockActivateMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
+    const { rerender } = renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credential-toggle-active-bc-1'));
+    expect(mockDeactivateMutate).toHaveBeenCalledWith('bc-1');
+
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: false }), isLoading: false, error: null });
+    rerender(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credential-toggle-active-bc-1'));
+    expect(mockActivateMutate).toHaveBeenCalledWith('bc-1');
+  });
+
+  it('V3: Edit reveals the label form and Save calls the edit-label mutation', () => {
+    mockEditLabelMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ label: 'old' }), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('credential-edit-label-form-bc-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('credential-edit-label-bc-1'));
+    const input = screen.getByTestId('credential-edit-label-input-bc-1').querySelector('input')!;
+    fireEvent.change(input, { target: { value: 'new name' } });
+    fireEvent.click(screen.getByTestId('credential-edit-label-save-bc-1'));
+    expect(mockEditLabelMutate).toHaveBeenCalledWith(
+      { credentialId: 'bc-1', label: 'new name' },
+      expect.anything(),
+    );
+  });
+
+  it('V5: a credential row has a Copy-JSON button', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credential-copy-json-bc-1')).toBeInTheDocument();
+  });
+
+  it('V4: the oauth_client Connect panel shows the secret inline when retained', () => {
+    mockRevealMutate.mockClear();
+    mockRevealMutate.mockImplementation((_id: string, opts?: { onSuccess?: (r: unknown) => void }) =>
+      opts?.onSuccess?.({ retained: true, clientSecret: 'super-secret-value' }),
+    );
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { OAuthClientCredentialsAuthEnabled: true },
+      credentials: [
+        { id: 'oc-v4', credentialType: 'oauth_client', label: 'ISV', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null, oauthClientId: 'client-id-ep-1' },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credential-connect-oc-v4'));
+    expect(screen.getByTestId('credential-connect-secret-oc-v4').textContent).toContain('super-secret-value');
   });
 
   it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
