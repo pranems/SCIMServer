@@ -39,6 +39,8 @@ import {
   Link,
   TabList,
   Tab,
+  InfoLabel,
+  Tooltip,
   Accordion,
   AccordionItem,
   AccordionHeader,
@@ -1432,17 +1434,19 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         >
                           Edit
                         </Button>
-                        <Button
-                          appearance="subtle"
-                          icon={<PlugConnected24Regular />}
-                          onClick={() =>
-                            setConnectTrustId(connectTrustId === cred.id ? null : cred.id)
-                          }
-                          aria-label={`Show connection parameters for WIF trust ${cred.label ?? cred.id}`}
-                          data-testid={`wif-credential-connect-${cred.id}`}
-                        >
-                          Connect
-                        </Button>
+                        <Tooltip content="Connect this endpoint to IdP like Entra ID" relationship="label" positioning="above">
+                          <Button
+                            appearance="subtle"
+                            icon={<PlugConnected24Regular />}
+                            onClick={() =>
+                              setConnectTrustId(connectTrustId === cred.id ? null : cred.id)
+                            }
+                            aria-label={`Show connection parameters for WIF trust ${cred.label ?? cred.id}`}
+                            data-testid={`wif-credential-connect-${cred.id}`}
+                          >
+                            Connect
+                          </Button>
+                        </Tooltip>
                         <Button
                           appearance="subtle"
                           icon={<PlugConnected24Regular />}
@@ -1519,8 +1523,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                     {connectTrustId === cred.id && (
                       <div className={wif.editInCard} data-testid={`wif-credential-connect-panel-${cred.id}`}>
                         <Caption1>
-                          <strong>Connect to Entra</strong> - paste these into your identity
-                          provider&apos;s Workload Identity Federation connection form.
+                          <strong>Connect this endpoint to IdP like Entra ID</strong> - paste these
+                          into your identity provider&apos;s Workload Identity Federation connection form.
                         </Caption1>
                         {/* W6 - copy / download the whole IdP-connection bundle for this trust. */}
                         <SettingsJsonExport
@@ -1535,15 +1539,15 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                           data-testid={`wif-connect-export-${cred.id}`}
                         />
                         <div className={wif.returnRow}>
-                          <Caption1>Application API URL</Caption1>
+                          <InfoLabel info={CONNECT_PARAM_HELP.applicationApiUrl} data-testid={`wif-connect-appurl-info-${cred.id}`}>Application API URL</InfoLabel>
                           <CopyableField value={scimUrl} monospace truncate data-testid={`wif-connect-appurl-${cred.id}`} />
                         </div>
                         <div className={wif.returnRow}>
-                          <Caption1>OAuth token endpoint</Caption1>
+                          <InfoLabel info={CONNECT_PARAM_HELP.oauthTokenEndpoint} data-testid={`wif-connect-tokenurl-info-${cred.id}`}>OAuth token endpoint</InfoLabel>
                           <CopyableField value={tokenUrl} monospace truncate data-testid={`wif-connect-tokenurl-${cred.id}`} />
                         </div>
                         <div className={wif.returnRow}>
-                          <Caption1>Client identifier (sub)</Caption1>
+                          <InfoLabel info={CONNECT_PARAM_HELP.clientIdentifier} data-testid={`wif-connect-clientid-info-${cred.id}`}>Client identifier (sub)</InfoLabel>
                           <CopyableField
                             value={cred.wif?.expectedSubject ?? '-'}
                             monospace
@@ -1760,6 +1764,22 @@ function buildMethodConnectBundle(
     credentials: credentials.map(projectCredentialPublic),
   };
 }
+
+/**
+ * W10 - the explanatory help for each Connect parameter, surfaced via a Fluent
+ * `InfoLabel` (an info icon + hover/click popover) on the parameter label in
+ * every Connect subpanel, instead of a wall of prose in a separate card.
+ */
+const CONNECT_PARAM_HELP = {
+  applicationApiUrl:
+    'The SCIM base URL for this endpoint. In Entra this is the provisioning app\u2019s "Tenant URL" / "Application API URL" - paste it as the target the IdP provisions to.',
+  oauthTokenEndpoint:
+    'The per-endpoint OAuth 2.0 token endpoint the identity provider calls to mint an access token for this endpoint.',
+  clientIdentifier:
+    'The client identity the IdP presents. For WIF this is the expected token "sub" claim; for OAuth2 client-credentials it is this credential\u2019s client id.',
+  clientSecret:
+    'The secret the IdP uses to authenticate. Shown here only when the endpoint retains it (CredentialSecretVisibility=always); otherwise Rotate to get a fresh one.',
+} as const;
 
 export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
@@ -2084,28 +2104,30 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     Rotate
                   </Button>
                 )}
-                {cred.credentialType === 'oauth_client' && (
-                  <Button
-                    appearance="subtle"
-                    icon={<PlugConnected24Regular />}
-                    onClick={() => {
-                      const next = connectCredId === cred.id ? null : cred.id;
-                      setConnectCredId(next);
-                      setConnectSecret(null);
-                      // V4 - auto-reveal the retained secret so it shows inline
-                      // with the params (a no-op when visibility is `once`).
-                      if (next) {
-                        revealMutation.mutate(next, {
-                          onSuccess: (r) =>
-                            setConnectSecret({ id: next, retained: r.retained, clientSecret: r.clientSecret }),
-                        });
-                      }
-                    }}
-                    aria-label={`Show connection parameters for ${cred.label ?? cred.id}`}
-                    data-testid={`credential-connect-${cred.id}`}
-                  >
-                    Connect
-                  </Button>
+                {(cred.credentialType === 'oauth_client' || cred.credentialType === 'bearer') && (
+                  <Tooltip content="Connect this endpoint to IdP like Entra ID" relationship="label" positioning="above">
+                    <Button
+                      appearance="subtle"
+                      icon={<PlugConnected24Regular />}
+                      onClick={() => {
+                        const next = connectCredId === cred.id ? null : cred.id;
+                        setConnectCredId(next);
+                        setConnectSecret(null);
+                        // V4 - auto-reveal the retained secret so it shows inline
+                        // with the params (a no-op when visibility is `once`).
+                        if (next) {
+                          revealMutation.mutate(next, {
+                            onSuccess: (r) =>
+                              setConnectSecret({ id: next, retained: r.retained, clientSecret: r.clientSecret }),
+                          });
+                        }
+                      }}
+                      aria-label={`Show connection parameters for ${cred.label ?? cred.id}`}
+                      data-testid={`credential-connect-${cred.id}`}
+                    >
+                      Connect
+                    </Button>
+                  </Tooltip>
                 )}
                 {/* V3 - edit the label without rotating (any type). */}
                 <Button
@@ -2200,46 +2222,62 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   </div>
                 </div>
               )}
-              {/* U2 - per-oauth_client Connect-to-Entra params (in-card). */}
-              {cred.credentialType === 'oauth_client' && connectCredId === cred.id && (
+              {/* U2 / W8 - per-credential Connect params (in-card), for both
+                  oauth_client and bearer credentials. */}
+              {(cred.credentialType === 'oauth_client' || cred.credentialType === 'bearer') && connectCredId === cred.id && (
                 <div className={classes.connectPanel} data-testid={`credential-connect-panel-${cred.id}`}>
                   <Caption1>
-                    <strong>Connect to Entra</strong> - paste these into your identity
-                    provider&apos;s OAuth2 client-credentials connection form.
+                    <strong>Connect this endpoint to IdP like Entra ID</strong> - paste these into
+                    your identity provider&apos;s{' '}
+                    {cred.credentialType === 'oauth_client'
+                      ? 'OAuth2 client-credentials'
+                      : 'bearer-token (Secret Token)'}{' '}
+                    connection form.
                   </Caption1>
                   {/* W6 - copy / download the whole IdP-connection bundle for this credential. */}
                   <SettingsJsonExport
-                    value={{
-                      applicationApiUrl: connectScimUrl,
-                      oauthTokenEndpoint: connectTokenUrl,
-                      clientIdentifier: cred.oauthClientId ?? null,
-                    }}
+                    value={
+                      cred.credentialType === 'oauth_client'
+                        ? {
+                            applicationApiUrl: connectScimUrl,
+                            oauthTokenEndpoint: connectTokenUrl,
+                            clientIdentifier: cred.oauthClientId ?? null,
+                          }
+                        : { applicationApiUrl: connectScimUrl }
+                    }
                     filename={`credential-${cred.id}-connection.json`}
                     copyLabel="Copy connection JSON"
                     data-testid={`credential-connect-export-${cred.id}`}
                   />
                   <div className={classes.connectRow}>
-                    <Caption1>Application API URL</Caption1>
+                    <InfoLabel info={CONNECT_PARAM_HELP.applicationApiUrl} data-testid={`credential-connect-appurl-info-${cred.id}`}>Application API URL</InfoLabel>
                     <CopyableField value={connectScimUrl} monospace truncate data-testid={`credential-connect-appurl-${cred.id}`} />
                   </div>
-                  <div className={classes.connectRow}>
-                    <Caption1>OAuth token endpoint</Caption1>
-                    <CopyableField value={connectTokenUrl} monospace truncate data-testid={`credential-connect-tokenurl-${cred.id}`} />
-                  </div>
-                  <div className={classes.connectRow}>
-                    <Caption1>Client identifier</Caption1>
-                    <CopyableField
-                      value={cred.oauthClientId ?? '-'}
-                      monospace
-                      truncate
-                      data-testid={`credential-connect-clientid-${cred.id}`}
-                    />
-                  </div>
-                  {/* V4 - the client secret, inline, when the endpoint retains it
-                      (CredentialSecretVisibility=always). */}
+                  {cred.credentialType === 'oauth_client' && (
+                    <>
+                      <div className={classes.connectRow}>
+                        <InfoLabel info={CONNECT_PARAM_HELP.oauthTokenEndpoint} data-testid={`credential-connect-tokenurl-info-${cred.id}`}>OAuth token endpoint</InfoLabel>
+                        <CopyableField value={connectTokenUrl} monospace truncate data-testid={`credential-connect-tokenurl-${cred.id}`} />
+                      </div>
+                      <div className={classes.connectRow}>
+                        <InfoLabel info={CONNECT_PARAM_HELP.clientIdentifier} data-testid={`credential-connect-clientid-info-${cred.id}`}>Client identifier</InfoLabel>
+                        <CopyableField
+                          value={cred.oauthClientId ?? '-'}
+                          monospace
+                          truncate
+                          data-testid={`credential-connect-clientid-${cred.id}`}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {/* V4 - the secret, inline, when the endpoint retains it
+                      (CredentialSecretVisibility=always). For bearer this is the
+                      Secret Token; for oauth_client the client secret. */}
                   {connectSecret?.id === cred.id && connectSecret.retained && connectSecret.clientSecret ? (
                     <div className={classes.connectRow}>
-                      <Caption1>Client secret</Caption1>
+                      <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
+                        {cred.credentialType === 'oauth_client' ? 'Client secret' : 'Secret token (bearer)'}
+                      </InfoLabel>
                       <CopyableField
                         value={connectSecret.clientSecret}
                         monospace
@@ -2249,8 +2287,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     </div>
                   ) : (
                     <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
-                      The client secret is shown here when the endpoint retains it
-                      (CredentialSecretVisibility=always); otherwise Rotate to get a fresh one.
+                      The {cred.credentialType === 'oauth_client' ? 'client secret' : 'bearer token'} is
+                      shown here when the endpoint retains it (CredentialSecretVisibility=always);
+                      otherwise Rotate to get a fresh one.
                     </Caption1>
                   )}
                 </div>

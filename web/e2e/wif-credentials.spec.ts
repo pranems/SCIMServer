@@ -133,22 +133,31 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(page.getByTestId('wif-resolve-button')).toBeVisible();
   });
 
-  // U2 - an oauth_client credential exposes an in-card Connect-to-Entra params
-  // panel with the Application API URL + token endpoint + this credential's
-  // client id. Skips when the first endpoint holds no oauth_client credential.
-  test('U2: an oauth_client credential exposes an in-card Connect params panel', async ({ page }) => {
+  // U2 / W8 - a bearer OR oauth_client credential exposes an in-card
+  // Connect-to-IdP params panel with the Application API URL (+ token endpoint +
+  // client id for oauth_client). Skips when the first endpoint holds no such
+  // credential.
+  test('U2/W8: a credential exposes an in-card Connect params panel', async ({ page }) => {
     await openFirstEndpointCredentials(page);
     const connectBtn = page.locator('button[data-testid^="credential-connect-"]').first();
-    const hasOc = await connectBtn.isVisible().catch(() => false);
-    test.skip(!hasOc, 'No oauth_client credential on the first endpoint.');
+    const hasConn = await connectBtn.isVisible().catch(() => false);
+    test.skip(!hasConn, 'No bearer/oauth_client credential on the first endpoint.');
     const testId = (await connectBtn.getAttribute('data-testid')) ?? '';
     const credId = testId.replace(/^credential-connect-/, '');
     await connectBtn.click();
     await expect(page.getByTestId(`credential-connect-panel-${credId}`)).toBeVisible();
+    // Common to both credential types: Application API URL.
     await expect(page.getByTestId(`credential-connect-appurl-${credId}`)).toBeVisible();
-    await expect(page.getByTestId(`credential-connect-clientid-${credId}`)).toBeVisible();
     // W6 - the subpanel carries a copy/download export of the IdP connection bundle.
     await expect(page.getByTestId(`credential-connect-export-${credId}-copy`)).toBeVisible();
+    // W9 - the subpanel uses the renamed header; W10 - the app-URL param has an InfoLabel.
+    await expect(page.getByTestId(`credential-connect-panel-${credId}`)).toContainText('Connect this endpoint to IdP like Entra ID');
+    await expect(page.getByTestId(`credential-connect-appurl-info-${credId}`)).toBeVisible();
+    // oauth_client-only: the client identifier field (absent on a bearer card).
+    const clientId = page.getByTestId(`credential-connect-clientid-${credId}`);
+    if ((await clientId.count()) > 0) {
+      await expect(clientId).toBeVisible();
+    }
   });
 
   // WI-1 regression: the WIF return-values box must present the SCIM base URL

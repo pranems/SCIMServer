@@ -675,6 +675,11 @@ describe('CredentialsTab', () => {
     // W6 - the subpanel carries a copy/download export of the IdP connection bundle.
     expect(screen.getByTestId('credential-connect-export-oc-1-copy')).toBeInTheDocument();
     expect(screen.getByTestId('credential-connect-export-oc-1-download')).toBeInTheDocument();
+    // W9 - the subpanel uses the renamed header; W10 - each param label has an InfoLabel.
+    expect(screen.getByTestId('credential-connect-panel-oc-1').textContent).toContain('Connect this endpoint to IdP like Entra ID');
+    expect(screen.getByTestId('credential-connect-appurl-info-oc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-connect-tokenurl-info-oc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-connect-clientid-info-oc-1')).toBeInTheDocument();
   });
 
   function wifTrustOverview(id: string): EndpointOverviewResponse {
@@ -1627,5 +1632,27 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
     expect(screen.getByTestId('connect-method-export-bearer')).toBeInTheDocument();
     expect(screen.getByTestId('connect-method-export-bearer-copy')).toBeInTheDocument();
     expect(screen.getByTestId('connect-method-export-bearer-download')).toBeInTheDocument();
+  });
+
+  // ─── W8 / W9 / W10: bearer Connect subpanel + rename + param tooltips ─
+
+  it('W8/W9/W10: a bearer credential card has a retractable Connect subpanel with the renamed header + InfoLabel help', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    // W8 - the bearer card now carries a Connect button; the subpanel is hidden until clicked.
+    expect(screen.queryByTestId('credential-connect-panel-cred-b1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('credential-connect-cred-b1'));
+    const panel = screen.getByTestId('credential-connect-panel-cred-b1');
+    // W9 - the subpanel header uses the renamed text.
+    expect(panel.textContent).toContain('Connect this endpoint to IdP like Entra ID');
+    // W8 - a bearer card shows the Application API URL but NOT the OAuth token endpoint / client id.
+    expect(screen.getByTestId('credential-connect-appurl-cred-b1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-connect-tokenurl-cred-b1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credential-connect-clientid-cred-b1')).not.toBeInTheDocument();
+    // W10 - the parameter label carries an InfoLabel help affordance.
+    expect(screen.getByTestId('credential-connect-appurl-info-cred-b1')).toBeInTheDocument();
+    // W6 - the bearer subpanel also carries the connection-bundle export.
+    expect(screen.getByTestId('credential-connect-export-cred-b1-copy')).toBeInTheDocument();
   });
 });
