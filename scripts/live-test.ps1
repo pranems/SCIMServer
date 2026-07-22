@@ -13575,6 +13575,43 @@ Write-Host "`n--- 9z-BO: durable auth decision on the log row (W1) Complete ---"
 
 
 # ============================================
+# TEST SECTION 9z-BP: admin JWT decode endpoint (W2)
+# ============================================
+$script:currentSection = "9z-BP: admin JWT decode endpoint (W2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BP: admin JWT decode endpoint (W2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# POST /scim/admin/decode-jwt decodes (never verifies) a JWT so an operator can
+# inspect a Bearer / client_assertion / access_token value.
+
+try {
+    # Build a JWT locally (base64url header.payload.sig).
+    $bpHeader = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('{"alg":"RS256","kid":"bp-k"}')).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    $bpPayload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('{"sub":"bp-user","aud":"api://bp"}')).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    $bpJwt = "$bpHeader.$bpPayload.sigbytes"
+
+    $bpRes = Invoke-RestMethod -Uri "$baseUrl/scim/admin/decode-jwt" -Method POST -Headers $headers -Body (@{ token = $bpJwt } | ConvertTo-Json)
+    Test-Result -Success ($bpRes.isJwt -eq $true) -Message "9z-BP.T1: decode-jwt returns isJwt=true for a real JWT"
+    Test-Result -Success ($bpRes.header.kid -eq "bp-k") -Message "9z-BP.T2: decoded header carries the kid"
+    Test-Result -Success ($bpRes.payload.sub -eq "bp-user") -Message "9z-BP.T3: decoded payload carries the claims"
+
+    $bpBad = Invoke-RestMethod -Uri "$baseUrl/scim/admin/decode-jwt" -Method POST -Headers $headers -Body (@{ token = "not-a-jwt" } | ConvertTo-Json)
+    Test-Result -Success ($bpBad.isJwt -eq $false -and $null -ne $bpBad.reason) -Message "9z-BP.T4: a non-JWT returns isJwt=false + reason"
+
+    # Admin-gated: no bearer -> 401.
+    $bpUnauth = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/decode-jwt" -Method POST -ContentType "application/json" -Body (@{ token = $bpJwt } | ConvertTo-Json) | Out-Null
+    } catch { $bpUnauth = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $bpUnauth -Message "9z-BP.T5: decode-jwt requires admin auth (401 without a bearer)"
+} catch {
+    Test-Result -Success $false -Message "9z-BP: decode-jwt section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BP: admin JWT decode endpoint (W2) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

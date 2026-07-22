@@ -26,6 +26,7 @@ import { ManualGroupDto } from '../dto/manual-group.dto';
 import { ManualUserDto } from '../dto/manual-user.dto';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
+import { decodeJwt, type DecodedJwt } from '../../../oauth/jwt-decode.util';
 
 interface VersionInfo {
   version: string;
@@ -131,6 +132,21 @@ export class AdminController {
     // No endpoints exist - create a default one
     const created = await this.endpointService.createEndpoint({ name: 'default' });
     return created.id;
+  }
+
+  /**
+   * W2 - decode (never verify) a JWT / encoded token so an operator can inspect
+   * what a `Bearer` / `client_assertion` / `access_token` value contains. A JWT
+   * is signed, not encrypted, so its header + claims are readable by any holder
+   * of the token; this returns them without touching the signature (only a
+   * presence flag). Admin-gated. The response is non-secret claim data; the
+   * submitted `token` body key is redacted by the request logger when
+   * PersistRequestSecrets is off. Always 200 - the caller inspects `isJwt`.
+   */
+  @Post('decode-jwt')
+  @HttpCode(200)
+  decodeJwtToken(@Body() body: { token?: string }): DecodedJwt {
+    return decodeJwt(body?.token);
   }
 
   @Post('logs/clear')

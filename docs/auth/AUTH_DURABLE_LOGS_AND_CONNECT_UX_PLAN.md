@@ -101,6 +101,8 @@ flowchart TB
 
 ## 5. Track W-B: decode encoded/JWT values everywhere
 
+> **Status: W2 IMPLEMENTED v0.54.43.** Shared `decodeJwt`/`looksLikeJwt` util (api + web); admin `POST /scim/admin/decode-jwt`; `JwtDecodeButton` primitive + `CopyableJsonBlock` inline per-token decode (via `findJwtsInValue`), so every log-detail header/body viewer offers decoding.
+
 - **Shared decoder:** a pure `decodeJwt(token)` util returning `{ header, payload }` (base64url decode of the first two segments; the signature is shown as opaque - a JWT is signed, not encrypted, so its claims are readable by the holder). Never attempt to "decrypt" - surface `alg`/`kid` + the claim set.
 - **Admin API:** `POST /scim/admin/decode-jwt` `{ "token": "<jwt>" }` -> `{ "header": {...}, "payload": {...}, "isJwt": true }` (admin-auth-gated; rejects non-JWT input with a clear error). Never logs the token.
 - **UI:** a decode affordance (a small "decode" button / popover) rendered next to any value that looks like a JWT (`eyJ...` three-segment) inside the log detail request/response header + body viewers (and reusable in other JSON viewers). Clicking reveals the decoded header + claims inline, copyable via the existing primitives.

@@ -35,6 +35,8 @@ export type { CopyJsonButtonProps } from './CopyJsonButton';
 
 export { CopyableJsonBlock } from './CopyableJsonBlock';
 export type { CopyableJsonBlockProps } from './CopyableJsonBlock';
+export { JwtDecodeButton } from './JwtDecodeButton';
+export type { JwtDecodeButtonProps } from './JwtDecodeButton';
 
 export { SettingsJsonExport } from './SettingsJsonExport';
 export type { SettingsJsonExportProps } from './SettingsJsonExport';
