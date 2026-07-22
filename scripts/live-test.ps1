@@ -12830,6 +12830,36 @@ try {
 Write-Host "`n--- 9z-BC: Phase 2 Resource-plane Tracing Complete ---" -ForegroundColor Green
 
 
+function Get-LogDetailByUrlStatus($urlFrag, $status) {
+    # Find a request-log row by URL fragment + HTTP status among the most-recent
+    # logs, then fetch its detail. This is the empirically-reliable 9z-BM pattern:
+    # the recent-log page is served from the createdAt index and the target is
+    # freshly created (so it stays near the top), and the poll's own admin queries
+    # are excluded by the default includeAdmin=false so they cannot bury it.
+    #
+    # Why NOT look up by requestId: under the full-suite Prisma flush backlog on a
+    # busy dev node, a ?requestId=/?search= lookup for a just-created row proved
+    # flaky for 60s+ even though the SAME row was findable by url+status in the
+    # recent page (9z-BM never flaked). The url+status axis is what the feature
+    # actually needs to locate its row; the requestId <-> row bridge itself is
+    # asserted directly in 9z-BD. InMemory is synchronous so this returns fast.
+    # Poll generously (~90s): under the full-suite Prisma flush backlog on dev a
+    # row created mid-suite can take that long to persist, draining as the suite
+    # winds down (a post-suite isolated lookup of the same row returns in ~6s).
+    for ($try = 0; $try -lt 30; $try++) {
+        Start-Sleep -Seconds 3
+        try {
+            $recent = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=200" -Method GET -Headers $headers
+            $row = @($recent.items | Where-Object { $_.url -like "*$urlFrag*" -and $_.status -eq $status })[0]
+            if ($null -ne $row) {
+                return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
+            }
+        } catch {}
+    }
+    return $null
+}
+
+
 # ============================================
 $script:currentSection = "9z-BD: requestId correlation bridge (P3)"
 # ============================================
@@ -12850,32 +12880,28 @@ try {
         $bdRid = if ($bdResp.Headers['X-Request-Id'] -is [array]) { $bdResp.Headers['X-Request-Id'][0] } else { $bdResp.Headers['X-Request-Id'] }
         Test-Result -Success ($null -ne $bdRid -and $bdRid.Length -gt 10) -Message "9z-BD.T1: SCIM request returns an X-Request-Id correlation header ($bdRid)"
 
-        # Allow the buffered logger to flush (Prisma backend writes in batches
-        # every ~3s; give it a generous margin for dev network + flush latency).
-        # Poll for the matching request log rather than a single fixed wait:
-        # the Prisma logger writes in ~3s batches, and under the full live-test
-        # load the flush for this specific row can lag several seconds. Retry
-        # the requestId query up to ~24s so the assertion is load-robust.
+        # Locate the row by url+status (reliable under the full-suite flush
+        # backlog - see Get-LogDetailByUrlStatus). This proves the row flushed
+        # WITHOUT depending on the requestId axis we are trying to verify, so the
+        # bridge assertions below are meaningful rather than circular.
+        $bdDetail = Get-LogDetailByUrlStatus "endpoints/$bdEpId/Users" 200
+        Test-Result -Success ($null -ne $bdDetail) -Message "9z-BD.T2: the request log row for the SCIM request is retrievable"
+
+        # The BRIDGE: the id persisted on the row equals the X-Request-Id the
+        # client received. A mismatch here is a real correlation defect.
+        Test-Result -Success ($null -ne $bdDetail -and $bdDetail.requestId -eq $bdRid) -Message "9z-BD.T3: the persisted requestId matches the returned X-Request-Id"
+
+        # The ?requestId= filter returns that row (and only rows carrying the id).
+        # Retry briefly - the indexed filter can trail the recent-page read.
         $bdList = $null
-        $bdMatch = $null
-        for ($bdTry = 0; $bdTry -lt 12; $bdTry++) {
-            Start-Sleep -Milliseconds 2000
-            try { $bdList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bdRid))" -Method GET -Headers $headers } catch { $bdList = $null }
-            if ($null -ne $bdList -and $null -ne $bdList.items) {
-                $bdMatch = $bdList.items | Where-Object { $_.requestId -eq $bdRid } | Select-Object -First 1
-                if ($null -ne $bdMatch) { break }
-            }
+        for ($bdF = 0; $bdF -lt 8; $bdF++) {
+            try { $bdList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bdRid))&includeAdmin=true&pageSize=50" -Method GET -Headers $headers } catch { $bdList = $null }
+            if ($null -ne $bdList -and @($bdList.items | Where-Object { $_.requestId -eq $bdRid }).Count -gt 0) { break }
+            Start-Sleep -Seconds 2
         }
-        Test-Result -Success ($null -ne $bdMatch) -Message "9z-BD.T2: GET /admin/logs?requestId=<id> returns the matching request log"
-
-        $bdAllMatch = ($null -ne $bdList) -and ($null -ne $bdList.items) -and (($bdList.items | Where-Object { $_.requestId -ne $bdRid } | Measure-Object).Count -eq 0)
-        Test-Result -Success $bdAllMatch -Message "9z-BD.T3: every row returned by the requestId filter carries that correlation id"
-
-        $bdDetail = $null
-        if ($null -ne $bdMatch) {
-            try { $bdDetail = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($bdMatch.id)" -Method GET -Headers $headers } catch {}
-        }
-        Test-Result -Success ($null -ne $bdDetail -and $bdDetail.requestId -eq $bdRid) -Message "9z-BD.T4: the per-log detail echoes the same requestId"
+        $bdFilterHit = ($null -ne $bdList) -and ($null -ne $bdList.items) -and (@($bdList.items | Where-Object { $_.requestId -eq $bdRid }).Count -gt 0)
+        $bdAllMatch = $bdFilterHit -and (@($bdList.items | Where-Object { $_.requestId -ne $bdRid }).Count -eq 0)
+        Test-Result -Success $bdAllMatch -Message "9z-BD.T4: the requestId filter returns only rows carrying that correlation id"
     } finally {
         try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bdEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
     }
@@ -13449,23 +13475,6 @@ function Get-DiagRequestId($errRecord) {
     } catch { return $null }
 }
 
-function Get-LogDetailByRequestId($rid) {
-    # Poll with retry - the Prisma backend buffers request logs and flushes on a
-    # ~3s timer, and the DB write to Azure Postgres can lag past a single fixed
-    # wait on a busy dev node (InMemory is synchronous so this returns fast).
-    for ($try = 0; $try -lt 8; $try++) {
-        Start-Sleep -Seconds 3
-        try {
-            $list = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?search=$rid&pageSize=5" -Method GET -Headers $headers
-            $row = @($list.items | Where-Object { $_.requestId -eq $rid })[0]
-            if ($null -ne $row) {
-                return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
-            }
-        } catch {}
-    }
-    return $null
-}
-
 try {
     $bnEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
         name = "live-test-bodycapture-$(Get-Random)"; profilePreset = "rfc-standard"
@@ -13477,35 +13486,33 @@ try {
     $authHeaderOnly = @{ Authorization = "Bearer $Token" }
 
     # T1 - malformed JSON, correct content-type -> 400 + unparseable marker.
-    $bnMalRid = $null
+    $bnMal400 = $false
     try {
         Invoke-RestMethod -Uri $bnUsers -Method POST -Headers $authHeaderOnly -ContentType "application/scim+json" -Body '{ "userName": "bn-broken", ' | Out-Null
-    } catch { $bnMalRid = Get-DiagRequestId $_ ; Test-Result -Success ($_.Exception.Response.StatusCode.value__ -eq 400) -Message "9z-BN.T1: malformed JSON rejected (400)" }
-    if ($bnMalRid) {
-        # Poll until the row's marker is present (flush lag under full-suite load).
-        $d = $null
-        for ($bnTry = 0; $bnTry -lt 10; $bnTry++) {
-            $cand = Get-LogDetailByRequestId $bnMalRid
-            if ($null -ne $cand -and $cand.requestBody._bodyNotCaptured -eq $true) { $d = $cand; break }
-            Start-Sleep -Seconds 2
-        }
+    } catch { $bnMal400 = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $bnMal400 -Message "9z-BN.T1: malformed JSON rejected (400)"
+    if ($bnMal400) {
+        # Locate the row by url+status (reliable under flush backlog - see
+        # Get-LogDetailByUrlStatus); the marker is written atomically with the row.
+        $d = Get-LogDetailByUrlStatus "endpoints/$bnId/Users" 400
         $bnHas = ($null -ne $d -and $d.requestBody._bodyNotCaptured -eq $true)
         Test-Result -Success ($bnHas -and $d.requestBody.reason -eq "unparseable") -Message "9z-BN.T2: malformed row stored with an 'unparseable' marker"
         Test-Result -Success ($bnHas -and ("$($d.requestBody._rawPreview)" -match "bn-broken")) -Message "9z-BN.T3: unparseable marker carries the raw bytes"
     } else {
-        Test-Result -Success $false -Message "9z-BN.T2-T3: could not resolve requestId from the malformed-JSON error"
+        Test-Result -Success $false -Message "9z-BN.T2-T3: malformed request was not rejected with 400"
     }
 
     # T4 - wrong content-type -> 415 + content-type-rejected marker.
-    $bnCtRid = $null
+    $bnCt415 = $false
     try {
         Invoke-RestMethod -Uri $bnUsers -Method POST -Headers $authHeaderOnly -ContentType "text/plain" -Body "userName=bn-wrongtype@example.com" | Out-Null
-    } catch { $bnCtRid = Get-DiagRequestId $_ ; Test-Result -Success ($_.Exception.Response.StatusCode.value__ -eq 415) -Message "9z-BN.T4: wrong content-type rejected (415)" }
-    if ($bnCtRid) {
-        $d2 = Get-LogDetailByRequestId $bnCtRid
+    } catch { $bnCt415 = ($_.Exception.Response.StatusCode.value__ -eq 415) }
+    Test-Result -Success $bnCt415 -Message "9z-BN.T4: wrong content-type rejected (415)"
+    if ($bnCt415) {
+        $d2 = Get-LogDetailByUrlStatus "endpoints/$bnId/Users" 415
         Test-Result -Success ($null -ne $d2 -and $d2.requestBody._bodyNotCaptured -eq $true -and $d2.requestBody.reason -eq "content-type-rejected") -Message "9z-BN.T5: 415 row stored with a 'content-type-rejected' marker"
     } else {
-        Test-Result -Success $false -Message "9z-BN.T5: could not resolve requestId from the 415 error"
+        Test-Result -Success $false -Message "9z-BN.T5: wrong content-type was not rejected with 415"
     }
 
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bnId" -Method DELETE -Headers $headers | Out-Null } catch {}
@@ -13546,26 +13553,21 @@ try {
     }
     Test-Result -Success ($null -ne $boRid) -Message "9z-BO.T1: rejected token request returns a correlation_id"
 
-    if ($boRid) {
-        # Poll until the row's authDecision is present (flush + DB write can lag
-        # under the full-suite load even after the row itself is listable).
-        $boDetail = $null
-        for ($boTry = 0; $boTry -lt 10; $boTry++) {
-            $cand = Get-LogDetailByRequestId $boRid
-            if ($null -ne $cand -and $null -ne $cand.authDecision) { $boDetail = $cand; break }
-            Start-Sleep -Seconds 2
-        }
-        $boHas = ($null -ne $boDetail -and $null -ne $boDetail.authDecision)
-        # R10: every assertion is guarded on $boHas so none can pass vacuously
-        # (PowerShell's @($null).Count is 1, and 'null' never matches a secret).
-        Test-Result -Success $boHas -Message "9z-BO.T2: the row detail carries the persisted authDecision trace"
-        Test-Result -Success ($boHas -and $boDetail.authDecision.method -eq "oauth_client" -and $boDetail.authDecision.outcome -eq "reject") -Message "9z-BO.T3: authDecision names the method + outcome"
-        Test-Result -Success ($boHas -and @($boDetail.authDecision.checks).Count -gt 0) -Message "9z-BO.T4: authDecision carries the per-check trace"
-        $boJson = if ($boHas) { $boDetail.authDecision | ConvertTo-Json -Depth 8 } else { "" }
-        Test-Result -Success ($boHas -and (-not ($boJson -match "wrong-w1"))) -Message "9z-BO.T5: authDecision carries NO secret material"
-    } else {
-        Test-Result -Success $false -Message "9z-BO.T2-T5: could not resolve the correlation id"
-    }
+    # Locate the rejected token-mint row by url+status (reliable under flush
+    # backlog - see Get-LogDetailByUrlStatus); authDecision is written with the row.
+    $boDetail = Get-LogDetailByUrlStatus "endpoints/$boId/oauth/token" 401
+    $boHas = ($null -ne $boDetail -and $null -ne $boDetail.authDecision)
+    # R10: every assertion is guarded on $boHas so none can pass vacuously
+    # (PowerShell's @($null).Count is 1, and 'null' never matches a secret).
+    Test-Result -Success $boHas -Message "9z-BO.T2: the row detail carries the persisted authDecision trace"
+    Test-Result -Success ($boHas -and $boDetail.authDecision.method -eq "oauth_client" -and $boDetail.authDecision.outcome -eq "reject") -Message "9z-BO.T3: authDecision names the method + outcome"
+    Test-Result -Success ($boHas -and @($boDetail.authDecision.checks).Count -gt 0) -Message "9z-BO.T4: authDecision carries the per-check trace"
+    $boJson = if ($boHas) { $boDetail.authDecision | ConvertTo-Json -Depth 8 } else { "" }
+    Test-Result -Success ($boHas -and (-not ($boJson -match "wrong-w1"))) -Message "9z-BO.T5: authDecision carries NO secret material"
+    # Also assert the persisted requestId <-> correlation_id bridge on this row
+    # (the reliable url+status lookup lets us verify the bridge without depending
+    # on it for the row lookup).
+    Test-Result -Success ($boHas -and $null -ne $boRid -and $boDetail.requestId -eq $boRid) -Message "9z-BO.T6: the row's requestId matches the returned correlation_id"
 
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boId" -Method DELETE -Headers $headers | Out-Null } catch {}
 } catch {
