@@ -146,6 +146,16 @@ test.describe('Logs auth durability (V10/V11/V12)', () => {
     requestBody: {},
     responseHeaders: {},
     responseBody: {},
+    // W1 - the FULL auth decision trace persisted on the row (never expires).
+    authDecision: {
+      plane: 'resource',
+      method: 'bearer_jwt',
+      outcome: 'reject',
+      reasonCode: 'wif_issuer_mismatch',
+      checks: [
+        { id: 'issuer_match', status: 'fail', expected: 'https://expected', received: 'https://actual' },
+      ],
+    },
   };
 
   test.beforeEach(async ({ page }) => {
@@ -177,5 +187,18 @@ test.describe('Logs auth durability (V10/V11/V12)', () => {
     await expect(summary).toBeVisible();
     await expect(summary).toContainText('wif');
     await expect(summary).toContainText('trust-durable');
+  });
+
+  test('W1: the auth decision diff renders from the PERSISTED trace with an empty store', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('logs-row-log-v10-1').click();
+    // The short-TTL store is empty; the persisted authDecision is the only
+    // source, and the expected-vs-received diff must still render.
+    await expect(page.getByTestId('log-detail-auth-section-record')).toBeVisible();
+    const failed = page.getByTestId('auth-decision-check-issuer_match');
+    await expect(failed).toContainText('https://expected');
+    await expect(failed).toContainText('https://actual');
+    await expect(page.getByTestId('log-detail-auth-section-empty')).toHaveCount(0);
   });
 });
