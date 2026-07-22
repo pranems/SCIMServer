@@ -626,6 +626,16 @@ export interface GlobalLogDetail {
    * to cross-link the Logs surfaces with the Auth Audit surfaces.
    */
   requestId?: string;
+  /**
+   * V10 - the auth decision persisted on the request-log row itself
+   * (outcome / method / reason / winning credential). Durable: survives the
+   * short-TTL auth-decision store, so the drawer shows an "Authenticated via"
+   * summary even for old rows.
+   */
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
+  authCredentialId?: string;
 }
 
 export const globalLogDetailQueryOptions = (id: string | undefined) => ({

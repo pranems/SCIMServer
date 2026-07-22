@@ -39,6 +39,14 @@ export interface CorrelationContext {
   authClientId?: string;
   /** Per-endpoint credential ID if authenticated via endpoint credential */
   authCredentialId?: string;
+  // ── V10 auth summary (stamped by emitAuthDecisionEvent) - persisted on the
+  //    RequestLog row so the logs list shows the auth outcome instantly. ──
+  /** 'accept' | 'reject' - the outcome of the request's auth decision. */
+  authOutcome?: 'accept' | 'reject';
+  /** The winning / attempted auth method (wif | oauth_client | shared_secret | bearer_jwt | endpoint_bearer). */
+  authMethod?: string;
+  /** The catalog reason code (reject) or a short accept note. */
+  authReason?: string;
 
   // ── Operation layer (set by service method) ────────────────────────
   /** SCIM resource type being operated on */

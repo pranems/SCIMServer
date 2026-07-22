@@ -18,6 +18,7 @@
  */
 
 import { getAuthReason, isKnownAuthReason } from './auth-reason-catalog';
+import { getCorrelationContext } from '../modules/logging/scim-logger.service';
 
 export type AuthPlaneKind = 'token-mint' | 'resource';
 export type AuthMethodKind = 'wif' | 'oauth_client' | 'shared_secret' | 'bearer_jwt' | 'endpoint_bearer';
@@ -255,6 +256,17 @@ export function emitAuthDecisionEvent(
   // Drop undefined keys so the log line stays clean.
   for (const k of Object.keys(data)) {
     if (data[k] === undefined) delete data[k];
+  }
+  // V10 - stamp the auth summary onto the correlation context so the request's
+  // RequestLog row (written by the interceptor later in the same async chain)
+  // persists the outcome/method/reason/credential. The winning credential is
+  // the WIF trust (selectedTrustId) or whatever the guard already stamped.
+  const ctx = getCorrelationContext();
+  if (ctx) {
+    ctx.authOutcome = trace.outcome;
+    ctx.authMethod = trace.method;
+    if (trace.reasonCode) ctx.authReason = trace.reasonCode;
+    if (trace.selectedTrustId) ctx.authCredentialId = trace.selectedTrustId;
   }
   if (trace.outcome === 'accept') {
     logger.info(logCategoryAuth, AUTH_DECISION_EVENT, data);

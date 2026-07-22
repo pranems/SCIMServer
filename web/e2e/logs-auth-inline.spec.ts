@@ -114,3 +114,68 @@ test.describe('Logs auth integration (U11 + U12)', () => {
     await expect(failed).toContainText('api://actual');
   });
 });
+
+test.describe('Logs auth durability (V10/V11/V12)', () => {
+  // The auth summary persisted ON the row must render the chip + drawer summary
+  // EVEN WHEN the short-TTL auth-decision store has expired (no records). This
+  // is the durable-fail guarantee (V12): a rejected request stays legible in
+  // the logs list long after the ephemeral decision record is gone.
+  const durableList = {
+    total: 1,
+    page: 1,
+    pageSize: 50,
+    items: [
+      {
+        id: 'log-v10-1',
+        method: 'POST',
+        url: '/scim/v2/endpoints/ep-x/Users',
+        status: 401,
+        durationMs: 4,
+        createdAt: '2026-07-21T12:00:00.000Z',
+        requestId: 'req-v10-1',
+        authOutcome: 'reject',
+        authMethod: 'wif',
+        authReason: 'wif_issuer_mismatch',
+        authCredentialId: 'trust-durable',
+      },
+    ],
+  };
+  const durableDetail = {
+    ...durableList.items[0],
+    requestHeaders: {},
+    requestBody: {},
+    responseHeaders: {},
+    responseBody: {},
+  };
+
+  test.beforeEach(async ({ page }) => {
+    // Empty auth-decisions store - the persisted row fields are the ONLY source.
+    await page.route('**/scim/admin/auth-decisions**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ count: 0, records: [] }) });
+    });
+    await page.route('**/scim/admin/logs**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(durableList) });
+    });
+    await page.route('**/scim/admin/logs/log-v10-1', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(durableDetail) });
+    });
+  });
+
+  test('V10/V12: the row chip renders from the persisted field with an empty decision store', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    const chip = page.getByTestId('log-row-auth-log-v10-1');
+    await expect(chip).toBeVisible();
+    await expect(chip).toContainText('wif_issuer_mismatch');
+  });
+
+  test('V11: the drawer shows the durable "Authenticated via" summary from persisted fields', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('logs-row-log-v10-1').click();
+    const summary = page.getByTestId('log-detail-auth-summary');
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText('wif');
+    await expect(summary).toContainText('trust-durable');
+  });
+});

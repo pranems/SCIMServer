@@ -49,6 +49,13 @@ model RequestLog {
   errorStack       String?
   identifier       String?
   requestId        String?  @db.Uuid          // P3 - the X-Request-Id correlation id, bridges to AuthDecisionTrace.correlationId
+  // V10 - the authentication summary for this request, persisted here (not only
+  // in the ephemeral AuthDecisionRecordStore) so the logs list shows it
+  // instantly + durably. authCredentialId is the winning credential / WIF trust.
+  authOutcome      String?                     // 'accept' | 'reject'
+  authMethod       String?                     // wif | oauth_client | shared_secret | bearer_jwt | endpoint_bearer
+  authReason       String?                     // catalog reason code (reject) or accept note
+  authCredentialId String?  @db.Uuid           // V11 - the winning credential / WIF trust id
   createdAt        DateTime @default(now()) @db.Timestamptz
 
   endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)

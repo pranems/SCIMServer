@@ -4,7 +4,7 @@ import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { ScimLogger } from './scim-logger.service';
+import { ScimLogger, getCorrelationContext } from './scim-logger.service';
 import { LogCategory } from './log-levels';
 import { redactSensitiveDeep } from '../../security/redact-sensitive';
 import { EndpointService } from '../endpoint/services/endpoint.service';
@@ -62,6 +62,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     errorStack: string | null;
     identifier: string | null;
     requestId: string | null;
+    authOutcome: string | null;
+    authMethod: string | null;
+    authReason: string | null;
+    authCredentialId: string | null;
   }> = [];
 
   constructor(
@@ -208,6 +212,16 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     const storedResponseHeaders = persistSecrets ? responseHeaders : redactSensitiveDeep(responseHeaders);
     const storedResponseBody = persistSecrets ? responseBody : redactSensitiveDeep(responseBody);
 
+    // V10 - the auth decision for this request is stamped onto the correlation
+    // context by emitAuthDecisionEvent / the guard earlier in the same async
+    // chain. Persist it on the row so the logs list shows the auth outcome
+    // instantly (no second per-row Auth-Decision-Record lookup needed).
+    const authCtx = getCorrelationContext();
+    const authOutcome = authCtx?.authOutcome ?? null;
+    const authMethod = authCtx?.authMethod ?? null;
+    const authReason = authCtx?.authReason ?? null;
+    const authCredentialId = authCtx?.authCredentialId ?? null;
+
     if (this.isInMemoryBackend) {
       const errorMessage = this.extractErrorMessage(error);
       const errorStack = this.extractErrorStack(error);
@@ -239,6 +253,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         errorStack,
         identifier: identifier ?? null,
         requestId: requestId ?? null,
+        authOutcome,
+        authMethod,
+        authReason,
+        authCredentialId,
       });
       return;
     }
@@ -272,6 +290,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       _identifier: identifier,
       endpointId: endpointId ?? null,
       requestId: requestId ?? null,
+      authOutcome,
+      authMethod,
+      authReason,
+      authCredentialId,
     };
 
     this.logBuffer.push(data);
@@ -481,6 +503,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         errorMessage: r.errorMessage ?? undefined,
         reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
         requestId: r.requestId ?? undefined,
+        authOutcome: r.authOutcome ?? undefined,
+        authMethod: r.authMethod ?? undefined,
+        authReason: r.authReason ?? undefined,
+        authCredentialId: r.authCredentialId ?? undefined,
       }));
 
       const total = filtered.length;
@@ -598,6 +624,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       createdAt: Date;
       errorMessage: string | null;
       requestId: string | null;
+      authOutcome: string | null;
+      authMethod: string | null;
+      authReason: string | null;
+      authCredentialId: string | null;
     };
     let records: RequestLogRow[] = [];
     try {
@@ -617,7 +647,11 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
             durationMs: true,
             createdAt: true,
             errorMessage: true,
-            requestId: true
+            requestId: true,
+            authOutcome: true,
+            authMethod: true,
+            authReason: true,
+            authCredentialId: true
           }
         })
       ]);
@@ -675,6 +709,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     createdAt: Date;
     errorMessage: string | null;
     requestId?: string | null;
+    authOutcome?: string | null;
+    authMethod?: string | null;
+    authReason?: string | null;
+    authCredentialId?: string | null;
   }, identifierMap?: Record<string, string | null>) {
     let identifier = identifierMap?.[r.id] || this.deriveIdentifierFromUrl(r.url);
 
@@ -696,7 +734,11 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       createdAt: r.createdAt,
       errorMessage: r.errorMessage ?? undefined,
       reportableIdentifier: identifier,
-      requestId: r.requestId ?? undefined
+      requestId: r.requestId ?? undefined,
+      authOutcome: r.authOutcome ?? undefined,
+      authMethod: r.authMethod ?? undefined,
+      authReason: r.authReason ?? undefined,
+      authCredentialId: r.authCredentialId ?? undefined
     };
   }
 
@@ -816,6 +858,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         errorMessage: row.errorMessage ?? undefined,
         reportableIdentifier: rid,
         requestId: row.requestId ?? undefined,
+        authOutcome: row.authOutcome ?? undefined,
+        authMethod: row.authMethod ?? undefined,
+        authReason: row.authReason ?? undefined,
+        authCredentialId: row.authCredentialId ?? undefined,
       };
     }
 
@@ -845,6 +891,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       errorMessage: row.errorMessage ?? undefined,
       reportableIdentifier: rid,
       requestId: row.requestId ?? undefined,
+      authOutcome: row.authOutcome ?? undefined,
+      authMethod: row.authMethod ?? undefined,
+      authReason: row.authReason ?? undefined,
+      authCredentialId: row.authCredentialId ?? undefined,
     };
   }
 

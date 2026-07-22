@@ -6,6 +6,7 @@ import {
   AUTH_DECISION_EVENT,
   type AuthDecisionTrace,
 } from './auth-decision-trace';
+import { ScimLogger, getCorrelationContext, type CorrelationContext } from '../modules/logging/scim-logger.service';
 
 describe('WI-D3 AuthDecisionTrace', () => {
   it('builds an accept trace with passing checks and no reason code', () => {
@@ -202,6 +203,60 @@ describe('WI-D3 AuthDecisionTrace', () => {
       const data = logger.warn.mock.calls[0][2];
       expect('selectedTrustId' in data).toBe(false);
       expect('endpointId' in data).toBe(false);
+    });
+  });
+
+  // V10/V11 - the emit choke point also stamps the auth summary onto the active
+  // correlation context so the request's RequestLog row persists it.
+  describe('V10 emitAuthDecisionEvent stamps the correlation context', () => {
+    const makeLogger = () => ({ info: jest.fn(), warn: jest.fn() });
+    const scimLogger = new ScimLogger();
+
+    it('stamps outcome/method/reason/credential on ACCEPT (wif -> selectedTrustId)', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'accept',
+        selectedTrustId: 'trust-abc',
+        checks: [{ id: 'jwks_signature', status: 'pass' }],
+      };
+      scimLogger.runWithContext({ requestId: 'req-stamp-1' } as CorrelationContext, () => {
+        emitAuthDecisionEvent(logger, trace, 'AUTH');
+        const ctx = getCorrelationContext();
+        expect(ctx?.authOutcome).toBe('accept');
+        expect(ctx?.authMethod).toBe('wif');
+        expect(ctx?.authCredentialId).toBe('trust-abc');
+      });
+    });
+
+    it('stamps outcome/method/reason on REJECT', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'resource',
+        method: 'bearer_jwt',
+        outcome: 'reject',
+        reasonCode: 'wif_issuer_mismatch',
+        checks: [],
+      };
+      scimLogger.runWithContext({ requestId: 'req-stamp-2' } as CorrelationContext, () => {
+        emitAuthDecisionEvent(logger, trace, 'AUTH');
+        const ctx = getCorrelationContext();
+        expect(ctx?.authOutcome).toBe('reject');
+        expect(ctx?.authMethod).toBe('bearer_jwt');
+        expect(ctx?.authReason).toBe('wif_issuer_mismatch');
+      });
+    });
+
+    it('is a no-op outside a correlation context (no throw)', () => {
+      const logger = makeLogger();
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'accept',
+        checks: [],
+      };
+      expect(() => emitAuthDecisionEvent(logger, trace, 'AUTH')).not.toThrow();
     });
   });
 });

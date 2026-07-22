@@ -318,6 +318,91 @@ describe('LogsPage', () => {
     });
   });
 
+  // ─── V10/V11/V12 - durable auth summary persisted ON the row ──────
+  describe('V10/V11/V12 - durable auth summary on the row', () => {
+    it('V10/V12: row chip reads the PERSISTED authOutcome even with NO live auth-decision record', async () => {
+      // The live auth-decision query returns nothing (as it would after the
+      // short-TTL store expires) - the chip must still render from the row.
+      mockUseAuthDecisions.mockReturnValue({ data: { count: 0, records: [] }, isLoading: false, error: null });
+      mockUseGlobalLogs.mockReturnValue({
+        data: {
+          total: 1,
+          items: [
+            {
+              id: 'l1',
+              method: 'POST',
+              url: '/scim/endpoints/ep-prod/Users',
+              status: 401,
+              durationMs: 3,
+              createdAt: '2026-05-01T10:00:00Z',
+              requestId: 'corr-old',
+              authOutcome: 'reject',
+              authMethod: 'wif',
+              authReason: 'wif_issuer_mismatch',
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs');
+      const chip = await screen.findByTestId('log-row-auth-l1');
+      expect(chip.textContent).toContain('wif_issuer_mismatch');
+    });
+
+    it('V10: an accepted row renders the "auth ok" chip from the persisted field', async () => {
+      mockUseAuthDecisions.mockReturnValue({ data: { count: 0, records: [] }, isLoading: false, error: null });
+      mockUseGlobalLogs.mockReturnValue({
+        data: {
+          total: 1,
+          items: [
+            {
+              id: 'l1',
+              method: 'GET',
+              url: '/scim/endpoints/ep-prod/Users',
+              status: 200,
+              durationMs: 5,
+              createdAt: '2026-05-01T10:00:00Z',
+              authOutcome: 'accept',
+              authMethod: 'oauth_client',
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs');
+      const chip = await screen.findByTestId('log-row-auth-l1');
+      expect(chip.textContent).toContain('auth ok');
+    });
+
+    it('V11: drawer shows the durable "Authenticated via" summary from persisted fields', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      mockUseGlobalLog.mockReturnValue({
+        data: {
+          id: 'l1',
+          method: 'POST',
+          url: '/scim/endpoints/ep-prod/Users',
+          status: 201,
+          durationMs: 6,
+          createdAt: '2026-05-01T10:00:00Z',
+          requestId: 'corr-xyz',
+          authOutcome: 'accept',
+          authMethod: 'wif',
+          authCredentialId: 'trust-abc',
+          authReason: 'ok',
+        },
+        isLoading: false,
+        error: null,
+      });
+      wrap(<LogsPage />, '/logs?detail=l1');
+      const summary = await screen.findByTestId('log-detail-auth-summary');
+      expect(summary.textContent).toContain('Authenticated via');
+      expect(summary.textContent).toContain('wif');
+      expect(summary.textContent).toContain('trust-abc');
+    });
+  });
+
   // ─── Phase P1 - CopyableField primitives on row + drawer ─────────
   describe('Phase P1 - CopyableField primitives', () => {
     it('renders row URL column via CopyableField with stable testid + copy button', async () => {

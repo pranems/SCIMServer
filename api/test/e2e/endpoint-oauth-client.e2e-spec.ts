@@ -160,6 +160,29 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect((rejectEvent!.data as Record<string, unknown>).method).toBe('oauth_client');
   });
 
+  it('V10: a rejected oauth_client token request persists the auth summary on its RequestLog row', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret-v10').expect(401);
+
+    const logs = await request(app.getHttpServer())
+      .get('/scim/admin/logs?pageSize=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const tokenRow = (logs.body.items as Array<Record<string, unknown>>).find(
+      (r) =>
+        typeof r.url === 'string' &&
+        r.url.includes(`/scim/endpoints/${endpointA}/oauth/token`) &&
+        r.status === 401,
+    );
+    // V10 - the auth decision is persisted directly on the request-log row, so
+    // the logs list can render the outcome without a second auth-decision query.
+    expect(tokenRow).toBeDefined();
+    expect(tokenRow!.authOutcome).toBe('reject');
+    expect(tokenRow!.authMethod).toBe('oauth_client');
+    expect(tokenRow!.authReason).toBe('oauth_client_auth_failed');
+  });
+
   it('WI-D5: a rejected oauth_client attempt is queryable at both auth-decisions scopes', async () => {
     const { clientId } = await createOauthClient(endpointA);
     await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);

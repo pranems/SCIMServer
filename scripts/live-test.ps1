@@ -13360,6 +13360,69 @@ Write-Host "`n--- 9z-BL: credential lifecycle (V2/V3) Complete ---" -ForegroundC
 
 
 # ============================================
+# TEST SECTION 9z-BM: auth summary persisted on request logs (V10/V11/V12)
+# ============================================
+$script:currentSection = "9z-BM: auth summary on request logs (V10/V11/V12)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BM: auth summary on request logs (V10/V11/V12)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# The auth decision for a request (outcome / method / reason / winning
+# credential) is now PERSISTED directly on the RequestLog row (V10), so the
+# logs list renders the auth outcome instantly and DURABLY - it survives the
+# short-TTL auth-decision store (V12). This section drives a per-endpoint
+# oauth_client token request (reject + accept), waits past the 3s logger flush,
+# then asserts the request-log rows carry the auth summary fields.
+
+try {
+    $bmEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-authsummary-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bmId = $bmEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    $bmCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "oauth_client"; label = "v10" } | ConvertTo-Json)
+    $bmClientId = $bmCred.clientId
+    $bmSecret = $bmCred.clientSecret
+    $bmTokenUri = "$baseUrl/scim/endpoints/$bmId/oauth/token"
+
+    # V10 - a REJECTED token request (wrong secret).
+    $bmRejected = $false
+    try {
+        Invoke-RestMethod -Uri $bmTokenUri -Method POST -ContentType "application/x-www-form-urlencoded" -Body "grant_type=client_credentials&client_id=$bmClientId&client_secret=wrong-v10" | Out-Null
+    } catch { $bmRejected = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $bmRejected -Message "9z-BM.T1: oauth_client token with wrong secret rejected (401)"
+
+    # V10 - an ACCEPTED token request (correct secret).
+    $bmToken = Invoke-RestMethod -Uri $bmTokenUri -Method POST -ContentType "application/x-www-form-urlencoded" -Body "grant_type=client_credentials&client_id=$bmClientId&client_secret=$bmSecret"
+    Test-Result -Success ($null -ne $bmToken.access_token) -Message "9z-BM.T2: oauth_client token with correct secret accepted"
+
+    # Wait beyond the 3-second logger flush window (the Prisma backend buffers
+    # request logs; the InMemory backend writes synchronously but the wait is
+    # harmless there).
+    Start-Sleep -Seconds 4
+
+    $bmLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=100" -Method GET -Headers $headers
+    $bmUrlFrag = "/scim/endpoints/$bmId/oauth/token"
+    $bmRejectRow = @($bmLogs.items | Where-Object { $_.url -like "*$bmUrlFrag*" -and $_.status -eq 401 })[0]
+    $bmAcceptRow = @($bmLogs.items | Where-Object { $_.url -like "*$bmUrlFrag*" -and ($_.status -eq 200 -or $_.status -eq 201) })[0]
+
+    Test-Result -Success ($null -ne $bmRejectRow -and $bmRejectRow.authOutcome -eq "reject") -Message "9z-BM.T3: rejected token request-log row carries authOutcome=reject (V10)"
+    Test-Result -Success ($bmRejectRow.authMethod -eq "oauth_client") -Message "9z-BM.T4: rejected row authMethod=oauth_client (V11)"
+    Test-Result -Success ($bmRejectRow.authReason -eq "oauth_client_auth_failed") -Message "9z-BM.T5: rejected row authReason carries the reason code (V12 durable fail)"
+    Test-Result -Success ($null -ne $bmAcceptRow -and $bmAcceptRow.authOutcome -eq "accept") -Message "9z-BM.T6: accepted token request-log row carries authOutcome=accept (V10)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BM: auth-summary section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BM: auth summary on request logs (V10/V11/V12) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

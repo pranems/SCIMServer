@@ -2,7 +2,7 @@
 
 > **What this is.** The design + planning capture for the second Connect/Logs follow-up batch (operator requirements, 2026-07-21). It audits the current state of 12 requirements, records the design decision for each, and sequences them into three tracks. It is the successor to [CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md](CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md) (U1-U12, IMPLEMENTED v0.54.32-0.54.37).
 >
-> **Status.** PLAN. Implementation follows per the standard feature checklist (TDD; API unit + E2E + live; web vitest + Playwright; docs; version bump; measured dev deploy).
+> **Status.** Track A (V6/V7/V8/V9) IMPLEMENTED v0.54.38; Track B (V1-V5) IMPLEMENTED v0.54.39; Track C (V10/V11/V12) IMPLEMENTED v0.54.40. Implementation followed the standard feature checklist (TDD; API unit + E2E + live; web vitest + Playwright; docs; version bump; measured dev deploy).
 >
 > **Verified against.** The `feat/wif` tree at v0.54.37 (audit cited inline).
 
@@ -100,16 +100,19 @@ Each item follows the standard checklist (TDD; API unit + E2E + live; web vitest
 - **Acceptance:** clicking Edit twice closes the in-card form; vitest asserts.
 
 ### V10 - Persist the auth summary on the request log
+- **Status:** IMPLEMENTED v0.54.40. `RequestLog` gained the four nullable columns (migration `20260721180000_add_requestlog_auth_summary`, indexed on `authOutcome`); the auth decision is stamped onto the correlation context at the `emitAuthDecisionEvent` choke point and persisted by `recordRequest` on both backends; `listLogs`/`getLog` (and the endpoint history + admin logs controllers by delegation) return the four fields.
 - **API:** add `authOutcome` / `authMethod` / `authReason` / `authCredentialId?` to `RequestLog` (+ prisma migration + InMemory parity); write them during the request; the logs list + detail return them.
 - **UI:** the row chip + the U11 detail read the persisted fields (no `useAuthDecisions` join for the chip).
 - **Acceptance:** a request-log row carries its auth outcome directly (no second query); the chip is instant + survives past the 30-min store TTL; unit + E2E + live.
 
 ### V11 - Which method / credential / trust + why
+- **Status:** IMPLEMENTED v0.54.40. The winning credential/trust id rides `selectedTrustId` (wif) / the guard-stamped `authCredentialId` (bearer/oauth); the log-detail drawer renders `log-detail-auth-summary` on both LogsPage + LogsTab.
 - **API:** the `AuthDecisionTrace` + the persisted summary record the winning `credentialId` (bearer/oauth) + `selectedTrustId` (wif); `authReason` carries the accept/reject reason.
 - **UI:** the log-detail auth section shows "Authenticated via {method} using {credential/trust} because {reason}" (`log-detail-auth-summary`).
 - **Acceptance:** an accepted request names the method + credential/trust; a rejected one names the failing reason; E2E + Playwright.
 
 ### V12 - Durable, clear auth-fail indication
+- **Status:** IMPLEMENTED v0.54.40. The per-row chip reads the persisted `authOutcome`/`authReason` first (live-decision map only as a pre-V10 fallback), so the red reason-code chip + the detail summary survive the 30-min store TTL. Playwright asserts the chip + drawer summary render with an EMPTY decision store.
 - **UI:** the persisted (V10) outcome makes a failed auth a durable red chip + reason on the row and the full diff in the detail, independent of the ephemeral store.
 - **Acceptance:** a request that failed auth 40+ minutes ago still shows a red chip + reason (from the persisted row); Playwright/live.
 

@@ -216,6 +216,11 @@ interface LogRow {
   createdAt: string | Date;
   /** P3 - the X-Request-Id correlation id echoed on each list item (U12). */
   requestId?: string;
+  /** V10 - the auth decision persisted on the row itself (durable, instant). */
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
+  authCredentialId?: string;
 }
 
 export const LogsPage: React.FC = () => {
@@ -473,7 +478,14 @@ export const LogsPage: React.FC = () => {
                 </td>
                 <td className={classes.td}>
                   {(() => {
-                    const auth = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                    // V10/V12 - prefer the auth summary PERSISTED on the row
+                    // (durable, survives the short-TTL auth-decision store, no
+                    // second query). Fall back to the live auth-decision map for
+                    // rows written before the persisted fields existed.
+                    const persisted = log.authOutcome
+                      ? { outcome: log.authOutcome, reasonCode: log.authReason }
+                      : undefined;
+                    const auth = persisted ?? (log.requestId ? authByCorrelation.get(log.requestId) : undefined);
                     if (!auth) {
                       return <Caption1 data-testid={`log-row-auth-${log.id}`}>-</Caption1>;
                     }
@@ -567,6 +579,37 @@ export const LogsPage: React.FC = () => {
                   maxWidth="100%"
                   data-testid="log-detail-request-id"
                 />
+              </div>
+            )}
+
+            {/* V11 - durable one-line auth summary from the fields PERSISTED on
+                the row. Present even after the short-TTL auth-decision store
+                has expired, unlike the deep U11 diff below. */}
+            {detailQuery.data.authOutcome && (
+              <div className={classes.drawerSection} data-testid="log-detail-auth-summary">
+                <Caption1 className={classes.drawerSectionTitle}>Authentication</Caption1>
+                <Badge
+                  appearance="filled"
+                  color={detailQuery.data.authOutcome === 'accept' ? 'success' : 'danger'}
+                >
+                  {detailQuery.data.authOutcome === 'accept' ? 'auth ok' : 'auth fail'}
+                </Badge>
+                <Text block>
+                  {detailQuery.data.authOutcome === 'accept' ? 'Authenticated via ' : 'Rejected via '}
+                  <strong>{detailQuery.data.authMethod ?? 'unknown method'}</strong>
+                  {detailQuery.data.authCredentialId ? (
+                    <>
+                      {' using '}
+                      <strong>{detailQuery.data.authCredentialId}</strong>
+                    </>
+                  ) : null}
+                  {detailQuery.data.authReason && detailQuery.data.authReason !== 'ok' ? (
+                    <>
+                      {' because '}
+                      <strong>{detailQuery.data.authReason}</strong>
+                    </>
+                  ) : null}
+                </Text>
               </div>
             )}
 

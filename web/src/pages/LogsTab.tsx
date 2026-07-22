@@ -242,7 +242,13 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
               </td>
               <td className={classes.td}>
                 {(() => {
-                  const auth = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                  // V10/V12 - prefer the auth summary PERSISTED on the row
+                  // (durable, instant); fall back to the live auth-decision map
+                  // for rows written before the persisted fields existed.
+                  const persisted = log.authOutcome
+                    ? { outcome: log.authOutcome as 'accept' | 'reject', reasonCode: log.authReason as string | undefined }
+                    : undefined;
+                  const auth = persisted ?? (log.requestId ? authByCorrelation.get(log.requestId) : undefined);
                   if (!auth) {
                     return <Caption1 data-testid={`log-row-auth-${log.id}`}>-</Caption1>;
                   }
@@ -307,6 +313,38 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }} data-testid="logs-tab-detail-correlation">
                 <Caption1>Correlation id</Caption1>
                 <CopyableField value={detailQuery.data.requestId} monospace maxWidth="100%" data-testid="logs-tab-detail-request-id" />
+              </div>
+            )}
+            {/* V11 - durable one-line auth summary from the fields PERSISTED on
+                the row (present even after the short-TTL auth-decision store
+                expires, unlike the deep U11 diff below). */}
+            {detailQuery.data.authOutcome && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }} data-testid="log-detail-auth-summary">
+                <Caption1>Authentication</Caption1>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <Badge
+                    appearance="filled"
+                    color={detailQuery.data.authOutcome === 'accept' ? 'success' : 'danger'}
+                  >
+                    {detailQuery.data.authOutcome === 'accept' ? 'auth ok' : 'auth fail'}
+                  </Badge>
+                  <Text>
+                    {detailQuery.data.authOutcome === 'accept' ? 'Authenticated via ' : 'Rejected via '}
+                    <strong>{detailQuery.data.authMethod ?? 'unknown method'}</strong>
+                    {detailQuery.data.authCredentialId ? (
+                      <>
+                        {' using '}
+                        <strong>{detailQuery.data.authCredentialId}</strong>
+                      </>
+                    ) : null}
+                    {detailQuery.data.authReason && detailQuery.data.authReason !== 'ok' ? (
+                      <>
+                        {' because '}
+                        <strong>{detailQuery.data.authReason}</strong>
+                      </>
+                    ) : null}
+                  </Text>
+                </div>
               </div>
             )}
             {/* U11 - the authentication decision for this request, inline. */}
