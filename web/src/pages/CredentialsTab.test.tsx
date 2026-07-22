@@ -672,6 +672,9 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credential-connect-clientid-oc-1').textContent).toContain('client-id-ep-1');
     expect(screen.getByTestId('credential-connect-appurl-oc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-connect-tokenurl-oc-1')).toBeInTheDocument();
+    // W6 - the subpanel carries a copy/download export of the IdP connection bundle.
+    expect(screen.getByTestId('credential-connect-export-oc-1-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-connect-export-oc-1-download')).toBeInTheDocument();
   });
 
   function wifTrustOverview(id: string): EndpointOverviewResponse {
@@ -792,10 +795,12 @@ describe('CredentialsTab', () => {
     );
   });
 
-  it('V5: a credential row has a Copy-JSON button', () => {
+  it('V5/W5: a credential row has a Copy + Download JSON export', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    expect(screen.getByTestId('credential-copy-json-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-export-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-export-bc-1-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-export-bc-1-download')).toBeInTheDocument();
   });
 
   it('V4: the oauth_client Connect panel shows the secret inline when retained', () => {

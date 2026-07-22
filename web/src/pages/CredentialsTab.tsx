@@ -1466,11 +1466,12 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         >
                           {cred.active ? 'Deactivate' : 'Activate'}
                         </Button>
-                        {/* V5 - copy this trust's public object as JSON. */}
-                        <CopyJsonButton
-                          value={{ id: cred.id, label: cred.label ?? null, active: cred.active, ...(cred.wif ?? {}) }}
-                          label="Copy JSON"
-                          data-testid={`wif-credential-copy-json-${cred.id}`}
+                        {/* W5 - copy / download this trust's public object as JSON. */}
+                        <SettingsJsonExport
+                          value={projectCredentialPublic(cred)}
+                          filename={`wif-trust-${cred.id}.json`}
+                          copyLabel="Copy JSON"
+                          data-testid={`wif-credential-export-${cred.id}`}
                         />
                         <Button
                           appearance="subtle"
@@ -1521,6 +1522,18 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                           <strong>Connect to Entra</strong> - paste these into your identity
                           provider&apos;s Workload Identity Federation connection form.
                         </Caption1>
+                        {/* W6 - copy / download the whole IdP-connection bundle for this trust. */}
+                        <SettingsJsonExport
+                          value={{
+                            applicationApiUrl: scimUrl,
+                            oauthTokenEndpoint: tokenUrl,
+                            clientIdentifier: cred.wif?.expectedSubject ?? null,
+                            ...(cred.wif ?? {}),
+                          }}
+                          filename={`wif-trust-${cred.id}-connection.json`}
+                          copyLabel="Copy connection JSON"
+                          data-testid={`wif-connect-export-${cred.id}`}
+                        />
                         <div className={wif.returnRow}>
                           <Caption1>Application API URL</Caption1>
                           <CopyableField value={scimUrl} monospace truncate data-testid={`wif-connect-appurl-${cred.id}`} />
@@ -2120,19 +2133,12 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 >
                   {cred.active ? 'Deactivate' : 'Activate'}
                 </Button>
-                {/* V5 - copy this credential's public object as JSON. */}
-                <CopyJsonButton
-                  value={{
-                    id: cred.id,
-                    credentialType: cred.credentialType,
-                    label: cred.label ?? null,
-                    active: cred.active,
-                    createdAt: cred.createdAt,
-                    expiresAt: cred.expiresAt ?? null,
-                    ...(cred.oauthClientId ? { oauthClientId: cred.oauthClientId } : {}),
-                  }}
-                  label="Copy JSON"
-                  data-testid={`credential-copy-json-${cred.id}`}
+                {/* W5 - copy / download this credential's public object as JSON. */}
+                <SettingsJsonExport
+                  value={projectCredentialPublic(cred)}
+                  filename={`credential-${cred.id}.json`}
+                  copyLabel="Copy JSON"
+                  data-testid={`credential-export-${cred.id}`}
                 />
                 <Button
                   appearance="subtle"
@@ -2201,6 +2207,17 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     <strong>Connect to Entra</strong> - paste these into your identity
                     provider&apos;s OAuth2 client-credentials connection form.
                   </Caption1>
+                  {/* W6 - copy / download the whole IdP-connection bundle for this credential. */}
+                  <SettingsJsonExport
+                    value={{
+                      applicationApiUrl: connectScimUrl,
+                      oauthTokenEndpoint: connectTokenUrl,
+                      clientIdentifier: cred.oauthClientId ?? null,
+                    }}
+                    filename={`credential-${cred.id}-connection.json`}
+                    copyLabel="Copy connection JSON"
+                    data-testid={`credential-connect-export-${cred.id}`}
+                  />
                   <div className={classes.connectRow}>
                     <Caption1>Application API URL</Caption1>
                     <CopyableField value={connectScimUrl} monospace truncate data-testid={`credential-connect-appurl-${cred.id}`} />

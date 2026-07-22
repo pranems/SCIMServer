@@ -147,6 +147,8 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await expect(page.getByTestId(`credential-connect-panel-${credId}`)).toBeVisible();
     await expect(page.getByTestId(`credential-connect-appurl-${credId}`)).toBeVisible();
     await expect(page.getByTestId(`credential-connect-clientid-${credId}`)).toBeVisible();
+    // W6 - the subpanel carries a copy/download export of the IdP connection bundle.
+    await expect(page.getByTestId(`credential-connect-export-${credId}-copy`)).toBeVisible();
   });
 
   // WI-1 regression: the WIF return-values box must present the SCIM base URL
@@ -448,8 +450,8 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     await expect(page.getByTestId('credential-validity-br-1')).toContainText('No expiry');
     // V2 - the activate/deactivate toggle is present (active -> Deactivate).
     await expect(page.getByTestId('credential-toggle-active-br-1')).toContainText('Deactivate');
-    // V5 - the row has a Copy-JSON button.
-    await expect(page.getByTestId('credential-copy-json-br-1')).toBeVisible();
+    // V5/W5 - the row has a Copy + Download JSON export.
+    await expect(page.getByTestId('credential-export-br-1-copy')).toBeVisible();
     // V3 - Edit opens the inline label form.
     await page.getByTestId('credential-edit-label-br-1').click();
     await expect(page.getByTestId('credential-edit-label-form-br-1')).toBeVisible();
