@@ -88,6 +88,29 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
     // WIF surfaces an expected-audience field and has no clientIdentifier.
     await expect(page.getByTestId('connect-tab-panel-value-expectedAudience')).toBeVisible();
   });
+
+  test('W3: the Connect header carries an endpoint-level export (copy + download all)', async ({ page }) => {
+    await openFirstEndpointConnect(page);
+    await expect(page.getByTestId('connect-endpoint-export')).toBeVisible();
+    await expect(page.getByTestId('connect-endpoint-export-copy')).toBeVisible();
+    await expect(page.getByTestId('connect-endpoint-export-download')).toBeVisible();
+  });
+
+  test('W4: selecting a method sub-tab reveals a per-method export', async ({ page }) => {
+    await openFirstEndpointConnect(page);
+    // Pick the first non-"All" method sub-tab present on this endpoint.
+    const methodTab = page
+      .locator('[data-testid^="credentials-method-tab-"]')
+      .filter({ hasNot: page.locator('[data-testid="credentials-method-tab-all"]') })
+      .first();
+    test.skip((await methodTab.count()) === 0, 'Endpoint has no per-method auth tabs enabled.');
+    const tabTestId = (await methodTab.getAttribute('data-testid')) ?? '';
+    const method = tabTestId.replace('credentials-method-tab-', '');
+    await methodTab.click();
+    await expect(page.getByTestId(`connect-method-export-${method}`)).toBeVisible();
+    await expect(page.getByTestId(`connect-method-export-${method}-copy`)).toBeVisible();
+    await expect(page.getByTestId(`connect-method-export-${method}-download`)).toBeVisible();
+  });
 });
 
 /**

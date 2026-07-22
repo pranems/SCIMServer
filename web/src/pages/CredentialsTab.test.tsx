@@ -1600,4 +1600,27 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
     // The retained secret is rendered inline (re-viewable) rather than hidden.
     expect(screen.getByTestId('connect-tab-panel').textContent).toContain('super-secret-token-value');
   });
+
+  // ─── W3 / W4: Connect export at the endpoint + method levels ─────────
+
+  it('W3: renders the endpoint-level Connect export (copy + download) in the header', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('connect-endpoint-export')).toBeInTheDocument();
+    // The SettingsJsonExport primitive derives a copy + a download button.
+    expect(screen.getByTestId('connect-endpoint-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('connect-endpoint-export-download')).toBeInTheDocument();
+  });
+
+  it('W4: renders a per-method Connect export when a specific method sub-tab is active', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // The "All" overview shows only the endpoint export, not a per-method one.
+    expect(screen.queryByTestId('connect-method-export-bearer')).not.toBeInTheDocument();
+    // Selecting the bearer method reveals its per-method export.
+    fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
+    expect(screen.getByTestId('connect-method-export-bearer')).toBeInTheDocument();
+    expect(screen.getByTestId('connect-method-export-bearer-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('connect-method-export-bearer-download')).toBeInTheDocument();
+  });
 });

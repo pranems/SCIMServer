@@ -88,6 +88,7 @@ import {
   CopyableJsonBlock,
   ConnectionPanel,
   AuthDiagnosticsPanel,
+  SettingsJsonExport,
 } from '../components/primitives';
 
 /**
@@ -146,6 +147,12 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: '12px',
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
   },
   list: {
     display: 'flex',
@@ -1654,6 +1661,93 @@ function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
   return tabs;
 }
 
+/**
+ * The auth-related endpoint config flags carried in a Connect export bundle
+ * (W3/W4). These are the flags that decide which auth methods this endpoint
+ * accepts + how its secrets are surfaced - the operator needs them alongside the
+ * connection info to reproduce or audit the endpoint's auth posture. Never a
+ * secret VALUE - only the enablement/visibility flags.
+ */
+const AUTH_CONFIG_FLAG_KEYS = [
+  'PerEndpointCredentialsEnabled',
+  'SharedSecretBearerAuthEnabled',
+  'SecretTokenBearerAuthEnabled',
+  'OAuthClientCredentialsAuthEnabled',
+  'WifCredentialsEnabled',
+  'CredentialSecretVisibility',
+] as const;
+
+/** Pick just the auth-related flags from the full endpoint config-flag map. */
+function pickAuthConfigFlags(flags: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of AUTH_CONFIG_FLAG_KEYS) {
+    if (flags[k] !== undefined) out[k] = flags[k];
+  }
+  return out;
+}
+
+/**
+ * Project a credential / trust to its public (NO secret) shape for a Connect
+ * export bundle. Mirrors the per-card `CopyJsonButton` projections (W5) so the
+ * endpoint (W3) and per-method (W4) bundles carry the same non-secret fields.
+ */
+function projectCredentialPublic(cred: EndpointOverviewCredential): Record<string, unknown> {
+  return {
+    id: cred.id,
+    credentialType: cred.credentialType,
+    label: cred.label ?? null,
+    active: cred.active,
+    createdAt: cred.createdAt,
+    expiresAt: cred.expiresAt ?? null,
+    ...(cred.oauthClientId ? { oauthClientId: cred.oauthClientId } : {}),
+    ...(cred.wif ? { wif: cred.wif } : {}),
+  };
+}
+
+/**
+ * W3 - assemble the whole-endpoint Connect bundle: every enabled auth method +
+ * the connection info (URLs + Entra field mappings, no secrets) + every
+ * credential/trust (public projection) + the auth-related config flags. This is
+ * the one object an operator can copy / download to reproduce or audit the
+ * endpoint's complete auth + connection posture.
+ */
+function buildEndpointConnectBundle(
+  endpointId: string,
+  connectionInfo: ConnectionInfo | undefined,
+  credentials: EndpointOverviewCredential[],
+  configFlags: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    endpointId,
+    displayName: connectionInfo?.displayName ?? null,
+    authConfigFlags: pickAuthConfigFlags(configFlags),
+    connectionInfo: connectionInfo ?? null,
+    credentials: credentials.map(projectCredentialPublic),
+  };
+}
+
+/**
+ * W4 - assemble the per-method Connect bundle: the one enabled method's
+ * connection info + the credentials/trusts backing that method (public
+ * projection). `method` is the active sub-tab's credential axis.
+ */
+function buildMethodConnectBundle(
+  endpointId: string,
+  method: ConnectionMethod,
+  connectionInfo: ConnectionInfo | undefined,
+  credentials: EndpointOverviewCredential[],
+): Record<string, unknown> {
+  const enabledMethod = connectionInfo?.enabledMethods.find((m) => m.method === method) ?? null;
+  return {
+    endpointId,
+    method,
+    displayName: connectionInfo?.displayName ?? null,
+    urls: connectionInfo?.urls ?? null,
+    enabledMethod,
+    credentials: credentials.map(projectCredentialPublic),
+  };
+}
+
 export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const navigate = useNavigate();
@@ -1825,17 +1919,30 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
     <div className={classes.root} data-testid="tab-credentials">
       <div className={classes.header}>
         <Subtitle1>Connect ({credentials.length})</Subtitle1>
-        {showGenericList && (
-          <Button
-            appearance="primary"
-            icon={<Add24Regular />}
-            onClick={() => onOpenCreate(createTypeForTab)}
-            data-testid="credentials-create-button"
-            disabled={!flagEnabledForTab}
-          >
-            Add credential
-          </Button>
-        )}
+        <div className={classes.headerActions}>
+          {/* W3 - copy / download the WHOLE endpoint Connect bundle: every
+              enabled method + connection info + every credential/trust + the
+              auth-related config flags (no secret values). */}
+          {data?.connectionInfo && (
+            <SettingsJsonExport
+              value={buildEndpointConnectBundle(endpointId, data.connectionInfo, credentials, configFlags)}
+              filename={`endpoint-${endpointId}-connect.json`}
+              copyLabel="Copy all as JSON"
+              data-testid="connect-endpoint-export"
+            />
+          )}
+          {showGenericList && (
+            <Button
+              appearance="primary"
+              icon={<Add24Regular />}
+              onClick={() => onOpenCreate(createTypeForTab)}
+              data-testid="credentials-create-button"
+              disabled={!flagEnabledForTab}
+            >
+              Add credential
+            </Button>
+          )}
+        </div>
       </div>
 
       <Caption1>
@@ -1863,6 +1970,21 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           </Tab>
         ))}
       </TabList>
+
+      {/* W4 - copy / download all info for the ACTIVE method: its connection
+          info + the credentials/trusts backing it (no secret values). Shown for
+          a specific method sub-tab (the "All" overview uses the W3 endpoint
+          export in the header). */}
+      {activeTab !== 'all' && data?.connectionInfo && (
+        <div className={classes.headerActions} data-testid={`connect-method-export-row-${activeTab}`}>
+          <SettingsJsonExport
+            value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, data.connectionInfo, listCredentials)}
+            filename={`endpoint-${endpointId}-${activeTab}-connect.json`}
+            copyLabel="Copy this method as JSON"
+            data-testid={`connect-method-export-${activeTab}`}
+          />
+        </div>
+      )}
 
       {showSharedSecretInfo && (
         <MessageBar intent="info" data-testid="credentials-shared-secret-info">
