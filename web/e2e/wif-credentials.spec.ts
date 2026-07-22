@@ -468,10 +468,13 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     await expect(page.getByTestId('credentials-method-tab-oauth_client')).toContainText('OAuth2 Client-Credential');
     // V1 - the row shows a validity line.
     await expect(page.getByTestId('credential-validity-br-1')).toContainText('No expiry');
-    // V2 - the activate/deactivate toggle is present (active -> Deactivate).
-    await expect(page.getByTestId('credential-toggle-active-br-1')).toContainText('Deactivate');
     // V5/W5 - the row has a Copy + Download JSON export.
     await expect(page.getByTestId('credential-export-br-1-copy')).toBeVisible();
+    // W7/V2 - the activate/deactivate toggle now lives in the overflow menu.
+    await page.getByTestId('credential-more-br-1').click();
+    await expect(page.getByTestId('credential-toggle-active-br-1')).toContainText('Deactivate');
+    // Close the menu before the next interaction.
+    await page.keyboard.press('Escape');
     // V3 - Edit opens the inline label form.
     await page.getByTestId('credential-edit-label-br-1').click();
     await expect(page.getByTestId('credential-edit-label-form-br-1')).toBeVisible();

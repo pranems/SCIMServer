@@ -372,6 +372,7 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
+    fireEvent.click(screen.getByTestId('credential-more-cred-x'));
     fireEvent.click(screen.getByTestId('credential-delete-cred-x'));
     expect(screen.getByTestId('credentials-delete-dialog')).toBeInTheDocument();
     // Title text is broken across nodes ("Revoke credential" + label)
@@ -397,6 +398,7 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
+    fireEvent.click(screen.getByTestId('credential-more-cred-x'));
     fireEvent.click(screen.getByTestId('credential-delete-cred-x'));
     const dialog = screen.getByTestId('credentials-delete-dialog');
     fireEvent.click(dialog.querySelector('button[type="submit"]')!);
@@ -418,6 +420,8 @@ describe('CredentialsTab', () => {
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     // The oauth_client credential lives on the oauth_client method tab (W11).
     fireEvent.click(screen.getByTestId('credentials-method-tab-oauth_client'));
+    // W7 - Reveal is in the card's overflow menu.
+    fireEvent.click(screen.getByTestId('credential-more-cred-r'));
     const revealBtn = screen.getByTestId('credential-reveal-cred-r');
     fireEvent.click(revealBtn);
     expect(mockRevealMutate).toHaveBeenCalledTimes(1);
@@ -449,6 +453,8 @@ describe('CredentialsTab', () => {
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     // The oauth_client credential lives on the oauth_client method tab (W11).
     fireEvent.click(screen.getByTestId('credentials-method-tab-oauth_client'));
+    // W7 - Rotate is in the card's overflow menu.
+    fireEvent.click(screen.getByTestId('credential-more-cred-rot'));
     const rotateBtn = screen.getByTestId('credential-rotate-cred-rot');
     fireEvent.click(rotateBtn);
     expect(mockRotateMutate).toHaveBeenCalledTimes(1);
@@ -784,13 +790,35 @@ describe('CredentialsTab', () => {
     mockActivateMutate.mockClear();
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
     const { rerender } = renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // W7 - the activate/deactivate toggle is in the card's overflow menu.
+    fireEvent.click(screen.getByTestId('credential-more-bc-1'));
     fireEvent.click(screen.getByTestId('credential-toggle-active-bc-1'));
     expect(mockDeactivateMutate).toHaveBeenCalledWith('bc-1');
 
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: false }), isLoading: false, error: null });
     rerender(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credential-more-bc-1'));
     fireEvent.click(screen.getByTestId('credential-toggle-active-bc-1'));
     expect(mockActivateMutate).toHaveBeenCalledWith('bc-1');
+  });
+
+  it('W7: primary actions stay visible; secondary/destructive actions live in the overflow menu', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // Primary actions are visible directly on the card (bearer has a Connect button).
+    expect(screen.getByTestId('credential-connect-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-edit-label-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-export-bc-1')).toBeInTheDocument();
+    // The overflow trigger is present; the secondary actions are hidden until opened.
+    expect(screen.getByTestId('credential-more-bc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-delete-bc-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credential-toggle-active-bc-1')).not.toBeInTheDocument();
+    // Opening the menu reveals Reveal / Rotate / Deactivate / Revoke.
+    fireEvent.click(screen.getByTestId('credential-more-bc-1'));
+    expect(screen.getByTestId('credential-reveal-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-rotate-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-toggle-active-bc-1')).toBeInTheDocument();
+    expect(screen.getByTestId('credential-delete-bc-1')).toBeInTheDocument();
   });
 
   it('V3: Edit reveals the label form and Save calls the edit-label mutation', () => {
@@ -1377,6 +1405,8 @@ describe('CredentialsTab', () => {
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
     expect(screen.getByTestId('wif-credential-row-wif-1')).toBeInTheDocument();
+    // W7 - the Revoke control is in the trust card's overflow menu.
+    fireEvent.click(screen.getByTestId('wif-credential-more-wif-1'));
     fireEvent.click(screen.getByTestId('wif-credential-delete-wif-1'));
     expect(mockDeleteMutate).toHaveBeenCalledWith('wif-1');
   });

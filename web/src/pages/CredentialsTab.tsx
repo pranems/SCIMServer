@@ -41,6 +41,11 @@ import {
   Tab,
   InfoLabel,
   Tooltip,
+  Menu,
+  MenuTrigger,
+  MenuList,
+  MenuItem,
+  MenuPopover,
   Accordion,
   AccordionItem,
   AccordionHeader,
@@ -56,6 +61,7 @@ import {
   Warning24Regular,
   ShieldKeyhole24Regular,
   PlugConnected24Regular,
+  MoreHorizontal24Regular,
 } from '@fluentui/react-icons';
 import {
   useEndpointOverview,
@@ -1425,18 +1431,11 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         {cred.active ? 'Active' : 'Revoked'}
                       </Badge>
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        <Button
-                          appearance="subtle"
-                          icon={<Edit24Regular />}
-                          onClick={() => onEditTrust(cred)}
-                          aria-label={`Edit WIF trust ${cred.label ?? cred.id}`}
-                          data-testid={`wif-credential-edit-${cred.id}`}
-                        >
-                          Edit
-                        </Button>
+                        {/* W7 - primary actions visible (Connect, Edit, Verify,
+                            Export); Deactivate + Revoke in a "More" overflow menu. */}
                         <Tooltip content="Connect this endpoint to IdP like Entra ID" relationship="label" positioning="above">
                           <Button
-                            appearance="subtle"
+                            appearance="secondary"
                             icon={<PlugConnected24Regular />}
                             onClick={() =>
                               setConnectTrustId(connectTrustId === cred.id ? null : cred.id)
@@ -1449,6 +1448,15 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         </Tooltip>
                         <Button
                           appearance="subtle"
+                          icon={<Edit24Regular />}
+                          onClick={() => onEditTrust(cred)}
+                          aria-label={`Edit WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-edit-${cred.id}`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          appearance="subtle"
                           icon={<PlugConnected24Regular />}
                           onClick={() => onVerifyTrust(cred)}
                           disabled={verifyMutation.isPending && cardVerify?.id === cred.id}
@@ -1457,19 +1465,6 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         >
                           {verifyMutation.isPending && cardVerify?.id === cred.id ? 'Verifying...' : 'Verify'}
                         </Button>
-                        {/* V2 - activate / deactivate this trust (soft). */}
-                        <Button
-                          appearance="subtle"
-                          onClick={() => {
-                            if (cred.active) deleteMutation.mutate(cred.id);
-                            else activateMutation.mutate(cred.id);
-                          }}
-                          disabled={activateMutation.isPending || deleteMutation.isPending}
-                          aria-label={`${cred.active ? 'Deactivate' : 'Activate'} WIF trust ${cred.label ?? cred.id}`}
-                          data-testid={`wif-credential-toggle-active-${cred.id}`}
-                        >
-                          {cred.active ? 'Deactivate' : 'Activate'}
-                        </Button>
                         {/* W5 - copy / download this trust's public object as JSON. */}
                         <SettingsJsonExport
                           value={projectCredentialPublic(cred)}
@@ -1477,13 +1472,40 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                           copyLabel="Copy JSON"
                           data-testid={`wif-credential-export-${cred.id}`}
                         />
-                        <Button
-                          appearance="subtle"
-                          icon={<Delete24Regular />}
-                          onClick={() => deleteMutation.mutate(cred.id)}
-                          aria-label={`Revoke WIF credential ${cred.label ?? cred.id}`}
-                          data-testid={`wif-credential-delete-${cred.id}`}
-                        />
+                        <Menu>
+                          <MenuTrigger disableButtonEnhancement>
+                            <Tooltip content="More actions" relationship="label" positioning="above">
+                              <Button
+                                appearance="subtle"
+                                icon={<MoreHorizontal24Regular />}
+                                aria-label={`More actions for WIF trust ${cred.label ?? cred.id}`}
+                                data-testid={`wif-credential-more-${cred.id}`}
+                              />
+                            </Tooltip>
+                          </MenuTrigger>
+                          <MenuPopover>
+                            <MenuList>
+                              {/* V2 - activate / deactivate this trust (soft). */}
+                              <MenuItem
+                                onClick={() => {
+                                  if (cred.active) deleteMutation.mutate(cred.id);
+                                  else activateMutation.mutate(cred.id);
+                                }}
+                                disabled={activateMutation.isPending || deleteMutation.isPending}
+                                data-testid={`wif-credential-toggle-active-${cred.id}`}
+                              >
+                                {cred.active ? 'Deactivate' : 'Activate'}
+                              </MenuItem>
+                              <MenuItem
+                                icon={<Delete24Regular />}
+                                onClick={() => deleteMutation.mutate(cred.id)}
+                                data-testid={`wif-credential-delete-${cred.id}`}
+                              >
+                                Revoke trust
+                              </MenuItem>
+                            </MenuList>
+                          </MenuPopover>
+                        </Menu>
                       </div>
                     </div>
                     {/* V1 - validity line (a WIF trust does not expire). */}
@@ -2079,42 +2101,12 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                   {cred.active ? 'Active' : 'Revoked'}
                 </Badge>
-                {cred.active && cred.credentialType !== 'wif' && (
-                  <Button
-                    appearance="subtle"
-                    onClick={() => {
-                      setRevealResult(null);
-                      revealMutation.mutate(cred.id, {
-                        onSuccess: (r) => setRevealResult(r),
-                      });
-                    }}
-                    disabled={revealMutation.isPending}
-                    aria-label={`Reveal secret for ${cred.label ?? cred.id}`}
-                    data-testid={`credential-reveal-${cred.id}`}
-                  >
-                    Reveal
-                  </Button>
-                )}
-                {cred.active && cred.credentialType !== 'wif' && (
-                  <Button
-                    appearance="subtle"
-                    onClick={() => {
-                      setRotateResult(null);
-                      rotateMutation.mutate(cred.id, {
-                        onSuccess: (r) => setRotateResult(r),
-                      });
-                    }}
-                    disabled={rotateMutation.isPending}
-                    aria-label={`Rotate secret for ${cred.label ?? cred.id}`}
-                    data-testid={`credential-rotate-${cred.id}`}
-                  >
-                    Rotate
-                  </Button>
-                )}
+                {/* W7 - primary actions first (Connect, Edit, Export), the
+                    less-common + destructive actions in a "More" overflow menu. */}
                 {(cred.credentialType === 'oauth_client' || cred.credentialType === 'bearer') && (
                   <Tooltip content="Connect this endpoint to IdP like Entra ID" relationship="label" positioning="above">
                     <Button
-                      appearance="subtle"
+                      appearance="secondary"
                       icon={<PlugConnected24Regular />}
                       onClick={() => {
                         const next = connectCredId === cred.id ? null : cred.id;
@@ -2149,19 +2141,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 >
                   Edit
                 </Button>
-                {/* V2 - activate / deactivate toggle (soft, keeps the row). */}
-                <Button
-                  appearance="subtle"
-                  onClick={() => {
-                    if (cred.active) deactivateMutation.mutate(cred.id);
-                    else activateMutation.mutate(cred.id);
-                  }}
-                  disabled={activateMutation.isPending || deactivateMutation.isPending}
-                  aria-label={`${cred.active ? 'Deactivate' : 'Activate'} credential ${cred.label ?? cred.id}`}
-                  data-testid={`credential-toggle-active-${cred.id}`}
-                >
-                  {cred.active ? 'Deactivate' : 'Activate'}
-                </Button>
                 {/* W5 - copy / download this credential's public object as JSON. */}
                 <SettingsJsonExport
                   value={projectCredentialPublic(cred)}
@@ -2169,16 +2148,67 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   copyLabel="Copy JSON"
                   data-testid={`credential-export-${cred.id}`}
                 />
-                <Button
-                  appearance="subtle"
-                  icon={<Delete24Regular />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setDeleteTarget(cred);
-                  }}
-                  aria-label={`Revoke credential ${cred.label ?? cred.id}`}
-                  data-testid={`credential-delete-${cred.id}`}
-                />
+                {/* W7 - overflow menu for the secondary + destructive actions. */}
+                <Menu>
+                  <MenuTrigger disableButtonEnhancement>
+                    <Tooltip content="More actions" relationship="label" positioning="above">
+                      <Button
+                        appearance="subtle"
+                        icon={<MoreHorizontal24Regular />}
+                        aria-label={`More actions for ${cred.label ?? cred.id}`}
+                        data-testid={`credential-more-${cred.id}`}
+                      />
+                    </Tooltip>
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      {cred.active && cred.credentialType !== 'wif' && (
+                        <MenuItem
+                          onClick={() => {
+                            setRevealResult(null);
+                            revealMutation.mutate(cred.id, { onSuccess: (r) => setRevealResult(r) });
+                          }}
+                          disabled={revealMutation.isPending}
+                          data-testid={`credential-reveal-${cred.id}`}
+                        >
+                          Reveal secret
+                        </MenuItem>
+                      )}
+                      {cred.active && cred.credentialType !== 'wif' && (
+                        <MenuItem
+                          onClick={() => {
+                            setRotateResult(null);
+                            rotateMutation.mutate(cred.id, { onSuccess: (r) => setRotateResult(r) });
+                          }}
+                          disabled={rotateMutation.isPending}
+                          data-testid={`credential-rotate-${cred.id}`}
+                        >
+                          Rotate secret
+                        </MenuItem>
+                      )}
+                      <MenuItem
+                        onClick={() => {
+                          if (cred.active) deactivateMutation.mutate(cred.id);
+                          else activateMutation.mutate(cred.id);
+                        }}
+                        disabled={activateMutation.isPending || deactivateMutation.isPending}
+                        data-testid={`credential-toggle-active-${cred.id}`}
+                      >
+                        {cred.active ? 'Deactivate' : 'Activate'}
+                      </MenuItem>
+                      <MenuItem
+                        icon={<Delete24Regular />}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(cred);
+                        }}
+                        data-testid={`credential-delete-${cred.id}`}
+                      >
+                        Revoke credential
+                      </MenuItem>
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
               </div>
               {/* V1 - remaining-validity line. */}
               {(() => {

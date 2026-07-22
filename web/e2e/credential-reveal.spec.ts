@@ -69,27 +69,31 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
     await expect(kek).toContainText(/default|configured/i);
   });
 
-  test('the credentials tab renders (reveal button appears for retained credentials)', async ({ page }) => {
+  test('the credentials tab renders (reveal is in the card overflow menu for retained credentials)', async ({ page }) => {
     await openFirstEndpointCredentials(page);
-    // The tab renders; a Reveal button is present only when a retained-capable
-    // credential exists. We assert the tab loaded; the button is conditional.
+    // The tab renders; W7 - Reveal now lives in each card's overflow menu, shown
+    // only for a retained-capable credential.
     await expect(page.getByTestId('tab-credentials')).toBeVisible();
-    const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
-    // If any exist, they must be enabled buttons (not asserting count > 0 since
-    // a fresh endpoint may have none).
-    const count = await revealButtons.count();
-    if (count > 0) {
-      await expect(revealButtons.first()).toBeEnabled();
+    const moreButtons = page.locator('[data-testid^="credential-more-"]');
+    if ((await moreButtons.count()) > 0) {
+      await moreButtons.first().click();
+      const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
+      if ((await revealButtons.count()) > 0) {
+        await expect(revealButtons.first()).toBeEnabled();
+      }
     }
   });
 
-  test('a Rotate button accompanies each retained-capable credential', async ({ page }) => {
+  test('a Rotate item accompanies each retained-capable credential in the overflow menu', async ({ page }) => {
     await openFirstEndpointCredentials(page);
     await expect(page.getByTestId('tab-credentials')).toBeVisible();
+    const moreButtons = page.locator('[data-testid^="credential-more-"]');
+    test.skip((await moreButtons.count()) === 0, 'No per-endpoint credential cards on the first endpoint.');
+    await moreButtons.first().click();
+    // W7 - Reveal + Rotate are shown together for the same credential (both
+    // secret-bearing, active, non-wif), so their counts match in the open menu.
     const rotateButtons = page.locator('[data-testid^="credential-rotate-"]');
     const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
-    // Reveal + Rotate are shown for the same credentials (both secret-bearing,
-    // active, non-wif), so their counts match.
     expect(await rotateButtons.count()).toBe(await revealButtons.count());
     if ((await rotateButtons.count()) > 0) {
       await expect(rotateButtons.first()).toBeEnabled();
