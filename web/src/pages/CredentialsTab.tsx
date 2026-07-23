@@ -1694,10 +1694,10 @@ function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
   const wif = coerceCredFlag(flags.WifCredentialsEnabled, false);
 
   const tabs: MethodTabDef[] = [];
-  if (sharedSecret) tabs.push({ value: 'shared_secret', label: 'Shared secret', credentialType: null });
-  if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
   if (oauthClient) tabs.push({ value: 'oauth_client', label: 'OAuth2 Client-Credential', credentialType: 'oauth_client' });
   if (wif) tabs.push({ value: 'wif', label: 'WIF', credentialType: 'wif' });
+  if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
+  if (sharedSecret) tabs.push({ value: 'shared_secret', label: 'Global Shared secret', credentialType: null });
   return tabs;
 }
 
@@ -2062,7 +2062,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
       {showSharedSecretInfo && (
         <MessageBar intent="info" data-testid="credentials-shared-secret-info">
           <MessageBarBody>
-            <MessageBarTitle>Shared-secret bearer (global)</MessageBarTitle>
+            <MessageBarTitle>Global Shared secret (bearer)</MessageBarTitle>
             This endpoint accepts the server-wide SCIM shared secret as a bearer token. There is no
             per-endpoint credential to create here - the secret is configured at the server level.
             Turn off <code>SharedSecretBearerAuthEnabled</code> in Settings to require this endpoint

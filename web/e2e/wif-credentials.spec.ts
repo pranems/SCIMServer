@@ -410,14 +410,15 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     await expect(page.getByTestId('credentials-method-tab-oauth_client')).toBeVisible();
     await expect(page.getByTestId('credentials-method-tab-wif')).toBeVisible();
 
-    // Default tab = bearer (the first per-endpoint method): only the bearer row.
-    await expect(page.getByTestId('credential-row-br-1')).toBeVisible();
-    await expect(page.getByTestId('credential-row-oc-1')).toHaveCount(0);
-
-    // OAuth2 client tab: only the oauth_client row.
-    await page.getByTestId('credentials-method-tab-oauth_client').click();
+    // Default tab = OAuth2 Client-Credential (first per-endpoint method after the
+    // X8 reorder): only the oauth_client row shows.
     await expect(page.getByTestId('credential-row-oc-1')).toBeVisible();
     await expect(page.getByTestId('credential-row-br-1')).toHaveCount(0);
+
+    // Per-endpoint bearer tab: only the bearer row.
+    await page.getByTestId('credentials-method-tab-bearer').click();
+    await expect(page.getByTestId('credential-row-br-1')).toBeVisible();
+    await expect(page.getByTestId('credential-row-oc-1')).toHaveCount(0);
 
     // Shared secret tab: info banner + no create button.
     await page.getByTestId('credentials-method-tab-shared_secret').click();
@@ -466,6 +467,8 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
 
     // V6 - the OAuth2 sub-tab is renamed.
     await expect(page.getByTestId('credentials-method-tab-oauth_client')).toContainText('OAuth2 Client-Credential');
+    // X8 - bearer is no longer the default tab; select it to see the bearer row.
+    await page.getByTestId('credentials-method-tab-bearer').click();
     // V1 - the row shows a validity line.
     await expect(page.getByTestId('credential-validity-br-1')).toContainText('No expiry');
     // V5/W5 - the row has a Copy + Download JSON export.

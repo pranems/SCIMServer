@@ -103,7 +103,9 @@ const baseOverview: EndpointOverviewResponse = {
   },
   credentials: [],
   recentActivity: [],
-  configFlags: { PerEndpointCredentialsEnabled: true },
+  // Bearer only (+ default shared-secret) so bearer is the default method tab
+  // for the bearer-credential tests (X8 reorder puts oauth_client first).
+  configFlags: { SecretTokenBearerAuthEnabled: true },
   connectionInfo: {
     endpointId: 'ep-1',
     displayName: 'Production',
@@ -412,6 +414,7 @@ describe('CredentialsTab', () => {
   it('shows a Reveal button for an active non-wif credential and calls the reveal mutation', () => {
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
+      configFlags: { OAuthClientCredentialsAuthEnabled: true },
       credentials: [
         { id: 'cred-r', credentialType: 'oauth_client', label: 'Revealable', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
       ],
@@ -445,6 +448,7 @@ describe('CredentialsTab', () => {
   it('shows a Rotate button for an active non-wif credential and calls the rotate mutation', () => {
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
+      configFlags: { OAuthClientCredentialsAuthEnabled: true },
       credentials: [
         { id: 'cred-rot', credentialType: 'oauth_client', label: 'Rotatable', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
       ],
@@ -1472,6 +1476,27 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(screen.getByTestId('credentials-method-tab-wif')).toBeInTheDocument();
   });
 
+  it('X8: orders the method tabs oauth_client, wif, bearer, shared_secret and renames Shared secret -> Global Shared secret', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    const order = screen.getAllByRole('tab').map((t) => t.getAttribute('data-testid'));
+    expect(order).toEqual([
+      'credentials-method-tab-oauth_client',
+      'credentials-method-tab-wif',
+      'credentials-method-tab-bearer',
+      'credentials-method-tab-shared_secret',
+    ]);
+    // Rename: "Shared secret" -> "Global Shared secret".
+    expect(screen.getByTestId('credentials-method-tab-shared_secret').textContent).toContain('Global Shared secret');
+  });
+
   it('V6: the OAuth2 sub-tab is labelled "OAuth2 Client-Credential"', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: { ...baseOverview, configFlags: { OAuthClientCredentialsAuthEnabled: true } },
@@ -1511,10 +1536,11 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
       error: null,
     });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // W11 - the default tab is the first per-endpoint method (bearer); it lists
-    // only bearer credentials, not every method's (there is no "All" view).
-    expect(screen.getByTestId('credential-row-br-1')).toBeInTheDocument();
-    expect(screen.queryByTestId('credential-row-oc-1')).not.toBeInTheDocument();
+    // W11 + X8 - the default tab is the first per-endpoint method in tab order
+    // (OAuth2 Client-Credential is now first); it lists only oauth_client
+    // credentials, not every method's (there is no "All" view).
+    expect(screen.getByTestId('credential-row-oc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-row-br-1')).not.toBeInTheDocument();
   });
 
   it('selecting the OAuth2 client tab filters the list to oauth_client only', () => {
@@ -1601,7 +1627,8 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
   function bearerOverview(retained = false): EndpointOverviewResponse {
     return {
       ...baseOverview,
-      configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true },
+      // Bearer only (+ the default shared-secret) so bearer is the default tab.
+      configFlags: { SecretTokenBearerAuthEnabled: true },
       connectionInfo: {
         ...baseOverview.connectionInfo!,
         enabledMethods: [
