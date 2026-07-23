@@ -30,6 +30,7 @@ import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, Copyable
 import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -222,7 +223,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
             <tr
               key={log.id}
               className={classes.tr}
-              onClick={() => setDetailId(log.id)}
+              {...clickableProps(() => setDetailId(log.id), `Open log ${log.method} ${log.url}`)}
               data-testid={`logs-tab-row-${log.id}`}
               style={{ cursor: 'pointer' }}
             >

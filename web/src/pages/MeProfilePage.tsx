@@ -56,6 +56,9 @@ const useStyles = makeStyles({
     padding: '12px',
     cursor: 'pointer',
     border: `1px solid transparent`,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
   },
   pickerCardSelected: {
     borderColor: tokens.colorBrandStroke1,

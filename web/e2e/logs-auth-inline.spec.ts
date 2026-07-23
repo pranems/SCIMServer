@@ -293,5 +293,16 @@ test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
     // Dragging the handle right widened the column by roughly the drag distance.
     expect(after).toBeGreaterThan(before + 60);
   });
+
+  test('X1: a log row + a filter chip carry uniform clickable affordances (role + aria-pressed)', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    // The clickable log row is a keyboard-activatable button, not a bare row.
+    await expect(page.getByTestId('logs-row-log-x5-crud')).toHaveAttribute('role', 'button');
+    // A status filter chip is a toggle button reflecting its selected state.
+    const chip = page.getByTestId('logs-status-chip-200');
+    await expect(chip).toHaveAttribute('role', 'button');
+    await expect(chip).toHaveAttribute('aria-pressed', /true|false/);
+  });
 });
 

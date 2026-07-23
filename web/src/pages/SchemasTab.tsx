@@ -240,7 +240,7 @@ const AttributeLeaf: React.FC<AttributeLeafProps> = ({ schemaId, attr, alternate
       >
         {hasSubs && (
           <Button
-            appearance="transparent"
+            appearance="subtle"
             size="small"
             icon={expanded ? <ChevronDown20Regular /> : <ChevronRight20Regular />}
             onClick={() => setExpanded((v) => !v)}

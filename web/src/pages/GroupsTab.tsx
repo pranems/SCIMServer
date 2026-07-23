@@ -27,6 +27,7 @@ import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer'
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
@@ -165,7 +166,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
             <tr
               key={group.id}
               className={classes.tr}
-              onClick={() => openDetail(group.id)}
+              {...clickableProps(() => openDetail(group.id), `Open group ${group.displayName ?? group.id}`)}
               style={{ cursor: 'pointer' }}
               data-testid={`group-row-${group.id}`}
             >

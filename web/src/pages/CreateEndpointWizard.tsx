@@ -106,6 +106,9 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     padding: '12px',
     border: `1px solid transparent`,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
   },
   presetCardSelected: {
     borderColor: tokens.colorBrandStroke1,

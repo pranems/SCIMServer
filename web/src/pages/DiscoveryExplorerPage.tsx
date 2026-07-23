@@ -104,6 +104,9 @@ const useStyles = makeStyles({
     padding: '10px',
     cursor: 'pointer',
     border: `1px solid transparent`,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
   },
   pickerCardSelected: {
     borderColor: tokens.colorBrandStroke1,
@@ -663,6 +666,8 @@ const SchemasDiffView: React.FC<{
   secondary: ScimSchemaResource[];
 }> = ({ primary, secondary }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the schema-characteristics diff columns (Attribute + N chars).
+  const cols = useResizableColumns('discovery-schema-diff', 1 + CHAR_KEYS.length, 'discovery-schema-col');
 
   // Build per-schema diff for the union of schema URNs.
   const secMap = new Map<string, ScimSchemaResource>();
@@ -710,10 +715,11 @@ const SchemasDiffView: React.FC<{
             <table className={classes.diffTable} style={{ marginTop: '8px' }}>
               <thead>
                 <tr>
-                  <th className={classes.diffHeaderCell}>Attribute</th>
-                  {CHAR_KEYS.map((k) => (
-                    <th key={k} className={classes.diffHeaderCell}>
+                  <th className={classes.diffHeaderCell} style={cols.headerProps(0).style}>Attribute<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                  {CHAR_KEYS.map((k, i) => (
+                    <th key={k} className={classes.diffHeaderCell} style={cols.headerProps(i + 1).style}>
                       {k}
+                      {i < CHAR_KEYS.length - 1 && <ColumnResizeHandle {...cols.handleProps(i + 1)} />}
                     </th>
                   ))}
                 </tr>

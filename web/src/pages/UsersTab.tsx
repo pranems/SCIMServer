@@ -33,6 +33,7 @@ import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer'
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
@@ -230,7 +231,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
             <tr
               key={user.id}
               className={classes.tr}
-              onClick={() => openDetail(user.id)}
+              {...clickableProps(() => openDetail(user.id), `Open user ${user.userName ?? user.id}`)}
               style={{ cursor: 'pointer' }}
               data-testid={`user-row-${user.id}`}
             >

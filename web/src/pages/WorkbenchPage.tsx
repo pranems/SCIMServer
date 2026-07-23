@@ -91,6 +91,7 @@ import {
 } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps } from '../utils/interactive';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -1008,7 +1009,7 @@ export const WorkbenchPage: React.FC = () => {
                 <tr
                   key={entry.id}
                   className={classes.historyRow}
-                  onClick={() => handleHistoryRowClick(entry)}
+                  {...clickableProps(() => handleHistoryRowClick(entry), `Load request ${entry.method} ${entry.path}`)}
                   data-testid={`workbench-history-row-${entry.id}`}
                 >
                   <td className={classes.historyCell}>

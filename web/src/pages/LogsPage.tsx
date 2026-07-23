@@ -53,6 +53,7 @@ import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkel
 import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps, toggleChipProps } from '../utils/interactive';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -397,9 +398,7 @@ export const LogsPage: React.FC = () => {
                 appearance={status === s ? 'filled' : 'outline'}
                 color={statusColor(s)}
                 className={classes.chip}
-                onClick={() =>
-                  updateFilter({ status: status === s ? undefined : s })
-                }
+                {...toggleChipProps(() => updateFilter({ status: status === s ? undefined : s }), status === s)}
                 data-testid={`logs-status-chip-${s}`}
               >
                 {s}
@@ -416,9 +415,7 @@ export const LogsPage: React.FC = () => {
                 appearance={timeRange === tr ? 'filled' : 'outline'}
                 color="brand"
                 className={classes.chip}
-                onClick={() =>
-                  updateFilter({ timeRange: timeRange === tr ? undefined : tr })
-                }
+                {...toggleChipProps(() => updateFilter({ timeRange: timeRange === tr ? undefined : tr }), timeRange === tr)}
                 data-testid={`logs-time-chip-${tr}`}
               >
                 {TIME_RANGE_LABEL[tr]}
@@ -468,7 +465,7 @@ export const LogsPage: React.FC = () => {
               <tr
                 key={log.id}
                 className={`${classes.tr} ${log.id === detailId ? classes.trSelected : ''}`}
-                onClick={() => openDetail(log.id)}
+                {...clickableProps(() => openDetail(log.id), `Open log ${log.method} ${log.url}`)}
                 data-testid={`logs-row-${log.id}`}
               >
                 <td className={classes.td}>
