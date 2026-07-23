@@ -41,11 +41,7 @@ import {
   Tab,
   InfoLabel,
   Tooltip,
-  Menu,
-  MenuTrigger,
-  MenuList,
   MenuItem,
-  MenuPopover,
   Accordion,
   AccordionItem,
   AccordionHeader,
@@ -61,7 +57,6 @@ import {
   Warning24Regular,
   ShieldKeyhole24Regular,
   PlugConnected24Regular,
-  MoreHorizontal24Regular,
 } from '@fluentui/react-icons';
 import {
   useEndpointOverview,
@@ -98,6 +93,7 @@ import {
   AuthDiagnosticsPanel,
   SettingsJsonExport,
 } from '../components/primitives';
+import { OverflowMenu } from '../components/primitives/OverflowMenu';
 
 /**
  * P5 - the "Connect" half of the unified tab. For a specific method it renders
@@ -1510,19 +1506,10 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                           copyLabel="Copy JSON"
                           data-testid={`wif-credential-export-${cred.id}`}
                         />
-                        <Menu>
-                          <MenuTrigger disableButtonEnhancement>
-                            <Tooltip content="More actions" relationship="label" positioning="above">
-                              <Button
-                                appearance="subtle"
-                                icon={<MoreHorizontal24Regular />}
-                                aria-label={`More actions for WIF trust ${cred.label ?? cred.id}`}
-                                data-testid={`wif-credential-more-${cred.id}`}
-                              />
-                            </Tooltip>
-                          </MenuTrigger>
-                          <MenuPopover>
-                            <MenuList>
+                        <OverflowMenu
+                          ariaLabel={`More actions for WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-more-${cred.id}`}
+                        >
                               {/* V2 - activate / deactivate this trust (soft). */}
                               <MenuItem
                                 onClick={() => {
@@ -1541,9 +1528,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                               >
                                 Revoke trust
                               </MenuItem>
-                            </MenuList>
-                          </MenuPopover>
-                        </Menu>
+                        </OverflowMenu>
                       </div>
                     </div>
                     {/* V1 - validity line (a WIF trust does not expire). */}
@@ -2198,20 +2183,11 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   copyLabel="Copy JSON"
                   data-testid={`credential-export-${cred.id}`}
                 />
-                {/* W7 - overflow menu for the secondary + destructive actions. */}
-                <Menu>
-                  <MenuTrigger disableButtonEnhancement>
-                    <Tooltip content="More actions" relationship="label" positioning="above">
-                      <Button
-                        appearance="subtle"
-                        icon={<MoreHorizontal24Regular />}
-                        aria-label={`More actions for ${cred.label ?? cred.id}`}
-                        data-testid={`credential-more-${cred.id}`}
-                      />
-                    </Tooltip>
-                  </MenuTrigger>
-                  <MenuPopover>
-                    <MenuList>
+                {/* W7/X1 - uniform "More" overflow menu for the secondary + destructive actions. */}
+                <OverflowMenu
+                  ariaLabel={`More actions for ${cred.label ?? cred.id}`}
+                  data-testid={`credential-more-${cred.id}`}
+                >
                       {cred.active && cred.credentialType !== 'wif' && (
                         <MenuItem
                           onClick={() => {
@@ -2256,9 +2232,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       >
                         Revoke credential
                       </MenuItem>
-                    </MenuList>
-                  </MenuPopover>
-                </Menu>
+                </OverflowMenu>
               </div>
               {/* V1 - remaining-validity line. */}
               {(() => {

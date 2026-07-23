@@ -474,6 +474,8 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     // V5/W5 - the row has a Copy + Download JSON export.
     await expect(page.getByTestId('credential-export-br-1-copy')).toBeVisible();
     // W7/V2 - the activate/deactivate toggle now lives in the overflow menu.
+    // X1 - the overflow trigger is the uniform "More" control (labelled, not a bare icon).
+    await expect(page.getByTestId('credential-more-br-1')).toContainText('More');
     await page.getByTestId('credential-more-br-1').click();
     await expect(page.getByTestId('credential-toggle-active-br-1')).toContainText('Deactivate');
     // Close the menu before the next interaction.
