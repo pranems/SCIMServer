@@ -14,6 +14,7 @@ import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../scim/common/scim-con
 import * as crypto from 'node:crypto';
 import { safeCompare } from '../../security/safe-compare';
 import { OAuthService } from '../../oauth/oauth.service';
+import { looksLikeJwt } from '../../oauth/jwt-decode.util';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
@@ -409,6 +410,22 @@ export class SharedSecretGuard implements CanActivate {
         this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });
         note('skipped', 'per-endpoint credentials not enabled');
         return false; // Fall through to OAuth/legacy
+      }
+
+      // PERF: a per-endpoint `bearer`/`oauth_client` credential is an OPAQUE
+      // random secret (stored bcrypt-hashed), never a JWT. An OAuth access token
+      // and a WIF-minted token ARE JWTs (`eyJ...` three-segment shape). A JWT can
+      // therefore NEVER match a per-endpoint secret, so comparing it against each
+      // credential's bcrypt hash is pure wasted work - and bcrypt is deliberately
+      // expensive (~hundreds of ms each), so this cost is O(active-credentials)
+      // per request. For the dominant Entra OAuth-JWT traffic this dominated the
+      // request time (e.g. a dev endpoint with 4 secret credentials spent ~1.4s
+      // in this loop before falling back to OAuth). Short-circuit JWTs straight
+      // to the OAuth/JWKS path; they are validated there, not here.
+      if (looksLikeJwt(token)) {
+        this.logger.debug(LogCategory.AUTH, 'Presented token is a JWT - skipping per-endpoint secret comparison (OAuth/JWKS validates it)', { endpointId });
+        note('skipped', 'token is a JWT (validated by OAuth, not a per-endpoint opaque secret)');
+        return false; // Fall through to OAuth/JWT validation
       }
 
       // Load active credentials for this endpoint

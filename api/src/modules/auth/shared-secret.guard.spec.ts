@@ -500,6 +500,40 @@ describe('SharedSecretGuard', () => {
       expect(request.authType).toBe('oauth');
     });
 
+    it('PERF: skips the per-endpoint credential bcrypt loop when the token is a JWT (falls through to OAuth)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        active: true,
+      });
+      // Even with active secret credentials present, a JWT must NOT be
+      // bcrypt-compared against any of them - the credential fetch is skipped.
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        {
+          id: 'cred-1',
+          endpointId,
+          credentialType: 'bearer',
+          credentialHash: '$2b$10$invalidhashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+          label: 'Test',
+          active: true,
+          createdAt: new Date(),
+          expiresAt: null,
+        },
+      ]);
+      const oauthPayload = { sub: 'client', client_id: 'c', scope: 's' };
+      mockOAuthService.validateAccessToken.mockResolvedValue(oauthPayload);
+
+      // A JWT-shaped token (eyJ... three base64url segments).
+      const jwt = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJjbGllbnQifQ.c2ln';
+      const { context, request } = createEndpointMockContext(endpointId, `Bearer ${jwt}`);
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('oauth');
+      // The expensive per-endpoint credential fetch + bcrypt loop is skipped.
+      expect(mockCredentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
     it('should not check per-endpoint credentials for non-endpoint URLs', async () => {
       // URL without /endpoints/:uuid/ pattern, using legacy secret
       const { context, request } = createMockContext('Bearer test-shared-secret');
