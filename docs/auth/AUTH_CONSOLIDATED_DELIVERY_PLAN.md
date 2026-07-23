@@ -1,6 +1,6 @@
 # Consolidated auth + WIF + performance delivery plan (X13)
 
-Status: PLAN (source at `feat/wif`, api v0.54.61). This doc **consolidates and
+Status: PLAN (source at `feat/wif`, api v0.54.63). This doc **consolidates and
 sequences** three previously separate analysis streams into one delivery backlog:
 
 1. **X11 - WIF token-mint latency** ([../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)) - the perf options (cold ~2,161 ms -> tens of ms).
@@ -26,9 +26,11 @@ The three streams are not independent backlogs - they have a forced order:
   background refresh + hardening (X11 A/B/C/D/H + guide Section 25.2) should land
   before those scale the JWKS surface, so cold-fetch tail latency and unbounded
   egress do not multiply per method.
-- **The security + correctness hotfix is independent and highest priority.** Secret
-  redaction (guide Phase -1), HTTP 200 + no-store, and capability-truthful metadata
-  do not depend on the refactor and should ship first.
+- **The correctness hotfix is independent and high value.** HTTP 200 + no-store and
+  capability-truthful metadata do not depend on the refactor and can ship first.
+  (Secret redaction / `PERSIST_REQUEST_SECRETS=false` is DECLINED per operator
+  decision - request-secret capture stays ON by default for troubleshooting and is
+  an operator-controlled runtime opt-out, not a build-time default flip; see W0.1.)
 
 ```mermaid
 flowchart LR
@@ -101,15 +103,15 @@ Estimate legend (relative complexity, not calendar): **S** = ~2 pts, **M** = ~5 
 
 | Wave | Theme | Streams | Depends on | Points | Release gate |
 |---|---|---|---|---:|---|
-| 0 | Security + correctness hotfix | SF Phase -1 | none | 15 | Sentinel privacy tests + metadata-truthful test |
+| 0 | Correctness hotfix (200/no-store + truthful metadata) | SF | none | 7 | Metadata-truthful test + token-response header test |
 | 1 | Perf foundation | X11 | none | 24 | Token-mint latency gate (`9z-BW`) |
-| 2 | Structural seam (refactor) | X12 | none (benefits from W1) | 20 | Guard/controller specs green + DA-gate |
+| 2 | Structural seam (refactor) + enablement consolidation | X12 | none (benefits from W1) | 25 | Guard/controller specs green + DA-gate |
 | 3 | RFC 7523 correctness + trust model | SF Phases 1-3 | W2, W1 | 22 | Real-token-shadow gate + parity |
 | 4 | RFC 8693 token exchange | SF Phase 4 | W2, W3, W1 | 15 | Real-SyncFabric 8693 validation |
 | 5 | Persona + claim strengthening + token profile | SF Phases 1,5 + X10 | W3, W4 | 18 | Persona contract suite |
 | 6 | Cleanup + future methods | SF Phase 6 | W3-W5 | 5 (+future) | Zero-legacy-use telemetry |
 
-Core (Waves 0-6 excluding optional/future) ~ **119 points**. Optional opaque-token
+Core (Waves 0-6 excluding optional/future) ~ **116 points**. Optional opaque-token
 track (W5.4) + future `private_key_jwt`/mTLS/DPoP (W6.2) add ~40 more and are
 separate tracks.
 
@@ -122,10 +124,9 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 
 ### Wave 0 - Security + correctness hotfix
 
-**W0.1 - Token-route secret redaction (secrecy hotfix)** `[Stream SF Phase -1]`
-- Tasks: classify auth-secret routes in [logging.service.ts](../../api/src/modules/logging/logging.service.ts) + [redact-sensitive.ts](../../api/src/security/redact-sensitive.ts) before persistence; unconditionally deep-redact request/response of `/oauth/token` + assertion-debugger regardless of `PERSIST_REQUEST_SECRETS`; default `PERSIST_REQUEST_SECRETS=false`; idempotent migration/job to purge/redact historical RequestLog auth payloads (never print candidate values).
-- Acceptance: sentinel test (Section 23.12 of the guide) proves no `client_assertion` / `client_secret` / `subject_token` / `access_token` sentinel survives in DB rows, admin API, UI/export - with the flag true AND false; migration test over a fixture removes historical raw values.
-- Deps: none. Estimate: **L**. Risk: **High** (live credential exposure; rotate affected credentials if exposure unbounded).
+**W0.1 - Token-route secret redaction** `[Stream SF Phase -1]` - **DECLINED (operator decision, 2026-07-23)**
+- Decision: do NOT default `PERSIST_REQUEST_SECRETS` to false and do NOT add unconditional token-route redaction. Request-secret capture is intentionally ON by default because it is needed for auth troubleshooting; an operator can turn it off at runtime (server env `PERSIST_REQUEST_SECRETS=false` or the per-endpoint `PersistRequestSecrets` override) when a given deployment wants it off.
+- Consequence: the field-spelling-based redaction ([redact-sensitive.ts](../../api/src/security/redact-sensitive.ts)) and the existing per-endpoint/server opt-out remain the controls; no build-time default flip. Revisit only if a specific compliance requirement lands.
 
 **W0.2 - Token endpoint returns HTTP 200 + no-store** `[Stream SF]`
 - Tasks: add `@HttpCode(200)` to the token POST; set `Cache-Control: no-store` + `Pragma: no-cache`; update the E2E specs that currently assert 201.
@@ -190,6 +191,16 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Tasks: one `AuthDecisionEmitter.record(trace)`; replace the 3 hand-rolled `emit + record` sites; move mint providers to `oauth/token-mint/`.
 - Acceptance: single emitter used everywhere; auth-decision specs green.
 - Deps: W2.1-W2.3. Estimate: **S**. Risk: Low.
+
+**W2.5 - Consolidate auth-enablement flags + co-locate enablement with the method** `[operator question 2026-07-23]`
+- Context: today enablement is a set of endpoint booleans that OVERLAP. `PerEndpointCredentialsEnabled` is the LEGACY umbrella (gates BOTH `bearer` and `oauth_client` via fallback); WI-11 split it into per-method `SecretTokenBearerAuthEnabled` (gates `bearer`) + `OAuthClientCredentialsAuthEnabled` (gates `oauth_client`), each falling back to the legacy flag when unset ([endpoint-config.interface.ts `getEffectiveAuthEnablement`](../../api/src/modules/endpoint/endpoint-config.interface.ts#L833)). So for the bearer method BOTH flags apply (specific wins, legacy is the default) - that is the ambiguity.
+- Tasks: (a) **disambiguate + consolidate** - finish the WI-11 migration: materialize each endpoint's effective per-method value into the explicit per-method flags, then **retire `PerEndpointCredentialsEnabled`** (WI-11's own stated end-state: "once every endpoint carries the new flags explicitly it can be retired"). Net: one flag per method, no legacy umbrella. (b) **co-locate** - make each `ResourceAuthenticator` strategy (W2.1) own `isEnabled(endpointId)` reading its method's enablement from the existing (inert) `profile.authentication` AuthenticationMethod model rather than a growing flat boolean list; derive OAuth metadata (W0.3/W4.2) from the SAME source so "advertised" and "enforced" cannot drift.
+- Acceptance: no endpoint reads the legacy umbrella flag at runtime; each strategy's enablement is read from one per-method source; a value-preserving migration proves byte-for-byte behavior for existing endpoints (cross-backend parity); metadata is derived from the same enablement.
+- Deps: W2.1 (strategies own `isEnabled`); pairs with W5.1 (persona) as the eventual home. Estimate: **M**. Risk: Medium (enablement is a security-relevant contract - migrate value-preservingly, shadow-verify).
+
+#### Design answer: is co-locating enablement with the method config good design?
+
+**Yes, and it aligns with the W2 seam.** Enablement is a property OF a method, so it belongs WITH the method (cohesion / SRP), not in a separate central boolean registry that every new method has to edit (an Open/Closed smell - the same god-file pressure W2 removes). Concretely: each `ResourceAuthenticator`/token-mint provider owns `isEnabled()`, reading a single per-method enable from the `AuthenticationMethod` model; the guard/controller never branch on flags; metadata derivation reads the same field (which is exactly what makes W0.3 capability-truthful metadata fall out for free). Two guardrails keep it from over-reaching: (1) keep "enabled" and "has an active credential/trust" as DISTINCT states (a method is ACTIVE iff enabled AND has a credential); (2) do NOT invent a new structure - reuse the existing inert `profile.authentication` backbone as the home, and migrate value-preservingly. This is a finite, typed change, not a policy DSL (YAGNI held).
 
 ### Wave 3 - RFC 7523 correctness + trust model
 
@@ -296,14 +307,14 @@ extends the chain instead of editing the god-guard/controller.
 
 | Wave | Points | Cumulative | Notes |
 |---|---:|---:|---|
-| 0 Security + correctness | 15 | 15 | Ship first; W0.1 is High risk |
-| 1 Perf foundation | 24 | 39 | Parallel with W0/W2 |
-| 2 Seam refactor | 20 | 59 | Enabler for W3/W4 |
-| 3 RFC 7523 correctness | 22 | 81 | Shadow-migrate first |
-| 4 RFC 8693 | 15 | 96 | Real-SyncFabric gate |
-| 5 Persona + claims + token | 18 | 114 | +W5.4 opaque XL is optional |
-| 6 Cleanup | 5 | 119 | +W6.2 future methods XL |
-| Optional/future (W5.4 + W6.2) | ~40 | ~159 | Separate tracks, on demand |
+| 0 Correctness (200/no-store + metadata) | 7 | 7 | Redaction W0.1 DECLINED (operator decision) |
+| 1 Perf foundation | 24 | 31 | Parallel with W0/W2 |
+| 2 Seam refactor + enablement consolidation | 25 | 56 | Enabler for W3/W4; includes W2.5 flags |
+| 3 RFC 7523 correctness | 22 | 78 | Shadow-migrate first |
+| 4 RFC 8693 | 15 | 93 | Real-SyncFabric gate |
+| 5 Persona + claims + token | 18 | 111 | +W5.4 opaque XL is optional |
+| 6 Cleanup | 5 | 116 | +W6.2 future methods XL |
+| Optional/future (W5.4 + W6.2) | ~40 | ~156 | Separate tracks, on demand |
 
 Relative complexity only. Split any XL item into <= L before starting.
 
@@ -365,3 +376,4 @@ Per the standing DA-gate:
 | Version | Change |
 |---|---|
 | 0.54.61 | This consolidated delivery plan (X13): interlocks the X11 perf, X12 refactor, and SyncFabric roadmap streams into one sequenced release train (Waves 0-6) with ~25 consolidated work items (each with goal/tasks/acceptance/deps/estimate/risk), a current-source state table, dependency + critical-path Mermaid diagrams, a relative-complexity estimate rollup (~119 core points), empirical gates, a per-item DoD contract, and the DA-gate disposition. Core sequencing rule: the X12 seam (W2) precedes RFC 8693 (W4) so new methods EXTEND not EDIT; the security hotfix (W0) ships first; the perf foundation (W1) de-risks all external-JWKS methods. Plan only - no runtime change. |
+| 0.54.63 | Operator-decision revision: **W0.1 secret redaction DECLINED** (`PERSIST_REQUEST_SECRETS` stays default true; runtime opt-out only), so Wave 0 is now just the 200/no-store + capability-truthful-metadata correctness items (15 -> 7 points, ~116 core). Added **W2.5** (consolidate the overlapping `PerEndpointCredentialsEnabled` legacy umbrella into the per-method flags + co-locate enablement with each method via the `AuthenticationMethod` model, so each `ResourceAuthenticator` owns `isEnabled()` and metadata derives from the same source) with a design answer on why co-locating enablement is good design. Cross-refs the delivered X14 copy/download-JSON drawer UI. |
