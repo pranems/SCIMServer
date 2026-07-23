@@ -185,7 +185,7 @@ export class SharedSecretGuard implements CanActivate {
     // If the URL contains an endpointId segment and the endpoint has
     // PerEndpointCredentialsEnabled=true, try per-endpoint credentials first.
     if (endpointId && this.credentialRepo && this.endpointService) {
-      const matched = await this.tryEndpointCredential(endpointId, token, request, checks);
+      const matched = await this.tryEndpointCredential(endpointId, token, request, checks, expectedSecret);
       if (matched) {
         recordDecision('accept', 'endpoint_bearer');
         return true;
@@ -388,6 +388,7 @@ export class SharedSecretGuard implements CanActivate {
     token: string,
     request: AuthenticatedRequest,
     checks?: AuthCheck[],
+    expectedSecret?: string,
   ): Promise<boolean> {
     const note = (status: AuthCheck['status'], received: string): void => {
       checks?.push({
@@ -426,6 +427,19 @@ export class SharedSecretGuard implements CanActivate {
         this.logger.debug(LogCategory.AUTH, 'Presented token is a JWT - skipping per-endpoint secret comparison (OAuth/JWKS validates it)', { endpointId });
         note('skipped', 'token is a JWT (validated by OAuth, not a per-endpoint opaque secret)');
         return false; // Fall through to OAuth/JWT validation
+      }
+
+      // PERF: the presented token IS the configured global shared secret. A
+      // per-endpoint credential is an auto-generated random secret, so it can
+      // never equal the operator-configured global secret - comparing this token
+      // against every credential's bcrypt hash is therefore wasted work (same
+      // O(active-credentials) x bcrypt cost as the JWT case above). Skip straight
+      // to the legacy global-secret acceptor, which handles it (including the
+      // WI-11 per-endpoint SharedSecretBearerAuthEnabled=false refusal).
+      if (expectedSecret && safeCompare(token, expectedSecret)) {
+        this.logger.debug(LogCategory.AUTH, 'Presented token is the global shared secret - skipping per-endpoint secret comparison (legacy acceptor handles it)', { endpointId });
+        note('skipped', 'token is the global shared secret (handled by the legacy acceptor)');
+        return false; // Fall through to the legacy global-secret acceptor
       }
 
       // Load active credentials for this endpoint

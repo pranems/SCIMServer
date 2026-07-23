@@ -534,6 +534,38 @@ describe('SharedSecretGuard', () => {
       expect(mockCredentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
     });
 
+    it('PERF: skips the per-endpoint credential bcrypt loop when the token is the global shared secret (falls through to legacy)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        active: true,
+      });
+      // Active secret credentials are present, but the global shared secret can
+      // never equal a random per-endpoint secret, so the credential fetch +
+      // bcrypt loop must be skipped and the legacy acceptor handles it.
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        {
+          id: 'cred-1',
+          endpointId,
+          credentialType: 'bearer',
+          credentialHash: '$2b$10$invalidhashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+          label: 'Test',
+          active: true,
+          createdAt: new Date(),
+          expiresAt: null,
+        },
+      ]);
+
+      // 'test-shared-secret' is the configured global secret (mockConfigService).
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+      // The expensive per-endpoint credential fetch + bcrypt loop is skipped.
+      expect(mockCredentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
     it('should not check per-endpoint credentials for non-endpoint URLs', async () => {
       // URL without /endpoints/:uuid/ pattern, using legacy secret
       const { context, request } = createMockContext('Bearer test-shared-secret');
