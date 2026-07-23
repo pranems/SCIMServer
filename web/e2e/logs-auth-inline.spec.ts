@@ -202,3 +202,75 @@ test.describe('Logs auth durability (V10/V11/V12)', () => {
     await expect(page.getByTestId('log-detail-auth-section-empty')).toHaveCount(0);
   });
 });
+
+test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
+  const EP_ID = 'ep-x5';
+  const x5List = {
+    total: 2,
+    page: 1,
+    pageSize: 50,
+    items: [
+      {
+        id: 'log-x5-crud',
+        method: 'GET',
+        url: `/scim/v2/endpoints/${EP_ID}/Users`,
+        status: 200,
+        durationMs: 6,
+        createdAt: '2026-07-23T12:00:00.000Z',
+        requestId: 'req-x5-crud',
+        endpointId: EP_ID,
+        authOutcome: 'accept',
+        authMethod: 'bearer_jwt',
+      },
+      {
+        id: 'log-x5-mint',
+        method: 'POST',
+        url: `/scim/endpoints/${EP_ID}/oauth/token`,
+        status: 201,
+        durationMs: 30,
+        createdAt: '2026-07-23T12:01:00.000Z',
+        requestId: 'req-x5-mint',
+        endpointId: EP_ID,
+        authOutcome: 'accept',
+        authMethod: 'oauth_client',
+      },
+    ],
+  };
+  const endpointsList = {
+    totalResults: 1,
+    endpoints: [{ id: EP_ID, name: 'x5-endpoint', displayName: 'X5 Endpoint', active: true }],
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/scim/admin/auth-decisions**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ count: 0, records: [] }) });
+    });
+    await page.route('**/scim/admin/endpoints', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(endpointsList) });
+    });
+    await page.route('**/scim/admin/logs**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x5List) });
+    });
+  });
+
+  test('X5: a resource-CRUD row names the auth method; a token-mint row names the minted JWT', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    // Resource CRUD -> "auth ok - OAuth JWT".
+    const crudChip = page.getByTestId('log-row-auth-log-x5-crud');
+    await expect(crudChip).toContainText('auth ok');
+    await expect(crudChip).toContainText('OAuth JWT');
+    // Token-mint -> "JWT - OAuth client" (names the minted token + the method).
+    const mintChip = page.getByTestId('log-row-auth-log-x5-mint');
+    await expect(mintChip).toContainText('JWT');
+    await expect(mintChip).toContainText('OAuth client');
+  });
+
+  test('X6: a log row shows the endpoint NAME + a quick-open button', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('log-row-endpoint-log-x5-crud')).toContainText('x5-endpoint');
+    await expect(page.getByTestId('log-row-endpoint-open-log-x5-crud')).toBeVisible();
+  });
+});
+

@@ -520,6 +520,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         errorMessage: r.errorMessage ?? undefined,
         reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
         requestId: r.requestId ?? undefined,
+        endpointId: r.endpointId ?? undefined,
         authOutcome: r.authOutcome ?? undefined,
         authMethod: r.authMethod ?? undefined,
         authReason: r.authReason ?? undefined,
@@ -641,6 +642,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       createdAt: Date;
       errorMessage: string | null;
       requestId: string | null;
+      endpointId: string | null;
       authOutcome: string | null;
       authMethod: string | null;
       authReason: string | null;
@@ -665,6 +667,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
             createdAt: true,
             errorMessage: true,
             requestId: true,
+            endpointId: true,
             authOutcome: true,
             authMethod: true,
             authReason: true,
@@ -726,6 +729,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     createdAt: Date;
     errorMessage: string | null;
     requestId?: string | null;
+    endpointId?: string | null;
     authOutcome?: string | null;
     authMethod?: string | null;
     authReason?: string | null;
@@ -752,6 +756,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       errorMessage: r.errorMessage ?? undefined,
       reportableIdentifier: identifier,
       requestId: r.requestId ?? undefined,
+      endpointId: r.endpointId ?? undefined,
       authOutcome: r.authOutcome ?? undefined,
       authMethod: r.authMethod ?? undefined,
       authReason: r.authReason ?? undefined,

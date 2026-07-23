@@ -13735,6 +13735,41 @@ Write-Host "`n--- 9z-BR: credential label + description (X3/X4) Complete ---" -F
 
 
 # ============================================
+$script:currentSection = "9z-BS: auth method + endpoint name in logs/activity (X5/X6)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BS: AUTH METHOD + ENDPOINT NAME IN LOGS/ACTIVITY (X5/X6)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# The request-log list surfaces the persisted auth decision (method + outcome)
+# AND the endpointId (X5/X6), and the dashboard recent-activity surfaces the
+# endpoint NAME + the same auth summary. All non-secret.
+
+try {
+    # Generate an endpoint-scoped, authenticated request so a log row exists.
+    Invoke-RestMethod -Uri "$scimBase/Users?count=1" -Headers $headers | Out-Null
+
+    # X5/X6 - the global logs list carries endpointId + auth summary per row.
+    $bsLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=100&includeAdmin=true" -Headers $headers
+    $bsAuthRow = $bsLogs.items | Where-Object { $null -ne $_.authOutcome } | Select-Object -First 1
+    Test-Result -Success ($null -ne $bsAuthRow) -Message "9z-BS.T1: a log row carries a persisted authOutcome (X5)"
+    Test-Result -Success ($null -ne $bsAuthRow -and $null -ne $bsAuthRow.authMethod) -Message "9z-BS.T2: a log row carries the auth method (X5)"
+    $bsEpRow = $bsLogs.items | Where-Object { $null -ne $_.endpointId -and $_.endpointId -ne "" } | Select-Object -First 1
+    Test-Result -Success ($null -ne $bsEpRow) -Message "9z-BS.T3: a log row carries endpointId (X6)"
+
+    # X5/X6 - the dashboard recent activity carries the endpoint NAME + auth.
+    $bsDash = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Headers $headers
+    $bsActEp = $bsDash.recentActivity | Where-Object { $_.endpointName } | Select-Object -First 1
+    Test-Result -Success ($null -ne $bsActEp) -Message "9z-BS.T4: dashboard recent activity resolves the endpoint NAME (X6)"
+    $bsActAuth = $bsDash.recentActivity | Where-Object { $null -ne $_.authOutcome } | Select-Object -First 1
+    Test-Result -Success ($null -ne $bsActAuth) -Message "9z-BS.T5: dashboard recent activity carries the auth decision (X5)"
+} catch {
+    Test-Result -Success $false -Message "9z-BS: logs/activity auth-method section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BS: auth method + endpoint name in logs/activity (X5/X6) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

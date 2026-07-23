@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import { endpointLogsQueryOptions, useEndpointLog, useAuthDecisions } from '../api/queries';
 import type { LogsSearch } from '../routes/search-schemas';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, CopyableJsonBlock, DetailDrawer, AuthDecisionForRequest } from '../components/primitives';
+import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -246,21 +247,18 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
                   // (durable, instant); fall back to the live auth-decision map
                   // for rows written before the persisted fields existed.
                   const persisted = log.authOutcome
-                    ? { outcome: log.authOutcome as 'accept' | 'reject', reasonCode: log.authReason as string | undefined }
+                    ? { outcome: log.authOutcome as 'accept' | 'reject', reasonCode: log.authReason as string | undefined, method: log.authMethod as string | undefined }
                     : undefined;
-                  const auth = persisted ?? (log.requestId ? authByCorrelation.get(log.requestId) : undefined);
-                  if (!auth) {
-                    return <Caption1 data-testid={`log-row-auth-${log.id}`}>-</Caption1>;
-                  }
+                  const live = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                  const auth = persisted ?? live;
                   return (
-                    <Badge
-                      appearance="filled"
-                      color={auth.outcome === 'accept' ? 'success' : 'danger'}
-                      title={auth.reasonCode ?? auth.outcome}
+                    <AuthMethodChip
+                      outcome={auth?.outcome}
+                      method={(auth as { method?: string } | undefined)?.method ?? log.authMethod}
+                      reason={auth?.reasonCode}
+                      url={log.url}
                       data-testid={`log-row-auth-${log.id}`}
-                    >
-                      {auth.outcome === 'accept' ? 'auth ok' : auth.reasonCode ?? 'auth fail'}
-                    </Badge>
+                    />
                   );
                 })()}
               </td>

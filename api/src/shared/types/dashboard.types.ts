@@ -207,6 +207,14 @@ export interface DashboardActivity {
   durationMs: number;
   endpointId: string;
   endpointName?: string;
+  /**
+   * X5 - the auth decision persisted on the request row, so a recent-activity
+   * row can render the same auth-method chip the Logs page shows. All non-secret.
+   */
+  requestId?: string;
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
 }
 
 /** Aggregated dashboard response (BFF endpoint) */
@@ -333,6 +341,14 @@ export interface EndpointOverviewActivity {
   path: string;
   statusCode: number;
   durationMs: number;
+  /**
+   * X5 - the auth decision persisted on the request row, so the per-endpoint
+   * recent-activity row can render the same auth-method chip. All non-secret.
+   */
+  requestId?: string;
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
 }
 
 /** Full BFF response for GET /admin/endpoints/:id/overview (Phase B1). */

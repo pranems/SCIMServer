@@ -30,12 +30,14 @@ import {
   Combobox,
   Option,
   Button,
+  Tooltip,
   Field,
 } from '@fluentui/react-components';
 import {
   ArrowReset24Regular,
   DocumentSearch24Regular,
   Open24Regular,
+  Open16Regular,
 } from '@fluentui/react-icons';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
@@ -48,6 +50,7 @@ import {
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
 import { TIME_RANGE_VALUES } from '../routes/search-schemas';
 import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton, AuthDecisionForRequest } from '../components/primitives';
+import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -100,11 +103,12 @@ const useStyles = makeStyles({
   tableScroll: { width: '100%', overflowX: 'auto' },
   table: { width: '100%', minWidth: '720px', borderCollapse: 'collapse', tableLayout: 'fixed' },
   // Percentage column widths (R5.1) - scale proportionally on resize.
-  colMethod: { width: '9%' },
-  colUrl: { width: '46%' },
-  colStatus: { width: '11%' },
-  colDuration: { width: '12%' },
-  colTime: { width: '22%' },
+  colMethod: { width: '8%' },
+  colUrl: { width: '31%' },
+  colEndpoint: { width: '15%' },
+  colStatus: { width: '10%' },
+  colDuration: { width: '10%' },
+  colTime: { width: '16%' },
   th: {
     textAlign: 'left',
     padding: '10px 12px',
@@ -214,6 +218,8 @@ interface LogRow {
   status?: number;
   durationMs?: number;
   createdAt: string | Date;
+  /** X6 - the endpoint this request targeted, so the row can show its name. */
+  endpointId?: string;
   /** P3 - the X-Request-Id correlation id echoed on each list item (U12). */
   requestId?: string;
   /** V10 - the auth decision persisted on the row itself (durable, instant). */
@@ -239,6 +245,12 @@ export const LogsPage: React.FC = () => {
   // (just renders an empty Combobox).
   const endpointsQuery = useEndpoints();
   const endpointOptions = endpointsQuery.data?.endpoints ?? [];
+  // X6 - endpointId -> name map so a log row can show the endpoint NAME + a
+  // quick-open link, not just the opaque id in the URL.
+  const endpointNameById = React.useMemo(
+    () => new Map(endpointOptions.map((e) => [e.id, e.name])),
+    [endpointOptions],
+  );
 
   // Compose the filter object that drives both the query key + the URL
   // search params on the API call. Keep this single source of truth so
@@ -439,6 +451,7 @@ export const LogsPage: React.FC = () => {
             <tr>
               <th className={mergeClasses(classes.th, classes.colMethod)}>Method</th>
               <th className={mergeClasses(classes.th, classes.colUrl)}>URL</th>
+              <th className={mergeClasses(classes.th, classes.colEndpoint)}>Endpoint</th>
               <th className={mergeClasses(classes.th, classes.colStatus)}>Status</th>
               <th className={mergeClasses(classes.th, classes.colStatus)}>Auth</th>
               <th className={mergeClasses(classes.th, classes.colDuration)}>Duration</th>
@@ -472,6 +485,33 @@ export const LogsPage: React.FC = () => {
                   />
                 </td>
                 <td className={classes.td}>
+                  {log.endpointId ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                      <CopyableField
+                        value={endpointNameById.get(log.endpointId) ?? log.endpointId}
+                        truncate
+                        maxWidth="100%"
+                        data-testid={`log-row-endpoint-${log.id}`}
+                      />
+                      <Tooltip content="Open this endpoint" relationship="label" positioning="above">
+                        <Button
+                          appearance="subtle"
+                          size="small"
+                          icon={<Open16Regular />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void navigate({ to: '/endpoints/$endpointId', params: { endpointId: log.endpointId! } });
+                          }}
+                          aria-label={`Open endpoint ${endpointNameById.get(log.endpointId) ?? log.endpointId}`}
+                          data-testid={`log-row-endpoint-open-${log.id}`}
+                        />
+                      </Tooltip>
+                    </div>
+                  ) : (
+                    <Caption1 data-testid={`log-row-endpoint-${log.id}`}>-</Caption1>
+                  )}
+                </td>
+                <td className={classes.td}>
                   <Badge appearance="outline" color={statusColor(log.status)}>
                     {log.status ?? '-'}
                   </Badge>
@@ -483,21 +523,18 @@ export const LogsPage: React.FC = () => {
                     // second query). Fall back to the live auth-decision map for
                     // rows written before the persisted fields existed.
                     const persisted = log.authOutcome
-                      ? { outcome: log.authOutcome, reasonCode: log.authReason }
+                      ? { outcome: log.authOutcome, reasonCode: log.authReason, method: log.authMethod }
                       : undefined;
-                    const auth = persisted ?? (log.requestId ? authByCorrelation.get(log.requestId) : undefined);
-                    if (!auth) {
-                      return <Caption1 data-testid={`log-row-auth-${log.id}`}>-</Caption1>;
-                    }
+                    const live = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                    const auth = persisted ?? live;
                     return (
-                      <Badge
-                        appearance="filled"
-                        color={auth.outcome === 'accept' ? 'success' : 'danger'}
-                        title={auth.reasonCode ?? auth.outcome}
+                      <AuthMethodChip
+                        outcome={auth?.outcome}
+                        method={(auth as { method?: string } | undefined)?.method ?? log.authMethod}
+                        reason={auth?.reasonCode}
+                        url={log.url}
                         data-testid={`log-row-auth-${log.id}`}
-                      >
-                        {auth.outcome === 'accept' ? 'auth ok' : auth.reasonCode ?? 'auth fail'}
-                      </Badge>
+                      />
                     );
                   })()}
                 </td>

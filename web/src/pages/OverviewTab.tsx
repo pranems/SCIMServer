@@ -44,6 +44,8 @@ import {
 import { useEndpointOverview } from '../api/queries';
 import type { EndpointOverviewActivity } from '@scim/types/dashboard.types';
 import { EmptyState, LoadingSkeleton } from '../components/primitives';
+import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
+import { useNavigate } from '@tanstack/react-router';
 
 const useStyles = makeStyles({
   kpiRow: {
@@ -81,13 +83,17 @@ const useStyles = makeStyles({
   },
   activityRow: {
     display: 'grid',
-    gridTemplateColumns: 'auto 1fr auto auto auto',
+    gridTemplateColumns: 'auto 1fr auto auto auto auto',
     alignItems: 'center',
     gap: '12px',
     padding: '8px 12px',
     borderRadius: tokens.borderRadiusMedium,
     fontFamily: 'monospace',
     fontSize: '12px',
+  },
+  activityRowClickable: {
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
   activityRowAlt: {
     backgroundColor: tokens.colorNeutralBackground2,
@@ -113,6 +119,7 @@ interface OverviewTabProps {
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ endpointId }) => {
   const classes = useStyles();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointOverview(endpointId);
 
   // While loading we mirror the final layout with skeletons. This is the
@@ -201,7 +208,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ endpointId }) => {
           <Card data-testid="overview-activity">
             <div className={classes.activityList}>
               {recentActivity.map((entry, i) => (
-                <ActivityRow key={entry.id} entry={entry} alternate={i % 2 === 1} />
+                <ActivityRow
+                  key={entry.id}
+                  entry={entry}
+                  alternate={i % 2 === 1}
+                  onOpen={() =>
+                    void navigate({ to: '/logs', search: { detail: entry.id, endpointId } as never })
+                  }
+                />
               ))}
             </div>
           </Card>
@@ -242,6 +256,7 @@ const KpiCard: React.FC<KpiCardProps> = ({
 interface ActivityRowProps {
   entry: EndpointOverviewActivity;
   alternate: boolean;
+  onOpen?: () => void;
 }
 
 /**
@@ -256,7 +271,7 @@ function statusBadgeColor(status: number): 'success' | 'informative' | 'warning'
   return 'subtle';
 }
 
-const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate }) => {
+const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate, onOpen }) => {
   const classes = useStyles();
   // Format timestamp as HH:MM:SS local. Recent activity is by definition
   // recent so the date is implicit; saving column space.
@@ -269,8 +284,13 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate }) => {
   })();
   return (
     <div
-      className={`${classes.activityRow} ${alternate ? classes.activityRowAlt : ''}`}
+      className={`${classes.activityRow} ${alternate ? classes.activityRowAlt : ''} ${onOpen ? classes.activityRowClickable : ''}`}
       data-testid={`overview-activity-row-${entry.id}`}
+      onClick={onOpen}
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={onOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } } : undefined}
+      title={onOpen ? 'Open this request in the Logs view' : undefined}
     >
       <Caption1 className={classes.activityMeta}>{time}</Caption1>
       <span className={classes.activityPath} title={entry.path}>{entry.path}</span>
@@ -278,6 +298,13 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate }) => {
       <Badge appearance="filled" color={statusBadgeColor(entry.statusCode)}>
         {entry.statusCode}
       </Badge>
+      <AuthMethodChip
+        outcome={entry.authOutcome}
+        method={entry.authMethod}
+        reason={entry.authReason}
+        url={entry.path}
+        data-testid={`overview-activity-auth-${entry.id}`}
+      />
       <Caption1 className={classes.activityMeta}>{entry.durationMs}ms</Caption1>
     </div>
   );

@@ -56,6 +56,10 @@ const sampleLogs = {
       status: 200,
       durationMs: 5,
       createdAt: '2026-05-01T10:00:00Z',
+      endpointId: 'ep-prod',
+      requestId: 'req-1',
+      authOutcome: 'accept',
+      authMethod: 'bearer_jwt',
     },
   ],
 };
@@ -86,6 +90,19 @@ describe('LogsPage', () => {
     // The row id testid is unique; "200" alone collides with the
     // status filter chip. Assert the row exists instead.
     expect(screen.getByTestId('logs-row-l1')).toBeInTheDocument();
+  });
+
+  it('X5/X6: a log row shows the auth-method chip + the endpoint name + a quick-open button', async () => {
+    mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+    wrap(<LogsPage />);
+    expect(await screen.findByTestId('global-logs-page')).toBeInTheDocument();
+    // X5 - the auth chip names the method (accept via bearer_jwt -> "OAuth JWT").
+    const chip = screen.getByTestId('log-row-auth-l1');
+    expect(chip.textContent).toContain('auth ok');
+    expect(chip.textContent).toContain('OAuth JWT');
+    // X6 - the endpoint NAME (resolved from endpointId) + a quick-open button.
+    expect(screen.getByTestId('log-row-endpoint-l1').textContent).toContain('production');
+    expect(screen.getByTestId('log-row-endpoint-open-l1')).toBeInTheDocument();
   });
 
   it('shows EmptyState (R4 - replaces "No logs found" text) when total=0', async () => {

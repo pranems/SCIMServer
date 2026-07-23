@@ -150,7 +150,13 @@ export class DashboardController {
       };
     });
 
-    // Map recent logs to activity entries
+    // Map recent logs to activity entries. X5/X6 - carry the persisted auth
+    // decision (method/outcome/reason + requestId) and resolve the endpoint
+    // NAME (not just the id) so the dashboard activity row can render the same
+    // auth-method chip + a quick-open link the Logs page has.
+    const endpointNameById = new Map<string, string>(
+      endpointList.endpoints.map((ep) => [ep.id, ep.name]),
+    );
     const recentActivity: DashboardActivity[] = recentLogs.items.map((log: any) => ({
       id: log.id,
       timestamp: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt),
@@ -159,6 +165,11 @@ export class DashboardController {
       statusCode: log.status ?? 0,
       durationMs: log.durationMs ?? 0,
       endpointId: log.endpointId ?? '',
+      endpointName: log.endpointId ? endpointNameById.get(log.endpointId) : undefined,
+      requestId: log.requestId ?? undefined,
+      authOutcome: log.authOutcome ?? undefined,
+      authMethod: log.authMethod ?? undefined,
+      authReason: log.authReason ?? undefined,
     }));
 
     return {
@@ -255,6 +266,12 @@ export class DashboardController {
         path: log.url,
         statusCode: log.status ?? 0,
         durationMs: log.durationMs ?? 0,
+        // X5 - carry the persisted auth decision so the per-endpoint activity
+        // row renders the same auth-method chip + is clickable to its detail.
+        requestId: log.requestId ?? undefined,
+        authOutcome: log.authOutcome ?? undefined,
+        authMethod: log.authMethod ?? undefined,
+        authReason: log.authReason ?? undefined,
       }));
 
     // Profile is optional in the EndpointResponse type; preset and
