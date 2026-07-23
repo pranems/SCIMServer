@@ -265,6 +265,30 @@ describe('CredentialsTab', () => {
     expect(mockCreateMutate.mock.calls[0][0]).toMatchObject({ label: 'My new cred' });
   });
 
+  it('X4: the create dialog has a Description field and passes it to the mutation', () => {
+    mockCreateMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('credentials-create-button'));
+    const labelContainer = screen.getByTestId('credentials-label-input');
+    const labelInput = labelContainer.tagName === 'INPUT' ? labelContainer : labelContainer.querySelector('input')!;
+    fireEvent.change(labelInput, { target: { value: 'Prod' } });
+    // The Description field is present and drives the mutation body.
+    const descContainer = screen.getByTestId('credentials-description-input');
+    const descInput = descContainer.tagName === 'TEXTAREA' ? descContainer : descContainer.querySelector('textarea')!;
+    fireEvent.change(descInput, { target: { value: 'Entra user provisioning' } });
+
+    const dialog = screen.getByTestId('credentials-create-dialog');
+    fireEvent.click(dialog.querySelector('button[type="submit"]')!);
+
+    expect(mockCreateMutate.mock.calls[0][0]).toMatchObject({
+      label: 'Prod',
+      description: 'Entra user provisioning',
+      credentialType: 'bearer',
+    });
+  });
+
   it('passes undefined label when input is empty (no whitespace string)', () => {
     mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
@@ -866,6 +890,19 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credential-connect-secret-oc-v4').textContent).toContain('super-secret-value');
   });
 
+  it('X2: the bearer Connect panel shows the retained secret token inline (reveal returns `token`, not `clientSecret`)', () => {
+    mockRevealMutate.mockClear();
+    // A bearer credential's retained secret is returned in the `token` field
+    // (oauth_client uses `clientSecret`). The Connect subpanel must show it.
+    mockRevealMutate.mockImplementation((_id: string, opts?: { onSuccess?: (r: unknown) => void }) =>
+      opts?.onSuccess?.({ retained: true, token: 'bearer-token-value' }),
+    );
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credential-connect-bc-1'));
+    expect(screen.getByTestId('credential-connect-secret-bc-1').textContent).toContain('bearer-token-value');
+  });
+
   it('item 4: Edit loads a saved trust into the form and Save changes calls the update mutation', () => {
     mockUpdateWif.mockClear();
     const overview: EndpointOverviewResponse = {
@@ -914,6 +951,55 @@ describe('CredentialsTab', () => {
     expect(arg.credentialId).toBe('cred-edit');
     expect(arg.wif.expectedIssuer).toBe('https://new.example/v2.0');
     expect(arg.wif.allowedTenantId).toBe('old-tid');
+  });
+
+  it('X3: the WIF edit form has Label + Description fields that load + save the values', () => {
+    mockUpdateWif.mockClear();
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      configFlags: { WifCredentialsEnabled: true },
+      credentials: [
+        {
+          id: 'cred-desc',
+          credentialType: 'wif',
+          label: 'Corp Entra',
+          description: 'Corp tenant WIF trust',
+          active: true,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+          wif: {
+            expectedIssuer: 'https://corp.example/v2.0',
+            expectedSubject: 'corp-sub',
+            expectedAudience: 'corp-aud',
+            jwksUri: 'https://login.microsoftonline.com/t/keys',
+            allowedTenantId: 'corp-tid',
+            requiredRoles: [],
+            scope: null,
+            assertionProfile: 'jwt-bearer',
+            issuedTokenTtlSec: null,
+          },
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    // The card shows the description.
+    expect(screen.getByTestId('wif-credential-description-cred-desc').textContent).toContain('Corp tenant WIF trust');
+
+    // Edit loads the label + description into the new fields.
+    fireEvent.click(screen.getByTestId('wif-credential-edit-cred-desc'));
+    expect((wifInput('wif-field-label') as HTMLInputElement).value).toBe('Corp Entra');
+    expect((wifInput('wif-field-description') as HTMLInputElement).value).toBe('Corp tenant WIF trust');
+
+    // Change the description and save -> update mutation carries label + description.
+    fireEvent.change(wifInput('wif-field-description'), { target: { value: 'Updated notes' } });
+    fireEvent.click(screen.getByTestId('wif-trust-edit-save-cred-desc'));
+    expect(mockUpdateWif).toHaveBeenCalledTimes(1);
+    const arg = mockUpdateWif.mock.calls[0][0];
+    expect(arg.credentialId).toBe('cred-desc');
+    expect(arg.label).toBe('Corp Entra');
+    expect(arg.description).toBe('Updated notes');
   });
 
   it('item 4: Cancel edit clears the form and exits edit mode', () => {
@@ -1688,10 +1774,11 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
 
   it('W8: shows the retained bearer secret inline in the per-card Connect subpanel when visibility is Always', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(true), isLoading: false, error: null });
-    // The reveal returns the retained secret so the per-card subpanel renders it.
+    // The reveal returns the retained bearer secret in `token` (oauth_client uses
+    // `clientSecret`) so the per-card subpanel renders it (X2).
     mockRevealMutate.mockImplementation(
-      (_id: string, opts: { onSuccess: (r: { retained: boolean; clientSecret: string }) => void }) => {
-        opts.onSuccess({ retained: true, clientSecret: 'super-secret-token-value' });
+      (_id: string, opts: { onSuccess: (r: { retained: boolean; token: string }) => void }) => {
+        opts.onSuccess({ retained: true, token: 'super-secret-token-value' });
       },
     );
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);

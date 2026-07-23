@@ -126,6 +126,25 @@ describe('AdminCredentialController', () => {
       );
     });
 
+    it('X4: persists a description in metadata and echoes it (trims; blank -> null)', async () => {
+      const withDesc = await controller.createCredential(mockEndpoint.id, {
+        label: 'Prod',
+        description: '  Entra user provisioning  ',
+      });
+      expect(withDesc.description).toBe('Entra user provisioning');
+      expect(mockCredentialRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: { description: 'Entra user provisioning' } }),
+      );
+
+      mockCredentialRepo.create.mockClear();
+      const blank = await controller.createCredential(mockEndpoint.id, { description: '   ' });
+      expect(blank.description).toBeNull();
+      // A blank description is normalized away - no metadata is attached.
+      expect(mockCredentialRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: undefined }),
+      );
+    });
+
     it('should reject when PerEndpointCredentialsEnabled is false', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,

@@ -221,6 +221,9 @@ export class DashboardController {
       id: c.id,
       credentialType: c.credentialType,
       label: c.label ?? null,
+      // X3/X4 - operator-supplied free-text description (never a secret),
+      // stored in metadata.description on any credential type.
+      description: typeof c.metadata?.description === 'string' ? c.metadata.description : null,
       active: c.active,
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
       expiresAt: c.expiresAt

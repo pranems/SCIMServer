@@ -67,6 +67,12 @@ const BCRYPT_SALT_ROUNDS = 12;
 
 interface CreateCredentialDto {
   label?: string;
+  /**
+   * X3/X4 - optional free-text description (operator notes) for a credential /
+   * WIF trust. Persisted in `metadata.description`; never a secret. Trimmed;
+   * an empty string is stored as no description.
+   */
+  description?: string | null;
   credentialType?: string; // "bearer" (default) | "oauth_client" | "wif"
   expiresAt?: string;      // ISO 8601 date
   wif?: WifTrustInput;     // required when credentialType === "wif"
@@ -166,6 +172,7 @@ interface CreateCredentialResponse {
   endpointId: string;
   credentialType: string;
   label: string | null;
+  description?: string | null;
   active: boolean;
   createdAt: Date;
   expiresAt: Date | null;
@@ -173,6 +180,17 @@ interface CreateCredentialResponse {
   clientId?: string;
   clientSecret?: string;
   wif?: Record<string, unknown>;
+}
+
+/**
+ * X3/X4 - normalize a credential/WIF-trust `description` for storage: trim it,
+ * and treat an empty/whitespace-only value as "no description" (null). Never a
+ * secret - stored as plain `metadata.description`.
+ */
+function normalizeCredentialDescription(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 @Controller('admin/endpoints')
@@ -476,12 +494,13 @@ export class AdminCredentialController {
       // still hashed with bcrypt and only its hash is stored.
       const oauthSecret = `client-secret-${crypto.randomUUID()}`;
       const oauthHash = await bcrypt.hash(oauthSecret, BCRYPT_SALT_ROUNDS);
+      const oauthDescription = normalizeCredentialDescription(dto.description);
       const credential = await this.credentialRepo.create({
         endpointId,
         credentialType,
         credentialHash: oauthHash,
         label: dto.label ?? null,
-        metadata: { clientId },
+        metadata: oauthDescription != null ? { clientId, description: oauthDescription } : { clientId },
         secretEnvelope: await this.maybeRetainSecret(config, oauthSecret),
         expiresAt,
       });
@@ -504,6 +523,7 @@ export class AdminCredentialController {
         endpointId: credential.endpointId,
         credentialType: credential.credentialType,
         label: credential.label,
+        description: oauthDescription,
         active: credential.active,
         createdAt: credential.createdAt,
         expiresAt: credential.expiresAt,
@@ -515,11 +535,13 @@ export class AdminCredentialController {
       };
     }
 
+    const bearerDescription = normalizeCredentialDescription(dto.description);
     const credential = await this.credentialRepo.create({
       endpointId,
       credentialType,
       credentialHash: hash,
       label: dto.label ?? null,
+      metadata: bearerDescription != null ? { description: bearerDescription } : undefined,
       secretEnvelope: await this.maybeRetainSecret(config, plaintext),
       expiresAt,
     });
@@ -543,6 +565,7 @@ export class AdminCredentialController {
       endpointId: credential.endpointId,
       credentialType: credential.credentialType,
       label: credential.label,
+      description: bearerDescription,
       active: credential.active,
       createdAt: credential.createdAt,
       expiresAt: credential.expiresAt,
@@ -744,6 +767,17 @@ export class AdminCredentialController {
     if (dto.verify) metadata.lastVerifiedAt = new Date().toISOString();
     else if (priorVerifiedAt) metadata.lastVerifiedAt = priorVerifiedAt;
 
+    // X3 - update the description when supplied; otherwise carry forward the
+    // prior one (updateMetadata replaces the whole metadata object).
+    const priorDescription =
+      typeof credential.metadata?.description === 'string' ? credential.metadata.description : undefined;
+    if (dto.description !== undefined) {
+      const nextDescription = normalizeCredentialDescription(dto.description);
+      if (nextDescription != null) metadata.description = nextDescription;
+    } else if (priorDescription != null) {
+      metadata.description = priorDescription;
+    }
+
     const updated = await this.credentialRepo.updateMetadata(credentialId, metadata);
     if (!updated) {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
@@ -765,6 +799,7 @@ export class AdminCredentialController {
       createdAt: labelled.createdAt,
       expiresAt: labelled.expiresAt,
       wif: metadata,
+      description: typeof metadata.description === 'string' ? metadata.description : null,
     };
   }
 
@@ -1011,6 +1046,10 @@ export class AdminCredentialController {
     // U7: stamp the last-verified time when this create passed verify-on-save.
     if (dto.verify) metadata.lastVerifiedAt = new Date().toISOString();
 
+    // X3 - operator notes for the trust, stored as plain metadata.description.
+    const wifDescription = normalizeCredentialDescription(dto.description);
+    if (wifDescription != null) metadata.description = wifDescription;
+
     const credential = await this.credentialRepo.create({
       endpointId,
       credentialType: 'wif',
@@ -1039,6 +1078,7 @@ export class AdminCredentialController {
       expiresAt: credential.expiresAt,
       // The full public trust config is echoed back (no secret exists).
       wif: metadata,
+      description: wifDescription,
     };
   }
 

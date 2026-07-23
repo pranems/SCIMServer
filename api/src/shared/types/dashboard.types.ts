@@ -278,6 +278,11 @@ export interface EndpointOverviewCredential {
   id: string;
   credentialType: string;
   label?: string | null;
+  /**
+   * X3/X4 - operator-supplied free-text description (never a secret), stored in
+   * metadata.description on any credential type. Null when none was set.
+   */
+  description?: string | null;
   active: boolean;
   createdAt: string;
   expiresAt?: string | null;

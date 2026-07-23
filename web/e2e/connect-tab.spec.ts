@@ -211,3 +211,161 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
     await expect(page.getByTestId('credential-connect-clientid-info-cred-r3')).toBeVisible();
   });
 });
+
+/**
+ * X2 - the per-endpoint BEARER credential's Connect subpanel shows its retained
+ * Secret Token inline, exactly like the oauth_client client secret. The reveal
+ * API returns a bearer secret in the `token` field (oauth_client uses
+ * `clientSecret`); the regression this guards is the subpanel reading only
+ * `clientSecret`, which left a retained bearer secret invisible. Route-mocked so
+ * it is deterministic and never touches a real credential.
+ */
+const EP_X2 = 'ep-connect-x2';
+
+test.describe('Connect tab - retained bearer secret (X2)', () => {
+  test('shows the retained bearer Secret Token inline in the per-card Connect subpanel', async ({ page }) => {
+    const ID = EP_X2;
+    const base = `https://scim.example.com/scim/v2/endpoints/${ID}`;
+    const overview = {
+      endpoint: { id: ID, name: 'x2', displayName: 'X2 Connect', active: true },
+      configFlags: { SecretTokenBearerAuthEnabled: true },
+      credentials: [
+        { id: 'cred-x2', credentialType: 'bearer', label: 'Bearer token', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null },
+      ],
+      connectionInfo: {
+        endpointId: ID,
+        displayName: 'X2 Connect',
+        urls: {
+          scimBaseUrl: base,
+          scimBaseUrlBare: `https://scim.example.com/scim/endpoints/${ID}`,
+          tokenEndpoint: `https://scim.example.com/scim/endpoints/${ID}/oauth/token`,
+          serviceProviderConfig: `${base}/ServiceProviderConfig`,
+          oauthMetadata: `https://scim.example.com/scim/endpoints/${ID}/.well-known/oauth-authorization-server`,
+        },
+        enabledMethods: [
+          {
+            method: 'bearer',
+            label: 'Bearer token',
+            entraAuthenticationMethod: 'Secret Token',
+            entraFields: { tenantUrl: base, secretToken: null },
+            clientSecretState: 'set-shown-once',
+            credentialId: 'cred-x2',
+            secretRetained: true,
+          },
+        ],
+        disabledMethods: [],
+      },
+    };
+
+    await page.route(`**/scim/admin/endpoints/${ID}`, async (route) => {
+      if (route.request().method() !== 'GET' || !route.request().url().endsWith(`/${ID}`)) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: ID,
+          name: 'x2',
+          displayName: 'X2 Connect',
+          active: true,
+          scimBasePath: `/scim/v2/endpoints/${ID}`,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          profile: { schemas: [], resourceTypes: [], serviceProviderConfig: { documentationUri: '', patch: { supported: true } }, settings: {} },
+        }),
+      });
+    });
+    await page.route(`**/scim/admin/endpoints/${ID}/overview`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(overview) });
+    });
+    await page.route(`**/scim/admin/endpoints/${ID}/credentials/cred-x2/reveal`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'cred-x2', credentialType: 'bearer', token: 'retained-bearer-token-x2', retained: true }),
+      });
+    });
+
+    await page.goto(`/endpoints/${ID}/connect`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+    // The bearer tab is the default (first per-endpoint method); open the card's
+    // Connect subpanel - the auto-reveal returns the retained Secret Token.
+    await page.getByTestId('credential-connect-cred-x2').click();
+    await expect(page.getByTestId('credential-connect-secret-cred-x2')).toContainText('retained-bearer-token-x2');
+    // The secret is labelled as the bearer Secret Token, not a client secret.
+    await expect(page.getByTestId('credential-connect-secret-info-cred-x2')).toContainText(/Secret token/i);
+  });
+});
+
+/**
+ * X3/X4 - the credential create dialog and the WIF trust form both carry a
+ * Label + Description input. Route-mocked so it is deterministic and never
+ * creates a real credential (the forms are only opened, never submitted).
+ */
+const EP_DESC = 'ep-connect-desc';
+
+test.describe('Connect tab - label + description fields (X3/X4)', () => {
+  test('the credential create dialog + WIF trust form expose Label + Description inputs', async ({ page }) => {
+    const ID = EP_DESC;
+    const base = `https://scim.example.com/scim/v2/endpoints/${ID}`;
+    const overview = {
+      endpoint: { id: ID, name: 'desc', displayName: 'Desc Connect', active: true },
+      // Enable both bearer (per-endpoint create) and WIF (trust form).
+      configFlags: { SecretTokenBearerAuthEnabled: true, PerEndpointCredentialsEnabled: true, WifCredentialsEnabled: true },
+      credentials: [],
+      connectionInfo: {
+        endpointId: ID,
+        displayName: 'Desc Connect',
+        urls: {
+          scimBaseUrl: base,
+          scimBaseUrlBare: `https://scim.example.com/scim/endpoints/${ID}`,
+          tokenEndpoint: `https://scim.example.com/scim/endpoints/${ID}/oauth/token`,
+          serviceProviderConfig: `${base}/ServiceProviderConfig`,
+          oauthMetadata: `https://scim.example.com/scim/endpoints/${ID}/.well-known/oauth-authorization-server`,
+        },
+        enabledMethods: [
+          { method: 'bearer', label: 'Bearer token', entraAuthenticationMethod: 'Secret Token', entraFields: { tenantUrl: base, secretToken: null }, clientSecretState: 'none' },
+          { method: 'wif', label: 'Federated identity (WIF)', entraAuthenticationMethod: 'OIDC federation', entraFields: { tenantUrl: base }, clientSecretState: 'none' },
+        ],
+        disabledMethods: [],
+      },
+    };
+
+    await page.route(`**/scim/admin/endpoints/${ID}`, async (route) => {
+      if (route.request().method() !== 'GET' || !route.request().url().endsWith(`/${ID}`)) return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: ID,
+          name: 'desc',
+          displayName: 'Desc Connect',
+          active: true,
+          scimBasePath: `/scim/v2/endpoints/${ID}`,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          profile: { schemas: [], resourceTypes: [], serviceProviderConfig: { documentationUri: '', patch: { supported: true } }, settings: {} },
+        }),
+      });
+    });
+    await page.route(`**/scim/admin/endpoints/${ID}/overview`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(overview) });
+    });
+
+    await page.goto(`/endpoints/${ID}/connect`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+    // X4 - the credential create dialog carries Label + Description.
+    await page.getByTestId('credentials-create-button').click();
+    await expect(page.getByTestId('credentials-create-dialog')).toBeVisible();
+    await expect(page.getByTestId('credentials-label-input')).toBeVisible();
+    await expect(page.getByTestId('credentials-description-input')).toBeVisible();
+    // Close the dialog without submitting.
+    await page.keyboard.press('Escape');
+
+    // X3 - the WIF trust form carries Label + Description.
+    await page.getByTestId('credentials-method-tab-wif').click();
+    await page.getByTestId('wif-add-trust-button').click();
+    await expect(page.getByTestId('wif-field-label')).toBeVisible();
+    await expect(page.getByTestId('wif-field-description')).toBeVisible();
+  });
+});

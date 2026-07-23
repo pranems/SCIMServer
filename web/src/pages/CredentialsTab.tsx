@@ -394,6 +394,9 @@ interface WifTrustForm {
   scope: string;
   /** Item E - how a missing required role is handled at auth time. */
   roleEnforcement: 'off' | 'shadow' | 'enforce';
+  /** X3 - optional operator notes about the trust (never a secret). */
+  label: string;
+  description: string;
 }
 
 const EMPTY_WIF_FORM: WifTrustForm = {
@@ -405,6 +408,8 @@ const EMPTY_WIF_FORM: WifTrustForm = {
   requiredRoles: '',
   scope: '',
   roleEnforcement: 'off',
+  label: '',
+  description: '',
 };
 
 /** A single Test Connection readiness step (client-side dry-run). */
@@ -691,6 +696,20 @@ const WifTrustFieldGrid: React.FC<{
 }> = ({ form, setField, setForm, styles }) => (
   <div className={styles.fieldGrid}>
     <EditableField
+      label="Label (optional)"
+      value={form.label}
+      onChange={setField('label')}
+      placeholder="e.g. Entra WIF - corp tenant"
+      data-testid="wif-field-label"
+    />
+    <EditableField
+      label="Description (optional)"
+      value={form.description}
+      onChange={setField('description')}
+      placeholder="Operator notes about this trust (never a secret)"
+      data-testid="wif-field-description"
+    />
+    <EditableField
       label="Issuer (iss)"
       value={form.expectedIssuer}
       onChange={setField('expectedIssuer')}
@@ -935,7 +954,13 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     };
     if (editingId != null) {
       updateMutation.mutate(
-        { credentialId: editingId, wif: trustPayload, verify },
+        {
+          credentialId: editingId,
+          wif: trustPayload,
+          label: form.label.trim() || undefined,
+          description: form.description.trim() || '',
+          verify,
+        },
         {
           onSuccess: () => {
             setEditingId(null);
@@ -949,7 +974,13 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       return;
     }
     createMutation.mutate(
-      { credentialType: 'wif', label: 'Federated Identity (WIF)', wif: trustPayload, verify },
+      {
+        credentialType: 'wif',
+        label: form.label.trim() || 'Federated Identity (WIF)',
+        description: form.description.trim() || undefined,
+        wif: trustPayload,
+        verify,
+      },
       {
         onSuccess: (raw) => {
           const cred = raw as unknown as { id: string };
@@ -986,6 +1017,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       requiredRoles: (t.requiredRoles ?? []).join(', '),
       scope: t.scope ?? '',
       roleEnforcement: (t.roleEnforcement as WifTrustForm['roleEnforcement']) ?? 'off',
+      label: cred.label ?? '',
+      description: cred.description ?? '',
     });
     // U4 - the edit form now opens in-card below the trust, so no scroll-to-top.
   };
@@ -1426,6 +1459,11 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                       <div>
                         <Subtitle2>{cred.label ?? '(no label)'}</Subtitle2>
                         <div className={wif.wifMeta}>{cred.id}</div>
+                        {cred.description && (
+                          <Caption1 className={wif.wifMeta} data-testid={`wif-credential-description-${cred.id}`}>
+                            {cred.description}
+                          </Caption1>
+                        )}
                       </div>
                       <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                         {cred.active ? 'Active' : 'Revoked'}
@@ -1736,6 +1774,7 @@ function projectCredentialPublic(cred: EndpointOverviewCredential): Record<strin
     id: cred.id,
     credentialType: cred.credentialType,
     label: cred.label ?? null,
+    description: cred.description ?? null,
     active: cred.active,
     createdAt: cred.createdAt,
     expiresAt: cred.expiresAt ?? null,
@@ -1823,6 +1862,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // Local UI state
   const [createOpen, setCreateOpen] = React.useState(false);
   const [labelInput, setLabelInput] = React.useState('');
+  // X4 - optional operator description for the credential being created.
+  const [descriptionInput, setDescriptionInput] = React.useState('');
   // R7 - which credential type the create dialog will mint.
   const [createType, setCreateType] = React.useState<'bearer' | 'oauth_client'>('bearer');
   // R6 - the selected per-method sub-tab.
@@ -1844,8 +1885,10 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // U2 - which oauth_client credential's Connect-to-Entra params are expanded.
   const [connectCredId, setConnectCredId] = React.useState<string | null>(null);
   // V4 - the retained secret for the credential whose Connect panel is open
-  // (auto-revealed when visibility is Always), shown inline with the params.
-  const [connectSecret, setConnectSecret] = React.useState<{ id: string; retained: boolean; clientSecret?: string } | null>(null);
+  // (auto-revealed when visibility is Always), shown inline with the params. A
+  // bearer credential's secret comes back in `token`; oauth_client's in
+  // `clientSecret` (X2), so both are carried and the type-appropriate one shown.
+  const [connectSecret, setConnectSecret] = React.useState<{ id: string; retained: boolean; clientSecret?: string; token?: string } | null>(null);
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const connectScimUrl = `${origin}/scim/v2/endpoints/${endpointId}`;
   const connectTokenUrl = `${origin}/scim/endpoints/${endpointId}/oauth/token`;
@@ -1854,6 +1897,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   const onOpenCreate = (type: 'bearer' | 'oauth_client' = 'bearer'): void => {
     setLabelInput('');
+    setDescriptionInput('');
     setCreateType(type);
     setCreateError(null);
     setCreatedCred(null);
@@ -1864,13 +1908,14 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
     setCreateOpen(false);
     setCreatedCred(null);
     setLabelInput('');
+    setDescriptionInput('');
     setCreateError(null);
   };
 
   const onSubmitCreate = (): void => {
     setCreateError(null);
     createMutation.mutate(
-      { label: labelInput.trim() || undefined, credentialType: createType },
+      { label: labelInput.trim() || undefined, description: descriptionInput.trim() || undefined, credentialType: createType },
       {
         onSuccess: (raw) => {
           // Bearer returns { id, label, token, createdAt }; oauth_client
@@ -2094,6 +2139,11 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   <div className={classes.meta}>
                     {cred.id} - {cred.credentialType}
                   </div>
+                  {cred.description && (
+                    <Caption1 className={classes.meta} data-testid={`credential-description-${cred.id}`}>
+                      {cred.description}
+                    </Caption1>
+                  )}
                 </div>
                 <Caption1>
                   Created {new Date(cred.createdAt).toLocaleString()}
@@ -2117,7 +2167,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                         if (next) {
                           revealMutation.mutate(next, {
                             onSuccess: (r) =>
-                              setConnectSecret({ id: next, retained: r.retained, clientSecret: r.clientSecret }),
+                              setConnectSecret({ id: next, retained: r.retained, clientSecret: r.clientSecret, token: r.token }),
                           });
                         }
                       }}
@@ -2307,28 +2357,35 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       </div>
                     </>
                   )}
-                  {/* V4 - the secret, inline, when the endpoint retains it
+                  {/* V4 / X2 - the secret, inline, when the endpoint retains it
                       (CredentialSecretVisibility=always). For bearer this is the
-                      Secret Token; for oauth_client the client secret. */}
-                  {connectSecret?.id === cred.id && connectSecret.retained && connectSecret.clientSecret ? (
-                    <div className={classes.connectRow}>
-                      <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
-                        {cred.credentialType === 'oauth_client' ? 'Client secret' : 'Secret token (bearer)'}
-                      </InfoLabel>
-                      <CopyableField
-                        value={connectSecret.clientSecret}
-                        monospace
-                        truncate
-                        data-testid={`credential-connect-secret-${cred.id}`}
-                      />
-                    </div>
-                  ) : (
-                    <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
-                      The {cred.credentialType === 'oauth_client' ? 'client secret' : 'bearer token'} is
-                      shown here when the endpoint retains it (CredentialSecretVisibility=always);
-                      otherwise Rotate to get a fresh one.
-                    </Caption1>
-                  )}
+                      Secret Token (reveal `token`); for oauth_client the client
+                      secret (reveal `clientSecret`). */}
+                  {(() => {
+                    const secretValue =
+                      cred.credentialType === 'oauth_client'
+                        ? connectSecret?.clientSecret
+                        : connectSecret?.token;
+                    return connectSecret?.id === cred.id && connectSecret.retained && secretValue ? (
+                      <div className={classes.connectRow}>
+                        <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
+                          {cred.credentialType === 'oauth_client' ? 'Client secret' : 'Secret token (bearer)'}
+                        </InfoLabel>
+                        <CopyableField
+                          value={secretValue}
+                          monospace
+                          truncate
+                          data-testid={`credential-connect-secret-${cred.id}`}
+                        />
+                      </div>
+                    ) : (
+                      <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
+                        The {cred.credentialType === 'oauth_client' ? 'client secret' : 'bearer token'} is
+                        shown here when the endpoint retains it (CredentialSecretVisibility=always);
+                        otherwise Rotate to get a fresh one.
+                      </Caption1>
+                    );
+                  })()}
                 </div>
               )}
             </Card>
@@ -2395,6 +2452,14 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 onChange={(_, d) => setLabelInput(d.value)}
                 placeholder="e.g. Entra production"
                 data-testid="credentials-label-input"
+              />
+            </Field>
+            <Field label="Description (optional)" hint="Operator notes about this credential (never a secret)">
+              <Textarea
+                value={descriptionInput}
+                onChange={(_, d) => setDescriptionInput(d.value)}
+                placeholder="e.g. Used for user + group provisioning from the corp AD tenant"
+                data-testid="credentials-description-input"
               />
             </Field>
           </div>

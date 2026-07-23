@@ -13689,6 +13689,52 @@ Write-Host "`n--- 9z-BQ: per-endpoint auth latency gate (X9 perf) Complete ---" 
 
 
 # ============================================
+$script:currentSection = "9z-BR: credential label + description (X3/X4)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BR: CREDENTIAL LABEL + DESCRIPTION (X3/X4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# A credential (and WIF trust) carries an optional operator `description`,
+# persisted in metadata.description and surfaced in the endpoint overview. A
+# blank/whitespace description normalizes to null (no description). Never a
+# secret.
+
+try {
+    $brEpBody = @{ name = "desc-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json -Depth 4
+    $brEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $brEpBody
+    $brEpId = $brEp.id
+    $brPatch = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 5
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$brEpId" -Method PATCH -Headers $headers -Body $brPatch -ContentType "application/json" | Out-Null
+
+    # X4 - create a bearer credential with a description; the create echoes it.
+    $brCreateBody = @{ credentialType = "bearer"; label = "Prod"; description = "Entra user provisioning" } | ConvertTo-Json
+    $brCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$brEpId/credentials" -Method POST -Headers $headers -Body $brCreateBody
+    Test-Result -Success ($brCred.description -eq "Entra user provisioning") -Message "9z-BR.T1: create echoes the credential description"
+
+    # The overview surfaces the description.
+    $brOverview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$brEpId/overview" -Headers $headers
+    $brOne = $brOverview.credentials | Where-Object { $_.id -eq $brCred.id } | Select-Object -First 1
+    Test-Result -Success ($brOne.description -eq "Entra user provisioning") -Message "9z-BR.T2: overview surfaces the credential description"
+
+    # A whitespace-only description normalizes to null.
+    $brBlankBody = @{ credentialType = "bearer"; label = "NoDesc"; description = "   " } | ConvertTo-Json
+    $brBlank = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$brEpId/credentials" -Method POST -Headers $headers -Body $brBlankBody
+    Test-Result -Success ($null -eq $brBlank.description) -Message "9z-BR.T3: a blank description normalizes to null"
+
+    # Description is never a secret-bearing field: no bcrypt hash leaks alongside it.
+    $brLeak = ($brOne.PSObject.Properties.Name -contains "credentialHash")
+    Test-Result -Success (-not $brLeak) -Message "9z-BR.T4: no credentialHash leaks in the overview credential row"
+
+    # Cleanup: deleting the endpoint cascades its credentials.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$brEpId" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-BR: credential description section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BR: credential label + description (X3/X4) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
