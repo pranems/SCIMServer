@@ -4,6 +4,7 @@ Status: ANALYSIS + STANDING GATE (source at `feat/wif`, api v0.54.60). Companion
 the X10 auth-methods comparison ([AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)),
 the X11 token-mint latency analysis ([../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)),
 and the SyncFabric WIF architecture guide ([SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)).
+The refactor is sequenced for delivery in [AUTH_CONSOLIDATED_DELIVERY_PLAN.md](AUTH_CONSOLIDATED_DELIVERY_PLAN.md) (X13, Wave 2).
 
 ## 0. Verdict (TL;DR)
 

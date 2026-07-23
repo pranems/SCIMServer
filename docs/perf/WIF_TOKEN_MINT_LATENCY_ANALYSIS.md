@@ -3,6 +3,7 @@
 Status: ANALYSIS (measured on dev `scimserver-dev` v0.54.58). Companion to the
 X9 resource-plane RCA ([perf/DEV_LATENCY_REGRESSION_RCA.md](DEV_LATENCY_REGRESSION_RCA.md))
 and the X10 auth-methods comparison ([auth/AUTH_METHODS_STANDARDS_COMPARISON.md](../auth/AUTH_METHODS_STANDARDS_COMPARISON.md)).
+These options are sequenced for delivery in [auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md](../auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md) (X13, Wave 1).
 
 ## 0. TL;DR
 

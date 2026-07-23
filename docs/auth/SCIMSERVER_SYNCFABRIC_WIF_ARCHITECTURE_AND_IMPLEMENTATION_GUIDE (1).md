@@ -13,6 +13,8 @@
 
 > This is a portable design artifact. It does not change either repository. Copy it into the SCIMServer repository only after review.
 
+> **Delivery sequencing:** the changes proposed here are consolidated and sequenced with the X11 perf and X12 refactor streams into a single release train in [AUTH_CONSOLIDATED_DELIVERY_PLAN.md](AUTH_CONSOLIDATED_DELIVERY_PLAN.md) (X13, Waves 3-6).
+
 ---
 
 ## Contents
