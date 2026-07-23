@@ -90,7 +90,7 @@ describe('OAuth discovery + bearer errors (Q0)', () => {
           client_id: 'e2e-client',
           client_secret: 'e2e-client-secret',
         })
-        .expect(201);
+        .expect(200);
 
       const payload = JSON.parse(
         Buffer.from(tokenRes.body.access_token.split('.')[1], 'base64url').toString('utf-8'),
@@ -112,7 +112,7 @@ describe('OAuth discovery + bearer errors (Q0)', () => {
         .post('/scim/oauth/token')
         .set('Authorization', `Basic ${basic}`)
         .send({ grant_type: 'client_credentials' })
-        .expect(201);
+        .expect(200);
 
       expect(typeof tokenRes.body.access_token).toBe('string');
       expect(tokenRes.body.token_type).toBe('Bearer');

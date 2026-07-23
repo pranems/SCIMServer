@@ -28,7 +28,7 @@ describe('Authentication (E2E)', () => {
   // ───────────── OAuth Token Flow ─────────────
 
   describe('POST /oauth/token', () => {
-    it('should issue a token for valid client_credentials', async () => {
+    it('should issue a token for valid client_credentials (RFC 6749 5.1: 200 + no-store)', async () => {
       const res = await request(app.getHttpServer())
         .post('/scim/oauth/token')
         .set('Content-Type', 'application/json')
@@ -37,7 +37,9 @@ describe('Authentication (E2E)', () => {
           client_id: 'e2e-client',
           client_secret: 'e2e-client-secret',
         })
-        .expect(201);
+        .expect(200)
+        .expect('Cache-Control', 'no-store')
+        .expect('Pragma', 'no-cache');
 
       expect(res.body.access_token).toBeDefined();
       expect(res.body.token_type).toBe('Bearer');
@@ -130,7 +132,7 @@ describe('Authentication (E2E)', () => {
           client_id: 'e2e-client',
           client_secret: 'e2e-client-secret',
         })
-        .expect(201);
+        .expect(200);
     });
 
     it('should allow /oauth/test without auth', async () => {

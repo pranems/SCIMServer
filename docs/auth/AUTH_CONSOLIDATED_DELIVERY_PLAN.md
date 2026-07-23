@@ -82,7 +82,7 @@ flowchart LR
 
 | Item | Current state (feat/wif) | Source of truth |
 |---|---|---|
-| Token endpoint HTTP status | **201** (no `@HttpCode`) - guide wants 200 | [endpoint-oauth.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) |
+| Token endpoint HTTP status | **200 + no-store** - W0.2 delivered (v0.54.66): `@HttpCode(200)` + `Cache-Control: no-store` + `Pragma: no-cache` on both token handlers; errors keep 400/401 | [oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) + [endpoint-oauth.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) |
 | `PERSIST_REQUEST_SECRETS` default | **true** - assertions/tokens persisted by default | [logging.service.ts#L86](../../api/src/modules/logging/logging.service.ts#L86) |
 | RFC 8693 handler | **not implemented** (rejected at runtime) | no `subject_token` parse path |
 | Metadata advertises token-exchange | **no** - W0.3 delivered (v0.54.64): capability-derived, token-exchange only when the RFC 8693 handler is active | [endpoint-oauth-metadata.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth-metadata.controller.ts) |
@@ -128,10 +128,10 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Decision: do NOT default `PERSIST_REQUEST_SECRETS` to false and do NOT add unconditional token-route redaction. Request-secret capture is intentionally ON by default because it is needed for auth troubleshooting; an operator can turn it off at runtime (server env `PERSIST_REQUEST_SECRETS=false` or the per-endpoint `PersistRequestSecrets` override) when a given deployment wants it off.
 - Consequence: the field-spelling-based redaction ([redact-sensitive.ts](../../api/src/security/redact-sensitive.ts)) and the existing per-endpoint/server opt-out remain the controls; no build-time default flip. Revisit only if a specific compliance requirement lands.
 
-**W0.2 - Token endpoint returns HTTP 200 + no-store** `[Stream SF]`
-- Tasks: add `@HttpCode(200)` to the token POST; set `Cache-Control: no-store` + `Pragma: no-cache`; update the E2E specs that currently assert 201.
-- Acceptance: token responses are 200 with no-store headers on both the `client_secret` and WIF paths; E2E updated.
-- Deps: none. Estimate: **S**. Risk: Low (client-compat - Entra tolerates 200).
+**W0.2 - Token endpoint returns HTTP 200 + no-store** `[Stream SF]` - **DONE (v0.54.66)**
+- Tasks: `@HttpCode(200)` + `Cache-Control: no-store` + `Pragma: no-cache` on EVERY token success path - the global `client_secret` handler AND the per-endpoint handler (which covers BOTH the `client_secret` and the WIF `client_assertion` sub-routes); error responses keep their RFC 6749 section 5.2 400/401; flip the E2E `201`->`200` (incl. the shared auth helper) + add header assertions; add real-wire status+header assertions in live-test `9z-BU`.
+- Acceptance: token successes are 200 with no-store + no-cache on the global, per-endpoint secret, and WIF paths - measured at E2E AND on the wire; error paths unchanged; E2E + live updated. Feature doc: [W0_2_TOKEN_ENDPOINT_200_NO_STORE.md](W0_2_TOKEN_ENDPOINT_200_NO_STORE.md).
+- Deps: none. Estimate: **S**. Risk: Low. Risk note corrected: 201 was tolerated but non-conformant; 200 is the tested contract Entra's own AS returns and that any conformant OAuth client accepts (no documented Entra requirement is violated). The future RFC 8693 handler (W4) must return 200 from day one.
 
 **W0.3 - Capability-derived OAuth metadata** `[Stream SF]` - **DELIVERED (v0.54.64)**
 - Tasks: derive [endpoint-oauth-metadata.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth-metadata.controller.ts) from active handler capabilities + endpoint config; stop advertising `token-exchange` until W4; disclose the `private_key_jwt`/SyncFabric-profile nuance per guide 17.4.

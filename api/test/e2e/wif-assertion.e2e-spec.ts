@@ -127,9 +127,12 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER });
   }
 
-  it('mints the endpoint token for a valid assertion (accept)', async () => {
+  it('mints the endpoint token for a valid assertion (accept) (RFC 6749 5.1 + RFC 8693: 200 + no-store)', async () => {
     const assertion = await signAssertion();
-    const res = await postAssertion(assertion).expect(201);
+    const res = await postAssertion(assertion)
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect('Pragma', 'no-cache');
 
     expect(res.body.token_type).toBe('Bearer');
     expect(typeof res.body.access_token).toBe('string');
@@ -145,7 +148,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
 
   it('the minted token authorizes the endpoint SCIM routes', async () => {
     const assertion = await signAssertion();
-    const tokenRes = await postAssertion(assertion).expect(201);
+    const tokenRes = await postAssertion(assertion).expect(200);
     const minted = tokenRes.body.access_token;
 
     await request(app.getHttpServer())
@@ -210,7 +213,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .post(`/scim/endpoints/${multiEndpoint}/oauth/token`)
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
-      .expect(201);
+      .expect(200);
 
     // Minted against the SECOND trust (its scope + ttl, not trust A's).
     expect(res.body.token_type).toBe('Bearer');
@@ -279,7 +282,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     // roleEnforcement, so a missing role is advisory: the token still mints
     // and the provisioning flow continues to the next step.
     const assertion = await signAssertion({ roles: ['Scim.Read'] });
-    const res = await postAssertion(assertion).expect(201);
+    const res = await postAssertion(assertion).expect(200);
     expect(res.body.access_token).toBeTruthy();
   });
 
@@ -321,7 +324,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .post(`/scim/endpoints/${enforceEndpoint}/oauth/token`)
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: ok, client_assertion_type: JWT_BEARER })
-      .expect(201);
+      .expect(200);
   });
 
   it('never returns a secret/hash on the wif credential (no-secret contract)', async () => {
@@ -410,7 +413,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .post(`/scim/endpoints/${aliasEndpoint}/oauth/token`)
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
-      .expect(201);
+      .expect(200);
     expect(res.body.token_type).toBe('Bearer');
     const payload = decodePayload(res.body.access_token);
     expect(payload.endpoint_id).toBe(aliasEndpoint);

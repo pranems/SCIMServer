@@ -71,9 +71,12 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(res.body.token).toBeUndefined();
   });
 
-  it('mints a per-endpoint token carrying the endpoint_id claim', async () => {
+  it('mints a per-endpoint token carrying the endpoint_id claim (RFC 6749 5.1: 200 + no-store)', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
-    const res = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
+    const res = await mintEndpointToken(endpointA, clientId, clientSecret)
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect('Pragma', 'no-cache');
 
     expect(res.body.token_type).toBe('Bearer');
     expect(typeof res.body.access_token).toBe('string');
@@ -93,7 +96,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .set('Authorization', `Basic ${basic}`)
       .send({ grant_type: 'client_credentials' })
-      .expect(201);
+      .expect(200);
 
     expect(res.body.token_type).toBe('Bearer');
     const payload = decodePayload(res.body.access_token);
@@ -103,7 +106,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
 
   it('the per-endpoint token authorizes ITS OWN endpoint SCIM routes', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
-    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
+    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(200);
     const epToken = tokenRes.body.access_token;
 
     await request(app.getHttpServer())
@@ -114,7 +117,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
 
   it('the per-endpoint token is REJECTED on a DIFFERENT endpoint (Q1 scoping)', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
-    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
+    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(200);
     const epToken = tokenRes.body.access_token;
 
     const res = await request(app.getHttpServer())
@@ -312,7 +315,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .type('form')
       .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret })
-      .expect(201);
+      .expect(200);
 
     expect(res.body.token_type).toBe('Bearer');
     expect(typeof res.body.access_token).toBe('string');
@@ -328,7 +331,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .set('Authorization', `Basic ${basic}`)
       .type('form')
       .send({ grant_type: 'client_credentials' })
-      .expect(201);
+      .expect(200);
 
     expect(res.body.token_type).toBe('Bearer');
     const payload = decodePayload(res.body.access_token);
@@ -364,7 +367,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
         .post(`/scim/endpoints/${endpointA}/oauth/token`)
         .type('form')
         .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret })
-        .expect(201);
+        .expect(200);
       expect(res.body.token_type).toBe('Bearer');
       expect(typeof res.body.access_token).toBe('string');
     });

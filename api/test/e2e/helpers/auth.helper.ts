@@ -24,7 +24,7 @@ export async function getAuthToken(app: INestApplication): Promise<string> {
     .post('/scim/oauth/token')
     .set('Content-Type', 'application/json')
     .send(requestBody)
-    .expect(201);
+    .expect(200);
 
   finishE2eFlowStep(trace, {
     status: res.status,

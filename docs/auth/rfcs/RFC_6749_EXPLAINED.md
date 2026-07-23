@@ -175,10 +175,10 @@ Optional `error_description` (human-readable) and `error_uri` (a docs link) may 
 
 | RFC 6749 concept | SCIMServer | Source |
 |---|---|---|
-| token endpoint (section 3.2) | `POST /oauth/token` (global) + proposed per-endpoint `POST /endpoints/{id}/oauth/token` | [oauth.controller.ts](../../../api/src/oauth/oauth.controller.ts) |
+| token endpoint (section 3.2) | `POST /oauth/token` (global) + per-endpoint `POST /endpoints/{id}/oauth/token` | [oauth.controller.ts](../../../api/src/oauth/oauth.controller.ts) |
 | `client_credentials` grant (section 4.4) | the only grant accepted today | same |
 | client authentication (section 2.3) | `client_id` + `client_secret`, timing-safe compared | [oauth.service.ts](../../../api/src/oauth/oauth.service.ts) |
-| token response (section 5.1) | HS256 JWT, 1 h TTL (proposed: RS256 + `Cache-Control: no-store`) | same |
+| token response (section 5.1) | **200 OK**, RS256/ES256 JWT, 1 h TTL, `Cache-Control: no-store` + `Pragma: no-cache` (W0.2) | same |
 | error response (section 5.2) | `unsupported_grant_type` / `invalid_request` / `invalid_client` already emitted | [oauth.controller.ts](../../../api/src/oauth/oauth.controller.ts) |
 | scope (section 3.3) | requested scopes filtered against the client's allowed set | [oauth.service.ts](../../../api/src/oauth/oauth.service.ts) |
 | extension grants (section 4.5) | RFC 8693 token-exchange (proposed WIF) | [WIF section 1.4](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md#14-two-assertion-profiles-rfc-7523-jwt-bearer-and-rfc-8693-token-exchange) |

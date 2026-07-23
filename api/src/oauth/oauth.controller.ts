@@ -1,4 +1,4 @@
-﻿import { Body, Controller, Get, Headers, Post, HttpException, HttpStatus, Optional, Inject } from '@nestjs/common';
+﻿import { Body, Controller, Get, Header, Headers, HttpCode, Post, HttpException, HttpStatus, Optional, Inject } from '@nestjs/common';
 import { Public } from '../modules/auth/public.decorator';
 import { OAuthService } from './oauth.service';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
@@ -64,8 +64,17 @@ export class OAuthController {
     return { message: 'OAuth controller is working!', timestamp: new Date().toISOString(), version: '1.1' };
   }
 
+  // RFC 6749 section 5.1 - a successful token response MUST be HTTP 200 with
+  // `Cache-Control: no-store` + `Pragma: no-cache` (the token is a bearer
+  // credential that must never be cached). These decorators apply to the
+  // success path only; a thrown HttpException keeps its own status (400/401 per
+  // section 5.2) and bypasses the @Header decorators, which is the intended
+  // behavior for error responses.
   @Public()
   @Post('token')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   async getToken(
     @Body() tokenRequest: TokenRequest,
     @Headers('authorization') authorization?: string,

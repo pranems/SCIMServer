@@ -69,7 +69,7 @@ describe('OAuth JWKS publication (Pre-Q.B / B2)', () => {
         client_id: 'e2e-client',
         client_secret: 'e2e-client-secret',
       })
-      .expect(201);
+      .expect(200);
 
     const header = decodeJwtHeader(tokenRes.body.access_token);
     expect(header.alg).toMatch(/^(RS256|ES256)$/);

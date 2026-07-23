@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Header,
   Headers,
+  HttpCode,
   HttpException,
   HttpStatus,
   Inject,
@@ -64,8 +66,17 @@ export class EndpointOAuthController {
     private readonly decisionStore: AuthDecisionRecordStore | null = null,
   ) {}
 
+  // RFC 6749 section 5.1 (+ RFC 8693 section 2.2.1 for the WIF/token-exchange
+  // route) - a successful token response MUST be HTTP 200 with
+  // `Cache-Control: no-store` + `Pragma: no-cache`. One decorator set covers
+  // BOTH sub-routes (client_secret and client_assertion) because both return
+  // through this handler. Thrown HttpExceptions keep their 400/401 status
+  // (section 5.2) and bypass the @Header decorators, as intended for errors.
   @Public()
   @Post('token')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   async getToken(
     @Param('endpointId') endpointId: string,
     @Body() body: EndpointTokenRequest,
