@@ -77,4 +77,30 @@ describe('DetailDrawer', () => {
     expect(screen.getByTestId('cred-drawer-title')).toBeInTheDocument();
     expect(screen.getByTestId('cred-drawer-close')).toBeInTheDocument();
   });
+
+  it('renders Copy-as-JSON + Download-JSON header actions when jsonData is provided', () => {
+    wrap(
+      <DetailDrawer
+        data-testid="cred-drawer"
+        open={true}
+        onClose={() => {}}
+        title="Credential"
+        jsonData={{ id: 'abc', secret: 'shown-in-json-only' }}
+      >
+        <div>body</div>
+      </DetailDrawer>,
+    );
+    expect(screen.getByTestId('cred-drawer-copy-json')).toBeInTheDocument();
+    expect(screen.getByTestId('cred-drawer-download-json')).toBeInTheDocument();
+  });
+
+  it('omits the JSON header actions when jsonData is not provided', () => {
+    wrap(
+      <DetailDrawer data-testid="cred-drawer" open={true} onClose={() => {}} title="Credential">
+        <div>body</div>
+      </DetailDrawer>,
+    );
+    expect(screen.queryByTestId('cred-drawer-copy-json')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cred-drawer-download-json')).not.toBeInTheDocument();
+  });
 });

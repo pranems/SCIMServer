@@ -293,6 +293,8 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
         open={Boolean(detailId)}
         onClose={() => setDetailId(undefined)}
         title={detailQuery.data ? `${detailQuery.data.method} ${detailQuery.data.url}` : 'Log detail'}
+        jsonData={detailQuery.data}
+        jsonFilename={detailId ? `log-${detailId}` : 'log-detail'}
         data-testid="logs-tab-detail-drawer"
       >
         {detailQuery.isLoading && (

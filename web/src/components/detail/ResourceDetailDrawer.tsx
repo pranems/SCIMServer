@@ -399,6 +399,8 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       title={title}
       width="640px"
       footer={footer}
+      jsonData={resource}
+      jsonFilename={`${resource.id ?? 'resource'}`}
       data-testid="resource-detail-drawer"
     >
       <div className={classes.body}>

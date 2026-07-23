@@ -564,6 +564,8 @@ export const LogsPage: React.FC = () => {
             ? `${detailQuery.data.method} ${detailQuery.data.url}`
             : 'Log detail'
         }
+        jsonData={detailQuery.data}
+        jsonFilename={detailId ? `log-${detailId}` : 'log-detail'}
         data-testid="logs-detail-drawer"
         footer={
           <Button

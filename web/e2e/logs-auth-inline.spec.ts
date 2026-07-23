@@ -113,6 +113,38 @@ test.describe('Logs auth integration (U11 + U12)', () => {
     await expect(failed).toContainText('api://expected');
     await expect(failed).toContainText('api://actual');
   });
+
+  test('the log detail drawer offers Copy-as-JSON + Download-JSON of the COMPLETE record', async ({
+    page,
+  }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('logs-row-log-u11-1').click();
+    await expect(page.getByTestId('logs-detail-drawer')).toBeVisible();
+
+    // Both header actions are present on the drawer.
+    await expect(page.getByTestId('logs-detail-drawer-copy-json')).toBeVisible();
+    await expect(page.getByTestId('logs-detail-drawer-download-json')).toBeVisible();
+
+    // OUTCOME (R10): downloading yields a .json file whose parsed content is the
+    // COMPLETE record - including fields the drawer body never renders
+    // (requestHeaders / requestBody / responseHeaders / responseBody).
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByTestId('logs-detail-drawer-download-json').click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('log-log-u11-1.json');
+
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    const parsed = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<string, unknown>;
+    expect(parsed.id).toBe('log-u11-1');
+    expect(parsed).toHaveProperty('requestHeaders');
+    expect(parsed).toHaveProperty('requestBody');
+    expect(parsed).toHaveProperty('responseHeaders');
+    expect(parsed).toHaveProperty('responseBody');
+  });
 });
 
 test.describe('Logs auth durability (V10/V11/V12)', () => {

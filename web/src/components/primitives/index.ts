@@ -33,6 +33,9 @@ export type { CopyableFieldProps } from './CopyableField';
 export { CopyJsonButton } from './CopyJsonButton';
 export type { CopyJsonButtonProps } from './CopyJsonButton';
 
+export { DownloadJsonButton } from './DownloadJsonButton';
+export type { DownloadJsonButtonProps } from './DownloadJsonButton';
+
 export { CopyableJsonBlock } from './CopyableJsonBlock';
 export type { CopyableJsonBlockProps } from './CopyableJsonBlock';
 export { JwtDecodeButton } from './JwtDecodeButton';
