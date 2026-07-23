@@ -85,7 +85,7 @@ flowchart LR
 | Token endpoint HTTP status | **201** (no `@HttpCode`) - guide wants 200 | [endpoint-oauth.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) |
 | `PERSIST_REQUEST_SECRETS` default | **true** - assertions/tokens persisted by default | [logging.service.ts#L86](../../api/src/modules/logging/logging.service.ts#L86) |
 | RFC 8693 handler | **not implemented** (rejected at runtime) | no `subject_token` parse path |
-| Metadata advertises token-exchange | **yes** (untruthful) | [endpoint-oauth-metadata.controller.ts#L53](../../api/src/modules/scim/controllers/endpoint-oauth-metadata.controller.ts#L53) |
+| Metadata advertises token-exchange | **no** - W0.3 delivered (v0.54.64): capability-derived, token-exchange only when the RFC 8693 handler is active | [endpoint-oauth-metadata.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth-metadata.controller.ts) |
 | `assertionProfile` field | persisted (`jwt-bearer` / `token-exchange`) but **inert** | [admin-credential.controller.ts#L97](../../api/src/modules/scim/controllers/admin-credential.controller.ts#L97) |
 | Resource-plane strategy seam | **none** - 491-line `SharedSecretGuard` inlines all methods | [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) |
 | Mint `client_secret` path | **inlined** in the controller | [endpoint-oauth.controller.ts#L189](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts#L189) |
@@ -133,9 +133,9 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Acceptance: token responses are 200 with no-store headers on both the `client_secret` and WIF paths; E2E updated.
 - Deps: none. Estimate: **S**. Risk: Low (client-compat - Entra tolerates 200).
 
-**W0.3 - Capability-derived OAuth metadata** `[Stream SF]`
+**W0.3 - Capability-derived OAuth metadata** `[Stream SF]` - **DELIVERED (v0.54.64)**
 - Tasks: derive [endpoint-oauth-metadata.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth-metadata.controller.ts) from active handler capabilities + endpoint config; stop advertising `token-exchange` until W4; disclose the `private_key_jwt`/SyncFabric-profile nuance per guide 17.4.
-- Acceptance: metadata advertises token-exchange only when the 8693 handler is active; a method appears only with an active compatible credential/trust; test per guide 17.5.
+- Acceptance: metadata advertises token-exchange only when the 8693 handler is active; a method appears only with an active compatible credential/trust; test per guide 17.5. **Done:** the controller now injects the credential repo + config and derives grants/methods from active `oauth_client`/`wif` credentials; token-exchange + `none` are never advertised (no RFC 8693 handler); `private_key_jwt` + `RS256/ES256` + the `x_scimserver_wif_profiles` disclosure appear only with an active WIF trust; fails open to an empty capability set. Coverage: metadata unit 12; `wif-assertion` E2E WI-12 strengthened; live-test `9z-BT`.
 - Deps: none (unblocks nothing but removes a live untruth). Estimate: **M**. Risk: Low.
 
 ### Wave 1 - Perf foundation (X11)

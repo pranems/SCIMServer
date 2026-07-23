@@ -13770,6 +13770,55 @@ Write-Host "`n--- 9z-BS: auth method + endpoint name in logs/activity (X5/X6) Co
 
 
 # ============================================
+# TEST SECTION 9z-BT: capability-derived OAuth metadata (W0.3)
+# ============================================
+$script:currentSection = "9z-BT: capability-derived OAuth metadata (W0.3)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BT: CAPABILITY-DERIVED OAUTH METADATA (W0.3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# The per-endpoint RFC 8414 metadata advertises a grant/method ONLY when the
+# runtime implements it AND the endpoint has an active compatible credential.
+# So: token-exchange is NEVER advertised (no RFC 8693 handler yet); a bare
+# endpoint advertises no auth methods; adding an oauth_client credential makes
+# the client_secret_* methods appear. The metadata route is public (no bearer).
+
+try {
+    $btEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-metacap-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $btId = $btEp.id
+    $btMetaUrl = "$baseUrl/scim/endpoints/$btId/.well-known/oauth-authorization-server"
+
+    # T1: a BARE endpoint (no credentials) advertises client_credentials only and
+    # NO auth methods - nothing is falsely claimed.
+    $btMeta1 = Invoke-RestMethod -Uri $btMetaUrl -Method GET
+    Test-Result -Success (($btMeta1.grant_types_supported -join ',') -eq 'client_credentials') -Message "9z-BT.T1: bare endpoint advertises grant_types_supported = [client_credentials] only"
+    Test-Result -Success ((@($btMeta1.token_endpoint_auth_methods_supported)).Count -eq 0) -Message "9z-BT.T2: bare endpoint advertises NO token_endpoint_auth_methods (nothing falsely claimed)"
+
+    # T3: token-exchange is NEVER advertised (no RFC 8693 handler until Wave 4).
+    Test-Result -Success (-not ($btMeta1.grant_types_supported -contains 'urn:ietf:params:oauth:grant-type:token-exchange')) -Message "9z-BT.T3: token-exchange grant is NOT advertised (no runtime handler)"
+
+    # T4: add an oauth_client credential -> client_secret_* methods now appear.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$btId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "oauth_client"; label = "metacap-client"
+    } | ConvertTo-Json) | Out-Null
+    $btMeta2 = Invoke-RestMethod -Uri $btMetaUrl -Method GET
+    $btM2 = @($btMeta2.token_endpoint_auth_methods_supported)
+    Test-Result -Success ($btM2 -contains 'client_secret_basic' -and $btM2 -contains 'client_secret_post') -Message "9z-BT.T4: an active oauth_client credential makes client_secret_basic + client_secret_post appear"
+    # T5: still no private_key_jwt (no WIF trust) and still no token-exchange.
+    Test-Result -Success (-not ($btM2 -contains 'private_key_jwt')) -Message "9z-BT.T5: private_key_jwt is NOT advertised without an active WIF trust"
+    Test-Result -Success (-not ($btMeta2.grant_types_supported -contains 'urn:ietf:params:oauth:grant-type:token-exchange')) -Message "9z-BT.T6: token-exchange still NOT advertised after adding a secret credential"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$btId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BT: capability-derived metadata section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BT: capability-derived OAuth metadata (W0.3) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

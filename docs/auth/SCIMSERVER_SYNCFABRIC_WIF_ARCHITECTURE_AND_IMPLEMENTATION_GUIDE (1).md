@@ -2205,6 +2205,8 @@ There is intentionally no `Oauth2ClientId` for the current SyncFabric RFC 8693 p
 
 ### 17.1 Current defect
 
+> **RESOLVED (W0.3, api v0.54.64).** The metadata is now capability-derived (see [AUTH_CONSOLIDATED_DELIVERY_PLAN.md](AUTH_CONSOLIDATED_DELIVERY_PLAN.md) W0.3): token-exchange + `none` are never advertised until the RFC 8693 handler ships (Wave 4), `private_key_jwt` + the `x_scimserver_wif_profiles` disclosure appear only with an active WIF trust, and the secret methods appear only with an active `oauth_client` credential. The description below is the pre-fix state, kept for context.
+
 `endpoint-oauth-metadata.controller.ts` currently advertises:
 
 - token exchange; and

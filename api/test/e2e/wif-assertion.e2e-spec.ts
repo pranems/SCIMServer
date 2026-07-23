@@ -431,6 +431,25 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     // jwks_uri points at the SHARED global key set.
     expect(res.body.jwks_uri).toMatch(/\/scim\/oauth\/jwks$/);
     expect(res.body.grant_types_supported).toContain('client_credentials');
+
+    // W0.3 - capability-derived (truthful) metadata. This endpoint has an active
+    // WIF trust, so `private_key_jwt` is advertised with the SyncFabric profile
+    // disclosure; the token-exchange grant + `none` method are NEVER advertised
+    // because there is no RFC 8693 handler yet (delivery-plan Wave 4).
+    expect(res.body.grant_types_supported).not.toContain(
+      'urn:ietf:params:oauth:grant-type:token-exchange',
+    );
+    expect(res.body.token_endpoint_auth_methods_supported).toContain('private_key_jwt');
+    expect(res.body.token_endpoint_auth_methods_supported).not.toContain('none');
+    expect(res.body.token_endpoint_auth_signing_alg_values_supported).toEqual(['RS256', 'ES256']);
+    expect(res.body.x_scimserver_wif_profiles).toEqual([
+      {
+        name: 'syncfabric-rfc7523',
+        client_id_binding: 'target-client-id',
+        assertion_subject_binding: 'independent',
+        resource_parameter_supported: true,
+      },
+    ]);
   });
 
   it('WI-12: per-endpoint metadata is public (no bearer required) and self-consistent', async () => {
