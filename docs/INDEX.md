@@ -227,6 +227,7 @@
 | [POST_V034_CHANGES_ROOT_CAUSE_ANALYSIS.md](POST_V034_CHANGES_ROOT_CAUSE_ANALYSIS.md) | Post-v0.34.0 - 26 commits, 12 issues, N+1 fix |
 | [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) | Azure-specific deployment troubleshooting |
 | [perf/DEV_LATENCY_REGRESSION_RCA.md](perf/DEV_LATENCY_REGRESSION_RCA.md) | X9 - per-endpoint auth latency regression (bcrypt loop skipped for JWT + global secret); measured ~40x; regression gate `9z-BQ` |
+| [perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md) | X11 - WIF token-mint latency (cold ~2,161 ms vs warm ~92 ms); root cause = lazy JWKS fetch (no background refresh) + hot-path `jose` import + `login.windows.net` redirect; pre-caching inventory, industry best practices, RFC 7523/8693 + multi-IdP use-case coverage, ranked options to reach tens of ms |
 
 ## Requirements & Compliance
 
