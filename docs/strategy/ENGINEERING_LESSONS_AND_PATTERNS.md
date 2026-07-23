@@ -91,12 +91,13 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (12 seeded)
+    title Patterns by category (13 seeded)
     "A Test/gate integrity" : 4
     "B Environment/deploy" : 2
     "C Framework/middleware" : 2
     "D Security at sinks" : 1
     "E Process/introspection" : 3
+    "F Design/architecture" : 1
 ```
 
 ### Category A - Test-harness and gate integrity (the false-green family)
@@ -145,6 +146,14 @@ How the agent learns reliably across compaction boundaries.
 | **PE-1** | Capture RCA at fix-confirmation time | Writing all RCA at build-end after compaction lost fidelity (a ~50x recurrence was misremembered as "3+") | Record each issue's symptom/RCA/fix/why the moment the fix goes RED->GREEN, into the per-build ledger | Discipline D1 (this doc) + RCA-ledger rule | operator 2026-06-19 |
 | **PE-2** | Reconcile against the full transcript at build end | In-context recollection alone cannot survive multiple compactions across a long build | Scan the session transcript jsonl for issue signals; map every diagnosed problem to a ledger entry; record provenance | Discipline D2 (this doc) + RCA-ledger rule | operator 2026-06-19 |
 | **PE-3** | Smoke-run before batching | Q6 batched ALL live-tests to a checkpoint; a live-only test bug (PA-2) surfaced one stage later than a per-step local-node run would have | Author AND smoke-run each new live section against one live node in the same step, before deferring the rest of the matrix | Rule: "Author-and-smoke-run-before-batch" | auth I-05 escape |
+
+### Category F - Design and architecture (structural drift)
+
+Structural decay that a correctness-only gate never sees; only an explicit design/architecture look finds it.
+
+| ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
+|---|---|---|---|---|---|
+| **PF-1** | Keep orchestrators thin; decouple by seam | `SharedSecretGuard` grew to 491 lines / ~7 responsibilities by inlining every resource-plane auth method (global secret + bearer + oauth_client + JWT + legacy + trace + flags); the mint plane's `client_secret` path is likewise inlined in the controller while WIF is a clean strategy - the asymmetry hid the drift | A guard/controller/service is an ORCHESTRATOR; each auth method (or per-case behavior) is a STRATEGY behind a seam (mirror the existing `IAssertionTokenProvider` + repository DI-token patterns). Adding the next method should EXTEND (a class + registration), not EDIT a god-file. Counter-check with YAGNI: a seam needs >=2 real impls or one concrete near-term one | Rule: "Design & Architecture Self-Improvement Gate" (copilot-instructions.md) | X12 2026-07-23 |
 
 ---
 
