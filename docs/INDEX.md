@@ -225,6 +225,7 @@
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug log with RCA and resolution |
 | [POST_V034_CHANGES_ROOT_CAUSE_ANALYSIS.md](POST_V034_CHANGES_ROOT_CAUSE_ANALYSIS.md) | Post-v0.34.0 - 26 commits, 12 issues, N+1 fix |
 | [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) | Azure-specific deployment troubleshooting |
+| [perf/DEV_LATENCY_REGRESSION_RCA.md](perf/DEV_LATENCY_REGRESSION_RCA.md) | X9 - per-endpoint auth latency regression (bcrypt loop skipped for JWT + global secret); measured ~40x; regression gate `9z-BQ` |
 
 ## Requirements & Compliance
 

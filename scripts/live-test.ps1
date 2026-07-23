@@ -13614,6 +13614,81 @@ Write-Host "`n--- 9z-BP: admin JWT decode endpoint (W2) Complete ---" -Foregroun
 
 
 # ============================================
+$script:currentSection = "9z-BQ: per-endpoint auth latency gate (X9 perf)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BQ: PER-ENDPOINT AUTH LATENCY GATE (X9 perf)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# REGRESSION GATE for the X9 latency fix. The auth guard used to bcrypt-compare
+# a presented bearer against EVERY active per-endpoint secret credential BEFORE
+# the resource query - an O(active-credentials) x bcrypt (~hundreds of ms each)
+# cost that a JWT (OAuth / WIF) never needed to pay, because a JWT can never
+# match an opaque bcrypt'd secret. This section seeds an endpoint with several
+# secret credentials and then asserts a JWT-authenticated per-endpoint op stays
+# fast: with the fix the loop is skipped (~tens of ms); a regression that
+# reintroduces the loop would blow past the threshold (~N x 350 ms).
+#
+# See docs/perf/DEV_LATENCY_REGRESSION_RCA.md.
+
+# Median of an int array (PowerShell 5.1 + 7.x compatible).
+function Get-Median {
+    param([int[]]$Values)
+    $sorted = $Values | Sort-Object
+    $n = $sorted.Count
+    if ($n -eq 0) { return 0 }
+    if ($n % 2 -eq 1) { return $sorted[[int](($n - 1) / 2)] }
+    return [int]((($sorted[$n / 2 - 1]) + ($sorted[$n / 2])) / 2)
+}
+
+# The JWT-authenticated op must stay well under this even with many seeded
+# credentials. The pre-fix loop with the seeded credential count below would be
+# ~N x 350 ms; the fast (loop-skipped) path is ~tens of ms. 800 ms cleanly
+# separates the two while tolerating cold-container / network variance.
+$perfSeedCredCount = 6
+$perfThresholdMs = 800
+
+try {
+    # Setup: an endpoint that enables per-endpoint secret credentials so the
+    # guard's credential loop is armed.
+    $perfEpBody = @{ name = "perf-gate-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json -Depth 4
+    $perfEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $perfEpBody
+    $perfEpId = $perfEp.id
+    $perfPatch = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True"; SecretTokenBearerAuthEnabled = "True" } } } | ConvertTo-Json -Depth 5
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$perfEpId" -Method PATCH -Headers $headers -Body $perfPatch -ContentType "application/json" | Out-Null
+    $perfScimBase = "$baseUrl/scim/endpoints/$perfEpId"
+
+    # Seed several active bearer credentials so the pre-fix bcrypt loop would be
+    # expensive (each compare is ~hundreds of ms).
+    for ($i = 0; $i -lt $perfSeedCredCount; $i++) {
+        $seedBody = @{ credentialType = "bearer"; label = "perf-seed-$i" } | ConvertTo-Json
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$perfEpId/credentials" -Method POST -Headers $headers -Body $seedBody | Out-Null
+    }
+    Test-Result -Success $true -Message "9z-BQ setup: endpoint + $perfSeedCredCount bearer credentials seeded"
+
+    # Warmup (discard) then measure the JWT-authenticated per-endpoint op. $headers
+    # carries the OAuth JWT (bearer_jwt) - the dominant Entra traffic shape.
+    try { Invoke-RestMethod -Uri "$perfScimBase/Users?count=1" -Headers $headers -TimeoutSec 30 | Out-Null } catch {}
+    $samples = @()
+    for ($i = 0; $i -lt 5; $i++) {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        try { Invoke-RestMethod -Uri "$perfScimBase/Users?count=1" -Headers $headers -TimeoutSec 30 | Out-Null } catch {}
+        $sw.Stop()
+        $samples += [int]$sw.ElapsedMilliseconds
+    }
+    $median = Get-Median -Values $samples
+    Write-Host "  JWT per-endpoint op ms (5 samples): $($samples -join ', ')  median=$median (threshold $perfThresholdMs)" -ForegroundColor Cyan
+    Test-Result -Success ($median -lt $perfThresholdMs) -Message "9z-BQ.T1: JWT per-endpoint op median ${median}ms < ${perfThresholdMs}ms with $perfSeedCredCount seeded credentials (X9: loop is skipped for JWTs)"
+
+    # Cleanup: deleting the endpoint cascades its credentials.
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$perfEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BQ: per-endpoint auth latency gate threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BQ: per-endpoint auth latency gate (X9 perf) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
