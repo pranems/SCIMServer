@@ -89,6 +89,8 @@ import {
   CopyableJsonBlock,
   CopyJsonButton,
 } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -288,6 +290,8 @@ function tryFormatJson(text: string): { ok: true; formatted: string } | { ok: fa
 
 export const WorkbenchPage: React.FC = () => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 6 history columns (time|method|path|status|ms|save).
+  const cols = useResizableColumns('workbench-history', 6, 'workbench-history-col');
   const search = useSearch({ strict: false }) as Record<string, unknown>;
 
   const endpoints = useEndpoints();
@@ -982,20 +986,20 @@ export const WorkbenchPage: React.FC = () => {
           <div className={classes.historyScroll}>
           <table className={classes.historyTable}>
             <colgroup>
-              <col style={{ width: '16%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '40%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
+              <col style={{ width: cols.widths[0] != null ? `${cols.widths[0]}px` : '16%' }} />
+              <col style={{ width: cols.widths[1] != null ? `${cols.widths[1]}px` : '12%' }} />
+              <col style={{ width: cols.widths[2] != null ? `${cols.widths[2]}px` : '40%' }} />
+              <col style={{ width: cols.widths[3] != null ? `${cols.widths[3]}px` : '12%' }} />
+              <col style={{ width: cols.widths[4] != null ? `${cols.widths[4]}px` : '10%' }} />
+              <col style={{ width: cols.widths[5] != null ? `${cols.widths[5]}px` : '10%' }} />
             </colgroup>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>time</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>method</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>path</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>status</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>ms</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>time<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>method<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>path<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>status<ColumnResizeHandle {...cols.handleProps(3)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>ms<ColumnResizeHandle {...cols.handleProps(4)} /></th>
                 <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>save</th>
               </tr>
             </thead>

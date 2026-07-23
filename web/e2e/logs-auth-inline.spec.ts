@@ -272,5 +272,26 @@ test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
     await expect(page.getByTestId('log-row-endpoint-log-x5-crud')).toContainText('x5-endpoint');
     await expect(page.getByTestId('log-row-endpoint-open-log-x5-crud')).toBeVisible();
   });
+
+  test('X7: a log column is resizable by dragging its header handle', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    // The URL column (index 1) carries a drag handle on its right edge.
+    const handle = page.getByTestId('logs-col-resize-1');
+    await expect(handle).toBeAttached();
+    // Measure the header cell (the handle's parent <th>) before + after a drag.
+    const widthOf = async () =>
+      handle.evaluate((el) => (el.parentElement as HTMLElement).getBoundingClientRect().width);
+    const before = await widthOf();
+    const box = await handle.boundingBox();
+    if (!box) throw new Error('resize handle has no bounding box');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 140, box.y + box.height / 2, { steps: 6 });
+    await page.mouse.up();
+    const after = await widthOf();
+    // Dragging the handle right widened the column by roughly the drag distance.
+    expect(after).toBeGreaterThan(before + 60);
+  });
 });
 

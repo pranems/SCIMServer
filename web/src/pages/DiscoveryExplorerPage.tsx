@@ -60,6 +60,8 @@ import {
   type ScimServiceProviderConfig,
 } from '../api/queries';
 import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import {
   compareSchemas,
@@ -496,6 +498,8 @@ const SpcSection: React.FC<{
   secondaryError: unknown;
 }> = ({ primary, primaryLoading, primaryError, secondary, secondaryLoading, secondaryError }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the SPC diff columns (Capability|Primary|Secondary).
+  const cols = useResizableColumns('discovery-spc', 3, 'discovery-spc-col');
   if (primaryLoading) return <LoadingSkeleton count={4} height="32px" />;
   if (primaryError) return <ScimErrorMessage error={primaryError} />;
   if (!primary) return null;
@@ -522,9 +526,9 @@ const SpcSection: React.FC<{
       <table className={classes.diffTable}>
         <thead>
           <tr>
-            <th className={classes.diffHeaderCell}>Capability</th>
-            <th className={classes.diffHeaderCell}>Primary</th>
-            {secondary && <th className={classes.diffHeaderCell}>Secondary</th>}
+            <th className={classes.diffHeaderCell} style={cols.headerProps(0).style}>Capability<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+            <th className={classes.diffHeaderCell} style={cols.headerProps(1).style}>Primary<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+            {secondary && <th className={classes.diffHeaderCell} style={cols.headerProps(2).style}>Secondary</th>}
           </tr>
         </thead>
         <tbody>

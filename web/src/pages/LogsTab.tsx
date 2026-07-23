@@ -28,6 +28,8 @@ import { endpointLogsQueryOptions, useEndpointLog, useAuthDecisions } from '../a
 import type { LogsSearch } from '../routes/search-schemas';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, CopyableJsonBlock, DetailDrawer, AuthDecisionForRequest } from '../components/primitives';
 import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
@@ -80,6 +82,8 @@ export function useEndpointLogs(endpointId: string, page: number, search: string
 
 export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 6 log columns (Method|URL|Status|Auth|Duration|Time).
+  const cols = useResizableColumns('logs-tab', 6, 'logs-tab-col');
   const search = useSearch({ strict: false }) as Partial<LogsSearch>;
   const page = search.page ?? 1;
   // Phase N4: fall back to the persisted user preference when no URL override is set.
@@ -205,12 +209,12 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
       <table className={classes.table}>
         <thead>
           <tr>
-            <th className={mergeClasses(classes.th, classes.colMethod)}>Method</th>
-            <th className={mergeClasses(classes.th, classes.colUrl)}>URL</th>
-            <th className={mergeClasses(classes.th, classes.colStatus)}>Status</th>
-            <th className={mergeClasses(classes.th, classes.colStatus)}>Auth</th>
-            <th className={mergeClasses(classes.th, classes.colDuration)}>Duration</th>
-            <th className={mergeClasses(classes.th, classes.colTime)}>Time</th>
+            <th className={mergeClasses(classes.th, classes.colMethod)} style={cols.headerProps(0).style}>Method<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+            <th className={mergeClasses(classes.th, classes.colUrl)} style={cols.headerProps(1).style}>URL<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+            <th className={mergeClasses(classes.th, classes.colStatus)} style={cols.headerProps(2).style}>Status<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+            <th className={mergeClasses(classes.th, classes.colStatus)} style={cols.headerProps(3).style}>Auth<ColumnResizeHandle {...cols.handleProps(3)} /></th>
+            <th className={mergeClasses(classes.th, classes.colDuration)} style={cols.headerProps(4).style}>Duration<ColumnResizeHandle {...cols.handleProps(4)} /></th>
+            <th className={mergeClasses(classes.th, classes.colTime)} style={cols.headerProps(5).style}>Time</th>
           </tr>
         </thead>
         <tbody>

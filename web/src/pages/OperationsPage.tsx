@@ -58,6 +58,8 @@ import {
   type DatabaseGroupRow,
 } from '../api/queries';
 import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 
@@ -297,6 +299,8 @@ const UsersSection: React.FC<{
   onPage: (p: number) => void;
 }> = ({ data, isLoading, error, search, activeOnly, page, onSearch, onActiveOnly, onPage }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 4 columns (userName|active|endpoint|created).
+  const cols = useResizableColumns('operations-users', 4, 'operations-users-col');
 
   const rows = data?.users ?? [];
   const pagination = data?.pagination;
@@ -357,10 +361,10 @@ const UsersSection: React.FC<{
           <table className={classes.rowTable}>
             <thead>
               <tr>
-                <th className={mergeClasses(classes.rowHeader, classes.colName)}>userName</th>
-                <th className={mergeClasses(classes.rowHeader, classes.colActive)}>active</th>
-                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)}>endpoint</th>
-                <th className={mergeClasses(classes.rowHeader, classes.colCreated)}>created</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colName)} style={cols.headerProps(0).style}>userName<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colActive)} style={cols.headerProps(1).style}>active<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)} style={cols.headerProps(2).style}>endpoint<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colCreated)} style={cols.headerProps(3).style}>created</th>
               </tr>
             </thead>
             <tbody>
@@ -464,6 +468,8 @@ const GroupsSection: React.FC<{
   onPage: (p: number) => void;
 }> = ({ data, isLoading, error, search, page, onSearch, onPage }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 4 columns (displayName|members|endpoint|created).
+  const cols = useResizableColumns('operations-groups', 4, 'operations-groups-col');
   const rows = data?.groups ?? [];
   const pagination = data?.pagination;
 
@@ -517,10 +523,10 @@ const GroupsSection: React.FC<{
           <table className={classes.rowTable}>
             <thead>
               <tr>
-                <th className={mergeClasses(classes.rowHeader, classes.colName)}>displayName</th>
-                <th className={mergeClasses(classes.rowHeader, classes.colMembers)}>members</th>
-                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)}>endpoint</th>
-                <th className={mergeClasses(classes.rowHeader, classes.colCreated)}>created</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colName)} style={cols.headerProps(0).style}>displayName<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colMembers)} style={cols.headerProps(1).style}>members<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)} style={cols.headerProps(2).style}>endpoint<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colCreated)} style={cols.headerProps(3).style}>created</th>
               </tr>
             </thead>
             <tbody>

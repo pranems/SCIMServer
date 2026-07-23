@@ -31,6 +31,8 @@ import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { UsersSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
@@ -107,6 +109,8 @@ interface UsersTabProps {
 
 export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 4 user columns (Username|Display Name|Status|Created).
+  const cols = useResizableColumns('users', 4, 'users-col');
   // Strict-false fallback to defaults so the component still renders if
   // mounted outside the typed route (e.g. in unit tests that haven't yet
   // wired the route schema).
@@ -215,10 +219,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
       <table className={classes.table}>
         <thead>
           <tr>
-            <th className={mergeClasses(classes.th, classes.thUsername)}>Username</th>
-            <th className={mergeClasses(classes.th, classes.thDisplayName)}>Display Name</th>
-            <th className={mergeClasses(classes.th, classes.thStatus)}>Status</th>
-            <th className={mergeClasses(classes.th, classes.thCreated)}>Created</th>
+            <th className={mergeClasses(classes.th, classes.thUsername)} style={cols.headerProps(0).style}>Username<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+            <th className={mergeClasses(classes.th, classes.thDisplayName)} style={cols.headerProps(1).style}>Display Name<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+            <th className={mergeClasses(classes.th, classes.thStatus)} style={cols.headerProps(2).style}>Status<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+            <th className={mergeClasses(classes.th, classes.thCreated)} style={cols.headerProps(3).style}>Created</th>
           </tr>
         </thead>
         <tbody>
