@@ -141,7 +141,14 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
 
     const payload = decodePayload(res.body.access_token);
     expect(payload.endpoint_id).toBe(endpointId);
-    expect(payload.sub).toBe(SUBJECT);
+    // W3.2 - the issued token identifies the OAuth CLIENT (the endpoint's own
+    // identity, the endpointId here since no explicit targetClientId), NEVER
+    // the federated assertion subject.
+    expect(payload.sub).toBe(endpointId);
+    expect(payload.client_id).toBe(endpointId);
+    expect(payload.sub).not.toBe(SUBJECT);
+    // The federated assertion subject is preserved as a DISTINCT claim.
+    expect(payload.src_sub).toBe(SUBJECT);
     // WI-17: the minted token is source-stamped with the winning trust's issuer.
     expect(payload.src_iss).toBe(ISSUER);
   });
@@ -155,6 +162,48 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .get(`/scim/endpoints/${endpointId}/Users`)
       .set('Authorization', `Bearer ${minted}`)
       .expect(200);
+  });
+
+  it('W3.2: mints with the trust\'s explicit targetClientId as the issued client_id (not the assertion subject)', async () => {
+    // A dedicated endpoint whose WIF trust pins an explicit target client id.
+    const tcEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${tcEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Entra WIF (target-client)',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: ISSUER,
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: TENANT,
+          requiredRoles: ['Scim.Provision'],
+          scope: 'scim.read scim.write',
+          issuedTokenTtlSec: 7200,
+          targetClientId: 'scim-wif-client-e2e',
+        },
+      })
+      .expect(201);
+
+    const assertion = await signAssertion();
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${tcEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(200);
+
+    const payload = decodePayload(res.body.access_token);
+    // The operator-configured target client id is the issued OAuth client id.
+    expect(payload.sub).toBe('scim-wif-client-e2e');
+    expect(payload.client_id).toBe('scim-wif-client-e2e');
+    // The federated assertion subject is preserved as the distinct src_sub claim.
+    expect(payload.src_sub).toBe(SUBJECT);
+    expect(payload.sub).not.toBe(SUBJECT);
   });
 
   // ─── WI-16 - multiple WIF trusts on one endpoint (iterate, not first-only) ──

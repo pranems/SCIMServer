@@ -25,6 +25,14 @@ export interface WifTrust {
   expectedResource?: string | null;
   scope?: string;
   issuedTokenTtlSec?: number;
+  /**
+   * W3.2 - the OAuth client id SCIMServer issues its own token as. The
+   * federated assertion's `sub` (the workload identity) is NEVER used as the
+   * issued `client_id`; when this is unset the mint falls back to the stable
+   * per-endpoint identity (the endpointId). Optional + additive: existing
+   * trusts without it keep the endpointId-derived client identity.
+   */
+  targetClientId?: string;
   // ── A4 seams (inert in A4: stored + computed in shadow, never enforced) ──
   /** per-app vs first-party identity model (telemetry attribution). */
   identityModel?: IdentityModel;

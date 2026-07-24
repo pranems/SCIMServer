@@ -257,5 +257,27 @@ describe('OAuthService', () => {
       const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
       expect(payload).not.toHaveProperty('src_iss');
     });
+
+    it('W3.2: stamps src_sub distinct from sub/client_id when sourceSubject is supplied (WIF identity separation)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'scim-wif-client-abc', undefined, {
+        trustedScope: 'scim.read',
+        sourceSubject: 'sp-object-id-federated',
+      });
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      // The issued OAuth client identity is the target client id, NEVER the
+      // federated assertion subject.
+      expect(payload.sub).toBe('scim-wif-client-abc');
+      expect(payload.client_id).toBe('scim-wif-client-abc');
+      // The federated assertion subject is preserved as a DISTINCT claim for
+      // attribution only.
+      expect(payload.src_sub).toBe('sp-object-id-federated');
+      expect(payload.sub).not.toBe('sp-object-id-federated');
+    });
+
+    it('W3.2: omits src_sub when sourceSubject is not supplied (plain oauth_client)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload).not.toHaveProperty('src_sub');
+    });
   });
 });

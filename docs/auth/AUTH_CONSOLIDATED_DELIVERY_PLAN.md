@@ -213,11 +213,13 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Tasks: `targetClientBinding.acceptedClientIds` (generate `scim-wif-client-<rand>`); validate the form `client_id`; stop assigning assertion `sub` to issued `client_id`; keep source subject visible-but-distinct in AT2.
 - Acceptance: a valid assertion presented with a wrong `client_id` is rejected (`wif_client_id_mismatch`); AT2 `client_id` != assertion `sub`; connection-info shows the generated client ID, not `sub`.
 - Deps: W3.1. Estimate: **M**. Risk: Medium (breaking for any config that relied on the old conflation - shadow first).
+- **Status: DELIVERED (partial, right-sized) - api v0.54.76.** The identity-separation core is done: the issued token's `sub`/`client_id` are now the trust's optional `targetClientId` (or the endpointId), NEVER the assertion `sub`, which rides the distinct `src_sub` claim. This makes the already-advertised `x_scimserver_wif_profiles` binding (`client_id_binding: target-client-id`, `assertion_subject_binding: independent`) truthful. Deferred (not needed until W4/RFC 8693): the form-`client_id` **validation** against `acceptedClientIds[]` with a `wif_client_id_mismatch` reject - the SyncFabric RFC 7523 flow does not currently send a form `client_id`, so there is nothing to bind against yet. Report: [WAVE3_W3_2_IMPLEMENTATION_REPORT.md](WAVE3_W3_2_IMPLEMENTATION_REPORT.md).
 
 **W3.3 - Remove endpoint-UUID audience default** `[guide gap]`
 - Tasks: require an explicit `expectedAudience`; flag endpoint-ID-like audiences as likely misconfiguration.
 - Acceptance: no derived-from-endpoint-UUID audience path remains; validation requires the value.
 - Deps: W3.1. Estimate: **S**. Risk: Low (guarded by shadow/observe).
+- **Status: DEFERRED (operator decision conflict).** The endpointId audience default is a *documented operator decision* ([CONNECTION_INFO_AND_ENTRA_SETUP.md](CONNECTION_INFO_AND_ENTRA_SETUP.md): "Audience = endpointId (operator decision)... a per-endpoint audience also blocks cross-endpoint token replay"). Reversing it to hard-require an explicit audience needs operator confirmation. Note that `buildTrust` already requires a non-empty `expectedAudience` at mint time - the endpointId is only a *config-time* proposed default, never a silent validation-time derivation, so there is no correctness hole to close unilaterally.
 
 **W3.4 - SuccessFactors `resource` policy** `[guide 13.3]`
 - Tasks: `resourceMode = ignore | optionalExact | requiredExact` + `expectedResource`; legacy starts `ignore` with shadow diagnostics.

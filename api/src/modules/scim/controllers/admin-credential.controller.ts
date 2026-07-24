@@ -103,6 +103,12 @@ interface WifTrustInput {
   jwksUri: string;
   allowedTenantId: string;
   /**
+   * W3.2 - the OAuth client id the endpoint's issued token is minted as. The
+   * federated assertion `sub` is NEVER used as the issued `client_id`; absent,
+   * the mint uses the endpointId. All public (non-secret).
+   */
+  targetClientId?: string;
+  /**
    * U8 - when `allowedTenantId` was gleaned from the issuer/JWKS URI rather than
    * supplied explicitly, this non-secret marker records which input it came from
    * so the UI can show "Inferred from {issuer|JWKS URI}". Absent when explicit.
@@ -123,6 +129,7 @@ const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
   'assertionProfile', 'subjectTokenType', 'expectedResource', 'expectedIssuer',
   'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId',
   'allowedTenantIdSource',
+  'targetClientId',
   'requiredRoles', 'scope', 'issuedTokenTtlSec',
   // A4 seams
   'identityModel', 'roleScopeMap', 'grantedScopes', 'roleEnforcement',

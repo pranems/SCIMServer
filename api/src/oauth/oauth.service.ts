@@ -151,7 +151,7 @@ export class OAuthService {
     endpointId: string,
     clientId: string,
     requestedScope?: string,
-    options?: { ttlSec?: number; trustedScope?: string; sourceIssuer?: string },
+    options?: { ttlSec?: number; trustedScope?: string; sourceIssuer?: string; sourceSubject?: string },
   ): Promise<AccessToken> {
     const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
 
@@ -186,6 +186,15 @@ export class OAuthService {
       // oauth_client mints (no source issuer).
       ...(options?.sourceIssuer && options.sourceIssuer.trim().length > 0
         ? { src_iss: options.sourceIssuer.trim() }
+        : {}),
+      // W3.2 - the issued token's `sub`/`client_id` identify the OAuth CLIENT
+      // (the endpoint's own client identity), never the federated assertion
+      // subject. When the mint was driven by a WIF assertion, the source
+      // subject is preserved as a DISTINCT `src_sub` claim for attribution
+      // only, keeping the OAuth client identity and the federated principal as
+      // separate values (RFC 6749 client_id vs the RFC 7523 assertion sub).
+      ...(options?.sourceSubject && options.sourceSubject.trim().length > 0
+        ? { src_sub: options.sourceSubject.trim() }
         : {}),
     };
 

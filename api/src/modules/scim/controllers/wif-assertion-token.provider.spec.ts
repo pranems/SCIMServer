@@ -117,12 +117,26 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       jwksUri: wifMetadata.jwksUri,
       allowedTenantId: 'tenant-123',
     }));
-    // Token minted with the configured scope + ttl (admin-trusted).
+    // W3.2 - the issued token's client_id is the endpoint's OWN client identity
+    // (the endpointId, since this trust has no explicit targetClientId), NOT the
+    // federated assertion subject. The assertion subject rides `sourceSubject`
+    // (stamped as the distinct `src_sub` claim) for attribution only.
     expect(generateEndpointAccessToken).toHaveBeenCalledWith(
       'ep-1',
-      wifMetadata.expectedSubject,
+      'ep-1',
       undefined,
-      expect.objectContaining({ ttlSec: 7200, trustedScope: 'scim.read scim.write' }),
+      expect.objectContaining({
+        ttlSec: 7200,
+        trustedScope: 'scim.read scim.write',
+        sourceSubject: wifMetadata.expectedSubject,
+      }),
+    );
+    // The assertion subject must NEVER be passed as the issued client_id (W3.2).
+    expect(generateEndpointAccessToken).not.toHaveBeenCalledWith(
+      'ep-1',
+      wifMetadata.expectedSubject,
+      expect.anything(),
+      expect.anything(),
     );
     // WI-D4 - exactly one canonical AUTH decision event (accept) is emitted.
     const acceptEvents = logger.info.mock.calls.filter((c) => c[1] === 'Auth decision');
@@ -134,6 +148,25 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     const accepted = decisionStore.query({ endpointId: 'ep-1' });
     expect(accepted).toHaveLength(1);
     expect(accepted[0].outcome).toBe('accept');
+  });
+
+  it("W3.2: mints with the trust's explicit targetClientId as the issued client_id (not the assertion subject)", async () => {
+    const cred = wifCredential();
+    cred.metadata = { ...wifMetadata, targetClientId: 'scim-wif-client-abc123' };
+    findActiveByEndpoint.mockResolvedValue([cred]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    // The operator-configured target client id is the issued client_id; the
+    // assertion subject rides `sourceSubject` only.
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1',
+      'scim-wif-client-abc123',
+      undefined,
+      expect.objectContaining({ sourceSubject: wifMetadata.expectedSubject }),
+    );
   });
 
   it('threads the endpoint-level egress overrides into the validator', async () => {
@@ -350,10 +383,11 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
 
     await provider.mintFromAssertion('ep-1', assertionWithIssuer('https://issuer-src/v2.0'));
 
-    // The mint call carries the winning trust's issuer as sourceIssuer.
+    // The mint call carries the winning trust's issuer as sourceIssuer, and
+    // issues the endpoint's own client identity (W3.2), not the assertion sub.
     expect(generateEndpointAccessToken).toHaveBeenCalledWith(
       'ep-1',
-      wifMetadata.expectedSubject,
+      'ep-1',
       undefined,
       expect.objectContaining({ sourceIssuer: 'https://issuer-src/v2.0' }),
     );

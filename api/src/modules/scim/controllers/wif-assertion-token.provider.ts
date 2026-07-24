@@ -120,15 +120,24 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         continue;
       }
 
+      // W3.2 - the issued token identifies the OAuth CLIENT, not the federated
+      // assertion subject. Use the trust's explicit `targetClientId` when the
+      // operator configured one, otherwise the stable per-endpoint identity
+      // (the endpointId, which is also the default `oauth_client` client_id).
+      // The assertion subject rides `sourceSubject` -> the distinct `src_sub`
+      // claim for attribution only, so the two identities stay separate.
+      const issuedClientId = trust.targetClientId ?? endpointId;
       const token = await this.oauthService.generateEndpointAccessToken(
         endpointId,
-        String(claims.sub),
+        issuedClientId,
         undefined,
         {
           ttlSec: trust.issuedTokenTtlSec,
           trustedScope: trust.scope,
           // WI-17 - stamp the winning trust's issuer for source attribution.
           sourceIssuer: trust.expectedIssuer,
+          // W3.2 - preserve the federated assertion subject as a distinct claim.
+          sourceSubject: String(claims.sub),
         },
       );
 
@@ -315,6 +324,12 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       expectedAudience: requireString('expectedAudience'),
       jwksUri: requireString('jwksUri'),
       allowedTenantId: requireString('allowedTenantId'),
+      // W3.2 - optional OAuth client id the issued token is minted as (never
+      // the assertion subject). Absent -> the mint uses the endpointId.
+      targetClientId:
+        typeof m.targetClientId === 'string' && m.targetClientId.length > 0
+          ? m.targetClientId
+          : undefined,
       requiredRoles: Array.isArray(m.requiredRoles)
         ? (m.requiredRoles as unknown[]).filter((r): r is string => typeof r === 'string')
         : undefined,

@@ -14028,6 +14028,72 @@ Write-Host "`n--- 9z-BW: logs survive endpoint deletion Complete ---" -Foregroun
 
 
 # ============================================
+# TEST SECTION 9z-BX: WIF issued-token identity separation contract (W3.2)
+# ============================================
+$script:currentSection = "9z-BX: WIF identity separation (W3.2)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BX: WIF ISSUED-TOKEN IDENTITY SEPARATION (W3.2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# W3.2 keeps the OAuth client identity SCIMServer issues its token as SEPARATE
+# from the federated assertion subject: the issued client_id is the trust's
+# explicit `targetClientId` (or the endpointId), NEVER the assertion `sub`. The
+# actual accept-path mint needs a real IdP-signed assertion (covered by the E2E
+# with a mocked JWKS), so on the wire we assert the two things that ARE live-
+# verifiable: (a) the per-endpoint metadata truthfully advertises the
+# independent-subject / target-client-id binding this contract fulfills, and
+# (b) an explicit `targetClientId` persists on the trust with no secret leak.
+
+try {
+    $bxEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wifident-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bxId = $bxEp.id
+
+    # Enable WIF so the trust create is not refused by the WI-11 enablement gate.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bxId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    # Create a WIF trust (config-time metadata; no real IdP needed) that pins an
+    # explicit target client id distinct from the expected assertion subject.
+    $bxTrust = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bxId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "wif-ident-w32"
+        wif = @{
+            assertionProfile   = "jwt-bearer"
+            expectedIssuer     = "https://login.microsoftonline.com/bx-tenant/v2.0"
+            expectedSubject    = "sp-object-id-federated-bx"
+            expectedAudience   = $bxId
+            jwksUri            = "https://login.microsoftonline.com/bx-tenant/discovery/v2.0/keys"
+            allowedTenantId    = "bx-tenant"
+            scope              = "scim.read scim.write"
+            targetClientId     = "scim-wif-client-bx"
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($bxTrust.credentialType -eq "wif") -Message "9z-BX.T1: WIF trust with explicit targetClientId persisted"
+
+    # T2: the persisted trust carries targetClientId and leaks NO secret/hash.
+    $bxJson = ($bxTrust | ConvertTo-Json -Depth 8)
+    Test-Result -Success ($bxJson -match '"targetClientId"\s*:\s*"scim-wif-client-bx"') -Message "9z-BX.T2: targetClientId is persisted on the trust"
+    Test-Result -Success (-not ($bxJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-BX.T3: WIF trust response carries NO secret/hash/token"
+
+    # T4: the per-endpoint metadata truthfully advertises the W3.2 binding: the
+    # issued client_id is target-client-id and the assertion subject is
+    # independent of it (this is exactly what W3.2 makes true at mint time).
+    $bxMeta = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$bxId/.well-known/oauth-authorization-server" -Method GET
+    $bxProfile = @($bxMeta.x_scimserver_wif_profiles | Where-Object { $_.name -eq "syncfabric-rfc7523" })[0]
+    Test-Result -Success ($null -ne $bxProfile -and $bxProfile.client_id_binding -eq "target-client-id") -Message "9z-BX.T4: metadata advertises client_id_binding = target-client-id"
+    Test-Result -Success ($null -ne $bxProfile -and $bxProfile.assertion_subject_binding -eq "independent") -Message "9z-BX.T5: metadata advertises assertion_subject_binding = independent (W3.2)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bxId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BX: WIF identity separation section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BX: WIF identity separation (W3.2) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
