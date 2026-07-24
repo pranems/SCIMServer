@@ -7,8 +7,12 @@
  * Design: docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md Part 6.
  *
  * Contract guarantees:
- *  - NO secrets are ever present. `secretToken` / `clientSecret` are always
- *    null; secrets remain one-time-at-create on the credential-create path.
+ *  - Secrets are WITHHELD by default (`secretToken` / `clientSecret` are null);
+ *    they are inlined ONLY when the effective `CredentialSecretVisibility` is
+ *    `always` (resolved upstream in the controller and passed in via the
+ *    `secrets` argument), which is an admin-only, audit-logged recipe
+ *    disclosure (WI-8). Per-endpoint credential secrets otherwise remain
+ *    one-time-at-create on the credential-create path.
  *  - The URL shapes match the authoritative forms in Part 2: the customer-
  *    facing SCIM base is the LEADING `/scim/v2/endpoints/{id}` form (WI-1),
  *    the per-endpoint token endpoint is the bare `/scim/endpoints/{id}/oauth/token`
