@@ -13793,6 +13793,9 @@ Write-Host "========================================" -ForegroundColor Yellow
 try {
     # Generate an endpoint-scoped, authenticated request so a log row exists.
     Invoke-RestMethod -Uri "$scimBase/Users?count=1" -Headers $headers | Out-Null
+    # Force-drain the buffered write so the just-produced row (for the EXISTING
+    # main test endpoint) is queryable in the logs list + dashboard immediately.
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers | Out-Null } catch {}
 
     # X5/X6 - the global logs list carries endpointId + auth summary per row.
     $bsLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=100&includeAdmin=true" -Headers $headers
@@ -14015,7 +14018,11 @@ try {
     # Force-drain the buffer; with the FK still present this createMany would fail.
     $bwDetail = Get-LogDetailByRequestId $bwRid
     Test-Result -Success ($null -ne $bwDetail) -Message "9z-BW.T2: the request-log row still persists after the endpoint was deleted (no FK-batch failure)"
-    Test-Result -Success ($null -ne $bwDetail -and $bwDetail.endpointId -eq $bwId) -Message "9z-BW.T3: the persisted row keeps its endpointId correlation to the deleted endpoint"
+    # The endpointId correlation is surfaced on the logs LIST row (the detail
+    # projection omits it); read it back by requestId to prove it is retained.
+    $bwList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($bwRid))&includeAdmin=true&pageSize=10" -Headers $headers
+    $bwRow = @($bwList.items | Where-Object { $_.requestId -eq $bwRid })[0]
+    Test-Result -Success ($null -ne $bwRow -and $bwRow.endpointId -eq $bwId) -Message "9z-BW.T3: the persisted row keeps its endpointId correlation to the deleted endpoint"
 } catch {
     Test-Result -Success $false -Message "9z-BW: logs-survive-deletion section threw: $($_.Exception.Message)"
 }
