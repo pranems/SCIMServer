@@ -182,7 +182,7 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Acceptance: parser rejects duplicate/mixed-method/oversized bodies; controller only routes + shapes responses.
 - Deps: W2.1 (shared shape). Estimate: **M**. Risk: Low.
 
-**W2.3 - `client_secret` mint -> provider** `[X12 Phase 2]`
+**W2.3 - `client_secret` mint -> provider** `[X12 Phase 2]` - **DELIVERED (v0.54.70)**
 - Tasks: extract the inlined `client_secret` path into `ClientSecretTokenProvider` implementing the mint seam; controller delegates.
 - Acceptance: controller has no bcrypt/repo logic; `endpoint-oauth.controller.spec.ts` + E2E green.
 - Deps: W2.1, W2.2. Estimate: **M**. Risk: Low.

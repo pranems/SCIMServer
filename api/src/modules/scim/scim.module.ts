@@ -16,6 +16,7 @@ import { AdminAuthenticationMethodController } from './controllers/admin-authent
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
 import { EndpointOAuthMetadataController } from './controllers/endpoint-oauth-metadata.controller';
 import { ASSERTION_TOKEN_PROVIDER } from './controllers/assertion-token-provider';
+import { ClientSecretTokenProvider } from './controllers/client-secret-token-provider';
 import { WifAssertionTokenProvider } from './controllers/wif-assertion-token.provider';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
@@ -86,6 +87,8 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     ConnectionSecretResolverService,
     CredentialEncryptionService,
     CredentialSecurityService,
+    // W2.3 - the client_secret mint provider (credential lookup + bcrypt + mint).
+    ClientSecretTokenProvider,
     // Q6 - bind the A3 assertion-provider seam to the WIF validate+issue pipeline.
     WifAssertionTokenProvider,
     {

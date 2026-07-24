@@ -11,11 +11,7 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { Public } from '../../auth/public.decorator';
-import { OAuthService } from '../../../oauth/oauth.service';
-import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
-import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
@@ -24,6 +20,7 @@ import {
   ASSERTION_TOKEN_PROVIDER,
   type IAssertionTokenProvider,
 } from './assertion-token-provider';
+import { ClientSecretTokenProvider } from './client-secret-token-provider';
 import { parseEndpointTokenRequest } from './endpoint-token-request-parser';
 import type { ParsedEndpointTokenRequest } from './endpoint-token-request.types';
 import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
@@ -58,9 +55,7 @@ interface EndpointTokenRequest {
 @Controller('endpoints/:endpointId/oauth')
 export class EndpointOAuthController {
   constructor(
-    private readonly oauthService: OAuthService,
-    @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
-    private readonly credentialRepo: IEndpointCredentialRepository,
+    private readonly clientSecretProvider: ClientSecretTokenProvider,
     private readonly logger: ScimLogger,
     @Optional() @Inject(ASSERTION_TOKEN_PROVIDER)
     private readonly assertionProvider: IAssertionTokenProvider | null = null,
@@ -157,82 +152,36 @@ export class EndpointOAuthController {
     endpointId: string,
     parsed: Extract<ParsedEndpointTokenRequest, { kind: 'client_secret' }>,
   ) {
-    // The parser guarantees client_id + client_secret are present for this
-    // variant, so no re-validation is needed here.
     const clientId = parsed.clientId;
-    const credentialLocation = parsed.credentialLocation;
 
-    const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
-    const candidate = credentials.find(
-      (c) => c.credentialType === 'oauth_client' && c.metadata?.clientId === clientId,
-    );
+    // W2.3 - the credential lookup + bcrypt verification + mint live in the
+    // ClientSecretTokenProvider. The controller owns only the cross-cutting
+    // response shaping, the W2.5 shadow read, and the decision emission.
+    const result = await this.clientSecretProvider.mintFromClientSecret(endpointId, {
+      clientId,
+      clientSecret: parsed.clientSecret,
+      credentialLocation: parsed.credentialLocation,
+      ...(parsed.scope !== undefined ? { scope: parsed.scope } : {}),
+    });
 
-    const secretValid =
-      candidate != null && (await bcrypt.compare(parsed.clientSecret, candidate.credentialHash));
-
-    // Phase 1 - build the per-check trace for the oauth_client decision so the
-    // diagnostics table shows real expected-vs-received (never the secret
-    // value). `credential_location` answers "how did the client present its
-    // secret" (basic vs post); `client_found` + `secret_match` answer why the
-    // decision went the way it did.
-    const oauthChecks: AuthCheck[] = [
-      {
-        id: 'grant_type',
-        status: 'pass',
-        expected: 'client_credentials',
-        received: 'client_credentials',
-      },
-      {
-        id: 'credential_location',
-        status: 'pass',
-        expected: 'client_secret_basic | client_secret_post',
-        received: credentialLocation,
-      },
-      {
-        id: 'client_id_present',
-        status: clientId ? 'pass' : 'fail',
-        expected: 'present',
-        received: clientId ? 'present' : 'absent',
-      },
-      {
-        id: 'client_found',
-        status: candidate != null ? 'pass' : 'fail',
-        expected: '(a registered oauth_client for this endpoint)',
-        received: candidate != null ? 'found' : 'not found',
-      },
-      {
-        id: 'secret_match',
-        status: secretValid ? 'pass' : 'fail',
-        expected: '(the registered client secret)',
-        // Never echo the secret; only whether the bcrypt compare matched.
-        received: secretValid ? 'match' : 'mismatch',
-      },
-    ];
-
-    if (!candidate || !secretValid) {
+    if (result.outcome === 'reject') {
       this.logger.warn(LogCategory.OAUTH, 'Per-endpoint oauth_client authentication failed', {
         endpointId,
         clientId,
-        credentialFound: candidate != null,
       });
-      // WI-D4 - one canonical AUTH decision event (reject). The distinguishing
-      // fact (credentialFound) stays in the diagnostic warn above; the decision
-      // event carries only the merged (T3) reason code - but the per-check trace
+      // WI-D4 - one canonical AUTH decision event (reject); the per-check trace
       // still shows client_found vs secret_match so the operator sees the step.
       this.emitOauthClientDecision(endpointId, 'reject', {
-        reasonCode: 'oauth_client_auth_failed',
-        checks: oauthChecks,
+        reasonCode: result.reasonCode,
+        checks: result.checks,
       });
-      throw this.invalidClient('oauth_client_auth_failed');
+      throw this.invalidClient(result.reasonCode);
     }
 
-    const token = await this.oauthService.generateEndpointAccessToken(
-      endpointId,
-      clientId,
-      parsed.scope,
-    );
+    const token = result.token;
+    const oauthChecks = result.checks;
 
-    // W2.5 (shadow) - the mint plane now CONSULTS the same per-method enablement
+    // W2.5 (shadow) - the mint plane CONSULTS the same per-method enablement
     // source as the resource guard + create-gate, fixing the design 7.1 mint-vs-
     // resource asymmetry. It runs in SHADOW: when the `oauth_client` method is
     // disabled for this endpoint (the disabled-with-credential state) it records

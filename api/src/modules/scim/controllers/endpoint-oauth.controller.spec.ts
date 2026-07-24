@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import { EndpointOAuthController } from './endpoint-oauth.controller';
+import { ClientSecretTokenProvider } from './client-secret-token-provider';
 
 /**
  * A3 - per-endpoint token-endpoint routing cascade unit tests.
@@ -27,9 +28,12 @@ function makeController(opts: {
   const credentialRepo: any = {
     findActiveByEndpoint: jest.fn().mockResolvedValue(opts.credentials ?? []),
   };
+  // W2.3 - the controller delegates the client_secret mint to the real provider,
+  // constructed here with the mock repo + oauthService so the existing setup
+  // (credentials + secrets) still drives the mint through the extracted logic.
+  const clientSecretProvider = new ClientSecretTokenProvider(credentialRepo, oauthService);
   const controller = new EndpointOAuthController(
-    oauthService,
-    credentialRepo,
+    clientSecretProvider,
     logger,
     opts.assertionProvider ?? null,
     opts.decisionStore ?? null,
