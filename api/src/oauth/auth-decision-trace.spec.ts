@@ -3,6 +3,7 @@ import {
   mapJwksErrorToReason,
   describeTraceReason,
   emitAuthDecisionEvent,
+  emitAndRecordAuthDecision,
   AUTH_DECISION_EVENT,
   type AuthDecisionTrace,
 } from './auth-decision-trace';
@@ -203,6 +204,48 @@ describe('WI-D3 AuthDecisionTrace', () => {
       const data = logger.warn.mock.calls[0][2];
       expect('selectedTrustId' in data).toBe(false);
       expect('endpointId' in data).toBe(false);
+    });
+  });
+
+  // W2.4 - the single emit+record choke point used by the guard, the mint
+  // controllers, and the WIF provider (replaces 4 hand-rolled emit+record pairs).
+  describe('W2.4 emitAndRecordAuthDecision', () => {
+    const makeLogger = () => ({ info: jest.fn(), warn: jest.fn() });
+    const trace: AuthDecisionTrace = {
+      plane: 'token-mint',
+      method: 'oauth_client',
+      outcome: 'reject',
+      reasonCode: 'oauth_client_auth_failed',
+      checks: [{ id: 'secret_match', status: 'fail' }],
+    };
+
+    it('emits the canonical event AND records to the store', () => {
+      const logger = makeLogger();
+      const store = { record: jest.fn() };
+      emitAndRecordAuthDecision(logger, trace, store, 'AUTH');
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn.mock.calls[0][1]).toBe(AUTH_DECISION_EVENT);
+      expect(store.record).toHaveBeenCalledTimes(1);
+      expect(store.record).toHaveBeenCalledWith(trace);
+    });
+
+    it('still emits the event when the store is null (nothing persisted)', () => {
+      const logger = makeLogger();
+      expect(() => emitAndRecordAuthDecision(logger, trace, null, 'AUTH')).not.toThrow();
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('emits an INFO event AND records on accept', () => {
+      const logger = makeLogger();
+      const store = { record: jest.fn() };
+      emitAndRecordAuthDecision(
+        logger,
+        { plane: 'resource', method: 'shared_secret', outcome: 'accept', checks: [] },
+        store,
+        'AUTH',
+      );
+      expect(logger.info).toHaveBeenCalledTimes(1);
+      expect(store.record).toHaveBeenCalledTimes(1);
     });
   });
 

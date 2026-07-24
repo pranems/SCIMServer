@@ -13,7 +13,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { computeShadowDecision } from '../../../oauth/wif-shadow-telemetry';
 import {
-  emitAuthDecisionEvent,
+  emitAndRecordAuthDecision,
   type AuthDecisionTrace,
 } from '../../../oauth/auth-decision-trace';
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
@@ -57,8 +57,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
 
   /** WI-D4 + WI-D5: emit the canonical AUTH log event AND capture the record. */
   private recordAndEmit(trace: AuthDecisionTrace): void {
-    emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
-    this.decisionStore.record(trace);
+    emitAndRecordAuthDecision(this.logger, trace, this.decisionStore, LogCategory.AUTH);
   }
 
   async mintFromAssertion(endpointId: string, clientAssertion: string): Promise<AccessToken | null> {

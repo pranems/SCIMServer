@@ -24,7 +24,7 @@ import { ClientSecretTokenProvider } from './client-secret-token-provider';
 import { parseEndpointTokenRequest } from './endpoint-token-request-parser';
 import type { ParsedEndpointTokenRequest } from './endpoint-token-request.types';
 import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
-import { emitAuthDecisionEvent, type AuthDecisionTrace, type AuthCheck } from '../../../oauth/auth-decision-trace';
+import { emitAndRecordAuthDecision, type AuthDecisionTrace, type AuthCheck } from '../../../oauth/auth-decision-trace';
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 
@@ -248,8 +248,7 @@ export class EndpointOAuthController {
       checks: opts.checks ?? [],
     };
     if (opts.reasonCode) trace.reasonCode = opts.reasonCode;
-    emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
-    this.decisionStore?.record(trace);
+    emitAndRecordAuthDecision(this.logger, trace, this.decisionStore, LogCategory.AUTH);
   }
 
   private invalidClient(reasonCode?: string): HttpException {

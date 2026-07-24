@@ -21,7 +21,7 @@ import type { IEndpointCredentialRepository } from '../../domain/repositories/en
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
 import {
-  emitAuthDecisionEvent,
+  emitAndRecordAuthDecision,
   type AuthDecisionTrace,
   type AuthCheck,
   type AuthMethodKind,
@@ -144,8 +144,7 @@ export class SharedSecretGuard implements CanActivate {
             : {}),
           ...(reasonCode ? { reasonCode } : {}),
         };
-        emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
-        this.decisionStore.record(trace);
+        emitAndRecordAuthDecision(this.logger, trace, this.decisionStore, LogCategory.AUTH);
       } catch {
         // best-effort observability; never affect the auth decision
       }

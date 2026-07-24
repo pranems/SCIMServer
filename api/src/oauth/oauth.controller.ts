@@ -6,7 +6,7 @@ import { LogCategory } from '../modules/logging/log-levels';
 import { resolveClientCredentials } from './client-credential-location';
 import { AuthDecisionRecordStore } from './auth-decision-record.store';
 import {
-  emitAuthDecisionEvent,
+  emitAndRecordAuthDecision,
   type AuthDecisionTrace,
   type AuthCheck,
 } from './auth-decision-trace';
@@ -54,8 +54,7 @@ export class OAuthController {
       checks: opts.checks ?? [],
     };
     if (opts.reasonCode) trace.reasonCode = opts.reasonCode;
-    emitAuthDecisionEvent(this.logger, trace, LogCategory.AUTH);
-    this.decisionStore?.record(trace);
+    emitAndRecordAuthDecision(this.logger, trace, this.decisionStore, LogCategory.AUTH);
   }
 
   @Public()

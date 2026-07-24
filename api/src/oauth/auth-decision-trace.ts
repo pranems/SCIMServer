@@ -297,3 +297,32 @@ export function emitAuthDecisionEvent(
   }
 }
 
+/** Minimal shape of the durable decision store (avoids a class import cycle). */
+export interface AuthDecisionRecorder {
+  record(trace: AuthDecisionTrace): void;
+}
+
+/**
+ * W2.4 - the single "emit the canonical AUTH event AND persist the durable
+ * record" choke point. It replaces the `emitAuthDecisionEvent(...) +
+ * decisionStore.record(...)` pair that was hand-rolled in the resource guard,
+ * the oauth_client mint controller, the WIF assertion provider, and the global
+ * token controller - so the emit/record sequence has ONE definition and cannot
+ * drift (e.g. emit-without-record, or a second canonical event).
+ *
+ * Each caller keeps its OWN pre-conditions (the guard's noise-control /
+ * no-store early return, the WIF provider's per-trust aggregation) and calls
+ * this only once it has decided to emit. `store` may be null/undefined (the
+ * event still emits; nothing is persisted), matching the previous optional
+ * `decisionStore?.record(...)` behavior.
+ */
+export function emitAndRecordAuthDecision(
+  logger: AuthDecisionLogger,
+  trace: AuthDecisionTrace,
+  store: AuthDecisionRecorder | null | undefined,
+  logCategoryAuth: string,
+): void {
+  emitAuthDecisionEvent(logger, trace, logCategoryAuth);
+  store?.record(trace);
+}
+

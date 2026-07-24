@@ -187,7 +187,7 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Acceptance: controller has no bcrypt/repo logic; `endpoint-oauth.controller.spec.ts` + E2E green.
 - Deps: W2.1, W2.2. Estimate: **M**. Risk: Low.
 
-**W2.4 - Centralize `AuthDecisionEmitter` + relocate providers** `[X12 Phase 3]`
+**W2.4 - Centralize `AuthDecisionEmitter` + relocate providers** `[X12 Phase 3]` - **DELIVERED (v0.54.71; emitter centralized as a function; provider relocation deferred)**
 - Tasks: one `AuthDecisionEmitter.record(trace)`; replace the 3 hand-rolled `emit + record` sites; move mint providers to `oauth/token-mint/`.
 - Acceptance: single emitter used everywhere; auth-decision specs green.
 - Deps: W2.1-W2.3. Estimate: **S**. Risk: Low.
