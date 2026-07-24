@@ -18,6 +18,8 @@ const logger: any = { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error:
 function makeController(opts: {
   assertionProvider?: { mintFromAssertion: jest.Mock };
   credentials?: any[];
+  decisionStore?: any;
+  endpointService?: any;
 } = {}) {
   const oauthService: any = {
     generateEndpointAccessToken: jest.fn().mockResolvedValue({ accessToken: 'secret-path-token', expiresIn: 3600, scope: 'scim.read' }),
@@ -30,6 +32,8 @@ function makeController(opts: {
     credentialRepo,
     logger,
     opts.assertionProvider ?? null,
+    opts.decisionStore ?? null,
+    opts.endpointService ?? null,
   );
   return { controller, oauthService, credentialRepo };
 }
@@ -152,6 +156,56 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     });
     expect(oauthService.generateEndpointAccessToken).toHaveBeenCalledWith(ENDPOINT_ID, 'epc_x', undefined);
     expect(res.access_token).toBe('secret-path-token');
+  });
+
+  // W2.5 - mint plane consults the unified per-method enablement source in SHADOW.
+  it('W2.5 shadow: still MINTS when oauth_client is disabled (non-blocking) and warns', async () => {
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('right-secret', 4);
+    logger.warn.mockClear();
+    // Endpoint whose oauth_client method is explicitly disabled (disabled-with-credential).
+    const endpointService: any = {
+      getEndpoint: jest.fn().mockResolvedValue({
+        id: ENDPOINT_ID,
+        profile: { settings: {}, authentication: { methods: [{ type: 'oauth-client', enabled: false }] } },
+      }),
+    };
+    const { controller, oauthService } = makeController({
+      credentials: [{ credentialType: 'oauth_client', credentialHash: hash, metadata: { clientId: 'epc_x' } }],
+      endpointService,
+    });
+    const res = await controller.getToken(ENDPOINT_ID, {
+      grant_type: 'client_credentials',
+      client_id: 'epc_x',
+      client_secret: 'right-secret',
+    });
+    // Shadow does NOT block: the token is still minted.
+    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalled();
+    expect(res.access_token).toBe('secret-path-token');
+    // A shadow warning was logged (message is the 2nd arg to logger.warn).
+    expect(
+      logger.warn.mock.calls.some((c: unknown[]) => String(c[1]).includes('W2.5 shadow')),
+    ).toBe(true);
+    expect(endpointService.getEndpoint).toHaveBeenCalledWith(ENDPOINT_ID);
+  });
+
+  it('W2.5 shadow: an endpoint lookup error never blocks a mint (fails open)', async () => {
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('right-secret', 4);
+    const endpointService: any = {
+      getEndpoint: jest.fn().mockRejectedValue(new Error('boom')),
+    };
+    const { controller, oauthService } = makeController({
+      credentials: [{ credentialType: 'oauth_client', credentialHash: hash, metadata: { clientId: 'epc_x' } }],
+      endpointService,
+    });
+    const res = await controller.getToken(ENDPOINT_ID, {
+      grant_type: 'client_credentials',
+      client_id: 'epc_x',
+      client_secret: 'right-secret',
+    });
+    expect(res.access_token).toBe('secret-path-token');
+    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalled();
   });
 
   it('WI-D4: emits exactly one AUTH decision event (accept) on a successful oauth_client mint', async () => {

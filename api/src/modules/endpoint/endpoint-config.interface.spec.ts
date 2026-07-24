@@ -7,6 +7,7 @@ import {
   getConfigNumber,
   getOptionalConfigBoolean,
   getEffectiveAuthEnablement,
+  resolveEndpointAuthEnablement,
   getEffectiveCredentialSecretVisibility,
   normalizeCredentialSecretVisibility,
   resolveEndpointEgressOverrides,
@@ -1388,6 +1389,65 @@ describe('endpoint-config.interface', () => {
         });
         expect(eff.secretTokenBearer).toBe(true);
         expect(eff.sharedSecretBearer).toBe(false);
+      });
+    });
+
+    // W2.5 - the single per-method enablement source (co-location + value-preserving).
+    describe('resolveEndpointAuthEnablement', () => {
+      it('value-preserving: with NO method entries it returns exactly getEffectiveAuthEnablement', () => {
+        const config: EndpointConfig = { PerEndpointCredentialsEnabled: true, SharedSecretBearerAuthEnabled: false };
+        expect(resolveEndpointAuthEnablement(config, undefined)).toEqual(getEffectiveAuthEnablement(config));
+        expect(resolveEndpointAuthEnablement(config, [])).toEqual(getEffectiveAuthEnablement(config));
+      });
+
+      it('a bare endpoint with no flags and no methods resolves to the flat defaults', () => {
+        expect(resolveEndpointAuthEnablement({}, [])).toEqual({
+          secretTokenBearer: false,
+          oauthClientCredentials: false,
+          sharedSecretBearer: true,
+        });
+      });
+
+      it('an explicit bearer method entry OVERRIDES the flat flag (co-location)', () => {
+        // Flat flags would say secretTokenBearer=false, but the method entry enables it.
+        const eff = resolveEndpointAuthEnablement({}, [{ type: 'bearer', enabled: true }]);
+        expect(eff.secretTokenBearer).toBe(true);
+        // Untouched facets fall back to flat.
+        expect(eff.oauthClientCredentials).toBe(false);
+        expect(eff.sharedSecretBearer).toBe(true);
+      });
+
+      it('honors disabled-with-credential: a bearer method enabled:false overrides a legacy-enabling flag', () => {
+        // Legacy flag enables both methods; the explicit method entry disables bearer.
+        const eff = resolveEndpointAuthEnablement({ PerEndpointCredentialsEnabled: true }, [
+          { type: 'bearer', enabled: false },
+        ]);
+        expect(eff.secretTokenBearer).toBe(false);
+        // oauth_client has no method entry -> still inherits the legacy flag.
+        expect(eff.oauthClientCredentials).toBe(true);
+      });
+
+      it('treats an entry with undefined enabled as enabled (A2 discovery convention)', () => {
+        const eff = resolveEndpointAuthEnablement({}, [{ type: 'oauth-client' }]);
+        expect(eff.oauthClientCredentials).toBe(true);
+      });
+
+      it('maps each facet to its method type (bearer / oauth-client / shared-secret)', () => {
+        const eff = resolveEndpointAuthEnablement({ SharedSecretBearerAuthEnabled: true }, [
+          { type: 'oauth-client', enabled: true },
+          { type: 'shared-secret', enabled: false },
+        ]);
+        expect(eff.oauthClientCredentials).toBe(true);
+        expect(eff.sharedSecretBearer).toBe(false);
+        // bearer has no entry -> flat default false.
+        expect(eff.secretTokenBearer).toBe(false);
+      });
+
+      it('ignores unrelated method types', () => {
+        const config: EndpointConfig = { PerEndpointCredentialsEnabled: true };
+        const eff = resolveEndpointAuthEnablement(config, [{ type: 'wif-7523', enabled: false }]);
+        // wif is not a resolved facet -> the flat values are unchanged.
+        expect(eff).toEqual(getEffectiveAuthEnablement(config));
       });
     });
 

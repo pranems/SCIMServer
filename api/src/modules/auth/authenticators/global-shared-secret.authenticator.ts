@@ -13,7 +13,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { safeCompare } from '../../../security/safe-compare';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { getEffectiveAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { resolveEndpointAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import type { AuthAttempt, AuthContext, ResourceAuthenticator } from './resource-authenticator';
 
 export class GlobalSharedSecretAuthenticator implements ResourceAuthenticator {
@@ -90,7 +90,7 @@ export class GlobalSharedSecretAuthenticator implements ResourceAuthenticator {
     try {
       const endpoint = await this.endpointService!.getEndpoint(endpointId);
       const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-      return getEffectiveAuthEnablement(config).sharedSecretBearer;
+      return resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods).sharedSecretBearer;
     } catch (error) {
       this.logger.debug(LogCategory.AUTH, 'Shared-secret enablement check failed, allowing (fail-open)', {
         endpointId,

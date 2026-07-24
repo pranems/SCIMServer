@@ -51,7 +51,7 @@ import type {
   WifDebugAssertionResponse,
   WifDebugTrustResult,
 } from '../../../shared/types/wif-debug.types';
-import { getConfigBoolean, getEffectiveAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
@@ -432,10 +432,11 @@ export class AdminCredentialController {
       return this.createWifCredential(endpointId, dto);
     }
 
-    // WI-11 - per-method create gate. `bearer` rides SecretTokenBearerAuthEnabled
-    // and `oauth_client` rides OAuthClientCredentialsAuthEnabled; each falls back
-    // to the legacy PerEndpointCredentialsEnabled when unset (value-preserving).
-    const effective = getEffectiveAuthEnablement(config);
+    // WI-11 / W2.5 - per-method create gate resolved from the single source: an
+    // explicit `profile.authentication.methods[]` entry wins, else the flat flags
+    // (SecretTokenBearerAuthEnabled / OAuthClientCredentialsAuthEnabled, each
+    // falling back to the legacy PerEndpointCredentialsEnabled).
+    const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
     if (credentialType === 'bearer' && !effective.secretTokenBearer) {
       throw new ForbiddenException(
         `Per-endpoint bearer (Secret Token) auth is not enabled for endpoint "${endpointId}". ` +

@@ -19,6 +19,8 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/rep
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
+import { resolveEndpointAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import {
   ASSERTION_TOKEN_PROVIDER,
   JWT_BEARER_ASSERTION_TYPE,
@@ -64,6 +66,8 @@ export class EndpointOAuthController {
     private readonly assertionProvider: IAssertionTokenProvider | null = null,
     @Optional() @Inject(AuthDecisionRecordStore)
     private readonly decisionStore: AuthDecisionRecordStore | null = null,
+    @Optional() @Inject(EndpointService)
+    private readonly endpointService: EndpointService | null = null,
   ) {}
 
   // RFC 6749 section 5.1 (+ RFC 8693 section 2.2.1 for the WIF/token-exchange
@@ -275,6 +279,38 @@ export class EndpointOAuthController {
       body.client_id,
       body.scope,
     );
+
+    // W2.5 (shadow) - the mint plane now CONSULTS the same per-method enablement
+    // source as the resource guard + create-gate, fixing the design 7.1 mint-vs-
+    // resource asymmetry. It runs in SHADOW: when the `oauth_client` method is
+    // disabled for this endpoint (the disabled-with-credential state) it records
+    // a fail check + warns, but STILL mints - so the future enforcement flip can
+    // be validated against real traffic first. Fails OPEN (never blocks a mint).
+    if (this.endpointService) {
+      try {
+        const endpoint = await this.endpointService.getEndpoint(endpointId);
+        const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+        const enabled = resolveEndpointAuthEnablement(
+          config,
+          endpoint.profile?.authentication?.methods,
+        ).oauthClientCredentials;
+        if (!enabled) {
+          this.logger.warn(
+            LogCategory.OAUTH,
+            'W2.5 shadow: oauth_client method is disabled for this endpoint - minting anyway (shadow mode, not yet enforced)',
+            { endpointId, clientId: body.client_id },
+          );
+        }
+        oauthChecks.push({
+          id: 'method_enabled_shadow',
+          status: enabled ? 'pass' : 'fail',
+          expected: 'oauth_client method enabled for this endpoint',
+          received: enabled ? 'enabled' : 'disabled (shadow - not enforced)',
+        });
+      } catch {
+        // Shadow read must never block a mint - swallow any lookup error.
+      }
+    }
 
     this.logger.info(LogCategory.OAUTH, 'Per-endpoint access token issued', {
       endpointId,

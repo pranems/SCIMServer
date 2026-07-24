@@ -852,6 +852,72 @@ export function getEffectiveAuthEnablement(
   return { secretTokenBearer, oauthClientCredentials, sharedSecretBearer };
 }
 
+/**
+ * W2.5 - a per-method authentication-method entry, structurally minimal so this
+ * module does not need to import the `AuthenticationMethod` type from
+ * `endpoint-profile` (which would create a module cycle). Callers pass
+ * `profile.authentication?.methods`.
+ */
+export interface AuthMethodEnablementEntry {
+  /** Registry key naming the method (e.g. 'bearer', 'oauth-client', 'shared-secret'). */
+  type: string;
+  /** Whether the method is enabled; `undefined` = enabled (A2 discovery semantics). */
+  enabled?: boolean;
+}
+
+/**
+ * Maps each `EffectiveAuthEnablement` facet to the `AuthenticationMethod.type`
+ * value(s) that co-locate its enablement (architecture A0 model). Kept in sync
+ * with `METHOD_TYPE_TO_SCHEME_TYPE` in `discovery/authentication-schemes.ts`.
+ */
+const AUTH_FACET_METHOD_TYPES: Record<keyof EffectiveAuthEnablement, readonly string[]> = {
+  secretTokenBearer: ['bearer'],
+  oauthClientCredentials: ['oauth-client'],
+  sharedSecretBearer: ['shared-secret'],
+};
+
+/**
+ * W2.5 - the SINGLE per-method enablement source, co-locating enablement with
+ * each method's `profile.authentication.methods[]` entry while remaining
+ * value-preserving for existing endpoints.
+ *
+ * For each facet: if the endpoint carries an explicit `AuthenticationMethod`
+ * entry of the corresponding `type`, that entry's `enabled` wins (`enabled !==
+ * false`, matching the A2 discovery convention where `undefined` means enabled).
+ * Otherwise the value falls back to the flat-flag {@link getEffectiveAuthEnablement}
+ * (which itself preserves the legacy `PerEndpointCredentialsEnabled` fallback).
+ *
+ * **Value-preserving.** `profile.authentication.methods[]` is never auto-seeded
+ * (see `expandAuthentication`), so every endpoint that has not been managed via
+ * the A1 authentication-method API has no method entries and resolves to the
+ * exact flat-flag values it does today. Co-location only takes effect for
+ * endpoints an operator has explicitly configured through the A1 model, which is
+ * that model's stated purpose.
+ *
+ * This is the one function the resource-plane authenticators, the mint plane
+ * (shadow), the credential-create gate, connection-info, and OAuth metadata all
+ * consult, so "advertised == enforced" cannot drift.
+ */
+export function resolveEndpointAuthEnablement(
+  config: EndpointConfig | undefined,
+  methods?: readonly AuthMethodEnablementEntry[],
+): EffectiveAuthEnablement {
+  const flat = getEffectiveAuthEnablement(config);
+  if (!methods || methods.length === 0) return flat;
+
+  const resolveFacet = (facet: keyof EffectiveAuthEnablement): boolean => {
+    const types = AUTH_FACET_METHOD_TYPES[facet];
+    const entry = methods.find((m) => types.includes(m.type));
+    return entry ? entry.enabled !== false : flat[facet];
+  };
+
+  return {
+    secretTokenBearer: resolveFacet('secretTokenBearer'),
+    oauthClientCredentials: resolveFacet('oauthClientCredentials'),
+    sharedSecretBearer: resolveFacet('sharedSecretBearer'),
+  };
+}
+
 // ─── WI-7: CredentialSecretVisibility precedence (server is the ceiling) ──────
 
 /** The two visibility values. `always` retains + reveals; `once` shows once. */

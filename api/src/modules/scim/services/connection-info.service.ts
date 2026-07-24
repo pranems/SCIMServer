@@ -17,9 +17,9 @@
  *    facing SCIM base is the LEADING `/scim/v2/endpoints/{id}` form (WI-1),
  *    the per-endpoint token endpoint is the bare `/scim/endpoints/{id}/oauth/token`
  *    form, and the per-endpoint RFC 8414 metadata is the WI-12 append form.
- *  - The method-enablement decisions reuse `getEffectiveAuthEnablement` +
+ *  - The method-enablement decisions reuse `resolveEndpointAuthEnablement` +
  *    `getConfigBoolean`, so they agree byte-for-byte with the create-gate and
- *    the resource-plane guard.
+ *    the resource-plane guard (all read the one per-method enablement source).
  *
  * The service is PURE: it takes the already-loaded endpoint + credentials + a
  * base URL and returns the assembled shape. Host derivation (X-Forwarded-*)
@@ -30,7 +30,7 @@ import { Injectable } from '@nestjs/common';
 import {
   ENDPOINT_CONFIG_FLAGS,
   getConfigBoolean,
-  getEffectiveAuthEnablement,
+  resolveEndpointAuthEnablement,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
@@ -62,7 +62,10 @@ export interface ConnectionInfoEndpointInput {
   id: string;
   name: string;
   displayName?: string;
-  profile?: { settings?: Record<string, unknown> } | null;
+  profile?: {
+    settings?: Record<string, unknown>;
+    authentication?: { methods?: readonly { type: string; enabled?: boolean }[] };
+  } | null;
 }
 
 /**
@@ -149,7 +152,7 @@ export class ConnectionInfoService {
     const endpointId = endpoint.id;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const urls = this.buildUrls(baseUrl, endpointId);
-    const effective = getEffectiveAuthEnablement(config);
+    const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
     const wifEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED);
 
     const activeCreds = credentials.filter((c) => c.active);

@@ -16,7 +16,7 @@ import { LogCategory } from '../../logging/log-levels';
 import { looksLikeJwt } from '../../../oauth/jwt-decode.util';
 import { safeCompare } from '../../../security/safe-compare';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { getEffectiveAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { resolveEndpointAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import type { AuthCheck } from '../../../oauth/auth-decision-trace';
 import type { AuthAttempt, AuthContext, ResourceAuthenticator } from './resource-authenticator';
 
@@ -60,12 +60,13 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
     }
 
     try {
-      // WI-11 - per-method enablement. `bearer` rides SecretTokenBearerAuthEnabled
-      // and `oauth_client` rides OAuthClientCredentialsAuthEnabled; each falls
-      // back to the legacy PerEndpointCredentialsEnabled when unset.
+      // WI-11 / W2.5 - per-method enablement resolved from the single source:
+      // an explicit `profile.authentication.methods[]` entry wins, else the flat
+      // flags (`SecretTokenBearerAuthEnabled` / `OAuthClientCredentialsAuthEnabled`,
+      // each falling back to the legacy `PerEndpointCredentialsEnabled`).
       const endpoint = await this.endpointService.getEndpoint(endpointId);
       const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-      const effective = getEffectiveAuthEnablement(config);
+      const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
 
       if (!effective.secretTokenBearer && !effective.oauthClientCredentials) {
         this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });

@@ -456,4 +456,81 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(200);
     });
   });
+
+  // ───────── W2.5 - per-method enablement co-location (profile.authentication.methods[]) ─────────
+  describe('W2.5 - per-method enablement co-location', () => {
+    it('resource-guard honors a bearer method enabled:false even though the flat flag enables it (disabled-with-credential)', async () => {
+      // Flat flag ON -> bearer creds allowed + authenticate today.
+      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      const credRes = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'w2.5-coloc' })
+        .expect(201);
+      const bearer = credRes.body.token;
+      const basePath = scimBasePath(ep);
+
+      // Baseline: the per-endpoint bearer authenticates (flat flag enables it).
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${bearer}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+
+      // Co-locate an explicit DISABLE on the bearer method via the A1 API.
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/authentication/methods`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'bearer', enabled: false })
+        .expect(201);
+
+      // The SAME bearer is now REJECTED: methods[].enabled overrides the flat flag.
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${bearer}`)
+        .set('Accept', 'application/scim+json')
+        .expect(401);
+    });
+
+    it('value-preserving: an endpoint with NO method entries still authenticates via the flat flag', async () => {
+      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      const credRes = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'w2.5-vp' })
+        .expect(201);
+      const bearer = credRes.body.token;
+
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${bearer}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+    });
+
+    it('co-location enables a method the flat flag leaves off (bearer enabled:true with no flat flag)', async () => {
+      // No flat per-endpoint flag -> bearer create is normally blocked; enable
+      // the method explicitly first so the create-gate + guard both allow it.
+      const ep = await createEndpointWithConfig(app, token, {});
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/authentication/methods`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'bearer', enabled: true })
+        .expect(201);
+      // The create-gate now allows the bearer credential (co-located enable).
+      const credRes = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'w2.5-enable' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${credRes.body.token}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+    });
+  });
 });

@@ -13917,6 +13917,58 @@ Write-Host "`n--- 9z-BU: token endpoint 200 + no-store (W0.2) Complete ---" -For
 
 
 # ============================================
+# TEST SECTION 9z-BV: per-method enablement co-location (W2.5)
+$script:currentSection = "9z-BV: enablement co-location (W2.5)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BV: PER-METHOD ENABLEMENT CO-LOCATION (W2.5)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# The resource guard + create-gate read ONE per-method enablement source:
+# profile.authentication.methods[].enabled wins, else the flat flags. A bearer
+# method explicitly disabled via the A1 API refuses a per-endpoint bearer that
+# the flat PerEndpointCredentialsEnabled flag would otherwise allow
+# (disabled-with-credential). Value-preserving: an endpoint with no method
+# entries resolves to exactly the flat-flag behavior.
+try {
+    $bvEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-w2_5-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bvId = $bvEp.id
+    try {
+        # Flat flag ON -> bearer creds allowed + authenticate.
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+        $bvCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/credentials" -Method POST -Headers $headers -Body (@{
+            credentialType = "bearer"; label = "w2.5-coloc"
+        } | ConvertTo-Json)
+        $bvHeaders = @{ Authorization = "Bearer $($bvCred.token)"; 'Accept' = 'application/scim+json' }
+
+        # Baseline: the per-endpoint bearer authenticates (flat flag enables it).
+        $bvBefore = 0
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/v2/endpoints/$bvId/Users" -Method GET -Headers $bvHeaders | Out-Null; $bvBefore = 200 } catch { $bvBefore = $_.Exception.Response.StatusCode.value__ }
+        Test-Result -Success ($bvBefore -eq 200) -Message "9z-BV.T1: per-endpoint bearer authenticates while the flat flag enables it (HTTP $bvBefore)"
+
+        # Co-locate an explicit DISABLE on the bearer method via the A1 API.
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/authentication/methods" -Method POST -Headers $headers -Body (@{
+            type = "bearer"; enabled = $false
+        } | ConvertTo-Json) | Out-Null
+
+        # The SAME bearer is now REFUSED: methods[].enabled overrides the flat flag.
+        $bvAfter = 0
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/v2/endpoints/$bvId/Users" -Method GET -Headers $bvHeaders | Out-Null; $bvAfter = 200 } catch { $bvAfter = $_.Exception.Response.StatusCode.value__ }
+        Test-Result -Success ($bvAfter -eq 401) -Message "9z-BV.T2: an explicit 'bearer' method enabled:false refuses the same bearer (disabled-with-credential, HTTP $bvAfter)"
+    } finally {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId" -Method DELETE -Headers $headers | Out-Null } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-BV: enablement co-location section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BV: enablement co-location (W2.5) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
