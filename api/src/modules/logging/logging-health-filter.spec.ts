@@ -154,4 +154,30 @@ describe('LoggingService.recordRequest - health-probe filter', () => {
       expect(prisma.requestLog.createMany).toHaveBeenCalled();
     });
   });
+
+  // Flush is now a SINGLE batch insert: the derived identifier + the requestId
+  // correlator are written INLINE with createMany (no per-row UPDATE backfill),
+  // so a flushed row is immediately queryable by identifier/requestId. This is
+  // the fix for the flush-backlog that made request-log-readback tests flake.
+  describe('single-batch flush includes identifier + requestId inline (no UPDATE backfill)', () => {
+    it('writes the derived userName identifier + the requestId in the createMany payload', async () => {
+      await recordAndFlush({
+        method: 'POST',
+        url: '/scim/v2/endpoints/ep-1/Users',
+        status: 201,
+        requestHeaders: {},
+        requestBody: { userName: 'inline-id@example.com' },
+        responseBody: { id: 'u-1', userName: 'inline-id@example.com' },
+        requestId: '11111111-2222-3333-4444-555555555555',
+      });
+      expect(prisma.requestLog.createMany).toHaveBeenCalledTimes(1);
+      const arg = prisma.requestLog.createMany.mock.calls[0][0] as { data: Array<Record<string, unknown>> };
+      expect(Array.isArray(arg.data)).toBe(true);
+      const row = arg.data[0];
+      expect(row.identifier).toBe('inline-id@example.com');
+      expect(row.requestId).toBe('11111111-2222-3333-4444-555555555555');
+      // The removed backfill helper `_identifier` must NOT leak into the insert.
+      expect('_identifier' in row).toBe(false);
+    });
+  });
 });

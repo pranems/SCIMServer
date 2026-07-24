@@ -468,6 +468,44 @@ describe('Log Configuration API (E2E)', () => {
     });
   });
 
+  // ─── Persistent Logs: Flush (force-drain the buffered writes) ──────
+
+  describe('POST /scim/admin/logs/flush', () => {
+    it('force-flushes the request-log buffer and returns 204', async () => {
+      await request(app.getHttpServer())
+        .post('/scim/admin/logs/flush')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+    });
+
+    it('requires authentication', async () => {
+      await request(app.getHttpServer())
+        .post('/scim/admin/logs/flush')
+        .expect(401);
+    });
+
+    it('a request is immediately queryable by requestId after a flush', async () => {
+      const requestId = `e2e-flush-${Date.now()}`;
+      // Drive a request that carries a known correlation id.
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Request-Id', requestId)
+        .expect(200);
+      // Force the buffered write to become durable, then read it back.
+      await request(app.getHttpServer())
+        .post('/scim/admin/logs/flush')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/logs?requestId=${requestId}&includeAdmin=true&pageSize=10`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const items = (res.body.items ?? res.body.data ?? []) as Array<{ requestId?: string }>;
+      expect(items.some((r) => r.requestId === requestId)).toBe(true);
+    });
+  });
+
   // ─── Persistent Logs: Prune ────────────────────────────────────────
 
   describe('POST /scim/admin/logs/prune', () => {

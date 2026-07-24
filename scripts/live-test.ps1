@@ -12860,22 +12860,19 @@ Write-Host "`n--- 9z-BC: Phase 2 Resource-plane Tracing Complete ---" -Foregroun
 
 function Get-LogDetailByUrlStatus($urlFrag, $status) {
     # Find a request-log row by URL fragment + HTTP status among the most-recent
-    # logs, then fetch its detail. This is the empirically-reliable 9z-BM pattern:
-    # the recent-log page is served from the createdAt index and the target is
-    # freshly created (so it stays near the top), and the poll's own admin queries
-    # are excluded by the default includeAdmin=false so they cannot bury it.
+    # logs, then fetch its detail.
     #
-    # Why NOT look up by requestId: under the full-suite Prisma flush backlog on a
-    # busy dev node, a ?requestId=/?search= lookup for a just-created row proved
-    # flaky for 60s+ even though the SAME row was findable by url+status in the
-    # recent page (9z-BM never flaked). The url+status axis is what the feature
-    # actually needs to locate its row; the requestId <-> row bridge itself is
-    # asserted directly in 9z-BD. InMemory is synchronous so this returns fast.
-    # Poll generously (~90s): under the full-suite Prisma flush backlog on dev a
-    # row created mid-suite can take that long to persist, draining as the suite
-    # winds down (a post-suite isolated lookup of the same row returns in ~6s).
-    for ($try = 0; $try -lt 30; $try++) {
-        Start-Sleep -Seconds 3
+    # Request logs are BUFFERED (Prisma mode flushes every ~3s / 50 entries), so
+    # a just-created row may not be durable yet. We force-drain the buffer via
+    # POST /scim/admin/logs/flush before each poll so the target row is
+    # immediately queryable - this removes the flush-backlog timing dependency
+    # that used to make request-log-readback flaky under full-suite load. The
+    # flush is a single fast batch insert (identifier is written inline), and the
+    # recent page is served from the createdAt index with the poll's own admin
+    # queries excluded by the default includeAdmin=false. InMemory is synchronous
+    # so the flush is a no-op and this returns fast.
+    for ($try = 0; $try -lt 20; $try++) {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers | Out-Null } catch {}
         try {
             $recent = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=200" -Method GET -Headers $headers
             $row = @($recent.items | Where-Object { $_.url -like "*$urlFrag*" -and $_.status -eq $status })[0]
@@ -12883,9 +12880,29 @@ function Get-LogDetailByUrlStatus($urlFrag, $status) {
                 return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
             }
         } catch {}
+        Start-Sleep -Seconds 2
     }
     return $null
 }
+
+function Get-LogDetailByRequestId($requestId) {
+    # Deterministic lookup by the X-Request-Id correlator: force-flush the buffer,
+    # then query the indexed ?requestId= filter (NOT limited to the recent page).
+    # Used where the caller already holds the correlation id.
+    for ($try = 0; $try -lt 20; $try++) {
+        try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers | Out-Null } catch {}
+        try {
+            $list = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$([uri]::EscapeDataString($requestId))&includeAdmin=true&pageSize=10" -Method GET -Headers $headers
+            $row = @($list.items | Where-Object { $_.requestId -eq $requestId })[0]
+            if ($null -ne $row) {
+                return Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$($row.id)" -Method GET -Headers $headers
+            }
+        } catch {}
+        Start-Sleep -Seconds 2
+    }
+    return $null
+}
+
 
 
 # ============================================

@@ -42,7 +42,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   // database write overhead. Single batch insert instead of N individual writes.
   // Originally introduced to mitigate SQLite single-writer contention; retained
   // for PostgreSQL to reduce connection pool pressure.
-  private logBuffer: Array<Prisma.RequestLogCreateManyInput & { _identifier?: string }> = [];
+  private logBuffer: Prisma.RequestLogCreateManyInput[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
   private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
@@ -292,7 +292,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
     }
 
-    const data: Prisma.RequestLogCreateManyInput & { _identifier?: string } = {
+    const data: Prisma.RequestLogCreateManyInput = {
       method,
       url,
       status: status ?? null,
@@ -303,7 +303,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       responseBody: capStoredBodyString(this.stringifyValue(storedResponseBody)),
       errorMessage,
       errorStack,
-      _identifier: identifier,
+      // Include the derived identifier INLINE so the flush is a single batch
+      // insert (no per-row UPDATE backfill). `identifier` is a real column.
+      identifier: identifier ?? null,
       endpointId: endpointId ?? null,
       requestId: requestId ?? null,
       authOutcome,
@@ -324,8 +326,16 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   }
 
   /**
-   * Flush the accumulated log buffer to PostgreSQL in a single batch.
-   * Uses createMany for the bulk insert, then a single raw UPDATE for identifiers.
+   * Flush the accumulated log buffer to PostgreSQL in ONE batch insert.
+   *
+   * The identifier is included inline in each row (see `recordRequest`), so the
+   * flush is a single `createMany` with no per-identifier `UPDATE` backfill. The
+   * old backfill (SELECT most-recent-N + N sequential UPDATEs) was the root cause
+   * of flush-backlog under sustained load on a latency-bound node - each flush
+   * did N+1 round-trips, so request volume outran flush throughput and rows sat
+   * un-persisted in the buffer. It was also fragile (createdAt-desc correlation
+   * could misassign identifiers when inserts interleaved). One batch insert is
+   * both faster and correct.
    */
   async flushLogs(): Promise<void> {
     if (this.isInMemoryBackend) {
@@ -342,43 +352,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.flushTimer = null;
     }
 
-    // Separate identifier metadata from Prisma create input
-    const identifiers: Array<{ index: number; identifier: string }> = [];
-    const createData: Prisma.RequestLogCreateManyInput[] = batch.map((entry, i) => {
-      if (entry._identifier) {
-        identifiers.push({ index: i, identifier: entry._identifier });
-      }
-      // Strip the non-Prisma field before passing to createMany
-      const { _identifier, ...prismaData } = entry;
-      return prismaData as Prisma.RequestLogCreateManyInput;
-    });
-
     try {
-      // Single batch insert (1 write instead of N*2 writes)
-      await this.prisma.requestLog.createMany({ data: createData });
-
-      // Phase 3 (PostgreSQL): Fetch the most recent N rows by createdAt to correlate
-      // batch-inserted records with their identifiers.
-      if (identifiers.length > 0) {
-        try {
-          const recentRows: Array<{ id: string }> = await this.prisma.$queryRawUnsafe(
-            `SELECT "id" FROM "RequestLog" ORDER BY "createdAt" DESC LIMIT ${batch.length}`
-          );
-          // recentRows[0] = newest (last in batch), so reverse to align with batch order
-          const ordered = [...recentRows].reverse();
-          for (const { index, identifier } of identifiers) {
-            if (ordered[index]) {
-              await this.prisma.$executeRawUnsafe(
-                `UPDATE "RequestLog" SET "identifier" = $1 WHERE "id" = $2`,
-                identifier,
-                ordered[index].id,
-              );
-            }
-          }
-        } catch (e) {
-          this.logger.debug(LogCategory.DATABASE, 'Identifier backfill failed (non-critical)', { error: (e as Error).message });
-        }
-      }
+      // Single batch insert (identifier included inline - no UPDATE backfill).
+      await this.prisma.requestLog.createMany({ data: batch });
     } catch (persistError) {
       this.logger.error(LogCategory.DATABASE, 'Failed to flush request log batch', persistError as Error);
     } finally {

@@ -155,6 +155,17 @@ export class AdminController {
     await this.loggingService.clearLogs();
   }
 
+  // Force-drain the buffered request-log writes to the database. Request logs
+  // are buffered (flushed every few seconds / at 50 entries), so a row created
+  // moments ago may not yet be queryable. This endpoint makes the pending
+  // writes immediately durable + queryable - used by operators chasing a fresh
+  // row and by tests that read back a row right after producing it.
+  @Post('logs/flush')
+  @HttpCode(204)
+  async flushLogs(): Promise<void> {
+    await this.loggingService.flushLogs();
+  }
+
   @Post('logs/prune')
   async pruneLogs(
     @Query('retentionDays') retentionDays?: string,
