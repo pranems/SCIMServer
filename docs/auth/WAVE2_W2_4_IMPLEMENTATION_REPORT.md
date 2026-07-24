@@ -72,7 +72,19 @@ those guards run before the call.
 | Simplicity (YAGNI) | Function over injectable service - avoids cross-module DI for no benefit; promote to a service only if injected policy is ever needed | **Applied** |
 | Provider relocation to `oauth/token-mint/` | Deferred - pure file movement with import-churn risk and no behavior benefit; do it when the mint providers next grow | **Accepted** (deferred, noted) |
 
-## 5. Change log
+## 5. Dev deployment + measured validation (v0.54.71, 2026-07-24)
+
+W2.4 was deployed to dev as part of the mint-refactor cluster (W2.2 + W2.3 + W2.4) on image
+`2b57289a` / v0.54.71 (dev confirmed on `0.54.71` / revision `v2b57289a` first).
+
+| Measured gate (vs dev) | Result |
+|---|---|
+| Live SCIM suite | 1305 PASS / 10 FAIL / 1315 (the 10 are the pre-existing flush-backlog flake) |
+| - `9z-AZ.T8` (rejected oauth_client emits exactly ONE AUTH decision event) | PASS (centralized emitter) |
+| - `9z-AZ.T9` / `T10` (decision queryable globally + endpoint-scoped) | PASS |
+| Playwright E2E (full suite) | 194 passed / 5 skipped / 0 failed |
+
+## 6. Change log
 
 | Version | Change |
 |---|---|

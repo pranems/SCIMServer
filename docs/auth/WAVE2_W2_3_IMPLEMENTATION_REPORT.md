@@ -67,7 +67,19 @@ headers are unchanged.
 | Open/Closed | A new secret-based method reuses the pattern (its own provider) | **Applied** |
 | Simplicity (YAGNI) | Plain `@Injectable`, NOT an interface + DI token - there is exactly one client_secret impl; extract the seam only when a second appears | **Applied** |
 
-## 5. Change log
+## 5. Dev deployment + measured validation (v0.54.71, 2026-07-24)
+
+W2.3 was deployed to dev as part of the mint-refactor cluster (W2.2 + W2.3 + W2.4) on image
+`2b57289a` / v0.54.71 (dev confirmed on `0.54.71` / revision `v2b57289a` first).
+
+| Measured gate (vs dev) | Result |
+|---|---|
+| Live SCIM suite | 1305 PASS / 10 FAIL / 1315 (the 10 are the pre-existing flush-backlog flake) |
+| - `9z-AZ.T7` (wrong oauth_client secret -> `oauth_client_auth_failed` on the wire) | PASS (provider reject) |
+| - `9z-AZ.T9b` (reject records per-check `secret_match=mismatch`, no secret) | PASS (provider trace) |
+| Playwright E2E (full suite) | 194 passed / 5 skipped / 0 failed |
+
+## 6. Change log
 
 | Version | Change |
 |---|---|

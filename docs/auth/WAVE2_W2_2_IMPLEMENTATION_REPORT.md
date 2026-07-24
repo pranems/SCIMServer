@@ -60,7 +60,20 @@ flowchart LR
 | Open/Closed | A new credential shape (e.g. `private_key_jwt`, mTLS) adds a union variant + a parser branch, not controller surgery | **Applied** |
 | Simplicity (YAGNI) | No size-limit / duplicate-param checks added (the body is already parsed to an object; the HTTP body-size limit already bounds it) - kept the extraction behavior-preserving | **Applied** |
 
-## 5. Change log
+## 5. Dev deployment + measured validation (v0.54.71, 2026-07-24)
+
+W2.2 was deployed to dev as part of the mint-refactor cluster (W2.2 + W2.3 + W2.4, all
+behavior-preserving) on image `2b57289a` / v0.54.71. Dev confirmed serving `0.54.71`
+(revision `v2b57289a`) before any live assertion ran.
+
+| Measured gate (vs dev) | Result |
+|---|---|
+| Live SCIM suite | 1305 PASS / 10 FAIL / 1315 (the 10 are the pre-existing flush-backlog flake) |
+| - `9z-BG.T1` (bad grant_type -> 400 `grant_type_unsupported`) | PASS (W2.2 parser on the wire) |
+| - `9z-BG.T2` / `9z-AZ.T7` (bad creds -> 401 `oauth_client_auth_failed`) | PASS |
+| Playwright E2E (full suite) | 194 passed / 5 skipped / 0 failed |
+
+## 6. Change log
 
 | Version | Change |
 |---|---|
