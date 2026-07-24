@@ -98,6 +98,30 @@ test.describe('CreateEndpointWizard - validation (read-only)', () => {
 test.describe('CreateEndpointWizard - happy path (mutation gated)', () => {
   test.skip(!MUTATIONS_ENABLED, 'Set E2E_ALLOW_MUTATIONS=1 to run create/delete tests.');
 
+  // Self-clean: the create test leaves an `e2e-create-*` endpoint behind after
+  // asserting the redirect. Delete any such endpoints via the admin API after
+  // the suite so repeated dev runs do not accumulate data-less endpoints that
+  // skew other specs' "first endpoint" selection (and inflate conditional skips).
+  test.afterAll(async () => {
+    const base = process.env.E2E_BASE_URL || 'http://localhost:4000';
+    const headers = { Authorization: `Bearer ${TOKEN}` };
+    try {
+      const res = await fetch(`${base}/scim/admin/endpoints`, { headers });
+      const body = (await res.json()) as { items?: unknown[]; endpoints?: unknown[] } | unknown[];
+      const list = (Array.isArray(body) ? body : (body.items ?? body.endpoints ?? [])) as Array<{
+        id: string;
+        name?: string;
+      }>;
+      for (const ep of list) {
+        if (typeof ep?.name === 'string' && ep.name.startsWith('e2e-create-')) {
+          await fetch(`${base}/scim/admin/endpoints/${ep.id}`, { method: 'DELETE', headers });
+        }
+      }
+    } catch {
+      // Best-effort cleanup; never fail the suite on cleanup.
+    }
+  });
+
   test('wizard creates an endpoint and redirects to the detail page', async ({ page }) => {
     await openWizard(page);
 
