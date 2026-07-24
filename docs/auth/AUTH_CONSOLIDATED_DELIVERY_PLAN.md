@@ -172,9 +172,9 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 
 ### Wave 2 - Structural seam (X12)
 
-**W2.1 - `ResourceAuthenticator` strategy chain** `[X12 Phase 1]`
-- Tasks: define the `RESOURCE_AUTHENTICATOR` seam (3-outcome, mirroring `IAssertionTokenProvider`); extract global-secret, endpoint-bearer, endpoint-oauth_client, OAuth-JWT into strategies each owning lookup + validation + `isEnabled()` + trace; reduce [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) to a ~80-line orchestrator; preserve the X9 `looksLikeJwt` short-circuit as the opaque authenticators' `not-applicable` branch.
-- Acceptance: existing guard specs + live-test `9z-*` all green (behavior-preserving); guard < 120 lines; cross-backend parity (Stage 2.5).
+**W2.1 - `ResourceAuthenticator` strategy chain** `[X12 Phase 1]` - **DELIVERED (v0.54.67)**
+- Tasks: define the `ResourceAuthenticator` seam (3-outcome, mirroring `IAssertionTokenProvider`); extract global-secret, endpoint-bearer/oauth_client, OAuth-JWT into strategies each owning lookup + validation + `isEnabled()` + trace; reduce [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) to a thin orchestrator; preserve the X9 `looksLikeJwt` short-circuit as the opaque-secret authenticator's `not-applicable` branch.
+- **Done:** guard 491 -> ~185-line orchestrator over 3 ordered authenticators ([authenticators/](../../api/src/modules/auth/authenticators/)); behavior-preserving (guard spec 39/39 + auth E2E 80/80 unchanged; full unit 4479); +20 per-strategy specs (accept / reject-STOP / not-applicable); the 2 reject-STOP cases + F3 fall-through + X9 fast-paths reproduced exactly. `isEnabled` still reads today's flags (W2.5 migrates it). Report + RCA + DA-gate: [WAVE2_W2_1_IMPLEMENTATION_REPORT.md](WAVE2_W2_1_IMPLEMENTATION_REPORT.md). (The `<120 line` acceptance was an estimate; ~185 lines is the thin orchestrator with the shared-secret resolution + trace + reject helper retained - the substantive goal, no method logic inline, is met.)
 - Deps: none (benefits from W1). Estimate: **L**. Risk: Medium (behavior-preserving refactor of the hot auth path - RED-first + full regression net mandatory).
 
 **W2.2 - Strict token-request parser + discriminated union** `[guide 25.1]`

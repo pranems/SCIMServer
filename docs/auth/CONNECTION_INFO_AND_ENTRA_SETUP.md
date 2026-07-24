@@ -200,7 +200,7 @@ Combinations 1 and 2 use Entra's Secret Token field. Combinations 3 and 4 use En
 
 Verified against the shipped code: `PerEndpointCredentialsEnabled` is doing double duty and there is a gap.
 
-- It gates **both** the `bearer` and the `oauth_client` credential type - at **creation** ([admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts)) AND on the **resource-plane validation path** ([shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) `tryEndpointCredential`: if the flag is off, existing per-endpoint credentials are skipped entirely and go inert).
+- It gates **both** the `bearer` and the `oauth_client` credential type - at **creation** ([admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts)) AND on the **resource-plane validation path** ([endpoint-credential.authenticator.ts](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts), the W2.1 `EndpointCredentialAuthenticator`: if the flag is off, existing per-endpoint credentials are skipped entirely and go inert).
 - There is **no per-endpoint way to refuse the global `SCIM_SHARED_SECRET`** - every endpoint always accepts it via the guard's Tier-3 legacy branch. That is a real gap for an operator who wants an endpoint to accept ONLY its own credentials.
 
 ### 3A.2 The proposed four-flag family
