@@ -296,6 +296,12 @@ test.describe('Phase H3 - Visual regression baselines', () => {
         '[data-testid="users-empty"]',
       ]),
       fullPage: true,
+      // The Users tab renders a data-driven table whose ROW COUNT (and thus
+      // panel height) varies per dev-environment provisioning - masking the
+      // table cells does not stop the panel's bottom edge from shifting. Use
+      // the same live-data-drift tolerance as the Overview tab so the snapshot
+      // is stable against user-count changes rather than a chrome/layout change.
+      maxDiffPixelRatio: 0.03,
     });
   });
 
