@@ -122,7 +122,27 @@ cohesive follow-up so it can be shadow-verified first:
 - **WIF explicit enable** - give WIF an `enabled` (default true-when-a-trust-exists) so all
   methods share the model.
 
-## 8. Change log
+## 8. Dev deployment + measured validation (v0.54.68, 2026-07-24)
+
+Deployed to the dev Azure Container App (`scimserver-dev`, prisma / PostgreSQL). Dev
+confirmed serving `0.54.68` (revision `vbad351a8`) before any live assertion ran.
+
+| Measured gate (vs dev) | Result |
+|---|---|
+| Isolated co-location check | PASS (bearer authenticates -> disable via A1 -> same bearer 401) |
+| Live SCIM suite (`scripts/live-test.ps1`) | 1305 PASS / 10 FAIL / 1315 total (453.4s) |
+| - `9z-BV.T1` (bearer authenticates while flat flag enables it) | PASS (HTTP 200) |
+| - `9z-BV.T2` (explicit `bearer` enabled:false refuses the same bearer) | PASS (HTTP 401) |
+| Playwright E2E (full suite vs dev) | 194 passed / 5 skipped / 0 failed (2.8m) |
+
+The two new `9z-BV` W2.5 co-location assertions PASS on the wire, proving the resource
+guard honors `profile.authentication.methods[].enabled` on the real deployment. The 10
+live-test failures are the identical pre-existing Prisma flush-backlog request-log-readback
+flake (`9z-BD` / `9z-BN` / `9z-BO`) documented in the W2.1 report section 8 - unchanged by
+W2.5 (the count stayed 10; W2.5 added +2 passing assertions, 1303->1305 pass, 1313->1315
+total). Playwright is unchanged from the W2.1 run because W2.5 touches no `web/` file.
+
+## 9. Change log
 
 | Version | Change |
 |---|---|
