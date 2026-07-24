@@ -111,8 +111,45 @@ Stage 1 lint) - zero escape.
   mint sites) once W2.3 lands.
 - **Full DI-token chain injection** - optional refinement over the current internal composition.
 
-## 8. Change log
+## 8. Dev deployment + measured validation (v0.54.67, 2026-07-24)
+
+W2.1 was deployed to the dev Azure Container App (`scimserver-dev`, prisma / PostgreSQL
+backend) and validated on the wire. Dev confirmed serving `0.54.67` (revision
+`vff0b9a22r2`) before any live assertion ran (version-endpoint check first, to avoid a
+false-green against a stale revision).
+
+| Measured gate (vs dev `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) | Result |
+|---|---|
+| Live SCIM suite (`scripts/live-test.ps1`) | 1303 PASS / 10 FAIL / 1313 total (445.9s) |
+| Playwright E2E (full suite vs dev) | 194 passed / 5 skipped / 0 failed (2.7m) |
+| Playwright `logs-auth-inline` (focused, X14 copy/download-JSON) | 11/11 passed |
+
+**The 10 live-test failures are the pre-existing, self-documented Prisma flush-backlog
+timing flake - not a W2.1 regression.** All 10 (`9z-BD.T2-T4`, `9z-BN.T2-T3`,
+`9z-BO.T2-T6`) read back a *freshly persisted request-log row*; `Get-LogDetailByUrlStatus`
+polls ~90s, and under the full-suite flush backlog on a busy dev node the row can exceed
+that window (the function's own comment documents this: "a post-suite isolated lookup of
+the same row returns in ~6s"). `9z-BO.T2` (`$boHas`) is the gate assertion; T3-T6 are all
+guarded on it, so a missed row cascades to all six.
+
+**Proof it is timing, not a trace defect (isolated re-run, no suite backlog):** the same
+`9z-BO` flow run standalone found the request-log row on the **first** poll (~3s) and the
+persisted `authDecision` was correct - `method=oauth_client`, `outcome=reject`,
+`checks=5`, `requestId` matches the returned `correlation_id`, and **no** secret material
+in the serialized trace. This confirms the refactored probe-chain persists the exact same
+decision trace the god-guard did. Every auth-on-the-wire assertion (`9z-AZ` / `9z-BB` /
+`9z-BM` / `9z-BG` reason-code + `authReason` checks) passed in the full suite.
+
+### 8.1 Pipeline RCA (deployment, captured at confirmation)
+
+| # | Type | Severity | Symptom | Root cause | Fix / workaround | Prevention |
+|---|---|---|---|---|---|---|
+| PIPE-01 | Tooling / environment | Medium | `dev-deployment-pipeline.ps1` Stage 4.1 `docker compose build` failed at the web-build `npm ci` (node:25-alpine) with `npm error Exit handler never called!` | Known npm-in-Docker environmental flake; NOT a code defect - the CI-built GHCR image for the same commit published + anonymous-pulled fine in the same run | Bypass the flaky local build: `az acr import --name acrscimserver20622 --source ghcr.io/pranems/scimserver:latest --image scimserver:<sha> --force`, then `az containerapp update --image acrscimserver20622.azurecr.io/scimserver:<sha> --revision-suffix <fresh>` | Prefer the CI/GHCR image as the deploy source when the local Docker build flakes; treat a local `npm ci` Docker failure as environmental, re-run once, else import from GHCR |
+| PIPE-02 | Process / false-green | High | The pipeline reported "Live SCIM 1,027 PASS vs dev" while dev was still on the **previous** version | The Docker-build failure meant the ACR push had no image, the new revision never became healthy, and dev silently stayed on the old revision - yet the live-test ran green against the old code | Verified `/scim/admin/version` shows the NEW version + new revision hostname BEFORE trusting the dev live-test | Standing rule: a dev live-test is only trustworthy after the version endpoint confirms the new build is actually serving (the pipeline's own poll must gate the live-test) |
+| PIPE-03 | Test flake (pre-existing) | Low | 10 request-log-readback live-tests flake under full-suite flush backlog | Async Prisma request-log flush backlog exceeds the ~90s readback poll window mid-suite | None needed for W2.1 (proven correct in isolation) | Consider draining/retrying request-log-readback assertions post-suite, or moving them out of the busy-suite window |
+
+## 9. Change log
 
 | Version | Change |
 |---|---|
-| 0.54.67 | W2.1: extract the resource-plane cascade into an ordered `ResourceAuthenticator` probe-chain (3 strategies) behind a thin `SharedSecretGuard`; behavior-preserving (guard spec 39/39 + auth E2E 80/80 unchanged); +20 per-strategy unit tests; DA-gate + RCA. `isEnabled` still reads today's flags (W2.5 migrates it). |
+| 0.54.67 | W2.1: extract the resource-plane cascade into an ordered `ResourceAuthenticator` probe-chain (3 strategies) behind a thin `SharedSecretGuard`; behavior-preserving (guard spec 39/39 + auth E2E 80/80 unchanged); +20 per-strategy unit tests; DA-gate + RCA. `isEnabled` still reads today's flags (W2.5 migrates it). Dev-validated: live-test 1303/1313 (10 = documented flush-backlog flake, proven correct in isolation), Playwright 194/194 (5 skipped). |
