@@ -14,7 +14,6 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Public } from '../../auth/public.decorator';
 import { OAuthService } from '../../../oauth/oauth.service';
-import { resolveClientCredentials } from '../../../oauth/client-credential-location';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -23,9 +22,10 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { resolveEndpointAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import {
   ASSERTION_TOKEN_PROVIDER,
-  JWT_BEARER_ASSERTION_TYPE,
   type IAssertionTokenProvider,
 } from './assertion-token-provider';
+import { parseEndpointTokenRequest } from './endpoint-token-request-parser';
+import type { ParsedEndpointTokenRequest } from './endpoint-token-request.types';
 import { WifAssertionInvalidError } from '../../../oauth/wif-assertion-validator.service';
 import { emitAuthDecisionEvent, type AuthDecisionTrace, type AuthCheck } from '../../../oauth/auth-decision-trace';
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
@@ -86,73 +86,32 @@ export class EndpointOAuthController {
     @Body() body: EndpointTokenRequest,
     @Headers('authorization') authorization?: string,
   ) {
-    // RFC 6749 section 2.3.1 - accept client credentials from the
-    // `Authorization: Basic` header (client_secret_basic) in addition to the
-    // body (client_secret_post). Entra's newer provisioning experience sends
-    // them in the header; body values still win when both are present.
-    const resolved = resolveClientCredentials(
-      { clientId: body.client_id, clientSecret: body.client_secret },
-      authorization,
-    );
-    // Phase 1 - record WHERE the credentials came from for the auth trace:
-    // the body (client_secret_post), the Authorization: Basic header
-    // (client_secret_basic), or neither. Body wins when both are present.
-    const bodyHadSecret = typeof body.client_secret === 'string' && body.client_secret.length > 0;
-    const credentialLocation: 'client_secret_post' | 'client_secret_basic' | 'none' = bodyHadSecret
-      ? 'client_secret_post'
-      : authorization
-        ? 'client_secret_basic'
-        : 'none';
-    body = { ...body, client_id: resolved.clientId, client_secret: resolved.clientSecret };
+    // W2.2 - the strict parser produces a discriminated union (client_assertion
+    // / client_secret / invalid) from the raw form + Authorization header. The
+    // controller no longer re-derives the method by hand: it just routes the
+    // well-formed variants and shapes the error response for the invalid one.
+    const parsed = parseEndpointTokenRequest(body, authorization);
 
-    if (body.grant_type !== 'client_credentials') {
+    if (parsed.kind === 'invalid') {
       throw new HttpException(
         {
-          error: 'unsupported_grant_type',
-          error_description: 'Only the client_credentials grant type is supported.',
-          reason_code: 'grant_type_unsupported',
+          error: parsed.error,
+          error_description: parsed.errorDescription,
+          reason_code: parsed.reasonCode,
         },
-        HttpStatus.BAD_REQUEST,
+        parsed.status,
       );
     }
 
-    // A3 - self-describing routing cascade. The request shape selects the
-    // credential type with no prior binding (grant_type -> field presence).
-    // client_assertion and client_secret are mutually exclusive.
-    const hasAssertion = typeof body.client_assertion === 'string' && body.client_assertion.length > 0;
-    const hasSecret = typeof body.client_secret === 'string' && body.client_secret.length > 0;
-
-    if (hasAssertion && hasSecret) {
-      throw new HttpException(
-        {
-          error: 'invalid_request',
-          error_description: 'client_assertion and client_secret are mutually exclusive.',
-          reason_code: 'mutually_exclusive_credentials',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
+    if (parsed.kind === 'client_assertion') {
+      return this.handleAssertion(endpointId, parsed);
     }
 
-    if (hasAssertion) {
-      return this.handleAssertion(endpointId, body);
-    }
-
-    return this.handleClientSecret(endpointId, body, credentialLocation);
+    return this.handleClientSecret(endpointId, parsed);
   }
 
   /** A3 - WIF assertion route: dispatch to the assertion provider (Q6 binds it). */
-  private async handleAssertion(endpointId: string, body: EndpointTokenRequest) {
-    if (body.client_assertion_type !== JWT_BEARER_ASSERTION_TYPE) {
-      throw new HttpException(
-        {
-          error: 'invalid_request',
-          error_description: `Unsupported client_assertion_type. Expected "${JWT_BEARER_ASSERTION_TYPE}".`,
-          reason_code: 'unsupported_assertion_type',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
+  private async handleAssertion(endpointId: string, parsed: Extract<ParsedEndpointTokenRequest, { kind: 'client_assertion' }>) {
     // Three-outcome acceptor (architecture section 2.2):
     //  - provider returns a token  -> accept
     //  - provider returns null     -> not-mine-continue (no other route here) -> invalid_client
@@ -165,7 +124,7 @@ export class EndpointOAuthController {
 
     let minted;
     try {
-      minted = await this.assertionProvider.mintFromAssertion(endpointId, body.client_assertion!);
+      minted = await this.assertionProvider.mintFromAssertion(endpointId, parsed.assertion);
     } catch (err) {
       const reasonCode =
         err instanceof WifAssertionInvalidError && err.reasonCode
@@ -196,27 +155,20 @@ export class EndpointOAuthController {
   /** Q1 - oauth_client (client_id + client_secret) route. */
   private async handleClientSecret(
     endpointId: string,
-    body: EndpointTokenRequest,
-    credentialLocation: 'client_secret_post' | 'client_secret_basic' | 'none' = 'none',
+    parsed: Extract<ParsedEndpointTokenRequest, { kind: 'client_secret' }>,
   ) {
-    if (!body.client_id || !body.client_secret) {
-      throw new HttpException(
-        {
-          error: 'invalid_request',
-          error_description: 'client_id and client_secret (or a client_assertion) are required.',
-          reason_code: 'missing_credentials',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    // The parser guarantees client_id + client_secret are present for this
+    // variant, so no re-validation is needed here.
+    const clientId = parsed.clientId;
+    const credentialLocation = parsed.credentialLocation;
 
     const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
     const candidate = credentials.find(
-      (c) => c.credentialType === 'oauth_client' && c.metadata?.clientId === body.client_id,
+      (c) => c.credentialType === 'oauth_client' && c.metadata?.clientId === clientId,
     );
 
     const secretValid =
-      candidate != null && (await bcrypt.compare(body.client_secret, candidate.credentialHash));
+      candidate != null && (await bcrypt.compare(parsed.clientSecret, candidate.credentialHash));
 
     // Phase 1 - build the per-check trace for the oauth_client decision so the
     // diagnostics table shows real expected-vs-received (never the secret
@@ -232,15 +184,15 @@ export class EndpointOAuthController {
       },
       {
         id: 'credential_location',
-        status: credentialLocation === 'none' ? 'fail' : 'pass',
+        status: 'pass',
         expected: 'client_secret_basic | client_secret_post',
         received: credentialLocation,
       },
       {
         id: 'client_id_present',
-        status: body.client_id ? 'pass' : 'fail',
+        status: clientId ? 'pass' : 'fail',
         expected: 'present',
-        received: body.client_id ? 'present' : 'absent',
+        received: clientId ? 'present' : 'absent',
       },
       {
         id: 'client_found',
@@ -260,7 +212,7 @@ export class EndpointOAuthController {
     if (!candidate || !secretValid) {
       this.logger.warn(LogCategory.OAUTH, 'Per-endpoint oauth_client authentication failed', {
         endpointId,
-        clientId: body.client_id,
+        clientId,
         credentialFound: candidate != null,
       });
       // WI-D4 - one canonical AUTH decision event (reject). The distinguishing
@@ -276,8 +228,8 @@ export class EndpointOAuthController {
 
     const token = await this.oauthService.generateEndpointAccessToken(
       endpointId,
-      body.client_id,
-      body.scope,
+      clientId,
+      parsed.scope,
     );
 
     // W2.5 (shadow) - the mint plane now CONSULTS the same per-method enablement
@@ -298,7 +250,7 @@ export class EndpointOAuthController {
           this.logger.warn(
             LogCategory.OAUTH,
             'W2.5 shadow: oauth_client method is disabled for this endpoint - minting anyway (shadow mode, not yet enforced)',
-            { endpointId, clientId: body.client_id },
+            { endpointId, clientId },
           );
         }
         oauthChecks.push({
@@ -314,7 +266,7 @@ export class EndpointOAuthController {
 
     this.logger.info(LogCategory.OAUTH, 'Per-endpoint access token issued', {
       endpointId,
-      clientId: body.client_id,
+      clientId,
     });
     oauthChecks.push({
       id: 'token_ttl',

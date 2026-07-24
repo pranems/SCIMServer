@@ -177,7 +177,7 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - **Done:** guard 491 -> ~185-line orchestrator over 3 ordered authenticators ([authenticators/](../../api/src/modules/auth/authenticators/)); behavior-preserving (guard spec 39/39 + auth E2E 80/80 unchanged; full unit 4479); +20 per-strategy specs (accept / reject-STOP / not-applicable); the 2 reject-STOP cases + F3 fall-through + X9 fast-paths reproduced exactly. `isEnabled` still reads today's flags (W2.5 migrates it). Report + RCA + DA-gate: [WAVE2_W2_1_IMPLEMENTATION_REPORT.md](WAVE2_W2_1_IMPLEMENTATION_REPORT.md). (The `<120 line` acceptance was an estimate; ~185 lines is the thin orchestrator with the shared-secret resolution + trace + reject helper retained - the substantive goal, no method logic inline, is met.)
 - Deps: none (benefits from W1). Estimate: **L**. Risk: Medium (behavior-preserving refactor of the hot auth path - RED-first + full regression net mandatory).
 
-**W2.2 - Strict token-request parser + discriminated union** `[guide 25.1]`
+**W2.2 - Strict token-request parser + discriminated union** `[guide 25.1]` - **DELIVERED (v0.54.69)**
 - Tasks: new `endpoint-token-request.types.ts` (discriminated union) + `endpoint-token-request-parser.service.ts` (strict singleton form parsing, ambiguity + size checks, Basic/form normalization, no crypto); controller stops guessing.
 - Acceptance: parser rejects duplicate/mixed-method/oversized bodies; controller only routes + shapes responses.
 - Deps: W2.1 (shared shape). Estimate: **M**. Risk: Low.
