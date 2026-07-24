@@ -26,6 +26,8 @@ export type ParsedEndpointTokenRequest =
       assertion: string;
       assertionType: string;
       scope?: string;
+      /** W3.4 - RFC 8707 `resource` form parameter (SAP SuccessFactors). */
+      resource?: string;
     }
   | {
       /** RFC 6749 client_credentials with a client_secret route. */
@@ -52,4 +54,6 @@ export interface RawEndpointTokenRequest {
   client_assertion?: string;
   client_assertion_type?: string;
   scope?: string;
+  /** W3.4 - RFC 8707 `resource` indicator (SAP SuccessFactors). */
+  resource?: string;
 }

@@ -206,6 +206,68 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     expect(payload.sub).not.toBe(SUBJECT);
   });
 
+  it('W3.4: enforces the RFC 8707 resource policy under requiredExact (SuccessFactors)', async () => {
+    const rEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${rEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Entra WIF (resource-required)',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: ISSUER,
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: TENANT,
+          scope: 'scim.read scim.write',
+          issuedTokenTtlSec: 7200,
+          resourceMode: 'requiredExact',
+          expectedResource: 'https://api.successfactors.com',
+        },
+      })
+      .expect(201);
+
+    const tokenUrl = `/scim/endpoints/${rEndpoint}/oauth/token`;
+    const assertion = await signAssertion();
+
+    // Missing resource -> rejected (401 invalid_client).
+    await request(app.getHttpServer())
+      .post(tokenUrl)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(401);
+
+    // Wrong resource -> rejected.
+    await request(app.getHttpServer())
+      .post(tokenUrl)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER, resource: 'https://api.other.com' })
+      .expect(401);
+
+    // Exact resource -> accepted (200).
+    const ok = await request(app.getHttpServer())
+      .post(tokenUrl)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER, resource: 'https://api.successfactors.com' })
+      .expect(200);
+    expect(ok.body.token_type).toBe('Bearer');
+  });
+
+  it('W3.4: resourceMode ignore (default) accepts a mismatched resource', async () => {
+    // The primary endpoint's trust sets no resourceMode -> ignore. A mismatched
+    // resource must NOT block the mint (legacy behavior preserved).
+    const assertion = await signAssertion();
+    await request(app.getHttpServer())
+      .post(`/scim/endpoints/${endpointId}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER, resource: 'https://anything.example' })
+      .expect(200);
+  });
+
   // ─── WI-16 - multiple WIF trusts on one endpoint (iterate, not first-only) ──
   it('WI-16: an endpoint with TWO wif trusts mints when the assertion matches the second', async () => {
     // A dedicated endpoint carrying two WIF trusts: the FIRST (issuer-A) does

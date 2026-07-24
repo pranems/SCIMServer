@@ -117,6 +117,8 @@ interface WifTrustInput {
   requiredRoles?: string[];
   scope?: string;
   issuedTokenTtlSec?: number;
+  /** W3.4 - RFC 8707 resource policy: how strictly the request `resource` is checked. */
+  resourceMode?: 'ignore' | 'optionalExact' | 'requiredExact';
   // ── A4 seams (persisted; computed in shadow telemetry, not enforced) ──
   identityModel?: 'per-app' | 'first-party';
   roleScopeMap?: Record<string, string[]>;
@@ -131,6 +133,7 @@ const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
   'allowedTenantIdSource',
   'targetClientId',
   'requiredRoles', 'scope', 'issuedTokenTtlSec',
+  'resourceMode',
   // A4 seams
   'identityModel', 'roleScopeMap', 'grantedScopes', 'roleEnforcement',
 ];

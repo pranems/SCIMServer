@@ -225,6 +225,7 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Tasks: `resourceMode = ignore | optionalExact | requiredExact` + `expectedResource`; legacy starts `ignore` with shadow diagnostics.
 - Acceptance: mismatch rejected under `requiredExact`; missing accepted under `ignore`; per guide 13.3 table.
 - Deps: W3.1. Estimate: **S**. Risk: Low.
+- **Status: DELIVERED - api v0.54.77.** `resourceMode` on the WIF trust (default `ignore` = legacy accept-anything + advisory shadow log; `optionalExact` rejects a present-but-mismatched resource; `requiredExact` requires an exact match). The RFC 8707 `resource` form param is threaded parser -> controller -> provider -> validator and checked in the decision trace (`resource_match`, reasons `wif_resource_required` / `wif_resource_mismatch`). Report: [WAVE3_W3_4_IMPLEMENTATION_REPORT.md](WAVE3_W3_4_IMPLEMENTATION_REPORT.md).
 
 **W3.5 - Credential/trust cache + typed lookup + index** `[X11 E/F + guide 25.3]`
 - Tasks: per-endpoint WIF-trust cache (invalidate on credential change); `findActiveByEndpointAndType('wif')`; composite index `(endpointId, credentialType, active)` (Prisma migration + in-memory parity); compile/cache exact issuer->trust selection; reject unknown issuers without unrelated JWKS fetches.

@@ -76,6 +76,21 @@ describe('parseEndpointTokenRequest (W2.2)', () => {
       });
     });
 
+    it('W3.4: captures the RFC 8707 resource parameter on the client_assertion variant', () => {
+      const p = parseEndpointTokenRequest({
+        grant_type: 'client_credentials',
+        client_assertion: 'a.b.c',
+        client_assertion_type: JWT_BEARER,
+        resource: 'https://api.successfactors.com',
+      });
+      expect(p).toEqual({
+        kind: 'client_assertion',
+        assertion: 'a.b.c',
+        assertionType: JWT_BEARER,
+        resource: 'https://api.successfactors.com',
+      });
+    });
+
     it('rejects an unsupported client_assertion_type', () => {
       const p = parseEndpointTokenRequest({
         grant_type: 'client_credentials',

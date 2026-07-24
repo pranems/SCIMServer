@@ -23,6 +23,15 @@ export interface WifTrust {
   allowedTenantId: string;
   requiredRoles?: string[];
   expectedResource?: string | null;
+  /**
+   * W3.4 - RFC 8707 `resource` request-parameter policy (SAP SuccessFactors
+   * sends one). `ignore` (default, legacy) accepts any/no resource and only
+   * emits an advisory shadow diagnostic on mismatch; `optionalExact` rejects a
+   * present-but-mismatched resource but accepts an absent one; `requiredExact`
+   * requires the request to present a resource that exactly equals
+   * `expectedResource`. Modes other than `ignore` require `expectedResource`.
+   */
+  resourceMode?: 'ignore' | 'optionalExact' | 'requiredExact';
   scope?: string;
   issuedTokenTtlSec?: number;
   /**
@@ -94,8 +103,9 @@ export class WifAssertionValidatorService {
     assertion: string,
     trust: WifTrust,
     egressOverrides?: EgressPolicyOverrides,
+    requestResource?: string,
   ): Promise<WifValidatedClaims> {
-    const { claims } = await this.runChecks(assertion, trust, egressOverrides);
+    const { claims } = await this.runChecks(assertion, trust, egressOverrides, requestResource);
     return claims;
   }
 
@@ -110,8 +120,9 @@ export class WifAssertionValidatorService {
     assertion: string,
     trust: WifTrust,
     egressOverrides?: EgressPolicyOverrides,
+    requestResource?: string,
   ): Promise<{ claims: WifValidatedClaims; trace: AuthDecisionTrace }> {
-    return this.runChecks(assertion, trust, egressOverrides);
+    return this.runChecks(assertion, trust, egressOverrides, requestResource);
   }
 
   /**
@@ -124,6 +135,7 @@ export class WifAssertionValidatorService {
     assertion: string,
     trust: WifTrust,
     egressOverrides?: EgressPolicyOverrides,
+    requestResource?: string,
   ): Promise<{ claims: WifValidatedClaims; trace: AuthDecisionTrace }> {
     // WI-D3 - build an ordered decision trace as we run the checks, so the
     // reject reason_code, the log, and the UI diff all derive from one object.
@@ -187,6 +199,55 @@ export class WifAssertionValidatorService {
       this.failTraced('wif_tenant_mismatch', 'tenant mismatch', trust, trace);
     }
     trace.pass('tenant_match', { expected: trust.allowedTenantId, received: String(claims.tid ?? '') });
+
+    // W3.4 - RFC 8707 `resource` request-parameter policy. The `resource` is a
+    // REQUEST parameter (not an assertion claim), so it is compared against the
+    // trust's `expectedResource` per `resourceMode`. Default `ignore` keeps the
+    // legacy behavior (accept + advisory shadow diagnostic on mismatch).
+    const resourceMode = trust.resourceMode ?? 'ignore';
+    const expectedResource = trust.expectedResource ?? undefined;
+    const presentedResource =
+      typeof requestResource === 'string' && requestResource.length > 0 ? requestResource : undefined;
+    if (resourceMode === 'requiredExact') {
+      if (!presentedResource) {
+        trace.fail('resource_match', { expected: expectedResource ?? '', received: '' });
+        this.failTraced('wif_resource_required', 'resource parameter is required', trust, trace);
+      }
+      if (presentedResource !== expectedResource) {
+        trace.fail('resource_match', { expected: expectedResource ?? '', received: presentedResource });
+        this.failTraced('wif_resource_mismatch', 'resource mismatch', trust, trace);
+      }
+      trace.pass('resource_match', { expected: expectedResource ?? '', received: presentedResource });
+    } else if (resourceMode === 'optionalExact') {
+      if (presentedResource && presentedResource !== expectedResource) {
+        trace.fail('resource_match', { expected: expectedResource ?? '', received: presentedResource });
+        this.failTraced('wif_resource_mismatch', 'resource mismatch', trust, trace);
+      }
+      if (presentedResource) {
+        trace.pass('resource_match', { expected: expectedResource ?? '', received: presentedResource });
+      } else {
+        trace.skip('resource_match', {
+          expected: expectedResource ?? '',
+          received: '',
+          detail: 'optional; not presented',
+        });
+      }
+    } else {
+      // ignore (default, legacy) - never blocks; only an advisory shadow
+      // diagnostic when a resource is presented that does not match.
+      if (presentedResource && expectedResource && presentedResource !== expectedResource) {
+        trace.skip('resource_match', {
+          expected: expectedResource,
+          received: presentedResource,
+          detail: 'resourceMode=ignore (advisory)',
+        });
+        this.logger.warn(
+          LogCategory.AUTH,
+          'WIF resource parameter mismatch - advisory, allowed (set resourceMode:requiredExact to reject)',
+          { expectedResource, presentedResource, issuer: trust.expectedIssuer },
+        );
+      }
+    }
 
     // Step 3 - roles are ADVISORY by default. A missing required role is
     // logged but does NOT block token issuance, so a provisioning flow always

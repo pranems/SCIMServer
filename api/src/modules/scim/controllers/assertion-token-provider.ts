@@ -20,6 +20,14 @@ export interface IAssertionTokenProvider {
    * endpoint's own token on success. Returns `null` when no WIF trust is
    * configured for the endpoint (not-mine-continue); throws when the assertion
    * is for the endpoint but invalid (mine-but-invalid-stop).
+   *
+   * W3.4 - `requestResource` is the optional RFC 8707 `resource` form parameter
+   * (SAP SuccessFactors sends one); the trust's `resourceMode` decides whether
+   * it is ignored, optional-exact, or required-exact.
    */
-  mintFromAssertion(endpointId: string, clientAssertion: string): Promise<AccessToken | null>;
+  mintFromAssertion(
+    endpointId: string,
+    clientAssertion: string,
+    requestResource?: string,
+  ): Promise<AccessToken | null>;
 }

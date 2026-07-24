@@ -60,7 +60,11 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     emitAndRecordAuthDecision(this.logger, trace, this.decisionStore, LogCategory.AUTH);
   }
 
-  async mintFromAssertion(endpointId: string, clientAssertion: string): Promise<AccessToken | null> {
+  async mintFromAssertion(
+    endpointId: string,
+    clientAssertion: string,
+    requestResource?: string,
+  ): Promise<AccessToken | null> {
     const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
     const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
 
@@ -107,7 +111,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       let claims: WifValidatedClaims;
       let validatorTrace: AuthDecisionTrace;
       try {
-        const result = await this.validator.validateWithTrace(clientAssertion, trust, egressOverrides);
+        const result = await this.validator.validateWithTrace(clientAssertion, trust, egressOverrides, requestResource);
         claims = result.claims;
         validatorTrace = result.trace;
       } catch (err) {
@@ -334,6 +338,11 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         ? (m.requiredRoles as unknown[]).filter((r): r is string => typeof r === 'string')
         : undefined,
       expectedResource: typeof m.expectedResource === 'string' ? m.expectedResource : undefined,
+      // W3.4 - RFC 8707 resource policy. Default `ignore` (legacy).
+      resourceMode:
+        m.resourceMode === 'optionalExact' || m.resourceMode === 'requiredExact'
+          ? m.resourceMode
+          : 'ignore',
       scope: typeof m.scope === 'string' ? m.scope : undefined,
       issuedTokenTtlSec: typeof m.issuedTokenTtlSec === 'number' ? m.issuedTokenTtlSec : undefined,
       // A4 seams - read inertly (computed in shadow telemetry, never enforced).

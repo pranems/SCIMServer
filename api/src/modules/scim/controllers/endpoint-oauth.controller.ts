@@ -36,6 +36,8 @@ interface EndpointTokenRequest {
   client_assertion?: string;
   client_assertion_type?: string;
   scope?: string;
+  /** W3.4 - RFC 8707 `resource` indicator (SAP SuccessFactors). */
+  resource?: string;
 }
 
 /**
@@ -119,7 +121,7 @@ export class EndpointOAuthController {
 
     let minted;
     try {
-      minted = await this.assertionProvider.mintFromAssertion(endpointId, parsed.assertion);
+      minted = await this.assertionProvider.mintFromAssertion(endpointId, parsed.assertion, parsed.resource);
     } catch (err) {
       const reasonCode =
         err instanceof WifAssertionInvalidError && err.reasonCode

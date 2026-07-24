@@ -84,6 +84,7 @@ export function parseEndpointTokenRequest(
       assertion: raw.client_assertion as string,
       assertionType: raw.client_assertion_type,
       ...(scope !== undefined ? { scope } : {}),
+      ...(typeof raw.resource === 'string' && raw.resource.length > 0 ? { resource: raw.resource } : {}),
     };
   }
 

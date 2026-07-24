@@ -14094,6 +14094,58 @@ Write-Host "`n--- 9z-BX: WIF identity separation (W3.2) Complete ---" -Foregroun
 
 
 # ============================================
+# TEST SECTION 9z-BY: WIF resource policy config (W3.4)
+# ============================================
+$script:currentSection = "9z-BY: WIF resource policy (W3.4)"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BY: WIF RESOURCE POLICY CONFIG (W3.4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# W3.4 adds an RFC 8707 `resource` policy (SAP SuccessFactors) to a WIF trust:
+# resourceMode = ignore (default) | optionalExact | requiredExact + a matching
+# expectedResource. The accept/reject enforcement runs AFTER signature + claim
+# validation, so it needs a real IdP-signed assertion (covered by the E2E with
+# a mocked JWKS); here we assert the config surface persists on the wire.
+
+try {
+    $byEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-wifres-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $byId = $byEp.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$byId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    $byTrust = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$byId/credentials" -Method POST -Headers $headers -Body (@{
+        credentialType = "wif"; label = "wif-res-w34"
+        wif = @{
+            assertionProfile = "jwt-bearer"
+            expectedIssuer   = "https://login.microsoftonline.com/by-tenant/v2.0"
+            expectedSubject  = "sp-object-id-by"
+            expectedAudience = $byId
+            jwksUri          = "https://login.microsoftonline.com/by-tenant/discovery/v2.0/keys"
+            allowedTenantId  = "by-tenant"
+            scope            = "scim.read scim.write"
+            resourceMode     = "requiredExact"
+            expectedResource = "https://api.successfactors.com"
+        }
+    } | ConvertTo-Json -Depth 6)
+    Test-Result -Success ($byTrust.credentialType -eq "wif") -Message "9z-BY.T1: WIF trust with resourceMode persisted"
+
+    $byJson = ($byTrust | ConvertTo-Json -Depth 8)
+    Test-Result -Success ($byJson -match '"resourceMode"\s*:\s*"requiredExact"') -Message "9z-BY.T2: resourceMode = requiredExact is persisted"
+    Test-Result -Success ($byJson -match '"expectedResource"\s*:\s*"https://api.successfactors.com"') -Message "9z-BY.T3: expectedResource is persisted"
+    Test-Result -Success (-not ($byJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-BY.T4: WIF trust response carries NO secret/hash/token"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$byId" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-BY: WIF resource policy section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BY: WIF resource policy (W3.4) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

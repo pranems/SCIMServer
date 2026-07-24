@@ -65,9 +65,27 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
       client_assertion_type: JWT_BEARER,
     });
 
-    expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(ENDPOINT_ID, 'eyJhbGciOiJSUzI1NiJ9.payload.sig');
+    expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(ENDPOINT_ID, 'eyJhbGciOiJSUzI1NiJ9.payload.sig', undefined);
     expect(oauthService.generateEndpointAccessToken).not.toHaveBeenCalled();
     expect(res.access_token).toBe('wif-token');
+  });
+
+  it('W3.4: threads the RFC 8707 resource form parameter to the assertion provider', async () => {
+    const assertionProvider = { mintFromAssertion: jest.fn().mockResolvedValue({ accessToken: 'wif-token', expiresIn: 3600, scope: 'scim.read' }) };
+    const { controller } = makeController({ assertionProvider });
+
+    await controller.getToken(ENDPOINT_ID, {
+      grant_type: 'client_credentials',
+      client_assertion: 'eyJhbGciOiJSUzI1NiJ9.payload.sig',
+      client_assertion_type: JWT_BEARER,
+      resource: 'https://api.successfactors.com',
+    });
+
+    expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(
+      ENDPOINT_ID,
+      'eyJhbGciOiJSUzI1NiJ9.payload.sig',
+      'https://api.successfactors.com',
+    );
   });
 
   it('rejects a body carrying BOTH client_assertion and client_secret with invalid_request', async () => {

@@ -71,6 +71,55 @@ describe('WifAssertionValidatorService (Q6.3)', () => {
     expect(verify).toHaveBeenCalledWith('assertion.jwt.value', TRUST.jwksUri, overrides);
   });
 
+  // ── W3.4 - RFC 8707 `resource` parameter policy (SAP SuccessFactors) ────────
+  describe('W3.4 resource policy (resourceMode)', () => {
+    const withResource = (mode: WifTrust['resourceMode'], expected?: string): WifTrust => ({
+      ...TRUST,
+      resourceMode: mode,
+      expectedResource: expected ?? null,
+    });
+
+    it('ignore (default): accepts regardless of the request resource', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      // No resourceMode set -> ignore. A mismatching resource is allowed.
+      const claims = await service.validate('a.b.c', { ...TRUST, expectedResource: 'api://sf' }, undefined, 'api://other');
+      expect(claims.sub).toBe(TRUST.expectedSubject);
+    });
+
+    it('requiredExact: rejects when the request omits the resource', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      await expect(
+        service.validate('a.b.c', withResource('requiredExact', 'api://sf'), undefined, undefined),
+      ).rejects.toMatchObject({ reasonCode: 'wif_resource_required' });
+    });
+
+    it('requiredExact: rejects when the request resource does not match', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      await expect(
+        service.validate('a.b.c', withResource('requiredExact', 'api://sf'), undefined, 'api://other'),
+      ).rejects.toMatchObject({ reasonCode: 'wif_resource_mismatch' });
+    });
+
+    it('requiredExact: accepts an exact match', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      const claims = await service.validate('a.b.c', withResource('requiredExact', 'api://sf'), undefined, 'api://sf');
+      expect(claims.sub).toBe(TRUST.expectedSubject);
+    });
+
+    it('optionalExact: accepts when the request omits the resource', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      const claims = await service.validate('a.b.c', withResource('optionalExact', 'api://sf'), undefined, undefined);
+      expect(claims.sub).toBe(TRUST.expectedSubject);
+    });
+
+    it('optionalExact: rejects a present-but-mismatched resource', async () => {
+      verify.mockResolvedValue({ payload: goodPayload(), protectedHeader: { alg: 'RS256' } });
+      await expect(
+        service.validate('a.b.c', withResource('optionalExact', 'api://sf'), undefined, 'api://other'),
+      ).rejects.toMatchObject({ reasonCode: 'wif_resource_mismatch' });
+    });
+  });
+
   it('rejects a wrong issuer', async () => {
     verify.mockResolvedValue({ payload: { ...goodPayload(), iss: 'https://evil.example/v2.0' }, protectedHeader: {} });
     await expect(service.validate('a', TRUST)).rejects.toBeInstanceOf(WifAssertionInvalidError);

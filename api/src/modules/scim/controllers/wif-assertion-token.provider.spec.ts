@@ -193,6 +193,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       'assertion.jwt',
       expect.objectContaining({ jwksUri: wifMetadata.jwksUri }),
       { timeoutMs: 1500, retries: 4, retryBackoffMs: 50, cacheMaxAgeMs: 30000 },
+      undefined,
     );
   });
 
@@ -203,7 +204,19 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
 
     await provider.mintFromAssertion('ep-1', 'assertion.jwt');
 
-    expect(validateWithTrace).toHaveBeenCalledWith('assertion.jwt', expect.any(Object), {});
+    expect(validateWithTrace).toHaveBeenCalledWith('assertion.jwt', expect.any(Object), {}, undefined);
+  });
+
+  it('W3.4: threads the request resource parameter into the validator', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt', 'api://sf-resource');
+
+    // The RFC 8707 resource param is the validator's 4th argument, so the
+    // trust's resourceMode can enforce it.
+    expect(validateWithTrace).toHaveBeenCalledWith('assertion.jwt', expect.any(Object), {}, 'api://sf-resource');
   });
 
   it('throws when the assertion is for this endpoint but invalid (mine-but-invalid-stop)', async () => {
