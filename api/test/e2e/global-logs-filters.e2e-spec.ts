@@ -143,4 +143,14 @@ describe('Global Logs filters (E2E) - Phase D5', () => {
       .expect(200);
     expect(detail.body.requestId).toBe(requestId);
   }, 15_000);
+
+  it('GET /admin/logs?requestId with a non-UUID value returns empty (200, not 500)', async () => {
+    // requestId is a `@db.Uuid` column; a non-UUID must not crash the query.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    const res = await request(app.getHttpServer() as any)
+      .get('/scim/admin/logs?requestId=not-a-valid-uuid')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body.items).toEqual([]);
+  });
 });

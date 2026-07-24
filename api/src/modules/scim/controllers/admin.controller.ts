@@ -159,11 +159,13 @@ export class AdminController {
   // are buffered (flushed every few seconds / at 50 entries), so a row created
   // moments ago may not yet be queryable. This endpoint makes the pending
   // writes immediately durable + queryable - used by operators chasing a fresh
-  // row and by tests that read back a row right after producing it.
+  // row and by tests that read back a row right after producing it. Uses
+  // `flushPending` (not `flushLogs`) so it reliably drains even while a
+  // background flush is in progress.
   @Post('logs/flush')
   @HttpCode(204)
   async flushLogs(): Promise<void> {
-    await this.loggingService.flushLogs();
+    await this.loggingService.flushPending();
   }
 
   @Post('logs/prune')

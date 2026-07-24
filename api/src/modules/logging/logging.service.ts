@@ -362,6 +362,35 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     }
   }
 
+  /**
+   * Force ALL currently-buffered entries to the database, awaiting any in-flight
+   * flush first.
+   *
+   * `flushLogs()` deliberately no-ops while a prior flush is in progress (so the
+   * 3s timer never double-flushes), which means a bare `flushLogs()` call is NOT
+   * a reliable "drain now" under sustained load - a background flush is usually
+   * running, so the call returns having drained nothing. `flushPending` spins
+   * until the buffer is empty AND no flush is in flight (bounded by a deadline),
+   * so on return every entry buffered before the call is durable + queryable.
+   * This is what the admin force-flush endpoint uses so a just-produced row is
+   * immediately readable (operators chasing a fresh row; tests reading back a
+   * row they just created). No-op on the in-memory backend (writes are sync).
+   */
+  async flushPending(timeoutMs = 10_000): Promise<void> {
+    if (this.isInMemoryBackend) return;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (this.flushInProgress) {
+        // A flush is writing; wait for it to release, then re-check the buffer
+        // (entries can arrive during the write).
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        continue;
+      }
+      if (this.logBuffer.length === 0) return; // drained + nothing in flight
+      await this.flushLogs();
+    }
+  }
+
   /** Flush remaining log entries and stop timers on application shutdown. */
   async onModuleDestroy(): Promise<void> {
     if (this.flushTimer) {
@@ -520,7 +549,14 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
   const where: Prisma.RequestLogWhereInput = {};
     if (filters.endpointId) where.endpointId = filters.endpointId;
-    if (filters.requestId) where.requestId = filters.requestId;
+    if (filters.requestId) {
+      // requestId is a `@db.Uuid` column: a non-UUID value makes Postgres throw
+      // on the cast (previously surfaced as a 500). A non-UUID can never match a
+      // UUID column, so return an empty set instead (parity with the in-memory
+      // string-equality branch), using the nil UUID as a guaranteed-no-match.
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.requestId);
+      where.requestId = isUuid ? filters.requestId : '00000000-0000-0000-0000-000000000000';
+    }
     if (filters.method) where.method = filters.method.toUpperCase();
     if (typeof filters.status === 'number') where.status = filters.status;
     if (filters.hasError === true) where.errorMessage = { not: null };

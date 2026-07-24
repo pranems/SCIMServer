@@ -22,6 +22,7 @@ describe('AdminController', () => {
     mockLoggingService = {
       clearLogs: jest.fn().mockResolvedValue(undefined),
       flushLogs: jest.fn().mockResolvedValue(undefined),
+      flushPending: jest.fn().mockResolvedValue(undefined),
       listLogs: jest.fn().mockResolvedValue({ data: [], total: 0 }),
       getLog: jest.fn(),
       pruneOldLogs: jest.fn().mockResolvedValue(5),
@@ -80,9 +81,9 @@ describe('AdminController', () => {
 
   // ── flushLogs (force-drain the buffered request-log writes) ─────────
   describe('flushLogs', () => {
-    it('should delegate to LoggingService.flushLogs so buffered rows become queryable', async () => {
+    it('should delegate to LoggingService.flushPending so buffered rows become queryable', async () => {
       await controller.flushLogs();
-      expect(mockLoggingService.flushLogs).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.flushPending).toHaveBeenCalledTimes(1);
     });
   });
 

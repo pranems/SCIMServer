@@ -180,4 +180,51 @@ describe('LoggingService.recordRequest - health-probe filter', () => {
       expect('_identifier' in row).toBe(false);
     });
   });
+
+  // flushPending is the reliable "drain now" (the admin force-flush endpoint):
+  // unlike flushLogs it drains even while a background flush is mid-write, so a
+  // just-produced row is immediately durable. This is the fix that makes the
+  // request-log-readback deterministic under load.
+  describe('flushPending drains the buffer reliably', () => {
+    it('persists all buffered rows on return', async () => {
+      service.recordRequest({ method: 'POST', url: '/scim/v2/endpoints/ep/Users', status: 201, requestHeaders: {} });
+      service.recordRequest({ method: 'GET', url: '/scim/v2/endpoints/ep/Users', status: 200, requestHeaders: {} });
+      await service.flushPending();
+      expect(prisma.requestLog.createMany).toHaveBeenCalled();
+      const totalInserted = prisma.requestLog.createMany.mock.calls.reduce(
+        (n, call) => n + ((call[0] as { data: unknown[] }).data?.length ?? 0),
+        0,
+      );
+      expect(totalInserted).toBe(2);
+    });
+
+    it('returns promptly when the buffer is already empty', async () => {
+      const start = Date.now();
+      await service.flushPending();
+      expect(Date.now() - start).toBeLessThan(1000);
+      expect(prisma.requestLog.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  // A non-UUID requestId filter must not crash the `@db.Uuid` column (was a 500);
+  // it returns an empty set (a non-UUID can never match a UUID column).
+  describe('listLogs requestId filter is UUID-safe', () => {
+    it('a non-UUID requestId yields the nil-UUID no-match filter (no throw)', async () => {
+      prisma.requestLog.count.mockResolvedValue(0);
+      prisma.requestLog.findMany.mockResolvedValue([]);
+      const res = await service.listLogs({ requestId: 'not-a-uuid' });
+      expect(res.items).toEqual([]);
+      const whereArg = (prisma.requestLog.findMany.mock.calls[0][0] as { where: { requestId?: string } }).where;
+      expect(whereArg.requestId).toBe('00000000-0000-0000-0000-000000000000');
+    });
+
+    it('a valid UUID requestId is passed through unchanged', async () => {
+      prisma.requestLog.count.mockResolvedValue(0);
+      prisma.requestLog.findMany.mockResolvedValue([]);
+      const uuid = 'fbc960ae-bd4a-4ac3-bcd8-2649fe1ce4f6';
+      await service.listLogs({ requestId: uuid });
+      const whereArg = (prisma.requestLog.findMany.mock.calls[0][0] as { where: { requestId?: string } }).where;
+      expect(whereArg.requestId).toBe(uuid);
+    });
+  });
 });
