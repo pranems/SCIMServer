@@ -91,20 +91,25 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 
 ### Data Model
 
+8 tables in PostgreSQL 17 (extensions `citext`, `pgcrypto`, `pg_trgm`). `RequestLog`
+is the durable request/audit trail; it is deliberately **not** a foreign key to
+`Endpoint` (its `endpointId` is a correlation column) so an append-only audit row
+survives the deletion of the endpoint it describes.
+
 ```mermaid
 erDiagram
-    Endpoint ||--o{ ScimResource : "owns"
-    Endpoint ||--o{ RequestLog : "logs"
-    Endpoint ||--o{ EndpointCredential : "authenticates"
-    ScimResource ||--o{ ResourceMember : "group has"
-    ScimResource ||--o{ ResourceMember : "member of"
+    Endpoint ||--o{ ScimResource : "owns (cascade)"
+    Endpoint ||--o{ EndpointCredential : "authenticates (cascade)"
+    ScimResource ||--o{ ResourceMember : "group has (cascade)"
+    ScimResource ||--o{ ResourceMember : "member of (set null)"
+    Endpoint }o..o{ RequestLog : "correlated by endpointId (NO FK)"
 
     Endpoint {
         uuid id PK
         string name UK
         string displayName
         string description
-        jsonb profile
+        jsonb profile "schemas/resourceTypes/spConfig/settings"
         boolean active
         datetime createdAt
         datetime updatedAt
@@ -112,23 +117,46 @@ erDiagram
 
     ScimResource {
         uuid id PK
-        string scimId
         uuid endpointId FK
-        string resourceType
+        string resourceType "User/Group/custom"
+        uuid scimId
+        text externalId "caseExact"
         citext userName
         citext displayName
-        string externalId
         boolean active
-        jsonb payload
-        int version
-        datetime deletedAt
+        jsonb payload "full SCIM resource"
+        int version "ETag"
+        string meta
         datetime createdAt
         datetime updatedAt
     }
 
-    RequestLog {
+    ResourceMember {
+        uuid id PK
+        uuid groupResourceId FK
+        uuid memberResourceId FK "nullable, set null"
+        string value
+        string type
+        string display
+        datetime createdAt
+    }
+
+    EndpointCredential {
         uuid id PK
         uuid endpointId FK
+        string credentialType "bearer/oauth_client/wif"
+        string credentialHash "bcrypt"
+        string label
+        jsonb metadata "clientId/scopes/WIF trust"
+        string secretEnvelope "DEK-encrypted, opt-in"
+        boolean active
+        datetime expiresAt
+        datetime createdAt
+    }
+
+    RequestLog {
+        uuid id PK
+        uuid endpointId "correlation, NOT a FK"
         string method
         string url
         int status
@@ -137,29 +165,45 @@ erDiagram
         string requestBody
         string responseHeaders
         string responseBody
-        string identifier
+        string errorMessage
+        string errorStack
+        string identifier "derived userName/displayName"
+        uuid requestId "X-Request-Id correlator"
+        string authOutcome "accept/reject"
+        string authMethod
+        string authReason
+        uuid authCredentialId
+        string authDecision "full redacted AuthDecisionTrace JSON"
         datetime createdAt
     }
 
-    EndpointCredential {
+    JwksHostAllowlistEntry {
         uuid id PK
-        uuid endpointId FK
-        string credentialType
+        string host UK
         string label
-        string tokenHash
-        boolean active
-        jsonb metadata
-        datetime expiresAt
         datetime createdAt
+    }
+
+    CredentialDek {
+        uuid id PK
+        string wrappedDek "KEK-wrapped DEK"
+        string kekSalt
+        boolean active
+        datetime createdAt
+    }
+
+    ServerSetting {
+        string key PK
+        string value
         datetime updatedAt
     }
-
-    ResourceMember {
-        uuid id PK
-        uuid groupId FK
-        uuid memberId FK
-    }
 ```
+
+> **Log lifecycle.** `RequestLog` rows are written by a buffered batch writer and
+> pruned by age (auto-prune, default 21-day retention via `LOG_RETENTION_DAYS`),
+> **not** by endpoint deletion. A row whose endpoint was deleted keeps its
+> `endpointId` and stays queryable by it; the endpoint name simply no longer
+> resolves in the UI. See [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md).
 
 ### Request Flow
 

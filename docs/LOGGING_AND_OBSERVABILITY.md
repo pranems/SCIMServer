@@ -506,11 +506,38 @@ Every HTTP request is persisted to the database (Prisma/PostgreSQL or in-memory)
 ### Record Fields
 
 Each `RequestLog` row contains:
-- `id` (UUID), `method`, `url`, `status`, `durationMs`, `createdAt`
-- `requestHeaders`, `requestBody` (JSON stringified)
+- `id` (UUID), `endpointId` (correlation), `method`, `url`, `status`, `durationMs`, `createdAt`
+- `requestHeaders`, `requestBody` (JSON stringified; secret-redacted unless `PersistRequestSecrets`)
 - `responseHeaders`, `responseBody` (JSON stringified)
 - `errorMessage`, `errorStack`
 - `identifier` - derived reportable identifier (userName, email, displayName)
+- `requestId` - the `X-Request-Id` correlator (bridges to the `AuthDecisionTrace.correlationId`)
+- `authOutcome` / `authMethod` / `authReason` / `authCredentialId` - the persisted auth summary (V10/V11)
+- `authDecision` - the FULL redacted `AuthDecisionTrace` (checks[] with expected/received, decoded claims, plane, sub-traces) as JSON (W1), so the log detail renders the auth diff permanently
+
+### `RequestLog` is the single durable audit trail (decoupled from `Endpoint`)
+
+`RequestLog` is the **one** persistent log table - there is no separate "audit log"
+table. It IS the durable request/audit trail: every HTTP request (including its auth
+outcome + full decision trace) lands here.
+
+`endpointId` is a **correlation column, not a foreign key.** An append-only audit
+record must outlive the resource it describes, so a request log for a since-deleted
+endpoint MUST still exist and stay queryable by that `endpointId`. Consequences:
+
+- **Orphaned-but-retained.** Deleting an endpoint does NOT delete or null its request
+  logs. The rows keep their `endpointId` and remain queryable (`GET /scim/admin/logs?endpointId=...`).
+  In the dashboard/UI the endpoint *name* simply no longer resolves (the endpoint is
+  gone) - the row still shows its method/url/status/auth.
+- **Pruned by age, never by cascade.** Orphaned logs do not accumulate forever - the
+  auto-prune deletes rows older than the retention window (default 21 days,
+  `LOG_RETENTION_DAYS`), regardless of endpoint lifecycle.
+- **Why no FK (historical bug):** `RequestLog.endpointId` previously had a FK to
+  `Endpoint` (`onDelete: SetNull`). Because writes are BUFFERED and flushed as one
+  atomic `createMany`, a row buffered for an endpoint that was then deleted violated
+  the FK on INSERT and **rejected the entire batch** - silently dropping every audit
+  row in that flush. Migration `20260724000000_drop_requestlog_endpoint_fk` removed
+  the constraint. See [CHANGELOG](../CHANGELOG.md) (v0.54.74).
 
 ### Identifier Derivation
 
@@ -759,6 +786,18 @@ All log configuration is changeable at runtime without server restart:
 | `DELETE` | `/scim/admin/log-config/recent` | Clear ring buffer |
 | `GET` | `/scim/admin/log-config/stream` | SSE live stream |
 | `GET` | `/scim/admin/log-config/download` | Download logs as NDJSON/JSON |
+
+> **"audit" is a VIEW, not a second table.** `GET /scim/admin/log-config/audit` is
+> NOT backed by its own table - it is a category filter (`CONFIG` + `ENDPOINT` +
+> `AUTH`) over the **in-memory ring buffer** (the last ~200 structured log lines,
+> ephemeral, lost on restart). The DURABLE audit trail is the `RequestLog` table
+> (`GET /scim/admin/logs`). So there are three log surfaces and only one is a table:
+>
+> | Surface | Route | Storage | Durability |
+> |---|---|---|---|
+> | **Request/audit log** | `GET /scim/admin/logs` | `RequestLog` table (Postgres / in-memory array) | Durable, age-pruned (21d default) |
+> | **Ring buffer + audit view** | `GET /scim/admin/log-config/recent` + `/audit` | In-memory ring (~200 lines) | Ephemeral (lost on restart) |
+> | **Auth decision store** | `GET /scim/admin/endpoints/{id}/auth-decisions` | `AuthDecisionRecordStore` (in-memory, 30-min TTL) | Ephemeral - also mirrored durably onto `RequestLog.authDecision` |
 
 ### Example: PUT Config
 

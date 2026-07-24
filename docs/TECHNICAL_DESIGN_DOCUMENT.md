@@ -82,7 +82,7 @@ flowchart TB
             PR[Prisma Repositories]
             IR[InMemory Repositories]
         end
-        DB[(PostgreSQL 17<br>5 tables)]
+        DB[(PostgreSQL 17<br>8 tables)]
     end
 
     C1 & C2 --> MW1
@@ -243,15 +243,18 @@ sequenceDiagram
 
 ## Data Model
 
-5 tables in PostgreSQL 17 with 3 extensions (`citext`, `pgcrypto`, `pg_trgm`):
+8 tables in PostgreSQL 17 with 3 extensions (`citext`, `pgcrypto`, `pg_trgm`).
+`RequestLog` is the durable request/audit trail and is deliberately **decoupled**
+from `Endpoint` (its `endpointId` is a correlation column, **not** a foreign key)
+so an append-only audit row outlives the endpoint it describes.
 
 ```mermaid
 erDiagram
-    Endpoint ||--o{ ScimResource : "owns"
-    Endpoint ||--o{ RequestLog : "logs"
-    Endpoint ||--o{ EndpointCredential : "authenticates"
-    ScimResource ||--o{ ResourceMember : "group has members"
-    ScimResource ||--o{ ResourceMember : "user is member of"
+    Endpoint ||--o{ ScimResource : "owns (cascade)"
+    Endpoint ||--o{ EndpointCredential : "authenticates (cascade)"
+    ScimResource ||--o{ ResourceMember : "group has (cascade)"
+    ScimResource ||--o{ ResourceMember : "member of (set null)"
+    Endpoint }o..o{ RequestLog : "correlated by endpointId (NO FK)"
 
     Endpoint {
         uuid id PK
@@ -266,23 +269,23 @@ erDiagram
 
     ScimResource {
         uuid id PK
-        string scimId
         uuid endpointId FK
         string resourceType "User/Group/custom"
+        uuid scimId
+        text externalId "caseExact"
         citext userName
         citext displayName
-        string externalId
         boolean active
-        jsonb payload "Full SCIM resource"
-        int version "Auto-increment ETag"
-        timestamp deletedAt "Soft delete"
+        jsonb payload "full SCIM resource"
+        int version "auto-increment ETag"
+        string meta
         timestamp createdAt
         timestamp updatedAt
     }
 
     RequestLog {
         uuid id PK
-        uuid endpointId FK
+        uuid endpointId "correlation, NOT a FK"
         string method
         string url
         int status
@@ -291,27 +294,60 @@ erDiagram
         text requestBody
         text responseHeaders
         text responseBody
+        text errorMessage
+        text errorStack
         string identifier
+        uuid requestId "X-Request-Id correlator"
+        string authOutcome
+        string authMethod
+        string authReason
+        uuid authCredentialId
+        text authDecision "redacted AuthDecisionTrace JSON"
         timestamp createdAt
     }
 
     EndpointCredential {
         uuid id PK
         uuid endpointId FK
-        string credentialType "bearer/oauth_client"
+        string credentialType "bearer/oauth_client/wif"
+        string credentialHash "bcrypt"
         string label
-        string tokenHash "bcrypt"
-        boolean active
         jsonb metadata
+        text secretEnvelope "DEK-encrypted, opt-in"
+        boolean active
         timestamp expiresAt
         timestamp createdAt
-        timestamp updatedAt
     }
 
     ResourceMember {
         uuid id PK
-        uuid groupId FK "cascade delete"
-        uuid memberId FK "set null"
+        uuid groupResourceId FK "cascade delete"
+        uuid memberResourceId FK "set null"
+        string value
+        string type
+        string display
+        timestamp createdAt
+    }
+
+    JwksHostAllowlistEntry {
+        uuid id PK
+        string host UK
+        string label
+        timestamp createdAt
+    }
+
+    CredentialDek {
+        uuid id PK
+        text wrappedDek "KEK-wrapped DEK"
+        string kekSalt
+        boolean active
+        timestamp createdAt
+    }
+
+    ServerSetting {
+        string key PK
+        text value
+        timestamp updatedAt
     }
 ```
 
@@ -320,10 +356,17 @@ erDiagram
 | Index | Columns | Purpose |
 |-------|---------|---------|
 | ScimResource unique | `[endpointId, scimId]` | SCIM ID uniqueness per endpoint |
-| ScimResource unique | `[endpointId, userName]` | userName uniqueness per endpoint |
-| RequestLog composite | `[endpointId, createdAt]` | Endpoint-scoped log queries |
-| RequestLog composite | `[endpointId, identifier, createdAt]` | Activity feed queries |
-| RequestLog composite | `[status, createdAt]` | Error log filtering |
+| ScimResource unique | `[endpointId, userName]` | userName uniqueness per endpoint (CITEXT) |
+| RequestLog | `[endpointId]` | Endpoint-scoped log queries (correlation, no FK) |
+| RequestLog | `[requestId]` | X-Request-Id correlation lookup |
+| RequestLog | `[identifier]` / `[status]` / `[method]` | Log filtering |
+| RequestLog composite | `[createdAt, method, url]` | Activity-summary count queries |
+| ResourceMember unique | `[groupResourceId, value]` | No duplicate memberships |
+
+> **`RequestLog` retention.** Rows are written by a buffered batch writer and
+> pruned by AGE (auto-prune, default 21-day retention via `LOG_RETENTION_DAYS`),
+> never cascaded on endpoint deletion. A row for a deleted endpoint keeps its
+> `endpointId` and stays queryable - the audit trail outlives the resource.
 
 ### Polymorphic Storage
 
