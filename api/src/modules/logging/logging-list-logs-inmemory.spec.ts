@@ -258,6 +258,21 @@ describe('LoggingService.listLogs - in-memory filter parity (Phase D4)', () => {
       expect(detail?.requestId).toBe('cccccccc-0000-0000-0000-000000000003');
     });
 
+    it('getLog detail carries the endpointId correlation (parity with the list row)', async () => {
+      service.recordRequest({
+        method: 'POST',
+        url: '/scim/v2/endpoints/ep-detail/Users',
+        status: 201,
+        endpointId: 'dddddddd-0000-0000-0000-000000000004',
+      } as Parameters<typeof service.recordRequest>[0]);
+      const list = await service.listLogs({ includeAdmin: true });
+      const listRow = list.items.find((r) => r.endpointId === 'dddddddd-0000-0000-0000-000000000004');
+      expect(listRow).toBeDefined();
+      const detail = await service.getLog(listRow!.id);
+      // The detail must expose the same endpointId the list row does.
+      expect(detail?.endpointId).toBe('dddddddd-0000-0000-0000-000000000004');
+    });
+
     it('leaves requestId undefined when none was recorded', async () => {
       service.recordRequest({
         method: 'GET',

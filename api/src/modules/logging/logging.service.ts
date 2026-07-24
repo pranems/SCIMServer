@@ -880,6 +880,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
       return {
         id: row.id,
+        endpointId: row.endpointId ?? undefined,
         method: row.method,
         url: row.url,
         status: row.status ?? undefined,
@@ -914,6 +915,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.deriveIdentifierFromUrl(row.url);
     return {
       id: row.id,
+      endpointId: row.endpointId ?? undefined,
       method: row.method,
       url: row.url,
       status: row.status ?? undefined,

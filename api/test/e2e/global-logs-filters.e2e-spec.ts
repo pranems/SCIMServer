@@ -142,6 +142,8 @@ describe('Global Logs filters (E2E) - Phase D5', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(detail.body.requestId).toBe(requestId);
+    // The detail also carries the endpointId correlation (parity with the list row).
+    expect(detail.body.endpointId).toBe(ep);
   }, 15_000);
 
   it('GET /admin/logs?requestId with a non-UUID value returns empty (200, not 500)', async () => {
