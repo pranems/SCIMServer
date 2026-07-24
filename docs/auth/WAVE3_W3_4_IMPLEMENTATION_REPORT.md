@@ -63,3 +63,11 @@ Full API unit 145 suites / 4523; API E2E 84 / 1409; ESLint 0 errors.
   every existing trust's behavior byte-for-byte. Did not build the `WifTrustV2` aggregate (W3.1,
   scheduled).
 - **Disposition:** (a) applied in this commit chain.
+
+## 5. Dev validation (v0.54.77, revision `vba599280`)
+
+Deployed to `scimserver-dev` (ACR-import-from-GHCR -> containerapp update). Live-test vs dev
+**1,327/1,327 PASS** (0 fail) including the new **9z-BY** section 4/4 on the wire (a `requiredExact`
+trust persists `resourceMode` + `expectedResource` with no secret leak). Playwright vs dev
+**194 passed / 5 skipped / 0 failed** (no web change this wave). The accept/reject enforcement is
+covered by the E2E (mocked JWKS) since it needs a real IdP-signed assertion.

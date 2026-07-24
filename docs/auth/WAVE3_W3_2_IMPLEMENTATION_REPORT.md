@@ -94,3 +94,11 @@ Full API unit 145 suites / 4514; API E2E 84 / 1407; ESLint 0 errors.
   "Audience = endpointId (operator decision)... blocks cross-endpoint token replay"). Reversing
   it requires operator confirmation; not done here.
 - **W3.4 (SuccessFactors `resource` policy): separate commit.**
+
+## 7. Dev validation (v0.54.77, revision `vba599280`)
+
+Deployed to `scimserver-dev` (ACR-import-from-GHCR -> containerapp update). Live-test vs dev
+**1,327/1,327 PASS** (0 fail) including the new **9z-BX** section 5/5 on the wire (trust with
+`targetClientId` persists with no secret leak; the per-endpoint metadata truthfully advertises
+`client_id_binding: target-client-id` + `assertion_subject_binding: independent`). Playwright vs
+dev **194 passed / 5 skipped / 0 failed** (no web change this wave).
