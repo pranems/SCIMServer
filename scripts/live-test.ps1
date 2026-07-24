@@ -13986,6 +13986,43 @@ Write-Host "`n--- 9z-BV: enablement co-location (W2.5) Complete ---" -Foreground
 
 
 # ============================================
+# TEST SECTION 9z-BW: request logs survive endpoint deletion (FK-drop regression)
+$script:currentSection = "9z-BW: logs survive endpoint deletion"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BW: REQUEST LOGS SURVIVE ENDPOINT DELETION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+#
+# RequestLog has NO foreign key to Endpoint (endpointId is a correlation column,
+# not a relational reference). A buffered request-log row whose endpoint is
+# deleted before the batched flush MUST still persist - otherwise the whole
+# atomic createMany batch is rejected (FK violation), silently dropping audit
+# rows AND making request-log-readback flaky. This locks the fix.
+try {
+    $bwEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-logfk-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $bwId = $bwEp.id
+    # Drive a SCIM request against the endpoint and capture its correlation id.
+    $bwResp = Invoke-WebRequest -Uri "$baseUrl/scim/v2/endpoints/$bwId/Users" -Method GET -Headers @{ Authorization = "Bearer $Token"; 'Accept' = 'application/scim+json' }
+    $bwRid = if ($bwResp.Headers['X-Request-Id'] -is [array]) { $bwResp.Headers['X-Request-Id'][0] } else { $bwResp.Headers['X-Request-Id'] }
+    Test-Result -Success ($null -ne $bwRid) -Message "9z-BW.T1: request against the endpoint returns a correlation id ($bwRid)"
+
+    # DELETE the endpoint BEFORE the row is flushed - the FK-drop must let the
+    # buffered row persist anyway.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bwId" -Method DELETE -Headers $headers | Out-Null
+
+    # Force-drain the buffer; with the FK still present this createMany would fail.
+    $bwDetail = Get-LogDetailByRequestId $bwRid
+    Test-Result -Success ($null -ne $bwDetail) -Message "9z-BW.T2: the request-log row still persists after the endpoint was deleted (no FK-batch failure)"
+    Test-Result -Success ($null -ne $bwDetail -and $bwDetail.endpointId -eq $bwId) -Message "9z-BW.T3: the persisted row keeps its endpointId correlation to the deleted endpoint"
+} catch {
+    Test-Result -Success $false -Message "9z-BW: logs-survive-deletion section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BW: logs survive endpoint deletion Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

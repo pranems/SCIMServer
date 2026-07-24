@@ -23,8 +23,6 @@ model Endpoint {
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt     @db.Timestamptz
 
-  logs    RequestLog[]
-
   // Phase 2: Unified resource relation
   resources ScimResource[]
 
@@ -62,7 +60,14 @@ model RequestLog {
   authDecision     String?
   createdAt        DateTime @default(now()) @db.Timestamptz
 
-  endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
+  // NO foreign key to Endpoint on purpose. RequestLog is an append-only audit
+  // record; `endpointId` is a correlation value, not a relational reference.
+  // A FK made the buffered batch flush fail (whole `createMany` rejected) when
+  // an endpoint was deleted between a row being buffered and the batch being
+  // flushed - losing audit rows AND making request-log-readback flaky. Keeping
+  // it a plain indexed column means logs for a since-deleted endpoint still
+  // persist (and stay queryable by that endpointId), which is what an audit
+  // trail must do.
 
   @@index([createdAt])
   @@index([method])

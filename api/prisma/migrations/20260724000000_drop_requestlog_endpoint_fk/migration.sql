@@ -1,0 +1,13 @@
+-- Drop the RequestLog -> Endpoint foreign key.
+--
+-- RequestLog is an append-only audit record; `endpointId` is a correlation
+-- value, not a relational reference. The FK (onDelete: SetNull) handled the
+-- delete-cascade for EXISTING rows, but INSERTING a buffered row whose endpoint
+-- was deleted between buffering and the batched flush violated the constraint -
+-- and because the flush is one atomic `createMany`, the WHOLE batch was rejected,
+-- silently dropping audit rows (and making request-log-readback flaky under load).
+--
+-- Keeping `endpointId` a plain indexed column means logs for a since-deleted
+-- endpoint still persist and stay queryable by that endpointId, which is exactly
+-- what an audit trail must do. The @@index([endpointId]) is retained.
+ALTER TABLE "RequestLog" DROP CONSTRAINT IF EXISTS "RequestLog_endpointId_fkey";
