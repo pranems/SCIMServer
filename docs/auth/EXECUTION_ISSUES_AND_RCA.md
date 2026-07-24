@@ -360,10 +360,46 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ---
 
-## 9. Reference
+## 9. Wave 3 addendum (RFC 7523 correctness: W3.2 + W3.4, 2026-07-24)
 
+> **Scope.** Sections 1-8 cover the 11-step WIF build + its integration tail. This addendum captures the (low-severity) frictions from the Wave 3 correctness items - **W3.2** (issued-token identity separation, v0.54.76) and **W3.4** (RFC 8707 resource policy, v0.54.77) - plus the getLog-parity fix (v0.54.75). Per the standing RCA-ledger rule, every issue of every type is recorded, numbered I-20+.
+
+### 10.1 Addendum dashboard
+
+| ID | Title | Type | Sev | Surfaced in | Detected at | Status | Fix |
+|---|---|---|---|---|---|---|---|
+| I-20 | Adding an optional threaded param broke exact-arg `toHaveBeenCalledWith` mock assertions (3 sites) | T3 | Low (recurring) | W3.2 + W3.4 | Stage 2 (full unit suite) | Fixed (x3) | 84a05c8c, 0abc07fb |
+| I-21 | Pre-existing specs asserted the OLD conflated WIF identity (issued sub == assertion sub) | T3 | Medium | W3.2 | Stage 2 (unit) + Stage 2 (E2E) | Fixed | 84a05c8c |
+
+> **Verified-and-dismissed non-issues.** (a) The issued-`client_id` change (W3.2) is NOT a resource-authz regression - the resource guard authorizes by the `endpoint_id` claim, and `client_id`/`sub` are used only for log enrichment (verified in [oauth-jwt.authenticator.ts](../../api/src/modules/auth/authenticators/oauth-jwt.authenticator.ts) before the change shipped). (b) The v0.54.74 flush-backlog flake did NOT recur on the dev live-test (1,327/1,327), confirming the FK-drop root-cause fix.
+
+### 10.2 I-20 (Low, recurring, T3) - optional-param addition breaks exact-arg mock assertions
+
+- **Symptom.** Threading a new optional param (`sourceSubject` on `generateEndpointAccessToken`; `requestResource` on `mintFromAssertion`/`validateWithTrace`) turned three green `expect(fn).toHaveBeenCalledWith(a, b, c)` assertions RED with `Received: a, b, c, undefined` - the extra trailing `undefined` arg.
+- **Root cause.** `toHaveBeenCalledWith` matches the FULL argument list exactly; a new trailing optional arg (even `undefined`) is a mismatch. Expected TDD churn, not a defect.
+- **Fix / why it works.** Updated each assertion to include the new trailing arg (`undefined` where no value is presented), and ADDED a positive threading test at each site (parser captures `resource`; provider + controller forward it). The assertions now match the real call shape and additionally lock the new param's propagation.
+- **Prevention.** No new gate needed - the **full unit suite caught every arity drift on the first run** (zero escape). This is the gate working as designed. Convention reinforced: when threading a new optional param through a signature, expect `toHaveBeenCalledWith` sites to go RED and update them in the same change (they are the propagation contract).
+
+### 10.3 I-21 (Medium, T3) - specs codified the old identity conflation as "correct"
+
+- **Symptom.** After W3.2 made the issued `client_id` = the endpoint identity (not the assertion `sub`), the WIF provider unit test, the WI-17 source-issuer test, and the `wif-assertion` E2E mint test all failed - each asserted `issued sub == assertion subject`, the exact bug W3.2 fixes.
+- **Root cause.** The pre-W3.2 tests baked the conflation into their expectations (`generateEndpointAccessToken` called with `wifMetadata.expectedSubject`; E2E `expect(payload.sub).toBe(SUBJECT)`). A test that asserts the buggy behavior is a false green - it would have blocked the correct fix.
+- **Fix / why it works.** Corrected each to assert the SEPARATION (issued `sub`/`client_id` == endpointId or `targetClientId`, `!=` assertion subject; `src_sub` == assertion subject). The corrected tests now fail if the conflation ever returns - a regression net for the fix.
+- **Prevention.** This is the R10 lesson (a green gate only proves what it asserts; a test can codify a broken state as the baseline). When fixing a correctness bug, first find the tests that assert the OLD behavior and flip them to assert the new contract - they become the regression net. No new standing rule (R10 + Stage 0 RED-first already cover it); dispositioned **accepted** (existing rules sufficient).
+
+### 10.4 Escape analysis (addendum)
+
+| ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier |
+|---|---|---|---|---|
+| I-20 | Stage 2 (full unit) | Stage 2 (full unit) | none | Arity drift is caught by the suite on the first run - working as designed; cost was a one-line assertion update x3. |
+| I-21 | Stage 2 (unit + E2E) | Stage 0 (RED-first) | none | The RED-first write of the W3.2 test immediately surfaced the sibling specs that asserted the old identity - they went RED together and were corrected in the same change. No escape to dev (dev live-test 9z-BX green). |
+
+**Headline:** both Wave 3 frictions were **zero-escape, immediately-caught test-assertion updates** - the RED-first discipline (Stage 0) and the full-suite gate (Stage 2) did exactly their job. The self-improvement disposition is **(c) no new improvement needed**: the existing gates caught everything at authoring time, and R10 + Stage 0 already encode the "don't codify the old behavior as the baseline" lesson (I-21).
+
+---
+
+## 10. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
-- The reconciled plan: [AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)
 - Self-improvement + gate discipline: [.github/copilot-instructions.md](../../.github/copilot-instructions.md)
 
