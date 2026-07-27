@@ -121,7 +121,10 @@ export class EndpointOAuthController {
 
     let minted;
     try {
-      minted = await this.assertionProvider.mintFromAssertion(endpointId, parsed.assertion, parsed.resource);
+      minted = await this.assertionProvider.mintFromAssertion(endpointId, parsed.assertion, {
+        resource: parsed.resource,
+        clientId: parsed.clientId,
+      });
     } catch (err) {
       const reasonCode =
         err instanceof WifAssertionInvalidError && err.reasonCode

@@ -151,7 +151,18 @@ export class OAuthService {
     endpointId: string,
     clientId: string,
     requestedScope?: string,
-    options?: { ttlSec?: number; trustedScope?: string; sourceIssuer?: string; sourceSubject?: string },
+    options?: {
+      ttlSec?: number;
+      trustedScope?: string;
+      sourceIssuer?: string;
+      sourceSubject?: string;
+      /**
+       * W3.6 - the `exp` (epoch seconds) of the assertion that authorized this
+       * mint. The issued token is capped so it can NEVER outlive its own
+       * authorization (SyncFabric guide 13.5). Omitted for non-federated mints.
+       */
+      assertionExpiresAt?: number;
+    },
   ): Promise<AccessToken> {
     const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
 
@@ -171,6 +182,23 @@ export class OAuthService {
     let expiresIn = TTL_FLOOR;
     if (typeof options?.ttlSec === 'number' && Number.isFinite(options.ttlSec)) {
       expiresIn = Math.min(TTL_CEIL, Math.max(TTL_FLOOR, Math.floor(options.ttlSec)));
+    }
+
+    // W3.6 (guide 13.5) - never issue a token that outlives the verified
+    // assertion that authorized it. This cap is applied AFTER the static
+    // window clamp so the 1h floor can never raise the lifetime back above the
+    // assertion: a 6h configured TTL against a 1h assertion yields 1h, and an
+    // assertion with only minutes left yields only those minutes.
+    if (
+      typeof options?.assertionExpiresAt === 'number' &&
+      Number.isFinite(options.assertionExpiresAt)
+    ) {
+      const remaining = Math.floor(options.assertionExpiresAt - Date.now() / 1000);
+      if (remaining < expiresIn) {
+        // Keep at least 1s so an almost-expired assertion still yields a usable
+        // (if very short) token rather than a zero/negative lifetime.
+        expiresIn = Math.max(1, remaining);
+      }
     }
 
     const payload = {

@@ -136,7 +136,11 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
 
     expect(res.body.token_type).toBe('Bearer');
     expect(typeof res.body.access_token).toBe('string');
-    expect(res.body.expires_in).toBe(7200);
+    // W3.6 (guide 13.5) - the configured 7200s TTL is capped down to the test
+    // assertion's own 10-minute lifetime: an issued token can never outlive the
+    // assertion that authorized it.
+    expect(res.body.expires_in).toBeLessThanOrEqual(600);
+    expect(res.body.expires_in).toBeGreaterThan(0);
     expect(res.body.scope).toBe('scim.read scim.write');
 
     const payload = decodePayload(res.body.access_token);
@@ -268,6 +272,95 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .expect(200);
   });
 
+  it('W3.6: the minted token never outlives the assertion that authorized it (guide 13.5)', async () => {
+    // A 6h configured TTL against a 10m assertion must yield <= 10m.
+    const capEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${capEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Entra WIF (lifetime cap)',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: ISSUER,
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: TENANT,
+          scope: 'scim.read',
+          issuedTokenTtlSec: 21600,
+        },
+      })
+      .expect(201);
+
+    const assertion = await signAssertion();
+    const res = await request(app.getHttpServer())
+      .post(`/scim/endpoints/${capEndpoint}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(200);
+
+    // signAssertion() sets a 10m expiry, so the 6h TTL must be capped down.
+    expect(res.body.expires_in).toBeLessThanOrEqual(600);
+    expect(res.body.expires_in).toBeGreaterThan(0);
+    const payload = decodePayload(res.body.access_token);
+    const assertionExp = decodePayload(assertion).exp as number;
+    expect(payload.exp as number).toBeLessThanOrEqual(assertionExp);
+  });
+
+  it('W3.7: a request client_id that does not match the trust targetClientId is rejected', async () => {
+    const bindEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${bindEndpoint}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        credentialType: 'wif',
+        label: 'Entra WIF (client binding)',
+        wif: {
+          assertionProfile: 'jwt-bearer',
+          expectedIssuer: ISSUER,
+          expectedSubject: SUBJECT,
+          expectedAudience: AUDIENCE,
+          jwksUri: JWKS_URI,
+          allowedTenantId: TENANT,
+          scope: 'scim.read',
+          targetClientId: 'scim-wif-client-bound',
+        },
+      })
+      .expect(201);
+
+    const assertion = await signAssertion();
+    const tokenUrl = `/scim/endpoints/${bindEndpoint}/oauth/token`;
+
+    // Wrong client_id -> rejected even though the assertion itself is valid.
+    const bad = await request(app.getHttpServer())
+      .post(tokenUrl)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_id: 'the-wrong-client', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(401);
+    expect(bad.body.reason_code).toBe('wif_client_id_mismatch');
+
+    // Matching client_id -> accepted.
+    const ok = await request(app.getHttpServer())
+      .post(tokenUrl)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_id: 'scim-wif-client-bound', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(200);
+    expect(decodePayload(ok.body.access_token).client_id).toBe('scim-wif-client-bound');
+
+    // No client_id at all -> unaffected (backward compatible).
+    await request(app.getHttpServer())
+      .post(tokenUrl)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
+      .expect(200);
+  });
+
   // ─── WI-16 - multiple WIF trusts on one endpoint (iterate, not first-only) ──
   it('WI-16: an endpoint with TWO wif trusts mints when the assertion matches the second', async () => {
     // A dedicated endpoint carrying two WIF trusts: the FIRST (issuer-A) does
@@ -328,7 +421,8 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
 
     // Minted against the SECOND trust (its scope + ttl, not trust A's).
     expect(res.body.token_type).toBe('Bearer');
-    expect(res.body.expires_in).toBe(7200);
+    // W3.6 - the trust's 7200s ttl is capped to the assertion's 10m lifetime.
+    expect(res.body.expires_in).toBeLessThanOrEqual(600);
     expect(res.body.scope).toBe('scim.read scim.write');
     const payload = decodePayload(res.body.access_token);
     expect(payload.endpoint_id).toBe(multiEndpoint);

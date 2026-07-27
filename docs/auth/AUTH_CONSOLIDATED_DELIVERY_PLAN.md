@@ -213,7 +213,20 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Tasks: `targetClientBinding.acceptedClientIds` (generate `scim-wif-client-<rand>`); validate the form `client_id`; stop assigning assertion `sub` to issued `client_id`; keep source subject visible-but-distinct in AT2.
 - Acceptance: a valid assertion presented with a wrong `client_id` is rejected (`wif_client_id_mismatch`); AT2 `client_id` != assertion `sub`; connection-info shows the generated client ID, not `sub`.
 - Deps: W3.1. Estimate: **M**. Risk: Medium (breaking for any config that relied on the old conflation - shadow first).
-- **Status: DELIVERED (partial, right-sized) - api v0.54.76.** The identity-separation core is done: the issued token's `sub`/`client_id` are now the trust's optional `targetClientId` (or the endpointId), NEVER the assertion `sub`, which rides the distinct `src_sub` claim. This makes the already-advertised `x_scimserver_wif_profiles` binding (`client_id_binding: target-client-id`, `assertion_subject_binding: independent`) truthful. Deferred (not needed until W4/RFC 8693): the form-`client_id` **validation** against `acceptedClientIds[]` with a `wif_client_id_mismatch` reject - the SyncFabric RFC 7523 flow does not currently send a form `client_id`, so there is nothing to bind against yet. Report: [WAVE3_W3_2_IMPLEMENTATION_REPORT.md](WAVE3_W3_2_IMPLEMENTATION_REPORT.md).
+- **Status: DELIVERED (partial, right-sized) - api v0.54.76.** The identity-separation core is done: the issued token's `sub`/`client_id` are now the trust's optional `targetClientId` (or the endpointId), NEVER the assertion `sub`, which rides the distinct `src_sub` claim. This makes the already-advertised `x_scimserver_wif_profiles` binding (`client_id_binding: target-client-id`, `assertion_subject_binding: independent`) truthful. Report: [WAVE3_W3_2_IMPLEMENTATION_REPORT.md](WAVE3_W3_2_IMPLEMENTATION_REPORT.md).
+- **COMPLETED by W3.7 - api v0.54.78.** The form-`client_id` validation half was originally deferred on the (incorrect) rationale that the SyncFabric RFC 7523 flow does not send a form `client_id`; guide 7.1 + 7.4 confirm it does, and a real-Entra proof run measured that a wrong `client_id` still minted. The binding now rejects with `wif_client_id_mismatch`. See [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md) F2.
+
+**W3.6 - Cap the issued-token lifetime at the assertion expiry** `[guide 13.5]` **(NEW - promoted from W5.2)**
+- Tasks: `expiresIn = min(configured ttl, assertion exp - now, server max)` on the WIF mint path.
+- Acceptance: a 6h `issuedTokenTtlSec` against a 1h assertion yields <= 1h; an almost-expired assertion yields only the remaining seconds; non-federated mints unchanged.
+- Deps: none. Estimate: **S**. Risk: Low.
+- **Status: DELIVERED - api v0.54.78.** Promoted out of W5.2 because a real-Entra proof run measured a **~5 hour overrun** in production behavior (a security defect, not a future hardening item). See [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md) F1.
+
+**W3.7 - Bind the RFC 7523 form `client_id` to the trust** `[guide 13.1]` **(NEW - completes W3.2)**
+- Tasks: capture the form `client_id` on the `client_assertion` parse variant; reject a mismatch against the trust's `targetClientId` with `wif_client_id_mismatch` + a `target_client_id_match` trace check.
+- Acceptance: wrong `client_id` -> 401 `wif_client_id_mismatch`; matching -> 200; absent `client_id` or absent `targetClientId` -> unchanged (backward compatible).
+- Deps: W3.2. Estimate: **S**. Risk: Low (binds only when the operator pinned a target AND the caller sent a different one).
+- **Status: DELIVERED - api v0.54.78.**
 
 **W3.3 - Remove endpoint-UUID audience default** `[guide gap]`
 - Tasks: require an explicit `expectedAudience`; flag endpoint-ID-like audiences as likely misconfiguration.

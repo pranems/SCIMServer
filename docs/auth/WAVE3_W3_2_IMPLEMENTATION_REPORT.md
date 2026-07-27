@@ -94,6 +94,18 @@ Full API unit 145 suites / 4514; API E2E 84 / 1407; ESLint 0 errors.
   "Audience = endpointId (operator decision)... blocks cross-endpoint token replay"). Reversing
   it requires operator confirmation; not done here.
 - **W3.4 (SuccessFactors `resource` policy): separate commit.**
+- **~~Form `client_id` validation: deferred to W4~~ - CORRECTED, shipped as W3.7 in v0.54.78.**
+  This report originally deferred the binding half on the rationale that "the SyncFabric RFC 7523
+  flow does not currently send a form `client_id`, so there is nothing to bind against yet."
+  **That rationale was factually wrong.** SyncFabric guide section 7.1 lists
+  `client_id=<ISV-issued target client identifier>` as a *confirmed current* RFC 7523 form field,
+  and section 7.4 maps `Oauth2ClientId` as **Required** for RFC 7523 (only RFC 8693 omits it). The
+  real-Entra proof run then measured the consequence: a valid assertion with a deliberately wrong
+  `client_id` still minted a token, while the endpoint's metadata advertised
+  `client_id_binding: "target-client-id"`. The binding shipped in v0.54.78 - see
+  [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md)
+  finding F2. **Lesson:** a deferral rationale that asserts a fact about an external system must
+  cite the source; this one was inferred, not read.
 
 ## 7. Dev validation (v0.54.77, revision `vba599280`)
 

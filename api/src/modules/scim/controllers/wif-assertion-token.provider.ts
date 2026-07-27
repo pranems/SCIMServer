@@ -19,7 +19,7 @@ import {
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
-import type { IAssertionTokenProvider } from './assertion-token-provider';
+import type { IAssertionTokenProvider, AssertionMintRequest } from './assertion-token-provider';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { resolveEndpointEgressOverrides } from '../../endpoint/endpoint-config.interface';
 
@@ -63,8 +63,10 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
   async mintFromAssertion(
     endpointId: string,
     clientAssertion: string,
-    requestResource?: string,
+    request?: AssertionMintRequest,
   ): Promise<AccessToken | null> {
+    const requestResource = request?.resource;
+    const requestClientId = request?.clientId;
     const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
     const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
 
@@ -124,6 +126,49 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         continue;
       }
 
+      // W3.7 (guide 13.1) - bind the REQUEST's client_id to the trust. The
+      // SyncFabric RFC 7523 profile sends the ISV-issued target client id in
+      // the form; when this trust pins one, a different value is a rejection,
+      // not a silently-ignored field (we advertise `client_id_binding:
+      // target-client-id` in the endpoint's RFC 8414 metadata). Backward
+      // compatible in both directions: a trust WITHOUT a targetClientId has
+      // nothing to bind against, and a request that sends NO client_id is
+      // unaffected (only the assertion authenticates it).
+      if (
+        trust.targetClientId &&
+        typeof requestClientId === 'string' &&
+        requestClientId.length > 0 &&
+        requestClientId !== trust.targetClientId
+      ) {
+        const mismatchTrace: AuthDecisionTrace = {
+          ...validatorTrace,
+          outcome: 'reject',
+          reasonCode: 'wif_client_id_mismatch',
+          correlationId: getCorrelationContext()?.requestId,
+          endpointId,
+          selectedTrustId: wif.id,
+          checks: [
+            ...validatorTrace.checks,
+            {
+              id: 'target_client_id_match',
+              status: 'fail',
+              expected: trust.targetClientId,
+              received: requestClientId,
+            },
+          ],
+        };
+        this.logger.warn(LogCategory.AUTH, 'WIF assertion rejected: request client_id does not match the trust', {
+          endpointId,
+          credentialId: wif.id,
+        });
+        this.recordAndEmit(mismatchTrace);
+        throw new WifAssertionInvalidError(
+          'The request client_id does not match this trust.',
+          'wif_client_id_mismatch',
+          mismatchTrace,
+        );
+      }
+
       // W3.2 - the issued token identifies the OAuth CLIENT, not the federated
       // assertion subject. Use the trust's explicit `targetClientId` when the
       // operator configured one, otherwise the stable per-endpoint identity
@@ -142,6 +187,9 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
           sourceIssuer: trust.expectedIssuer,
           // W3.2 - preserve the federated assertion subject as a distinct claim.
           sourceSubject: String(claims.sub),
+          // W3.6 (guide 13.5) - the issued token must never outlive the
+          // assertion that authorized it.
+          assertionExpiresAt: typeof claims.exp === 'number' ? claims.exp : undefined,
         },
       );
 

@@ -279,5 +279,36 @@ describe('OAuthService', () => {
       const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
       expect(payload).not.toHaveProperty('src_sub');
     });
+
+    it('W3.6: caps the issued lifetime at the authorizing assertion expiry (guide 13.5)', async () => {
+      // A 6h configured TTL against an assertion that expires in ~1h MUST yield
+      // ~1h, never 6h - the issued token can never outlive its authorization.
+      const nowSec = Math.floor(Date.now() / 1000);
+      const assertionExpiresAt = nowSec + 3600;
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        ttlSec: 21600,
+        assertionExpiresAt,
+      });
+      expect(result.expiresIn).toBeLessThanOrEqual(3600);
+      expect(result.expiresIn).toBeGreaterThan(3500);
+    });
+
+    it('W3.6: an assertion expiring sooner than the 1h floor still caps below the floor', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        ttlSec: 3600,
+        assertionExpiresAt: nowSec + 120,
+      });
+      // The static 1h floor must NOT re-raise the lifetime above the assertion.
+      expect(result.expiresIn).toBeLessThanOrEqual(120);
+      expect(result.expiresIn).toBeGreaterThan(0);
+    });
+
+    it('W3.6: without an assertion expiry the configured ttl is unchanged (oauth_client path)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'epc_abc', undefined, {
+        ttlSec: 21600,
+      });
+      expect(result.expiresIn).toBe(21600);
+    });
   });
 });

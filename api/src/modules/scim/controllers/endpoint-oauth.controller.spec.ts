@@ -65,7 +65,7 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
       client_assertion_type: JWT_BEARER,
     });
 
-    expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(ENDPOINT_ID, 'eyJhbGciOiJSUzI1NiJ9.payload.sig', undefined);
+    expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(ENDPOINT_ID, 'eyJhbGciOiJSUzI1NiJ9.payload.sig', { resource: undefined, clientId: undefined });
     expect(oauthService.generateEndpointAccessToken).not.toHaveBeenCalled();
     expect(res.access_token).toBe('wif-token');
   });
@@ -84,7 +84,25 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(
       ENDPOINT_ID,
       'eyJhbGciOiJSUzI1NiJ9.payload.sig',
-      'https://api.successfactors.com',
+      expect.objectContaining({ resource: 'https://api.successfactors.com' }),
+    );
+  });
+
+  it('W3.7: threads the RFC 6749 client_id form parameter to the assertion provider', async () => {
+    const assertionProvider = { mintFromAssertion: jest.fn().mockResolvedValue({ accessToken: 'wif-token', expiresIn: 3600, scope: 'scim.read' }) };
+    const { controller } = makeController({ assertionProvider });
+
+    await controller.getToken(ENDPOINT_ID, {
+      grant_type: 'client_credentials',
+      client_id: 'scim-wif-client-abc',
+      client_assertion: 'eyJhbGciOiJSUzI1NiJ9.payload.sig',
+      client_assertion_type: JWT_BEARER,
+    });
+
+    expect(assertionProvider.mintFromAssertion).toHaveBeenCalledWith(
+      ENDPOINT_ID,
+      'eyJhbGciOiJSUzI1NiJ9.payload.sig',
+      expect.objectContaining({ clientId: 'scim-wif-client-abc' }),
     );
   });
 

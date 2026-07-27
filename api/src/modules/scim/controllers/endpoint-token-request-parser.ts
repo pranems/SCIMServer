@@ -85,6 +85,8 @@ export function parseEndpointTokenRequest(
       assertionType: raw.client_assertion_type,
       ...(scope !== undefined ? { scope } : {}),
       ...(typeof raw.resource === 'string' && raw.resource.length > 0 ? { resource: raw.resource } : {}),
+      // W3.7 - the RFC 7523 profile sends the ISV-issued target client id.
+      ...(typeof clientId === 'string' && clientId.length > 0 ? { clientId } : {}),
     };
   }
 

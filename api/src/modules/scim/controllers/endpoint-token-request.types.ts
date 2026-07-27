@@ -28,6 +28,11 @@ export type ParsedEndpointTokenRequest =
       scope?: string;
       /** W3.4 - RFC 8707 `resource` form parameter (SAP SuccessFactors). */
       resource?: string;
+      /**
+       * W3.7 - the RFC 6749 `client_id` form parameter. SyncFabric's RFC 7523
+       * profile sends the ISV-issued target client id here (guide 7.1).
+       */
+      clientId?: string;
     }
   | {
       /** RFC 6749 client_credentials with a client_secret route. */

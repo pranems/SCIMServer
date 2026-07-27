@@ -212,11 +212,71 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] });
     generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
 
-    await provider.mintFromAssertion('ep-1', 'assertion.jwt', 'api://sf-resource');
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt', { resource: 'api://sf-resource' });
 
     // The RFC 8707 resource param is the validator's 4th argument, so the
     // trust's resourceMode can enforce it.
     expect(validateWithTrace).toHaveBeenCalledWith('assertion.jwt', expect.any(Object), {}, 'api://sf-resource');
+  });
+
+  it('W3.6: passes the assertion exp so the mint can cap the issued lifetime (guide 13.5)', async () => {
+    const assertionExp = Math.floor(Date.now() / 1000) + 900;
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', exp: assertionExp });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 900, scope: 'scim.read scim.write' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1',
+      'ep-1',
+      undefined,
+      expect.objectContaining({ assertionExpiresAt: assertionExp }),
+    );
+  });
+
+  it('W3.7: rejects a request client_id that does not match the trust targetClientId', async () => {
+    const cred = wifCredential();
+    cred.metadata = { ...wifMetadata, targetClientId: 'scim-wif-client-abc123' };
+    findActiveByEndpoint.mockResolvedValue([cred]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123' });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+
+    await expect(
+      provider.mintFromAssertion('ep-1', 'assertion.jwt', { clientId: 'the-wrong-client' }),
+    ).rejects.toMatchObject({ reasonCode: 'wif_client_id_mismatch' });
+    expect(generateEndpointAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('W3.7: accepts a request client_id that matches the trust targetClientId', async () => {
+    const cred = wifCredential();
+    cred.metadata = { ...wifMetadata, targetClientId: 'scim-wif-client-abc123' };
+    findActiveByEndpoint.mockResolvedValue([cred]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123' });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+
+    const token = await provider.mintFromAssertion('ep-1', 'assertion.jwt', { clientId: 'scim-wif-client-abc123' });
+    expect(token?.accessToken).toBe('minted.jwt');
+  });
+
+  it('W3.7: a request with NO client_id is unaffected by the binding (backward compatible)', async () => {
+    const cred = wifCredential();
+    cred.metadata = { ...wifMetadata, targetClientId: 'scim-wif-client-abc123' };
+    findActiveByEndpoint.mockResolvedValue([cred]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123' });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+
+    const token = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+    expect(token?.accessToken).toBe('minted.jwt');
+  });
+
+  it('W3.7: a trust with NO targetClientId never binds (nothing to bind against)', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123' });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+
+    const token = await provider.mintFromAssertion('ep-1', 'assertion.jwt', { clientId: 'anything-at-all' });
+    expect(token?.accessToken).toBe('minted.jwt');
   });
 
   it('throws when the assertion is for this endpoint but invalid (mine-but-invalid-stop)', async () => {
