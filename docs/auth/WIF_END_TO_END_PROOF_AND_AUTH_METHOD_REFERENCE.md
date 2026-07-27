@@ -16,6 +16,11 @@
 > could outlive its authorizing assertion by ~5 hours) shipped as **W3.6**, and
 > [F2](#f2-the-form-client_id-is-not-bound-to-the-trust-high---fixed-in-v05478-w37) (an advertised
 > but unenforced `client_id` binding) shipped as **W3.7**. The harness now gates both.
+>
+> **Re-verified on dev v0.54.78 with a fresh real Entra app: 40/40 passed, 6 findings remain.**
+> The 6h-TTL overrun measured **+18,002s before** the fix and **-1s after** it; a wrong form
+> `client_id` now returns `401 wif_client_id_mismatch` while a request with no `client_id` still
+> mints (backward compatible). Full live-test regression on the same build: **1327/1327**.
 
 ---
 
