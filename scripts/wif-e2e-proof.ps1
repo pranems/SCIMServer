@@ -438,7 +438,10 @@ try { $xMint = Invoke-RestMethod -Uri "$BaseUrl/scim/endpoints/$($epP.id)/oauth/
 if ($xCreated.credentialType -eq "wif" -and $xMint.access_token) {
     Add-Finding "profile-not-routed" "A trust saved with assertionProfile='token-exchange' is accepted AND still mints via the jwt-bearer path - assertionProfile is stored but never routed on (no per-variation selection)."
 }
-Test-Result -Success ($xCreated.credentialType -eq "wif") -Message "S7.T13 (probe): assertionProfile='token-exchange' is accepted at config time (routing gap recorded)"
+Test-Result -Success ($xCreated.credentialType -eq "wif") -Message "S7.T13 (probe): assertionProfile='token-exchange' is accepted at config time"
+Test-Result -Success ($null -eq $xMint.access_token) -Message "S7.T13b (W3.1): a token-exchange-scoped trust does NOT authorize a jwt-bearer request (per-variation routing)"
+$xMeta = Invoke-RestMethod -Uri "$BaseUrl/scim/endpoints/$($epP.id)/.well-known/oauth-authorization-server" -Method GET
+Test-Result -Success (-not (@($xMeta.token_endpoint_auth_methods_supported) -contains 'private_key_jwt')) -Message "S7.T13c (W3.1): the metadata does NOT advertise private_key_jwt for a token-exchange-only trust"
 try { Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints/$($epP.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 # 7j - the SIBLING auth method: OAuth2 client credentials (Entra's other choice).

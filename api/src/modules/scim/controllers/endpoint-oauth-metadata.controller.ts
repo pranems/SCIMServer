@@ -5,6 +5,11 @@ import { Public } from '../../auth/public.decorator';
 import { OAUTH_METADATA_PATH } from '../../../oauth/oauth.constants';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
+import {
+  WIF_PROFILE_RFC7523,
+  trustEnablesProfile,
+  type WifProfile,
+} from './assertion-token-provider';
 
 /** The RFC 8693 token-exchange grant URN (advertised only when W4 lands). */
 const TOKEN_EXCHANGE_GRANT = 'urn:ietf:params:oauth:grant-type:token-exchange';
@@ -154,16 +159,26 @@ export class EndpointOAuthMetadataController {
    * capability when the lookup is unavailable.
    */
   private async resolveCapabilities(endpointId: string): Promise<EndpointOAuthCapabilities> {
-    let active: Array<{ credentialType: string }> = [];
+    let active: Array<{ credentialType: string; metadata?: Record<string, unknown> | null }> = [];
     try {
       active = await this.credentialRepo.findActiveByEndpoint(endpointId);
     } catch {
       active = [];
     }
     const hasType = (t: string): boolean => active.some((c) => c.credentialType === t);
+    // W3.1 - a WIF trust only makes a profile advertisable if it actually SERVES
+    // that profile. A trust scoped to token-exchange no longer causes the RFC
+    // 7523 client-assertion capability (and its `private_key_jwt` method) to be
+    // advertised, because the 7523 provider will not select it. This keeps the
+    // W0.3 "advertise only what is implemented AND active" invariant true now
+    // that routing is per-variation.
+    const hasWifForProfile = (profile: WifProfile): boolean =>
+      active.some((c) => c.credentialType === 'wif' && trustEnablesProfile(c.metadata ?? null, profile));
     return {
       clientSecret: hasType('oauth_client'),
-      syncFabricRfc7523: hasType('wif'),
+      syncFabricRfc7523: hasWifForProfile(WIF_PROFILE_RFC7523),
+      // Still hardcoded false: there is no RFC 8693 runtime handler until Wave 4,
+      // so an 8693-scoped trust must NOT make us advertise the grant.
       syncFabricRfc8693: false,
     };
   }

@@ -117,6 +117,12 @@ interface WifTrustInput {
   requiredRoles?: string[];
   scope?: string;
   issuedTokenTtlSec?: number;
+  /**
+   * W3.1 - the protocol profile(s) this trust serves (`syncfabric-rfc7523` /
+   * `syncfabric-rfc8693`). When absent it is projected from the legacy singular
+   * `assertionProfile`, so existing trusts are unaffected.
+   */
+  enabledProfiles?: string[];
   /** W3.4 - RFC 8707 resource policy: how strictly the request `resource` is checked. */
   resourceMode?: 'ignore' | 'optionalExact' | 'requiredExact';
   // ── A4 seams (persisted; computed in shadow telemetry, not enforced) ──
@@ -134,6 +140,7 @@ const WIF_TRUST_KEYS: ReadonlyArray<keyof WifTrustInput> = [
   'targetClientId',
   'requiredRoles', 'scope', 'issuedTokenTtlSec',
   'resourceMode',
+  'enabledProfiles',
   // A4 seams
   'identityModel', 'roleScopeMap', 'grantedScopes', 'roleEnforcement',
 ];

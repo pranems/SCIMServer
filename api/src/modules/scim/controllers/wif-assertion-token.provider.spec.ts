@@ -283,6 +283,82 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     );
   });
 
+  // ── W3.1 - per-variation profile routing ──────────────────────────────────
+  describe('W3.1 profile routing', () => {
+    function credWithProfile(meta: Record<string, unknown>): EndpointCredentialModel {
+      const c = wifCredential();
+      c.metadata = { ...wifMetadata, ...meta };
+      return c;
+    }
+
+    beforeEach(() => {
+      validate.mockResolvedValue({
+        iss: wifMetadata.expectedIssuer,
+        sub: wifMetadata.expectedSubject,
+        aud: wifMetadata.expectedAudience,
+        tid: 'tenant-123',
+      });
+      generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+    });
+
+    it('a trust scoped to token-exchange does NOT mint via the jwt-bearer path (closes F6)', async () => {
+      findActiveByEndpoint.mockResolvedValue([credWithProfile({ assertionProfile: 'token-exchange' })]);
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+      expect(result).toBeNull();
+      expect(validate).not.toHaveBeenCalled();
+    });
+
+    it('a trust with enabledProfiles=[syncfabric-rfc8693] does NOT match a 7523 request', async () => {
+      findActiveByEndpoint.mockResolvedValue([credWithProfile({ enabledProfiles: ['syncfabric-rfc8693'] })]);
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+      expect(result).toBeNull();
+    });
+
+    it('a trust with enabledProfiles=[syncfabric-rfc7523] matches', async () => {
+      findActiveByEndpoint.mockResolvedValue([credWithProfile({ enabledProfiles: ['syncfabric-rfc7523'] })]);
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+      expect(result?.accessToken).toBe('minted.jwt');
+    });
+
+    it('a trust enabling BOTH profiles matches a 7523 request', async () => {
+      findActiveByEndpoint.mockResolvedValue([
+        credWithProfile({ enabledProfiles: ['syncfabric-rfc7523', 'syncfabric-rfc8693'] }),
+      ]);
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+      expect(result?.accessToken).toBe('minted.jwt');
+    });
+
+    it('BACKWARD COMPAT: a legacy trust with assertionProfile=jwt-bearer still matches', async () => {
+      findActiveByEndpoint.mockResolvedValue([credWithProfile({ assertionProfile: 'jwt-bearer' })]);
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+      expect(result?.accessToken).toBe('minted.jwt');
+    });
+
+    it('BACKWARD COMPAT: a legacy trust with NO assertionProfile at all still matches', async () => {
+      const c = wifCredential();
+      const meta = { ...wifMetadata } as Record<string, unknown>;
+      delete meta.assertionProfile;
+      c.metadata = meta;
+      findActiveByEndpoint.mockResolvedValue([c]);
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+      expect(result?.accessToken).toBe('minted.jwt');
+    });
+
+    it('with a mix, only the 7523-capable trust is considered', async () => {
+      const exchangeOnly = credWithProfile({ assertionProfile: 'token-exchange' });
+      exchangeOnly.id = 'cred-8693';
+      const bearer = credWithProfile({ assertionProfile: 'jwt-bearer' });
+      bearer.id = 'cred-7523';
+      findActiveByEndpoint.mockResolvedValue([exchangeOnly, bearer]);
+
+      const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+      expect(result?.accessToken).toBe('minted.jwt');
+      // Only ONE trust was validated - the 8693-only one was never tried.
+      expect(validate).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('W3.7: rejects a request client_id that does not match the trust targetClientId', async () => {
     const cred = wifCredential();
     cred.metadata = { ...wifMetadata, targetClientId: 'scim-wif-client-abc123' };

@@ -28,8 +28,12 @@
 > [F5](#f5-connection-info-projects-the-assertion-subject-as-the-entra-client-identifier-medium---fixed-in-v05479-w39)
 > (connection-info shows the OAuth client identity, with the assertion subject as its own field) as
 > **W3.9**. Re-verified on dev v0.54.79 with a fresh real Entra app: **47/47 passed, 1 finding
-> remaining** ([F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium), which is the W3.1 /
+> remaining** ([F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium---fixed-in-v05480-w31), which is the W3.1 /
 > Wave 4 per-variation routing item). Live-test regression: **1329/1329**.
+>
+> **v0.54.80 closes the last one.** [F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium---fixed-in-v05480-w31)
+> shipped as the right-sized **W3.1**: per-variation profile routing, which is also the exact seam
+> Wave 4 (RFC 8693) extends. **All 8 findings from the original proof run are now closed and gated.**
 
 ---
 
@@ -144,9 +148,10 @@ separate auth-method choices rather than settings of one method.
 | **Customer-application identity model** | (orthogonal) | `azp` = the customer's calling app | - | - | Supported by config; claim binding is `sub`-only today |
 | **First-party identity model** | (orthogonal) | `azp` = the fixed 1P app id | - | - | Supported by config; `azp`/`oid` not yet enforced (Wave 5.2) |
 
-**The variation-routing gap:** the trust already stores an `assertionProfile` field with values
-`jwt-bearer` or `token-exchange`, but nothing routes on it - see
-[F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium).
+**Per-variation routing (W3.1, v0.54.80):** a trust declares which profile(s) it serves via the
+versioned `enabledProfiles[]` (or the legacy singular `assertionProfile`, which is projected onto
+it). Each provider selects only the trusts enabling ITS profile, so the variations can coexist on
+one endpoint and Wave 4 adds RFC 8693 by EXTENDING the seam rather than editing the 7523 path.
 
 ---
 
@@ -740,12 +745,23 @@ the mint exactly, so advertised == minted - and the expected assertion subject i
 distinct `expectedAssertionSubject` field instead of being conflated into the client identity
 (guide 11.2: separate values, separate validation rules).
 
-### F6. `assertionProfile` is stored but never routed on (MEDIUM)
+### F6. `assertionProfile` is stored but never routed on (MEDIUM) - **FIXED in v0.54.80 (W3.1)**
 
-**Measured:** a trust saved with `assertionProfile: "token-exchange"` is accepted **and still mints
-via the `jwt-bearer` path**. The field is inert. This is the concrete reason the
-`WifTrustV2.enabledProfiles[]` model (W3.1) becomes load-bearing at Wave 4: without per-variation
-routing, two variations cannot coexist on one endpoint.
+**Measured:** a trust saved with `assertionProfile: "token-exchange"` was accepted **and still
+minted via the `jwt-bearer` path**. The field was inert.
+
+**Fix (shipped v0.54.80):** trusts are now selected by the profile they declare. A new
+`resolveTrustProfiles` helper reads the versioned `enabledProfiles[]` (guide 12.1) when present and
+otherwise projects the legacy singular `assertionProfile` onto it; the RFC 7523 provider filters to
+trusts enabling `syncfabric-rfc7523`, and the metadata derives its capability the same way so
+advertised stays == enforced. A `token-exchange`-scoped trust now yields 401 for a jwt-bearer
+request and advertises no `private_key_jwt`. Value-preserving: `jwt-bearer` and profile-less trusts
+are unchanged.
+
+**This is the seam Wave 4 needs.** The RFC 8693 provider will select on `syncfabric-rfc8693`
+without touching the 7523 path - EXTEND, not EDIT. The full `WifTrustV2` aggregate and its 7-state
+reversible migration machine remain deliberately unbuilt: the projection delivers the only
+load-bearing part (per-variation routing) without a migration that no production data needs.
 
 ### F7. `azp` and `oid` are present but not enforced (MEDIUM)
 
@@ -816,7 +832,7 @@ The proof run changes the priority order in four concrete ways:
 ```mermaid
 flowchart LR
     A["DONE v0.54.78<br/>W3.6 lifetime cap<br/>W3.7 client_id binding"]:::done --> C["DONE v0.54.79<br/>W3.8 auth_method + source_* + jti<br/>W3.9 connection-info client identity"]:::done
-    C --> E["W3.1 WifTrustV2<br/>+ enabledProfiles routing (L)"]
+    C --> E["DONE v0.54.80<br/>W3.1 per-variation profile routing"]:::done
     E --> F["W1 perf foundation<br/>(before 2nd JWKS path)"]
     F --> G["W4 RFC 8693 (L)"]
     G --> H["W5 claims + persona"]
@@ -835,7 +851,8 @@ run confirms the JWKS fetch is on the hot path today.
 | Form `client_id` binding (F2) | **DONE v0.54.78 (W3.7)** | - |
 | AT2 provenance claims + `jti` (F3, F4) | **DONE v0.54.79 (W3.8)** | - |
 | connection-info `targetClientId` (F5) | **DONE v0.54.79 (W3.9)** | - |
-| `WifTrustV2` + profile routing (W3.1, F6) | Not started | **Yes for Wave 4** |
+| Per-variation profile routing (F6, W3.1 right-sized) | **DONE v0.54.80** | - |
+| Full `WifTrustV2` aggregate + migration machine | Deferred (YAGNI) | No |
 | Trust cache + composite index (W3.5) | Not started | No (perf) |
 | Wave 1 perf foundation (W1.1-W1.6) | Not started | Recommended before Wave 4 |
 | RFC 8693 handler (W4.1-W4.3) | Not started | Yes for SyncFabric parity |

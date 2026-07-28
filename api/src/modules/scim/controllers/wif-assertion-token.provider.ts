@@ -20,6 +20,7 @@ import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.sto
 import { getCorrelationContext } from '../../logging/scim-logger.service';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider, AssertionMintRequest } from './assertion-token-provider';
+import { WIF_PROFILE_RFC7523, resolveTrustProfiles, trustEnablesProfile } from './assertion-token-provider';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { resolveEndpointEgressOverrides } from '../../endpoint/endpoint-config.interface';
 
@@ -75,6 +76,32 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       return null;
     }
 
+    // W3.1 - per-variation routing. A trust declares which protocol profile(s)
+    // it serves; this provider implements RFC 7523 (`client_assertion` +
+    // `jwt-bearer`) ONLY, so a trust scoped to RFC 8693 must not authorize a
+    // 7523 request. Before this, `assertionProfile` was stored but never routed
+    // on, so a `token-exchange` trust silently minted via the jwt-bearer path.
+    // Filtering here (on raw metadata, before the throwing full validation)
+    // keeps the selection cheap and is the seam the Wave 4 RFC 8693 provider
+    // will mirror with its own profile.
+    const profileCredentials = wifCredentials.filter((c) =>
+      trustEnablesProfile(c.metadata, WIF_PROFILE_RFC7523),
+    );
+    if (profileCredentials.length === 0) {
+      this.logger.warn(
+        LogCategory.AUTH,
+        'WIF trust(s) exist for this endpoint but none serves the RFC 7523 profile (not-mine)',
+        {
+          endpointId,
+          requestedProfile: WIF_PROFILE_RFC7523,
+          configuredProfiles: [
+            ...new Set(wifCredentials.flatMap((c) => resolveTrustProfiles(c.metadata))),
+          ],
+        },
+      );
+      return null;
+    }
+
     // Resolve the ENDPOINT-level runtime egress overrides (JWKS fetch timeout /
     // retries / backoff / cache max-age) once for this mint. Any field the
     // endpoint sets OVERRIDES the server-level default; unset fields fall
@@ -95,7 +122,7 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     // guarantees the fallback: if the issuer is undecodable or matches nothing,
     // every trust is tried in turn. A rejecting or misconfigured trust is a
     // non-match; if NONE accepts, we fail closed (throw) and NEVER fall through.
-    const orderedTrusts = this.orderByAssertionIssuer(wifCredentials, clientAssertion);
+    const orderedTrusts = this.orderByAssertionIssuer(profileCredentials, clientAssertion);
 
     let lastError: unknown;
     const subTraces: AuthDecisionTrace[] = [];
