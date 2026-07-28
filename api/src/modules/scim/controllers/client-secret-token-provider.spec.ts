@@ -42,7 +42,13 @@ describe('ClientSecretTokenProvider (W2.3)', () => {
       expect(res.checks.find((c) => c.id === 'secret_match')?.status).toBe('pass');
       expect(res.checks.find((c) => c.id === 'credential_location')?.received).toBe('client_secret_post');
     }
-    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalledWith(ENDPOINT_ID, 'epc_x', 'scim.read');
+    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalledWith(
+      ENDPOINT_ID,
+      'epc_x',
+      'scim.read',
+      // W3.8 - the mint is tagged with the profile that authorized it.
+      expect.objectContaining({ authMethod: 'client_secret' }),
+    );
   });
 
   it('rejects when no oauth_client credential matches the client_id', async () => {

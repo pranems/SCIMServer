@@ -53,6 +53,13 @@ export interface ConnectionEnabledMethod {
   /** Present only for `wif`: the audience the source token must carry. */
   expectedAudience?: string;
   /**
+   * Present only for `wif` (W3.9): the assertion `sub` the trust requires.
+   * Kept DISTINCT from `entraFields.clientIdentifier`, which is the OAuth
+   * client identity the token is minted as (guide 11.2 - the assertion subject
+   * and the target client are separate values with separate validation rules).
+   */
+  expectedAssertionSubject?: string | null;
+  /**
    * The active per-endpoint credential id backing this method (bearer /
    * oauth_client), when one exists. The UI uses it to call the reveal
    * endpoint. Null for methods with no per-endpoint credential (shared_secret,

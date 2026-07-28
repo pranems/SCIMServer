@@ -194,7 +194,13 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
       client_id: 'epc_x',
       client_secret: 'right-secret',
     });
-    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalledWith(ENDPOINT_ID, 'epc_x', undefined);
+    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalledWith(
+      ENDPOINT_ID,
+      'epc_x',
+      undefined,
+      // W3.8 - the mint is tagged with the profile that authorized it.
+      expect.objectContaining({ authMethod: 'client_secret' }),
+    );
     expect(res.access_token).toBe('secret-path-token');
   });
 

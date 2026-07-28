@@ -14085,6 +14085,15 @@ try {
     Test-Result -Success ($null -ne $bxProfile -and $bxProfile.client_id_binding -eq "target-client-id") -Message "9z-BX.T4: metadata advertises client_id_binding = target-client-id"
     Test-Result -Success ($null -ne $bxProfile -and $bxProfile.assertion_subject_binding -eq "independent") -Message "9z-BX.T5: metadata advertises assertion_subject_binding = independent (W3.2)"
 
+    # T6-T7 (W3.9): connection-info must project the OAuth CLIENT identity (the
+    # trust's targetClientId, which is what the mint issues) as Entra's "Client
+    # identifier", and keep the expected ASSERTION SUBJECT as its own distinct
+    # field. Conflating the two is the guide-16.2 defect.
+    $bxConn = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bxId/connection-info" -Headers $headers
+    $bxWif = @($bxConn.enabledMethods | Where-Object { $_.method -eq "wif" })[0]
+    Test-Result -Success ($null -ne $bxWif -and $bxWif.entraFields.clientIdentifier -eq "scim-wif-client-bx") -Message "9z-BX.T6 (W3.9): connection-info Client identifier is the trust targetClientId"
+    Test-Result -Success ($null -ne $bxWif -and $bxWif.expectedAssertionSubject -eq "sp-object-id-federated-bx") -Message "9z-BX.T7 (W3.9): the expected assertion subject is a DISTINCT field, not the client identity"
+
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bxId" -Method DELETE -Headers $headers | Out-Null } catch {}
 } catch {

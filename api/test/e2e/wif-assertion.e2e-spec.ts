@@ -155,6 +155,21 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     expect(payload.src_sub).toBe(SUBJECT);
     // WI-17: the minted token is source-stamped with the winning trust's issuer.
     expect(payload.src_iss).toBe(ISSUER);
+    // W3.8 (guide 13.4 + 13.6) - provenance + a unique token id.
+    expect(payload.auth_method).toBe('syncfabric-rfc7523');
+    expect(payload.source_tid).toBe(TENANT);
+    expect(typeof payload.jti).toBe('string');
+    expect((payload.jti as string).length).toBeGreaterThan(10);
+  });
+
+  it('W3.8: two mints of the same assertion produce DIFFERENT jti values', async () => {
+    const assertion = await signAssertion();
+    const a = await postAssertion(assertion).expect(200);
+    const b = await postAssertion(assertion).expect(200);
+    const jtiA = decodePayload(a.body.access_token).jti;
+    const jtiB = decodePayload(b.body.access_token).jti;
+    expect(jtiA).toBeTruthy();
+    expect(jtiA).not.toBe(jtiB);
   });
 
   it('the minted token authorizes the endpoint SCIM routes', async () => {

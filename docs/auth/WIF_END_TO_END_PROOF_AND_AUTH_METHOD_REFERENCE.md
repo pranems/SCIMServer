@@ -698,24 +698,38 @@ unaffected.
 source. This one was inferred rather than read, and the wrong inference kept an advertised-but-
 unenforced binding in production for two versions.
 
-### F3. AT2 omits the guide-13.4 provenance claims (MEDIUM)
+### F3. AT2 omits the guide-13.4 provenance claims (MEDIUM) - **FIXED in v0.54.79 (W3.8)**
 
-**Measured:** AT2 carries `src_iss` + `src_sub` but not `auth_method`, `source_tid`, `source_oid`,
+**Measured:** AT2 carried `src_iss` + `src_sub` but not `auth_method`, `source_tid`, `source_oid`,
 or `source_azp`. Without `auth_method` a downstream consumer cannot tell an RFC 7523 token from a
 future RFC 8693 token, and without `source_tid` a multi-tenant trust cannot attribute the tenant.
 
-### F4. AT2 has no `jti` (MEDIUM)
+**Fix (shipped v0.54.79):** the mint stamps `auth_method` (`syncfabric-rfc7523` for WIF,
+`client_secret` for the OAuth2 client-credentials path) plus `source_tid` / `source_oid` /
+`source_azp` taken from the VERIFIED assertion claims (`azp`, falling back to `appid` for v1.0
+assertions). The `source_*` claims are omitted entirely on non-federated mints, so that asymmetry
+remains the clean WIF/non-WIF discriminator.
 
-**Measured:** no `jti` claim. There is therefore no per-token identifier for a replay denylist or
-for correlating a specific token across logs. Parked in **W5.3**. Note the real Entra assertion
-uses `uti`, not `jti` - any future replay design must handle that.
+### F4. AT2 has no `jti` (MEDIUM) - **FIXED in v0.54.79 (W3.8)**
 
-### F5. connection-info projects the assertion subject as the Entra "Client identifier" (MEDIUM)
+**Measured:** no `jti` claim, so there was no per-token identifier for a replay denylist or for
+correlating a specific token across logs.
+
+**Fix (shipped v0.54.79):** every issued token now carries a fresh UUID `jti`. Two mints of the
+SAME assertion produce different `jti` values (asserted at E2E). Note the real Entra assertion uses
+`uti`, not `jti` - any future replay design must handle that on the inbound side.
+
+### F5. connection-info projects the assertion subject as the Entra "Client identifier" (MEDIUM) - **FIXED in v0.54.79 (W3.9)**
 
 **Measured:** `entraFields.clientIdentifier` returned `d085870e-...` (the assertion `sub`) even
-though the trust defines `targetClientId: "scim-wif-client-proof"`. Guide 16.2 requires the
-ISV-issued target client id to be surfaced here. Now that W3.2 makes `targetClientId` real, the
-projection is inconsistent with what the token actually contains.
+though the trust defined `targetClientId: "scim-wif-client-proof"`. Since W3.2 made `targetClientId`
+the value the token actually carries, the operator was shown one identity while the wire carried
+another (guide 16.2).
+
+**Fix (shipped v0.54.79):** `clientIdentifier` is now `targetClientId ?? endpointId` - mirroring
+the mint exactly, so advertised == minted - and the expected assertion subject is surfaced as a new
+distinct `expectedAssertionSubject` field instead of being conflated into the client identity
+(guide 11.2: separate values, separate validation rules).
 
 ### F6. `assertionProfile` is stored but never routed on (MEDIUM)
 
@@ -792,9 +806,8 @@ The proof run changes the priority order in four concrete ways:
 
 ```mermaid
 flowchart LR
-    A["DONE - W3.6 lifetime cap<br/>+ W3.7 client_id binding"]:::done --> C["F3+F4 - auth_method,<br/>source_*, jti on AT2<br/>(S, unblocks attribution)"]
-    C --> D["F5 - connection-info<br/>targetClientId (S)"]
-    D --> E["W3.1 WifTrustV2<br/>+ enabledProfiles routing (L)"]
+    A["DONE v0.54.78<br/>W3.6 lifetime cap<br/>W3.7 client_id binding"]:::done --> C["DONE v0.54.79<br/>W3.8 auth_method + source_* + jti<br/>W3.9 connection-info client identity"]:::done
+    C --> E["W3.1 WifTrustV2<br/>+ enabledProfiles routing (L)"]
     E --> F["W1 perf foundation<br/>(before 2nd JWKS path)"]
     F --> G["W4 RFC 8693 (L)"]
     G --> H["W5 claims + persona"]
@@ -811,8 +824,8 @@ run confirms the JWKS fetch is on the hot path today.
 |---|---|---|
 | AT2 lifetime cap (F1) | **DONE v0.54.78 (W3.6)** | - |
 | Form `client_id` binding (F2) | **DONE v0.54.78 (W3.7)** | - |
-| AT2 provenance claims + `jti` (F3, F4) | Not started | No, but blocks per-method attribution |
-| connection-info `targetClientId` (F5) | Not started | No |
+| AT2 provenance claims + `jti` (F3, F4) | **DONE v0.54.79 (W3.8)** | - |
+| connection-info `targetClientId` (F5) | **DONE v0.54.79 (W3.9)** | - |
 | `WifTrustV2` + profile routing (W3.1, F6) | Not started | **Yes for Wave 4** |
 | Trust cache + composite index (W3.5) | Not started | No (perf) |
 | Wave 1 perf foundation (W1.1-W1.6) | Not started | Recommended before Wave 4 |

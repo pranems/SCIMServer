@@ -27,7 +27,7 @@ describe('Connection-info API (E2E)', () => {
 
   const TOP_KEYS = ['endpointId', 'displayName', 'urls', 'enabledMethods', 'disabledMethods'];
   const URL_KEYS = ['scimBaseUrl', 'scimBaseUrlBare', 'tokenEndpoint', 'serviceProviderConfig', 'oauthMetadata'];
-  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity'];
+  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'expectedAssertionSubject', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity'];
   const DISABLED_KEYS = ['method', 'reason', 'enableHint'];
 
   it('assembles the connection-info shape with only documented top-level keys', async () => {

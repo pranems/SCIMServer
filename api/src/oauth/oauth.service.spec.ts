@@ -310,5 +310,41 @@ describe('OAuthService', () => {
       });
       expect(result.expiresIn).toBe(21600);
     });
+
+    it('W3.8: every issued token carries a unique jti (guide 13.6)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [first] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [second] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(typeof first.jti).toBe('string');
+      expect((first.jti as string).length).toBeGreaterThan(10);
+      expect(first.jti).not.toBe(second.jti);
+    });
+
+    it('W3.8: stamps auth_method + source_tid/oid/azp when supplied (guide 13.4 provenance)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'scim-wif-client-x', undefined, {
+        trustedScope: 'scim.read',
+        authMethod: 'syncfabric-rfc7523',
+        sourceTenantId: 'tenant-abc',
+        sourceObjectId: 'oid-def',
+        sourceAuthorizedParty: 'azp-ghi',
+      });
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload.auth_method).toBe('syncfabric-rfc7523');
+      expect(payload.source_tid).toBe('tenant-abc');
+      expect(payload.source_oid).toBe('oid-def');
+      expect(payload.source_azp).toBe('azp-ghi');
+    });
+
+    it('W3.8: omits the source_* provenance claims when there is no federated source', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc', undefined, {
+        authMethod: 'client_secret',
+      });
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload.auth_method).toBe('client_secret');
+      expect(payload).not.toHaveProperty('source_tid');
+      expect(payload).not.toHaveProperty('source_oid');
+      expect(payload).not.toHaveProperty('source_azp');
+    });
   });
 });

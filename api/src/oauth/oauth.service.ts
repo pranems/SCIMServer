@@ -162,6 +162,17 @@ export class OAuthService {
        * authorization (SyncFabric guide 13.5). Omitted for non-federated mints.
        */
       assertionExpiresAt?: number;
+      /**
+       * W3.8 (guide 13.4) - provenance. `authMethod` names the profile that
+       * authorized the mint (e.g. `syncfabric-rfc7523`, `client_secret`) so a
+       * downstream consumer can tell them apart. The `source*` values describe
+       * the federated principal and are omitted entirely for non-federated
+       * mints. None of these is an authorization input - they are attribution.
+       */
+      authMethod?: string;
+      sourceTenantId?: string;
+      sourceObjectId?: string;
+      sourceAuthorizedParty?: string;
     },
   ): Promise<AccessToken> {
     const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
@@ -208,6 +219,16 @@ export class OAuthService {
       endpoint_id: endpointId,
       scope: grantedScope,
       token_type: 'access_token',
+      // W3.8 (guide 13.6) - a unique per-token identifier. It gives every
+      // issued token a stable handle for log correlation and is the
+      // prerequisite for any future replay denylist / revocation list.
+      jti: crypto.randomUUID(),
+      // W3.8 (guide 13.4) - which auth profile authorized this mint. Without
+      // it a consumer cannot distinguish an RFC 7523 token from a future RFC
+      // 8693 one, nor a federated mint from a plain client_secret mint.
+      ...(options?.authMethod && options.authMethod.trim().length > 0
+        ? { auth_method: options.authMethod.trim() }
+        : {}),
       // WI-17 - when the token is minted from a federated (WIF) assertion, stamp
       // the winning trust's issuer so telemetry + downstream consumers can
       // attribute which identity provider drove the call. Omitted for plain
@@ -223,6 +244,17 @@ export class OAuthService {
       // separate values (RFC 6749 client_id vs the RFC 7523 assertion sub).
       ...(options?.sourceSubject && options.sourceSubject.trim().length > 0
         ? { src_sub: options.sourceSubject.trim() }
+        : {}),
+      // W3.8 (guide 13.4) - the rest of the federated principal, for
+      // attribution + multi-tenant analytics. Absent on non-federated mints.
+      ...(options?.sourceTenantId && options.sourceTenantId.trim().length > 0
+        ? { source_tid: options.sourceTenantId.trim() }
+        : {}),
+      ...(options?.sourceObjectId && options.sourceObjectId.trim().length > 0
+        ? { source_oid: options.sourceObjectId.trim() }
+        : {}),
+      ...(options?.sourceAuthorizedParty && options.sourceAuthorizedParty.trim().length > 0
+        ? { source_azp: options.sourceAuthorizedParty.trim() }
         : {}),
     };
 

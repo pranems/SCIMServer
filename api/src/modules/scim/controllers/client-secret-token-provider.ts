@@ -97,6 +97,9 @@ export class ClientSecretTokenProvider {
       endpointId,
       req.clientId,
       req.scope,
+      // W3.8 (guide 13.4) - name the profile that authorized this mint so a
+      // consumer can tell a plain client_secret token from a federated one.
+      { authMethod: 'client_secret' },
     );
     return { outcome: 'accept', token, checks };
   }

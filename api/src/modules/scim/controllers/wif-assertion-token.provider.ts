@@ -190,6 +190,17 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
           // W3.6 (guide 13.5) - the issued token must never outlive the
           // assertion that authorized it.
           assertionExpiresAt: typeof claims.exp === 'number' ? claims.exp : undefined,
+          // W3.8 (guide 13.4) - provenance. `azp` is the v2.0 authorized-party
+          // claim; v1.0 assertions carry `appid` instead.
+          authMethod: 'syncfabric-rfc7523',
+          sourceTenantId: typeof claims.tid === 'string' ? claims.tid : undefined,
+          sourceObjectId: typeof claims.oid === 'string' ? claims.oid : undefined,
+          sourceAuthorizedParty:
+            typeof claims.azp === 'string'
+              ? claims.azp
+              : typeof claims.appid === 'string'
+                ? claims.appid
+                : undefined,
         },
       );
 

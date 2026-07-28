@@ -236,12 +236,15 @@ Test-Result -Success ($at2.Payload.src_sub -eq $at1Sub) -Message "S5.T3 (W3.2): 
 Test-Result -Success ($at2.Payload.src_iss -eq $at1Iss) -Message "S5.T4 (WI-17): AT2 carries src_iss source attribution"
 Test-Result -Success ($at2.Payload.endpoint_id -eq $epId) -Message "S5.T5: AT2 is endpoint-scoped via the endpoint_id claim"
 
-# Guide section 13.4 target shape - report which claims are still missing.
-foreach ($c in @('auth_method','source_tid','source_oid','source_azp','jti')) {
+# W3.8 (guide 13.4 + 13.6) - provenance + a unique token id on every AT2.
+foreach ($c in @('auth_method','source_tid','source_oid','jti')) {
     if (-not $at2.Payload.PSObject.Properties.Name.Contains($c)) {
-        Add-Finding "AT2-$c" "AT2 does not carry the guide-13.4 claim '$c'"
+        Add-Finding "AT2-$c" "AT2 does not carry the guide-13.4/13.6 claim '$c'"
     }
 }
+Test-Result -Success ($at2.Payload.auth_method -eq 'syncfabric-rfc7523') -Message "S5.T7 (W3.8): AT2 names the auth profile that authorized it (auth_method)"
+Test-Result -Success ($at2.Payload.source_tid -eq $at1Tid) -Message "S5.T8 (W3.8): AT2 carries the federated tenant as source_tid"
+Test-Result -Success ([bool]$at2.Payload.jti) -Message "S5.T9 (W3.8): AT2 carries a unique jti (guide 13.6)"
 # Guide section 13.5 - AT2 must never outlive the assertion that authorized it.
 $at1Exp = [int]$at1.Payload.exp
 $at2Exp = [int]$at2.Payload.exp
@@ -394,6 +397,8 @@ if ($wifMethod.entraFields.clientIdentifier -eq $at1Sub) {
     Add-Finding "conn-clientIdentifier" "connection-info still projects the ASSERTION SUBJECT as Entra 'Client identifier'; the trust's targetClientId ($($trustBody.wif.targetClientId)) is not surfaced (guide 16.2)"
 }
 Test-Result -Success ($wifMethod.entraAuthenticationMethod -eq "Workload Identity based authentication") -Message "S7.T11: connection-info names the Entra auth-method choice for WIF"
+Test-Result -Success ($wifMethod.entraFields.clientIdentifier -eq $trustBody.wif.targetClientId) -Message "S7.T11b (W3.9): connection-info surfaces the trust targetClientId as the Entra Client identifier"
+Test-Result -Success ($wifMethod.expectedAssertionSubject -eq $at1Sub) -Message "S7.T11c (W3.9): the expected assertion subject is a DISTINCT field, not the client identity"
 
 # 7h - GUIDE 13.5 LIFETIME CAP: does AT2 ever outlive the assertion that authorized it?
 # A 6h issuedTokenTtlSec against a 1h Entra assertion makes the answer unambiguous.
@@ -452,6 +457,8 @@ Write-Host "--- AT2 minted via OAuth2 client-credentials (for contrast with WIF)
 $ocAt2.Payload | ConvertTo-Json -Depth 5
 Test-Result -Success ($ocAt2.Payload.client_id -eq $oc.clientId) -Message "S7.T15: client-credentials AT2 client_id is the endpoint's own oauth_client id"
 Test-Result -Success (-not $ocAt2.Payload.PSObject.Properties.Name.Contains('src_iss')) -Message "S7.T16: client-credentials AT2 carries NO src_iss (no federated source) - the WIF/non-WIF discriminator"
+Test-Result -Success ($ocAt2.Payload.auth_method -eq 'client_secret') -Message "S7.T17 (W3.8): client-credentials AT2 is tagged auth_method=client_secret"
+Test-Result -Success (-not $ocAt2.Payload.PSObject.Properties.Name.Contains('source_tid')) -Message "S7.T18 (W3.8): client-credentials AT2 carries NO source_* claims (nothing federated to attribute)"
 try { Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints/$($epO.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -251,15 +251,25 @@ export class ConnectionInfoService {
           ? wifCred.metadata.expectedAudience
           : endpointId;
       // Entra's WIF connectivity "Enter values from your application" form has a
-      // 3rd field "Client identifier" that takes the SUBJECT (sub) claim the
-      // SCIM endpoint expects - NOT the audience. Surface the expected subject
-      // as clientIdentifier (mapped to Entra's Client identifier field) and
-      // keep the audience as its own row (Entra shows it under "Configure
-      // trust", not the connection form).
+      // 3rd field "Client identifier". W3.9 (guide 16.2): that is the OAuth
+      // CLIENT identity, which since W3.2 is the trust's `targetClientId` (the
+      // value the issued token actually carries as `client_id`) - NOT the
+      // federated assertion subject. The expected assertion subject is still
+      // needed for setup, so it is surfaced as its own distinct field rather
+      // than being conflated into `clientIdentifier`. When no `targetClientId`
+      // is configured the mint falls back to the endpointId, so the projection
+      // does the same, keeping advertised == minted.
       const subject =
         typeof wifCred?.metadata?.expectedSubject === 'string'
           ? wifCred.metadata.expectedSubject
           : null;
+      const targetClientId =
+        typeof wifCred?.metadata?.targetClientId === 'string' &&
+        wifCred.metadata.targetClientId.length > 0
+          ? wifCred.metadata.targetClientId
+          : wifCred
+            ? endpointId
+            : null;
       enabledMethods.push({
         method: 'wif',
         label: 'Workload Identity Federation',
@@ -269,11 +279,16 @@ export class ConnectionInfoService {
         entraFields: {
           tenantUrl: urls.scimBaseUrl,
           tokenEndpoint: urls.tokenEndpoint,
-          // Entra's "Client identifier" field = the sub claim for WIF.
-          clientIdentifier: subject,
+          // Entra's "Client identifier" field = the OAuth client id the token
+          // is minted as (W3.2 target client), not the assertion subject.
+          clientIdentifier: targetClientId,
         },
         clientSecretState: 'none',
         expectedAudience: audience,
+        // W3.9 - the assertion `sub` the trust requires, kept DISTINCT from the
+        // OAuth client identity above (guide 11.2 "separate values, separate
+        // validation rules").
+        expectedAssertionSubject: subject,
         credentialId: wifCred?.id ?? null,
       });
     } else {

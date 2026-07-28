@@ -228,6 +228,18 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Deps: W3.2. Estimate: **S**. Risk: Low (binds only when the operator pinned a target AND the caller sent a different one).
 - **Status: DELIVERED - api v0.54.78.**
 
+**W3.8 - Issued-token provenance + `jti`** `[guide 13.4 + 13.6]` **(NEW - pulled forward from W5.3)**
+- Tasks: stamp a unique `jti` on every mint; stamp `auth_method` (`syncfabric-rfc7523` / `client_secret`) and, for federated mints only, `source_tid` / `source_oid` / `source_azp` (with the v1.0 `appid` fallback).
+- Acceptance: two mints of the same assertion yield different `jti`; a client-credentials token carries `auth_method` but NO `source_*`; claims are attribution only, never an authorization input.
+- Deps: none. Estimate: **S**. Risk: Low.
+- **Status: DELIVERED - api v0.54.79.** Pulled forward because the real-Entra proof showed a consumer could not distinguish auth profiles nor attribute a tenant. `typ=at+jwt` remains in W5.3.
+
+**W3.9 - connection-info projects the OAuth client identity** `[guide 16.2]` **(NEW - completes W3.2)**
+- Tasks: `entraFields.clientIdentifier` becomes `targetClientId ?? endpointId` (mirroring the mint); the expected assertion subject moves to a distinct `expectedAssertionSubject` field.
+- Acceptance: advertised client identity == the `client_id` the token actually carries; the assertion subject stays visible but separate.
+- Deps: W3.2. Estimate: **S**. Risk: Low (additive response field; key allowlist updated).
+- **Status: DELIVERED - api v0.54.79.**
+
 **W3.3 - Remove endpoint-UUID audience default** `[guide gap]`
 - Tasks: require an explicit `expectedAudience`; flag endpoint-ID-like audiences as likely misconfiguration.
 - Acceptance: no derived-from-endpoint-UUID audience path remains; validation requires the value.

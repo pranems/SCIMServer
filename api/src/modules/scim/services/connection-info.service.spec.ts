@@ -217,14 +217,39 @@ describe('ConnectionInfoService', () => {
       expect(wif?.entraAuthenticationMethod).toBe('Workload Identity based authentication');
     });
 
-    it('maps the wif expectedSubject to Entra\'s Client identifier field (sub claim)', () => {
+    it('W3.9: surfaces the trust targetClientId as Entra\'s Client identifier when configured', () => {
+      const info = service.assemble(
+        endpoint({ WifCredentialsEnabled: 'True' }),
+        [cred({
+          credentialType: 'wif',
+          metadata: {
+            expectedSubject: 'sp-object-id-abc',
+            expectedAudience: 'aud',
+            targetClientId: 'scim-wif-client-abc123',
+          },
+        })],
+        'https://x',
+      );
+      const wif = info.enabledMethods.find((m) => m.method === 'wif');
+      // The ISV-issued target client id is what the token is minted as (W3.2),
+      // so it - not the federated assertion subject - is the client identity.
+      expect(wif?.entraFields.clientIdentifier).toBe('scim-wif-client-abc123');
+      // The expected assertion subject stays visible as its own distinct value.
+      expect(wif?.expectedAssertionSubject).toBe('sp-object-id-abc');
+    });
+
+    it('W3.9: with no targetClientId the Client identifier falls back to the endpointId (what the mint issues)', () => {
       const info = service.assemble(
         endpoint({ WifCredentialsEnabled: 'True' }),
         [cred({ credentialType: 'wif', metadata: { expectedSubject: 'sp-object-id-abc', expectedAudience: 'aud' } })],
         'https://x',
       );
       const wif = info.enabledMethods.find((m) => m.method === 'wif');
-      expect(wif?.entraFields.clientIdentifier).toBe('sp-object-id-abc');
+      // The mint uses `targetClientId ?? endpointId`, so the projection must too.
+      expect(wif?.entraFields.clientIdentifier).toBe(ID);
+      // The assertion subject is NOT the client identity - it has its own field.
+      expect(wif?.entraFields.clientIdentifier).not.toBe('sp-object-id-abc');
+      expect(wif?.expectedAssertionSubject).toBe('sp-object-id-abc');
       // The audience stays a separate row.
       expect(wif?.expectedAudience).toBe('aud');
     });

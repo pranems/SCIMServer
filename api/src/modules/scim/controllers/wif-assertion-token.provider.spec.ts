@@ -169,6 +169,54 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     );
   });
 
+  it('W3.8: stamps the auth method + the assertion tenant/object/authorized-party as AT2 provenance', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({
+      iss: wifMetadata.expectedIssuer,
+      sub: wifMetadata.expectedSubject,
+      aud: wifMetadata.expectedAudience,
+      tid: 'tenant-123',
+      oid: 'sp-object-id-abc',
+      azp: 'calling-app-id',
+    });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1',
+      'ep-1',
+      undefined,
+      expect.objectContaining({
+        authMethod: 'syncfabric-rfc7523',
+        sourceTenantId: 'tenant-123',
+        sourceObjectId: 'sp-object-id-abc',
+        sourceAuthorizedParty: 'calling-app-id',
+      }),
+    );
+  });
+
+  it('W3.8: falls back to the appid claim when azp is absent (v1.0 assertions)', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({
+      iss: wifMetadata.expectedIssuer,
+      sub: wifMetadata.expectedSubject,
+      aud: wifMetadata.expectedAudience,
+      tid: 'tenant-123',
+      appid: 'v1-calling-app',
+    });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 3600, scope: 'scim.read' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1',
+      'ep-1',
+      undefined,
+      expect.objectContaining({ sourceAuthorizedParty: 'v1-calling-app' }),
+    );
+  });
+
   it('threads the endpoint-level egress overrides into the validator', async () => {
     findActiveByEndpoint.mockResolvedValue([wifCredential()]);
     validate.mockResolvedValue({ iss: wifMetadata.expectedIssuer, sub: wifMetadata.expectedSubject, aud: wifMetadata.expectedAudience, tid: 'tenant-123', roles: ['Scim.Provision'] });
