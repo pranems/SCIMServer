@@ -617,11 +617,11 @@ flowchart TD
     H --> I["6. resource per resourceMode (W3.4)"]
     I -->|fail| R6["wif_resource_required /<br/>wif_resource_mismatch"]
     I --> J["7. roles (advisory unless enforce)"]
-    J -->|fail + enforce| R7["wif_missing_role"]
+    J -->|"fail + enforce"| R7["wif_missing_role"]
     J --> K["mint AT2"]
     R2 --> L{"more trusts?"}
-    L -->|yes| C
-    L -->|no, multiple| R8["wif_no_trust_accepted (aggregate)"]
+    L -->|"yes"| C
+    L -->|"no, multiple"| R8["wif_no_trust_accepted (aggregate)"]
 ```
 
 | Reason code | Axis | Observed in this run |

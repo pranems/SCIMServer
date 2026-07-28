@@ -120,8 +120,8 @@ stateDiagram-v2
     Created --> Active: active=true (default)
     Active --> Inactive: PATCH active=false
     Inactive --> Active: PATCH active=true
-    Active --> Deleted: DELETE /admin/endpoints/:id
-    Inactive --> Deleted: DELETE /admin/endpoints/:id
+    Active --> Deleted: DELETE /admin/endpoints/#58;id
+    Inactive --> Deleted: DELETE /admin/endpoints/#58;id
     Deleted --> [*]
 ```
 

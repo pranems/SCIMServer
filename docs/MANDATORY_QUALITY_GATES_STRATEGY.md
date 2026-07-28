@@ -262,10 +262,10 @@ The 6 per-commit stages are the FLOOR. Stage X is what RAISES the floor over tim
 stateDiagram-v2
     [*] --> Floor : per-commit gates 0-6
     Floor --> Floor : keep shipping
-    Floor --> M1 : Trigger A: release cut (v0.X.0 stable)
-    Floor --> M1 : Trigger B: calendar (monthly 1st)
-    Floor --> M1 : Trigger C: on-demand
-    Floor --> M1 : Trigger D: incident (after Stage 1-5 escape)
+    Floor --> M1 : Trigger A - release cut (v0.X.0 stable)
+    Floor --> M1 : Trigger B - calendar (monthly 1st)
+    Floor --> M1 : Trigger C - on-demand
+    Floor --> M1 : Trigger D - incident (after Stage 1-5 escape)
     M1 --> M2 : security-flavored findings escalate
     M1 --> M2 : security-landscape window opens
     M2 --> M1 : general drift findings cross-reference

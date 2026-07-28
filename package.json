@@ -5,10 +5,11 @@
   "description": "Repo-level tooling only. The shippable projects live in api/ and web/ and have their own package.json + lockfile; this file exists solely so documentation/quality scripts under scripts/ have declared, lockable dependencies instead of ad-hoc global installs.",
   "type": "module",
   "scripts": {
-    "docs:mermaid": "node scripts/validate-mermaid.mjs"
+    "docs:mermaid": "node scripts/validate-mermaid.mjs",
+    "docs:mermaid:render": "node scripts/render-mermaid.mjs"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",
-    "mermaid": "^11.6.0"
+    "mermaid": "11.12.2"
   }
 }
