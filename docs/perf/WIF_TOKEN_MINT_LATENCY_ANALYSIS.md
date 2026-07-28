@@ -5,6 +5,16 @@ X9 resource-plane RCA ([perf/DEV_LATENCY_REGRESSION_RCA.md](DEV_LATENCY_REGRESSI
 and the X10 auth-methods comparison ([auth/AUTH_METHODS_STANDARDS_COMPARISON.md](../auth/AUTH_METHODS_STANDARDS_COMPARISON.md)).
 These options are sequenced for delivery in [auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md](../auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md) (X13, Wave 1).
 
+> **Configuration companion (X15).** Every value this analysis proposes to tune is
+> environment-dependent, so the settings surface, the clamp contract, and a
+> recommended value per deployment form factor live in
+> [RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md).
+> That audit also found that the 10-minute `JWKS_CACHE_MAX_AGE_MS` default assumed
+> by Option A below **contradicts Microsoft's own published guidance** for its
+> signing keys (24 h TTL with a 1 h background refresh, per-`kid` caching, and a
+> 5-minute rate limit on unknown-`kid` refetch), which changes the shape of the
+> recommended fix - see X15 section 4.1.
+
 ## 0. TL;DR
 
 A single WIF (Workload Identity Federation) token mint

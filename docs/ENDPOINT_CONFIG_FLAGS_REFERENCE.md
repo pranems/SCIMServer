@@ -211,6 +211,14 @@ See [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.1a](ENDPOINT_PROFILE_ENFORCEMENT
 
 ### Runtime egress (WIF JWKS fetch)
 
+> **This four-flag family is the reference implementation of the repo's tier-2
+> configuration pattern** (server env default, per-endpoint override, mandatory
+> clamp at both levels). Any new environment-dependent numeric setting should
+> follow this exact shape. The full model, the complete inventory of what is and
+> is not configurable elsewhere in the server, and a recommended value for every
+> knob per deployment form factor are in
+> [perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) (X15).
+
 These four `number` flags tune the **runtime** egress the server makes when it
 fetches an identity provider's JWKS to verify a WIF (RFC 7523 `jwt-bearer`)
 client assertion during the endpoint token-mint. They are **per-endpoint
@@ -230,7 +238,7 @@ time - an out-of-range or non-numeric value is rejected with `400`.
 | `JwksFetchTimeoutMs` | `JWKS_FETCH_TIMEOUT_MS` (5000) | 100 - 60000 | Per-attempt fetch timeout (ms). A hung IdP is aborted rather than blocking the mint (**G1**). |
 | `JwksFetchRetries` | `JWKS_FETCH_RETRIES` (2) | 0 - 10 | Retries for a failed fetch; total tries = `retries + 1` (**G5**). |
 | `JwksFetchRetryBackoffMs` | `JWKS_FETCH_RETRY_BACKOFF_MS` (200) | 0 - 10000 | Base retry backoff (ms); exponential `backoff * 2^(attempt-1)` + jitter. |
-| `JwksCacheMaxAgeMs` | `JWKS_CACHE_MAX_AGE_MS` (600000) | 0 - 86400000 | How long a cached JWKS is served before a refetch (`0` = always refetch). |
+| `JwksCacheMaxAgeMs` | `JWKS_CACHE_MAX_AGE_MS` (600000) | 0 - 86400000 | How long a cached JWKS is served before a refetch (`0` = always refetch). **Open finding X15-F1:** Microsoft's guidance for its own signing keys is a 24 h TTL with a 1 h background refresh, so `600000` is ~144x more aggressive than the IdP asks. Do NOT simply raise this on today's code - the long TTL is only safe once W1.4 lands the background refresher and the rate-limited unknown-`kid` path. See [perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) section 4.1. |
 
 Alongside these knobs the runtime fetch also enforces **single-flight** (G3 -
 concurrent fetches for the same URI are coalesced into one) and **redirect

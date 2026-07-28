@@ -6,6 +6,7 @@ sequences** three previously separate analysis streams into one delivery backlog
 1. **X11 - WIF token-mint latency** ([../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)) - the perf options (cold ~2,161 ms -> tens of ms).
 2. **X12 - auth-source refactoring** ([AUTH_SOURCE_REFACTORING_ANALYSIS.md](AUTH_SOURCE_REFACTORING_ANALYSIS.md)) - the `ResourceAuthenticator` / provider strategy seam.
 3. **SyncFabric roadmap** ([SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)) - RFC 8693, RFC 7523 binding corrections, persona model, security + metadata truthfulness, migration (its Phases -1..6 and file-by-file Section 25).
+4. **X15 - runtime tuning + configuration** ([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md), added 2026-07-28) - the configuration layer under the X11 options: the three-tier model, per-environment recommended values, and three findings that **redesign W1.4** and add **W1.7**.
 
 It is grounded in the **current** `feat/wif` source (state confirmed below), the
 X10 standards comparison ([AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)),
@@ -39,12 +40,16 @@ flowchart LR
         H0[HTTP 200 + no-store]
         M0[capability-derived metadata]
     end
-    subgraph W1["Wave 1 - Perf foundation (X11)"]
+    subgraph W1["Wave 1 - Perf foundation (X11 + X15)"]
+        P0[config surface + bounds + effective-config log]
         P1[eager jose + startup pre-warm]
         P2[canonical jwks_uri]
-        P3[background refresh + hard-stale]
         P4[JWKS deadline + caps]
+        P3[per-kid cache + background refresh + hard-stale]
+        P6[DB + HTTP knobs / runtime-config endpoint]
         P5[token-mint latency gate]
+        P0 --> P4 --> P3
+        P0 --> P6
     end
     subgraph W2["Wave 2 - Structural seam (X12)"]
         R1[ResourceAuthenticator chain]
@@ -89,7 +94,7 @@ flowchart LR
 | `assertionProfile` field | persisted (`jwt-bearer` / `token-exchange`) but **inert** | [admin-credential.controller.ts#L97](../../api/src/modules/scim/controllers/admin-credential.controller.ts#L97) |
 | Resource-plane strategy seam | **none** - 491-line `SharedSecretGuard` inlines all methods | [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) |
 | Mint `client_secret` path | **inlined** in the controller | [endpoint-oauth.controller.ts#L189](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts#L189) |
-| JWKS pre-warm / background refresh | **none** (lazy fetch, 10-min TTL) | [external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts) |
+| JWKS pre-warm / background refresh | **none** (lazy fetch, 10-min TTL - X15-F1: Microsoft's guidance for its own keys is 24 h TTL + 1 h background refresh) | [external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts) |
 | `jose` load | lazy `await import('jose')` on hot path | [external-jwks-validator.service.ts#L93](../../api/src/oauth/external-jwks-validator.service.ts#L93) |
 | Credential lookup | `findActiveByEndpoint` (all types, no index by type) | [wif-assertion-token.provider.ts](../../api/src/modules/scim/controllers/wif-assertion-token.provider.ts) |
 | Issued token `jti` / `typ=at+jwt` | **absent** | [oauth.service.ts](../../api/src/oauth/oauth.service.ts) |
@@ -104,14 +109,15 @@ Estimate legend (relative complexity, not calendar): **S** = ~2 pts, **M** = ~5 
 | Wave | Theme | Streams | Depends on | Points | Release gate |
 |---|---|---|---|---:|---|
 | 0 | Correctness hotfix (200/no-store + truthful metadata) | SF | none | 7 | Metadata-truthful test + token-response header test |
-| 1 | Perf foundation | X11 | none | 24 | Token-mint latency gate (`9z-BW`) |
+| 1 | Perf foundation | X11, X15 | none | 36 | Token-mint latency gate (`9z-BW`) + runtime-config contract |
 | 2 | Structural seam (refactor) + enablement consolidation | X12 | none (benefits from W1) | 25 | Guard/controller specs green + DA-gate |
 | 3 | RFC 7523 correctness + trust model | SF Phases 1-3 | W2, W1 | 22 | Real-token-shadow gate + parity |
 | 4 | RFC 8693 token exchange | SF Phase 4 | W2, W3, W1 | 15 | Real-SyncFabric 8693 validation |
 | 5 | Persona + claim strengthening + token profile | SF Phases 1,5 + X10 | W3, W4 | 18 | Persona contract suite |
 | 6 | Cleanup + future methods | SF Phase 6 | W3-W5 | 5 (+future) | Zero-legacy-use telemetry |
 
-Core (Waves 0-6 excluding optional/future) ~ **116 points**. Optional opaque-token
+Core (Waves 0-6 excluding optional/future) ~ **128 points** (was 116 before the
+X15 W1.7 configuration surface added 12 to Wave 1). Optional opaque-token
 track (W5.4) + future `private_key_jwt`/mTLS/DPoP (W6.2) add ~40 more and are
 separate tracks.
 
@@ -157,22 +163,35 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Deps: none. Estimate: **S**. Risk: Low.
 - **Status: DELIVERED - api v0.54.81.** Implemented as a RUNTIME resolution memo rather than a config rewrite: the canonical target a `jwksUri` redirects to is remembered per process, so the hop is paid once instead of on every cold fetch, and no stored trust data has to be migrated. The remembered target is re-validated against the SSRF allowlist on every use.
 
-**W1.4 - Background JWKS refresh-ahead + honor Cache-Control + hard-stale** `[X11 A + guide 25.2]`
+**W1.4 - Background JWKS refresh-ahead + honor Cache-Control + hard-stale** `[X11 A + guide 25.2 + X15-F1]`
 - Tasks: refresh timer at ~60% of TTL; `maxAge = min(JWKS_CACHE_MAX_AGE_MS, response Cache-Control)`; separate fresh age from a hard stale-if-error age; atomic cache swap; keep single-flight + serve-stale.
 - Acceptance: steady-state hot path is always a cache hit (no periodic 10-min cold); hard-stale rejection test; Cache-Control honored test.
 - Deps: none. Estimate: **L**. Risk: Medium (key-rotation correctness - overlap window test required).
 - **Note (2026-07-28 source audit):** single-flight coalescing (`inflight` map) and serve-stale-on-error already exist, so this item is only the background refresh + Cache-Control + hard-stale age. It also owns the open question in [EXECUTION_ISSUES_AND_RCA.md](EXECUTION_ISSUES_AND_RCA.md) section 10.2 (should an allowlist revocation purge that host's cached keys?).
+- **REDESIGNED by X15-F1 (2026-07-28).** The target is no longer "refresh at 60% of a 10-min TTL" but **Microsoft's own published algorithm** for its signing keys ([signing-key-rollover](https://learn.microsoft.com/en-us/entra/identity-platform/signing-key-rollover)): cache **per `kid`** (not per `jwksUri`), **24 h TTL**, **1 h background refresh**, prefetch on startup, and a synchronous unknown-`kid` refresh that is **rate-limited to once per 5 minutes** (today's unrate-limited unknown-`kid` refetch is an amplification vector). Full rationale + the today-vs-target diagrams in [../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) section 4.1. **Hard constraint:** the 10-min -> 24 h TTL raise MUST ship in the same commit as the background refresher, the rate-limited unknown-`kid` path, and an overlap-window rotation test - raising the TTL alone multiplies the key-rotation blast radius by 144x. New keys `JWKS_REFRESH_INTERVAL_MS`, `JWKS_UNKNOWN_KID_MIN_INTERVAL_MS`, `JWKS_STALE_IF_ERROR_MS` come from W1.7a.
 
-**W1.5 - JWKS total deadline + response caps** `[guide 25.2 + X11 H]`
+**W1.5 - JWKS total deadline + response caps** `[guide 25.2 + X11 H + X15-F1]`
 - Tasks: one cancellable total deadline across trust-selection + redirects + retries + backoff; response byte cap, key-count cap, key-size/type checks, cache-entry + trust-count cardinality caps.
 - Acceptance: worst-case cold bounded to a fixed budget (not ~10-60 s); oversized-response + too-many-keys + cardinality-cap tests.
 - Deps: W1.4. Estimate: **M**. Risk: Medium.
+- **Resequenced + amended by X15 (2026-07-28).** Now runs **BEFORE** W1.4, not after: the deadline and caps are the safety envelope inside which the riskier caching change runs, so the envelope is built first. Every cap ships **configurable from birth** (`JWKS_TOTAL_DEADLINE_MS`, `JWKS_MAX_RESPONSE_BYTES`, `JWKS_MAX_KEYS`) via the W1.7a plumbing rather than as hardcoded literals to be retrofitted. Recommended values per form factor and the clamp bounds are in [../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) sections 7.1 and 8.1. Note `JWKS_MAX_KEYS` must be generous (100, not 10) - Microsoft states a key cache should hold 10-1000 keys across issuers.
 
 **W1.6 - Token-mint latency gate** `[X11 §9]`
 - Tasks: live-test `9z-BW` - seed a WIF trust, warm once, time N mints; assert warm median < 150 ms and (post W1.1-W1.2) cold-first < 300 ms.
 - Acceptance: gate runs local + Docker + Azure dev; fails on a regression to the cold path.
 - Deps: W1.1-W1.4. Estimate: **S**. Risk: Low.
 - **Status: DELIVERED - api v0.54.81.** Landed in [scripts/wif-e2e-proof.ps1](../../scripts/wif-e2e-proof.ps1) (Stage 8), not `live-test.ps1`, because the proof harness is the only place with a REAL Entra assertion to mint from. 7 samples, median, configurable `-MintLatencyBudgetMs`. Cold-first is deliberately NOT asserted: the JWKS cache is process-wide per `jwksUri`, so whether a run starts cold depends on what else already hit that IdP on that replica - a cold assertion would be a flake generator.
+
+**W1.7 - Runtime configuration surface** `[X15]` **(NEW, 2026-07-28)**
+
+Promotes the environment-dependent values that are currently hardcoded into a clamped settings surface, and closes X15-F2 + X15-F3. Full design in [../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) section 8.
+
+- **W1.7a - config plumbing + bounds + effective-config log.** Group-level resolvers mirroring the existing `EGRESS_POLICY_DEFAULTS` / `EGRESS_POLICY_BOUNDS` / `resolveServerEgressDefaults` shape (no new pattern); the bounds table in X15 section 8.1; cross-key invariant validation (deadline < request timeout, refresh interval < cache TTL, default count <= max count) that WARNs rather than failing startup; one `INFO` boot line per group naming every effective value and its source (`env` / `default` / `clamped`). Deps: none. Estimate: **M**. Risk: Low.
+- **W1.7b - DB + HTTP knobs.** `DB_POOL_MAX`, `DB_POOL_ACQUIRE_TIMEOUT_MS`, `DB_POOL_IDLE_TIMEOUT_MS`, `DB_TX_MAX_WAIT_MS`, `DB_TX_TIMEOUT_MS`; `HTTP_REQUEST_TIMEOUT_MS`, `HTTP_HEADERS_TIMEOUT_MS`, `HTTP_KEEPALIVE_TIMEOUT_MS`, `HTTP_KEEPALIVE_TIMEOUT_BUFFER_MS`, `HTTP_JSON_BODY_LIMIT`, `HTTP_FORM_BODY_LIMIT`; `LOG_FLUSH_INTERVAL_MS`, `LOG_FLUSH_MAX_BUFFER`; `SCIM_DEFAULT_COUNT`, `SCIM_MAX_COUNT`. Closes **X15-F2** (`server.requestTimeout` + `server.headersTimeout` are never set today, so `REQUEST_TIMEOUT_MS` does not actually bound request duration - Node's implicit 300 s does - and `keepAliveTimeout` is wrongly coupled to it) and **X15-F3** (the Prisma v6 -> v7 driver-adapter migration silently dropped the pool acquire timeout; `pg` defaults `connectionTimeoutMillis: 0` = wait forever). `REQUEST_TIMEOUT_MS` is retained as a value-preserving legacy alias (X15 section 8.3). Independent of the JWKS stream, can land in parallel. Deps: W1.7a. Estimate: **M**. Risk: Low (behaviour change: the implicit 300 s request timeout becomes an explicit 120 s - CHANGELOG must call it out).
+- **W1.7c - `GET /scim/admin/runtime-config`.** Admin-authenticated, `Cache-Control: no-store`, returns every tier-1/tier-2 value with `effective` / `source` / `default` / `min` / `max` / `clamped` plus `invariantWarnings[]`. Contains no secrets by construction; the E2E key-allowlist assertion locks that. Deps: W1.7a. Estimate: **S**. Risk: Low.
+- **Regression locks (the X15 section 10 self-improvement).** A unit test asserting the `pg.Pool` options are **explicitly passed** (the general fix for the dependency-default-drift class that produced X15-F3), and a boot test proving an out-of-range env var yields a clamped effective value with `clamped: true`.
+
+**Wave 1 sequencing after X15:** W1.7a -> W1.5 -> W1.4 -> W1.2 -> W1.6 re-run, with W1.7b/W1.7c in parallel. Rationale in X15 section 8.4.
 
 ### Wave 2 - Structural seam (X12)
 
@@ -399,6 +418,7 @@ Per the standing DA-gate:
 ## 9. References
 
 - X11 perf: [../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)
+- X15 runtime tuning + configuration: [../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md)
 - X12 refactor: [AUTH_SOURCE_REFACTORING_ANALYSIS.md](AUTH_SOURCE_REFACTORING_ANALYSIS.md)
 - X10 standards: [AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)
 - SyncFabric guide (Phases -1..6, file-by-file Section 25, test strategy Section 23): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)
@@ -410,3 +430,4 @@ Per the standing DA-gate:
 |---|---|
 | 0.54.61 | This consolidated delivery plan (X13): interlocks the X11 perf, X12 refactor, and SyncFabric roadmap streams into one sequenced release train (Waves 0-6) with ~25 consolidated work items (each with goal/tasks/acceptance/deps/estimate/risk), a current-source state table, dependency + critical-path Mermaid diagrams, a relative-complexity estimate rollup (~119 core points), empirical gates, a per-item DoD contract, and the DA-gate disposition. Core sequencing rule: the X12 seam (W2) precedes RFC 8693 (W4) so new methods EXTEND not EDIT; the security hotfix (W0) ships first; the perf foundation (W1) de-risks all external-JWKS methods. Plan only - no runtime change. |
 | 0.54.63 | Operator-decision revision: **W0.1 secret redaction DECLINED** (`PERSIST_REQUEST_SECRETS` stays default true; runtime opt-out only), so Wave 0 is now just the 200/no-store + capability-truthful-metadata correctness items (15 -> 7 points, ~116 core). Added **W2.5** (consolidate the overlapping `PerEndpointCredentialsEnabled` legacy umbrella into the per-method flags + co-locate enablement with each method via the `AuthenticationMethod` model, so each `ResourceAuthenticator` owns `isEnabled()` and metadata derives from the same source) with a design answer on why co-locating enablement is good design. Cross-refs the delivered X14 copy/download-JSON drawer UI. |
+| 0.54.81 | **X15 runtime-tuning intake** ([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md)) folded into Wave 1. Added **W1.7** (runtime configuration surface: a/plumbing + bounds + effective-config boot log, b/DB + HTTP knobs, c/`GET /scim/admin/runtime-config`), taking Wave 1 from 24 to 36 points and core from 116 to 128. **W1.4 redesigned** to Microsoft's published signing-key algorithm (per-`kid` cache, 24 h TTL, 1 h background refresh, 5-min rate limit on unknown-`kid` refetch) with a hard constraint that the TTL raise ships with the refresher and an overlap-window rotation test. **W1.5 resequenced BEFORE W1.4** (build the deadline/caps safety envelope before the riskier cache change) and its caps ship configurable from birth. Two new findings scheduled into W1.7b: X15-F2 (`server.requestTimeout`/`headersTimeout` never set, keep-alive wrongly coupled to the request timeout) and X15-F3 (the Prisma v7 driver-adapter migration silently dropped the pool acquire timeout). |

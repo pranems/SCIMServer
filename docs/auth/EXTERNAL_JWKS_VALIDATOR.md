@@ -59,12 +59,35 @@ fetch still fails to a usable stale cache if present, otherwise fails closed.
 **Scope:** this hardening applies to the runtime token-mint fetch only, not the
 config-time discovery/verify paths.
 
+> **Open finding X15-F1 - the cache defaults contradict Entra's published guidance.**
+> The 2026-07-28 runtime-tuning audit
+> ([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) section 4.1)
+> compared the behaviour documented above against
+> [Microsoft's signing-key-rollover guidance](https://learn.microsoft.com/en-us/entra/identity-platform/signing-key-rollover)
+> for consumers of its own keys, and found four gaps:
+>
+> | Aspect | Entra guidance | This validator today |
+> |---|---|---|
+> | Cache TTL | 24 h | **10 min** (144x more aggressive) |
+> | Refresh mode | background job | **synchronous, on the mint hot path** |
+> | Refresh cadence | every 1 h | on expiry only (no proactive refresh) |
+> | Cache granularity | per `kid` | per `jwksUri` (whole key set) |
+> | Unknown-`kid` refetch | yes, **rate-limited to once per 5 min** | yes, **no rate limit** (guarantee 4 above) |
+> | On fetch failure | serve last-known-good | serve stale (guarantee 5 - already correct) |
+>
+> The 10-minute TTL is the direct cause of the periodic ~2,161 ms cold mint measured in
+> [../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md),
+> and the unrate-limited unknown-`kid` refetch is an amplification vector (a flood of
+> tokens carrying a bogus `kid` each triggers an outbound fetch). Both are owned by
+> **W1.4**, which the finding redesigns. **The TTL raise must not ship alone** - a 24 h
+> TTL without a working background refresher multiplies the key-rotation blast radius.
+
 ## Configuration
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `JWKS_HOST_ALLOWLIST` | (empty - all hosts rejected) | Comma-separated host allowlist for JWKS fetches. **Must** be set before WIF (Q6) can validate any assertion. e.g. `login.microsoftonline.com`. |
-| `JWKS_CACHE_MAX_AGE_MS` | `600000` (10 min) | Max age of a cached JWKS before a refetch. Per-endpoint override `JwksCacheMaxAgeMs`. |
+| `JWKS_CACHE_MAX_AGE_MS` | `600000` (10 min) | Max age of a cached JWKS before a refetch. Per-endpoint override `JwksCacheMaxAgeMs`. **X15-F1: the recommended value is `86400000` (24 h), but only once W1.4's background refresher and rate-limited unknown-`kid` path exist. Do not raise it on today's code.** |
 | `JWKS_FETCH_TIMEOUT_MS` | `5000` | Per-attempt runtime fetch timeout (ms). Per-endpoint override `JwksFetchTimeoutMs`. |
 | `JWKS_FETCH_RETRIES` | `2` | Retries for a failed runtime fetch (total tries = retries + 1). Per-endpoint override `JwksFetchRetries`. |
 | `JWKS_FETCH_RETRY_BACKOFF_MS` | `200` | Base retry backoff (ms), exponential + jitter. Per-endpoint override `JwksFetchRetryBackoffMs`. |

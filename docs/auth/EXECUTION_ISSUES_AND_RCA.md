@@ -429,6 +429,17 @@ availability risk, and that is a security decision for the operator, not a side-
 work. **Owner action:** decide whether a host revocation should purge that host's cache entries;
 if yes, it belongs with the W1.4 cache rework, not before it.
 
+**Update (2026-07-28, X15).** The runtime-tuning audit
+([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md),
+issue 12 in its section 6) raises the stakes on this decision: X15-F1 recommends taking
+`cacheMaxAgeMs` from 10 minutes to **24 hours** to match Microsoft's published guidance.
+The exposure window named above is bounded by `cacheMaxAgeMs`, so that change would widen
+it from 10 minutes to a full day. The two must therefore be decided **together** inside
+W1.4, not sequentially. A middle option now exists that did not before: make an **SSRF
+rejection specifically non-stale-eligible** (distinct from a network failure, which stays
+stale-eligible), which purges nothing and keeps the availability property for real outages
+while closing the revocation window. That is the recommended resolution.
+
 ---
 
 ## 11. Reference
