@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable, Inject, Optional, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
@@ -52,13 +52,30 @@ interface JwksCacheEntry {
  * a runtime `import()` rather than a `require()`.
  */
 @Injectable()
-export class ExternalJwksValidatorService {
+export class ExternalJwksValidatorService implements OnModuleInit {
   private readonly hostAllowlist: Set<string>;
   /** SERVER-level egress defaults (env-driven); endpoint overrides layer on top. */
   private readonly serverEgress: EgressPolicy;
   private readonly cache = new Map<string, JwksCacheEntry>();
   /** G3 single-flight: coalesce concurrent fetches for the same jwksUri. */
   private readonly inflight = new Map<string, Promise<unknown>>();
+  /**
+   * W1.1 - memoized `jose` module. The import is kicked off at boot by
+   * `onModuleInit` so the FIRST token mint after a restart does not pay the
+   * ESM module load on the hot path (measured as part of the ~2.1s cold mint
+   * in the X11 latency analysis).
+   */
+  private josePromise?: Promise<typeof import('jose')>;
+  /**
+   * W1.3 - the canonical URL a configured `jwksUri` redirected to, remembered
+   * after the first successful fetch. A trust that stores the legacy
+   * `login.windows.net` host pays a redirect hop on EVERY cold fetch
+   * (measured ~130-160ms); remembering the target removes it from all
+   * subsequent fetches. The remembered target is re-validated against the
+   * SSRF allowlist on every use, so this is a latency shortcut ONLY - it can
+   * never widen what the fetcher is allowed to reach.
+   */
+  private readonly resolvedUri = new Map<string, string>();
 
   constructor(
     private readonly config: ConfigService,
@@ -71,6 +88,34 @@ export class ExternalJwksValidatorService {
       raw.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     );
     this.serverEgress = resolveServerEgressDefaults((k) => this.config.get<string>(k));
+  }
+
+  /**
+   * W1.1 - warm the ESM `jose` import at boot. Deliberately non-fatal: if the
+   * pre-load fails the service still works (the next `verify` retries the
+   * import), so a transient module-resolution problem can never break startup.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.loadJose();
+    } catch (err) {
+      this.logger.warn(LogCategory.AUTH, 'jose pre-load failed (non-fatal; will load on first use)', {
+        reason: (err as Error)?.message,
+      });
+    }
+  }
+
+  /** True once the `jose` module has been successfully pre-loaded. */
+  isJoseLoaded(): boolean {
+    return this.josePromise !== undefined;
+  }
+
+  /** Memoized `jose` import - one module load per process, not per mint. */
+  private loadJose(): Promise<typeof import('jose')> {
+    if (!this.josePromise) {
+      this.josePromise = import('jose');
+    }
+    return this.josePromise;
   }
 
   /**
@@ -90,7 +135,7 @@ export class ExternalJwksValidatorService {
     this.assertJwksUriAllowed(jwksUri);
     const policy = mergeEgressPolicy(this.serverEgress, egressOverrides);
 
-    const jose = await import('jose');
+    const jose = await this.loadJose();
     const kid = this.peekKid(token);
 
     // Try the cached key set first; refetch on a cache miss / unknown kid.
@@ -209,7 +254,14 @@ export class ExternalJwksValidatorService {
   /** A single fetch attempt: timeout-bounded, redirects followed + re-validated. */
   private async fetchJwksOnce(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
     const doFetch = this.fetchFn ?? globalThis.fetch;
-    let current = jwksUri;
+    // W1.3 - start from the canonical target this URI previously resolved to,
+    // so a legacy host's redirect hop is paid once per process instead of on
+    // every cold fetch. Re-validated below on every hop, including this one.
+    const remembered = this.resolvedUri.get(jwksUri);
+    let current = remembered ?? jwksUri;
+    if (remembered) {
+      this.assertJwksUriAllowed(current);
+    }
     for (let hop = 0; hop <= MAX_JWKS_REDIRECTS; hop++) {
       const res = await doFetch(current, {
         // G1 - abort a hung IdP rather than blocking the token mint.
@@ -235,6 +287,10 @@ export class ExternalJwksValidatorService {
       }
       if (!res.ok) {
         throw new Error(`JWKS fetch returned HTTP ${status ?? 'error'}.`);
+      }
+      // W1.3 - remember where this URI actually resolved to (only when it moved).
+      if (current !== jwksUri) {
+        this.resolvedUri.set(jwksUri, current);
       }
       return await res.json();
     }

@@ -237,6 +237,100 @@ describe('ExternalJwksValidatorService - runtime egress robustness', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('https://login.microsoftonline.com/keys');
   });
 
+  // `getFreshCached` treats an entry as fresh while `elapsed <= maxAge`, so with
+  // maxAge=0 a second call in the SAME millisecond is still a cache hit. These
+  // W1.3 tests need a genuinely cold second fetch, so they let a few ms pass.
+  const elapse = () => new Promise((r) => setTimeout(r, 5));
+
+  it('W1.3: the resolved redirect target is remembered, so a later cold fetch skips the hop', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest
+      .fn()
+      // first cold fetch: legacy host -> 302 -> canonical host
+      .mockResolvedValueOnce(redirect('https://login.microsoftonline.com/keys'))
+      .mockResolvedValueOnce(ok(fx.jwks))
+      // second cold fetch (cache expired): must go STRAIGHT to the canonical host
+      .mockResolvedValue(ok(fx.jwks));
+    // cacheMaxAgeMs=0 (+ elapsed time) forces every verify to be a cold fetch.
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_FETCH_RETRY_BACKOFF_MS: '0', JWKS_CACHE_MAX_AGE_MS: '0' }),
+      logger,
+      fetchMock as any,
+    );
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+
+    await svc.verify(token, 'https://idp.example.com/keys');
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 302 + follow
+
+    await elapse();
+    fetchMock.mockClear();
+    await svc.verify(token, 'https://idp.example.com/keys');
+
+    // The redirect hop is NOT paid again - one request, straight to the target.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://login.microsoftonline.com/keys');
+  });
+
+  it('W1.3: a remembered target is still re-validated against the SSRF allowlist on every use', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(redirect('https://login.microsoftonline.com/keys'))
+      .mockResolvedValue(ok(fx.jwks));
+    // A mutable allowlist so the canonical host can be revoked AFTER it has
+    // been remembered - this is the case that proves the shortcut cannot widen
+    // what the fetcher may reach.
+    let canonicalAllowed = true;
+    const allowlistStub = {
+      isAllowed: (host: string) =>
+        host === 'idp.example.com' || (host === 'login.microsoftonline.com' && canonicalAllowed),
+    };
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_FETCH_RETRY_BACKOFF_MS: '0', JWKS_CACHE_MAX_AGE_MS: '0' }),
+      logger,
+      fetchMock as any,
+      allowlistStub as any,
+    );
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+
+    await svc.verify(token, 'https://idp.example.com/keys');
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 302 + follow (now remembered)
+
+    // Revoke the canonical host. The REMEMBERED target must be re-checked, so
+    // NO request may go out to it. (The verify itself still succeeds: the
+    // pre-existing fail-to-stale path returns the keys already fetched while
+    // the host WAS allowed - allowlist revocation does not retroactively
+    // invalidate cached keys. That is existing behaviour, unchanged by W1.3.)
+    await elapse();
+    canonicalAllowed = false;
+    fetchMock.mockClear();
+    await svc.verify(token, 'https://idp.example.com/keys', { retries: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('W1.1: onModuleInit pre-loads jose so the first mint does not pay the module import', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest.fn().mockResolvedValue(ok(fx.jwks));
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+
+    await expect(svc.onModuleInit()).resolves.toBeUndefined();
+    expect(svc.isJoseLoaded()).toBe(true);
+
+    // ...and verification still works normally afterwards.
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+    const res = await svc.verify(token, 'https://idp.example.com/keys');
+    expect(res.payload.iss).toBe('a');
+  });
+
+  it('W1.1: a failed pre-load is non-fatal (boot must never break on it)', async () => {
+    const fetchMock = jest.fn();
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+    // Force the loader to fail once; onModuleInit must swallow it.
+    jest.spyOn(svc as unknown as { loadJose: () => Promise<unknown> }, 'loadJose')
+      .mockRejectedValueOnce(new Error('module resolution failed'));
+    await expect(svc.onModuleInit()).resolves.toBeUndefined();
+  });
+
   it('G3 single-flight: concurrent verifies for the same URI fetch once', async () => {
     const fx = await makeRsaKey('kid-1');
     let release: (() => void) | undefined;

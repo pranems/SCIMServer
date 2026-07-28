@@ -360,9 +360,7 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ---
 
-## 9. Wave 3 addendum (RFC 7523 correctness: W3.2 + W3.4, 2026-07-24)
-
-> **Scope.** Sections 1-8 cover the 11-step WIF build + its integration tail. This addendum captures the (low-severity) frictions from the Wave 3 correctness items - **W3.2** (issued-token identity separation, v0.54.76) and **W3.4** (RFC 8707 resource policy, v0.54.77) - plus the getLog-parity fix (v0.54.75). Per the standing RCA-ledger rule, every issue of every type is recorded, numbered I-20+.
+## 9. Wave 3 addendum (RFC 7523 correctness: W3.2 + W3.4, 2026-07-24)> **Scope.** Sections 1-8 cover the 11-step WIF build + its integration tail. This addendum captures the (low-severity) frictions from the Wave 3 correctness items - **W3.2** (issued-token identity separation, v0.54.76) and **W3.4** (RFC 8707 resource policy, v0.54.77) - plus the getLog-parity fix (v0.54.75). Per the standing RCA-ledger rule, every issue of every type is recorded, numbered I-20+.
 
 ### 10.1 Addendum dashboard
 
@@ -398,7 +396,42 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ---
 
-## 10. Reference
+## 10. Wave 1 addendum (perf foundation, 2026-07-28)
+
+### 10.1 I-22 (Low, T3) - a zero max-age cache is NOT stale within the same millisecond
+
+- **Symptom.** Two new W1.3 tests were intermittently failing (1-2 failures per run, varying).
+  They set `JWKS_CACHE_MAX_AGE_MS=0` expecting every `verify()` to be a cold fetch, but the second
+  fetch was sometimes served from cache.
+- **Root cause.** `getFreshCached` treats an entry as fresh while `Date.now() - fetchedAt > maxAge`
+  is FALSE. With `maxAge = 0`, a second call in the SAME millisecond gives `0 > 0` = false, i.e. a
+  cache HIT. Whether the test passed depended on how many milliseconds the surrounding crypto took.
+- **Fix.** The tests now let ~5ms elapse before the second verify. The production semantics were
+  left alone deliberately: changing the comparison to `>=` to make `maxAge=0` mean "never cache"
+  would be a behaviour change in a security-adjacent path made solely to suit a test.
+- **Prevention.** When a test needs a boundary condition ("expired", "stale", "just past the
+  limit"), assert it by CROSSING the boundary, never by sitting exactly on it. A test parked on an
+  inclusive/exclusive boundary is a coin flip whose bias is set by unrelated code speed.
+
+### 10.2 Observation (not a defect) - allowlist revocation does not invalidate cached JWKS
+
+While writing the W1.3 re-validation test, the harness surfaced this existing behaviour: if a host
+is removed from `JWKS_HOST_ALLOWLIST` **after** its keys were cached, `verify()` still succeeds
+until the cache entry ages out. The remembered redirect target IS re-validated - no request is
+issued to the revoked host - but `fetchJwksWithRetry`'s **fail-to-stale** path then returns the
+previously-cached keys rather than propagating the SSRF rejection.
+
+This is arguably correct (the keys were obtained legitimately while the host was trusted, and
+failing closed on every allowlist edit would be an outage risk), and it is **unchanged by W1.3** -
+the shortcut can never widen what the fetcher reaches. It is recorded here rather than silently
+"fixed", because tightening it means choosing an exposure window (up to `cacheMaxAgeMs`) over an
+availability risk, and that is a security decision for the operator, not a side-quest inside perf
+work. **Owner action:** decide whether a host revocation should purge that host's cache entries;
+if yes, it belongs with the W1.4 cache rework, not before it.
+
+---
+
+## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)
 - Self-improvement + gate discipline: [.github/copilot-instructions.md](../../.github/copilot-instructions.md)

@@ -144,21 +144,24 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Tasks: `import('jose')` in `onModuleInit` + warm one throwaway verify.
 - Acceptance: first WIF mint after restart does not pay the module load; measured first-mint drops by the jose-load component.
 - Deps: none. Estimate: **S**. Risk: Low.
-
+- **Status: DELIVERED - api v0.54.81.** Memoized `jose` import warmed by a non-fatal `onModuleInit` (a failed pre-load logs and falls back to loading on first use, so it can never break startup).
 **W1.2 - Startup JWKS + DB pool pre-warm** `[X11 C]`
 - Tasks: enumerate registered trust `jwksUri` at boot + on trust create; prefetch; warm the Prisma pool.
 - Acceptance: first mint after deploy is a warm cache hit (tens of ms) in a live-test.
 - Deps: W1.4 cache. Estimate: **M**. Risk: Low.
+- **Note (2026-07-28 source audit):** the Prisma pool half is already done - `PrismaService.onModuleInit` connects at startup (pool max 5). Only the JWKS prefetch remains.
 
 **W1.3 - Canonical `jwks_uri` (drop the redirect)** `[X11 D]`
 - Tasks: store/resolve the canonical `login.microsoftonline.com` (or discovery `jwks_uri`) instead of legacy `login.windows.net`; cache the resolved URL.
 - Acceptance: cold fetch is one hop; ~130-160 ms saved per cold fetch (measured).
 - Deps: none. Estimate: **S**. Risk: Low.
+- **Status: DELIVERED - api v0.54.81.** Implemented as a RUNTIME resolution memo rather than a config rewrite: the canonical target a `jwksUri` redirects to is remembered per process, so the hop is paid once instead of on every cold fetch, and no stored trust data has to be migrated. The remembered target is re-validated against the SSRF allowlist on every use.
 
 **W1.4 - Background JWKS refresh-ahead + honor Cache-Control + hard-stale** `[X11 A + guide 25.2]`
 - Tasks: refresh timer at ~60% of TTL; `maxAge = min(JWKS_CACHE_MAX_AGE_MS, response Cache-Control)`; separate fresh age from a hard stale-if-error age; atomic cache swap; keep single-flight + serve-stale.
 - Acceptance: steady-state hot path is always a cache hit (no periodic 10-min cold); hard-stale rejection test; Cache-Control honored test.
 - Deps: none. Estimate: **L**. Risk: Medium (key-rotation correctness - overlap window test required).
+- **Note (2026-07-28 source audit):** single-flight coalescing (`inflight` map) and serve-stale-on-error already exist, so this item is only the background refresh + Cache-Control + hard-stale age. It also owns the open question in [EXECUTION_ISSUES_AND_RCA.md](EXECUTION_ISSUES_AND_RCA.md) section 10.2 (should an allowlist revocation purge that host's cached keys?).
 
 **W1.5 - JWKS total deadline + response caps** `[guide 25.2 + X11 H]`
 - Tasks: one cancellable total deadline across trust-selection + redirects + retries + backoff; response byte cap, key-count cap, key-size/type checks, cache-entry + trust-count cardinality caps.
@@ -169,6 +172,7 @@ doc + INDEX + CHANGELOG + version bump + DA-gate disposition.
 - Tasks: live-test `9z-BW` - seed a WIF trust, warm once, time N mints; assert warm median < 150 ms and (post W1.1-W1.2) cold-first < 300 ms.
 - Acceptance: gate runs local + Docker + Azure dev; fails on a regression to the cold path.
 - Deps: W1.1-W1.4. Estimate: **S**. Risk: Low.
+- **Status: DELIVERED - api v0.54.81.** Landed in [scripts/wif-e2e-proof.ps1](../../scripts/wif-e2e-proof.ps1) (Stage 8), not `live-test.ps1`, because the proof harness is the only place with a REAL Entra assertion to mint from. 7 samples, median, configurable `-MintLatencyBudgetMs`. Cold-first is deliberately NOT asserted: the JWKS cache is process-wide per `jwksUri`, so whether a run starts cold depends on what else already hit that IdP on that replica - a cold assertion would be a flake generator.
 
 ### Wave 2 - Structural seam (X12)
 

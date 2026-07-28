@@ -57,6 +57,7 @@ param(
     [string] $AppId = $env:WIF_TEST_APPID,
     [string] $TenantId = $env:WIF_TEST_TENANT,
     [string] $ClientSecret = $env:WIF_TEST_SECRET,
+    [int] $MintLatencyBudgetMs = 400,
     [switch] $KeepArtifacts
 )
 
@@ -464,8 +465,42 @@ Test-Result -Success ($ocAt2.Payload.auth_method -eq 'client_secret') -Message "
 Test-Result -Success (-not $ocAt2.Payload.PSObject.Properties.Name.Contains('source_tid')) -Message "S7.T18 (W3.8): client-credentials AT2 carries NO source_* claims (nothing federated to attribute)"
 try { Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints/$($epO.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
 
-# ─────────────────────────────────────────────────────────────────────────────
-if (-not $KeepArtifacts) {
+# ─────────────────────────────────────────────────────────────────────────────Write-Section "STAGE 8: WARM MINT LATENCY (W1.6 perf gate)"
+# ────────────────────────────────────────────────────────────────────────
+# The X11 analysis measured the SAME mint at ~2,161ms cold vs ~92ms warm, and
+# the JWKS fetch sits synchronously on the mint path with a 10-minute cache and
+# no background refresh - so roughly every 10 minutes a real caller pays the
+# cold cost. This gate locks the WARM path: a regression that puts a network
+# fetch (or an ESM module load) back on every mint shows up immediately.
+# Cold-start timing is deliberately NOT asserted here: the JWKS cache is
+# process-wide per jwksUri, so whether a given run starts cold depends on what
+# else has already hit that IdP on that replica.
+
+$latencySamples = @()
+try {
+    # Warm once (not measured) so the JWKS + trust lookups are cached.
+    Invoke-RestMethod -Uri $tokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+        grant_type = "client_credentials"; client_id = "scim-wif-client-proof"
+        client_assertion = $assertion; client_assertion_type = $JWT_BEARER } | Out-Null
+
+    foreach ($n in 1..7) {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        Invoke-RestMethod -Uri $tokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_id = "scim-wif-client-proof"
+            client_assertion = $assertion; client_assertion_type = $JWT_BEARER } | Out-Null
+        $sw.Stop()
+        $latencySamples += [int]$sw.ElapsedMilliseconds
+    }
+
+    $sorted = $latencySamples | Sort-Object
+    $median = $sorted[[math]::Floor($sorted.Count / 2)]
+    Write-Host ("warm mint latency ms: min={0} median={1} max={2}  (samples: {3})" -f $sorted[0], $median, $sorted[-1], ($latencySamples -join ', ')) -ForegroundColor Gray
+    Test-Result -Success ($median -le $MintLatencyBudgetMs) -Message "S8.T1 (W1.6): warm WIF mint median ${median}ms is within the ${MintLatencyBudgetMs}ms budget"
+} catch {
+    Test-Result -Success $false -Message "S8.T1 (W1.6): mint latency stage threw: $($_.Exception.Message)"
+}
+
+# ────────────────────────────────────────────────────────────────────────if (-not $KeepArtifacts) {
     Write-Section "STAGE 8: cleanup"
     try { Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints/$epId" -Method DELETE -Headers $headers | Out-Null; Write-Host "deleted endpoint $epId" } catch {}
 }
