@@ -34,6 +34,8 @@
 > **v0.54.80 closes the last one.** [F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium---fixed-in-v05480-w31)
 > shipped as the right-sized **W3.1**: per-variation profile routing, which is also the exact seam
 > Wave 4 (RFC 8693) extends. **All 8 findings from the original proof run are now closed and gated.**
+> Re-verified on dev v0.54.80 with a fresh real Entra app: **49/49 passed, 0 findings**. Live-test
+> regression: **1329/1329**.
 
 ---
 
