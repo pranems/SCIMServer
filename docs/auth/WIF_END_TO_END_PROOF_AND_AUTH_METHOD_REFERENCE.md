@@ -21,6 +21,15 @@
 > The 6h-TTL overrun measured **+18,002s before** the fix and **-1s after** it; a wrong form
 > `client_id` now returns `401 wif_client_id_mismatch` while a request with no `client_id` still
 > mints (backward compatible). Full live-test regression on the same build: **1327/1327**.
+>
+> **v0.54.79 closes three more:** [F3](#f3-at2-omits-the-guide-134-provenance-claims-medium---fixed-in-v05479-w38) +
+> [F4](#f4-at2-has-no-jti-medium---fixed-in-v05479-w38) (AT2 now carries `auth_method`,
+> `source_tid` / `source_oid` / `source_azp` and a unique `jti`) as **W3.8**, and
+> [F5](#f5-connection-info-projects-the-assertion-subject-as-the-entra-client-identifier-medium---fixed-in-v05479-w39)
+> (connection-info shows the OAuth client identity, with the assertion subject as its own field) as
+> **W3.9**. Re-verified on dev v0.54.79 with a fresh real Entra app: **47/47 passed, 1 finding
+> remaining** ([F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium), which is the W3.1 /
+> Wave 4 per-variation routing item). Live-test regression: **1329/1329**.
 
 ---
 
