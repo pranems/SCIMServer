@@ -326,7 +326,7 @@ When enabled, validates that extension URNs present in the request body are also
 flowchart TD
     A[Incoming POST/PUT] --> B{StrictSchemaValidation?}
     B -->|true| C{Extension data in body?}
-    C -->|Yes| D{URN in schemas[] array?}
+    C -->|Yes| D{"URN in schemas[] array?"}
     D -->|Yes| E[Allow]
     D -->|No| F[400 invalidValue<br>Extension URN missing from schemas]
     C -->|No| E

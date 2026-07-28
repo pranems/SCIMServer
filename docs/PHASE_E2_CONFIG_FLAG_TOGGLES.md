@@ -55,7 +55,7 @@ We use an inline MessageBar instead of a Fluent Toaster because the tab is a foc
 ```mermaid
 flowchart TB
   subgraph Tab[SettingsTab]
-    H[Subtitle1: "Endpoint Configuration"]
+    H["Subtitle1: #quot;Endpoint Configuration#quot;"]
     FB{feedback?}
     FB -->|success| MS[MessageBar intent=success]
     FB -->|error| ME[MessageBar intent=error]

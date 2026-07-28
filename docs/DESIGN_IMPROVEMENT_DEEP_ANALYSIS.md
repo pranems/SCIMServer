@@ -945,7 +945,7 @@ Based on recurring design patterns and trade-offs identified in this audit, the 
 | | | | |
 | **Overall** | **78%** | **B+** | Strong domain architecture + RFC compliance. Security debt + duplication are the main risks. |
 
-```mermaid
+```text
 %%{init: {'theme': 'default'}}%%
 radar
     title SCIMServer v0.40.0 - Quality Radar
@@ -960,6 +960,21 @@ radar
     "Maintainability" : 72
     "Documentation" : 85
 ```
+
+**SCIMServer v0.40.0 - Quality Radar (same axis/value pairs as the block above):**
+
+| Radar axis | Value |
+|---|---:|
+| RFC Compliance | 93 |
+| Security | 60 |
+| SOLID | 65 |
+| DRY | 55 |
+| Data Integrity | 80 |
+| DTO Validation | 65 |
+| TypeScript | 95 |
+| Testing | 92 |
+| Maintainability | 72 |
+| Documentation | 85 |
 
 ---
 

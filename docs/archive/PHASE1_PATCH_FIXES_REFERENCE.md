@@ -59,7 +59,7 @@ sequenceDiagram
     
     Interceptor->>Express: response.headersSent?
     Express-->>Interceptor: false
-    Interceptor->>Express: setHeader('Content-Type',<br/>'application/scim+json; charset=utf-8')
+    Interceptor->>Express: setHeader('Content-Type',<br/>'application/scim+json#59; charset=utf-8')
     Express-->>Client: HTTP 200 with correct Content-Type
 ```
 
@@ -393,7 +393,7 @@ flowchart LR
     end
 
     subgraph "Prisma $transaction"
-        TX["scimGroup.update({<br/>  displayName: 'Renamed Team',<br/>  rawPayload: '{\"externalId\": \"GRP-EXT-42\"}'<br/>})"]
+        TX["scimGroup.update({<br/>  displayName: 'Renamed Team',<br/>  rawPayload: '{#quot;externalId#quot;: #quot;GRP-EXT-42#quot;}'<br/>})"]
     end
 
     V1 -->|"Extracted as displayName"| DB1

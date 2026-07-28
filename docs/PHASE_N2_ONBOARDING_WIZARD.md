@@ -113,7 +113,7 @@ sequenceDiagram
     Wizard->>Operator: title + Skip + Get started buttons
     alt Skip
         Operator->>Wizard: click Skip
-        Wizard->>Wizard: markOnboardingComplete (dismiss; never shown again)
+        Wizard->>Wizard: markOnboardingComplete (dismiss#59; never shown again)
     else Get started
         Operator->>Wizard: click Get started
         Wizard->>Wizard: setStep(2)
@@ -125,7 +125,7 @@ sequenceDiagram
     Operator->>Wizard: click Next
     Wizard->>useCreateEndpoint: mutateAsync(name='onboarding-{stamp}', preset=picked)
     useCreateEndpoint-->>Wizard: { id, ... }
-    Wizard->>Wizard: setCreatedEndpointId; setStep(3)
+    Wizard->>Wizard: setCreatedEndpointId#59; setStep(3)
 
     Note over Wizard: Step 3 - Issue Credential
     Wizard->>Operator: render Issue button

@@ -25,7 +25,7 @@ intentionally not yet wired into chrome (see "Deferred" below).
 ```mermaid
 flowchart LR
   subgraph Storage
-    LS[localStorage<br/>scimserver.preferences.v1<br/>{v:1, prefs:{...}}]
+    LS["localStorage<br/>scimserver.preferences.v1<br/>{v:1, prefs:{...}}"]
   end
   subgraph Store
     PS[preferences-store.ts<br/>Zustand atom]
@@ -51,10 +51,10 @@ flowchart LR
   GT -->|defaultPageSize selector| PS
   LT -->|defaultPageSize selector| PS
   AT -->|defaultPageSize selector| PS
-  UR -->|getState\(\).defaultPageSize| PS
-  GR -->|getState\(\).defaultPageSize| PS
-  LR -->|getState\(\).defaultPageSize| PS
-  AR -->|getState\(\).defaultPageSize| PS
+  UR -->|"getState().defaultPageSize"| PS
+  GR -->|"getState().defaultPageSize"| PS
+  LR -->|"getState().defaultPageSize"| PS
+  AR -->|"getState().defaultPageSize"| PS
 ```
 
 ## Module Map

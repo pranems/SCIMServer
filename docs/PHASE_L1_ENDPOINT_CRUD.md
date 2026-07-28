@@ -38,8 +38,8 @@ flowchart LR
         UDE[useDeleteEndpoint<br/>onSettled: invalidate endpoints.all + remove detail/overview]
         UP[usePresets, usePresetDetail<br/>thin useQuery wrappers]
 
-        WIZ[/endpoints/new<br/>4-step Wizard]
-        EDIT[/endpoints/$id/edit<br/>Form]
+        WIZ["/endpoints/new<br/>4-step Wizard"]
+        EDIT["/endpoints/$id/edit<br/>Form"]
         DEL[DeleteEndpointDialog<br/>type-name-to-confirm safety]
         DETAIL[EndpointDetailPage header<br/>Edit + Delete buttons]
 
@@ -123,7 +123,7 @@ sequenceDiagram
     else 400 duplicate name
         API-->>H: 400 BadRequest (uniqueness)
         H-->>W: ScimApiError(400)
-        W->>U: <ScimErrorMessage> in Step 4 panel; user goes back to Step 1
+        W->>U: <ScimErrorMessage> in Step 4 panel#59; user goes back to Step 1
     end
 ```
 

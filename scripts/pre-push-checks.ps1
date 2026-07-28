@@ -180,6 +180,21 @@ Invoke-Gate -Name 'web: vite production build' -WorkingDir (Join-Path $repoRoot 
     npm run build 2>&1 | Out-Host
 }
 
+# Docs: every ```mermaid block must PARSE. A Mermaid syntax error does not fail
+# any build - it silently renders as an error box (or nothing) in the VS Code
+# preview and on GitHub, so a broken diagram is invisible until a human opens
+# the doc. This gate is the durable fix for the recurring "I cannot see the
+# diagrams" problem. Skips (does not fail) when the tooling deps are absent, so
+# a fresh clone that has not run `npm install` at the repo root is not blocked.
+Invoke-Gate -Name 'docs: mermaid diagrams parse' -WorkingDir $repoRoot -Action {
+    if (-not (Test-Path (Join-Path $repoRoot 'node_modules/mermaid'))) {
+        Write-Host "Skipped (run 'npm install' at the repo root to enable this gate)" -ForegroundColor Yellow
+        $global:LASTEXITCODE = 0
+        return
+    }
+    node scripts/validate-mermaid.mjs 2>&1 | Out-Host
+}
+
 # -------------------------------------------------------------------------
 # Validate gates (mirror CI validate job)
 # -------------------------------------------------------------------------

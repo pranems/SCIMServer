@@ -33,21 +33,21 @@ collector + a debug surface; Phase O wires it to durable storage.
 ```mermaid
 flowchart LR
   subgraph Sources
-    R[TanStack Router\nsubscribe('onResolved')]
+    R["TanStack Router\nsubscribe('onResolved')"]
     W1[window 'error']
     W2[window 'unhandledrejection']
   end
   subgraph Collector["telemetry-collectors.ts (boot-time wire)"]
-    BC[bootstrapTelemetryCollectors&#40;router&#41;]
+    BC["bootstrapTelemetryCollectors&#40;router&#41;"]
   end
   subgraph Store["telemetry-store.ts (Zustand)"]
-    TS[useTelemetryStore\nring &le; 50 evt &middot; TTL 24h]
+    TS["useTelemetryStore\nring &le; 50 evt &middot; TTL 24h"]
   end
   subgraph Gate["preferences-store.ts"]
-    P[telemetryOptIn\n&#40;persisted localStorage&#41;]
+    P["telemetryOptIn\n&#40;persisted localStorage&#41;"]
   end
   subgraph UI["SettingsPage.tsx"]
-    TC[TelemetryCard\n&#40;opt-in switch + last 10 + clear&#41;]
+    TC["TelemetryCard\n&#40;opt-in switch + last 10 + clear&#41;"]
   end
   R --> BC
   W1 --> BC

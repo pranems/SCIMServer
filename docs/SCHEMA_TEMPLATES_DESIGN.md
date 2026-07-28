@@ -108,7 +108,7 @@ graph TB
     end
 
     subgraph "New: 1 API, 1 Field"
-        E[POST /admin/endpoints<br/>{ name, profilePreset? }] --> EP2[(Endpoint.profile JSONB)]
+        E["POST /admin/endpoints<br/>{ name, profilePreset? }"] --> EP2[(Endpoint.profile JSONB)]
         F[POST /admin/.../credentials] --> EC2[(EndpointCredential)]
     end
 
