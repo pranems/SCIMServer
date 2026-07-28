@@ -1,12 +1,13 @@
 # WIF end-to-end proof + auth-method reference (real Entra evidence)
 
-> **Status:** Proven against **api v0.54.77** on the Azure dev deployment, 2026-07-27, using a
-> **real Microsoft Entra application registration** in tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373`.
+> **Status:** Proven against the Azure dev deployment using a **real Microsoft Entra application
+> registration** in tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373`. First run 2026-07-27 against
+> **api v0.54.77**; re-verified after each fix, most recently against **api v0.54.80** (2026-07-28).
 > Every request, response, header and decoded token in this document is a **verbatim capture** from
-> that run - nothing here is illustrative or hand-written. Harness:
-> [scripts/wif-e2e-proof.ps1](../../scripts/wif-e2e-proof.ps1). Raw log: `test-results/wif-proof-dev.log`.
+> those runs - nothing here is illustrative or hand-written. Harness:
+> [scripts/wif-e2e-proof.ps1](../../scripts/wif-e2e-proof.ps1). Raw logs under `test-results/`.
 >
-> **Result: 39/39 assertions passed, 8 gap findings recorded.** WIF works end to end today -
+> **Result of the FIRST run (v0.54.77): 39/39 assertions passed, 8 gap findings recorded.** WIF works end to end today -
 > config setup, trust establishment, token mint, and real SCIM resource provisioning - and the
 > Wave 3 (W3.2 + W3.4) changes are confirmed correct on the wire against a genuine
 > Microsoft-signed assertion. The 8 findings are the remaining delta to the SyncFabric guide.
@@ -33,9 +34,12 @@
 >
 > **v0.54.80 closes the last one.** [F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium---fixed-in-v05480-w31)
 > shipped as the right-sized **W3.1**: per-variation profile routing, which is also the exact seam
-> Wave 4 (RFC 8693) extends. **All 8 findings from the original proof run are now closed and gated.**
-> Re-verified on dev v0.54.80 with a fresh real Entra app: **49/49 passed, 0 findings**. Live-test
-> regression: **1329/1329**.
+> Wave 4 (RFC 8693) extends. **All six code-level findings (F1-F6) are now closed and gated by the
+> harness.** Two remain open by design: [F7](#f7-azp-and-oid-are-present-but-not-enforced-medium)
+> (`azp` / `oid` enforcement) is blocked on a first-party assertion capture and belongs to W5.2, and
+> [F8](#f8-expectedaudience-is-easy-to-misconfigure-low-documentation) is a documentation item that
+> this document itself addresses. Re-verified on dev v0.54.80 with a fresh real Entra app:
+> **49/49 passed, 0 harness-detectable findings**. Live-test regression: **1329/1329**.
 
 ---
 
@@ -70,7 +74,7 @@ flowchart LR
         SP["Service principal<br/>oid d085870e-..."]
         JWKS["JWKS<br/>login.microsoftonline.com/.../discovery/v2.0/keys"]
     end
-    subgraph DEV["SCIMServer dev (Azure Container Apps, v0.54.77, prisma)"]
+    subgraph DEV["SCIMServer dev (Azure Container Apps, prisma backend)"]
         TOK["POST /scim/endpoints/:id/oauth/token"]
         VAL["WifAssertionValidatorService"]
         SCIM["/scim/v2/endpoints/:id/Users|Groups"]
@@ -123,7 +127,7 @@ exact Entra field names, the enablement flag that gates it, and its implementati
 | 1 | **Global shared secret** (bearer) | *Secret Token* | **Tenant URL**, **Secret Token** (= `SCIM_SHARED_SECRET`) | `SharedSecretBearerAuthEnabled` | Shipped |
 | 2 | **Per-endpoint bearer** (secret token) | *Secret Token* | **Tenant URL**, **Secret Token** (the one-time `token`) | `SecretTokenBearerAuthEnabled` | Shipped |
 | 3 | **Per-endpoint OAuth2 client credentials** | *OAuth2 client credentials grant* | **Tenant URL**, **Token Endpoint**, **Client Identifier**, **Client Secret** | `OAuthClientCredentialsAuthEnabled` | Shipped ([Section 7.5](#75-the-sibling-method-oauth2-client-credentials)) |
-| 4 | **WIF / RFC 7523 `jwt-bearer`** | *Workload Identity based authentication* | **Tenant URL**, **Token Endpoint**, **Client identifier** (see [F5](#f5-connection-info-projects-the-assertion-subject-as-the-entra-client-identifier-medium)) | `WifCredentialsEnabled` | **Shipped + proven here** |
+| 4 | **WIF / RFC 7523 `jwt-bearer`** | *Workload Identity based authentication* | **Tenant URL**, **Token Endpoint**, **Client identifier** (the trust's `targetClientId`, per [F5](#f5-connection-info-projects-the-assertion-subject-as-the-entra-client-identifier-medium---fixed-in-v05479-w39)) | `WifCredentialsEnabled` | **Shipped + proven here** |
 | 5 | **WIF / RFC 8693 token exchange** | (SyncFabric-internal; no `client_id` sent) | n/a - SyncFabric config, not an Entra blade field | `WifCredentialsEnabled` | **Wave 4 - not implemented** |
 | 6 | `private_key_jwt` / mTLS / DPoP | n/a | n/a | n/a | Wave 6.2 - future track |
 
@@ -345,8 +349,9 @@ The **real** response (note: `201`, and **no secret material anywhere**):
 | `allowedTenantId` | The `tid` the assertion must carry | Exact string match | Yes |
 | `requiredRoles` | App roles expected in `roles` | **Advisory** unless `roleEnforcement: "enforce"` | No |
 | `scope` | The scope SCIMServer grants in AT2 | Admin-trusted, used verbatim | No |
-| `issuedTokenTtlSec` | Requested AT2 lifetime | Clamped to 3600-21600 (see [F1](#f1-at2-outlives-the-assertion-that-authorized-it-high)) | No |
-| `targetClientId` | **(W3.2)** the OAuth `client_id` AT2 is minted as | Not validated against the request (see [F2](#f2-the-form-client_id-is-not-bound-to-the-trust-high)) | No - defaults to the endpointId |
+| `issuedTokenTtlSec` | Requested AT2 lifetime | Clamped to 3600-21600, then **(W3.6)** capped at the assertion `exp` | No |
+| `targetClientId` | **(W3.2)** the OAuth `client_id` AT2 is minted as | **(W3.7)** a request `client_id` that differs is rejected with `wif_client_id_mismatch` | No - defaults to the endpointId |
+| `enabledProfiles` | **(W3.1)** the protocol profile(s) this trust serves (`syncfabric-rfc7523` / `syncfabric-rfc8693`) | Selects which provider may use the trust; projected from `assertionProfile` when absent | No - defaults to RFC 7523 |
 | `resourceMode` | **(W3.4)** `ignore` / `optionalExact` / `requiredExact` | Governs the RFC 8707 `resource` check | No - defaults to `ignore` |
 | `expectedResource` | The `resource` value required when mode is not `ignore` | Exact string match | Only when `resourceMode != ignore` |
 | `roleEnforcement` | `off` / `shadow` / `enforce` | Controls whether `requiredRoles` blocks | No |
@@ -386,37 +391,61 @@ This confirms **W0.2** (HTTP 200 + both cache headers) on the WIF path with a re
 
 ### 6.4 Stage 4 - the minted token (AT2) decoded
 
-The **real** AT2 claim set:
+The **real** AT2 claim set (captured on dev **v0.54.80**, so it includes everything W3.6 to W3.9
+added):
 
 ```json
 {
   "sub": "scim-wif-client-proof",
   "client_id": "scim-wif-client-proof",
-  "aud": "scimserver-scim-api:6c2ac9c5-faac-4965-838d-fb284c88c712",
-  "endpoint_id": "6c2ac9c5-faac-4965-838d-fb284c88c712",
+  "aud": "scimserver-scim-api:f8813404-44e5-4f6c-b1a7-5de1d6970e37",
+  "endpoint_id": "f8813404-44e5-4f6c-b1a7-5de1d6970e37",
   "scope": "scim.read scim.write",
   "token_type": "access_token",
+  "jti": "73f99b66-9507-4409-819e-c22b6702eae5",
+  "auth_method": "syncfabric-rfc7523",
   "src_iss": "https://login.microsoftonline.com/f08e6aff-ca0f-4f11-81fa-1ffd43323373/v2.0",
-  "src_sub": "d085870e-ffe1-45c1-bc6d-4f793f1fd09f",
-  "iat": 1785194883,
-  "exp": 1785198483,
+  "src_sub": "199155b4-35f3-404c-94ac-2ff03eb937f2",
+  "source_tid": "f08e6aff-ca0f-4f11-81fa-1ffd43323373",
+  "source_oid": "199155b4-35f3-404c-94ac-2ff03eb937f2",
+  "source_azp": "34d8d807-94d5-4c16-a343-2ff4841ec429",
+  "iat": 1785262312,
+  "exp": 1785265910,
   "iss": "scimserver-oauth-server"
 }
 ```
+
+**Every claim, and which identity it represents:**
+
+| Claim | Value | Meaning |
+|---|---|---|
+| `sub` / `client_id` | `scim-wif-client-proof` | **(W3.2)** the OAuth CLIENT the token represents - the trust's `targetClientId`. Pre-W3.2 this was the assertion `sub` (the conflation bug). |
+| `src_sub` | `199155b4-...` | **(W3.2)** the federated assertion subject, kept DISTINCT |
+| `src_iss` | `https://login.microsoftonline.com/.../v2.0` | (WI-17) the winning trust's issuer |
+| `source_tid` | `f08e6aff-...` | **(W3.8)** the assertion's tenant - multi-tenant attribution |
+| `source_oid` | `199155b4-...` | **(W3.8)** the service principal object id |
+| `source_azp` | `34d8d807-...` | **(W3.8)** the calling application (`azp`, or `appid` on v1.0) |
+| `auth_method` | `syncfabric-rfc7523` | **(W3.8)** which profile authorized the mint |
+| `jti` | `73f99b66-...` | **(W3.8)** unique per mint - log correlation + future replay denylist |
+| `endpoint_id` | `f8813404-...` | the endpoint this token is scoped to (the authorization input) |
+| `exp` | `1785265910` | **(W3.6)** capped so it never outlives the authorizing assertion |
+
+Only `endpoint_id` (plus the signature and `exp`) participates in authorization. The `src_*` /
+`source_*` / `auth_method` / `jti` claims are **attribution only**.
 
 **This is the W3.2 fix, proven on the wire with a real Entra assertion:**
 
 | Identity | Value | Was (pre-W3.2) |
 |---|---|---|
-| OAuth client the token represents (`client_id`, `sub`) | `scim-wif-client-proof` | the assertion `sub` (`d085870e-...`) - the conflation bug |
-| Federated principal (`src_sub`) | `d085870e-ffe1-45c1-bc6d-4f793f1fd09f` | not present as a distinct claim |
+| OAuth client the token represents (`client_id`, `sub`) | `scim-wif-client-proof` | the assertion `sub` - the conflation bug |
+| Federated principal (`src_sub`) | `199155b4-35f3-404c-94ac-2ff03eb937f2` | not present as a distinct claim |
 | Source issuer (`src_iss`) | `https://login.microsoftonline.com/f08e6aff-.../v2.0` | present (WI-17) |
-| Endpoint scope (`endpoint_id`) | `6c2ac9c5-...` | unchanged |
+| Endpoint scope (`endpoint_id`) | `f8813404-...` | unchanged |
 
-Claims the guide (section 13.4) specifies that AT2 does **not** yet carry:
-`auth_method`, `source_tid`, `source_oid`, `source_azp`, `jti` - see
-[F3](#f3-at2-omits-the-guide-134-provenance-claims-medium) and
-[F4](#f4-at2-has-no-jti-medium).
+The guide-13.4 provenance claims (`auth_method`, `source_tid`, `source_oid`, `source_azp`) and the
+guide-13.6 `jti` were added in v0.54.79 (**W3.8**) - see
+[F3](#f3-at2-omits-the-guide-134-provenance-claims-medium---fixed-in-v05479-w38) and
+[F4](#f4-at2-has-no-jti-medium---fixed-in-v05479-w38).
 
 ### 6.5 Stage 5 - real resource provisioning with AT2
 
@@ -511,26 +540,29 @@ Two W0.3 truthfulness properties confirmed: `token-exchange` is **absent** (no h
   "label": "Workload Identity Federation",
   "entraAuthenticationMethod": "Workload Identity based authentication",
   "entraFields": {
-    "tenantUrl": "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/v2/endpoints/c0b19d83-76e3-4de9-842a-067d636da990",
-    "tokenEndpoint": "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/endpoints/c0b19d83-76e3-4de9-842a-067d636da990/oauth/token",
-    "clientIdentifier": "d085870e-ffe1-45c1-bc6d-4f793f1fd09f"
+    "tenantUrl": "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/v2/endpoints/f8813404-44e5-4f6c-b1a7-5de1d6970e37",
+    "tokenEndpoint": "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/endpoints/f8813404-44e5-4f6c-b1a7-5de1d6970e37/oauth/token",
+    "clientIdentifier": "scim-wif-client-proof"
   },
   "clientSecretState": "none",
-  "expectedAudience": "c8242cf6-29d0-4fc4-90cc-bad7449545ad",
-  "credentialId": "e9530cc9-bf3a-456e-b30f-c3aa526a9039",
+  "expectedAudience": "34d8d807-94d5-4c16-a343-2ff4841ec429",
+  "expectedAssertionSubject": "199155b4-35f3-404c-94ac-2ff03eb937f2",
+  "credentialId": "555fe131-d46c-4082-8a95-bcf6d2cf6c0b",
   "authHealth": {
     "lastOutcome": "accept",
-    "lastAttemptAt": "2026-07-27T23:29:27.899Z",
-    "lastCorrelationId": "777dc27d-5dfd-45e6-8661-27e3d7974e3c"
+    "lastAttemptAt": "2026-07-28T18:11:53.818Z",
+    "lastCorrelationId": "240b8889-4147-4477-a8fa-f37e82ea8ddb"
   },
   "lastVerifiedAt": null,
-  "lastUsedAt": "2026-07-27T23:29:27.899Z",
+  "lastUsedAt": "2026-07-28T18:11:53.818Z",
   "validity": "ok"
 }
 ```
 
 `authHealth.lastOutcome: "accept"` is the live proof that the real assertion authenticated.
-`clientIdentifier` is the assertion subject, which is [F5](#f5-connection-info-projects-the-assertion-subject-as-the-entra-client-identifier-medium).
+**(W3.9)** `clientIdentifier` is the trust's `targetClientId` - the OAuth client identity the token
+actually carries - and the expected assertion subject sits in its own `expectedAssertionSubject`
+field, so the operator is never shown one identity while the wire carries another.
 
 ---
 
@@ -657,7 +689,7 @@ flowchart TD
 | `wif_missing_role` | `roles` (opt-in) | - |
 | `wif_no_trust_configured` | Config | - |
 | `wif_no_trust_accepted` | Multi-trust aggregate | - |
-| `wif_client_id_mismatch` | Target client binding | **Never fires** - see [F2](#f2-the-form-client_id-is-not-bound-to-the-trust-high) |
+| `wif_client_id_mismatch` | Target client binding **(W3.7)** | **Yes** - valid assertion + a wrong form `client_id` |
 
 **Fail-closed is proven:** an invalid assertion never falls through to another auth method. It is
 always `401 invalid_client` with a precise `reason_code`.
@@ -769,7 +801,8 @@ load-bearing part (per-variation routing) without a migration that no production
 
 **Measured:** the real assertion carries both. SCIMServer binds only `sub`. Guide 12.6 wants `oid`
 enforced when stable and `azp`/`appid` enforced when validated - this is the first-party vs
-customer-application discriminator. Parked in **W5.2**; the empirical gate it was waiting on is now
+customer-application discriminator. Still parked in **W5.2** (the one finding that remains open by
+design); the empirical gate it was waiting on is now
 partially satisfied by the capture in [Section 6.1](#61-stage-1-acquire-the-real-entra-assertion-at1).
 
 ### F8. `expectedAudience` is easy to misconfigure (LOW, documentation)
@@ -826,7 +859,7 @@ The proof run changes the priority order in four concrete ways:
 |---|---|---|---|---|
 | **R1** | **AT2 lifetime cap** | W5.2 (late) | **DONE - shipped as W3.6 in v0.54.78** | [F1](#f1-at2-outlives-the-assertion-that-authorized-it-high---fixed-in-v05478-w36): measured 5h overrun. Security defect, small contained fix, no dependencies - it should not have waited two waves. |
 | **R2** | **Form `client_id` binding** | Deferred to W4 | **DONE - shipped as W3.7 in v0.54.78** | [F2](#f2-the-form-client_id-is-not-bound-to-the-trust-high---fixed-in-v05478-w37): the deferral rationale was factually wrong (guide 7.1 + 7.4 confirm RFC 7523 *does* send `client_id`). We advertised a binding we did not enforce. |
-| **R3** | **W3.1 `WifTrustV2`** | "Wave 3 core, before W3.2" | **Immediately before W4.1** | [F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium): its real value is `enabledProfiles[]` per-variation routing, which only becomes load-bearing when a second variation (RFC 8693) exists. W3.2, W3.4, W3.6 and W3.7 all shipped *without* it, so the stated `W3.2 -> deps: W3.1` edge is not real. |
+| **R3** | **W3.1 `WifTrustV2`** | "Wave 3 core, before W3.2" | **DONE (right-sized) - shipped in v0.54.80** | [F6](#f6-assertionprofile-is-stored-but-never-routed-on-medium---fixed-in-v05480-w31): its real value is `enabledProfiles[]` per-variation routing, which only becomes load-bearing when a second variation (RFC 8693) exists. W3.2, W3.4, W3.6 and W3.7 all shipped *without* it, so the stated `W3.2 -> deps: W3.1` edge was not real. Shipped as the routing half only; the versioned aggregate + migration machine stay deferred. |
 | **R4** | **Empirical gate "real assertion capture"** | Blocking W3.2/W3.3/W5.2 | **Partially satisfied now** | [Section 6.1](#61-stage-1-acquire-the-real-entra-assertion-at1) captures a real customer-mode v2.0 assertion. Still outstanding: a **first-party** (`azp = cb1d50fe-...`) capture and a **real SyncFabric RFC 8693 request**. |
 
 **Recommended order from here:**
