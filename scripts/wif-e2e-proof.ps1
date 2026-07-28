@@ -57,7 +57,11 @@ param(
     [string] $AppId = $env:WIF_TEST_APPID,
     [string] $TenantId = $env:WIF_TEST_TENANT,
     [string] $ClientSecret = $env:WIF_TEST_SECRET,
-    [int] $MintLatencyBudgetMs = 400,
+    # W1.6 budget. Measured on Azure dev v0.54.81: median 36ms (min 33, max 42),
+    # so 150ms is ~4x headroom - loose enough to absorb container jitter, tight
+    # enough that putting a network fetch or a module load back on the mint path
+    # trips it immediately. This is the plan's stated warm target.
+    [int] $MintLatencyBudgetMs = 150,
     [switch] $KeepArtifacts
 )
 
@@ -500,8 +504,9 @@ try {
     Test-Result -Success $false -Message "S8.T1 (W1.6): mint latency stage threw: $($_.Exception.Message)"
 }
 
-# ────────────────────────────────────────────────────────────────────────if (-not $KeepArtifacts) {
-    Write-Section "STAGE 8: cleanup"
+# ─────────────────────────────────────────────────────────────────────────────
+if (-not $KeepArtifacts) {
+    Write-Section "STAGE 9: cleanup"
     try { Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints/$epId" -Method DELETE -Headers $headers | Out-Null; Write-Host "deleted endpoint $epId" } catch {}
 }
 
