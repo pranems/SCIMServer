@@ -1,3 +1,4 @@
+import { resolveRuntimeConfig } from '../../../bootstrap/runtime-config';
 export const SCIM_CORE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 export const SCIM_CORE_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 export const SCIM_ENTERPRISE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
@@ -37,8 +38,21 @@ export const KNOWN_EXTENSION_URNS: readonly string[] = [
   MSFTTEST_IETF_GROUP_SCHEMA,
 ] as const;
 
-export const DEFAULT_COUNT = 100;
-export const MAX_COUNT = 200;
+/**
+ * Pagination ceilings (W1.7b). These are the SERVER-level defaults and are
+ * environment-dependent: a 0.5 vCPU container serving a bursty provisioning
+ * cycle wants a different page ceiling than a laptop. Resolved once at import
+ * from `SCIM_DEFAULT_COUNT` / `SCIM_MAX_COUNT`, clamped to a published range so
+ * `MAX_COUNT` can never be configured into a memory problem.
+ *
+ * A per-endpoint override still layers on TOP of `MAX_COUNT` via the
+ * ServiceProviderConfig `filter.maxResults` cascade (`resolveNumericLimit`),
+ * which is the RFC 7644 section 3.7 mechanism - this env tier only moves the
+ * server floor, it does not replace that.
+ */
+const scimLimits = resolveRuntimeConfig((k) => process.env[k]).groups.scim;
+export const DEFAULT_COUNT = scimLimits.defaultCount.effective as number;
+export const MAX_COUNT = scimLimits.maxCount.effective as number;
 
 /**
  * RFC 7644 §3.12 - Standard SCIM error scimType values.

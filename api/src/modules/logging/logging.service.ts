@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { resolveRuntimeConfig } from '../../bootstrap/runtime-config';
 import { ModuleRef } from '@nestjs/core';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
@@ -45,8 +46,15 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   private logBuffer: Prisma.RequestLogCreateManyInput[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
-  private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
-  private static readonly MAX_BUFFER_SIZE = 50;        // or when 50 entries accumulate
+  /**
+   * W1.7b - buffering is a throughput/durability tradeoff that moves with the
+   * deployment: a busy production replica wants a SHORTER interval (bounding
+   * crash-loss) with a LARGER batch (fewer round-trips and less pool pressure)
+   * than a developer laptop. `LOG_FLUSH_INTERVAL_MS` / `LOG_FLUSH_MAX_BUFFER`,
+   * clamped; the previous hardcoded 3000 ms / 50 remain the defaults.
+   */
+  private readonly flushIntervalMs: number;
+  private readonly flushMaxBuffer: number;
   private inMemoryLogRows: Array<{
     id: string;
     method: string;
@@ -74,7 +82,11 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly logger: ScimLogger,
     private readonly moduleRef: ModuleRef,
-  ) {}
+  ) {
+    const log = resolveRuntimeConfig((k) => process.env[k]).groups.logging;
+    this.flushIntervalMs = log.flushIntervalMs.effective as number;
+    this.flushMaxBuffer = log.flushMaxBuffer.effective as number;
+  }
 
   /**
    * The server-level default for PersistRequestSecrets (env, default true). When
@@ -318,10 +330,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     this.logBuffer.push(data);
 
     // Flush immediately if buffer is full, otherwise schedule a delayed flush
-    if (this.logBuffer.length >= LoggingService.MAX_BUFFER_SIZE) {
+    if (this.logBuffer.length >= this.flushMaxBuffer) {
       void this.flushLogs();
     } else if (!this.flushTimer) {
-      this.flushTimer = setTimeout(() => void this.flushLogs(), LoggingService.FLUSH_INTERVAL_MS);
+      this.flushTimer = setTimeout(() => void this.flushLogs(), this.flushIntervalMs);
     }
   }
 
