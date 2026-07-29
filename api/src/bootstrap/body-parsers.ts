@@ -1,9 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 import type { Request } from 'express';
-
-/** Cap the raw body we retain per request (matches the json() body limit). */
-const RAW_BODY_LIMIT = '5mb';
+import { resolveRuntimeConfig } from './runtime-config';
 
 /**
  * Apply the request body parsers, shared by production bootstrap (main.ts) and
@@ -17,8 +15,18 @@ const RAW_BODY_LIMIT = '5mb';
  * side-effect free for the happy path. A wrong-content-type request (415) never
  * reaches a parser (the `type` predicate is false), so `rawBody` stays unset and
  * the filter records a content-type-rejected marker instead.
+ *
+ * The limits are environment-dependent (X15): a bulk-heavy tenant may need a
+ * larger JSON body, while the form limit only has to carry an OAuth token
+ * request and can be much tighter in production. Both come from
+ * `HTTP_JSON_BODY_LIMIT` / `HTTP_FORM_BODY_LIMIT`, falling back to the values
+ * that were previously hardcoded here.
  */
 export function applyBodyParsers(app: NestExpressApplication): void {
+  const http = resolveRuntimeConfig((k) => process.env[k]).groups.http;
+  const jsonLimit = http.jsonBodyLimit.effective as string;
+  const formLimit = http.formBodyLimit.effective as string;
+
   const stashRaw = (req: Request, _res: unknown, buf: Buffer): void => {
     // Retain the raw bytes for the log path only; capping happens at storage.
     (req as Request & { rawBody?: Buffer }).rawBody = buf;
@@ -27,7 +35,7 @@ export function applyBodyParsers(app: NestExpressApplication): void {
   // Accept both standard JSON and the SCIM media type.
   app.use(
     json({
-      limit: RAW_BODY_LIMIT,
+      limit: jsonLimit,
       verify: stashRaw,
       type: (req) => {
         const ct = req.headers['content-type']?.toLowerCase() ?? '';
@@ -38,5 +46,5 @@ export function applyBodyParsers(app: NestExpressApplication): void {
 
   // A3 - the OAuth token endpoints accept application/x-www-form-urlencoded
   // (RFC 6749 section 3.2).
-  app.use(urlencoded({ extended: true, limit: '1mb', verify: stashRaw }));
+  app.use(urlencoded({ extended: true, limit: formLimit, verify: stashRaw }));
 }

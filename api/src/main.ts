@@ -12,6 +12,7 @@ import { applySpaFallback } from './bootstrap/spa-fallback';
 import { OAUTH_METADATA_PATH } from './oauth/oauth.constants';
 import { applyCorrelationMiddleware } from './bootstrap/correlation-middleware';
 import { applyBodyParsers } from './bootstrap/body-parsers';
+import { resolveRuntimeConfig, formatRuntimeConfigLines } from './bootstrap/runtime-config';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -136,18 +137,44 @@ async function bootstrap(): Promise<void> {
   );
 
   const port = Number(process.env.PORT ?? 3000);
-  const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS) || 120_000;
+  const runtimeConfig = resolveRuntimeConfig((k) => process.env[k]);
+  const http = runtimeConfig.groups.http;
   await app.listen(port);
 
-  // Set HTTP server request timeout - prevents any single request from blocking
-  // the event loop indefinitely (e.g., slow DB queries, N+1 bugs).
-  // Default: 120 seconds (Node.js default). Override with REQUEST_TIMEOUT_MS env var.
+  // ── HTTP server timeouts (X15-F2) ──
+  // Node's http.Server has FOUR distinct timeouts and we used to set one and a
+  // half of them. `setTimeout()` is SOCKET INACTIVITY, not request duration - a
+  // slow client that dribbles a byte every 60 s never trips it - so an operator
+  // setting REQUEST_TIMEOUT_MS believed requests were bounded when they were
+  // actually bounded by Node's implicit 300 s `requestTimeout`. All four are now
+  // set explicitly; the Node docs call `headersTimeout`/`requestTimeout` a
+  // denial-of-service protection when there is no reverse proxy in front.
+  //
+  // keepAliveTimeout is deliberately DECOUPLED from the request timeout: its
+  // correct value is a function of the UPSTREAM ingress idle timeout, not of how
+  // long a request may take. If it is shorter than the proxy's idle timeout the
+  // proxy reuses a socket the server is closing and the client sees a 502 /
+  // ECONNRESET. REQUEST_TIMEOUT_MS still drives it as a legacy alias so existing
+  // deployments keep exactly today's behaviour.
   const httpServer = app.getHttpServer();
+  const requestTimeoutMs = http.requestTimeoutMs.effective as number;
   httpServer.setTimeout(requestTimeoutMs);
-  httpServer.keepAliveTimeout = requestTimeoutMs;
+  httpServer.requestTimeout = requestTimeoutMs;
+  httpServer.headersTimeout = http.headersTimeoutMs.effective as number;
+  httpServer.keepAliveTimeout = http.keepAliveTimeoutMs.effective as number;
+  // Added in recent Node; closes the socket slightly before the advertised
+  // keep-alive to shave the ECONNRESET race window. Guarded because older
+  // runtimes do not have it.
+  if ('keepAliveTimeoutBuffer' in httpServer) {
+    (httpServer as { keepAliveTimeoutBuffer: number }).keepAliveTimeoutBuffer =
+      http.keepAliveTimeoutBufferMs.effective as number;
+  }
 
   Logger.log(`🚀 SCIM Endpoint Server API is running on http://localhost:${port}/${globalPrefix}`);
-  Logger.log(`⏱️ Request timeout: ${requestTimeoutMs}ms (REQUEST_TIMEOUT_MS)`);
+  // Emit what ACTUALLY took effect, with provenance. A configurable system
+  // without this is strictly harder to operate than a hardcoded one.
+  for (const line of formatRuntimeConfigLines(runtimeConfig)) Logger.log(line);
+  for (const warning of runtimeConfig.warnings) Logger.warn(`[Config] ${warning}`);
   Logger.log(`🔎 Log API quick access: http://localhost:${port}/scim/admin/log-config/recent?limit=25`);
   Logger.log(`🔎 Log stream (SSE): http://localhost:${port}/scim/admin/log-config/stream?level=INFO`);
   Logger.log(`🔎 Log download (JSON): http://localhost:${port}/scim/admin/log-config/download?format=json`);
