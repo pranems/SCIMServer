@@ -70,6 +70,36 @@ if (renderers.length === 0) {
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Is an uninstall PENDING but not yet in effect?
+//
+//     `code --uninstall-extension` only marks the folder in `.obsolete`; the
+//     files are deleted at the editor's next startup, and the already-loaded
+//     preview script keeps running until then. On 2026-07-29 this cost a whole
+//     extra round trip: the conflicting renderer had been uninstalled, the
+//     doctor reported a single renderer, and the diagrams were STILL broken
+//     because the editor process had been running since 13 days earlier and had
+//     never picked up the change. Detect that state explicitly.
+// ---------------------------------------------------------------------------
+try {
+  const obsoletePath = join(extRoot, '.obsolete');
+  if (existsSync(obsoletePath)) {
+    const obsolete = JSON.parse(readFileSync(obsoletePath, 'utf8'));
+    const pending = Object.keys(obsolete).filter((k) => /mermaid/i.test(k) && obsolete[k]);
+    const stillOnDisk = pending.filter((k) => existsSync(join(extRoot, k)));
+    if (stillOnDisk.length > 0) {
+      add(
+        'BLOCKER',
+        'An uninstalled Mermaid renderer is STILL LOADED',
+        `${stillOnDisk.join(', ')} is marked uninstalled but its files are still on disk, which means the editor has not restarted since. Its preview script is still being injected into the webview, so the two-renderer collision is still live even though the extension "is uninstalled".`,
+        `Either restart VS Code, or delete the folder now (it is already uninstalled, so this is exactly what VS Code would do at next startup):\n          Remove-Item "${join(extRoot, stillOnDisk[0])}" -Recurse -Force\n     Then close and reopen the Markdown preview tab - preview scripts are re-read from disk when a preview is created.`,
+      );
+    }
+  }
+} catch {
+  /* no marker file, or unreadable */
+}
+
+// ---------------------------------------------------------------------------
 // 2. Does the gate's mermaid version match the one that actually renders?
 //    The BUILT-IN is authoritative: it ships with the editor, so it is what
 //    every reader of this repo gets. (Drift bit us twice: 11.6 vs 11.12.2 on
