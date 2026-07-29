@@ -102,7 +102,7 @@ For each: does our build / publish flow adopt it?
 
 ## Category 5 - Container / runtime
 
-- **Distroless base images** ([github.com/GoogleContainerTools/distroless](https://github.com/GoogleContainerTools/distroless)) vs our current node:25-alpine.
+- **Distroless base images** ([github.com/GoogleContainerTools/distroless](https://github.com/GoogleContainerTools/distroless)) vs our current node:24-alpine.
 - **Rootless containers** - run as non-root UID; our `Dockerfile` should set `USER scim` after `RUN useradd`.
 - **Image scanning** - trivy ([github.com/aquasecurity/trivy](https://github.com/aquasecurity/trivy)) for OS-level CVEs in the base image; grype as alternative.
 - **SBOM generation** - syft ([github.com/anchore/syft](https://github.com/anchore/syft)) generates SBOMs at build time; SBOMs enable post-deploy CVE lookup.

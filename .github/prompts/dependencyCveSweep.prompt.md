@@ -99,11 +99,11 @@ git diff package-lock.json | Select-Object -First 30
 
 ## Step 6 - Verify lockfile reproducibility
 
-The standing rule (copilot-instructions.md Stage 6.1) requires lockfiles to be regenerated inside `node:25-alpine` for cross-platform CI reproducibility. After `npm audit fix`, run:
+The standing rule (copilot-instructions.md Stage 6.1) requires lockfiles to be regenerated inside `node:24-alpine` for cross-platform CI reproducibility. After `npm audit fix`, run:
 
 ```powershell
-docker run --rm -v "${PWD}:/app" -w /app node:25-alpine sh -c "cd api && rm -rf node_modules && npm ci && npm install"
-docker run --rm -v "${PWD}:/app" -w /app node:25-alpine sh -c "cd web && rm -rf node_modules && npm ci && npm install"
+docker run --rm -v "${PWD}:/app" -w /app node:24-alpine sh -c "cd api && rm -rf node_modules && npm ci && npm install"
+docker run --rm -v "${PWD}:/app" -w /app node:24-alpine sh -c "cd web && rm -rf node_modules && npm ci && npm install"
 ```
 
 Commit the regenerated lockfiles in the SAME commit as the CVE fix.
