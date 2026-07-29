@@ -121,6 +121,7 @@
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema, custom extensions |
 | [CUSTOM_EXTENSIONS_RFC_GUIDE.md](CUSTOM_EXTENSIONS_RFC_GUIDE.md) | **RFC-compliant custom extension authoring** - URN structure (RFC 7643 §10), schema meta-schema (§7), ResourceType binding (§6), worked `proxyAddresses` example, authoring checklist, error catalogue, end-to-end flow, common anti-patterns |
 | [COLLISION-TESTING-GUIDE.md](COLLISION-TESTING-GUIDE.md) | Entra collision (409) testing guide |
+| [tls/PER_ENDPOINT_TLS_POLICY_OPTIONS.md](tls/PER_ENDPOINT_TLS_POLICY_OPTIONS.md) | **Per-endpoint TLS version policy** - feasibility, measured probe evidence, 7 options, phased recommendation, security guard rails for forwarded-header trust |
 
 ## Feature Implementation Docs
 
