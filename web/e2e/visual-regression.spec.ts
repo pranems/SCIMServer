@@ -324,6 +324,15 @@ test.describe('Phase H3 - Visual regression baselines', () => {
         '[data-testid="schemas-empty"]',
       ]),
       fullPage: true,
+      // Same live-data-drift tolerance as the Overview and Users tabs. The
+      // schemas TREE is data-driven (attribute count varies with the endpoint's
+      // profile), so masking its cells does not stop the panel's bottom edge
+      // from shifting - the mask itself changes height. Without this the
+      // snapshot fails on data drift rather than on a chrome/layout regression,
+      // which is exactly what happened on 2026-07-29: this tab was the only one
+      // of the three that never received the tolerance when Overview and Users
+      // did, so its baseline silently rotted while theirs stayed green.
+      maxDiffPixelRatio: 0.03,
     });
   });
 });
