@@ -49,6 +49,14 @@ export async function createTestApp(
   process.env.OAUTH_CLIENT_ID = 'e2e-client';
   process.env.OAUTH_CLIENT_SECRET = 'e2e-client-secret';
   process.env.NODE_ENV = 'test';
+  // W1.7b knobs: shorten the RequestLog buffer flush interval for E2E so a row
+  // becomes durable in ~100 ms instead of the 3 s production default. Log-reading
+  // specs still POLL via waitForLogRow (a shorter timer narrows the race, it does
+  // not remove it), but this keeps those polls to one or two attempts instead of
+  // waiting out a 3 s timer on every assertion. The buffer SIZE is deliberately
+  // left at its default so batching behaviour stays representative.
+  // `??=` so an individual spec can still override it.
+  process.env.LOG_FLUSH_INTERVAL_MS ??= '100';
 
   const moduleFixture = await (
     customize

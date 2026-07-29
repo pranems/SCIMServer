@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
+import { waitForLogRowByRequestId } from './helpers/log-wait.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { createEndpoint, scimBasePath } from './helpers/request.helper';
 
@@ -33,17 +34,13 @@ describe('Request body capture on pre-parse failures (E2E)', () => {
   });
 
   async function detailForRequestId(requestId: string): Promise<Record<string, unknown> | undefined> {
-    await new Promise((r) => setTimeout(r, 300));
-    const list = await request(app.getHttpServer())
-      .get(`/scim/admin/logs?search=${requestId}&pageSize=5`)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-    const row = ((list.body.items ?? []) as Array<Record<string, unknown>>).find(
-      (i) => i.requestId === requestId,
-    );
+    // The RequestLog row is buffered and flushed asynchronously, so it is not
+    // queryable the instant the response returns. Poll (forcing a flush each
+    // attempt) rather than sleeping a fixed interval and hoping.
+    const row = await waitForLogRowByRequestId(app, token, requestId);
     if (!row) return undefined;
     const detail = await request(app.getHttpServer())
-      .get(`/scim/admin/logs/${row.id}`)
+      .get(`/scim/admin/logs/${row.id as string}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     return detail.body as Record<string, unknown>;

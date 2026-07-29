@@ -24,6 +24,23 @@ import { REQUEST_LOGGING_META_KEY, type RequestLoggingMeta } from '../modules/lo
  * Shared by production bootstrap (main.ts) and the E2E harness (app.helper.ts)
  * so both behave identically.
  */
+
+/**
+ * The correlation id is echoed and traced VERBATIM.
+ *
+ * There are two consumers of `X-Request-Id` with different constraints:
+ *
+ *   1. Tracing - the response-header echo and the in-memory ring buffer. These
+ *      take the client's value as-is, which is the documented contract
+ *      (`log-config.e2e-spec.ts` locks the echo) and matches how distributed
+ *      tracing ids work generally - they are not required to be UUIDs.
+ *   2. Persistence - `RequestLog.requestId` is a `@db.Uuid` column and cannot
+ *      hold arbitrary text.
+ *
+ * Normalising here would satisfy (2) by breaking (1). The guard therefore lives
+ * at the PERSISTENCE boundary - see `logging/storable-request-id.ts` - so
+ * tracing keeps the caller's id while the column can never be poisoned.
+ */
 export function applyCorrelationMiddleware(app: NestExpressApplication): void {
   const scimLogger = app.get(ScimLogger);
   app.use((req: Request, res: Response, next: NextFunction) => {

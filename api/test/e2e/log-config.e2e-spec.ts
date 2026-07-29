@@ -1,6 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 import { createTestApp } from './helpers/app.helper';
+import { waitForLogRowByRequestId } from './helpers/log-wait.helper';
 import { getAuthToken } from './helpers/auth.helper';
 
 /**
@@ -485,24 +487,19 @@ describe('Log Configuration API (E2E)', () => {
     });
 
     it('a request is immediately queryable by requestId after a flush', async () => {
-      const requestId = `e2e-flush-${Date.now()}`;
+      const requestId = randomUUID(); // MUST be a real UUID - RequestLog.requestId is a @db.Uuid column
       // Drive a request that carries a known correlation id.
       await request(app.getHttpServer())
         .get('/scim/admin/log-config')
         .set('Authorization', `Bearer ${token}`)
         .set('X-Request-Id', requestId)
         .expect(200);
-      // Force the buffered write to become durable, then read it back.
-      await request(app.getHttpServer())
-        .post('/scim/admin/logs/flush')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(204);
-      const res = await request(app.getHttpServer())
-        .get(`/scim/admin/logs?requestId=${requestId}&includeAdmin=true&pageSize=10`)
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-      const items = (res.body.items ?? res.body.data ?? []) as Array<{ requestId?: string }>;
-      expect(items.some((r) => r.requestId === requestId)).toBe(true);
+      // A single flush-then-read races: the row is enqueued asynchronously AFTER
+      // the response is sent, so the flush can run before the row it is meant to
+      // make durable was ever buffered. Poll instead, flushing each attempt.
+      const row = await waitForLogRowByRequestId(app, token, requestId);
+      expect(row).toBeDefined();
+      expect(row!.requestId).toBe(requestId);
     });
   });
 

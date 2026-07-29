@@ -398,6 +398,32 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ## 10. Wave 1 addendum (perf foundation, 2026-07-28)
 
+### 10.-1 I-24 (High, T1 harness/DI) - a "pure helper" import that took out 65 tests at once
+
+- **Symptom.** After adding a UUID guard for the log `requestId`, all three E2E suites failed
+  COMPLETELY - 65 of 65 tests - with `TypeError: Cannot read properties of undefined (reading
+  'close')` in `afterAll`, masking the real error: `Nest can't resolve dependencies of the
+  RequestLoggingInterceptor (?, ScimLogger) ... the dependency at index [0] appears to be
+  undefined at runtime`.
+- **Root cause.** The guard imported `isUuid` from `bootstrap/correlation-middleware.ts`, which
+  imports `ScimLogger`. `logging.service.ts` then imported the guard, closing the cycle
+  `logging.service -> storable-request-id -> correlation-middleware -> scim-logger -> logging`.
+  A circular import leaves one module's exports `undefined` at evaluation time, so Nest received
+  `undefined` for a constructor parameter.
+- **Why it was invisible until runtime.** `tsc` compiled it **cleanly**. TypeScript resolves types
+  across cycles happily; only the runtime value is undefined. So the build gate is structurally
+  incapable of catching this class.
+- **Fix.** Move the predicate to `src/shared/uuid.ts` - a LEAF module with no Nest and no app
+  imports - and have both consumers import from there.
+- **Prevention.** A shared predicate/helper pulled into a service must live in a leaf module. When
+  adding an import to a widely-imported service, check what the SOURCE module itself imports, not
+  just what you are importing. The tell for this class is a `Nest can't resolve dependencies ...
+  appears to be undefined at runtime` error immediately after a new import - read past the
+  `afterAll` teardown noise, which is a symptom, not the cause.
+- **Detection-stage escape analysis.** Caught immediately by the targeted E2E re-run in the same
+  step. Note the build gate passed, so a change relying on `npm run build` alone would have shipped
+  it.
+
 ### 10.0 I-23 (High, T2 test-correctness) - a live-test section that passed VACUOUSLY, including its secret-leak check
 
 - **Symptom.** The new `9z-BZ` live section (W1.7c runtime-config surface) was smoke-run against a

@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { resolveRuntimeConfig } from '../../bootstrap/runtime-config';
+import { toStorableRequestId } from './storable-request-id';
 import { ModuleRef } from '@nestjs/core';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
@@ -279,7 +280,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         errorMessage,
         errorStack,
         identifier: identifier ?? null,
-        requestId: requestId ?? null,
+        requestId: toStorableRequestId(requestId),
         authOutcome,
         authMethod,
         authReason,
@@ -319,7 +320,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // insert (no per-row UPDATE backfill). `identifier` is a real column.
       identifier: identifier ?? null,
       endpointId: endpointId ?? null,
-      requestId: requestId ?? null,
+      requestId: toStorableRequestId(requestId),
       authOutcome,
       authMethod,
       authReason,
