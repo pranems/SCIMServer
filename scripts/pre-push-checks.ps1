@@ -197,6 +197,30 @@ Invoke-Gate -Name 'docs: mermaid diagrams render' -WorkingDir $repoRoot -Action 
     node scripts/render-mermaid.mjs 2>&1 | Out-Host
 }
 
+# Infra: base images must sit on an Active/Maintenance LTS Node line. Trivy scans
+# for CVEs, never for SUPPORT STATUS, so an EOL runtime with no CVE filed yet is
+# invisible to it - which is how the shipped image ran EOL Node 25 for ~2 months
+# on 2026-07-29 with every gate green.
+Invoke-Gate -Name 'infra: base images on LTS' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/audit-base-images.ps1') -Quiet 2>&1 | Out-Host
+}
+
+# Infra: the canonical deployment doc must stay true. Any infra change (Dockerfile,
+# compose, Bicep, workflow, deploy/promote script) must update
+# docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md in the same change. Compares
+# against the upstream ref so the commits BEING PUSHED are what gets checked - at
+# pre-push the working tree is clean, so a HEAD-only comparison could never fire.
+Invoke-Gate -Name 'infra: deployment doc current' -WorkingDir $repoRoot -Action {
+    $upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    $script = Join-Path $repoRoot 'scripts/audit-deployment-doc.ps1'
+    if ($LASTEXITCODE -eq 0 -and $upstream) {
+        pwsh -NoProfile -ExecutionPolicy Bypass -File $script -BaseRef $upstream 2>&1 | Out-Host
+    } else {
+        # No upstream yet (new branch): fall back to uncommitted-only comparison.
+        pwsh -NoProfile -ExecutionPolicy Bypass -File $script 2>&1 | Out-Host
+    }
+}
+
 # -------------------------------------------------------------------------
 # Validate gates (mirror CI validate job)
 # -------------------------------------------------------------------------

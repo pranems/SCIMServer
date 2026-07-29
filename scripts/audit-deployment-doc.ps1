@@ -78,9 +78,18 @@ $infraPatterns = @(
 Write-Section '[C1] infra change coverage'
 Push-Location $repoRoot
 try {
-    $changed = @(git diff --name-only $BaseRef 2>$null) +
-               @(git diff --cached --name-only 2>$null) +
+    # Uncommitted work (staged + unstaged + untracked). This is what a manual or
+    # pre-commit run sees.
+    $changed = @(git diff --name-only HEAD 2>$null) +
                @(git ls-files --others --exclude-standard 2>$null)
+
+    # Committed work. At pre-push time the tree is clean, so comparing against
+    # HEAD alone would make C1 structurally incapable of ever firing - pass the
+    # upstream ref (or any base) to compare the commits actually being shipped.
+    if ($BaseRef -and $BaseRef -ne 'HEAD') {
+        $changed += @(git diff --name-only "$BaseRef...HEAD" 2>$null)
+    }
+
     $changed = $changed | Where-Object { $_ } | Sort-Object -Unique
 } finally {
     Pop-Location
