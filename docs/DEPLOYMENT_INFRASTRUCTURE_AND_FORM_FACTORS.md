@@ -57,6 +57,8 @@ pwsh scripts/audit-deployment-doc.ps1          # static  - Stage 1.11
 pwsh scripts/audit-deployment-doc.ps1 -Live    # + probes every live estate
 ```
 
+It also runs automatically on **every push** (Fast tier of [scripts/pre-push-checks.ps1](../scripts/pre-push-checks.ps1), alongside `infra: base images on LTS`), so this is not a gate someone has to remember to invoke. At pre-push the working tree is clean and the change lives in commits, so the hook passes the upstream ref as `-BaseRef` - comparing against `HEAD` alone would make C1 structurally incapable of ever firing.
+
 | Check | Fails when |
 |---|---|
 | **C1** change coverage | an infra path above changed and this doc did not change in the same diff |
