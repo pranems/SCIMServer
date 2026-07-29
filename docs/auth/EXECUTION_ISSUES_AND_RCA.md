@@ -398,6 +398,39 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ## 10. Wave 1 addendum (perf foundation, 2026-07-28)
 
+### 10.0 I-23 (High, T2 test-correctness) - a live-test section that passed VACUOUSLY, including its secret-leak check
+
+- **Symptom.** The new `9z-BZ` live section (W1.7c runtime-config surface) was smoke-run against a
+  local node immediately after authoring it, per the standing author-and-smoke-run-before-batch
+  convention. Four assertions failed (`T4` envelope keys, `T5` schema URN, `T6` group list,
+  `T10`/`T11`), reporting nonsense like `got: Count,IsFixedSize,IsReadOnly,IsSynchronized,Length,...`.
+- **Root cause.** `Invoke-WebRequest` returned `.Content` as a **`System.Byte[]`**, not a string.
+  Piping a byte array into `ConvertFrom-Json` **enumerates** it, so `$rc` became an `Object[]` of
+  1,732 integers instead of the parsed payload. The API response itself was correct throughout.
+- **The dangerous part is what did NOT fail.** Three assertions **PASSED** on that broken parse:
+  `T7` ("all **0** effective values sit inside their published bounds"), `T8` (provenance valid for
+  zero settings), and - worst - `T9`, the **secret-leak check**, which ran `-like` against a byte
+  array and found nothing because there was nothing to find. A security assertion that passes
+  because its haystack is the wrong type is a false-green, and it would have shipped as one had the
+  four loud failures not been sitting next to it.
+- **Fix.** Decode explicitly (`[System.Text.Encoding]::UTF8.GetString(...)` when `.Content` is
+  `byte[]`), and make every loop-based assertion require a **non-zero count** to pass:
+  `T7`/`T8` now demand `>= 15` settings and `T9` demands a payload longer than 100 chars. Each
+  message prints the count it actually checked (`all 15 effective values...`, `no secret-bearing
+  key or value in the 1732-char payload`), so a future regression to zero is visible in the log
+  rather than silently green. Re-run: **12/12**, then the full local suite **1341/1341**.
+- **Prevention.** This is the live-test instance of rule **R10** (*presence is not correctness*),
+  and it generalizes: **an assertion that iterates a collection MUST also assert the collection is
+  non-empty**, otherwise "no violations found" and "nothing was examined" are indistinguishable.
+  Every existing `foreach`-based live assertion is a candidate for the same audit. It also
+  reinforces PG-2: `Invoke-WebRequest.Content` is a library default whose *type* varies by response
+  - do not assume it, decode it.
+- **Detection-stage escape analysis.** Caught at the earliest possible gate (the smoke-run in the
+  same step that authored it), which is exactly what that convention exists for. Had the section
+  been batched to a later checkpoint, the four loud failures would have been debugged then - but
+  the three vacuous passes might never have been noticed at all, because they look identical to
+  success.
+
 ### 10.1 I-22 (Low, T3) - a zero max-age cache is NOT stale within the same millisecond
 
 - **Symptom.** Two new W1.3 tests were intermittently failing (1-2 failures per run, varying).

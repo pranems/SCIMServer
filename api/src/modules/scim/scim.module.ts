@@ -11,6 +11,7 @@ import { AdminCredentialController } from './controllers/admin-credential.contro
 import { AdminConnectionInfoController } from './controllers/admin-connection-info.controller';
 import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
 import { AuthDecisionsController } from './controllers/auth-decisions.controller';
+import { RuntimeConfigController } from './controllers/runtime-config.controller';
 import { AdminSecuritySettingsController } from './controllers/admin-security-settings.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
@@ -59,6 +60,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     AdminJwksHostController,
     AdminSecuritySettingsController,
     AuthDecisionsController,
+    RuntimeConfigController,
     EndpointOAuthController,
     EndpointScimUsersController,
     EndpointScimGroupsController,

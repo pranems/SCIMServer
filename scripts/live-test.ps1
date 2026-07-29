@@ -14155,6 +14155,121 @@ Write-Host "`n--- 9z-BY: WIF resource policy (W3.4) Complete ---" -ForegroundCol
 
 
 # ============================================
+# TEST SECTION 9z-BZ: RUNTIME CONFIG SURFACE (W1.7c)
+$script:currentSection = "9z-BZ: runtime config surface (W1.7c)"
+# ============================================
+# Proves the effective-configuration surface is live, admin-gated, uncacheable,
+# internally consistent, and leaks nothing. The self-consistency assertion
+# (every effective value inside its OWN published bounds) is the one that
+# actually catches a clamping regression - a presence check would not.
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-BZ: RUNTIME CONFIG SURFACE (W1.7c)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $rcUrl = "$baseUrl/scim/admin/runtime-config"
+
+    # T1 - admin-gated
+    try {
+        Invoke-RestMethod -Uri $rcUrl -Method GET -ErrorAction Stop | Out-Null
+        Test-Result -Success $false -Message "9z-BZ.T1: runtime-config must require authentication"
+    } catch {
+        $code = $_.Exception.Response.StatusCode.value__
+        Test-Result -Success ($code -eq 401) -Message "9z-BZ.T1: unauthenticated runtime-config returns 401 (got $code)"
+    }
+
+    # T2 - authenticated fetch + no-store
+    $rcResp = Invoke-WebRequest -Uri $rcUrl -Method GET -Headers $headers -ErrorAction Stop
+    Test-Result -Success ($rcResp.StatusCode -eq 200) -Message "9z-BZ.T2: authenticated runtime-config returns 200"
+    $cacheControl = $rcResp.Headers['Cache-Control']
+    Test-Result -Success ("$cacheControl" -match 'no-store') -Message "9z-BZ.T3: runtime-config sets Cache-Control no-store (got '$cacheControl')"
+
+    # Invoke-WebRequest hands back .Content as a Byte[] for this response, and
+    # piping a byte array into ConvertFrom-Json ENUMERATES it - yielding an
+    # Object[] of 1,732 integers instead of the payload. That silently emptied
+    # every loop below, so the bounds/provenance/secret-leak assertions all
+    # "passed" over zero items on the first run. Decode explicitly, and make the
+    # loop assertions require a non-zero count so they can never pass vacuously
+    # again.
+    $rcRaw = if ($rcResp.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($rcResp.Content) } else { [string]$rcResp.Content }
+    $rc = $rcRaw | ConvertFrom-Json
+
+    # T4 - envelope key allowlist (a field EXISTING is not the contract; the FULL set is)
+    $envelopeKeys = @($rc.PSObject.Properties.Name | Sort-Object)
+    $expectedEnvelope = @('groups', 'invariantWarnings', 'schemas')
+    Test-Result -Success (-not (Compare-Object $envelopeKeys $expectedEnvelope)) `
+        -Message "9z-BZ.T4: envelope exposes exactly schemas/groups/invariantWarnings (got: $($envelopeKeys -join ','))"
+
+    # T5 - schema URN
+    Test-Result -Success ($rc.schemas -contains 'urn:scimserver:params:scim:schemas:admin:2.0:RuntimeConfig') `
+        -Message "9z-BZ.T5: advertises the RuntimeConfig schema URN"
+
+    # T6 - every group present
+    $groupNames = @($rc.groups.PSObject.Properties.Name | Sort-Object)
+    $expectedGroups = @('database', 'http', 'logging', 'scim')
+    Test-Result -Success (-not (Compare-Object $groupNames $expectedGroups)) `
+        -Message "9z-BZ.T6: reports all four config groups (got: $($groupNames -join ','))"
+
+    # T7 - SELF-CONSISTENCY: every numeric effective value sits inside its own bounds.
+    $outOfBounds = @()
+    $settingCount = 0
+    foreach ($g in $rc.groups.PSObject.Properties) {
+        foreach ($s in $g.Value.PSObject.Properties) {
+            $settingCount++
+            $v = $s.Value
+            if ($null -ne $v.min -and $null -ne $v.max -and $v.effective -is [int]) {
+                if ($v.effective -lt $v.min -or $v.effective -gt $v.max) {
+                    $outOfBounds += "$($g.Name).$($s.Name)=$($v.effective) not in [$($v.min),$($v.max)]"
+                }
+            }
+        }
+    }
+    Test-Result -Success ($outOfBounds.Count -eq 0 -and $settingCount -ge 15) `
+        -Message "9z-BZ.T7: all $settingCount effective values sit inside their published bounds (expected >= 15)$(if ($outOfBounds) { ' - VIOLATIONS: ' + ($outOfBounds -join '; ') })"
+
+    # T8 - provenance is always reported
+    $badSource = @()
+    $sourceChecked = 0
+    foreach ($g in $rc.groups.PSObject.Properties) {
+        foreach ($s in $g.Value.PSObject.Properties) {
+            $sourceChecked++
+            if ($s.Value.source -notin @('env', 'legacy-env', 'default')) {
+                $badSource += "$($g.Name).$($s.Name)=$($s.Value.source)"
+            }
+        }
+    }
+    Test-Result -Success ($badSource.Count -eq 0 -and $sourceChecked -ge 15) `
+        -Message "9z-BZ.T8: all $sourceChecked settings report a valid provenance (expected >= 15)$(if ($badSource) { ' - BAD: ' + ($badSource -join '; ') })"
+
+    # T9 - NO SECRET may be reachable through this surface
+    $raw = $rcRaw
+    $forbidden = @('DATABASE_URL', 'OAUTH_CLIENT_SECRET', 'SCIM_SHARED_SECRET', 'JWT_SECRET',
+                   'JWKS_HOST_ALLOWLIST', 'CREDENTIAL_KEK', 'OAUTH_JWT_PRIVATE_KEY', 'postgresql://')
+    $leaked = @($forbidden | Where-Object { $raw -like "*$_*" })
+    Test-Result -Success ($leaked.Count -eq 0 -and $raw.Length -gt 100) `
+        -Message "9z-BZ.T9: no secret-bearing key or value in the $($raw.Length)-char payload$(if ($leaked) { ' - LEAKED: ' + ($leaked -join ',') })"
+
+    # T10 - X15-F2: the HTTP timeouts this deployment actually applied
+    $httpGroup = $rc.groups.http
+    Test-Result -Success ($null -ne $httpGroup.requestTimeoutMs -and $null -ne $httpGroup.headersTimeoutMs) `
+        -Message "9z-BZ.T10: requestTimeout AND headersTimeout are both reported (X15-F2 closed)"
+
+    # T11 - X15-F3: the pool acquire timeout exists and is bounded
+    $poolAcquire = $rc.groups.database.poolAcquireTimeoutMs
+    Test-Result -Success ($poolAcquire.effective -gt 0) `
+        -Message "9z-BZ.T11: DB pool acquire timeout is a positive bound, not pg's wait-forever 0 (X15-F3 closed) - $($poolAcquire.effective)ms"
+
+    # T12 - a coherent deployment reports no invariant warnings
+    Test-Result -Success ($rc.invariantWarnings.Count -eq 0) `
+        -Message "9z-BZ.T12: no cross-key invariant warnings on this deployment$(if ($rc.invariantWarnings) { ' - ' + ($rc.invariantWarnings -join '; ') })"
+
+} catch {
+    Test-Result -Success $false -Message "9z-BZ: runtime config section threw: $($_.Exception.Message)"
+}
+Write-Host "`n--- 9z-BZ: runtime config surface (W1.7c) Complete ---" -ForegroundColor Green
+
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
