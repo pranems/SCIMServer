@@ -180,6 +180,15 @@ Invoke-Gate -Name 'web: vite production build' -WorkingDir (Join-Path $repoRoot 
     npm run build 2>&1 | Out-Host
 }
 
+# Offline-only checks (C1-C5): coverage, SHA-256 integrity, update/obsolete
+# closure, freshness and README linkage. The network checks (O1-O3) are NOT run
+# here on purpose - pre-push must stay deterministic and work offline. They run
+# monthly in .github/workflows/rfc-currency.yml and on demand via
+# `npm run rfcs:check:online`.
+Invoke-Gate -Name 'docs: RFC corpus current + intact' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/sync-rfcs.ps1') -Quiet 2>&1 | Out-Host
+}
+
 # -------------------------------------------------------------------------
 # Validate gates (mirror CI validate job)
 # -------------------------------------------------------------------------

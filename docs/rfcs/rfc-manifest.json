@@ -1,0 +1,334 @@
+{
+  "$comment": [
+    "Machine-checked inventory of every RFC mirrored in this repository.",
+    "DO NOT HAND-EDIT the generated fields (title, status, published, updatedBy,",
+    "obsoletedBy, errata, sha256). Run `pwsh -File scripts/sync-rfcs.ps1 -Update`,",
+    "which rewrites them from https://www.rfc-editor.org. Hand-maintained fields",
+    "are `rfc`, `file`, `role`, `retrieved` and the waivers[] array.",
+    "Enforced by scripts/sync-rfcs.ps1 (checks C1-C5 offline, O1-O3 with -Online)."
+  ],
+  "lastVerified": "2026-07-29",
+  "sources": {
+    "index": "https://www.rfc-editor.org/rfc-index.xml",
+    "errata": "https://www.rfc-editor.org/errata.json",
+    "textFormat": "https://www.rfc-editor.org/rfc/rfc{N}.txt",
+    "infoFormat": "https://www.rfc-editor.org/info/rfc{N}"
+  },
+  "mirrors": [
+    {
+      "rfc": "7642",
+      "file": "docs/rfcs/rfc7642.txt",
+      "role": "SCIM: Definitions, Overview, Concepts and Requirements. Background and use cases; not normative for schema.",
+      "retrieved": "2026-04-16",
+      "title": "System for Cross-domain Identity Management: Definitions, Overview, Concepts, and Requirements",
+      "status": "INFORMATIONAL",
+      "published": "2015-September",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Held for Document Update": 2,
+        "Verified": 1
+      },
+      "sha256": "4abbf1bf65926800df6604d627ac0e1d8a0efa784ddcb63b5b59ca8cf4a93e56"
+    },
+    {
+      "rfc": "7643",
+      "file": "docs/rfcs/rfc7643.txt",
+      "role": "SCIM Core Schema. THE normative source for attribute data types, the complex/multi-valued model and the sub-attribute nesting rule (section 2.3.8).",
+      "retrieved": "2026-04-16",
+      "title": "System for Cross-domain Identity Management: Core Schema",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-September",
+      "updatedBy": [
+        "9865",
+        "9967"
+      ],
+      "obsoletedBy": [],
+      "errata": {
+        "Held for Document Update": 12,
+        "Rejected": 5,
+        "Reported": 7,
+        "Verified": 16
+      },
+      "sha256": "df799c112a3fa5be3c0fe054c08b1f4eb5d07590c4c8343a014c4537bf638ae3"
+    },
+    {
+      "rfc": "7644",
+      "file": "docs/rfcs/rfc7644.txt",
+      "role": "SCIM Protocol. The PATCH path ABNF (section 3.5.2) and filter grammar (section 3.4.2.2) that make the two-level sub-attribute model addressable - and anything deeper unaddressable.",
+      "retrieved": "2026-04-16",
+      "title": "System for Cross-domain Identity Management: Protocol",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-September",
+      "updatedBy": [
+        "9865",
+        "9967"
+      ],
+      "obsoletedBy": [],
+      "errata": {
+        "Held for Document Update": 6,
+        "Reported": 7,
+        "Verified": 5
+      },
+      "sha256": "b9078e016c98b86934a23c80926b74fc8b59885ab2943729ec2493c17488a09b"
+    },
+    {
+      "rfc": "9865",
+      "file": "docs/rfcs/rfc9865.txt",
+      "role": "Cursor-based pagination. Updates RFC 7643 + RFC 7644; adds the ServiceProviderConfig 'pagination' complex attribute (all-simple sub-attributes).",
+      "retrieved": "2026-07-29",
+      "title": "Cursor-Based Pagination of System of Cross-domain Identity Management (SCIM) Resources",
+      "status": "PROPOSED STANDARD",
+      "published": "2025-October",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "ed56d0cf69e82c757480a42df4c68f3c636647493cfb3e9f8f12ceea158edc6d"
+    },
+    {
+      "rfc": "9967",
+      "file": "docs/rfcs/rfc9967.txt",
+      "role": "SCIM profile for Security Event Tokens. Updates RFC 7643 + RFC 7644; adds the ServiceProviderConfig 'securityEvents' complex attribute, including a multi-valued SIMPLE sub-attribute (eventUris).",
+      "retrieved": "2026-07-29",
+      "title": "System for Cross-Domain Identity Management (SCIM) Profile for Security Event Tokens (SETs)",
+      "status": "PROPOSED STANDARD",
+      "published": "2026-May",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "c6dbda036453b2629327005e247ba073666cb39c6ca8e4f1c78d05e860b9b543"
+    },
+    {
+      "rfc": "6749",
+      "file": "docs/auth/rfcs/rfc6749.txt",
+      "role": "OAuth 2.0 Authorization Framework. Token endpoint, grant types, error catalog.",
+      "retrieved": "2026-06-18",
+      "title": "The OAuth 2.0 Authorization Framework",
+      "status": "PROPOSED STANDARD",
+      "published": "2012-October",
+      "updatedBy": [
+        "8252",
+        "8996",
+        "9700"
+      ],
+      "obsoletedBy": [],
+      "errata": {
+        "Held for Document Update": 2,
+        "Rejected": 1,
+        "Reported": 23,
+        "Verified": 5
+      },
+      "sha256": "f204fc8661d6c92d2ec6e0b54808f961a9ad26e792f57f312d9528335519bd71"
+    },
+    {
+      "rfc": "6750",
+      "file": "docs/auth/rfcs/rfc6750.txt",
+      "role": "OAuth 2.0 Bearer Token Usage. How a bearer token is presented; WWW-Authenticate challenge.",
+      "retrieved": "2026-06-18",
+      "title": "The OAuth 2.0 Authorization Framework: Bearer Token Usage",
+      "status": "PROPOSED STANDARD",
+      "published": "2012-October",
+      "updatedBy": [
+        "8996",
+        "9700"
+      ],
+      "obsoletedBy": [],
+      "errata": {
+        "Reported": 2
+      },
+      "sha256": "9dc385cf4ecdd85024e5a95e447ede9230e11700bf35251906b25b37557d604b"
+    },
+    {
+      "rfc": "7517",
+      "file": "docs/auth/rfcs/rfc7517.txt",
+      "role": "JSON Web Key (JWK). The JWKS supplying verification keys by kid.",
+      "retrieved": "2026-06-18",
+      "title": "JSON Web Key (JWK)",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-May",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Reported": 1
+      },
+      "sha256": "681c19b92a85068716b7e89c5815aa821bd3f11c755ff1c641b40ae9851bb33c"
+    },
+    {
+      "rfc": "7519",
+      "file": "docs/auth/rfcs/rfc7519.txt",
+      "role": "JSON Web Token (JWT). The token format Entra signs and SCIMServer validates and issues.",
+      "retrieved": "2026-06-18",
+      "title": "JSON Web Token (JWT)",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-May",
+      "updatedBy": [
+        "7797",
+        "8725"
+      ],
+      "obsoletedBy": [],
+      "errata": {
+        "Rejected": 2,
+        "Reported": 3,
+        "Verified": 2
+      },
+      "sha256": "fecd930e9ccf2276b95c0017c6c4ff5d09352e4bc3c7629946447894e0f97248"
+    },
+    {
+      "rfc": "7521",
+      "file": "docs/auth/rfcs/rfc7521.txt",
+      "role": "Assertion Framework for OAuth 2.0. The umbrella RFC 7523 / 8693 profile.",
+      "retrieved": "2026-06-15",
+      "title": "Assertion Framework for OAuth 2.0 Client Authentication and Authorization Grants",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-May",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "d5d97b3e691c9bbc495c277cc2cd79316b82486991468fc346a96ab59ba4b3c8"
+    },
+    {
+      "rfc": "7523",
+      "file": "docs/auth/rfcs/rfc7523.txt",
+      "role": "JWT profile for OAuth 2.0 client authentication and authorization grants. Today's WIF path.",
+      "retrieved": "2026-06-15",
+      "title": "JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and Authorization Grants",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-May",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "ae24f77a8fc4338903c805c6ace38def1f23d40194aea87b123b13c5b3d2d915"
+    },
+    {
+      "rfc": "7591",
+      "file": "docs/auth/rfcs/rfc7591.txt",
+      "role": "OAuth 2.0 Dynamic Client Registration. The token_endpoint_auth_method registry.",
+      "retrieved": "2026-06-18",
+      "title": "OAuth 2.0 Dynamic Client Registration Protocol",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-July",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Rejected": 1,
+        "Reported": 2
+      },
+      "sha256": "f9cd8b8eefdb2d1b1bd5734310f246926db0abb4ec1b2f933f358d58327964e3"
+    },
+    {
+      "rfc": "7636",
+      "file": "docs/auth/rfcs/rfc7636.txt",
+      "role": "Proof Key for Code Exchange (PKCE).",
+      "retrieved": "2026-06-18",
+      "title": "Proof Key for Code Exchange by OAuth Public Clients",
+      "status": "PROPOSED STANDARD",
+      "published": "2015-September",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Rejected": 2,
+        "Reported": 2,
+        "Verified": 1
+      },
+      "sha256": "1972e5d81cbaba7066cfd46374207bc2b4546b085ed5dd9b034e79e023e0ca31"
+    },
+    {
+      "rfc": "8414",
+      "file": "docs/auth/rfcs/rfc8414.txt",
+      "role": "OAuth 2.0 Authorization Server Metadata. The .well-known discovery document.",
+      "retrieved": "2026-06-18",
+      "title": "OAuth 2.0 Authorization Server Metadata",
+      "status": "PROPOSED STANDARD",
+      "published": "2018-June",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Rejected": 1,
+        "Reported": 1
+      },
+      "sha256": "16c816e4e0fdbffb7e910ff3017867bf39debe9cb7f52f5cbc508a052ed660e8"
+    },
+    {
+      "rfc": "8693",
+      "file": "docs/auth/rfcs/rfc8693.txt",
+      "role": "OAuth 2.0 Token Exchange. The token-exchange WIF profile.",
+      "retrieved": "2026-06-15",
+      "title": "OAuth 2.0 Token Exchange",
+      "status": "PROPOSED STANDARD",
+      "published": "2020-January",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Reported": 1
+      },
+      "sha256": "358d658014738bf4dc56c8aae2094ce716ede23b6d5a80488a7dc8e8d72da609"
+    },
+    {
+      "rfc": "8705",
+      "file": "docs/auth/rfcs/rfc8705.txt",
+      "role": "OAuth 2.0 Mutual-TLS client authentication and certificate-bound access tokens.",
+      "retrieved": "2026-06-18",
+      "title": "OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens",
+      "status": "PROPOSED STANDARD",
+      "published": "2020-February",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "6e45a1ee94c6a6a177a4cb077fe67d74bd70c1218c9362f2db2f153239612414"
+    },
+    {
+      "rfc": "9449",
+      "file": "docs/auth/rfcs/rfc9449.txt",
+      "role": "OAuth 2.0 Demonstrating Proof of Possession (DPoP).",
+      "retrieved": "2026-06-18",
+      "title": "OAuth 2.0 Demonstrating Proof of Possession (DPoP)",
+      "status": "PROPOSED STANDARD",
+      "published": "2023-September",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {
+        "Verified": 1
+      },
+      "sha256": "3842c58e1f6043389416023b9bb8d765048266024982fbbd90640e05943f4e13"
+    },
+    {
+      "rfc": "9700",
+      "file": "docs/auth/rfcs/rfc9700.txt",
+      "role": "Best Current Practice for OAuth 2.0 Security. The OAuth 2.1 security baseline.",
+      "retrieved": "2026-06-18",
+      "title": "Best Current Practice for OAuth 2.0 Security",
+      "status": "BEST CURRENT PRACTICE",
+      "published": "2025-January",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "9919d061d40a97886ca866b51c69389b6c81c65cd4b979056c14fdbebfcf622a"
+    }
+  ],
+  "waivers": [
+    {
+      "rfc": "8252",
+      "updates": "6749",
+      "reason": "OAuth 2.0 for Native Apps. Constrains the authorization-code flow in a native user-agent. SCIMServer has no native-app client and no user-agent redirect flow (client_credentials + jwt-bearer only), so nothing it says applies. Re-evaluate if Phase Q4 ever ships the authorization-code grant.",
+      "raisedBy": "scripts/sync-rfcs.ps1 C3 on 2026-07-29"
+    },
+    {
+      "rfc": "8996",
+      "updates": "6749, 6750",
+      "reason": "Deprecating TLS 1.0 and TLS 1.1 (BCP 195). Already satisfied and independently enforced: Azure Container Apps ingress terminates TLS 1.2+, and the Entra SCIM contract mandates TLS 1.2 with a pinned cipher list. Mirroring the text would add nothing the platform does not already guarantee. Owned by the auth workstream (feat/wif); mirror it there if the auth explainer set is ever extended.",
+      "raisedBy": "scripts/sync-rfcs.ps1 C3 on 2026-07-29"
+    },
+    {
+      "rfc": "7797",
+      "updates": "7519",
+      "reason": "JWS Unencoded Payload Option (b64:false). SCIMServer neither produces nor accepts unencoded-payload JWS; its validators require standard base64url JWS compact serialization. Tracked as an auth-workstream item because a validator that silently honoured b64:false would be a signature-bypass surface.",
+      "raisedBy": "scripts/sync-rfcs.ps1 C3 on 2026-07-29"
+    },
+    {
+      "rfc": "8725",
+      "updates": "7519",
+      "reason": "JWT Best Current Practices. Genuinely load-bearing for WIF assertion validation (alg confusion, aud/iss pinning, kid handling). NOT waived on merit - waived only because docs/auth/rfcs/ is owned by the feat/wif workstream and adding a mirror there from this branch would collide with an in-flight session. FOLLOW-UP: mirror rfc8725.txt plus RFC_8725_EXPLAINED.md on the auth branch, then delete this waiver.",
+      "raisedBy": "scripts/sync-rfcs.ps1 C3 on 2026-07-29"
+    }
+  ]
+}
