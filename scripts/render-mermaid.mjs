@@ -154,34 +154,75 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 await page.setContent('<!DOCTYPE html><html><body><div id="host"></div></body></html>');
 await page.addScriptTag({ path: MERMAID_UMD });
-await page.evaluate(() => {
-  window.mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
-});
+
+/**
+ * CONFIG FIDELITY (fixed 2026-07-28).
+ *
+ * This gate previously initialized with `securityLevel: 'loose'`, which is NOT
+ * what renders the diagram for a human. bierner.markdown-mermaid uses Mermaid's
+ * DEFAULT `securityLevel: 'strict'` (verified by reading the extension's
+ * dist-preview bundle), under which labels are run through DOMPurify. A gate
+ * that renders under `loose` can therefore be green while the preview mangles
+ * or drops content - the exact "green gate, broken preview" class this gate
+ * exists to prevent (cf. the 2026-07-27 version-drift incident).
+ *
+ * The theme also matters: the extension picks `lightModeTheme` (default
+ * "default") or `darkModeTheme` (default "dark") from the active VS Code color
+ * theme, so a diagram must render under BOTH - a repo is read by people using
+ * either. `maxTextSize` mirrors the extension's own default; when a diagram
+ * exceeds it Mermaid silently swaps the body for an error message instead of
+ * throwing, which is caught by the error-diagram check below.
+ */
+const RENDER_CONFIGS = [
+  { label: 'light', config: { startOnLoad: false, securityLevel: 'strict', theme: 'default', maxTextSize: 50_000 } },
+  { label: 'dark', config: { startOnLoad: false, securityLevel: 'strict', theme: 'dark', maxTextSize: 50_000 } },
+];
 
 const failures = [];
-for (const [idx, b] of blocks.entries()) {
-  const result = await page.evaluate(
-    async ([text, id]) => {
-      try {
-        const { svg } = await window.mermaid.render(`m${id}`, text);
-        if (!svg || svg.length === 0) return { ok: false, error: 'render produced an empty SVG' };
-        // Mermaid emits an "error icon" SVG instead of throwing for some failures.
-        if (/aria-roledescription="error"|class="error-icon"|Syntax error in text/i.test(svg)) {
-          return { ok: false, error: 'mermaid produced its ERROR diagram instead of the requested one' };
+for (const { label, config } of RENDER_CONFIGS) {
+  await page.evaluate((cfg) => {
+    window.mermaid.initialize(cfg);
+  }, config);
+
+  for (const [idx, b] of blocks.entries()) {
+    const result = await page.evaluate(
+      async ([text, id]) => {
+        try {
+          const { svg } = await window.mermaid.render(`m${id}`, text);
+          if (!svg || svg.length === 0) return { ok: false, error: 'render produced an empty SVG' };
+          // Mermaid emits an "error icon" SVG instead of throwing for some failures,
+          // and silently substitutes a message when maxTextSize is exceeded.
+          if (/aria-roledescription="error"|class="error-icon"|Syntax error in text|Maximum text size in diagram exceeded/i.test(svg)) {
+            return { ok: false, error: 'mermaid produced its ERROR diagram instead of the requested one' };
+          }
+          // DEGENERATE-RENDER CHECK: a diagram can "succeed" and still be invisible
+          // (zero-size box, or all labels sanitized away). Measure the real thing.
+          const host = document.getElementById('host');
+          host.innerHTML = svg;
+          const el = host.querySelector('svg');
+          const box = el ? el.getBoundingClientRect() : { width: 0, height: 0 };
+          const textLen = (el ? el.textContent : '').replace(/\s+/g, '').length;
+          host.innerHTML = '';
+          if (box.width < 40 || box.height < 20) {
+            return { ok: false, error: `rendered but effectively invisible (${Math.round(box.width)}x${Math.round(box.height)}px)` };
+          }
+          if (textLen === 0) {
+            return { ok: false, error: 'rendered but contains NO text - every label was dropped or sanitized away' };
+          }
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: String((e && e.message) || e) };
         }
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: String((e && e.message) || e) };
-      }
-    },
-    [b.text, idx],
-  );
-  if (!result.ok) failures.push({ ...b, error: result.error });
+      },
+      [b.text, `${label}_${idx}`],
+    );
+    if (!result.ok) failures.push({ ...b, error: `[${label} theme] ${result.error}` });
+  }
 }
 
 await browser.close();
 
-console.log(`Mermaid blocks rendered: ${blocks.length}`);
+console.log(`Mermaid blocks rendered: ${blocks.length} (x${RENDER_CONFIGS.length} themes, securityLevel=strict - matches the VS Code extension)`);
 if (failures.length === 0) {
   console.log('All Mermaid diagrams render cleanly in a real browser.');
   process.exit(0);

@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "docs:mermaid": "node scripts/validate-mermaid.mjs",
-    "docs:mermaid:render": "node scripts/render-mermaid.mjs"
+    "docs:mermaid:render": "node scripts/render-mermaid.mjs",
+    "docs:mermaid:doctor": "node scripts/doctor-mermaid.mjs"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",
