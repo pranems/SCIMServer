@@ -29,11 +29,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Node majors permitted as a base image, with the date maintenance support ends.
-$SUPPORTED_MAJORS = @{
-    '22' = @{ Name = 'Jod';     MaintenanceEnds = '2027-04-30' }
-    '24' = @{ Name = 'Krypton'; MaintenanceEnds = '2028-04-30' }
-}
+# Shared with scripts/audit-deployment-doc.ps1, which applies the same rule to the
+# DEPLOYED artifact. Keep the LTS table in one place.
+. "$PSScriptRoot/node-lts.ps1"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $dockerfiles = Get-ChildItem -Path $repoRoot -Filter 'Dockerfile*' -Recurse -File |
@@ -55,25 +53,14 @@ foreach ($file in $dockerfiles) {
         $checked++
         $major = $Matches['major']
 
-        if (-not $SUPPORTED_MAJORS.ContainsKey($major)) {
+        $issue = Get-NodeMajorSupportIssue -Major $major
+        if ($issue) {
             $findings += [pscustomobject]@{
                 File    = $relative
                 Line    = $i + 1
                 Major   = $major
                 Text    = $line.Trim()
-                Message = "node:$major is not an Active/Maintenance LTS release. Allowed: $(($SUPPORTED_MAJORS.Keys | Sort-Object) -join ', ')."
-            }
-            continue
-        }
-
-        $endsOn = [datetime]::ParseExact($SUPPORTED_MAJORS[$major].MaintenanceEnds, 'yyyy-MM-dd', $null)
-        if ((Get-Date) -gt $endsOn) {
-            $findings += [pscustomobject]@{
-                File    = $relative
-                Line    = $i + 1
-                Major   = $major
-                Text    = $line.Trim()
-                Message = "node:$major maintenance ended $($SUPPORTED_MAJORS[$major].MaintenanceEnds). Move to a supported LTS and update SUPPORTED_MAJORS."
+                Message = $issue
             }
         }
     }

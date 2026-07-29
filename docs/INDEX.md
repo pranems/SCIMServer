@@ -18,6 +18,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) | **Canonical infra reference** - 6 form factors, every Azure resource type + Bicep template, measured state of all 3 live estates, network/data/supply-chain topology, drift + gap register |
 | [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | End-to-end Azure Container Apps deployment + Entra ID setup |
 | [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Government, BLEU (France), China - sovereign cloud deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker Compose build/run, 4-stage Dockerfile, healthcheck, testing |
