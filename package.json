@@ -7,10 +7,12 @@
   "scripts": {
     "docs:mermaid": "node scripts/validate-mermaid.mjs",
     "docs:mermaid:render": "node scripts/render-mermaid.mjs",
-    "docs:mermaid:doctor": "node scripts/doctor-mermaid.mjs"
+    "docs:mermaid:doctor": "node scripts/doctor-mermaid.mjs",
+    "docs:html": "node scripts/export-docs-html.mjs"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",
+    "markdown-it": "^14.3.0",
     "mermaid": "11.15.0"
   }
 }
