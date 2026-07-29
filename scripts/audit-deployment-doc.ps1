@@ -127,21 +127,29 @@ if ($docText -match '\*\*Last verified:\*\*\s*(\d{4}-\d{2}-\d{2})') {
 
 # ---------------------------------------------------------------- C3
 Write-Section '[C3] infra element coverage'
-$elements = @()
-$elements += Get-ChildItem -Path $repoRoot -Filter 'Dockerfile*' -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' -and $_.FullName -notmatch '[\\/]docs[\\/]archive[\\/]' }
-$elements += Get-ChildItem -Path $repoRoot -Filter 'docker-compose*.yml' -File -ErrorAction SilentlyContinue
-$infraDir = Join-Path $repoRoot 'infra'
-if (Test-Path $infraDir) {
-    $elements += Get-ChildItem -Path $infraDir -Filter '*.bicep' -Recurse -File -ErrorAction SilentlyContinue
+# git-based enumeration: a Get-ChildItem -Recurse over the repo root walks
+# node_modules (22.7s vs 0.08s) and surfaces vendored Dockerfiles that are not
+# ours. --others catches a brand-new element before it is committed.
+Push-Location $repoRoot
+try {
+    $elements = @(git ls-files --cached --others --exclude-standard) |
+        Where-Object {
+            $_ -notmatch '(^|/)docs/archive/' -and (
+                $_ -match '(^|/)Dockerfile[^/]*$' -or
+                $_ -match '(^|/)docker-compose[^/]*\.ya?ml$' -or
+                $_ -match '^infra/.*\.bicep$'
+            )
+        } | Sort-Object -Unique
+} finally {
+    Pop-Location
 }
 
 $missing = @()
 foreach ($e in $elements) {
-    $name = $e.Name
+    $name = Split-Path $e -Leaf
     if ($docText -notmatch [regex]::Escape($name)) { $missing += $name }
 }
-if (-not $Quiet) { Write-Host "  infra elements on disk: $($elements.Count)   undocumented: $($missing.Count)" }
+if (-not $Quiet) { Write-Host "  infra elements on disk: $(@($elements).Count)   undocumented: $($missing.Count)" }
 if ($missing.Count -gt 0) {
     $failures += "C3: infra element(s) exist but are never named in the doc:`n" +
                  (($missing | Sort-Object -Unique | ForEach-Object { "        $_" }) -join "`n")
