@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { findMermaidRenderers, authoritativeRenderer } from './mermaid-renderers.mjs';
 
 const ROOT = process.cwd();
 const require = createRequire(import.meta.url);
@@ -36,34 +37,43 @@ const findings = [];
 const add = (level, title, detail, remedy) => findings.push({ level, title, detail, remedy });
 
 // ---------------------------------------------------------------------------
-// 1. Is the extension installed at all?
+// 1. WHICH renderer(s) can claim the preview?
+//
+//    THE 2026-07-28 BLIND SPOT. This check originally looked only at
+//    ~/.vscode/extensions and therefore never saw that VS Code >= 1.104 ships
+//    its OWN `vscode.mermaid-markdown-features` (bundling a DIFFERENT Mermaid,
+//    using the SAME `markdown-mermaid.*` config namespace, and contributing the
+//    SAME `markdown.previewScripts`). With both present, two Mermaid builds race
+//    to render the same <pre class="mermaid"> nodes and one silently wins.
 // ---------------------------------------------------------------------------
+const renderers = findMermaidRenderers();
+const authoritative = authoritativeRenderer(renderers);
 const extRoot = join(HOME, '.vscode', 'extensions');
-let extDir = null;
-try {
-  extDir = readdirSync(extRoot)
-    .filter((d) => d.startsWith(`${EXT_ID}-`))
-    .sort()
-    .pop() ?? null;
-} catch {
-  /* extensions dir unreadable */
-}
 
-if (!extDir) {
+if (renderers.length === 0) {
   add(
     'BLOCKER',
-    'The Mermaid preview extension is NOT installed',
-    `No ${EXT_ID}-* directory under ${extRoot}. VS Code's built-in Markdown preview has NO mermaid support of its own, so every diagram renders as a plain code block with no error.`,
-    `Install it: code --install-extension ${EXT_ID}  (or search "Markdown Preview Mermaid Support" in the Extensions view)`,
+    'No Mermaid renderer found at all',
+    `Neither VS Code's built-in vscode.mermaid-markdown-features nor ${EXT_ID} was found. The Markdown preview has NO mermaid support without one, so every diagram renders as a plain code block with no error.`,
+    `Update VS Code to 1.104 or newer (Mermaid is then built in), or install: code --install-extension ${EXT_ID}`,
   );
+} else if (renderers.length === 1) {
+  const r = renderers[0];
+  add('OK', `Exactly one Mermaid renderer (${r.kind})`, `${r.id} bundling mermaid ${r.version ?? 'unknown'}`, null);
 } else {
-  add('OK', 'Extension installed', extDir, null);
+  add(
+    'BLOCKER',
+    `${renderers.length} COMPETING Mermaid renderers are installed`,
+    `${renderers.map((r) => `${r.id} [${r.kind}] mermaid ${r.version ?? '?'}`).join('  AND  ')}\n     Both contribute markdown.previewScripts for the same mermaid fences and share the markdown-mermaid.* config namespace, so two different Mermaid builds race to render the same <pre class="mermaid"> nodes in one webview. The loser can replace or re-parse the winner's output, leaving a BLANK diagram with no error message.`,
+    `VS Code has shipped Mermaid built in since 1.104, so the marketplace extension is redundant AND conflicting. Remove it: code --uninstall-extension ${EXT_ID}   (then reload the window)`,
+  );
 }
 
 // ---------------------------------------------------------------------------
 // 2. Does the gate's mermaid version match the one that actually renders?
-//    A mismatch means the gate can be green while the preview is broken.
-//    (This exact drift bit us on 2026-07-27: gate 11.6 vs extension 11.12.2.)
+//    The BUILT-IN is authoritative: it ships with the editor, so it is what
+//    every reader of this repo gets. (Drift bit us twice: 11.6 vs 11.12.2 on
+//    2026-07-27, then 11.12.2 vs the built-in's 11.15.0 on 2026-07-28.)
 // ---------------------------------------------------------------------------
 let gateVersion = null;
 try {
@@ -77,26 +87,15 @@ try {
   );
 }
 
-let extVersion = null;
-if (extDir) {
-  for (const rel of ['dist-preview/index.bundle.js', 'dist-notebook/index.bundle.js']) {
-    const p = join(extRoot, extDir, ...rel.split('/'));
-    if (!existsSync(p)) continue;
-    const m = readFileSync(p, 'utf8').match(/version:"(\d+\.\d+\.\d+)"/);
-    if (m) {
-      extVersion = m[1];
-      break;
-    }
-  }
-}
+const extVersion = authoritative?.version ?? null;
 if (gateVersion && extVersion) {
   if (gateVersion === extVersion) {
-    add('OK', 'Mermaid version', `gate and extension both on ${gateVersion}`, null);
+    add('OK', 'Mermaid version', `gate and the authoritative renderer (${authoritative.id}) both on ${gateVersion}`, null);
   } else {
     add(
       'BLOCKER',
       'Mermaid VERSION DRIFT between the gate and the real renderer',
-      `gate uses ${gateVersion}; the VS Code extension renders with ${extVersion}. A diagram can pass the gate and still break in the preview.`,
+      `gate uses ${gateVersion}; ${authoritative.id} [${authoritative.kind}] renders with ${extVersion}. A diagram can pass the gate and still break in the preview.`,
       `npm install --save-exact mermaid@${extVersion}   (at the repo root, then re-run the render gate)`,
     );
   }
@@ -114,10 +113,10 @@ if (gateVersion && extVersion) {
 //    dismissible banner that is very easy to miss.
 // ---------------------------------------------------------------------------
 let declaresTrust = null;
-if (extDir) {
+if (authoritative) {
   try {
-    const pkg = JSON.parse(readFileSync(join(extRoot, extDir, 'package.json'), 'utf8'));
-    declaresTrust = Boolean(pkg?.capabilities?.untrustedWorkspaces);
+    const pkg = JSON.parse(readFileSync(join(authoritative.dir, 'package.json'), 'utf8'));
+    declaresTrust = Boolean(pkg?.capabilities?.untrustedWorkspaces?.supported ?? pkg?.capabilities?.untrustedWorkspaces);
   } catch {
     /* ignore */
   }
@@ -138,11 +137,16 @@ try {
 }
 
 const here = ROOT.replace(/\\/g, '/').toLowerCase();
-if (trustedUris === null) {
+const trustLabel = authoritative ? `${authoritative.id} declares ${declaresTrust ? 'SUPPORT for' : 'NO support for'} untrusted workspaces` : 'no renderer found';
+if (declaresTrust) {
+  // VS Code's BUILT-IN renderer sets capabilities.untrustedWorkspaces.supported,
+  // so it keeps working in Restricted Mode. Trust is then irrelevant to mermaid.
+  add('OK', 'Workspace Trust is not a factor', trustLabel, null);
+} else if (trustedUris === null) {
   add(
     'CHECK',
     'Workspace Trust could not be read automatically',
-    'Restricted Mode DISABLES the mermaid extension entirely (it declares no untrustedWorkspaces support), and the only on-screen signal is a dismissible banner. This is the single most likely cause of "no diagrams, no error".',
+    `Restricted Mode DISABLES any extension that has not opted in, and ${trustLabel}. The only on-screen signal is a dismissible banner.`,
     'Command Palette -> "Workspaces: Manage Workspace Trust". If it says Restricted Mode, click Trust and reopen the preview.',
   );
 } else {
@@ -151,34 +155,53 @@ if (trustedUris === null) {
     add('OK', 'Workspace Trust', 'this folder is covered by a trusted path', null);
   } else {
     add(
-      declaresTrust ? 'WARN' : 'BLOCKER',
+      'BLOCKER',
       'This workspace is NOT in the trusted-folders list',
-      `${ROOT} is not covered by any entry in VS Code's trusted-folders store. In Restricted Mode VS Code disables every extension that has not opted into Workspace Trust, and ${EXT_ID} declares ${declaresTrust ? 'support' : 'NO support'} - so mermaid fences render as PLAIN CODE BLOCKS with no error at all.\n     (The store is flushed periodically, so if you trusted this folder in the current session it may not be recorded yet - verify in the UI.)`,
+      `${ROOT} is not covered by any entry in VS Code's trusted-folders store, and ${trustLabel} - so in Restricted Mode mermaid fences render as PLAIN CODE BLOCKS with no error at all.\n     (The store is flushed periodically, so if you trusted this folder in the current session it may not be recorded yet - verify in the UI.)`,
       'Command Palette -> "Workspaces: Manage Workspace Trust" -> Trust. Then reopen the preview.',
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// 4. Is the workspace recommendation actually present?
-//    copilot-instructions.md claimed this file existed for months. It did not:
-//    .gitignore excluded the whole .vscode folder, so a fresh clone never got a
-//    recommendation and nobody was ever prompted to install the extension.
+// 4. Does the workspace steer people to the RIGHT renderer?
+//    Two historical mistakes are checked here:
+//      a) The file was gitignored, so no clone ever saw a recommendation, while
+//         copilot-instructions.md claimed it existed.
+//      b) Once VS Code shipped Mermaid built in, RECOMMENDING the marketplace
+//         extension actively creates the two-renderer conflict from check 1.
 // ---------------------------------------------------------------------------
 const recFile = join(ROOT, '.vscode', 'extensions.json');
+const haveBuiltin = renderers.some((r) => r.kind === 'builtin');
 if (!existsSync(recFile)) {
   add(
-    'BLOCKER',
+    'WARN',
     '.vscode/extensions.json is missing',
-    'Nobody cloning this repo is prompted to install the mermaid extension, so a fresh machine silently has no diagram rendering.',
-    'Create .vscode/extensions.json with the recommendation AND make sure .gitignore does not exclude it.',
+    'Nothing steers a fresh clone toward (or away from) a Mermaid renderer.',
+    'Create .vscode/extensions.json AND make sure .gitignore uses `.vscode/*` + `!.vscode/extensions.json` (git cannot re-include a file whose parent DIRECTORY is excluded).',
   );
 } else {
   const rec = readFileSync(recFile, 'utf8');
-  if (!rec.includes(EXT_ID)) {
-    add('WARN', '.vscode/extensions.json does not recommend the mermaid extension', recFile, `Add "${EXT_ID}" to recommendations[].`);
+  const recommends = /"recommendations"\s*:\s*\[[^\]]*bierner\.markdown-mermaid/s.test(rec);
+  const unwanted = /"unwantedRecommendations"\s*:\s*\[[^\]]*bierner\.markdown-mermaid/s.test(rec);
+  if (haveBuiltin && recommends) {
+    add(
+      'BLOCKER',
+      '.vscode/extensions.json recommends a renderer that CONFLICTS with the built-in one',
+      `VS Code already ships vscode.mermaid-markdown-features, so recommending ${EXT_ID} tells every contributor to install a second, competing renderer.`,
+      `Move "${EXT_ID}" from recommendations[] to unwantedRecommendations[].`,
+    );
+  } else if (haveBuiltin && unwanted) {
+    add('OK', 'Workspace recommendation is correct', `built-in renderer used; ${EXT_ID} listed as unwanted`, null);
+  } else if (!haveBuiltin && !recommends) {
+    add(
+      'WARN',
+      'No built-in renderer AND no recommendation',
+      'This VS Code predates built-in Mermaid support and the workspace does not recommend an extension.',
+      `Add "${EXT_ID}" to recommendations[], or update VS Code to 1.104+.`,
+    );
   } else {
-    add('OK', 'Workspace recommendation present', `.vscode/extensions.json recommends ${EXT_ID}`, null);
+    add('OK', 'Workspace recommendation present', recFile, null);
   }
 }
 

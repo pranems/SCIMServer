@@ -18,6 +18,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, extname, relative } from 'node:path';
 import { createRequire } from 'node:module';
+import { findMermaidRenderers, authoritativeRenderer } from './mermaid-renderers.mjs';
 
 const ROOT = process.cwd();
 const require = createRequire(import.meta.url);
@@ -45,49 +46,43 @@ if (!existsSync(MERMAID_UMD)) {
  * VERSION-DRIFT GUARD.
  *
  * The gate is only trustworthy if it uses the SAME Mermaid version as the thing
- * that actually renders the diagram for a human. On 2026-07-27 the gate ran
- * mermaid 11.6 while the VS Code extension bundled 11.12.2, and two diagrams
- * that 11.6 accepted were rejected by 11.12.2 - so they were broken in the
- * operator's preview while the gate stayed green. Detect that drift loudly.
+ * that actually renders the diagram for a human. This has now bitten twice:
+ *   2026-07-27: gate 11.6 vs bierner.markdown-mermaid 11.12.2.
+ *   2026-07-28: gate 11.12.2 vs VS Code's BUILT-IN renderer 11.15.0 - a renderer
+ *               the gate did not know existed, because it only looked in
+ *               ~/.vscode/extensions and never at the editor's own bundled
+ *               extensions.
+ * Renderer discovery now lives in scripts/mermaid-renderers.mjs so the gate and
+ * the doctor can never disagree about what is authoritative.
  */
 function checkVersionDrift() {
   const ours = JSON.parse(
     readFileSync(join(ROOT, 'node_modules', 'mermaid', 'package.json'), 'utf8'),
   ).version;
-  const home = process.env.USERPROFILE || process.env.HOME;
-  if (!home) return ours;
-  const extRoot = join(home, '.vscode', 'extensions');
-  let extDir;
-  try {
-    extDir = readdirSync(extRoot)
-      .filter((d) => d.startsWith('bierner.markdown-mermaid-'))
-      .sort()
-      .pop();
-  } catch {
-    return ours;
+
+  const renderers = findMermaidRenderers();
+  if (renderers.length > 1) {
+    console.warn(
+      `\nWARNING: ${renderers.length} COMPETING Mermaid renderers are installed.\n` +
+        renderers.map((r) => `  - ${r.id} [${r.kind}] mermaid ${r.version ?? '?'}`).join('\n') +
+        `\n  Both inject markdown.previewScripts, so two Mermaid builds race in one\n` +
+        `  webview and diagrams can come out BLANK with no error.\n` +
+        `  Fix: npm run docs:mermaid:doctor\n`,
+    );
   }
-  if (!extDir) return ours;
-  // The extension bundles Mermaid into a single webview bundle; the version is
-  // present as a `version:"x.y.z"` literal.
-  const candidates = ['dist-preview/index.bundle.js', 'dist-notebook/index.bundle.js'];
-  for (const rel of candidates) {
-    const p = join(extRoot, extDir, ...rel.split('/'));
-    if (!existsSync(p)) continue;
-    const m = readFileSync(p, 'utf8').match(/version:"(1[0-9]\.\d+\.\d+)"/);
-    if (m) {
-      if (m[1] !== ours) {
-        console.warn(
-          `\nWARNING: Mermaid VERSION DRIFT.\n` +
-            `  gate uses          : mermaid ${ours} (root package.json)\n` +
-            `  VS Code renders w/ : mermaid ${m[1]} (${extDir})\n` +
-            `  A diagram can pass this gate and still break in the preview.\n` +
-            `  Fix: npm install --save-exact mermaid@${m[1]} at the repo root.\n`,
-        );
-      } else {
-        console.log(`Mermaid ${ours} (matches the VS Code extension bundle - no drift).`);
-      }
-      return ours;
-    }
+
+  const auth = authoritativeRenderer(renderers);
+  if (!auth || !auth.version) return ours;
+  if (auth.version !== ours) {
+    console.warn(
+      `\nWARNING: Mermaid VERSION DRIFT.\n` +
+        `  gate uses          : mermaid ${ours} (root package.json)\n` +
+        `  VS Code renders w/ : mermaid ${auth.version} (${auth.id} [${auth.kind}])\n` +
+        `  A diagram can pass this gate and still break in the preview.\n` +
+        `  Fix: npm install --save-exact mermaid@${auth.version} at the repo root.\n`,
+    );
+  } else {
+    console.log(`Mermaid ${ours} (matches ${auth.id} [${auth.kind}] - no drift).`);
   }
   return ours;
 }

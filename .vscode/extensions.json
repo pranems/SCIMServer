@@ -1,5 +1,25 @@
 {
-  "recommendations": [
+  "// why": [
+    "This file is deliberately EXEMPTED from the '.vscode/*' entry in .gitignore.",
+    "",
+    "VS Code 1.104+ ships Mermaid rendering for the Markdown preview BUILT IN, as",
+    "the bundled extension vscode.mermaid-markdown-features. Nothing needs to be",
+    "installed for docs/ diagrams to render - just open the Markdown Preview",
+    "(Ctrl+Shift+V).",
+    "",
+    "bierner.markdown-mermaid is therefore listed as UNWANTED, not recommended.",
+    "It predates the built-in support and does the same job with the same",
+    "'markdown-mermaid.*' config namespace and the same markdown.previewScripts",
+    "contribution, so installing both puts TWO different Mermaid builds in one",
+    "webview, racing to render the same <pre class=\"mermaid\"> nodes. The loser can",
+    "replace or re-parse the winner's output, and the diagram silently comes out",
+    "BLANK with no error. That was the root cause of the recurring 2026-07-27 and",
+    "2026-07-28 'I cannot see the diagrams' reports.",
+    "",
+    "If diagrams are missing, run: npm run docs:mermaid:doctor"
+  ],
+  "recommendations": [],
+  "unwantedRecommendations": [
     "bierner.markdown-mermaid"
   ]
 }
