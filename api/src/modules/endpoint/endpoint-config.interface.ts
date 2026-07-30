@@ -191,6 +191,23 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see RFC 7644 §3.4.2 - Querying resources
    */
   ENFORCE_RESOURCE_TYPES: 'EnforceResourceTypes',
+
+  /**
+   * When true, sub-attributes are handled per RFC 7643 instead of SCIMServer's
+   * historical behavior. Two orthogonal rules turn on together:
+   *  - §2.3.8: a complex attribute MUST NOT contain complex sub-attributes.
+   *    A payload that populates one is rejected 400 invalidValue.
+   *  - §1.2: a sub-attribute MAY be multi-valued as long as it stays simple,
+   *    so `skus: ["A","B"]` is accepted and each element is type-checked.
+   * When false (default), current behavior is preserved exactly: nested complex
+   * sub-attributes are accepted, and a multi-valued simple sub-attribute is
+   * rejected as "must be a string, got object".
+   * In practice: leave false unless you author custom schemas and want the
+   * server to hold them to the RFC.
+   * @see docs/rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md
+   * @see RFC 7643 §2.3.8, §1.2, errata 8415 + 5607
+   */
+  RFC_COMPLIANT_SUB_ATTRIBUTES: 'RfcCompliantSubAttributes',
 } as const;
 
 /**
@@ -417,6 +434,18 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'returns a 200 empty ListResponse (RFC 7644 §3.4.2) plus a non-fatal warning (server log + ' +
       'urn:scimserver:api:messages:2.0:Warning body member + X-SCIM-Warning header). Item-by-id reads ' +
       'and all writes still reject with 404. Set false for Entra provisioning of user-only (no Group) endpoints.',
+  },
+  RFC_COMPLIANT_SUB_ATTRIBUTES: {
+    key: ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, sub-attributes are handled per RFC 7643: a complex attribute MUST NOT contain ' +
+      'complex sub-attributes (§2.3.8, erratum 8415) so a payload populating one is rejected 400 ' +
+      'invalidValue, AND a multi-valued SIMPLE sub-attribute is honoured (§1.2, erratum 5607) with ' +
+      'each element type-checked. When false (default), current behavior is preserved exactly: ' +
+      'nested complex sub-attributes are accepted and a multi-valued simple sub-attribute is ' +
+      'rejected as "must be a string, got object". Leave false unless you author custom schemas.',
   },
 };
 

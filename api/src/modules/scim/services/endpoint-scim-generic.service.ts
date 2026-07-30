@@ -918,6 +918,13 @@ export class EndpointScimGenericService {
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
+      // Mirrors ScimServiceHelpers.validatePayloadSchema so the generic
+      // (custom resource type) path enforces RFC 7643 sub-attribute rules
+      // identically. Default false = current behavior.
+      rfcCompliantSubAttributes: getConfigBoolean(
+        config,
+        ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+      ),
     }, this.getAttrMapsForRT(resourceType, endpointId));
 
     if (!result.valid) {

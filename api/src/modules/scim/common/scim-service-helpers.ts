@@ -1058,6 +1058,15 @@ export class ScimSchemaHelpers {
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
+      // RfcCompliantSubAttributes (default false) turns on RFC 7643 §2.3.8
+      // (no complex sub-attributes) and §1.2 (multi-valued SIMPLE sub-attributes
+      // are legal). It rides inside the strict path because that is the only
+      // path that walks sub-attributes at all - with StrictSchemaValidation OFF
+      // there is no sub-attribute validation to make compliant.
+      rfcCompliantSubAttributes: getConfigBoolean(
+        config,
+        ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+      ),
     }, cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
 
     if (!result.valid) {

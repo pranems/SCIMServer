@@ -148,6 +148,12 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     defaultValue: true,
   },
   {
+    key: 'RfcCompliantSubAttributes',
+    label: 'RfcCompliantSubAttributes',
+    description: 'When OFF (default), current behavior: a schema may declare a complex sub-attribute and payloads for it are accepted, while a multi-valued simple sub-attribute is rejected. Turn ON to follow RFC 7643 instead - a complex sub-attribute is refused (2.3.8, erratum 8415) and a multi-valued simple sub-attribute is accepted with each element type-checked (1.2, erratum 5607). Requires StrictSchemaValidation ON to take effect.',
+    defaultValue: false,
+  },
+  {
     key: 'CustomResourceTypesEnabled',
     label: 'CustomResourceTypesEnabled',
     description: 'Allow registering custom resource types (beyond User and Group) on the Resource Types tab.',

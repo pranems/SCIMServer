@@ -461,6 +461,64 @@ export class SchemaValidator {
         }
         continue;
       }
+
+      // RFC 7643 §2.3.8: "A complex attribute MUST NOT contain sub-attributes
+      // that have sub-attributes (i.e., that are complex)." Reinforced by
+      // erratum 8415 (Verified 2025-10-28), which struck 'complex' from the
+      // legal values of subAttributes.type in §8.7.1.
+      //
+      // Opt-in only. The default (flag absent/false) preserves SCIMServer's
+      // historical unbounded recursion, so no existing endpoint changes
+      // behavior. `continue` avoids cascading a second, confusing error from
+      // recursing into a shape we just declared illegal.
+      //
+      // Deliberately keyed on the sub-attribute being COMPLEX, never on it
+      // being multi-valued: a multi-valued SIMPLE sub-attribute is legal per
+      // RFC 7643 §1.2 and erratum 5607.
+      if (
+        options.rfcCompliantSubAttributes === true &&
+        (subDef.type?.toLowerCase() === 'complex' ||
+          (subDef.subAttributes !== undefined && subDef.subAttributes.length > 0))
+      ) {
+        errors.push({
+          path: `${parentPath}.${key}`,
+          message:
+            `Sub-attribute '${subDef.name}' of complex attribute '${parentPath}' is itself complex, ` +
+            `which RFC 7643 §2.3.8 forbids: "A complex attribute MUST NOT contain sub-attributes ` +
+            `that have sub-attributes (i.e., that are complex)." ` +
+            `Set RfcCompliantSubAttributes=false on this endpoint to accept this schema shape.`,
+          scimType: 'invalidValue',
+        });
+        continue;
+      }
+
+      // RFC 7643 §1.2 defines a simple attribute as "singular or multi-valued",
+      // so a multi-valued SIMPLE sub-attribute is legal - erratum 5607 confirms
+      // it for `referenceTypes` inside `subAttributes`. SCIMServer historically
+      // treated EVERY sub-attribute as singular (see the legacy comment below),
+      // so `skus: ["A","B"]` was rejected with "must be a string, got object".
+      //
+      // Only honour it when the flag is on, and only when the value really is
+      // an array: null/undefined keep falling through to the existing path so
+      // RFC 7643 §2.5 unassigned-value handling is untouched.
+      if (
+        options.rfcCompliantSubAttributes === true &&
+        subDef.multiValued === true &&
+        Array.isArray(value)
+      ) {
+        const elementDef: SchemaAttributeDefinition = { ...subDef, multiValued: false };
+        value.forEach((element, index) => {
+          this.validateSingleValue(
+            `${parentPath}.${key}[${index}]`,
+            element,
+            elementDef,
+            options,
+            errors,
+          );
+        });
+        continue;
+      }
+
       // Sub-attributes are always single-valued in SCIM (multi-valued applies at the parent level)
       this.validateSingleValue(`${parentPath}.${key}`, value, subDef, options, errors);
     }
