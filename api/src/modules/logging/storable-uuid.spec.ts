@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { toStorableRequestId } from './storable-request-id';
+import { toStorableRequestId } from './storable-uuid';
 import { isUuid } from '../../shared/uuid';
 
 /**

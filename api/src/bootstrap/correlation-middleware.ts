@@ -38,7 +38,7 @@ import { REQUEST_LOGGING_META_KEY, type RequestLoggingMeta } from '../modules/lo
  *      hold arbitrary text.
  *
  * Normalising here would satisfy (2) by breaking (1). The guard therefore lives
- * at the PERSISTENCE boundary - see `logging/storable-request-id.ts` - so
+ * at the PERSISTENCE boundary - see `logging/storable-uuid.ts` - so
  * tracing keeps the caller's id while the column can never be poisoned.
  */
 export function applyCorrelationMiddleware(app: NestExpressApplication): void {

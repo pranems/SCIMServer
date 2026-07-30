@@ -14519,6 +14519,90 @@ try {
 Write-Host "`n--- 9z-CB: Malformed Admin Log Id Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CC: log display-name resolution reaches the userName fallback
+$script:currentSection = "9z-CC: log display-name resolution"
+# ============================================
+# Origin: 2026-07-30, read out of the SERVER LOG of a Prisma live run while
+# validating 9z-CB. Every GET /scim/admin/logs printed:
+#   prisma:error ... invalid input syntax for type uuid: "live-9z-V-user-..."
+# `resolveUserDisplayName` looks up by `scimId` (@db.Uuid) first and falls back
+# to `userName` (@db.Citext). A userName-shaped identifier made the FIRST query
+# raise P2023, so control jumped to the outer catch and the fallback was
+# UNREACHABLE - every userName-identified row kept its raw identifier while the
+# catch made it look like a clean degrade.
+#
+# Backend-aware on purpose: display-name resolution is a Prisma-branch feature
+# (the InMemory listLogs branch returns the stored identifier verbatim), so on
+# InMemory this asserts only that nothing regressed to an error.
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-CC: LOG DISPLAY-NAME RESOLUTION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $ccVersion = Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Method GET -Headers $headers
+    $ccBackend = $ccVersion.storage.persistenceBackend
+    Write-Host "  backend: $ccBackend" -ForegroundColor DarkGray
+
+    $ccEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-dispname-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $ccId = $ccEp.id
+
+    # userName deliberately has NO '@' - mapLog only attempts resolution for a
+    # non-email identifier on a /Users URL, which is the exact path that broke.
+    $ccUserName = "livecc-user-$(Get-Random)"
+    $ccDisplay = "Ada Lovelace CC"
+    $ccUserBody = @{
+        schemas     = @('urn:ietf:params:scim:schemas:core:2.0:User')
+        userName    = $ccUserName
+        displayName = $ccDisplay
+        active      = $true
+    } | ConvertTo-Json -Depth 5
+
+    $ccUser = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ccId/Users" -Method POST -Headers $headers -Body $ccUserBody -ContentType 'application/scim+json'
+    Test-Result -Success ($null -ne $ccUser.id) -Message "9z-CC.T1: created a user with a non-email userName ($ccUserName)"
+
+    # Drive a read so a /Users log row exists, then drain the buffer.
+    Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ccId/Users/$($ccUser.id)" -Method GET -Headers $headers | Out-Null
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers | Out-Null } catch {}
+
+    $ccLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?includeAdmin=true&pageSize=200&endpointId=$ccId" -Method GET -Headers $headers
+    $ccRows = @($ccLogs.items | Where-Object { $_.url -like '*/Users*' -and $_.reportableIdentifier })
+    Test-Result -Success ($ccRows.Count -gt 0) `
+        -Message "9z-CC.T2: at least one /Users log row carries a reportableIdentifier (examined $($ccLogs.items.Count) rows)"
+
+    # The identifier must never be left as the raw userName on Prisma - that is
+    # the exact symptom of the fallback being unreachable.
+    $ccResolved = @($ccRows | Where-Object { $_.reportableIdentifier -eq $ccDisplay })
+    $ccRaw = @($ccRows | Where-Object { $_.reportableIdentifier -eq $ccUserName })
+
+    if ($ccBackend -eq 'prisma') {
+        Test-Result -Success ($ccResolved.Count -gt 0) `
+            -Message "9z-CC.T3: userName identifier resolves to the display name '$ccDisplay' (found $($ccResolved.Count) resolved of $($ccRows.Count))"
+        Test-Result -Success ($ccRaw.Count -eq 0) `
+            -Message "9z-CC.T4: no row is left holding the RAW userName (fallback was reachable)"
+    } else {
+        # InMemory keeps the stored identifier verbatim by design.
+        Test-Result -Success ($ccRows.Count -gt 0) `
+            -Message "9z-CC.T3: [inmemory] identifier is preserved verbatim, no resolution attempted"
+        Test-Result -Success $true `
+            -Message "9z-CC.T4: [inmemory] display-name resolution is a Prisma-branch feature, not applicable"
+    }
+
+    # A uuid-shaped identifier must STILL go through the scimId path, so the
+    # guard cannot be passing by simply skipping resolution altogether.
+    $ccByIdRows = @($ccLogs.items | Where-Object { $_.url -like "*/Users/$($ccUser.id)*" })
+    Test-Result -Success ($ccByIdRows.Count -gt 0) `
+        -Message "9z-CC.T5 (positive control): the GET-by-id request produced its own log row"
+
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ccId" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-CC: display-name resolution section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CC: Log Display-Name Resolution Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
