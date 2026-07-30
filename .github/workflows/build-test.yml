@@ -176,6 +176,80 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
+      # Container smoke test: prove the image actually BOOTS and serves before
+      # anything downstream trusts it.
+      #
+      # Added 2026-07-30 alongside removing npm from the runtime image. Until
+      # now the only post-build gate was Trivy, which scans a filesystem and
+      # never starts the process - so a change that stripped something the
+      # entrypoint needed would have produced a GREENER Trivy result and a
+      # container that cannot start. A scan is not a smoke test, and "fewer
+      # CVEs" must never be purchasable with "does not run".
+      #
+      # Deliberately exercises the inmemory backend so no database is required:
+      # this asserts the ENTRYPOINT and the HTTP surface, which is the part the
+      # npm removal could plausibly break. The Prisma migrate path is covered by
+      # the compose gate and by the live-test suite.
+      - name: Container smoke test (image boots and serves)
+        run: |
+          set -euo pipefail
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/scimserver@${{ steps.build.outputs.digest }}"
+          echo "Booting $IMAGE"
+          docker run -d --name scim-smoke \
+            -e PERSISTENCE_BACKEND=inmemory \
+            -e NODE_ENV=production \
+            -e SCIM_SHARED_SECRET=smoke-shared \
+            -e JWT_SECRET=smoke-jwt \
+            -e OAUTH_CLIENT_SECRET=smoke-oauth \
+            -p 8080:8080 "$IMAGE"
+
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8080/scim/health -o /tmp/health.json 2>/dev/null; then
+              ok=1; break
+            fi
+            sleep 3
+          done
+
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Container never became healthy - dumping logs"
+            docker logs scim-smoke || true
+            docker rm -f scim-smoke || true
+            exit 1
+          fi
+
+          echo "health: $(cat /tmp/health.json)"
+          grep -q '"status":"ok"' /tmp/health.json || {
+            echo "::error::/scim/health did not report status=ok"
+            docker logs scim-smoke || true
+            docker rm -f scim-smoke || true
+            exit 1
+          }
+
+          # Assert an OUTCOME beyond "it responded": the SCIM discovery surface
+          # must serve, which proves the app booted rather than merely that a
+          # port opened.
+          curl -fsS http://127.0.0.1:8080/scim/v2/ServiceProviderConfig -o /tmp/spc.json
+          grep -q 'urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig' /tmp/spc.json || {
+            echo "::error::ServiceProviderConfig did not carry its SCIM schema URN"
+            cat /tmp/spc.json || true
+            docker logs scim-smoke || true
+            docker rm -f scim-smoke || true
+            exit 1
+          }
+
+          # npm must be GONE - this is the change under test, so assert it
+          # directly rather than inferring it from the Trivy result.
+          if docker run --rm --entrypoint sh "$IMAGE" -c 'command -v npm || command -v npx'; then
+            echo "::error::npm/npx is still present in the runtime image"
+            docker rm -f scim-smoke || true
+            exit 1
+          fi
+          echo "npm and npx are absent from the runtime image, as intended."
+
+          docker rm -f scim-smoke
+          echo "Container smoke test PASSED."
+
       # OPS-3: Trivy CVE scan on the just-pushed test image. Same gating as
       # build-and-push.yml so test images can never become "well, it scanned
       # clean once when we ran it manually" snowflakes.

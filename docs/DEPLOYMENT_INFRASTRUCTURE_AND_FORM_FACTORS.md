@@ -233,7 +233,7 @@ Six workflows build, validate or audit; none of them deploy. The first three bui
 
 | Workflow | Trigger | What it produces / gates |
 |---|---|---|
-| [build-test.yml](../.github/workflows/build-test.yml) | push to `test/** dev/** feature/** feat/** ci/** fix/**`, PR to `master`, dispatch | Full validate job, then pushes `ghcr.io/pranems/scimserver:test-<branch>` + `:sha-<sha>` and runs **Trivy** (`HIGH,CRITICAL`, `exit-code: 1`, `ignore-unfixed: true`, `trivyignores: .trivyignore`) |
+| [build-test.yml](../.github/workflows/build-test.yml) | push to `test/** dev/** feature/** feat/** ci/** fix/**`, PR to `master`, dispatch | Full validate job, then pushes `ghcr.io/pranems/scimserver:test-<branch>` + `:sha-<sha>`, runs a **container smoke test** (boots the image on the inmemory backend, requires `/scim/health` `status=ok`, requires `ServiceProviderConfig` to carry its SCIM schema URN, and asserts npm/npx are absent), then **Trivy** (`HIGH,CRITICAL`, `exit-code: 1`, `ignore-unfixed: true`, `trivyignores: .trivyignore`) |
 | [build-and-push.yml](../.github/workflows/build-and-push.yml) | push tag `v*`, dispatch | Semver + `latest` + `sha-` tags to GHCR, Trivy gate |
 | [publish-ghcr.yml](../.github/workflows/publish-ghcr.yml) | dispatch only, inputs `version` (required) and `pushLatest` | `:<version>` and `:sha-<sha>`; `latest` created via `docker buildx imagetools create`. **This is the workflow the dev pipeline drives.** |
 | [codeql.yml](../.github/workflows/codeql.yml) | push `master`/`feat/**`, PR to `master`, Mondays 04:00 UTC, dispatch | CodeQL `security-extended,security-and-quality` for `javascript-typescript` |
@@ -282,7 +282,7 @@ flowchart TB
     CA --> ID
 ```
 
-The ~160 s startup budget is deliberate: the entrypoint runs `npx prisma migrate deploy` before `node dist/main.js`, and a cold Burstable database plus a multi-migration catch-up can take well over a minute.
+The ~160 s startup budget is deliberate: the entrypoint runs `node node_modules/prisma/build/index.js migrate deploy` before `node dist/main.js`, and a cold Burstable database plus a multi-migration catch-up can take well over a minute.
 
 Registry-auth selection logic in the template, in order:
 1. Both `ghcrUsername` and `ghcrPassword` supplied -> username + `passwordSecretRef: 'ghcr-password'` against `acrLoginServer`.
@@ -495,7 +495,21 @@ The root [Dockerfile](../Dockerfile) is four stages on `node:24-alpine`:
 | `web-build` | `npm ci` + `npm run build` in `web/` | deletes `node_modules` after build |
 | `api-build` | `npm ci`, `npx prisma generate`, `npx tsc -p tsconfig.build.json` | sets a placeholder `DATABASE_URL` because `prisma.config.ts` calls `env('DATABASE_URL')` at config-load time even for `generate`, which never connects |
 | `prod-deps` | `npm ci --omit=dev`, then **grafts** `prisma`, `@prisma/engines`, `@prisma/engines-version` from `api-build` | grafting avoids reinstalling ~100 MB of transitive dev deps just to get `prisma migrate deploy`; then strips cockroachdb/mysql/sqlite/sqlserver Prisma runtimes, `typescript`, `@types`, and the Studio UI |
-| `runtime` | final image | `apk upgrade --no-cache libcrypto3 libssl3` (patches ahead of the base image cadence, e.g. CVE-2026-45447 in `PKCS7_verify`), non-root user `scim` uid 1001 / group `nodejs` gid 1001, `NODE_OPTIONS=--max_old_space_size=384`, `ARG IMAGE_TAG` written to `/app/.image-tag`, `HEALTHCHECK` that parses `http://127.0.0.1:8080/scim/health` and requires `status === 'ok'`, `EXPOSE 8080`, `CMD ["/app/docker-entrypoint.sh"]` |
+| `runtime` | final image | `apk upgrade --no-cache libcrypto3 libssl3` (patches ahead of the base image cadence, e.g. CVE-2026-45447 in `PKCS7_verify`), **npm/npx/yarn deleted** (see below), non-root user `scim` uid 1001 / group `nodejs` gid 1001, `NODE_OPTIONS=--max_old_space_size=384`, `ARG IMAGE_TAG` written to `/app/.image-tag`, `HEALTHCHECK` that parses `http://127.0.0.1:8080/scim/health` and requires `status === 'ok'`, `EXPOSE 8080`, `CMD ["/app/docker-entrypoint.sh"]` |
+
+#### Why npm is deleted from the runtime image
+
+npm is a **build-time** tool. The running container starts with `node dist/main.js` and needs no package manager. Keeping it was not free: npm's OWN bundled dependencies under `/usr/local/lib/node_modules/npm` accounted for **5 of the 7** HIGH/CRITICAL findings blocking the Trivy gate, including the only CRITICAL.
+
+| Package (npm-bundled) | Version | Findings |
+|---|---|---|
+| `tar` | 7.5.15 | CVE-2026-59873 (**CRITICAL**, gzip-bomb DoS), CVE-2026-59874 (HIGH) |
+| `brace-expansion` | 5.0.6 | CVE-2026-13149, CVE-2026-14257 (HIGH) |
+| `undici` | 6.26.0 | CVE-2026-12151 (HIGH) |
+
+None of these are our dependencies, so **no `package.json` or lockfile change could ever fix them** - which is precisely why the Dependabot PRs opened against this gate also failed. The distinguishing evidence is the image path Trivy reports: `usr/local/lib/node_modules/npm/...` is the base image's npm, whereas `app/node_modules/...` is ours.
+
+The single former npm usage was `npx prisma migrate deploy` in [api/docker-entrypoint.sh](../api/docker-entrypoint.sh). That is now a direct invocation, `node node_modules/prisma/build/index.js migrate deploy`, which is **exactly equivalent rather than a workaround**: prisma's `bin` field is `{"prisma": "build/index.js"}`, so `npx prisma` resolved to that same file, and the CLI is grafted into the image by the `prod-deps` stage. The standalone Windows launcher already used this form.
 
 ### Container boot sequence
 
@@ -855,6 +869,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-07-30 (latest) | **npm removed from the runtime image**, and a **container smoke test** added to [build-test.yml](../.github/workflows/build-test.yml). The Trivy gate had been red on **every branch for days** - including the three Dependabot PRs opened to fix it, and including a feature branch that was merged to master while red. Triage showed why nothing worked: **5 of the 7 findings, including the only CRITICAL, were npm's OWN bundled dependencies** (`tar`, `brace-expansion`, `undici`) under `/usr/local/lib/node_modules/npm`, not ours, and therefore unreachable from any `package.json`. The image path Trivy prints is the tell: `usr/local/lib/node_modules/npm/...` vs `app/node_modules/...`. Deleting a build-time tool the runtime never needed removes the attack surface outright. The entrypoint's `npx prisma migrate deploy` became a direct `node node_modules/prisma/build/index.js migrate deploy` - equivalent, since `npx prisma` already resolved to that exact file. **The smoke test is the important half:** the only post-build gate was a filesystem SCAN, which never starts the process, so stripping something the entrypoint needed would have made Trivy *greener* while shipping a container that cannot boot. "Fewer CVEs" must never be purchasable with "does not run." See [Section 7](#7-image-supply-chain) |
 | 2026-07-30 (later) | Documented [docker-compose.ci-image.yml](../docker-compose.ci-image.yml) in [Section F3](#f3---docker-compose), the override that runs the Docker form factor from the CI-built image on a host where the npm registry is TLS-blocked and `docker build` therefore cannot run `npm ci`. **Demanded by the gate again, and by a different check this time:** C3 element coverage blocked the push with `infra element(s) exist but are never named in the doc: docker-compose.ci-image.yml`. This is the self-extending property working as intended - nobody edited the gate to know about this file; it started requiring documentation the moment the file appeared. Note the failure mode it guards against is not cosmetic: an undocumented compose override is exactly the kind of thing a future reader would delete as cruft, taking the only way to test the Docker form factor on a blocked host with it. Repo version at capture `0.54.86` -> `0.54.87` |
 | 2026-07-29 | Wired both infra gates into the **pre-push hook** (Fast tier of [pre-push-checks.ps1](../scripts/pre-push-checks.ps1)) so they run on every push rather than on request. Fixed C1, which was structurally incapable of firing at pre-push: it compared the working tree against `HEAD`, but at pre-push the tree is clean and the change lives in the commits being pushed, so the hook now passes the upstream ref as `-BaseRef`. Switched both gates from `Get-ChildItem -Recurse` to `git ls-files` enumeration after the first wired run added ~47s to every push - the recurse was walking `node_modules` (22.7s vs 0.08s, and it surfaced 4 vendored Dockerfiles that are not ours). Gates now run in 0.78s and 1.02s. Added [test-audit-deployment-doc.ps1](../scripts/test-audit-deployment-doc.ps1), a committed self-test that proves C1/C2/C3 each fire on their own condition and refuses to run on a dirty tree |
 | 2026-07-29 | Made the document **enforced**. Added [Section 0.1 maintenance contract](#01-maintenance-contract---this-is-a-living-document), a machine-readable `**Last verified:**` header field, and the Stage 1.11 gate [audit-deployment-doc.ps1](../scripts/audit-deployment-doc.ps1) (C1 change coverage, C2 freshness, C3 element coverage, C4 live-estate truth). Extracted the Node LTS table to [node-lts.ps1](../scripts/node-lts.ps1) so the source-image and deployed-artifact checks share one definition. Closed the G3 and doc-rot gate gaps and partly closed G10/G11 in Section 14 |
