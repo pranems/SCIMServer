@@ -55,7 +55,7 @@ flowchart LR
 
 The two listeners differ in **exactly one directive**, `ssl_protocols`. Same certificate, same backend, same proxy headers, same container. That is what makes every result below attributable to the TLS policy rather than to a certificate, DNS, routing or application difference.
 
-Artifacts, all in the worktree under `standalone/tls13/`:
+Artifacts, all in the worktree under `docker/tls13/`:
 
 | File | Purpose |
 |---|---|
@@ -70,7 +70,7 @@ Artifacts, all in the worktree under `standalone/tls13/`:
 ## 3. Reproduce
 
 ```powershell
-cd standalone/tls13
+cd docker/tls13
 pwsh ./up.ps1                       # generates certs, starts stack, proves the policy
 pwsh ./test-endpoint-tls13.ps1      # one endpoint, full lifecycle, 26 assertions
 pwsh ./run-live-test-tls13.ps1      # full SCIM contract suite, 1105 assertions
@@ -386,7 +386,7 @@ The control endpoint's access log gives the answer directly, because it records 
 | Gap revealed | Disposition |
 |---|---|
 | No harness rule covers PowerShell reading `application/scim+json` bodies, where `.Content` is a `byte[]` and a naive `ConvertFrom-Json` silently yields nothing (issue E2). This can produce false passes as easily as the false failure seen here. | **scheduled**: propose a standing rule that all PowerShell assertions against SCIM response bodies go through a shared decode helper, and audit `scripts/live-test.ps1` for raw `.Content | ConvertFrom-Json` usages. |
-| Nothing in the repo could stand up or verify a non-default TLS posture. | **applied**: `standalone/tls13/` is committed, and `up.ps1` fails rather than reporting ready when the policy is not actually enforced. |
+| Nothing in the repo could stand up or verify a non-default TLS posture. | **applied**: `docker/tls13/` is committed, and `up.ps1` fails rather than reporting ready when the policy is not actually enforced. |
 | Verifying a transport policy by reading configuration is the same class of error as asserting CSS instead of layout (R1). | **applied**: every claim here is backed by a measured negotiated protocol, from three independent vantage points (openssl, a real .NET client, and the terminator's own log). |
 
 **Design and architecture gate.**
