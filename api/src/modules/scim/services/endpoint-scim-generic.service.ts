@@ -875,6 +875,46 @@ export class EndpointScimGenericService {
   }
 
   /**
+   * Dynamic-URN twin of ScimServiceHelpers.enforceSubAttributeNesting - the ONE
+   * place the RfcCompliantSubAttributes nesting rule (RFC 7643 §2.3.8, erratum
+   * 8415) is enforced for custom resource types.
+   *
+   * @param isStrict only reported in `activeConfig`; it does NOT gate the rule.
+   */
+  private enforceSubAttributeNesting(
+    dto: Record<string, unknown>,
+    resourceType: ScimResourceType,
+    endpointId: string,
+    isStrict: boolean,
+  ): void {
+    const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+    if (schemas.length === 0) return;
+
+    const nesting = SchemaValidator.validateSubAttributeNesting(
+      dto,
+      schemas,
+      this.getAttrMapsForRT(resourceType, endpointId),
+    );
+    if (nesting.valid) return;
+
+    const details = nesting.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+    throw createScimError({
+      status: 400,
+      scimType: nesting.errors[0]?.scimType ?? 'invalidValue',
+      detail: `Schema validation failed: ${details}`,
+      diagnostics: {
+        errorCode: 'VALIDATION_SCHEMA',
+        triggeredBy: 'RfcCompliantSubAttributes',
+        attributePaths: nesting.errors.map((e) => e.path),
+        activeConfig: {
+          StrictSchemaValidation: isStrict,
+          RfcCompliantSubAttributes: true,
+        },
+      },
+    });
+  }
+
+  /**
    * GEN-01: Attribute-level payload validation against schema definitions.
    * Dynamic-URN equivalent of ScimSchemaHelpers.validatePayloadSchema().
    * G2 fix: Required checks run unconditionally on create/replace (RFC 7643 §2.4 "MUST").
@@ -887,6 +927,19 @@ export class EndpointScimGenericService {
     mode: 'create' | 'replace' | 'patch',
   ): void {
     const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const rfcCompliantSubAttributes = getConfigBoolean(
+      config,
+      ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+    );
+
+    // RfcCompliantSubAttributes is STANDALONE - see the twin block in
+    // ScimServiceHelpers.validatePayloadSchema. Kept behaviourally identical
+    // here so a custom resource type cannot drift from Users/Groups, including
+    // running BEFORE the strict branch so the rejection is attributed to the
+    // flag that caused it rather than to StrictSchemaValidation.
+    if (rfcCompliantSubAttributes) {
+      this.enforceSubAttributeNesting(dto, resourceType, endpointId, isStrict);
+    }
 
     if (!isStrict) {
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
@@ -918,6 +971,7 @@ export class EndpointScimGenericService {
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
+      rfcCompliantSubAttributes,
     }, this.getAttrMapsForRT(resourceType, endpointId));
 
     if (!result.valid) {

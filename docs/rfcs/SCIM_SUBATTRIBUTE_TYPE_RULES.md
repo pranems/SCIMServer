@@ -830,7 +830,34 @@ For anyone authoring or reviewing a schema, in either direction.
 
 ## 12. Where SCIMServer stands today
 
-Recorded as an **observation**. This document changes no server behavior.
+**Status: the gap is now closable per endpoint, behind the `RfcCompliantSubAttributes` flag.**
+
+This section originally recorded the divergence below as an observation, with the
+correction listed as a proposed follow-up. That follow-up has since shipped. The
+flag defaults to `false`, so the behavior described in the observation table is
+still what an untouched endpoint does; turning the flag on switches that endpoint
+to the RFC behavior this document specifies.
+
+| | Flag OFF (default) | Flag ON |
+|---|---|---|
+| complex sub-attribute (forbidden by [section 2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8)) | accepted | rejected `400 invalidValue` |
+| multi-valued SIMPLE sub-attribute (allowed by [section 1.2](https://www.rfc-editor.org/rfc/rfc7643#section-1.2)) | rejected | accepted, each element type-checked |
+
+See [RFC_COMPLIANT_SUBATTRIBUTES.md](../RFC_COMPLIANT_SUBATTRIBUTES.md) for the
+design, the 2x2 interaction with `StrictSchemaValidation`, and the test matrix.
+Two details differ from the follow-up originally proposed here, and both were
+deliberate:
+
+1. **It is enforced at payload-validation time, not schema-registration time.** A
+   schema may still carry a legacy complex sub-attribute declaration; only a
+   payload that populates it is refused. That keeps an existing endpoint's
+   schema loadable after the flag is turned on.
+2. **It is standalone, not gated on `StrictSchemaValidation`.** The two flags
+   answer different questions - how carefully do I police this payload, versus
+   is this schema shape legal at all - so a lenient endpoint must still be able
+   to refuse a shape the RFC forbids.
+
+### The original observation
 
 `SchemaValidator.validateSingleValue` in [api/src/domain/validation/schema-validator.ts](../../api/src/domain/validation/schema-validator.ts) recurses into `subAttributes` with no depth cap:
 
@@ -851,12 +878,10 @@ if (attrDef.subAttributes && attrDef.subAttributes.length > 0) {
 
 | Observation | Detail |
 |---|---|
-| Deep nesting is **accepted** | An operator can register an endpoint schema with `type: "complex"` inside `subAttributes`; SCIMServer validates payloads against it and publishes it at `/Schemas`. |
-| The permissive behavior is **locked by a test** | [schema-validator-comprehensive.spec.ts](../../api/src/domain/validation/schema-validator-comprehensive.spec.ts) has a `deeply nested complex sub-attributes` describe block. |
-| Every shipped preset is **conformant** | [scim-schemas.constants.ts](../../api/src/modules/scim/discovery/scim-schemas.constants.ts) and [rfc-baseline.ts](../../api/src/modules/scim/endpoint-profile/rfc-baseline.ts) declare only simple sub-attributes. The gap is reachable only through operator-authored custom schemas. |
-| Net | A latent RFC 7643 [section 2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8) conformance gap: a schema SCIMServer happily serves may be one that no Entra or Okta client can PATCH. |
-
-**Proposed follow-up (not implemented here).** A schema-registration-time check rejecting `type: "complex"` at depth >= 2, gated behind `StrictSchemaValidation` to match the existing flag model, with the `Schema` resource exempt per the [section 7](https://www.rfc-editor.org/rfc/rfc7643#section-7) carve-out - plus unit, E2E and `live-test.ps1` coverage per the standing commit checklist. Scoped out of this change deliberately: the request was to document the rules, not to alter behavior.
+| Deep nesting is **accepted** (flag OFF) | An operator can register an endpoint schema with `type: "complex"` inside `subAttributes`; SCIMServer validates payloads against it and publishes it at `/Schemas`. With `RfcCompliantSubAttributes` ON, a payload populating that sub-attribute is refused. |
+| The permissive behavior is **locked by a test** | [schema-validator-comprehensive.spec.ts](../../api/src/domain/validation/schema-validator-comprehensive.spec.ts) has a `deeply nested complex sub-attributes` describe block. It remains correct: it exercises the default, flag-off path. |
+| Every shipped preset is **conformant** | [scim-schemas.constants.ts](../../api/src/modules/scim/discovery/scim-schemas.constants.ts) and [rfc-baseline.ts](../../api/src/modules/scim/endpoint-profile/rfc-baseline.ts) declare only simple sub-attributes. The gap is reachable only through operator-authored custom schemas, which is why the flag is opt-in. |
+| Net | An RFC 7643 [section 2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8) conformance gap that is latent by default and closable per endpoint: a schema SCIMServer happily serves may be one that no Entra or Okta client can PATCH. |
 
 ---
 

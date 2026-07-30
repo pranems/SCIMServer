@@ -77,7 +77,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 13 boolean flags + logLevel + PrimaryEnforcement + logFileEnabled (16 flags) + helpers
+  endpoint-config.interface.ts                           # 17 boolean flags + logLevel + PrimaryEnforcement (19 flags) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -432,8 +432,11 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 4. Update `validateEndpointConfig()` if needed
 5. Add tests
 6. Update [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - flag summary table (§2), defaults matrix (§2.1), and true/false behavior (§2.2)
+7. Add the Switch to [SettingsTab.tsx](../web/src/pages/SettingsTab.tsx) `BOOLEAN_FLAGS` (it carries a `data-testid` of `settings-flag-<Key>` automatically) plus a vitest case, a Playwright spec asserting a measured OUTCOME (not just that the Switch renders), and a `live-test.ps1` section
 
-> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `StrictSchemaValidation`, and `logFileEnabled` default to `true`. `PatchOpAllowRemoveAllMembers`, `VerbosePatchSupported`, `RequireIfMatch`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, and `IgnoreReadOnlyAttributesInPatch` default to `false`. `PrimaryEnforcement` defaults to `passthrough`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets several flags, PrimaryEnforcement to `normalize`).
+> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `StrictSchemaValidation`, `EnforceResourceTypes`, and `logFileEnabled` default to `true`. `PatchOpAllowRemoveAllMembers`, `VerbosePatchSupported`, `RequireIfMatch`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, and `RfcCompliantSubAttributes` default to `false`. `PrimaryEnforcement` defaults to `passthrough`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets several flags, PrimaryEnforcement to `normalize`).
+>
+> **`RfcCompliantSubAttributes` is standalone.** It is NOT gated on `StrictSchemaValidation` - the two answer different questions (how carefully do I police this payload vs is this schema shape legal at all). Enforce it in exactly one place per service (`enforceSubAttributeNesting`), BEFORE the strict branch, so the rejection is attributed to the flag that caused it. See [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md).
 
 ### Adding a new admin API route:
 1. Add method to appropriate controller (`AdminController`, `DatabaseController`, etc.)

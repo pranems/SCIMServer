@@ -219,6 +219,23 @@ export const ENDPOINT_CONFIG_FLAGS = {
   ENFORCE_RESOURCE_TYPES: 'EnforceResourceTypes',
 
   /**
+   * When true, sub-attributes are handled per RFC 7643 instead of SCIMServer's
+   * historical behavior. Two orthogonal rules turn on together:
+   *  - §2.3.8: a complex attribute MUST NOT contain complex sub-attributes.
+   *    A payload that populates one is rejected 400 invalidValue.
+   *  - §1.2: a sub-attribute MAY be multi-valued as long as it stays simple,
+   *    so `skus: ["A","B"]` is accepted and each element is type-checked.
+   * When false (default), current behavior is preserved exactly: nested complex
+   * sub-attributes are accepted, and a multi-valued simple sub-attribute is
+   * rejected as "must be a string, got object".
+   * In practice: leave false unless you author custom schemas and want the
+   * server to hold them to the RFC.
+   * @see docs/rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md
+   * @see RFC 7643 §2.3.8, §1.2, errata 8415 + 5607
+   */
+  RFC_COMPLIANT_SUB_ATTRIBUTES: 'RfcCompliantSubAttributes',
+
+  /**
    * `CredentialSecretVisibility` (WI-7): whether a per-endpoint credential
    * secret is retained (encrypted at rest) and re-viewable by an admin, or
    * shown exactly once at create. Enum: `always` (default) | `once`. Stored
@@ -597,6 +614,18 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'included) for fast RCA. When false, secret-bearing values are redacted before persist ' +
       '(and API/UI display). Endpoint value overrides the server default; console/file logs ' +
       'always redact regardless.',
+  },
+  RFC_COMPLIANT_SUB_ATTRIBUTES: {
+    key: ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, sub-attributes are handled per RFC 7643: a complex attribute MUST NOT contain ' +
+      'complex sub-attributes (§2.3.8, erratum 8415) so a payload populating one is rejected 400 ' +
+      'invalidValue, AND a multi-valued SIMPLE sub-attribute is honoured (§1.2, erratum 5607) with ' +
+      'each element type-checked. When false (default), current behavior is preserved exactly: ' +
+      'nested complex sub-attributes are accepted and a multi-valued simple sub-attribute is ' +
+      'rejected as "must be a string, got object". Leave false unless you author custom schemas.',
   },
 };
 

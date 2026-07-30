@@ -123,7 +123,8 @@
 
 | Document | Description |
 |----------|-------------|
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** - 16 flags with Mermaid diagrams, preset defaults, deprecation notes |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** - 19 flags with Mermaid diagrams, preset defaults, deprecation notes |
+| [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md) | **`RfcCompliantSubAttributes` flag** (default `false`, standalone) - the two rules it governs (R1 complex sub-attributes forbidden per RFC 7643 2.3.8 + erratum 8415; R2 multi-valued simple sub-attributes allowed per 1.2 + erratum 5607), the 2x2 interaction with `StrictSchemaValidation`, worked request/response examples, and the 51-assertion test matrix across 5 levels. |
 | [SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md](SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md) | Attribute customization guide - tighten-only rules, 12 scenarios, 4 templates |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH add/remove config |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema, custom extensions |

@@ -243,6 +243,50 @@ describe('SettingsTab', () => {
     expect(sw.checked).toBe(false);
   });
 
+  // RfcCompliantSubAttributes - RFC 7643 sub-attribute handling.
+  // Asserts the OUTCOME (rendered checked-state and the exact mutation payload),
+  // not merely that a Switch exists: a presence-only assertion would pass even
+  // if the flag defaulted the wrong way, which is the one thing that matters
+  // here because the whole point is that current behavior stays the default.
+  it('defaults RfcCompliantSubAttributes to OFF when the flag is absent', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const sw = screen.getByRole('switch', { name: /RfcCompliantSubAttributes/i }) as HTMLInputElement;
+    expect(sw.checked).toBe(false);
+  });
+
+  it('reflects RfcCompliantSubAttributes=true and toggles it back off via profile.settings', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ RfcCompliantSubAttributes: 'True' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const sw = screen.getByRole('switch', { name: /RfcCompliantSubAttributes/i }) as HTMLInputElement;
+    expect(sw.checked).toBe(true);
+    await user.click(sw);
+    expect(mutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { RfcCompliantSubAttributes: false } },
+    });
+  });
+
+  it('turns RfcCompliantSubAttributes ON from the default off state', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const sw = screen.getByRole('switch', { name: /RfcCompliantSubAttributes/i }) as HTMLInputElement;
+    await user.click(sw);
+    expect(mutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { RfcCompliantSubAttributes: true } },
+    });
+  });
+
   it('shows a success MessageBar after a successful toggle', async () => {
     const user = userEvent.setup();
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({

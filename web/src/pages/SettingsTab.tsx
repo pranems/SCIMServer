@@ -188,6 +188,13 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     category: 'Discovery',
   },
   {
+    key: 'RfcCompliantSubAttributes',
+    label: 'RfcCompliantSubAttributes',
+    description: 'When OFF (default), current behavior: a schema may declare a complex sub-attribute and payloads for it are accepted, while a multi-valued simple sub-attribute is rejected. Turn ON to follow RFC 7643 instead - a complex sub-attribute is refused (2.3.8, erratum 8415) and a multi-valued simple sub-attribute is accepted with each element type-checked (1.2, erratum 5607). Independent of StrictSchemaValidation: it applies whether that flag is on or off, and turning it on does not enable strict validation.',
+    defaultValue: false,
+    category: 'Validation & schema',
+  },
+  {
     key: 'CustomResourceTypesEnabled',
     label: 'CustomResourceTypesEnabled',
     description: 'Allow registering custom resource types (beyond User and Group) on the Resource Types tab.',
@@ -645,17 +652,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                 const checked = coerceFlag(flags[flag.key], flag.defaultValue);
                 const disabled = isPending && pendingKey === flag.key;
                 return (
-                  <div key={flag.key} className={classes.flagRow}>
+                  <div key={flag.key} className={classes.flagRow} data-testid={`settings-flag-row-${flag.key}`}>
                     <div className={classes.flagHeader}>
                       <Text className={classes.monospace}>{flag.label}</Text>
                       <Switch
                         aria-label={flag.label}
+                        data-testid={`settings-flag-${flag.key}`}
                         checked={checked}
                         disabled={disabled}
                         onChange={(_, d) => { void handleToggle(flag, d.checked); }}
                       />
                     </div>
-                    <Caption1 className={classes.flagDescription}>{flag.description}</Caption1>
+                    <Caption1 className={classes.flagDescription} data-testid={`settings-flag-desc-${flag.key}`}>
+                      {flag.description}
+                    </Caption1>
                   </div>
                 );
               })}

@@ -194,6 +194,144 @@ export class SchemaValidator {
     return { valid: errors.length === 0, errors };
   }
 
+  // ─── RfcCompliantSubAttributes ──────────────────────────────────────
+
+  /**
+   * The ONE place the §2.3.8 violation message is built, so the strict-path
+   * guard in validateSubAttributes and the standalone pass below cannot drift.
+   */
+  private static subAttributeNestingError(
+    parentPath: string,
+    subKey: string,
+    subDef: SchemaAttributeDefinition,
+  ): ValidationError {
+    return {
+      path: `${parentPath}.${subKey}`,
+      message:
+        `Sub-attribute '${subDef.name}' of complex attribute '${parentPath}' is itself complex, ` +
+        `which RFC 7643 §2.3.8 forbids: "A complex attribute MUST NOT contain sub-attributes ` +
+        `that have sub-attributes (i.e., that are complex)." ` +
+        `Set RfcCompliantSubAttributes=false on this endpoint to accept this schema shape.`,
+      scimType: 'invalidValue',
+    };
+  }
+
+  /** True when this sub-attribute definition is itself complex (a §2.3.8 violation). */
+  private static isComplexSubAttribute(subDef: SchemaAttributeDefinition): boolean {
+    return (
+      subDef.type?.toLowerCase() === 'complex' ||
+      (subDef.subAttributes !== undefined && subDef.subAttributes.length > 0)
+    );
+  }
+
+  /**
+   * STANDALONE RFC 7643 §2.3.8 pass - runs independently of StrictSchemaValidation.
+   *
+   * `RfcCompliantSubAttributes` is deliberately NOT gated on strict mode,
+   * because the two answer different questions:
+   *   StrictSchemaValidation    - how carefully do I police an inbound payload?
+   *   RfcCompliantSubAttributes - is this schema shape legal at all?
+   * An endpoint running lenient for Entra interop must still be able to refuse a
+   * shape the RFC forbids.
+   *
+   * This pass reports ONLY §2.3.8 violations. It deliberately does NOT report
+   * unknown attributes, type mismatches or missing required attributes - doing
+   * so would silently turn strict mode on for lenient endpoints, which is a far
+   * bigger behavior change than the flag advertises.
+   *
+   * The permissive half of the flag (§1.2 multi-valued SIMPLE sub-attributes) is
+   * not needed here: with strict mode off there is no rejection to relax.
+   */
+  static validateSubAttributeNesting(
+    payload: Record<string, unknown>,
+    schemas: readonly SchemaDefinition[],
+    preBuiltMaps?: {
+      coreAttrMap: Map<string, SchemaAttributeDefinition>;
+      extensionSchemaMap: Map<string, SchemaDefinition>;
+    },
+  ): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    let coreAttributes: Map<string, SchemaAttributeDefinition>;
+    let extensionSchemas: Map<string, SchemaDefinition>;
+
+    if (preBuiltMaps) {
+      coreAttributes = preBuiltMaps.coreAttrMap;
+      extensionSchemas = preBuiltMaps.extensionSchemaMap;
+    } else {
+      coreAttributes = new Map<string, SchemaAttributeDefinition>();
+      extensionSchemas = new Map<string, SchemaDefinition>();
+      for (const schema of schemas) {
+        if (isCoreSchema(schema)) {
+          for (const attr of schema.attributes) {
+            coreAttributes.set(attr.name.toLowerCase(), attr);
+          }
+        } else {
+          extensionSchemas.set(schema.id, schema);
+        }
+      }
+    }
+
+    const checkComplexAttribute = (
+      path: string,
+      value: unknown,
+      attrDef: SchemaAttributeDefinition,
+    ): void => {
+      // RFC 7643 §2.5 - unassigned/null is equivalent to absent.
+      if (value === null || value === undefined) return;
+      if (attrDef.type?.toLowerCase() !== 'complex') return;
+      if (!attrDef.subAttributes || attrDef.subAttributes.length === 0) return;
+
+      const subMap = new Map<string, SchemaAttributeDefinition>();
+      for (const sa of attrDef.subAttributes) {
+        subMap.set(sa.name.toLowerCase(), sa);
+      }
+
+      const elements: Array<{ element: unknown; elementPath: string }> =
+        attrDef.multiValued && Array.isArray(value)
+          ? value.map((element, index) => ({ element, elementPath: `${path}[${index}]` }))
+          : [{ element: value, elementPath: path }];
+
+      for (const { element, elementPath } of elements) {
+        if (!element || typeof element !== 'object' || Array.isArray(element)) continue;
+
+        for (const [subKey, subValue] of Object.entries(element as Record<string, unknown>)) {
+          if (subValue === null || subValue === undefined) continue;
+          const subDef = subMap.get(subKey.toLowerCase());
+          // An unknown sub-attribute is strict mode's business, not ours.
+          if (!subDef) continue;
+          if (this.isComplexSubAttribute(subDef)) {
+            errors.push(this.subAttributeNestingError(elementPath, subKey, subDef));
+          }
+        }
+      }
+    };
+
+    for (const [key, value] of Object.entries(payload)) {
+      if (RESERVED_KEYS.has(key)) continue;
+      if (key.startsWith('urn:')) continue;
+      const attrDef = coreAttributes.get(key.toLowerCase());
+      if (attrDef) checkComplexAttribute(key, value, attrDef);
+    }
+
+    for (const [urn, schema] of extensionSchemas) {
+      const extPayload = payload[urn];
+      if (!extPayload || typeof extPayload !== 'object' || Array.isArray(extPayload)) continue;
+
+      const extAttrMap = new Map<string, SchemaAttributeDefinition>();
+      for (const attr of schema.attributes) {
+        extAttrMap.set(attr.name.toLowerCase(), attr);
+      }
+
+      for (const [key, value] of Object.entries(extPayload as Record<string, unknown>)) {
+        const attrDef = extAttrMap.get(key.toLowerCase());
+        if (attrDef) checkComplexAttribute(`${urn}.${key}`, value, attrDef);
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
   /**
    * Validate all attributes in a nested object (e.g., an extension block).
    */
@@ -461,6 +599,52 @@ export class SchemaValidator {
         }
         continue;
       }
+
+      // RFC 7643 §2.3.8: "A complex attribute MUST NOT contain sub-attributes
+      // that have sub-attributes (i.e., that are complex)." Reinforced by
+      // erratum 8415 (Verified 2025-10-28), which struck 'complex' from the
+      // legal values of subAttributes.type in §8.7.1.
+      //
+      // Opt-in only. The default (flag absent/false) preserves SCIMServer's
+      // historical unbounded recursion, so no existing endpoint changes
+      // behavior. `continue` avoids cascading a second, confusing error from
+      // recursing into a shape we just declared illegal.
+      //
+      // Deliberately keyed on the sub-attribute being COMPLEX, never on it
+      // being multi-valued: a multi-valued SIMPLE sub-attribute is legal per
+      // RFC 7643 §1.2 and erratum 5607.
+      if (options.rfcCompliantSubAttributes === true && this.isComplexSubAttribute(subDef)) {
+        errors.push(this.subAttributeNestingError(parentPath, key, subDef));
+        continue;
+      }
+
+      // RFC 7643 §1.2 defines a simple attribute as "singular or multi-valued",
+      // so a multi-valued SIMPLE sub-attribute is legal - erratum 5607 confirms
+      // it for `referenceTypes` inside `subAttributes`. SCIMServer historically
+      // treated EVERY sub-attribute as singular (see the legacy comment below),
+      // so `skus: ["A","B"]` was rejected with "must be a string, got object".
+      //
+      // Only honour it when the flag is on, and only when the value really is
+      // an array: null/undefined keep falling through to the existing path so
+      // RFC 7643 §2.5 unassigned-value handling is untouched.
+      if (
+        options.rfcCompliantSubAttributes === true &&
+        subDef.multiValued === true &&
+        Array.isArray(value)
+      ) {
+        const elementDef: SchemaAttributeDefinition = { ...subDef, multiValued: false };
+        value.forEach((element, index) => {
+          this.validateSingleValue(
+            `${parentPath}.${key}[${index}]`,
+            element,
+            elementDef,
+            options,
+            errors,
+          );
+        });
+        continue;
+      }
+
       // Sub-attributes are always single-valued in SCIM (multi-valued applies at the parent level)
       this.validateSingleValue(`${parentPath}.${key}`, value, subDef, options, errors);
     }
