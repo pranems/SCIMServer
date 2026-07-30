@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-07-30 - **Repo version at capture:** `api/package.json` = `0.54.86`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-07-30 - **Repo version at capture:** `api/package.json` = `0.54.87`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -200,6 +200,19 @@ flowchart TB
 ```
 
 `docker-compose.debug.yml` is a different animal: it builds **no** image, runs `image: node:24` with `./api` bind-mounted, exposes `3000` (SCIM) plus `9229` (inspector), and sets `NODE_OPTIONS=--inspect=0.0.0.0:9229`. Note it points `DATABASE_URL` at host `postgres` but declares no such service, so it only works alongside a separately started database.
+
+`docker-compose.ci-image.yml` is an **override**, never used alone:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ci-image.yml up -d --no-build
+```
+
+It swaps the `api` service's `build:` for a pinned `image: ghcr.io/pranems/scimserver:<version>` with `pull_policy: missing`. It exists because **the npm registry is TLS-blocked on some developer hosts** - every `npm ci` inside `docker build` dies with `ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE` reaching `registry.npmjs.org`, which npm surfaces unhelpfully as `Exit handler never called!`. Confirm in five seconds with `docker run --rm node:24-alpine npm ping`. Without this override the **Docker form factor cannot be exercised at all** on such a host, so a real gate would silently be skipped; with it, the CI-built image is pulled and the form factor is tested for real. It also sets `JWKS_HOST_ALLOWLIST`, which [docker-compose.yml](../docker-compose.yml) omits and whose absence fails 5 WIF-verify live assertions for an environment reason rather than a code one.
+
+Two consequences worth knowing:
+
+- Compose **merges** list values, so an override that adds a `ports:` entry APPENDS rather than replaces. Free the host port instead (`docker stop scim-dev-pipeline-pg`) or use `!override`.
+- The compose secrets differ from local and dev: `-ClientSecret devscimclientsecret -SharedSecret devscimsharedsecret`.
 
 ### F4 - Standalone Windows package
 
@@ -842,6 +855,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-07-30 (later) | Documented [docker-compose.ci-image.yml](../docker-compose.ci-image.yml) in [Section F3](#f3---docker-compose), the override that runs the Docker form factor from the CI-built image on a host where the npm registry is TLS-blocked and `docker build` therefore cannot run `npm ci`. **Demanded by the gate again, and by a different check this time:** C3 element coverage blocked the push with `infra element(s) exist but are never named in the doc: docker-compose.ci-image.yml`. This is the self-extending property working as intended - nobody edited the gate to know about this file; it started requiring documentation the moment the file appeared. Note the failure mode it guards against is not cosmetic: an undocumented compose override is exactly the kind of thing a future reader would delete as cruft, taking the only way to test the Docker form factor on a blocked host with it. Repo version at capture `0.54.86` -> `0.54.87` |
 | 2026-07-29 | Wired both infra gates into the **pre-push hook** (Fast tier of [pre-push-checks.ps1](../scripts/pre-push-checks.ps1)) so they run on every push rather than on request. Fixed C1, which was structurally incapable of firing at pre-push: it compared the working tree against `HEAD`, but at pre-push the tree is clean and the change lives in the commits being pushed, so the hook now passes the upstream ref as `-BaseRef`. Switched both gates from `Get-ChildItem -Recurse` to `git ls-files` enumeration after the first wired run added ~47s to every push - the recurse was walking `node_modules` (22.7s vs 0.08s, and it surfaced 4 vendored Dockerfiles that are not ours). Gates now run in 0.78s and 1.02s. Added [test-audit-deployment-doc.ps1](../scripts/test-audit-deployment-doc.ps1), a committed self-test that proves C1/C2/C3 each fire on their own condition and refuses to run on a dirty tree |
 | 2026-07-29 | Made the document **enforced**. Added [Section 0.1 maintenance contract](#01-maintenance-contract---this-is-a-living-document), a machine-readable `**Last verified:**` header field, and the Stage 1.11 gate [audit-deployment-doc.ps1](../scripts/audit-deployment-doc.ps1) (C1 change coverage, C2 freshness, C3 element coverage, C4 live-estate truth). Extracted the Node LTS table to [node-lts.ps1](../scripts/node-lts.ps1) so the source-image and deployed-artifact checks share one definition. Closed the G3 and doc-rot gate gaps and partly closed G10/G11 in Section 14 |
 | 2026-07-30 | Documented [rfc-currency.yml](../.github/workflows/rfc-currency.yml) in [Section F6](#f6---ci-ephemeral), which arrived when `origin/master` was merged into `feat/wif`, and explained why it and `trivyignore-review.yml` are scheduled rather than commit-triggered. **This edit was demanded by the gate, not remembered by a human:** check C1 blocked the push with `infra files changed but ... was not updated: .github/workflows/rfc-currency.yml`. First time the doc-currency gate fired on a real change, and it fired on a *merge* - the case most likely to slip past a person, because nobody feels like the author of a file that arrived via someone else's commit |
