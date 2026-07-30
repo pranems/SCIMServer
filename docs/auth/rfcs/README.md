@@ -18,6 +18,7 @@ Authoritative plain-text copies of the IETF RFCs that the SCIMServer authenticat
 | File | RFC | Title | Role | Explainer |
 |---|---|---|---|---|
 | [rfc7519.txt](rfc7519.txt) | RFC 7519 | JSON Web Token (JWT) | The token format Entra signs, SCIMServer validates and issues | [RFC_7519_EXPLAINED.md](RFC_7519_EXPLAINED.md) |
+| [rfc8725.txt](rfc8725.txt) | RFC 8725 | JSON Web Token Best Current Practices (BCP 225) | **Updates 7519.** What a correct JWT *validator* must do: algorithm allowlist, issuer/subject/audience validation, never trusting `kid` / `jku` / `x5u` | [RFC_8725_EXPLAINED.md](RFC_8725_EXPLAINED.md) |
 | [rfc7517.txt](rfc7517.txt) | RFC 7517 | JSON Web Key (JWK) | The JWK / JWKS that supplies verification keys by `kid` | [RFC_7517_EXPLAINED.md](RFC_7517_EXPLAINED.md) |
 
 ## Discovery + registration
@@ -46,7 +47,7 @@ Authoritative plain-text copies of the IETF RFCs that the SCIMServer authenticat
 
 ## Provenance
 
-- Retrieved 2026-06-15 (7521 / 7523 / 8693) and 2026-06-18 (all others) from `https://www.rfc-editor.org/rfc/rfc<NNNN>.txt`.
+- Retrieved 2026-06-15 (7521 / 7523 / 8693), 2026-06-18 (all others) and 2026-07-30 (8725) from `https://www.rfc-editor.org/rfc/rfc<NNNN>.txt`.
 - These are verbatim RFC text files. **Do not edit them**; they are the authoritative reference. All commentary lives in the `*_EXPLAINED.md` docs and in [../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](../WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) / [../AUTHENTICATION_ARCHITECTURE.md](../AUTHENTICATION_ARCHITECTURE.md).
 
 ## Referenced but not mirrored
@@ -60,14 +61,14 @@ These are cited by the design but not copied in (stable, widely available, or ow
 
 ### Surfaced by the corpus gate, waived with a reason
 
-The first run of the check C3 update/obsolete closure (2026-07-29) found four published RFCs that **update** documents mirrored here and had never been noticed. Each now carries an explicit `waivers[]` entry in [../../rfcs/rfc-manifest.json](../../rfcs/rfc-manifest.json) and is re-reported as a warning on every run, so none of them can go quiet again.
+The first run of the check C3 update/obsolete closure (2026-07-29) found four published RFCs that **update** documents mirrored here and had never been noticed. Each got an explicit `waivers[]` entry in [../../rfcs/rfc-manifest.json](../../rfcs/rfc-manifest.json), re-reported as a warning on every run, so none of them could go quiet again. **One of the four has since been resolved by mirroring it** - which is the outcome a waiver is supposed to lead to.
 
 | RFC | Updates | Disposition |
 |---|---|---|
 | [RFC 8252](https://www.rfc-editor.org/info/rfc8252) - OAuth 2.0 for Native Apps | 6749 | **Waived - not applicable.** No native-app client and no user-agent redirect flow. Re-evaluate if Phase Q4 ships the authorization-code grant. |
 | [RFC 8996](https://www.rfc-editor.org/info/rfc8996) - Deprecating TLS 1.0/1.1 (BCP 195) | 6749, 6750 | **Waived - already satisfied.** Azure Container Apps ingress terminates TLS 1.2+, and the Entra SCIM contract mandates TLS 1.2 with a pinned cipher list. |
 | [RFC 7797](https://www.rfc-editor.org/info/rfc7797) - JWS Unencoded Payload Option | 7519 | **Waived - not implemented.** Validators require standard base64url JWS compact serialization. Tracked because a validator that silently honoured `b64:false` would be a signature-bypass surface. |
-| [RFC 8725](https://www.rfc-editor.org/info/rfc8725) - JWT Best Current Practices | 7519 | **Waived on process, NOT on merit.** Genuinely load-bearing for WIF assertion validation (alg confusion, `aud` / `iss` pinning, `kid` handling). **Follow-up: mirror `rfc8725.txt` + `RFC_8725_EXPLAINED.md` here, then delete the waiver.** |
+| [RFC 8725](https://www.rfc-editor.org/info/rfc8725) - JWT Best Current Practices | 7519 | **RESOLVED 2026-07-30 - waiver deleted.** It was waived on process, never on merit. Now mirrored as [rfc8725.txt](rfc8725.txt) with [RFC_8725_EXPLAINED.md](RFC_8725_EXPLAINED.md), which audits the real validator code practice by practice and records three honest gaps (explicit typing, clock-skew tolerance, `jti` replay denylist). |
 
 ## SCIM core RFCs
 
