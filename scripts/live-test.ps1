@@ -11403,6 +11403,163 @@ foreach ($epId in @($pegUoId, $pegCapId, $pegMrId, $pegEtId, $pegRlId)) {
 Write-Host "`n--- 9z-AS: Profile Enforcement Gaps Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT: RfcCompliantSubAttributes (RFC 7643 2.3.8 + 1.2)
+$script:currentSection = "9z-AT: RfcCompliantSubAttributes"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT: RfcCompliantSubAttributes" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# One flag, TWO opposite RFC 7643 rules, and it is STANDALONE (not gated on
+# StrictSchemaValidation), so the whole 2x2 of (flag x strict) is exercised:
+#   R1  2.3.8 - a complex attribute MUST NOT contain complex sub-attributes.
+#               Erratum 8415. Server is too PERMISSIVE by default.
+#   R2  1.2   - a sub-attribute MAY be multi-valued while staying simple.
+#               Erratum 5607. Server is too STRICT by default.
+try {
+    $atEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-subattr-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $atId = $atEp.id
+    $atAdmin = "$baseUrl/scim/admin/endpoints/$atId"
+    $atScim = "$baseUrl/scim/endpoints/$atId"
+
+    # Append the two probe attributes to the endpoint's EXISTING User schema.
+    # Replacing profile.schemas wholesale orphans the ResourceType references
+    # and the profile validator (correctly) rejects the PATCH with 400.
+    $atCur = Invoke-RestMethod -Uri $atAdmin -Method GET -Headers $headers
+    $atSchemas = @($atCur.profile.schemas)
+    $atUserSchema = $atSchemas | Where-Object { $_.id -eq 'urn:ietf:params:scim:schemas:core:2.0:User' }
+
+    $atAddress = [ordered]@{
+        name = 'address'; type = 'complex'; multiValued = $false; required = $false
+        mutability = 'readWrite'; returned = 'default'
+        subAttributes = @(
+            [ordered]@{ name = 'street'; type = 'string'; multiValued = $false; required = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+            # R1 violation: a COMPLEX sub-attribute.
+            [ordered]@{ name = 'geo'; type = 'complex'; multiValued = $false; required = $false; mutability = 'readWrite'; returned = 'default'; subAttributes = @(
+                [ordered]@{ name = 'lat'; type = 'decimal'; multiValued = $false; required = $false; mutability = 'readWrite'; returned = 'default' },
+                [ordered]@{ name = 'lon'; type = 'decimal'; multiValued = $false; required = $false; mutability = 'readWrite'; returned = 'default' }
+            )}
+        )
+    }
+    $atLicenses = [ordered]@{
+        name = 'licenses'; type = 'complex'; multiValued = $true; required = $false
+        mutability = 'readWrite'; returned = 'default'
+        subAttributes = @(
+            [ordered]@{ name = 'value'; type = 'string'; multiValued = $false; required = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+            # R2 shape: multi-valued but SIMPLE - legal per 1.2.
+            [ordered]@{ name = 'skus'; type = 'string'; multiValued = $true; required = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' }
+        )
+    }
+    $atUserSchema.attributes = @($atUserSchema.attributes) + $atAddress + $atLicenses
+
+    Invoke-RestMethod -Uri $atAdmin -Method PATCH -Headers $headers -Body (@{
+        profile = @{ schemas = $atSchemas }
+    } | ConvertTo-Json -Depth 25) | Out-Null
+
+    # Set the (flag x strict) pair for the next assertion.
+    function Set-AtFlags([bool]$rfc, [bool]$strict) {
+        Invoke-RestMethod -Uri $atAdmin -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ RfcCompliantSubAttributes = $rfc; StrictSchemaValidation = $strict } }
+        } | ConvertTo-Json -Depth 8) | Out-Null
+    }
+
+    # POST a user and return status + parsed body, so a 400 can be inspected.
+    # Asserting only on the status would let a test pass on an unrelated 400.
+    function Invoke-AtPost([hashtable]$body) {
+        try {
+            $r = Invoke-RestMethod -Uri "$atScim/Users" -Method POST -Headers $headers -Body ($body | ConvertTo-Json -Depth 10)
+            return @{ status = 201; body = $r }
+        } catch {
+            $code = 0
+            try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+            $parsed = $null
+            try { $parsed = $_.ErrorDetails.Message | ConvertFrom-Json } catch {}
+            return @{ status = $code; body = $parsed }
+        }
+    }
+
+    # displayName + emails are REQUIRED by the stock profile; omitting them
+    # yields a 400 for an unrelated reason and masks what is under test.
+    function New-AtUser([string]$tag) {
+        return @{
+            schemas     = @('urn:ietf:params:scim:schemas:core:2.0:User')
+            userName    = "subattr-$tag-$(Get-Random)@example.com"
+            displayName = "subattr $tag"
+            emails      = @(@{ value = "subattr-$tag-$(Get-Random)@example.com"; type = 'work'; primary = $true })
+        }
+    }
+
+    $DIAG_URN = 'urn:scimserver:api:messages:2.0:Diagnostics'
+    $null = $DIAG_URN
+
+    # Guarded: on a regression the body has no Diagnostics member, and indexing
+    # into it would throw and abort the whole section - hiding every later
+    # assertion behind one failure.
+    function Get-AtDiag($resp, [string]$field) {
+        try {
+            $d = $resp.body.'urn:scimserver:api:messages:2.0:Diagnostics'
+            if ($null -eq $d) { return @() }
+            return @($d.$field)
+        } catch { return @() }
+    }
+
+    # ── Flag OFF: current behavior preserved in BOTH strict states ──────────
+    Set-AtFlags $false $true
+    $u = New-AtUser 't1'; $u.address = @{ street = '1 Main St'; geo = @{ lat = 47.6; lon = -122.3 } }
+    $r1 = Invoke-AtPost $u
+    Test-Result -Success ($r1.status -eq 201) -Message "9z-AT.T1: flag OFF + strict ON accepts a nested complex sub-attribute (current behavior)"
+
+    Set-AtFlags $false $false
+    $u = New-AtUser 't2'; $u.address = @{ street = '1 Main St'; geo = @{ lat = 47.6; lon = -122.3 } }
+    $r2 = Invoke-AtPost $u
+    Test-Result -Success ($r2.status -eq 201) -Message "9z-AT.T2: flag OFF + strict OFF accepts it too"
+
+    # ── R1: rejected regardless of strict mode ─────────────────────────────
+    Set-AtFlags $true $true
+    $u = New-AtUser 't3'; $u.address = @{ street = '1 Main St'; geo = @{ lat = 47.6; lon = -122.3 } }
+    $r3 = Invoke-AtPost $u
+    Test-Result -Success ($r3.status -eq 400 -and $r3.body.detail -match '2\.3\.8') -Message "9z-AT.T3: flag ON + strict ON rejects 400 citing RFC 7643 2.3.8"
+    Test-Result -Success ((Get-AtDiag $r3 'attributePaths') -contains 'address.geo') -Message "9z-AT.T4: diagnostics name the offending path address.geo"
+
+    Set-AtFlags $true $false
+    $u = New-AtUser 't5'; $u.address = @{ street = '1 Main St'; geo = @{ lat = 47.6; lon = -122.3 } }
+    $r5 = Invoke-AtPost $u
+    Test-Result -Success ($r5.status -eq 400 -and $r5.body.detail -match '2\.3\.8') -Message "9z-AT.T5: STANDALONE - still rejects with StrictSchemaValidation OFF"
+    Test-Result -Success ((Get-AtDiag $r5 'triggeredBy') -contains 'RfcCompliantSubAttributes') -Message "9z-AT.T6: diagnostics triggeredBy is RfcCompliantSubAttributes"
+
+    # The flag must NOT smuggle strict mode in: an undeclared attribute on a
+    # lenient endpoint must still be accepted.
+    $u = New-AtUser 't7'; $u.somethingUndeclared = 'tolerated'
+    $r7 = Invoke-AtPost $u
+    Test-Result -Success ($r7.status -eq 201) -Message "9z-AT.T7: flag ON + strict OFF still tolerates undeclared attributes (strict not smuggled in)"
+
+    # Omitting the offending sub-attribute is fine.
+    Set-AtFlags $true $true
+    $u = New-AtUser 't8'; $u.address = @{ street = '1 Main St' }
+    $r8 = Invoke-AtPost $u
+    Test-Result -Success ($r8.status -eq 201) -Message "9z-AT.T8: payload omitting the complex sub-attribute is accepted"
+
+    # ── R2: multi-valued SIMPLE sub-attributes ─────────────────────────────
+    $u = New-AtUser 't9'; $u.licenses = @(@{ value = 'E5'; skus = @('EXCHANGE', 'TEAMS') })
+    $r9 = Invoke-AtPost $u
+    Test-Result -Success ($r9.status -eq 201) -Message "9z-AT.T9: flag ON accepts a multi-valued SIMPLE sub-attribute (RFC 7643 1.2)"
+    Test-Result -Success (@($r9.body.licenses[0].skus) -join ',' -eq 'EXCHANGE,TEAMS') -Message "9z-AT.T10: the multi-valued sub-attribute round-trips intact"
+
+    Set-AtFlags $false $true
+    $u = New-AtUser 't11'; $u.licenses = @(@{ value = 'E5'; skus = @('EXCHANGE', 'TEAMS') })
+    $r11 = Invoke-AtPost $u
+    Test-Result -Success ($r11.status -eq 400) -Message "9z-AT.T11: flag OFF rejects the same payload (legacy behavior preserved)"
+
+    # Cleanup
+    try { Invoke-RestMethod -Uri $atAdmin -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT: RfcCompliantSubAttributes section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT: RfcCompliantSubAttributes Tests Complete ---" -ForegroundColor Green
+
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

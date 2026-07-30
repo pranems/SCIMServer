@@ -131,6 +131,7 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 16 | [`logFileEnabled`](#logfileenabled) | boolean | `true` | Logging |
 | 17 | [`WifCredentialsEnabled`](#wifcredentialsenabled) | boolean | `false` | Authentication |
 | 18 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
+| 19 | [`RfcCompliantSubAttributes`](#rfccompliantsubattributes) | boolean | `false` | Validation |
 
 ### WifCredentialsEnabled
 
@@ -159,6 +160,67 @@ only LIST/query is relaxed. Applies symmetrically to `/Users` and `/Groups`.
 endpoint**: Entra's Test Connection probes both `/Users` and `/Groups` and treats
 a `/Groups` 404 as `SystemForCrossDomainIdentityManagementServiceIncompatible`.
 See [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.1a](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md#81a-enforceresourcetypes-flag---relax-listquery-to-200-empty-entra-test-connection).
+
+### RfcCompliantSubAttributes
+
+When `false` (**default**) the current behavior is preserved exactly, so no
+existing endpoint changes when this flag ships. When `true`, sub-attribute
+shapes are handled per RFC 7643 instead. The flag governs exactly two rules:
+
+| Rule | RFC | Flag OFF (default) | Flag ON |
+|---|---|---|---|
+| **R1** complex sub-attribute | [RFC 7643 §2.3.8](rfcs/rfc7643.txt), erratum 8415 | a schema may declare one and a payload populating it is **accepted** | the payload is **rejected** `400 invalidValue` |
+| **R2** multi-valued SIMPLE sub-attribute | [RFC 7643 §1.2](rfcs/rfc7643.txt), erratum 5607 | **rejected** (`must be a string, got object`) | **accepted**, each element type-checked with an `[index]` path |
+
+RFC 7643 §2.3.8 states a complex attribute "MUST NOT contain sub-attributes that
+have sub-attributes (i.e., that are complex)", and §1.2 defines a simple
+attribute as "singular or multi-valued", which is why a multi-valued *simple*
+sub-attribute is legal while a *complex* one is not. See
+[SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) for the
+full combination matrix and the ISV/IdP survey.
+
+**It is standalone.** It is deliberately NOT gated on
+[`StrictSchemaValidation`](#strictschemavalidation), because the two answer
+different questions: strict asks *how carefully do I police this payload*, while
+this flag asks *is this schema shape legal at all*. A lenient endpoint must
+still be able to refuse a shape the RFC forbids. Concretely:
+
+- turning this flag on does **not** enable strict validation (undeclared
+  attributes stay tolerated when strict is off), and
+- turning `StrictSchemaValidation` off does **not** lift an R1 rejection.
+
+Because of that, an R1 rejection is always attributed to this flag in the
+diagnostics envelope, whatever the strict setting:
+
+```json
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "status": "400",
+  "scimType": "invalidValue",
+  "detail": "Schema validation failed: address.geo: Sub-attribute 'geo' is complex, but RFC 7643 2.3.8 forbids a complex attribute from containing complex sub-attributes.",
+  "urn:scimserver:api:messages:2.0:Diagnostics": {
+    "errorCode": "VALIDATION_SCHEMA",
+    "triggeredBy": "RfcCompliantSubAttributes",
+    "attributePaths": [
+      "address.geo"
+    ],
+    "activeConfig": {
+      "StrictSchemaValidation": true,
+      "RfcCompliantSubAttributes": true
+    }
+  }
+}
+```
+
+**When to turn it on.** Only if you author custom schemas and want the server to
+hold you to the RFC's shape rules, or if you need multi-valued simple
+sub-attributes (R2). Leave it off otherwise - stock `User` and `Group` schemas
+declare no complex sub-attributes, so the flag is a no-op for them.
+
+Applies to `POST`, `PUT` and `PATCH`, to `/Users`, `/Groups` and custom resource
+types alike. Full design: [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md).
 
 ---
 

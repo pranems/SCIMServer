@@ -195,6 +195,15 @@ describe('RfcCompliantSubAttributes (E2E)', () => {
       // The payload is otherwise VALID, so 2.3.8 must be the ONLY complaint.
       // Without this the test would pass even if the 400 were mostly noise.
       expect(res.body[DIAG]?.attributePaths).toEqual(['address.geo']);
+      // The rejection must be attributed to the flag that CAUSED it. Blaming
+      // StrictSchemaValidation here would send an operator to the wrong
+      // switch, because turning strict off does not lift this rejection
+      // (proved by the STANDALONE test below). Found by the Playwright spec.
+      expect(res.body[DIAG]?.triggeredBy).toBe('RfcCompliantSubAttributes');
+      expect(res.body[DIAG]?.activeConfig).toMatchObject({
+        StrictSchemaValidation: true,
+        RfcCompliantSubAttributes: true,
+      });
     });
 
     it('STANDALONE: strict OFF still rejects with 400 (the flag is not gated on strict)', async () => {

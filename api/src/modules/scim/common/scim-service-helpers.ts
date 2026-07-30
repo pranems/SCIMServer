@@ -1029,47 +1029,23 @@ export class ScimSchemaHelpers {
       ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
     );
 
-    if (!isStrict) {
-      // RfcCompliantSubAttributes is STANDALONE: it is not gated on
-      // StrictSchemaValidation, because the two answer different questions
-      // (how carefully do I police a payload vs is this schema shape legal at
-      // all). A lenient endpoint must still be able to refuse a shape RFC 7643
-      // §2.3.8 forbids, so this pass runs here too - including for PATCH, which
-      // returns early below.
-      if (rfcCompliantSubAttributes) {
-        const nestingSchemas = this.buildSchemaDefinitions(dto, endpointId);
-        if (nestingSchemas.length > 0) {
-          const nestingCache = this.getSchemaCache(endpointId);
-          const nesting = SchemaValidator.validateSubAttributeNesting(
-            dto,
-            nestingSchemas,
-            nestingCache
-              ? {
-                  coreAttrMap: nestingCache.coreAttrMap,
-                  extensionSchemaMap: nestingCache.extensionSchemaMap,
-                }
-              : undefined,
-          );
-          if (!nesting.valid) {
-            const nestingDetails = nesting.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
-            throw createScimError({
-              status: 400,
-              scimType: nesting.errors[0]?.scimType ?? 'invalidValue',
-              detail: `Schema validation failed: ${nestingDetails}`,
-              diagnostics: {
-                errorCode: 'VALIDATION_SCHEMA',
-                triggeredBy: 'RfcCompliantSubAttributes',
-                attributePaths: nesting.errors.map((e) => e.path),
-                activeConfig: {
-                  StrictSchemaValidation: false,
-                  RfcCompliantSubAttributes: true,
-                },
-              },
-            });
-          }
-        }
-      }
+    // RfcCompliantSubAttributes is STANDALONE: it is not gated on
+    // StrictSchemaValidation, because the two answer different questions
+    // (how carefully do I police a payload vs is this schema shape legal at
+    // all). A lenient endpoint must still be able to refuse a shape RFC 7643
+    // §2.3.8 forbids, so this pass runs here too - including for PATCH, which
+    // returns early below.
+    //
+    // It deliberately runs BEFORE the strict branch as well, so the rejection
+    // is attributed to the flag that actually caused it. Letting the strict
+    // path report it would blame StrictSchemaValidation for a rejection that
+    // survives turning StrictSchemaValidation off - a misleading diagnostic
+    // that sends an operator to the wrong switch.
+    if (rfcCompliantSubAttributes) {
+      this.enforceSubAttributeNesting(dto, endpointId, isStrict);
+    }
 
+    if (!isStrict) {
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       // Type/unknown/canonical validation remains strict-gated
       if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
@@ -1121,6 +1097,48 @@ export class ScimSchemaHelpers {
         },
       });
     }
+  }
+
+  /**
+   * The ONE place the RfcCompliantSubAttributes nesting rule (RFC 7643 §2.3.8,
+   * erratum 8415) is enforced for Users/Groups, so the strict and lenient
+   * paths cannot drift in either the decision or the diagnostics.
+   *
+   * @param isStrict only reported in `activeConfig`; it does NOT gate the rule.
+   */
+  private enforceSubAttributeNesting(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    isStrict: boolean,
+  ): void {
+    const schemas = this.buildSchemaDefinitions(dto, endpointId);
+    if (schemas.length === 0) return;
+
+    const cache = this.getSchemaCache(endpointId);
+    const nesting = SchemaValidator.validateSubAttributeNesting(
+      dto,
+      schemas,
+      cache
+        ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap }
+        : undefined,
+    );
+    if (nesting.valid) return;
+
+    const details = nesting.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+    throw createScimError({
+      status: 400,
+      scimType: nesting.errors[0]?.scimType ?? 'invalidValue',
+      detail: `Schema validation failed: ${details}`,
+      diagnostics: {
+        errorCode: 'VALIDATION_SCHEMA',
+        triggeredBy: 'RfcCompliantSubAttributes',
+        attributePaths: nesting.errors.map((e) => e.path),
+        activeConfig: {
+          StrictSchemaValidation: isStrict,
+          RfcCompliantSubAttributes: true,
+        },
+      },
+    });
   }
 
   /**
