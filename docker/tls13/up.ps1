@@ -100,9 +100,26 @@ try {
 
     if ($fail) { throw 'TLS policy verification FAILED. Do not run tests against this stack.' }
 
+    # Per-hostname profile selection on the single public port.
+    Write-Host "`nVerifying per-hostname TLS profiles..." -ForegroundColor Cyan
+    & pwsh -NoProfile -File (Join-Path $here 'test-tls-profiles.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'per-hostname TLS profile verification FAILED' }
+
     Write-Host "`nReady." -ForegroundColor Green
-    Write-Host '  TLS 1.3 ONLY : https://localhost:8443' -ForegroundColor Green
-    Write-Host '  control 1.2+3: https://localhost:8444' -ForegroundColor DarkGray
+    Write-Host '  Single public port 8443, TLS profile chosen by SNI hostname:' -ForegroundColor Green
+    Write-Host '    tls13.localhost  -> TLS 1.3 ONLY   (also the default for any other name)' -ForegroundColor Green
+    Write-Host '    tls12.localhost  -> TLS 1.2 + 1.3  (control, for A/B comparison)' -ForegroundColor DarkGray
+    Write-Host '  Direct control bypassing the stream layer: https://localhost:8444' -ForegroundColor DarkGray
+    Write-Host ''
+    Write-Host '  Next:' -ForegroundColor Cyan
+    Write-Host '    pwsh ./test-endpoint-tls13.ps1     create and exercise one endpoint'
+    Write-Host '    pwsh ./run-live-test-tls13.ps1     full SCIM contract suite'
+    Write-Host '    pwsh ./tls-report.ps1              every handshake attempt, accepted and refused'
+    Write-Host ''
+    Write-Host '  Note: connecting by hostname from a browser or curl needs hosts entries:' -ForegroundColor DarkGray
+    Write-Host '    127.0.0.1 tls13.localhost' -ForegroundColor DarkGray
+    Write-Host '    127.0.0.1 tls12.localhost' -ForegroundColor DarkGray
+    Write-Host '  The test scripts do not need them: they connect to 127.0.0.1 and set SNI directly.' -ForegroundColor DarkGray
 }
 finally {
     Pop-Location

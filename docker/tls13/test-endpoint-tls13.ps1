@@ -169,8 +169,10 @@ Assert-That 'user deleted (204)' ($delU.StatusCode -eq 204) "status=$($delU.Stat
 # In the nginx image /var/log/nginx/access.log is a SYMLINK TO /dev/stdout, so
 # reading it from inside the container blocks forever. The log has to be read
 # from the container's stdout via `docker logs`.
+# The log is keyed on the TLS PROFILE NAME rather than a port number, so this
+# assertion survives the internal ports moving behind the stream front door.
 Write-Host "`n8. Independent confirmation from the terminator's own log" -ForegroundColor Yellow
-$log = docker logs --tail 400 scim-tls13-nginx 2>&1 | Where-Object { "$_" -match 'listener=8443' }
+$log = docker logs --tail 400 scim-tls13-nginx 2>&1 | Where-Object { "$_" -match 'EVENT=request' -and "$_" -match 'profile=strict-tls13-only' }
 $protos = foreach ($line in $log) { if ("$line" -match 'proto=(\S+)') { $Matches[1] } }
 # @() is REQUIRED: with a single distinct value Sort-Object returns a scalar
 # string, and indexing a string yields its first CHARACTER ('T'), not the value.
