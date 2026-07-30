@@ -122,6 +122,7 @@
 | [CUSTOM_EXTENSIONS_RFC_GUIDE.md](CUSTOM_EXTENSIONS_RFC_GUIDE.md) | **RFC-compliant custom extension authoring** - URN structure (RFC 7643 §10), schema meta-schema (§7), ResourceType binding (§6), worked `proxyAddresses` example, authoring checklist, error catalogue, end-to-end flow, common anti-patterns |
 | [COLLISION-TESTING-GUIDE.md](COLLISION-TESTING-GUIDE.md) | Entra collision (409) testing guide |
 | [tls/PER_ENDPOINT_TLS_POLICY_OPTIONS.md](tls/PER_ENDPOINT_TLS_POLICY_OPTIONS.md) | **Per-endpoint TLS version policy** - feasibility, measured probe evidence, 7 options, phased recommendation, security guard rails for forwarded-header trust |
+| [tls/TLS13_STANDALONE_INSTANCE_REPORT.md](tls/TLS13_STANDALONE_INSTANCE_REPORT.md) | **TLS 1.3-only standalone instance** - build, endpoint lifecycle 26/26, full live suite 1103/1105 with failure attribution, 1157/1157 requests measured as TLS 1.3, execution RCA ledger, Entra prerequisites |
 
 ## Feature Implementation Docs
 
