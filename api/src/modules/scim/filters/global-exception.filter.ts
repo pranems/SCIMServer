@@ -11,6 +11,7 @@ import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.ser
 import { LogCategory } from '../../logging/log-levels';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
+import { resolveRequestBodyForLog, type RawBodyRequest } from '../../logging/request-body-capture';
 
 /**
  * Global catch-all exception filter for unhandled non-HttpException errors.
@@ -128,11 +129,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status: 500,
       durationMs,
       requestHeaders: meta?.requestHeaders ?? { ...(request?.headers ?? {}) },
-      requestBody: meta?.requestBody ?? request?.body,
+      requestBody: resolveRequestBodyForLog(request as RawBodyRequest, meta),
       responseHeaders: response.getHeaders() as Record<string, unknown>,
       responseBody,
       error,
       endpointId: meta?.endpointId,
+      requestId: meta?.requestId,
     });
   }
 }

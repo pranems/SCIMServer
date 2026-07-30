@@ -11,6 +11,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md S14.1
  * @see docs/DELIVERY_PLAN.md UI-B1
  */
+import type { ConnectionInfo } from './connection-info.types';
 
 // ─── Resource Stats ──────────────────────────────────────────────────────
 
@@ -206,6 +207,14 @@ export interface DashboardActivity {
   durationMs: number;
   endpointId: string;
   endpointName?: string;
+  /**
+   * X5 - the auth decision persisted on the request row, so a recent-activity
+   * row can render the same auth-method chip the Logs page shows. All non-secret.
+   */
+  requestId?: string;
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
 }
 
 /** Aggregated dashboard response (BFF endpoint) */
@@ -277,9 +286,51 @@ export interface EndpointOverviewCredential {
   id: string;
   credentialType: string;
   label?: string | null;
+  /**
+   * X3/X4 - operator-supplied free-text description (never a secret), stored in
+   * metadata.description on any credential type. Null when none was set.
+   */
+  description?: string | null;
   active: boolean;
   createdAt: string;
   expiresAt?: string | null;
+  /**
+   * Public WIF trust fields, present ONLY when credentialType === 'wif'.
+   * These are all non-secret trust-configuration values (a WIF credential
+   * stores no secret), surfaced so the UI can display the full trust and
+   * offer inline editing without a second round trip. NEVER includes any
+   * secret/hash material (a WIF credential has none).
+   */
+  wif?: EndpointOverviewWifTrust | null;
+  /**
+   * U2 - the public client id for an `oauth_client` credential (from
+   * metadata.clientId), so each credential row can render its own
+   * Connect-to-Entra bundle. Absent for other credential types. Never a secret.
+   */
+  oauthClientId?: string | null;
+}
+
+/**
+ * Public projection of a WIF trust for display + edit in the UI. Every
+ * field here is a non-secret trust-configuration value. Kept as a closed
+ * allowlist so a future metadata addition cannot silently leak.
+ */
+export interface EndpointOverviewWifTrust {
+  expectedIssuer?: string | null;
+  expectedSubject?: string | null;
+  expectedAudience?: string | null;
+  jwksUri?: string | null;
+  allowedTenantId?: string | null;
+  /** U8 - which input `allowedTenantId` was gleaned from, or null when explicit. */
+  allowedTenantIdSource?: 'issuer' | 'jwksUri' | null;
+  requiredRoles?: string[] | null;
+  scope?: string | null;
+  assertionProfile?: string | null;
+  issuedTokenTtlSec?: number | null;
+  /** Item E - role-enforcement posture (off default | shadow | enforce). */
+  roleEnforcement?: 'off' | 'shadow' | 'enforce' | null;
+  /** U7 - ISO timestamp of the last successful verify-on-save, or null. */
+  lastVerifiedAt?: string | null;
 }
 
 /** Recent activity row with display-name resolution. */
@@ -290,6 +341,14 @@ export interface EndpointOverviewActivity {
   path: string;
   statusCode: number;
   durationMs: number;
+  /**
+   * X5 - the auth decision persisted on the request row, so the per-endpoint
+   * recent-activity row can render the same auth-method chip. All non-secret.
+   */
+  requestId?: string;
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
 }
 
 /** Full BFF response for GET /admin/endpoints/:id/overview (Phase B1). */
@@ -299,6 +358,12 @@ export interface EndpointOverviewResponse {
   credentials: EndpointOverviewCredential[];
   recentActivity: EndpointOverviewActivity[];
   configFlags: Record<string, unknown>;
+  /**
+   * WI-3: the assembled connection-info (absolute URLs + per-method Entra
+   * field set) so the UI never hand-builds URLs. Same shape the dedicated
+   * `GET /admin/endpoints/{id}/connection-info` returns; no secrets.
+   */
+  connectionInfo: ConnectionInfo;
 }
 
 // ─── Presets ─────────────────────────────────────────────────────────────

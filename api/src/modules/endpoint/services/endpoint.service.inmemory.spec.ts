@@ -132,4 +132,44 @@ describe('EndpointService - inmemory backend createEndpoint() parity', () => {
     expect(b.name).toBe('inmemory-name-b');
     expect(a.id).not.toBe(b.id);
   });
+
+  // ── Phase 4 (auth-obs) - auth-flag change audit event ──
+  describe('Phase 4 - auth-flag change audit', () => {
+    let logger: { info: jest.Mock; warn: jest.Mock };
+
+    beforeEach(() => {
+      logger = (service as unknown as { scimLogger: { info: jest.Mock; warn: jest.Mock } }).scimLogger;
+    });
+
+    function authEvent() {
+      return logger.info.mock.calls.find((c) => c[1] === 'Auth config change');
+    }
+
+    it('emits an "Auth config change" event when an auth-affecting flag flips', async () => {
+      const ep = await service.createEndpoint({ name: 'p4-flag-flip', profilePreset: 'rfc-standard' });
+      logger.info.mockClear();
+      await service.updateEndpoint(ep.id, { profile: { settings: { WifCredentialsEnabled: true } } as never });
+      const call = authEvent();
+      expect(call).toBeDefined();
+      expect(call![2]).toMatchObject({ action: 'auth_flags_changed', outcome: 'success', endpointId: ep.id });
+      const changed = (call![2] as { changedFlags: Array<{ flag: string; to: unknown }> }).changedFlags;
+      expect(changed.some((c) => c.flag === 'WifCredentialsEnabled' && c.to === true)).toBe(true);
+    });
+
+    it('does NOT emit an auth event when only a non-auth setting changes', async () => {
+      const ep = await service.createEndpoint({ name: 'p4-nonauth', profilePreset: 'rfc-standard' });
+      logger.info.mockClear();
+      await service.updateEndpoint(ep.id, { profile: { settings: { LogLevel: 'debug' } } as never });
+      expect(authEvent()).toBeUndefined();
+    });
+
+    it('does NOT emit an auth event when an update leaves the auth flag unchanged', async () => {
+      const ep = await service.createEndpoint({ name: 'p4-unchanged', profilePreset: 'rfc-standard' });
+      await service.updateEndpoint(ep.id, { profile: { settings: { WifCredentialsEnabled: true } } as never });
+      logger.info.mockClear();
+      // Re-apply the SAME value - no delta, so no event.
+      await service.updateEndpoint(ep.id, { profile: { settings: { WifCredentialsEnabled: true } } as never });
+      expect(authEvent()).toBeUndefined();
+    });
+  });
 });

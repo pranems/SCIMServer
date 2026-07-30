@@ -636,10 +636,10 @@ classDiagram
         -applyPatchOperationsForEndpoint(user, dto, ...) UserUpdateInput
     }
 
-    EndpointScimUsersService --> SchemaValidator : "Step 3a: pre-validate"
-    EndpointScimUsersService --> UserPatchEngine : "Step 4: apply"
-    UserPatchEngine --> ScimPatchPath : "delegates extension ops"
-    EndpointScimUsersService --> SchemaValidator : "Step 5: post-validate"
+    EndpointScimUsersService --> SchemaValidator : Step 3a - pre-validate
+    EndpointScimUsersService --> UserPatchEngine : Step 4 - apply
+    UserPatchEngine --> ScimPatchPath : delegates extension ops
+    EndpointScimUsersService --> SchemaValidator : Step 5 - post-validate
 
     note for SchemaValidator "FIX HERE: case 'complex' in\nvalidateSingleValue() must\nallow strings in patch mode\nfor complex attrs with\n'value' sub-attr"
 ```

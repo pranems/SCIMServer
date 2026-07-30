@@ -71,9 +71,12 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(res.body.token).toBeUndefined();
   });
 
-  it('mints a per-endpoint token carrying the endpoint_id claim', async () => {
+  it('mints a per-endpoint token carrying the endpoint_id claim (RFC 6749 5.1: 200 + no-store)', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
-    const res = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
+    const res = await mintEndpointToken(endpointA, clientId, clientSecret)
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect('Pragma', 'no-cache');
 
     expect(res.body.token_type).toBe('Bearer');
     expect(typeof res.body.access_token).toBe('string');
@@ -93,7 +96,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .set('Authorization', `Basic ${basic}`)
       .send({ grant_type: 'client_credentials' })
-      .expect(201);
+      .expect(200);
 
     expect(res.body.token_type).toBe('Bearer');
     const payload = decodePayload(res.body.access_token);
@@ -103,7 +106,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
 
   it('the per-endpoint token authorizes ITS OWN endpoint SCIM routes', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
-    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
+    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(200);
     const epToken = tokenRes.body.access_token;
 
     await request(app.getHttpServer())
@@ -114,7 +117,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
 
   it('the per-endpoint token is REJECTED on a DIFFERENT endpoint (Q1 scoping)', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
-    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(201);
+    const tokenRes = await mintEndpointToken(endpointA, clientId, clientSecret).expect(200);
     const epToken = tokenRes.body.access_token;
 
     const res = await request(app.getHttpServer())
@@ -127,10 +130,167 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
   it('rejects an invalid client_secret with invalid_client', async () => {
     const { clientId } = await createOauthClient(endpointA);
     const res = await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);
-    // The token endpoint currently rides the SCIM exception filter, which wraps
-    // the RFC 6749 5.2 `error` into the SCIM envelope `detail`. The raw OAuth
-    // error format for the token endpoint is formalized in A3's error catalog.
-    expect(res.body.detail).toBe('invalid_client');
+    // WI-D1: the token endpoint returns the native RFC-6749 error as
+    // application/json (NOT the SCIM envelope), enriched with a correlation_id.
+    expect(res.body.error).toBe('invalid_client');
+    expect(res.body.schemas).toBeUndefined();
+    expect(typeof res.body.correlation_id).toBe('string');
+    expect(typeof res.body.timestamp).toBe('string');
+    // WI-D3: the merged (T3) oauth_client reason code - never distinguishes
+    // secret-not-found from secret-mismatch on the wire (P2).
+    expect(res.body.reason_code).toBe('oauth_client_auth_failed');
+    expect(res.body.error_description).toBe('Client authentication failed.');
+  });
+
+  it('WI-D4: a rejected oauth_client attempt emits an AUTH decision event in the ring buffer', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);
+
+    const recent = await request(app.getHttpServer())
+      .get('/scim/admin/log-config/recent?category=auth&limit=200')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const decisionEvents = (recent.body.entries as Array<Record<string, unknown>>).filter(
+      (e) => e.message === 'Auth decision',
+    );
+    expect(decisionEvents.length).toBeGreaterThan(0);
+    const rejectEvent = decisionEvents.find(
+      (e) => (e.data as Record<string, unknown>)?.reasonCode === 'oauth_client_auth_failed',
+    );
+    expect(rejectEvent).toBeDefined();
+    expect((rejectEvent!.data as Record<string, unknown>).outcome).toBe('reject');
+    expect((rejectEvent!.data as Record<string, unknown>).method).toBe('oauth_client');
+  });
+
+  it('V10: a rejected oauth_client token request persists the auth summary on its RequestLog row', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret-v10').expect(401);
+
+    const logs = await request(app.getHttpServer())
+      .get('/scim/admin/logs?pageSize=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const tokenRow = (logs.body.items as Array<Record<string, unknown>>).find(
+      (r) =>
+        typeof r.url === 'string' &&
+        r.url.includes(`/scim/endpoints/${endpointA}/oauth/token`) &&
+        r.status === 401,
+    );
+    // V10 - the auth decision is persisted directly on the request-log row, so
+    // the logs list can render the outcome without a second auth-decision query.
+    expect(tokenRow).toBeDefined();
+    expect(tokenRow!.authOutcome).toBe('reject');
+    expect(tokenRow!.authMethod).toBe('oauth_client');
+    expect(tokenRow!.authReason).toBe('oauth_client_auth_failed');
+  });
+
+  it('W1: the request-log row detail carries the FULL auth decision trace (durable, no store)', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret-w1').expect(401);
+
+    const logs = await request(app.getHttpServer())
+      .get('/scim/admin/logs?pageSize=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const tokenRow = (logs.body.items as Array<Record<string, unknown>>).find(
+      (r) =>
+        typeof r.url === 'string' &&
+        r.url.includes(`/scim/endpoints/${endpointA}/oauth/token`) &&
+        r.status === 401,
+    );
+    expect(tokenRow).toBeDefined();
+
+    const detail = await request(app.getHttpServer())
+      .get(`/scim/admin/logs/${tokenRow!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    // W1 - the full trace is persisted on the row, so the expected-vs-received
+    // diff renders permanently (independent of the 30-min decision store).
+    const decision = detail.body.authDecision as Record<string, unknown>;
+    expect(decision).toBeDefined();
+    expect(decision.method).toBe('oauth_client');
+    expect(decision.outcome).toBe('reject');
+    expect(Array.isArray(decision.checks)).toBe(true);
+    expect((decision.checks as unknown[]).length).toBeGreaterThan(0);
+    // Never leaks a secret.
+    expect(JSON.stringify(decision)).not.toContain('wrong-secret-w1');
+  });
+
+  it('WI-D5: a rejected oauth_client attempt is queryable at both auth-decisions scopes', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'wrong-secret').expect(401);
+
+    // Global scope - the reject appears across all endpoints.
+    const global = await request(app.getHttpServer())
+      .get('/scim/admin/auth-decisions?outcome=reject&limit=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(global.body.count).toBeGreaterThan(0);
+    const globalHit = (global.body.records as Array<Record<string, unknown>>).find(
+      (r) => r.endpointId === endpointA && r.reasonCode === 'oauth_client_auth_failed',
+    );
+    expect(globalHit).toBeDefined();
+    expect(globalHit!.outcome).toBe('reject');
+    expect(globalHit!.method).toBe('oauth_client');
+
+    // Per-endpoint scope - the same record scoped to endpointA.
+    const scoped = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}/auth-decisions?limit=100`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(scoped.body.count).toBeGreaterThan(0);
+    expect(
+      (scoped.body.records as Array<Record<string, unknown>>).every((r) => r.endpointId === endpointA),
+    ).toBe(true);
+
+    // Per-endpoint scope for a DIFFERENT endpoint does NOT include endpointA's record.
+    const other = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointB}/auth-decisions?limit=100`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (other.body.records as Array<Record<string, unknown>>).some((r) => r.endpointId === endpointA),
+    ).toBe(false);
+
+    // WI-D5 - the record never carries a raw secret/assertion.
+    expect(JSON.stringify(scoped.body)).not.toContain('wrong-secret');
+  });
+
+  it('Phase 1: the recorded oauth_client reject carries populated per-check expected/received (no secret)', async () => {
+    const { clientId } = await createOauthClient(endpointA);
+    await mintEndpointToken(endpointA, clientId, 'definitely-wrong').expect(401);
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}/auth-decisions?outcome=reject&limit=50`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const rec = (res.body.records as Array<Record<string, unknown>>).find(
+      (r) => r.reasonCode === 'oauth_client_auth_failed',
+    );
+    expect(rec).toBeDefined();
+    const checks = rec!.checks as Array<{ id: string; status: string; expected?: string; received?: string }>;
+    // The oauth_client decision now has real per-step checks (not an empty array).
+    expect(checks.length).toBeGreaterThanOrEqual(5);
+    const secretCheck = checks.find((c) => c.id === 'secret_match');
+    expect(secretCheck).toBeDefined();
+    expect(secretCheck!.status).toBe('fail');
+    expect(secretCheck!.received).toBe('mismatch');
+    // Every check carries BOTH expected and received (no "-" in the UI table).
+    for (const c of checks) {
+      expect(c.expected).toBeDefined();
+      expect(c.received).toBeDefined();
+    }
+    // The secret value itself is never present.
+    expect(JSON.stringify(checks)).not.toContain('definitely-wrong');
+  });
+
+  it('WI-D5: the auth-decisions endpoints require admin auth (401 without a bearer)', async () => {
+    await request(app.getHttpServer()).get('/scim/admin/auth-decisions').expect(401);
+    await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}/auth-decisions`)
+      .expect(401);
   });
 
   it('rejects a wrong grant_type with unsupported_grant_type', async () => {
@@ -139,7 +299,9 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .send({ grant_type: 'password', client_id: clientId, client_secret: clientSecret })
       .expect(400);
-    expect(res.body.detail).toBe('unsupported_grant_type');
+    expect(res.body.error).toBe('unsupported_grant_type');
+    // WI-D1: error_description survives (was dropped by the old flattener).
+    expect(typeof res.body.error_description).toBe('string');
   });
 
   it('accepts an application/x-www-form-urlencoded body on the per-endpoint token endpoint (RFC 6749 3.2)', async () => {
@@ -153,7 +315,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .type('form')
       .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret })
-      .expect(201);
+      .expect(200);
 
     expect(res.body.token_type).toBe('Bearer');
     expect(typeof res.body.access_token).toBe('string');
@@ -169,7 +331,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .set('Authorization', `Basic ${basic}`)
       .type('form')
       .send({ grant_type: 'client_credentials' })
-      .expect(201);
+      .expect(200);
 
     expect(res.body.token_type).toBe('Bearer');
     const payload = decodePayload(res.body.access_token);
@@ -193,5 +355,58 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       expect(row).not.toHaveProperty('clientSecret');
       expect(row).not.toHaveProperty('credentialHash');
     }
+  });
+
+  // ─── A3: form-urlencoded intake + routing cascade ──────────────────────────
+  describe('A3 routing cascade + form-urlencoded intake', () => {
+    const JWT_BEARER = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+
+    it('accepts a form-urlencoded token request (RFC 6749 section 3.2)', async () => {
+      const { clientId, clientSecret } = await createOauthClient(endpointA);
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret })
+        .expect(200);
+      expect(res.body.token_type).toBe('Bearer');
+      expect(typeof res.body.access_token).toBe('string');
+    });
+
+    it('rejects a body carrying BOTH client_assertion and client_secret (invalid_request)', async () => {
+      const { clientId, clientSecret } = await createOauthClient(endpointA);
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+          client_assertion: 'a.b.c',
+          client_assertion_type: JWT_BEARER,
+        })
+        .expect(400);
+      // WI-D1: RFC-6749 error shape on the token endpoint.
+      expect(res.body.error).toBe('invalid_request');
+    });
+
+    it('rejects a client_assertion with an unsupported assertion type (invalid_request)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_assertion: 'a.b.c', client_assertion_type: 'urn:bogus' })
+        .expect(400);
+      expect(res.body.error).toBe('invalid_request');
+    });
+
+    it('a client_assertion is routed to the WIF path (invalid_client until Q6 wires the validator)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointA}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_assertion: 'a.b.c', client_assertion_type: JWT_BEARER })
+        .expect(401);
+      // Routed to the assertion path (invalid_client), NOT the secret path
+      // (which would be invalid_request for missing client_id/secret).
+      expect(res.body.error).toBe('invalid_client');
+    });
   });
 });

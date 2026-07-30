@@ -1,10 +1,17 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { resolveRuntimeConfig } from '../../bootstrap/runtime-config';
+import { toStorableRequestId } from './storable-request-id';
+import { ModuleRef } from '@nestjs/core';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { ScimLogger } from './scim-logger.service';
+import { ScimLogger, getCorrelationContext } from './scim-logger.service';
+import { capStoredBodyString } from './request-body-capture';
 import { LogCategory } from './log-levels';
+import { redactSensitiveDeep, REDACTED } from '../../security/redact-sensitive';
+import { EndpointService } from '../endpoint/services/endpoint.service';
+import { getEffectivePersistRequestSecrets } from '../endpoint/endpoint-config.interface';
 
 export interface CreateRequestLogOptions {
   method: string;
@@ -18,6 +25,8 @@ export interface CreateRequestLogOptions {
   error?: unknown;
   /** SCIM endpoint ID extracted from URL (persisted for indexed endpoint-scoped queries) */
   endpointId?: string;
+  /** P3 - the X-Request-Id correlation id, bridges a log row to its AuthDecisionTrace. */
+  requestId?: string;
 }
 
 @Injectable()
@@ -35,11 +44,18 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   // database write overhead. Single batch insert instead of N individual writes.
   // Originally introduced to mitigate SQLite single-writer contention; retained
   // for PostgreSQL to reduce connection pool pressure.
-  private logBuffer: Array<Prisma.RequestLogCreateManyInput & { _identifier?: string }> = [];
+  private logBuffer: Prisma.RequestLogCreateManyInput[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
-  private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
-  private static readonly MAX_BUFFER_SIZE = 50;        // or when 50 entries accumulate
+  /**
+   * W1.7b - buffering is a throughput/durability tradeoff that moves with the
+   * deployment: a busy production replica wants a SHORTER interval (bounding
+   * crash-loss) with a LARGER batch (fewer round-trips and less pool pressure)
+   * than a developer laptop. `LOG_FLUSH_INTERVAL_MS` / `LOG_FLUSH_MAX_BUFFER`,
+   * clamped; the previous hardcoded 3000 ms / 50 remain the defaults.
+   */
+  private readonly flushIntervalMs: number;
+  private readonly flushMaxBuffer: number;
   private inMemoryLogRows: Array<{
     id: string;
     method: string;
@@ -55,12 +71,55 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     errorMessage: string | null;
     errorStack: string | null;
     identifier: string | null;
+    requestId: string | null;
+    authOutcome: string | null;
+    authMethod: string | null;
+    authReason: string | null;
+    authCredentialId: string | null;
+    authDecision: string | null;
   }> = [];
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: ScimLogger,
-  ) {}
+    private readonly moduleRef: ModuleRef,
+  ) {
+    const log = resolveRuntimeConfig((k) => process.env[k]).groups.logging;
+    this.flushIntervalMs = log.flushIntervalMs.effective as number;
+    this.flushMaxBuffer = log.flushMaxBuffer.effective as number;
+  }
+
+  /**
+   * The server-level default for PersistRequestSecrets (env, default true). When
+   * true the RequestLog keeps the complete request/response (secrets included);
+   * an endpoint may override it per-endpoint via the `PersistRequestSecrets`
+   * config flag.
+   */
+  private readonly persistRequestSecretsServerDefault =
+    (process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false';
+
+  /** Lazily-resolved EndpointService (cycle-safe via ModuleRef; cached). */
+  private endpointServiceRef?: EndpointService | null;
+
+  /**
+   * Resolve the EFFECTIVE PersistRequestSecrets for a request: the endpoint's
+   * explicit config flag OVERRIDES the server-level default; an endpoint that
+   * leaves it unset (or a global/unknown route) inherits the server default.
+   * Cache-only endpoint read (no async/DB) so this stays cheap on the log path;
+   * a cache miss falls back to the server default.
+   */
+  private resolvePersistSecrets(endpointId?: string): boolean {
+    if (!endpointId) return this.persistRequestSecretsServerDefault;
+    if (this.endpointServiceRef === undefined) {
+      try {
+        this.endpointServiceRef = this.moduleRef.get(EndpointService, { strict: false });
+      } catch {
+        this.endpointServiceRef = null;
+      }
+    }
+    const settings = this.endpointServiceRef?.getCachedProfileSettings(endpointId);
+    return getEffectivePersistRequestSecrets(settings, this.persistRequestSecretsServerDefault);
+  }
 
   // ── Auto-prune lifecycle ──
 
@@ -141,6 +200,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     responseBody,
     error,
     endpointId,
+    requestId,
   }: CreateRequestLogOptions): void {
     // Skip successful health probes - see method-level docstring.
     // Matches: GET /health, /scim/health (with optional trailing slash or
@@ -153,6 +213,42 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     ) {
       return;
     }
+
+    // F1 - request-log privacy. By DEFAULT the RequestLog keeps the complete
+    // request/response (headers + body, secrets included) for fast RCA. When the
+    // effective PersistRequestSecrets flag is OFF (server env or per-endpoint
+    // override), secret-bearing header/body values are redacted BEFORE the row is
+    // persisted, so they never reach the DB or the API/UI. Identifier derivation
+    // still runs on the raw payload (userName/displayName/externalId are not
+    // secrets). Console/file structured logs are always redacted separately.
+    const persistSecrets = this.resolvePersistSecrets(endpointId);
+    const storedRequestHeaders = persistSecrets ? requestHeaders : redactSensitiveDeep(requestHeaders);
+    let storedRequestBody = persistSecrets ? requestBody : redactSensitiveDeep(requestBody);
+    const storedResponseHeaders = persistSecrets ? responseHeaders : redactSensitiveDeep(responseHeaders);
+    const storedResponseBody = persistSecrets ? responseBody : redactSensitiveDeep(responseBody);
+    // When secrets are not persisted, mask the free-text raw preview of an
+    // unparseable body - key-based redaction cannot reach a blob's contents.
+    if (
+      !persistSecrets &&
+      storedRequestBody &&
+      typeof storedRequestBody === 'object' &&
+      (storedRequestBody as Record<string, unknown>)._rawPreview !== undefined
+    ) {
+      storedRequestBody = { ...(storedRequestBody as Record<string, unknown>), _rawPreview: REDACTED };
+    }
+
+    // V10 - the auth decision for this request is stamped onto the correlation
+    // context by emitAuthDecisionEvent / the guard earlier in the same async
+    // chain. Persist it on the row so the logs list shows the auth outcome
+    // instantly (no second per-row Auth-Decision-Record lookup needed).
+    const authCtx = getCorrelationContext();
+    const authOutcome = authCtx?.authOutcome ?? null;
+    const authMethod = authCtx?.authMethod ?? null;
+    const authReason = authCtx?.authReason ?? null;
+    const authCredentialId = authCtx?.authCredentialId ?? null;
+    // W1 - the full redacted AuthDecisionTrace (JSON), so the detail renders the
+    // diff permanently. Capped like any stored body.
+    const authDecision = capStoredBodyString(authCtx?.authDecision) ?? null;
 
     if (this.isInMemoryBackend) {
       const errorMessage = this.extractErrorMessage(error);
@@ -177,13 +273,19 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         status: status ?? null,
         durationMs: durationMs ?? null,
         createdAt: new Date(),
-        requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
-        requestBody: this.stringifyValue(requestBody),
-        responseHeaders: this.stringifyValue(responseHeaders),
-        responseBody: this.stringifyValue(responseBody),
+        requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
+        requestBody: capStoredBodyString(this.stringifyValue(storedRequestBody)) ?? null,
+        responseHeaders: this.stringifyValue(storedResponseHeaders),
+        responseBody: capStoredBodyString(this.stringifyValue(storedResponseBody)) ?? null,
         errorMessage,
         errorStack,
         identifier: identifier ?? null,
+        requestId: toStorableRequestId(requestId),
+        authOutcome,
+        authMethod,
+        authReason,
+        authCredentialId,
+        authDecision,
       });
       return;
     }
@@ -203,34 +305,50 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
     }
 
-    const data: Prisma.RequestLogCreateManyInput & { _identifier?: string } = {
+    const data: Prisma.RequestLogCreateManyInput = {
       method,
       url,
       status: status ?? null,
       durationMs: durationMs ?? null,
-      requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
-      requestBody: this.stringifyValue(requestBody),
-      responseHeaders: this.stringifyValue(responseHeaders),
-      responseBody: this.stringifyValue(responseBody),
+      requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
+      requestBody: capStoredBodyString(this.stringifyValue(storedRequestBody)),
+      responseHeaders: this.stringifyValue(storedResponseHeaders),
+      responseBody: capStoredBodyString(this.stringifyValue(storedResponseBody)),
       errorMessage,
       errorStack,
-      _identifier: identifier,
+      // Include the derived identifier INLINE so the flush is a single batch
+      // insert (no per-row UPDATE backfill). `identifier` is a real column.
+      identifier: identifier ?? null,
       endpointId: endpointId ?? null,
+      requestId: toStorableRequestId(requestId),
+      authOutcome,
+      authMethod,
+      authReason,
+      authCredentialId,
+      authDecision,
     };
 
     this.logBuffer.push(data);
 
     // Flush immediately if buffer is full, otherwise schedule a delayed flush
-    if (this.logBuffer.length >= LoggingService.MAX_BUFFER_SIZE) {
+    if (this.logBuffer.length >= this.flushMaxBuffer) {
       void this.flushLogs();
     } else if (!this.flushTimer) {
-      this.flushTimer = setTimeout(() => void this.flushLogs(), LoggingService.FLUSH_INTERVAL_MS);
+      this.flushTimer = setTimeout(() => void this.flushLogs(), this.flushIntervalMs);
     }
   }
 
   /**
-   * Flush the accumulated log buffer to PostgreSQL in a single batch.
-   * Uses createMany for the bulk insert, then a single raw UPDATE for identifiers.
+   * Flush the accumulated log buffer to PostgreSQL in ONE batch insert.
+   *
+   * The identifier is included inline in each row (see `recordRequest`), so the
+   * flush is a single `createMany` with no per-identifier `UPDATE` backfill. The
+   * old backfill (SELECT most-recent-N + N sequential UPDATEs) was the root cause
+   * of flush-backlog under sustained load on a latency-bound node - each flush
+   * did N+1 round-trips, so request volume outran flush throughput and rows sat
+   * un-persisted in the buffer. It was also fragile (createdAt-desc correlation
+   * could misassign identifiers when inserts interleaved). One batch insert is
+   * both faster and correct.
    */
   async flushLogs(): Promise<void> {
     if (this.isInMemoryBackend) {
@@ -247,47 +365,42 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.flushTimer = null;
     }
 
-    // Separate identifier metadata from Prisma create input
-    const identifiers: Array<{ index: number; identifier: string }> = [];
-    const createData: Prisma.RequestLogCreateManyInput[] = batch.map((entry, i) => {
-      if (entry._identifier) {
-        identifiers.push({ index: i, identifier: entry._identifier });
-      }
-      // Strip the non-Prisma field before passing to createMany
-      const { _identifier, ...prismaData } = entry;
-      return prismaData as Prisma.RequestLogCreateManyInput;
-    });
-
     try {
-      // Single batch insert (1 write instead of N*2 writes)
-      await this.prisma.requestLog.createMany({ data: createData });
-
-      // Phase 3 (PostgreSQL): Fetch the most recent N rows by createdAt to correlate
-      // batch-inserted records with their identifiers.
-      if (identifiers.length > 0) {
-        try {
-          const recentRows: Array<{ id: string }> = await this.prisma.$queryRawUnsafe(
-            `SELECT "id" FROM "RequestLog" ORDER BY "createdAt" DESC LIMIT ${batch.length}`
-          );
-          // recentRows[0] = newest (last in batch), so reverse to align with batch order
-          const ordered = [...recentRows].reverse();
-          for (const { index, identifier } of identifiers) {
-            if (ordered[index]) {
-              await this.prisma.$executeRawUnsafe(
-                `UPDATE "RequestLog" SET "identifier" = $1 WHERE "id" = $2`,
-                identifier,
-                ordered[index].id,
-              );
-            }
-          }
-        } catch (e) {
-          this.logger.debug(LogCategory.DATABASE, 'Identifier backfill failed (non-critical)', { error: (e as Error).message });
-        }
-      }
+      // Single batch insert (identifier included inline - no UPDATE backfill).
+      await this.prisma.requestLog.createMany({ data: batch });
     } catch (persistError) {
       this.logger.error(LogCategory.DATABASE, 'Failed to flush request log batch', persistError as Error);
     } finally {
       this.flushInProgress = false;
+    }
+  }
+
+  /**
+   * Force ALL currently-buffered entries to the database, awaiting any in-flight
+   * flush first.
+   *
+   * `flushLogs()` deliberately no-ops while a prior flush is in progress (so the
+   * 3s timer never double-flushes), which means a bare `flushLogs()` call is NOT
+   * a reliable "drain now" under sustained load - a background flush is usually
+   * running, so the call returns having drained nothing. `flushPending` spins
+   * until the buffer is empty AND no flush is in flight (bounded by a deadline),
+   * so on return every entry buffered before the call is durable + queryable.
+   * This is what the admin force-flush endpoint uses so a just-produced row is
+   * immediately readable (operators chasing a fresh row; tests reading back a
+   * row they just created). No-op on the in-memory backend (writes are sync).
+   */
+  async flushPending(timeoutMs = 10_000): Promise<void> {
+    if (this.isInMemoryBackend) return;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (this.flushInProgress) {
+        // A flush is writing; wait for it to release, then re-check the buffer
+        // (entries can arrive during the write).
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        continue;
+      }
+      if (this.logBuffer.length === 0) return; // drained + nothing in flight
+      await this.flushLogs();
     }
   }
 
@@ -347,6 +460,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     minDurationMs?: number;
     /** Filter by indexed endpointId column (preferred over urlContains) */
     endpointId?: string;
+    /** P3 - filter by the X-Request-Id correlation id (auth-decision bridge). */
+    requestId?: string;
   } = {}) {
     if (this.isInMemoryBackend) {
       const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
@@ -360,6 +475,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // branch's filter set 1:1.
       if (filters.endpointId) {
         filtered = filtered.filter((r) => r.endpointId === filters.endpointId);
+      }
+      if (filters.requestId) {
+        filtered = filtered.filter((r) => r.requestId === filters.requestId);
       }
       if (filters.method) {
         const m = filters.method.toUpperCase();
@@ -419,6 +537,12 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         createdAt: r.createdAt,
         errorMessage: r.errorMessage ?? undefined,
         reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
+        requestId: r.requestId ?? undefined,
+        endpointId: r.endpointId ?? undefined,
+        authOutcome: r.authOutcome ?? undefined,
+        authMethod: r.authMethod ?? undefined,
+        authReason: r.authReason ?? undefined,
+        authCredentialId: r.authCredentialId ?? undefined,
       }));
 
       const total = filtered.length;
@@ -438,6 +562,14 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
   const where: Prisma.RequestLogWhereInput = {};
     if (filters.endpointId) where.endpointId = filters.endpointId;
+    if (filters.requestId) {
+      // requestId is a `@db.Uuid` column: a non-UUID value makes Postgres throw
+      // on the cast (previously surfaced as a 500). A non-UUID can never match a
+      // UUID column, so return an empty set instead (parity with the in-memory
+      // string-equality branch), using the nil UUID as a guaranteed-no-match.
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.requestId);
+      where.requestId = isUuid ? filters.requestId : '00000000-0000-0000-0000-000000000000';
+    }
     if (filters.method) where.method = filters.method.toUpperCase();
     if (typeof filters.status === 'number') where.status = filters.status;
     if (filters.hasError === true) where.errorMessage = { not: null };
@@ -534,6 +666,12 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       durationMs: number | null;
       createdAt: Date;
       errorMessage: string | null;
+      requestId: string | null;
+      endpointId: string | null;
+      authOutcome: string | null;
+      authMethod: string | null;
+      authReason: string | null;
+      authCredentialId: string | null;
     };
     let records: RequestLogRow[] = [];
     try {
@@ -552,7 +690,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
             status: true,
             durationMs: true,
             createdAt: true,
-            errorMessage: true
+            errorMessage: true,
+            requestId: true,
+            endpointId: true,
+            authOutcome: true,
+            authMethod: true,
+            authReason: true,
+            authCredentialId: true
           }
         })
       ]);
@@ -609,6 +753,12 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     durationMs: number | null;
     createdAt: Date;
     errorMessage: string | null;
+    requestId?: string | null;
+    endpointId?: string | null;
+    authOutcome?: string | null;
+    authMethod?: string | null;
+    authReason?: string | null;
+    authCredentialId?: string | null;
   }, identifierMap?: Record<string, string | null>) {
     let identifier = identifierMap?.[r.id] || this.deriveIdentifierFromUrl(r.url);
 
@@ -629,7 +779,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       durationMs: r.durationMs ?? undefined,
       createdAt: r.createdAt,
       errorMessage: r.errorMessage ?? undefined,
-      reportableIdentifier: identifier
+      reportableIdentifier: identifier,
+      requestId: r.requestId ?? undefined,
+      endpointId: r.endpointId ?? undefined,
+      authOutcome: r.authOutcome ?? undefined,
+      authMethod: r.authMethod ?? undefined,
+      authReason: r.authReason ?? undefined,
+      authCredentialId: r.authCredentialId ?? undefined
     };
   }
 
@@ -737,6 +893,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
       return {
         id: row.id,
+        endpointId: row.endpointId ?? undefined,
         method: row.method,
         url: row.url,
         status: row.status ?? undefined,
@@ -748,6 +905,12 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         responseBody: parsedResponse,
         errorMessage: row.errorMessage ?? undefined,
         reportableIdentifier: rid,
+        requestId: row.requestId ?? undefined,
+        authOutcome: row.authOutcome ?? undefined,
+        authMethod: row.authMethod ?? undefined,
+        authReason: row.authReason ?? undefined,
+        authCredentialId: row.authCredentialId ?? undefined,
+        authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
       };
     }
 
@@ -765,6 +928,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.deriveIdentifierFromUrl(row.url);
     return {
       id: row.id,
+      endpointId: row.endpointId ?? undefined,
       method: row.method,
       url: row.url,
       status: row.status ?? undefined,
@@ -775,7 +939,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
       responseBody: parsedResponse,
       errorMessage: row.errorMessage ?? undefined,
-      reportableIdentifier: rid
+      reportableIdentifier: rid,
+      requestId: row.requestId ?? undefined,
+      authOutcome: row.authOutcome ?? undefined,
+      authMethod: row.authMethod ?? undefined,
+      authReason: row.authReason ?? undefined,
+      authCredentialId: row.authCredentialId ?? undefined,
+      authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
     };
   }
 

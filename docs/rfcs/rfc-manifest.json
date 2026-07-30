@@ -7,7 +7,7 @@
     "are `rfc`, `file`, `role`, `retrieved` and the waivers[] array.",
     "Enforced by scripts/sync-rfcs.ps1 (checks C1-C5 offline, O1-O3 with -Online)."
   ],
-  "lastVerified": "2026-07-29",
+  "lastVerified": "2026-07-30",
   "sources": {
     "index": "https://www.rfc-editor.org/rfc-index.xml",
     "errata": "https://www.rfc-editor.org/errata.json",
@@ -303,6 +303,19 @@
       "obsoletedBy": [],
       "errata": {},
       "sha256": "9919d061d40a97886ca866b51c69389b6c81c65cd4b979056c14fdbebfcf622a"
+    },
+    {
+      "rfc": "8725",
+      "file": "docs/auth/rfcs/rfc8725.txt",
+      "role": "JSON Web Token Best Current Practices. Updates RFC 7519. The normative source for the algorithm allowlist, explicit typing and issuer/audience/subject validation the WIF assertion path implements.",
+      "retrieved": "2026-07-30",
+      "title": "JSON Web Token Best Current Practices",
+      "status": "BEST CURRENT PRACTICE",
+      "published": "2020-February",
+      "updatedBy": [],
+      "obsoletedBy": [],
+      "errata": {},
+      "sha256": "737b7013a2495dcfd5481cf4c57c87e2455d537c4cec1140c9096a71fcef0812"
     }
   ],
   "waivers": [
@@ -322,12 +335,6 @@
       "rfc": "7797",
       "updates": "7519",
       "reason": "JWS Unencoded Payload Option (b64:false). SCIMServer neither produces nor accepts unencoded-payload JWS; its validators require standard base64url JWS compact serialization. Tracked as an auth-workstream item because a validator that silently honoured b64:false would be a signature-bypass surface.",
-      "raisedBy": "scripts/sync-rfcs.ps1 C3 on 2026-07-29"
-    },
-    {
-      "rfc": "8725",
-      "updates": "7519",
-      "reason": "JWT Best Current Practices. Genuinely load-bearing for WIF assertion validation (alg confusion, aud/iss pinning, kid handling). NOT waived on merit - waived only because docs/auth/rfcs/ is owned by the feat/wif workstream and adding a mirror there from this branch would collide with an in-flight session. FOLLOW-UP: mirror rfc8725.txt plus RFC_8725_EXPLAINED.md on the auth branch, then delete this waiver.",
       "raisedBy": "scripts/sync-rfcs.ps1 C3 on 2026-07-29"
     }
   ]

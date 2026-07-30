@@ -89,6 +89,13 @@ export const globalLogsSearchSchema = paginationSchema.extend({
   timeRange: z.preprocess(emptyToUndef, z.enum(TIME_RANGE_VALUES).optional()),
   urlContains: z.preprocess(emptyToUndef, z.string().optional()),
   detail: z.preprocess(emptyToUndef, z.string().optional()),
+  /**
+   * Phase 3 (auth-obs) - filter to the single request log whose
+   * X-Request-Id correlation id matches. Set by the "View request log"
+   * deep-link from an auth decision so the operator lands on the exact
+   * request that produced the decision.
+   */
+  requestId: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type GlobalLogsSearch = z.infer<typeof globalLogsSearchSchema>;
 

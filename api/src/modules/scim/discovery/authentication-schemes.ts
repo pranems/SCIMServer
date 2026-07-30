@@ -35,6 +35,18 @@ const SCHEME_NAME_BY_TYPE: Record<string, string> = {
   httpbasic: 'HTTP Basic',
 };
 
+/** The canonical name of the auto-advertised WIF scheme (Q6.6). */
+const WIF_SCHEME_NAME = 'Workload Identity Federation';
+
+/** The WIF scheme advertised when `WifCredentialsEnabled` is on (Q6.6). */
+const WIF_SCHEME: SpcAuthenticationScheme = {
+  type: 'oauth2',
+  name: WIF_SCHEME_NAME,
+  description:
+    'Federated identity (RFC 7523 jwt-bearer): present a signed identity-provider assertion at the per-endpoint token endpoint to obtain a short-lived access token.',
+  specUri: 'https://www.rfc-editor.org/rfc/rfc7523',
+};
+
 function methodToScheme(method: AuthenticationMethod): SpcAuthenticationScheme {
   const schemeType = METHOD_TYPE_TO_SCHEME_TYPE[method.type] ?? 'oauth2';
   const scheme: SpcAuthenticationScheme = {
@@ -52,19 +64,31 @@ function methodToScheme(method: AuthenticationMethod): SpcAuthenticationScheme {
  * @param baseline The deployment baseline scheme(s) (always the
  *   `oauthbearertoken` scheme). Cloned so the input is never mutated.
  * @param authentication The endpoint's authentication block (optional).
+ * @param options Q6.6 - `wifCredentialsEnabled` advertises a WIF scheme when the
+ *   endpoint's `WifCredentialsEnabled` flag is on (and no enabled `wif-*` method
+ *   already advertises one), so discovery reflects that the federated-identity
+ *   token path is accepted.
  */
 export function computeAuthenticationSchemes(
   baseline: readonly SpcAuthenticationScheme[],
   authentication?: ProfileAuthentication,
+  options?: { wifCredentialsEnabled?: boolean },
 ): SpcAuthenticationScheme[] {
   // Always start from a clone of the baseline; reset primary flags - we set
   // exactly one primary below.
   const baselineClones = baseline.map((s) => ({ ...s, primary: false }));
 
   const enabled = (authentication?.methods ?? []).filter((m) => m.enabled !== false);
+
+  // Q6.6 - whether an enabled method already contributes a WIF scheme.
+  const hasWifMethod = enabled.some((m) => m.type === 'wif-7523' || m.type === 'wif-8693');
+  const appendWif = options?.wifCredentialsEnabled === true && !hasWifMethod;
+
   if (enabled.length === 0) {
-    // Disabled / no methods: baseline only, baseline is primary.
+    // Disabled / no methods: baseline only, baseline is primary. Q6.6 may still
+    // append the WIF scheme when the flag is on.
     if (baselineClones.length > 0) baselineClones[0].primary = true;
+    if (appendWif) baselineClones.push({ ...WIF_SCHEME, primary: false });
     return baselineClones;
   }
 
@@ -85,6 +109,8 @@ export function computeAuthenticationSchemes(
   } else if (baselineClones.length > 0) {
     baselineClones[0].primary = true;
   }
+
+  if (appendWif) schemes.push({ ...WIF_SCHEME, primary: false });
 
   return schemes;
 }

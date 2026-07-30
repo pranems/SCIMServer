@@ -307,7 +307,7 @@ describe('API Response Contract Verification - Part 2 (E2E)', () => {
           client_id: 'e2e-client',
           client_secret: 'e2e-client-secret',
         })
-        .expect(201);
+        .expect(200);
 
       assertAllowedKeys(res.body, TOKEN_ALLOWED_KEYS, 'POST /oauth/token');
       expect(res.body.token_type).toBe('Bearer');

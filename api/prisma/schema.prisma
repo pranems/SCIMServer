@@ -4,7 +4,7 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
 }
 
-// Phase 3: PostgreSQL provider — CITEXT for case-insensitive columns, JSONB for
+// Phase 3: PostgreSQL provider - CITEXT for case-insensitive columns, JSONB for
 // payload storage, row-level locking for concurrent writes, GIN indexes for
 // filter push-down. See docs/phases/PHASE_03_POSTGRESQL_MIGRATION.md
 datasource db {
@@ -18,12 +18,10 @@ model Endpoint {
   name        String   @unique
   displayName String?
   description String?
-  profile     Json?    // JSONB — { schemas, resourceTypes, serviceProviderConfig, settings }
+  profile     Json?    // JSONB - { schemas, resourceTypes, serviceProviderConfig, settings }
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt     @db.Timestamptz
-
-  logs    RequestLog[]
 
   // Phase 2: Unified resource relation
   resources ScimResource[]
@@ -48,20 +46,40 @@ model RequestLog {
   errorMessage     String?
   errorStack       String?
   identifier       String?
+  requestId        String?  @db.Uuid          // P3 - the X-Request-Id correlation id, bridges to AuthDecisionTrace.correlationId
+  // V10 - the authentication summary for this request, persisted here (not only
+  // in the ephemeral AuthDecisionRecordStore) so the logs list shows it
+  // instantly + durably. authCredentialId is the winning credential / WIF trust.
+  authOutcome      String?                     // 'accept' | 'reject'
+  authMethod       String?                     // wif | oauth_client | shared_secret | bearer_jwt | endpoint_bearer
+  authReason       String?                     // catalog reason code (reject) or accept note
+  authCredentialId String?  @db.Uuid           // V11 - the winning credential / WIF trust id
+  // W1 - the FULL, redacted AuthDecisionTrace (checks[] with expected/received,
+  // decodedClaims, plane, subTraces) as JSON, so the log detail renders the
+  // expected-vs-received diff permanently, not from the 30-min ephemeral store.
+  authDecision     String?
   createdAt        DateTime @default(now()) @db.Timestamptz
 
-  endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
+  // NO foreign key to Endpoint on purpose. RequestLog is an append-only audit
+  // record; `endpointId` is a correlation value, not a relational reference.
+  // A FK made the buffered batch flush fail (whole `createMany` rejected) when
+  // an endpoint was deleted between a row being buffered and the batch being
+  // flushed - losing audit rows AND making request-log-readback flaky. Keeping
+  // it a plain indexed column means logs for a since-deleted endpoint still
+  // persist (and stay queryable by that endpointId), which is what an audit
+  // trail must do.
 
   @@index([createdAt])
   @@index([method])
   @@index([status])
   @@index([endpointId])
   @@index([identifier])
+  @@index([requestId])
   @@index([createdAt, method, url])  // Composite for activity summary count queries
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Phase 2 → Phase 3 — Unified scim_resource table (PostgreSQL-native)
+// Phase 2 → Phase 3 - Unified scim_resource table (PostgreSQL-native)
 //
 // Polymorphic table: resourceType discriminator ("User" / "Group") determines
 // which columns are populated. CITEXT on userName/displayName eliminates the
@@ -73,11 +91,11 @@ model ScimResource {
   endpointId       String   @db.Uuid
   resourceType     String   @db.VarChar(50)
   scimId           String   @db.Uuid
-  externalId       String?  @db.Text          // TEXT — case-sensitive per RFC 7643 §3.1 (caseExact=true)
-  userName         String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
-  displayName      String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
+  externalId       String?  @db.Text          // TEXT - case-sensitive per RFC 7643 §3.1 (caseExact=true)
+  userName         String?  @db.Citext        // CITEXT - case-insensitive natively (Phase 3)
+  displayName      String?  @db.Citext        // CITEXT - case-insensitive natively (Phase 3)
   active           Boolean  @default(true)
-  payload          Json                        // JSONB — replaces rawPayload String (Phase 3)
+  payload          Json                        // JSONB - replaces rawPayload String (Phase 3)
   version          Int      @default(1)
   meta             String?
   createdAt        DateTime @default(now()) @db.Timestamptz
@@ -90,7 +108,7 @@ model ScimResource {
   // Composite unique constraints
   @@unique([endpointId, scimId])
   @@unique([endpointId, userName])                 // CITEXT handles case-insensitive uniqueness
-  // displayName + externalId: NOT unique — saved as received per RFC 7643.
+  // displayName + externalId: NOT unique - saved as received per RFC 7643.
   // Group.displayName uniqueness is enforced at service level only.
   @@index([endpointId, displayName])               // Non-unique index for query perf
   @@index([endpointId, resourceType, externalId])  // Non-unique index for query perf
@@ -120,7 +138,7 @@ model ResourceMember {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Phase 11 — Per-endpoint credentials
+// Phase 11 - Per-endpoint credentials
 //
 // Stores bcrypt-hashed bearer tokens or OAuth client credentials scoped to a
 // specific endpoint. When the `PerEndpointCredentialsEnabled` config flag is
@@ -135,6 +153,7 @@ model EndpointCredential {
   credentialHash String    @db.VarChar(255)  // bcrypt hash of the token/secret
   label          String?   @db.VarChar(255)  // Human-readable label for management
   metadata       Json?                       // {clientId, scopes, ...} for OAuth
+  secretEnvelope String?   @db.Text          // WI-7: retained secret, DEK-encrypted (v1.<iv>.<ct>.<tag>); null unless CredentialSecretVisibility=always
   active         Boolean   @default(true)
   createdAt      DateTime  @default(now()) @db.Timestamptz
   expiresAt      DateTime?                   @db.Timestamptz
@@ -143,3 +162,42 @@ model EndpointCredential {
 
   @@index([endpointId, active])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WI-15 - JWKS host allowlist (persisted, admin-editable-at-runtime layer)
+//
+// The effective JWKS host allowlist is the UNION of three layers: a compiled
+// well-known IdP seed + the JWKS_HOST_ALLOWLIST env var + these admin-added
+// rows. This is the persisted layer - hosts an admin adds at runtime (via the
+// admin API) so onboarding a new customer IdP host never needs a redeploy. It
+// is a convenience/runtime-flexibility choice: server-global, no deny-list, no
+// lock flag. The existing https + exact-host-match SSRF validation is retained.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model JwksHostAllowlistEntry {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  host      String   @unique @db.VarChar(255)  // lowercased hostname, exact match
+  label     String?  @db.VarChar(255)          // optional human note
+  createdAt DateTime @default(now()) @db.Timestamptz
+}
+
+// WI-6: per-install data-encryption-key (DEK), stored WRAPPED by the KEK.
+// The KEK lives only in env (CREDENTIAL_KEK); this wrapped DEK + its scrypt
+// salt survive restart/redeploy/backup, while a DB dump alone stays inert.
+model CredentialDek {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wrappedDek String   @db.Text                 // v1.<iv>.<ct>.<tag> (KEK-wrapped)
+  kekSalt    String   @db.VarChar(255)         // base64url scrypt salt
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz
+}
+
+// WI-7: server-global key/value settings store. Holds the server-scope
+// CredentialSecretVisibility (seeded to 'always'), plus room for future
+// server-global settings. Endpoint-scope settings ride profile.settings.
+model ServerSetting {
+  key       String   @id @db.VarChar(128)
+  value     String   @db.Text
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz
+}
+

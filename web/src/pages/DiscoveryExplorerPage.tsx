@@ -60,6 +60,8 @@ import {
   type ScimServiceProviderConfig,
 } from '../api/queries';
 import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import {
   compareSchemas,
@@ -102,6 +104,9 @@ const useStyles = makeStyles({
     padding: '10px',
     cursor: 'pointer',
     border: `1px solid transparent`,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
   },
   pickerCardSelected: {
     borderColor: tokens.colorBrandStroke1,
@@ -123,11 +128,20 @@ const useStyles = makeStyles({
     rowGap: '6px',
     alignItems: 'center',
   },
+  diffTableScroll: {
+    width: '100%',
+    overflowX: 'auto',
+  },
   diffTable: {
     width: '100%',
+    minWidth: '480px',
     borderCollapse: 'collapse',
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
+    // R5: fixed layout so a long attribute name / value cannot balloon a
+    // column. Values WRAP (not truncate) because a diff is meant to be
+    // read in full; wordBreak keeps long unbreakable tokens inside the cell.
+    tableLayout: 'fixed',
   },
   diffHeaderCell: {
     textAlign: 'left',
@@ -142,10 +156,14 @@ const useStyles = makeStyles({
   diffNameCell: {
     padding: '6px 8px',
     fontWeight: 600,
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   diffCell: {
     padding: '4px 8px',
     fontSize: '11px',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   cellTighten: {
     backgroundColor: '#e5f5e0', // light green
@@ -483,6 +501,8 @@ const SpcSection: React.FC<{
   secondaryError: unknown;
 }> = ({ primary, primaryLoading, primaryError, secondary, secondaryLoading, secondaryError }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the SPC diff columns (Capability|Primary|Secondary).
+  const cols = useResizableColumns('discovery-spc', 3, 'discovery-spc-col');
   if (primaryLoading) return <LoadingSkeleton count={4} height="32px" />;
   if (primaryError) return <ScimErrorMessage error={primaryError} />;
   if (!primary) return null;
@@ -505,12 +525,13 @@ const SpcSection: React.FC<{
     <Card className={classes.surfaceCard} data-testid="discovery-spc-section">
       {secondaryLoading && <LoadingSkeleton count={2} height="20px" />}
       {secondaryError && <ScimErrorMessage error={secondaryError} />}
+      <div className={classes.diffTableScroll}>
       <table className={classes.diffTable}>
         <thead>
           <tr>
-            <th className={classes.diffHeaderCell}>Capability</th>
-            <th className={classes.diffHeaderCell}>Primary</th>
-            {secondary && <th className={classes.diffHeaderCell}>Secondary</th>}
+            <th className={classes.diffHeaderCell} style={cols.headerProps(0).style}>Capability<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+            <th className={classes.diffHeaderCell} style={cols.headerProps(1).style}>Primary<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+            {secondary && <th className={classes.diffHeaderCell} style={cols.headerProps(2).style}>Secondary</th>}
           </tr>
         </thead>
         <tbody>
@@ -523,6 +544,7 @@ const SpcSection: React.FC<{
           ))}
         </tbody>
       </table>
+      </div>
     </Card>
   );
 };
@@ -644,6 +666,8 @@ const SchemasDiffView: React.FC<{
   secondary: ScimSchemaResource[];
 }> = ({ primary, secondary }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the schema-characteristics diff columns (Attribute + N chars).
+  const cols = useResizableColumns('discovery-schema-diff', 1 + CHAR_KEYS.length, 'discovery-schema-col');
 
   // Build per-schema diff for the union of schema URNs.
   const secMap = new Map<string, ScimSchemaResource>();
@@ -687,13 +711,15 @@ const SchemasDiffView: React.FC<{
               {diff.summary.onlyACount} only on primary ·{' '}
               {diff.summary.onlyBCount} only on secondary
             </Caption1>
+            <div className={classes.diffTableScroll}>
             <table className={classes.diffTable} style={{ marginTop: '8px' }}>
               <thead>
                 <tr>
-                  <th className={classes.diffHeaderCell}>Attribute</th>
-                  {CHAR_KEYS.map((k) => (
-                    <th key={k} className={classes.diffHeaderCell}>
+                  <th className={classes.diffHeaderCell} style={cols.headerProps(0).style}>Attribute<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                  {CHAR_KEYS.map((k, i) => (
+                    <th key={k} className={classes.diffHeaderCell} style={cols.headerProps(i + 1).style}>
                       {k}
+                      {i < CHAR_KEYS.length - 1 && <ColumnResizeHandle {...cols.handleProps(i + 1)} />}
                     </th>
                   ))}
                 </tr>
@@ -704,6 +730,7 @@ const SchemasDiffView: React.FC<{
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         );
       })}

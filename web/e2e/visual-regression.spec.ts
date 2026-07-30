@@ -97,12 +97,25 @@ const SETTINGS_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
   '[data-testid="settings-page"] > div:first-of-type',
   '[data-testid="log-config-section"]',
+  // R4b/secret-show: the Server connection info card renders the live base URL,
+  // token/JWKS/metadata URLs, and - when CredentialSecretVisibility=always -
+  // the actual shared secret + OAuth client id/secret. Those are environment-
+  // specific + secret-bearing, so mask the whole card: never assert (or commit
+  // to a baseline PNG) live secret values.
+  '[data-testid="server-connection-info-card"]',
 ];
 
 const ENDPOINT_DETAIL_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
   '[data-testid="endpoint-detail-page"] > div:nth-of-type(1)',
   '[data-testid="endpoint-detail-page"] > div:nth-of-type(2)',
+  // The OverviewTab renders live, per-request-drifting content that a fullPage
+  // snapshot against a real dev server can never match byte-for-byte: the KPI
+  // stat cards show live user/group/credential/flag counts, and the Recent
+  // Activity feed shows real request rows with wall-clock timestamps. Mask both
+  // so the snapshot only asserts the STABLE chrome (header, tabs, layout).
+  '[data-testid="overview-kpi-row"]',
+  '[data-testid="overview-activity"]',
 ];
 
 const locatorsFor = (page: Page, selectors: string[]) =>
@@ -190,6 +203,15 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Manual Provision page', async ({ page }) => {
     await page.goto('/manual-provision');
+    // Load guard (2026-07-07): assert the SPA actually rendered the page
+    // BEFORE screenshotting. Without this, a hard-navigation that 404s
+    // (as /manual-provision did before the spa-fallback allowlist fix)
+    // silently screenshots the NestJS "Cannot GET /manual-provision" JSON
+    // 404 - and --update-snapshots would happily bake that error page in
+    // as the baseline, so the gate goes green comparing a 404 to a 404
+    // and never catches the routing bug. Every visual baseline MUST prove
+    // its page loaded first.
+    await expect(page.getByTestId('manual-provision-page')).toBeVisible({ timeout: 30_000 });
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('manual-provision.png', {
       ...SNAPSHOT_OPTIONS,
@@ -274,6 +296,12 @@ test.describe('Phase H3 - Visual regression baselines', () => {
         '[data-testid="users-empty"]',
       ]),
       fullPage: true,
+      // The Users tab renders a data-driven table whose ROW COUNT (and thus
+      // panel height) varies per dev-environment provisioning - masking the
+      // table cells does not stop the panel's bottom edge from shifting. Use
+      // the same live-data-drift tolerance as the Overview tab so the snapshot
+      // is stable against user-count changes rather than a chrome/layout change.
+      maxDiffPixelRatio: 0.03,
     });
   });
 
@@ -296,6 +324,15 @@ test.describe('Phase H3 - Visual regression baselines', () => {
         '[data-testid="schemas-empty"]',
       ]),
       fullPage: true,
+      // Same live-data-drift tolerance as the Overview and Users tabs. The
+      // schemas TREE is data-driven (attribute count varies with the endpoint's
+      // profile), so masking its cells does not stop the panel's bottom edge
+      // from shifting - the mask itself changes height. Without this the
+      // snapshot fails on data drift rather than on a chrome/layout regression,
+      // which is exactly what happened on 2026-07-29: this tab was the only one
+      // of the three that never received the tolerance when Overview and Users
+      // did, so its baseline silently rotted while theirs stayed green.
+      maxDiffPixelRatio: 0.03,
     });
   });
 });

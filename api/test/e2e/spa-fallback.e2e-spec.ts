@@ -25,16 +25,23 @@ const SPA_PATHS = [
   '/',
   '/admin',
   '/admin/anything',
+  '/discovery',
   '/endpoints',
   '/endpoints/abc-123',
   '/endpoints/abc-123/users',
   '/endpoints/abc-123/users?page=2',
   '/endpoints/abc-123/groups',
+  '/endpoints/abc-123/connect',
   '/endpoints/abc-123/logs?urlContains=Users',
   '/endpoints/abc-123/settings',
   '/logs',
   '/logs?endpointId=ep-1',
+  '/manual-provision',
+  '/me',
+  '/operations',
+  '/operations?active=true',
   '/settings',
+  '/workbench',
 ];
 
 describe('SPA fallback (E2E) - Phase A5', () => {

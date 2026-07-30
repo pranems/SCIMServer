@@ -81,6 +81,32 @@ export const ENDPOINT_CONFIG_FLAGS = {
   PER_ENDPOINT_CREDENTIALS_ENABLED: 'PerEndpointCredentialsEnabled',
 
   /**
+   * WI-11 - per-method auth-enablement flag family (splits the double-duty
+   * PerEndpointCredentialsEnabled). Each gates one auth method independently,
+   * at credential-create AND on the resource-plane validation path.
+   *
+   * `SecretTokenBearerAuthEnabled`: gates the per-endpoint `bearer` credential
+   * (Entra "Secret Token"). Effective value falls back to the legacy
+   * PerEndpointCredentialsEnabled when unset (value-preserving migration).
+   */
+  SECRET_TOKEN_BEARER_AUTH_ENABLED: 'SecretTokenBearerAuthEnabled',
+
+  /**
+   * WI-11 - gates the per-endpoint `oauth_client` credential (Entra "OAuth2
+   * client-credentials"). Effective value falls back to the legacy
+   * PerEndpointCredentialsEnabled when unset (value-preserving migration).
+   */
+  OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED: 'OAuthClientCredentialsAuthEnabled',
+
+  /**
+   * WI-11 - whether THIS endpoint accepts the global SCIM_SHARED_SECRET. New
+   * capability: an operator can make an endpoint refuse the global secret and
+   * accept ONLY its own credentials. Effective value defaults to `true` when
+   * unset (back-compat: every endpoint accepts the global secret today).
+   */
+  SHARED_SECRET_BEARER_AUTH_ENABLED: 'SharedSecretBearerAuthEnabled',
+
+  /**
    * When true, write responses include a warning extension URN listing any readOnly
    * attributes that were silently stripped from the incoming payload.
    * When false (default), stripping happens silently without response annotation.
@@ -191,8 +217,63 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see RFC 7644 §3.4.2 - Querying resources
    */
   ENFORCE_RESOURCE_TYPES: 'EnforceResourceTypes',
-} as const;
 
+  /**
+   * `CredentialSecretVisibility` (WI-7): whether a per-endpoint credential
+   * secret is retained (encrypted at rest) and re-viewable by an admin, or
+   * shown exactly once at create. Enum: `always` (default) | `once`. Stored
+   * explicitly; the server-scope setting is the ceiling (most-restrictive
+   * wins). See docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md section 6A.
+   */
+  CREDENTIAL_SECRET_VISIBILITY: 'CredentialSecretVisibility',
+
+  /**
+   * Runtime egress robustness (WIF JWKS fetch during token mint). Per-endpoint
+   * override of the JWKS fetch TIMEOUT in milliseconds. When set, it OVERRIDES
+   * the server-level default (env `JWKS_FETCH_TIMEOUT_MS`, default 5000). When
+   * unset, the server default applies. Bounds: 100 - 60000 ms.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.timeoutMs
+   */
+  JWKS_FETCH_TIMEOUT_MS: 'JwksFetchTimeoutMs',
+
+  /**
+   * Runtime egress robustness. Per-endpoint override of the number of RETRIES
+   * for a failed JWKS fetch (total tries = retries + 1). Overrides the server
+   * default (env `JWKS_FETCH_RETRIES`, default 2) when set. Bounds: 0 - 10.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.retries
+   */
+  JWKS_FETCH_RETRIES: 'JwksFetchRetries',
+
+  /**
+   * Runtime egress robustness. Per-endpoint override of the base retry BACKOFF
+   * in milliseconds (exponential: backoff * 2^(attempt-1) + jitter). Overrides
+   * the server default (env `JWKS_FETCH_RETRY_BACKOFF_MS`, default 200) when
+   * set. Bounds: 0 - 10000 ms.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.retryBackoffMs
+   */
+  JWKS_FETCH_RETRY_BACKOFF_MS: 'JwksFetchRetryBackoffMs',
+
+  /**
+   * Runtime egress robustness. Per-endpoint override of the JWKS cache max-age
+   * in milliseconds (how long a cached key set is served without refetch).
+   * Overrides the server default (env `JWKS_CACHE_MAX_AGE_MS`, default 600000)
+   * when set. Bounds: 0 - 86400000 ms (0 = always refetch).
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.cacheMaxAgeMs
+   */
+  JWKS_CACHE_MAX_AGE_MS: 'JwksCacheMaxAgeMs',
+
+  /**
+   * Request-log privacy. When true (the default, inherited from the server-level
+   * `PERSIST_REQUEST_SECRETS` env when unset here), the RequestLog stores and
+   * displays the COMPLETE request/response for this endpoint - headers and body,
+   * secrets included - for fast, complete RCA. When false, secret-bearing header
+   * and body values (`Authorization`, `client_secret`, `client_assertion`,
+   * `password`, `access_token`, ...) are redacted before the row is persisted
+   * (and therefore before it is shown in the API/UI). Endpoint value OVERRIDES
+   * the server default. Shipped console/file logs always redact regardless.
+   */
+  PERSIST_REQUEST_SECRETS: 'PersistRequestSecrets',
+} as const;
 /**
  * Type for endpoint config flag values (the runtime string keys).
  */
@@ -201,7 +282,7 @@ export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPO
 // ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
-type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'structured';
+type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement' | 'credentialVisibility' | 'structured' | 'number';
 
 /**
  * Shape contract for a `structured` config flag value (Pre-Q.A).
@@ -220,7 +301,7 @@ export interface EndpointConfigFlagDefinition {
   /** Data type of the flag. */
   readonly type: FlagType;
   /** Default value when not set (undefined = no default). */
-  readonly default: boolean | undefined;
+  readonly default: boolean | number | undefined;
   /** Human-readable description. */
   readonly description: string;
   /**
@@ -228,6 +309,10 @@ export interface EndpointConfigFlagDefinition {
    * {@link validateStructuredFlag}. Ignored for other flag types.
    */
   readonly structuredSchema?: StructuredFlagSchema;
+  /** For `number` flags only: inclusive lower bound (clamp/validate floor). */
+  readonly min?: number;
+  /** For `number` flags only: inclusive upper bound (clamp/validate ceiling). */
+  readonly max?: number;
 }
 
 /**
@@ -307,7 +392,36 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'When true, incoming bearer tokens are validated against the EndpointCredential table ' +
       '(bcrypt-hashed per-endpoint tokens). Falls back to global SCIM_SHARED_SECRET and OAuth JWT. ' +
       'When false (default), only global SCIM_SHARED_SECRET and OAuth JWT are used. ' +
-      'Enable for multi-tenant deployments where each endpoint has its own secret.',
+      'Enable for multi-tenant deployments where each endpoint has its own secret. ' +
+      'WI-11: superseded by SecretTokenBearerAuthEnabled + OAuthClientCredentialsAuthEnabled ' +
+      '(this flag is read as a one-release fallback for both).',
+  },
+  SECRET_TOKEN_BEARER_AUTH_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'WI-11. When true, this endpoint accepts a per-endpoint bcrypt bearer token (Entra "Secret Token"). ' +
+      'When unset, the effective value falls back to the legacy PerEndpointCredentialsEnabled ' +
+      '(value-preserving migration). Gates both credential-create and the resource-plane validation path.',
+  },
+  OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'WI-11. When true, this endpoint accepts a per-endpoint oauth_client credential (Entra "OAuth2 ' +
+      'client-credentials"). When unset, the effective value falls back to the legacy ' +
+      'PerEndpointCredentialsEnabled (value-preserving migration). Gates both create and validation.',
+  },
+  SHARED_SECRET_BEARER_AUTH_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'WI-11. When true (default), this endpoint accepts the global SCIM_SHARED_SECRET as a bearer token. ' +
+      'When false, the endpoint refuses the global secret and accepts ONLY its own per-endpoint ' +
+      'credentials (or endpoint-scoped OAuth tokens). Back-compat: unset means true.',
   },
   INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: {
     key: ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE,
@@ -407,6 +521,16 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'attached and the WIF token-mint path is offered. When false (default), WIF is off and existing ' +
       'endpoints are untouched. Orthogonal to PerEndpointCredentialsEnabled.',
   },
+  CREDENTIAL_SECRET_VISIBILITY: {
+    key: ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY,
+    type: 'credentialVisibility',
+    default: undefined, // string default via getEffectiveCredentialSecretVisibility (server ceiling -> 'always')
+    description:
+      'Controls whether a per-endpoint credential secret is retained (encrypted at rest) and ' +
+      're-viewable by an admin, or shown once at creation. "always" (default): retain + reveal. ' +
+      '"once": shown once at create, then hidden (retained ciphertext is purged). The server-scope ' +
+      'setting is the ceiling - most-restrictive-wins, so server "once" forces "once" everywhere.',
+  },
   ENFORCE_RESOURCE_TYPES: {
     key: ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES,
     type: 'boolean',
@@ -417,6 +541,62 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'returns a 200 empty ListResponse (RFC 7644 §3.4.2) plus a non-fatal warning (server log + ' +
       'urn:scimserver:api:messages:2.0:Warning body member + X-SCIM-Warning header). Item-by-id reads ' +
       'and all writes still reject with 404. Set false for Entra provisioning of user-only (no Group) endpoints.',
+  },
+  JWKS_FETCH_TIMEOUT_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS,
+    type: 'number',
+    default: undefined,
+    min: 100,
+    max: 60000,
+    description:
+      'Runtime egress: JWKS fetch timeout (ms) for the WIF token-mint path. Overrides the server ' +
+      'default (env JWKS_FETCH_TIMEOUT_MS, default 5000) when set; unset falls through to the server. ' +
+      'Bounds: 100 - 60000 ms.',
+  },
+  JWKS_FETCH_RETRIES: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 10,
+    description:
+      'Runtime egress: number of retries for a failed JWKS fetch (total tries = retries + 1). ' +
+      'Overrides the server default (env JWKS_FETCH_RETRIES, default 2) when set. Bounds: 0 - 10.',
+  },
+  JWKS_FETCH_RETRY_BACKOFF_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 10000,
+    description:
+      'Runtime egress: base retry backoff (ms); exponential backoff * 2^(attempt-1) + jitter. ' +
+      'Overrides the server default (env JWKS_FETCH_RETRY_BACKOFF_MS, default 200) when set. ' +
+      'Bounds: 0 - 10000 ms.',
+  },
+  JWKS_CACHE_MAX_AGE_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 86400000,
+    description:
+      'Runtime egress: JWKS cache max-age (ms) - how long a cached key set is served without refetch. ' +
+      'Overrides the server default (env JWKS_CACHE_MAX_AGE_MS, default 600000) when set. ' +
+      'Bounds: 0 - 86400000 ms (0 = always refetch).',
+  },
+  PERSIST_REQUEST_SECRETS: {
+    key: ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS,
+    type: 'boolean',
+    // Unset -> inherit the server-level PERSIST_REQUEST_SECRETS env (default true).
+    // NOT baked into DEFAULT_ENDPOINT_CONFIG so "unset" stays distinguishable.
+    default: undefined,
+    description:
+      'When true (default, inherited from server env PERSIST_REQUEST_SECRETS when unset), the ' +
+      'RequestLog stores + displays the COMPLETE request/response (headers + body, secrets ' +
+      'included) for fast RCA. When false, secret-bearing values are redacted before persist ' +
+      '(and API/UI display). Endpoint value overrides the server default; console/file logs ' +
+      'always redact regardless.',
   },
 };
 
@@ -436,6 +616,9 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]?: boolean | string;
@@ -446,7 +629,13 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
   [ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY]?: string;
   [ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS]?: number | string;
+  [ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS]?: boolean | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -529,6 +718,60 @@ export function getConfigString(config: EndpointConfig | undefined, key: string)
 }
 
 /**
+ * Get a finite numeric config value, or `undefined` when the key is absent /
+ * not a parseable finite number. Accepts native numbers and numeric strings
+ * (Entra and the admin UI both serialize config values as strings). This is the
+ * primitive the per-endpoint egress overrides are read through, so an unset key
+ * cleanly falls through to the server-level default.
+ */
+export function getConfigNumber(config: EndpointConfig | undefined, key: string): number | undefined {
+  if (!config) return undefined;
+  const value = config[key];
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the ENDPOINT-level runtime egress overrides (WIF JWKS fetch) from an
+ * endpoint's stored config. Only keys that are explicitly set are returned, so
+ * the merge in the oauth layer keeps the server default for every unset field.
+ * The returned object is structurally compatible with the oauth
+ * `EgressPolicyOverrides` type (kept decoupled to avoid a module cycle).
+ */
+export function resolveEndpointEgressOverrides(
+  config: EndpointConfig | undefined,
+): { timeoutMs?: number; retries?: number; retryBackoffMs?: number; cacheMaxAgeMs?: number } {
+  const overrides: { timeoutMs?: number; retries?: number; retryBackoffMs?: number; cacheMaxAgeMs?: number } = {};
+  const timeoutMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS);
+  if (timeoutMs !== undefined) overrides.timeoutMs = timeoutMs;
+  const retries = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES);
+  if (retries !== undefined) overrides.retries = retries;
+  const retryBackoffMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRY_BACKOFF_MS);
+  if (retryBackoffMs !== undefined) overrides.retryBackoffMs = retryBackoffMs;
+  const cacheMaxAgeMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS);
+  if (cacheMaxAgeMs !== undefined) overrides.cacheMaxAgeMs = cacheMaxAgeMs;
+  return overrides;
+}
+
+/**
+ * Resolve the EFFECTIVE `PersistRequestSecrets` for an endpoint (RequestLog RCA
+ * privacy). Precedence: the endpoint's explicit value OVERRIDES the server-level
+ * default; when the endpoint leaves it unset it inherits `serverDefault`. When
+ * the result is `true` the RequestLog keeps the full request/response (secrets
+ * included); when `false` the persisted + displayed row is redacted.
+ */
+export function getEffectivePersistRequestSecrets(
+  config: EndpointConfig | undefined,
+  serverDefault: boolean,
+): boolean {
+  return getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS) ?? serverDefault;
+}
+
+/**
  * Get a structured (object-valued) config flag. Returns the object when the
  * value is a plain object, otherwise undefined (missing, primitive, or array).
  */
@@ -542,6 +785,177 @@ export function getConfigStructured(
     return value as Record<string, unknown>;
   }
   return undefined;
+}
+
+/**
+ * Read a boolean flag ONLY when it is explicitly set, returning `undefined`
+ * when the key is absent (so a caller can distinguish "unset" from "false").
+ * This is the primitive the WI-11 effective-flag fallback is built on.
+ */
+export function getOptionalConfigBoolean(
+  config: EndpointConfig | undefined,
+  key: string,
+): boolean | undefined {
+  if (!config) return undefined;
+  const value = config[key];
+  if (value === undefined) return undefined;
+  return parseBooleanValue(value);
+}
+
+/**
+ * WI-11 - the effective per-method auth enablement for an endpoint.
+ *
+ * The single legacy `PerEndpointCredentialsEnabled` flag is split into a
+ * per-method family. This helper computes the EFFECTIVE value of each new flag
+ * with a value-preserving fallback, so existing endpoints (which have only the
+ * legacy flag, or nothing) behave byte-for-byte as before:
+ *
+ *  - `secretTokenBearer`      = SecretTokenBearerAuthEnabled if set, else the
+ *                               legacy PerEndpointCredentialsEnabled, else false.
+ *  - `oauthClientCredentials` = OAuthClientCredentialsAuthEnabled if set, else the
+ *                               legacy PerEndpointCredentialsEnabled, else false.
+ *  - `sharedSecretBearer`     = SharedSecretBearerAuthEnabled if set, else true
+ *                               (back-compat: every endpoint accepts the global
+ *                               secret today).
+ *
+ * The legacy flag is read as a one-release fallback; once every endpoint carries
+ * the new flags explicitly it can be retired.
+ */
+export interface EffectiveAuthEnablement {
+  /** Per-endpoint bcrypt `bearer` credential (Entra Secret Token). */
+  secretTokenBearer: boolean;
+  /** Per-endpoint `oauth_client` credential (Entra OAuth2 client-credentials). */
+  oauthClientCredentials: boolean;
+  /** Whether this endpoint accepts the global SCIM_SHARED_SECRET. */
+  sharedSecretBearer: boolean;
+}
+
+export function getEffectiveAuthEnablement(
+  config: EndpointConfig | undefined,
+): EffectiveAuthEnablement {
+  const legacy = getOptionalConfigBoolean(
+    config,
+    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+  );
+  const legacyOrFalse = legacy ?? false;
+
+  const secretTokenBearer =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED) ??
+    legacyOrFalse;
+  const oauthClientCredentials =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED) ??
+    legacyOrFalse;
+  const sharedSecretBearer =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED) ??
+    true;
+
+  return { secretTokenBearer, oauthClientCredentials, sharedSecretBearer };
+}
+
+/**
+ * W2.5 - a per-method authentication-method entry, structurally minimal so this
+ * module does not need to import the `AuthenticationMethod` type from
+ * `endpoint-profile` (which would create a module cycle). Callers pass
+ * `profile.authentication?.methods`.
+ */
+export interface AuthMethodEnablementEntry {
+  /** Registry key naming the method (e.g. 'bearer', 'oauth-client', 'shared-secret'). */
+  type: string;
+  /** Whether the method is enabled; `undefined` = enabled (A2 discovery semantics). */
+  enabled?: boolean;
+}
+
+/**
+ * Maps each `EffectiveAuthEnablement` facet to the `AuthenticationMethod.type`
+ * value(s) that co-locate its enablement (architecture A0 model). Kept in sync
+ * with `METHOD_TYPE_TO_SCHEME_TYPE` in `discovery/authentication-schemes.ts`.
+ */
+const AUTH_FACET_METHOD_TYPES: Record<keyof EffectiveAuthEnablement, readonly string[]> = {
+  secretTokenBearer: ['bearer'],
+  oauthClientCredentials: ['oauth-client'],
+  sharedSecretBearer: ['shared-secret'],
+};
+
+/**
+ * W2.5 - the SINGLE per-method enablement source, co-locating enablement with
+ * each method's `profile.authentication.methods[]` entry while remaining
+ * value-preserving for existing endpoints.
+ *
+ * For each facet: if the endpoint carries an explicit `AuthenticationMethod`
+ * entry of the corresponding `type`, that entry's `enabled` wins (`enabled !==
+ * false`, matching the A2 discovery convention where `undefined` means enabled).
+ * Otherwise the value falls back to the flat-flag {@link getEffectiveAuthEnablement}
+ * (which itself preserves the legacy `PerEndpointCredentialsEnabled` fallback).
+ *
+ * **Value-preserving.** `profile.authentication.methods[]` is never auto-seeded
+ * (see `expandAuthentication`), so every endpoint that has not been managed via
+ * the A1 authentication-method API has no method entries and resolves to the
+ * exact flat-flag values it does today. Co-location only takes effect for
+ * endpoints an operator has explicitly configured through the A1 model, which is
+ * that model's stated purpose.
+ *
+ * This is the one function the resource-plane authenticators, the mint plane
+ * (shadow), the credential-create gate, connection-info, and OAuth metadata all
+ * consult, so "advertised == enforced" cannot drift.
+ */
+export function resolveEndpointAuthEnablement(
+  config: EndpointConfig | undefined,
+  methods?: readonly AuthMethodEnablementEntry[],
+): EffectiveAuthEnablement {
+  const flat = getEffectiveAuthEnablement(config);
+  if (!methods || methods.length === 0) return flat;
+
+  const resolveFacet = (facet: keyof EffectiveAuthEnablement): boolean => {
+    const types = AUTH_FACET_METHOD_TYPES[facet];
+    const entry = methods.find((m) => types.includes(m.type));
+    return entry ? entry.enabled !== false : flat[facet];
+  };
+
+  return {
+    secretTokenBearer: resolveFacet('secretTokenBearer'),
+    oauthClientCredentials: resolveFacet('oauthClientCredentials'),
+    sharedSecretBearer: resolveFacet('sharedSecretBearer'),
+  };
+}
+
+// ─── WI-7: CredentialSecretVisibility precedence (server is the ceiling) ──────
+
+/** The two visibility values. `always` retains + reveals; `once` shows once. */
+export type CredentialSecretVisibility = 'always' | 'once';
+
+/** Valid CredentialSecretVisibility values (case-insensitive). */
+export const VALID_CREDENTIAL_SECRET_VISIBILITY = ['always', 'once'] as const;
+
+/**
+ * Normalize an arbitrary stored value to a valid visibility, or undefined when
+ * absent/invalid (so callers can apply the default).
+ */
+export function normalizeCredentialSecretVisibility(
+  value: unknown,
+): CredentialSecretVisibility | undefined {
+  if (typeof value !== 'string') return undefined;
+  const v = value.trim().toLowerCase();
+  return v === 'always' || v === 'once' ? (v as CredentialSecretVisibility) : undefined;
+}
+
+/**
+ * Compute the EFFECTIVE CredentialSecretVisibility for an endpoint, applying
+ * the design 6A.3 precedence: `once` is more restrictive than `always`, and the
+ * SERVER scope is the ceiling (most-restrictive-wins). So:
+ *   - server `once`  -> always `once` (no endpoint can override).
+ *   - server `always`-> the endpoint value if set, else `always`.
+ * Missing/invalid values fall back to `always` (the retain-friendly default).
+ */
+export function getEffectiveCredentialSecretVisibility(
+  serverValue: unknown,
+  config: EndpointConfig | undefined,
+): CredentialSecretVisibility {
+  const server = normalizeCredentialSecretVisibility(serverValue) ?? 'always';
+  if (server === 'once') return 'once'; // server ceiling
+  const endpoint = normalizeCredentialSecretVisibility(
+    config?.[ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY],
+  );
+  return endpoint ?? 'always';
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -627,6 +1041,69 @@ function validatePrimaryEnforcementFlag(config: Record<string, any>, flagName: s
 }
 
 /**
+ * Validate a `credentialVisibility` config flag value (WI-7). Enum always|once.
+ */
+function validateCredentialVisibilityFlag(config: Record<string, any>, flagName: string): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  if (typeof value === 'string') {
+    if (!VALID_CREDENTIAL_SECRET_VISIBILITY.includes(value.toLowerCase() as CredentialSecretVisibility)) {
+      throw new Error(
+        `Invalid value "${value}" for config flag "${flagName}". ` +
+        `Allowed values: "always", "once" (case-insensitive).`,
+      );
+    }
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected string ("always"/"once"), got ${typeof value}.`,
+    );
+  }
+}
+
+/**
+ * Validate a `number`-typed config flag value against its inclusive [min, max]
+ * bounds. Accepts native numbers and numeric strings (the admin UI / Entra
+ * serialize config values as strings). An absent value passes (falls through to
+ * the server default). A non-numeric, non-finite, or out-of-range value throws.
+ */
+function validateNumberFlag(
+  config: Record<string, unknown>,
+  flagName: string,
+  min?: number,
+  max?: number,
+): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  let n: number;
+  if (typeof value === 'number') {
+    n = value;
+  } else if (typeof value === 'string' && value.trim() !== '') {
+    n = Number(value);
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected a number or numeric string, got ${typeof value}.`,
+    );
+  }
+  if (!Number.isFinite(n)) {
+    throw new Error(
+      `Invalid value "${value}" for config flag "${flagName}". Expected a finite number.`,
+    );
+  }
+  if (min !== undefined && n < min) {
+    throw new Error(
+      `Value ${n} for config flag "${flagName}" is below the minimum ${min}.`,
+    );
+  }
+  if (max !== undefined && n > max) {
+    throw new Error(
+      `Value ${n} for config flag "${flagName}" exceeds the maximum ${max}.`,
+    );
+  }
+}
+
+/**
  * Validate a `structured` (object-valued) config flag against its shape contract.
  *
  * - Absent value: passes.
@@ -695,8 +1172,12 @@ export function validateEndpointConfig(
       validateLogLevelFlag(config, def.key);
     } else if (def.type === 'primaryEnforcement') {
       validatePrimaryEnforcementFlag(config, def.key);
+    } else if (def.type === 'credentialVisibility') {
+      validateCredentialVisibilityFlag(config, def.key);
     } else if (def.type === 'structured') {
       validateStructuredFlag(config, def.key, def.structuredSchema);
+    } else if (def.type === 'number') {
+      validateNumberFlag(config, def.key, def.min, def.max);
     }
   }
 }

@@ -94,9 +94,13 @@ describe('LogsTab', () => {
     );
     await screen.findByText(/no request logs/i);
     // The hook is called with (endpointId, page, urlContains, pageSize) -
-    // assert via the queryKey that mockUseQuery received.
-    const lastCall = mockUseQuery.mock.calls.at(-1) ?? [];
-    const queryArg = lastCall[0] as { queryKey: unknown[] };
+    // assert via the queryKey that mockUseQuery received. (WI-D6 added an
+    // AuthDiagnosticsPanel that also calls useQuery, so target the logs call.)
+    const logsCall = mockUseQuery.mock.calls.find(
+      (c) => Array.isArray((c[0] as { queryKey?: unknown[] })?.queryKey) &&
+        (c[0] as { queryKey: unknown[] }).queryKey[0] === 'endpoint-logs',
+    ) ?? [];
+    const queryArg = logsCall[0] as { queryKey: unknown[] };
     expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 3, 20, 'Users']);
   });
 
@@ -116,6 +120,26 @@ describe('LogsTab', () => {
     wrap(<LogsTab endpointId="ep-1" />);
     expect(await screen.findByTestId('export-button')).toBeInTheDocument();
     expect(screen.getByTestId('export-button')).not.toBeDisabled();
+  });
+
+  it('opens a detail drawer when a log row is clicked', async () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [
+          { id: 'l1', method: 'POST', url: '/scim/v2/endpoints/ep-1/Users', status: 201, durationMs: 42, createdAt: '2026-05-01T10:00:00Z',
+            requestHeaders: {}, requestBody: { userName: 'x' }, responseHeaders: {}, responseBody: { id: 'u1' } },
+        ],
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    const row = await screen.findByTestId('logs-tab-row-l1');
+    fireEvent.click(row);
+    // The detail drawer opens with the request/response blocks.
+    expect(await screen.findByTestId('logs-tab-detail-drawer')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-detail-request-body')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-detail-response-body')).toBeInTheDocument();
   });
 
   it('CSV export invokes triggerCsvDownload with flattened log rows', async () => {
@@ -178,8 +202,44 @@ describe('LogsTab', () => {
     wrap(<LogsTab endpointId="ep-1" />);
     await screen.findByText(/no request logs/i);
     // Hook is called via useQuery({queryKey: ['endpoint-logs', endpointId, page, pageSize, urlContains]}).
-    const lastCall = mockUseQuery.mock.calls.at(-1) ?? [];
-    const queryArg = lastCall[0] as { queryKey: unknown[] };
+    const logsCall = mockUseQuery.mock.calls.find(
+      (c) => Array.isArray((c[0] as { queryKey?: unknown[] })?.queryKey) &&
+        (c[0] as { queryKey: unknown[] }).queryKey[0] === 'endpoint-logs',
+    ) ?? [];
+    const queryArg = logsCall[0] as { queryKey: unknown[] };
     expect(queryArg.queryKey).toEqual(['endpoint-logs', 'ep-1', 1, 50, '']);
+  });
+
+  // ==========================================================================
+  // U11 - the auth decision renders inline inside the request-log drawer
+  // ==========================================================================
+  it('drawer shows the correlation id + the inline auth decision section', async () => {
+    // mockUseQuery returns the same object for the list, the detail, and the
+    // auth-decisions query. Carrying requestId on it drives the detail drawer's
+    // correlation section without a distinct per-query mock.
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [
+          { id: 'l1', method: 'GET', url: '/scim/v2/endpoints/ep-1/Users', status: 401, durationMs: 3, createdAt: '2026-05-01T10:00:00Z' },
+        ],
+        method: 'GET',
+        url: '/scim/v2/endpoints/ep-1/Users',
+        status: 401,
+        durationMs: 3,
+        requestId: 'corr-xyz',
+        requestHeaders: {},
+        requestBody: {},
+        responseHeaders: {},
+        responseBody: {},
+      },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />);
+    fireEvent.click(await screen.findByTestId('logs-tab-row-l1'));
+    expect(await screen.findByTestId('logs-tab-detail-correlation')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-detail-request-id')).toHaveTextContent('corr-xyz');
+    // U11 - the auth decision section is embedded inline (no focus-jump panel).
+    expect(screen.getByTestId('log-detail-auth-section')).toBeInTheDocument();
   });
 });

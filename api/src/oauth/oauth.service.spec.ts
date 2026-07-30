@@ -189,4 +189,162 @@ describe('OAuthService', () => {
       expect(service.hasScope(payload, 'scim.read')).toBe(false);
     });
   });
+
+  describe('generateEndpointAccessToken (Q1 + Q6.4)', () => {
+    it('issues a per-endpoint token with endpoint_id + per-endpoint aud (Q1)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      expect(result.expiresIn).toBe(3600);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'epc_abc',
+          client_id: 'epc_abc',
+          endpoint_id: 'ep-1',
+          aud: 'scimserver-scim-api:ep-1',
+          token_type: 'access_token',
+        }),
+        expect.objectContaining({ expiresIn: '3600s' }),
+      );
+    });
+
+    it('honors a custom issuedTokenTtlSec within the 1-6h window (Q6.4)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 7200 });
+      expect(result.expiresIn).toBe(7200);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ expiresIn: '7200s' }),
+      );
+    });
+
+    it('clamps a ttlSec below the 1h floor up to 3600 (Q6.4)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 60 });
+      expect(result.expiresIn).toBe(3600);
+    });
+
+    it('clamps a ttlSec above the 6h ceiling down to 21600 (Q6.4)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 99999 });
+      expect(result.expiresIn).toBe(21600);
+    });
+
+    it('uses an admin-trusted scope verbatim, bypassing the caller-scope filter (Q6.4 WIF)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        trustedScope: 'scim.provision custom.scope',
+      });
+      expect(result.scope).toBe('scim.provision custom.scope');
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'scim.provision custom.scope' }),
+        expect.any(Object),
+      );
+    });
+
+    it('still filters a caller-requested scope to the allowed default scopes (Q1)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', 'scim.read unknown.scope');
+      expect(result.scope).toBe('scim.read');
+    });
+
+    it('WI-17: stamps a src_iss claim on the token when sourceIssuer is supplied', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        trustedScope: 'scim.read',
+        sourceIssuer: 'https://login.microsoftonline.com/tenant-x/v2.0',
+      });
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ src_iss: 'https://login.microsoftonline.com/tenant-x/v2.0' }),
+        expect.any(Object),
+      );
+    });
+
+    it('WI-17: omits src_iss when sourceIssuer is not supplied (plain oauth_client)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload).not.toHaveProperty('src_iss');
+    });
+
+    it('W3.2: stamps src_sub distinct from sub/client_id when sourceSubject is supplied (WIF identity separation)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'scim-wif-client-abc', undefined, {
+        trustedScope: 'scim.read',
+        sourceSubject: 'sp-object-id-federated',
+      });
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      // The issued OAuth client identity is the target client id, NEVER the
+      // federated assertion subject.
+      expect(payload.sub).toBe('scim-wif-client-abc');
+      expect(payload.client_id).toBe('scim-wif-client-abc');
+      // The federated assertion subject is preserved as a DISTINCT claim for
+      // attribution only.
+      expect(payload.src_sub).toBe('sp-object-id-federated');
+      expect(payload.sub).not.toBe('sp-object-id-federated');
+    });
+
+    it('W3.2: omits src_sub when sourceSubject is not supplied (plain oauth_client)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload).not.toHaveProperty('src_sub');
+    });
+
+    it('W3.6: caps the issued lifetime at the authorizing assertion expiry (guide 13.5)', async () => {
+      // A 6h configured TTL against an assertion that expires in ~1h MUST yield
+      // ~1h, never 6h - the issued token can never outlive its authorization.
+      const nowSec = Math.floor(Date.now() / 1000);
+      const assertionExpiresAt = nowSec + 3600;
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        ttlSec: 21600,
+        assertionExpiresAt,
+      });
+      expect(result.expiresIn).toBeLessThanOrEqual(3600);
+      expect(result.expiresIn).toBeGreaterThan(3500);
+    });
+
+    it('W3.6: an assertion expiring sooner than the 1h floor still caps below the floor', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
+        ttlSec: 3600,
+        assertionExpiresAt: nowSec + 120,
+      });
+      // The static 1h floor must NOT re-raise the lifetime above the assertion.
+      expect(result.expiresIn).toBeLessThanOrEqual(120);
+      expect(result.expiresIn).toBeGreaterThan(0);
+    });
+
+    it('W3.6: without an assertion expiry the configured ttl is unchanged (oauth_client path)', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'epc_abc', undefined, {
+        ttlSec: 21600,
+      });
+      expect(result.expiresIn).toBe(21600);
+    });
+
+    it('W3.8: every issued token carries a unique jti (guide 13.6)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [first] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc');
+      const [second] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(typeof first.jti).toBe('string');
+      expect((first.jti as string).length).toBeGreaterThan(10);
+      expect(first.jti).not.toBe(second.jti);
+    });
+
+    it('W3.8: stamps auth_method + source_tid/oid/azp when supplied (guide 13.4 provenance)', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'scim-wif-client-x', undefined, {
+        trustedScope: 'scim.read',
+        authMethod: 'syncfabric-rfc7523',
+        sourceTenantId: 'tenant-abc',
+        sourceObjectId: 'oid-def',
+        sourceAuthorizedParty: 'azp-ghi',
+      });
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload.auth_method).toBe('syncfabric-rfc7523');
+      expect(payload.source_tid).toBe('tenant-abc');
+      expect(payload.source_oid).toBe('oid-def');
+      expect(payload.source_azp).toBe('azp-ghi');
+    });
+
+    it('W3.8: omits the source_* provenance claims when there is no federated source', async () => {
+      await service.generateEndpointAccessToken('ep-1', 'epc_abc', undefined, {
+        authMethod: 'client_secret',
+      });
+      const [payload] = (jwtService.sign as jest.Mock).mock.calls.at(-1) as [Record<string, unknown>];
+      expect(payload.auth_method).toBe('client_secret');
+      expect(payload).not.toHaveProperty('source_tid');
+      expect(payload).not.toHaveProperty('source_oid');
+      expect(payload).not.toHaveProperty('source_azp');
+    });
+  });
 });

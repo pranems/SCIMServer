@@ -10,6 +10,7 @@ import {
   parseLogLevel,
 } from './log-levels';
 import { FileLogTransport } from './file-log-transport';
+import { redactSensitiveDeep } from '../../security/redact-sensitive';
 
 /**
  * Correlation context attached to every log entry within a single request.
@@ -38,6 +39,18 @@ export interface CorrelationContext {
   authClientId?: string;
   /** Per-endpoint credential ID if authenticated via endpoint credential */
   authCredentialId?: string;
+  // ── V10 auth summary (stamped by emitAuthDecisionEvent) - persisted on the
+  //    RequestLog row so the logs list shows the auth outcome instantly. ──
+  /** 'accept' | 'reject' - the outcome of the request's auth decision. */
+  authOutcome?: 'accept' | 'reject';
+  /** The winning / attempted auth method (wif | oauth_client | shared_secret | bearer_jwt | endpoint_bearer). */
+  authMethod?: string;
+  /** The catalog reason code (reject) or a short accept note. */
+  authReason?: string;
+  /** W1 - the FULL redacted AuthDecisionTrace serialized as JSON (checks[] with
+   *  expected/received, decodedClaims, plane, subTraces) so the log detail can
+   *  render the diff permanently, independent of the short-TTL decision store. */
+  authDecision?: string;
 
   // ── Operation layer (set by service method) ────────────────────────
   /** SCIM resource type being operated on */
@@ -478,16 +491,16 @@ export class ScimLogger {
     }
   }
 
-  /** Sanitize data: truncate large payloads, redact secrets. */
+  /** Sanitize data: redact secrets (recursively), then truncate large payloads. */
   private sanitizeData(data: Record<string, unknown>): Record<string, unknown> {
+    // Deep-redact secret-named values at ANY depth first (a nested
+    // `body.client_secret` or `headers.authorization` must never reach the
+    // console/file sink). The persisted RequestLog is the full-fidelity RCA
+    // surface governed by the PersistRequestSecrets flag; shipped structured
+    // logs are always redacted (defense in depth for log aggregation).
+    const redacted = redactSensitiveDeep(data);
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data)) {
-      // Redact sensitive fields
-      if (/secret|password|token|authorization|bearer|jwt/i.test(key)) {
-        result[key] = '[REDACTED]';
-        continue;
-      }
-
+    for (const [key, value] of Object.entries(redacted)) {
       if (typeof value === 'string' && value.length > this.config.maxPayloadSizeBytes) {
         result[key] = value.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated ${value.length - this.config.maxPayloadSizeBytes}B]`;
       } else if (typeof value === 'object' && value !== null) {

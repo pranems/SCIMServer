@@ -402,7 +402,7 @@ sequenceDiagram
   New->>Val: validate body
   Val-->>New: REJECT - invalidSyntax<br/>(undeclared extension URN)
   New-->>Mig: 400 invalidSyntax
-  Mig->>Mig: log + continue<br/>(idempotent; safe to retry later)
+  Mig->>Mig: log + continue<br/>(idempotent#59; safe to retry later)
 ```
 
 ### Resolution (Option B - chosen + executed 2026-05-19)

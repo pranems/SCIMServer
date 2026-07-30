@@ -25,7 +25,7 @@ flowchart LR
   subgraph BEFORE["BEFORE Phase J"]
     direction LR
     SC1[SCIM service<br/>e.g. createUser] -->|eventEmitter.emit| EE1[EventEmitter2]
-    EE1 --> SP1[StatsProjectionService<br/>@OnEvent]
+    EE1 --> SP1["StatsProjectionService<br/>#64;OnEvent"]
     SC1 -.->|logger.info| LOG1[ScimLogger]
     LOG1 --> SSE1[SSE stream<br/>log entries only]
     SSE1 --> US1[useSSE]
@@ -38,8 +38,8 @@ flowchart LR
   subgraph AFTER["AFTER Phase J"]
     direction LR
     SC2[SCIM service<br/>or admin controller] -->|eventEmitter.emit| EE2[EventEmitter2]
-    EE2 --> SP2[StatsProjectionService<br/>@OnEvent counters]
-    EE2 --> BR[ScimEventSseBridge<br/>13 @OnEvent handlers]
+    EE2 --> SP2["StatsProjectionService<br/>#64;OnEvent counters"]
+    EE2 --> BR["ScimEventSseBridge<br/>13 #64;OnEvent handlers"]
     BR -->|emitScimEvent type, payload| LOG2[ScimLogger.scimEventEmitter]
     LOG2 --> SSE2[SSE stream<br/>log entries + SCIM events]
     SSE2 --> US2[useSSE.computeInvalidations]

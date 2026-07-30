@@ -56,8 +56,17 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     // Top-level allowlist - prevents accidental field additions that
     // ship internal data to the client.
     expect(Object.keys(res.body).sort()).toEqual(
-      ['configFlags', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
+      ['configFlags', 'connectionInfo', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
     );
+
+    // WI-3: the overview carries the assembled connection-info (absolute URLs
+    // + per-method Entra field set) so the UI never hand-builds URLs.
+    expect(res.body.connectionInfo.endpointId).toBe(endpointId);
+    expect(res.body.connectionInfo.urls.scimBaseUrl).toContain(`/scim/v2/endpoints/${endpointId}`);
+    expect(Array.isArray(res.body.connectionInfo.enabledMethods)).toBe(true);
+    expect(Array.isArray(res.body.connectionInfo.disabledMethods)).toBe(true);
+    // No secret ever leaks through the overview.
+    expect(JSON.stringify(res.body.connectionInfo)).not.toContain('bcrypt$');
 
     // Endpoint summary contract.
     expect(res.body.endpoint.id).toBe(endpointId);
@@ -140,5 +149,91 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     }
     // And explicitly assert the well-known internal field is absent.
     expect(cred).not.toHaveProperty('credentialHash');
+  });
+
+  it('U2: an oauth_client credential surfaces its public oauthClientId (no secret)', async () => {
+    const endpointRes = await request(app.getHttpServer() as any)
+      .post('/scim/admin/endpoints')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: `e2e-overview-oc-${Date.now()}`, profilePreset: 'rfc-standard' })
+      .expect(201);
+    const endpointId = endpointRes.body.id as string;
+
+    await request(app.getHttpServer() as any)
+      .patch(`/scim/admin/endpoints/${endpointId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ profile: { settings: { OAuthClientCredentialsAuthEnabled: 'True' } } })
+      .expect(200);
+
+    const credRes = await request(app.getHttpServer() as any)
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ credentialType: 'oauth_client', label: 'ISV client' })
+      .expect(201);
+    const credentialId = credRes.body.id as string;
+    const clientId = credRes.body.clientId as string;
+
+    const overviewRes = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/overview`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const cred = overviewRes.body.credentials.find((c: any) => c.id === credentialId);
+    expect(cred).toBeDefined();
+    expect(cred.credentialType).toBe('oauth_client');
+    // U2 - the public client id is surfaced for the per-credential Connect view.
+    expect(cred.oauthClientId).toBe(clientId);
+    // No secret material leaks alongside it.
+    expect(cred).not.toHaveProperty('credentialHash');
+    expect(cred).not.toHaveProperty('clientSecret');
+    expect(cred).not.toHaveProperty('secretEnvelope');
+  });
+
+  it('X3/X4: a credential description is persisted and surfaced in the overview (never a secret)', async () => {
+    const endpointRes = await request(app.getHttpServer() as any)
+      .post('/scim/admin/endpoints')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: `e2e-overview-desc-${Date.now()}`, profilePreset: 'rfc-standard' })
+      .expect(201);
+    const endpointId = endpointRes.body.id as string;
+
+    // Enable per-endpoint bearer credentials so the create is authorized.
+    await request(app.getHttpServer() as any)
+      .patch(`/scim/admin/endpoints/${endpointId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ profile: { settings: { PerEndpointCredentialsEnabled: 'True' } } })
+      .expect(200);
+
+    // Create a bearer credential carrying an operator description.
+    const credRes = await request(app.getHttpServer() as any)
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ credentialType: 'bearer', label: 'Prod', description: 'Entra user provisioning' })
+      .expect(201);
+    const credentialId = credRes.body.id as string;
+    // The create response echoes the description.
+    expect(credRes.body.description).toBe('Entra user provisioning');
+
+    const overviewRes = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/overview`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const cred = overviewRes.body.credentials.find((c: any) => c.id === credentialId);
+    expect(cred).toBeDefined();
+    expect(cred.description).toBe('Entra user provisioning');
+    // A whitespace-only description is normalized to null (no description).
+    const blankRes = await request(app.getHttpServer() as any)
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ credentialType: 'bearer', label: 'NoDesc', description: '   ' })
+      .expect(201);
+    expect(blankRes.body.description).toBeNull();
   });
 });

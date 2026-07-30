@@ -89,6 +89,9 @@ import {
   CopyableJsonBlock,
   CopyJsonButton,
 } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps } from '../utils/interactive';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -224,10 +227,16 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '8px',
   },
+  historyScroll: {
+    width: '100%',
+    overflowX: 'auto',
+  },
   historyTable: {
     width: '100%',
+    minWidth: '640px',
     borderCollapse: 'collapse',
     fontSize: tokens.fontSizeBase200,
+    tableLayout: 'fixed',
   },
   historyRow: {
     cursor: 'pointer',
@@ -235,6 +244,7 @@ const useStyles = makeStyles({
   },
   historyCell: {
     padding: '6px 8px',
+    overflow: 'hidden',
   },
 });
 
@@ -281,6 +291,8 @@ function tryFormatJson(text: string): { ok: true; formatted: string } | { ok: fa
 
 export const WorkbenchPage: React.FC = () => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 6 history columns (time|method|path|status|ms|save).
+  const cols = useResizableColumns('workbench-history', 6, 'workbench-history-col');
   const search = useSearch({ strict: false }) as Record<string, unknown>;
 
   const endpoints = useEndpoints();
@@ -972,14 +984,23 @@ export const WorkbenchPage: React.FC = () => {
         {history.length === 0 ? (
           <Caption1>No requests yet. Send one to start building history.</Caption1>
         ) : (
+          <div className={classes.historyScroll}>
           <table className={classes.historyTable}>
+            <colgroup>
+              <col style={{ width: cols.widths[0] != null ? `${cols.widths[0]}px` : '16%' }} />
+              <col style={{ width: cols.widths[1] != null ? `${cols.widths[1]}px` : '12%' }} />
+              <col style={{ width: cols.widths[2] != null ? `${cols.widths[2]}px` : '40%' }} />
+              <col style={{ width: cols.widths[3] != null ? `${cols.widths[3]}px` : '12%' }} />
+              <col style={{ width: cols.widths[4] != null ? `${cols.widths[4]}px` : '10%' }} />
+              <col style={{ width: cols.widths[5] != null ? `${cols.widths[5]}px` : '10%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>time</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>method</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>path</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>status</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>ms</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>time<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>method<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>path<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>status<ColumnResizeHandle {...cols.handleProps(3)} /></th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3, position: 'relative' }}>ms<ColumnResizeHandle {...cols.handleProps(4)} /></th>
                 <th style={{ textAlign: 'left', padding: '6px 8px', color: tokens.colorNeutralForeground3 }}>save</th>
               </tr>
             </thead>
@@ -988,7 +1009,7 @@ export const WorkbenchPage: React.FC = () => {
                 <tr
                   key={entry.id}
                   className={classes.historyRow}
-                  onClick={() => handleHistoryRowClick(entry)}
+                  {...clickableProps(() => handleHistoryRowClick(entry), `Load request ${entry.method} ${entry.path}`)}
                   data-testid={`workbench-history-row-${entry.id}`}
                 >
                   <td className={classes.historyCell}>
@@ -1005,7 +1026,7 @@ export const WorkbenchPage: React.FC = () => {
                       copyValue={entry.path}
                       truncate
                       monospace
-                      maxWidth="360px"
+                      maxWidth="100%"
                       data-testid={`workbench-history-path-${entry.id}`}
                     />
                   </td>
@@ -1043,6 +1064,7 @@ export const WorkbenchPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
     </div>

@@ -25,6 +25,15 @@ describe('ActivityController', () => {
     errorStack: overrides.errorStack || null,
     createdAt: overrides.createdAt || new Date('2024-01-01T10:00:00Z'),
     identifier: overrides.identifier !== undefined ? overrides.identifier : null,
+    // P3 - RequestLog gained a nullable requestId (X-Request-Id correlation id).
+    requestId: overrides.requestId !== undefined ? overrides.requestId : null,
+    // V10 - RequestLog gained the persisted auth summary (nullable).
+    authOutcome: overrides.authOutcome !== undefined ? overrides.authOutcome : null,
+    authMethod: overrides.authMethod !== undefined ? overrides.authMethod : null,
+    authReason: overrides.authReason !== undefined ? overrides.authReason : null,
+    authCredentialId: overrides.authCredentialId !== undefined ? overrides.authCredentialId : null,
+    // W1 - RequestLog gained the full serialized AuthDecisionTrace (nullable).
+    authDecision: overrides.authDecision !== undefined ? overrides.authDecision : null,
   });
 
   const mockActivitySummary = (log: any) => ({

@@ -208,6 +208,9 @@ export class GenericPatchEngine {
     const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
     if (urnMatch) {
       const [, urn, subPath] = urnMatch;
+      // CWE-1321 defense-in-depth: `urn` matches ^urn: so it is never a
+      // prototype key, but guard the dynamic write at the sink regardless.
+      if (DANGEROUS_KEYS.has(urn)) return;
       let ext = this.payload[urn] as Record<string, unknown> | undefined;
       if (!ext || typeof ext !== 'object') {
         ext = {};
@@ -255,12 +258,16 @@ export class GenericPatchEngine {
     let current = obj;
     for (let i = 0; i < segments.length - 1; i++) {
       const seg = segments[i];
+      // CWE-1321 defense-in-depth: callers pre-validate the path via
+      // guardPrototypePollution, but never write a prototype-polluting segment.
+      if (DANGEROUS_KEYS.has(seg)) return;
       if (typeof current[seg] !== 'object' || current[seg] === null) {
         current[seg] = {};
       }
       current = current[seg] as Record<string, unknown>;
     }
     const last = segments[segments.length - 1];
+    if (DANGEROUS_KEYS.has(last)) return; // CWE-1321 defense-in-depth
     if (merge && Array.isArray(current[last]) && Array.isArray(value)) {
       (current[last] as unknown[]).push(...(value as unknown[]));
     } else {

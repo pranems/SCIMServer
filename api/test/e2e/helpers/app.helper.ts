@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
-import { json } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
@@ -11,6 +10,8 @@ import { AppModule } from '@app/modules/app/app.module';
 import { applySpaFallback } from '@app/bootstrap/spa-fallback';
 import { buildHelmetMiddleware, PERMISSIONS_POLICY_HEADER_VALUE } from '@app/security/helmet-config';
 import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
+import { applyCorrelationMiddleware } from '@app/bootstrap/correlation-middleware';
+import { applyBodyParsers } from '@app/bootstrap/body-parsers';
 
 /**
  * Bootstraps a full NestJS application for E2E testing.
@@ -21,8 +22,13 @@ import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
  * - Sets known auth credentials so test helpers can acquire tokens deterministically
  *
  * Call `app.close()` in your `afterAll()` to shut down cleanly.
+ *
+ * @param customize Optional hook to tweak the testing module before compile
+ *   (e.g. `builder => builder.overrideProvider(JWKS_FETCH).useValue(fetchMock)`).
  */
-export async function createTestApp(): Promise<INestApplication> {
+export async function createTestApp(
+  customize?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<INestApplication> {
   // Read the database URL from the marker file written by global-setup
   const markerPath = path.resolve(__dirname, '..', '.test-db-path');
   const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
@@ -43,10 +49,20 @@ export async function createTestApp(): Promise<INestApplication> {
   process.env.OAUTH_CLIENT_ID = 'e2e-client';
   process.env.OAUTH_CLIENT_SECRET = 'e2e-client-secret';
   process.env.NODE_ENV = 'test';
+  // W1.7b knobs: shorten the RequestLog buffer flush interval for E2E so a row
+  // becomes durable in ~100 ms instead of the 3 s production default. Log-reading
+  // specs still POLL via waitForLogRow (a shorter timer narrows the race, it does
+  // not remove it), but this keeps those polls to one or two attempts instead of
+  // waiting out a 3 s timer on every assertion. The buffer SIZE is deliberately
+  // left at its default so batching behaviour stays representative.
+  // `??=` so an individual spec can still override it.
+  process.env.LOG_FLUSH_INTERVAL_MS ??= '100';
 
-  const moduleFixture = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+  const moduleFixture = await (
+    customize
+      ? customize(Test.createTestingModule({ imports: [AppModule] }))
+      : Test.createTestingModule({ imports: [AppModule] })
+  ).compile();
 
   const app = moduleFixture.createNestApplication<NestExpressApplication>();
 
@@ -65,6 +81,10 @@ export async function createTestApp(): Promise<INestApplication> {
     next();
   });
 
+  // Early correlation middleware (main.ts parity) - X-Request-Id + ALS context
+  // + base RequestLoggingMeta before guards, so guard-rejected 401s are traceable.
+  applyCorrelationMiddleware(app);
+
   // Phase N3a (2026-05-18): mirror the production helmet middleware so
   // the security-headers E2E spec sees what production sees. See
   // api/src/security/helmet-config.ts for design rationale.
@@ -81,15 +101,9 @@ export async function createTestApp(): Promise<INestApplication> {
   });
   applySpaFallback(app);
 
-  app.use(
-    json({
-      limit: '5mb',
-      type: (req) => {
-        const ct = req.headers['content-type']?.toLowerCase() ?? '';
-        return ct.includes('application/json') || ct.includes('application/scim+json');
-      },
-    }),
-  );
+  // Body parsers (main.ts parity) - json + scim media type + urlencoded, with
+  // the raw-body verify hook so a malformed body still surfaces on the RequestLog.
+  applyBodyParsers(app);
 
   app.setGlobalPrefix('scim', {
     exclude: ['/', OAUTH_METADATA_PATH],

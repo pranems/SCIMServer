@@ -22,6 +22,7 @@ import {
   Res,
   Optional,
   Inject,
+  NotFoundException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { LogQueryService } from '../../logging/log-query.service';
@@ -105,6 +106,7 @@ export class EndpointLogController {
     @Query('since') since?: string,
     @Query('until') until?: string,
     @Query('minDurationMs') minDurationMs?: string,
+    @Query('requestId') requestId?: string,
   ) {
     if (!this.loggingService) {
       return { endpointId, total: 0, items: [], message: 'Persistent logging not available (InMemory backend)' };
@@ -120,7 +122,44 @@ export class EndpointLogController {
       since: since ? new Date(since) : undefined,
       until: until ? new Date(until) : undefined,
       minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
+      requestId: requestId || undefined,
       includeAdmin: false,
     });
+  }
+
+  /**
+   * GET /scim/endpoints/:endpointId/logs/:logId
+   *
+   * Full request/response detail for a single log row (headers + parsed
+   * bodies), so the endpoint Logs tab can open a clickable detail drawer just
+   * like the SCIMServer-level Logs page. Tenant-isolated: the row is returned
+   * ONLY when its URL belongs to this endpoint (a per-endpoint credential
+   * holder must never read another endpoint's payloads). 404 when the log does
+   * not exist OR is not scoped to this endpoint.
+   */
+  @Get(':logId')
+  async getLogDetail(
+    @Param('endpointId') endpointId: string,
+    @Param('logId') logId: string,
+  ) {
+    if (!this.loggingService) {
+      throw new NotFoundException('Persistent logging not available (InMemory backend).');
+    }
+    // A malformed logId (e.g. a non-UUID on a UUID column in Postgres) makes the
+    // DB lookup throw; degrade that to a clean 404 rather than a 500 - an id
+    // that cannot resolve is simply "not found".
+    let log: Awaited<ReturnType<typeof this.loggingService.getLog>>;
+    try {
+      log = await this.loggingService.getLog(logId);
+    } catch {
+      throw new NotFoundException(`Log "${logId}" not found for endpoint "${endpointId}".`);
+    }
+    // Tenant isolation: the log's URL must reference this endpoint. Endpoint
+    // request URLs contain `/endpoints/<endpointId>` (both the v2 and bare
+    // rewrite forms), so a substring check on the id is a safe scope gate.
+    if (!log || typeof log.url !== 'string' || !log.url.includes(endpointId)) {
+      throw new NotFoundException(`Log "${logId}" not found for endpoint "${endpointId}".`);
+    }
+    return log;
   }
 }

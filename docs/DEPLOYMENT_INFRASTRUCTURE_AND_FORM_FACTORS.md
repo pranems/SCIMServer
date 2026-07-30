@@ -1,0 +1,848 @@
+# Deployment Infrastructure and Form Factors
+
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-07-30 - **Repo version at capture:** `api/package.json` = `0.54.86`
+> **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
+> **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
+> **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
+
+---
+
+## 0. Provenance and how to reproduce every fact
+
+Nothing in this document is inferred from memory. Every Azure value was read from the live control plane or the live data plane on the capture date; every repo value was read from the file cited.
+
+| Fact class | Source | Capture command |
+|---|---|---|
+| Azure resource inventory | ARM control plane, subscription `ProvIAM_Subscription` (`5738ea6a-533b-4c0d-a18a-d322f2094475`), tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373` | `az resource list --query "[].{rg:resourceGroup,name:name,type:type,location:location,sku:sku.name}" -o table` |
+| Container App config | ARM | `az containerapp show -n <app> -g <rg> -o json` |
+| Revisions and traffic | ARM | `az containerapp revision list -n <app> -g <rg> --query "[].[name,properties.active,properties.replicas,properties.runningState,properties.trafficWeight]" -o tsv` |
+| Managed environment | ARM | `az containerapp env show -n scimserver-env -g scimserver-prod -o json` |
+| PostgreSQL | ARM | `az postgres flexible-server list -o json`, `... parameter show --name max_connections`, `... firewall-rule list` |
+| Networking | ARM | `az network vnet list -o json` |
+| Registry | ARM + data plane | `az acr show -n acrscimserver20622`, `az acr repository show-tags -n acrscimserver20622 --repository scimserver --orderby time_desc --top 10` |
+| Running app state (all 3 estates, incl. the cross-tenant one) | Data plane `GET /scim/admin/version` after OAuth `client_credentials` | see [Section 12](#12-verification-recipes) |
+| Node.js support status | [endoflife.date/nodejs](https://endoflife.date/nodejs) (last updated 2026-07-14) and [nodejs.org previous releases](https://nodejs.org/en/about/previous-releases) | web fetch |
+| Azure Container Apps rate card | [Azure Container Apps pricing](https://azure.microsoft.com/en-us/pricing/details/container-apps/) | web fetch |
+
+**Cross-tenant caveat.** The customer-facing production estate (calmsand) lives in a **different Azure AD tenant** (`9de357c6-4488-4a8d-bd2f-14696f1af950`, subscription `AnandSa-Test-150`) than dev and the canary prod. The `az` session used for this capture was authenticated to the ProvIAM tenant only, so calmsand's ARM-level facts (SKUs, revisions, firewall rules) are **not enumerable here**. Everything stated about calmsand below came from its **data plane** (`/scim/admin/version`, which self-reports resource group, container app, registry, database host, and runtime) or from the repo's own promotion tooling. Rows that could not be verified are marked `not enumerable (cross-tenant)`.
+
+---
+
+### 0.1 Maintenance contract - this is a living document
+
+A reference doc that is not mechanically tied to the thing it describes rots silently. Worse, a **confidently wrong** infra doc is more dangerous than no doc at all, because it terminates an investigation in the wrong place - which is precisely how the 2026-05-17 security intake "resolved" the Node base-image drift by checking `api/Dockerfile` (which does not ship) instead of the root `Dockerfile` (which does), leaving an EOL runtime in production for two more months.
+
+So this document is **enforced by a gate**, not by good intentions.
+
+#### The rule
+
+> **Any change to the infrastructure updates this document in the same commit.**
+
+"Infrastructure" is defined mechanically - it is exactly the set [scripts/audit-deployment-doc.ps1](../scripts/audit-deployment-doc.ps1) watches:
+
+| Path | Why it is infra |
+|---|---|
+| `Dockerfile*` | image composition and base image |
+| `docker-compose*.yml` | the Docker form factor |
+| `infra/**` (Bicep) | declared Azure topology |
+| `.github/workflows/**` | the supply chain that builds and publishes the artifact |
+| `api/docker-entrypoint.sh` | container boot sequence |
+| `dev-containerapp.yaml`, `prod-app-template.json` | Container App templates |
+| `scripts/{deploy-azure,promote-to-prod,dev-deployment-pipeline,verify-deployment,build-standalone,audit-base-images}.ps1` | provisioning, promotion, verification, packaging |
+
+#### The gate
+
+```powershell
+pwsh scripts/audit-deployment-doc.ps1          # static  - Stage 1.11
+pwsh scripts/audit-deployment-doc.ps1 -Live    # + probes every live estate
+```
+
+It also runs automatically on **every push** (Fast tier of [scripts/pre-push-checks.ps1](../scripts/pre-push-checks.ps1), alongside `infra: base images on LTS`), so this is not a gate someone has to remember to invoke. At pre-push the working tree is clean and the change lives in commits, so the hook passes the upstream ref as `-BaseRef` - comparing against `HEAD` alone would make C1 structurally incapable of ever firing.
+
+| Check | Fails when |
+|---|---|
+| **C1** change coverage | an infra path above changed and this doc did not change in the same diff |
+| **C2** freshness | the `**Last verified:**` header date is older than 90 days |
+| **C3** element coverage | a `Dockerfile*`, `docker-compose*.yml` or `infra/*.bicep` exists on disk that this doc never names |
+| **C4** live truth (`-Live`) | a reachable estate runs a Node major that is not Active/Maintenance LTS, or reports a version this doc does not mention |
+
+C3 is what makes the gate **self-extending**: add a new Bicep template or Dockerfile and the gate starts demanding documentation for it on the next run, with no edit to the gate itself. C4 is the deployed-artifact half of the Node-LTS rule - [audit-base-images.ps1](../scripts/audit-base-images.ps1) gates the **source**, C4 gates **what is actually running**, and both read the same LTS table from [scripts/node-lts.ps1](../scripts/node-lts.ps1) so they cannot disagree.
+
+**The gate has its own self-test.** [scripts/test-audit-deployment-doc.ps1](../scripts/test-audit-deployment-doc.ps1) feeds the auditor deliberately bad input and asserts each check fires: an infra change with no doc update (C1), a backdated `Last verified` (C2), and an undocumented `infra/*.bicep` (C3). Run it after touching the auditor. This exists because this repo has twice shipped a gate that reported PASS on input it was written to reject - `audit-base-images.ps1` v1 indexed characters instead of lines, and C1 v1 compared the working tree against `HEAD`, which is always empty at pre-push. Neither was caught by writing the gate carefully; both were caught by watching them fail. The harness refuses to run on a dirty tree, because it mutates and reverts tracked files.
+
+```mermaid
+flowchart LR
+    A["infra change<br/>(Dockerfile, Bicep,<br/>workflow, deploy script)"] --> B{"C1: doc updated<br/>in same commit?"}
+    B -->|"no"| F["FAIL - update the doc"]
+    B -->|"yes"| C{"C3: every infra<br/>element documented?"}
+    C -->|"no"| F
+    C -->|"yes"| D{"C2: Last verified<br/>within 90 days?"}
+    D -->|"no"| G["FAIL - re-run Section 12<br/>capture recipes"]
+    D -->|"yes"| E{"C4 -Live: estates on<br/>supported Node LTS?"}
+    E -->|"no"| H["FAIL - promote the<br/>LTS image"]
+    E -->|"yes"| P["PASS"]
+    F --> R["Section 15 change log<br/>+ bump Last verified"]
+    G --> R
+    H --> R
+    R --> P
+```
+
+#### What to update, per change type
+
+| Change | Sections to revisit |
+|---|---|
+| Base image / Dockerfile stage | [7 Image supply chain](#7-image-supply-chain), [2 Form factors](#2-the-six-form-factors) |
+| New or removed Azure resource | [3 Element catalogue](#3-azure-infrastructure-element-catalogue), [4 Live estates](#4-live-estates---measured-configuration), [11 Cost model](#11-cost-model) |
+| Container env var added | [Container environment variables](#container-environment-variables-set-by-the-template), [9 Configuration surface](#9-configuration-surface-by-form-factor) |
+| Deploy / promote script behaviour | [8 Deployment flows](#8-deployment-flows) |
+| A deployment to any estate | [4 Live estates](#4-live-estates---measured-configuration) measured table |
+| Anything that reveals a gap | [10 Drift and gap register](#10-drift-and-gap-register), [14 Self-improvement](#14-self-improvement-and-designarchitecture-gate-disposition) |
+| **Every** change | [15 Change log](#15-change-log) + the `**Last verified:**` header date |
+
+#### Standing rules for facts
+
+1. **Measured, never remembered.** Every value here is reproducible via a command in [Section 12](#12-verification-recipes). If a fact cannot be captured, mark it `not enumerable` with the reason (see the cross-tenant caveat) rather than guessing.
+2. **Verify against the artifact that ships.** CI builds the **root** `Dockerfile` (`publish-ghcr.yml` -> `file: ./Dockerfile`). A same-named sibling is not evidence.
+3. **A gap is recorded, not silently fixed later.** New findings go in [Section 10](#10-drift-and-gap-register) with severity, evidence, impact and remedy, and get a disposition in [Section 14](#14-self-improvement-and-designarchitecture-gate-disposition) - applied, scheduled, or accepted with a reason.
+4. **Promote findings that recur.** A gap seen twice, or one high-severity escape, graduates from this register to a hard gate in [.github/copilot-instructions.md](../.github/copilot-instructions.md), following the standing `issue -> pattern -> rule` loop.
+
+---
+
+## 1. Executive summary
+
+SCIMServer ships as **one container image** that runs in **six form factors**. Only one of them (Azure Container Apps) involves Azure infrastructure; the rest exist so the identical binary can be exercised locally, in CI, and air-gapped.
+
+```mermaid
+flowchart LR
+    SRC["Source: api/ (NestJS) + web/ (React + Vite)"]
+
+    subgraph BUILD["Build"]
+      DF["Root Dockerfile - 4 stages, node:24-alpine"]
+      SA["scripts/build-standalone.ps1"]
+      TSC["tsc + vite (no container)"]
+    end
+
+    SRC --> DF
+    SRC --> SA
+    SRC --> TSC
+
+    subgraph FF["Deployment form factors"]
+      F1["F1 Local Node process"]
+      F2["F2 Docker Compose (api + postgres)"]
+      F3["F3 Single container"]
+      F4["F4 Standalone Windows package"]
+      F5["F5 Azure Container Apps"]
+      F6["F6 CI ephemeral (GitHub Actions)"]
+    end
+
+    TSC --> F1
+    DF --> F2
+    DF --> F3
+    SA --> F4
+    DF --> F5
+    DF --> F6
+
+    F1 --> MEM["Backend: inmemory (default for F1/F4)"]
+    F2 --> PG["Backend: prisma over PostgreSQL 17"]
+    F3 --> PG
+    F4 --> MEM
+    F4 --> PG
+    F5 --> PGAZ["Backend: prisma over Azure DB for PostgreSQL Flexible Server"]
+    F6 --> MEM
+```
+
+**Key structural facts**
+
+1. The image is **built once** from the repo-root [Dockerfile](../Dockerfile). `Dockerfile.optimized`, `Dockerfile.ultra`, [api/Dockerfile](../api/Dockerfile), and `api/Dockerfile.multi` are referenced by **no** workflow, compose file, or deploy script - they are dead artifacts, and two of them still assume a SQLite persistence model the product left behind in Phase 3.
+2. Persistence is selected at runtime by a single env var read in one place: `PERSISTENCE_BACKEND` in [api/src/infrastructure/repositories/repository.module.ts](../api/src/infrastructure/repositories/repository.module.ts). Default is `prisma`; the only other value is `inmemory`.
+3. Azure provisioning is **100 % Bicep**. [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1) contains no `az containerapp create/update` - it only calls `az deployment group create` against four templates in [infra/](../infra).
+4. All three public install paths ([bootstrap.ps1](../bootstrap.ps1) -> [setup.ps1](../setup.ps1), and [deploy.ps1](../deploy.ps1)) converge on `deploy-azure.ps1 -ProvisionPostgres`, so a first-time user always lands on the same Azure shape.
+5. Six Azure resource types constitute the entire cloud footprint. There is no App Service, no AKS, no Key Vault, no Front Door, no Storage account, and no private endpoint in the live estates.
+
+---
+
+## 2. The six form factors
+
+| # | Form factor | Artifact | Persistence | Ports | Web UI served | Migrations run | Primary use |
+|---|---|---|---|---|---|---|---|
+| F1 | Local Node process | `api/dist/main.js` after `npm run build` | `inmemory` (default) or `prisma` | `PORT` env, code default **3000**, live-test convention **6000** | yes, from `api/public` | no (manual `prisma migrate dev`) | Stage 4.3 inmemory parity live tests |
+| F2 | Docker Compose | root `Dockerfile` + `postgres:17` | `prisma` | `8080` api, `5432` postgres | yes | yes, in entrypoint | Stage 4.2 gate, local prod-equivalent |
+| F3 | Single container | same image, `docker run` | `prisma` (needs external `DATABASE_URL`) | `8080` | yes | yes | third-party self-host |
+| F4 | Standalone Windows package | `standalone/` directory tree | `inmemory` default, `prisma` opt-in, optional bundled PostgreSQL | `8080` | yes, from `public/` | opt-in (`-RunMigrations`) | air-gapped / no-Docker demos |
+| F5 | Azure Container Apps | same image via GHCR or ACR | `prisma` over Flexible Server | ingress 443 -> container `8080` | yes | yes | dev + 2 production estates |
+| F6 | CI ephemeral | GitHub-hosted `ubuntu-latest` runner | `inmemory` | n/a | n/a | n/a (migration **linter** runs instead) | pre-push validation |
+
+### F1 - Local Node process
+
+Built with `cd api; npm run build`, launched with `node api/dist/main.js`. [api/src/main.ts](../api/src/main.ts) reads `Number(process.env.PORT ?? 3000)`; the container images and Bicep both override this to `8080`, and the repo's live-test convention uses `6000` for the inmemory local node. In non-production (`NODE_ENV !== 'production'`) [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) generates an ephemeral 32-byte base64url `SCIM_SHARED_SECRET` and writes it back into `process.env` so a bare local run is usable; in production a missing shared secret is fatal to the request.
+
+### F2 - Docker Compose
+
+[docker-compose.yml](../docker-compose.yml) defines exactly two services.
+
+```mermaid
+flowchart TB
+    subgraph HOST["Docker host"]
+      subgraph NET["compose default bridge network"]
+        API["service: api<br/>container scimserver-api<br/>image built from root Dockerfile<br/>PERSISTENCE_BACKEND=prisma"]
+        DB["service: postgres<br/>container scimserver-postgres<br/>image postgres:17<br/>healthcheck pg_isready"]
+      end
+      VOL[("named volume pgdata")]
+      LOGS[("bind mount ./logs -> /app/logs")]
+      INIT["scripts/init-pg-extensions.sql<br/>mounted read-only into<br/>/docker-entrypoint-initdb.d/01-extensions.sql"]
+    end
+    CLIENT["Host :8080"] --> API
+    API -->|"postgresql://scim:scim@postgres:5432/scimdb"| DB
+    DB --- VOL
+    DB --- INIT
+    API --- LOGS
+    API -.->|"depends_on: service_healthy"| DB
+```
+
+`docker-compose.debug.yml` is a different animal: it builds **no** image, runs `image: node:24` with `./api` bind-mounted, exposes `3000` (SCIM) plus `9229` (inspector), and sets `NODE_OPTIONS=--inspect=0.0.0.0:9229`. Note it points `DATABASE_URL` at host `postgres` but declares no such service, so it only works alongside a separately started database.
+
+### F4 - Standalone Windows package
+
+[scripts/build-standalone.ps1](../scripts/build-standalone.ps1) produces a **directory**, not a single binary, and it is Windows-only (`.bat` and `.ps1` launchers, `node-vX-win-<arch>.zip`, EDB Windows PostgreSQL binaries). Contents: compiled `dist/`, production `node_modules` with the Prisma CLI and engines grafted in (needed for `migrate deploy`), `prisma/`, `src/generated/`, `public/` (the built web UI), launchers, and a generated README.
+
+| Launcher | Backend | Notable defaults |
+|---|---|---|
+| `start.bat` | `inmemory` | `PORT=8080`, `JWT_SECRET=changeme-jwt`, `SCIM_SHARED_SECRET=changeme`, `OAUTH_CLIENT_SECRET=changeme-oauth` |
+| `start.ps1` | `-Backend inmemory` or `prisma`; passing `-DatabaseUrl` forces `prisma` | `-RunMigrations` invokes `node node_modules/prisma/build/index.js migrate deploy --schema prisma/schema.prisma` |
+| `start-postgres.bat` | `prisma` | `DATABASE_URL=postgresql://scim:scim@localhost:5432/scimdb`, always migrates first |
+| `start-bundled-postgres.bat` (only with `-IncludePostgres`) | `prisma` | `initdb -U scim -E UTF8 --no-locale -A trust`, `pg_ctl start -p 5432`, `createdb scimdb`, migrate, start |
+
+Optional switches: `-IncludeNode` downloads `https://nodejs.org/dist/v<ver>/node-v<ver>-win-<x64|x86>.zip` and extracts only `node.exe`; `-IncludePostgres` downloads the EDB Windows binaries; `-Zip` packs the tree with `System.IO.Compression.ZipFile` (chosen over `Compress-Archive` because of long paths inside `node_modules`). The checked-in `standalone/` tree was built at **v0.52.2** with `-IncludeNode` (bundled Node v24.13.0) and **without** `-IncludePostgres`.
+
+### F6 - CI ephemeral
+
+Six workflows build, validate or audit; none of them deploy. The first three build an image; the last three never touch the artifact and exist only to make an upstream change visible.
+
+| Workflow | Trigger | What it produces / gates |
+|---|---|---|
+| [build-test.yml](../.github/workflows/build-test.yml) | push to `test/** dev/** feature/** feat/** ci/** fix/**`, PR to `master`, dispatch | Full validate job, then pushes `ghcr.io/pranems/scimserver:test-<branch>` + `:sha-<sha>` and runs **Trivy** (`HIGH,CRITICAL`, `exit-code: 1`, `ignore-unfixed: true`, `trivyignores: .trivyignore`) |
+| [build-and-push.yml](../.github/workflows/build-and-push.yml) | push tag `v*`, dispatch | Semver + `latest` + `sha-` tags to GHCR, Trivy gate |
+| [publish-ghcr.yml](../.github/workflows/publish-ghcr.yml) | dispatch only, inputs `version` (required) and `pushLatest` | `:<version>` and `:sha-<sha>`; `latest` created via `docker buildx imagetools create`. **This is the workflow the dev pipeline drives.** |
+| [codeql.yml](../.github/workflows/codeql.yml) | push `master`/`feat/**`, PR to `master`, Mondays 04:00 UTC, dispatch | CodeQL `security-extended,security-and-quality` for `javascript-typescript` |
+| [trivyignore-review.yml](../.github/workflows/trivyignore-review.yml) | Mondays 04:00 UTC, dispatch, push touching `.trivyignore` | Opens/updates/closes a `[security] .trivyignore review needed` issue. Explicitly non-blocking |
+| [rfc-currency.yml](../.github/workflows/rfc-currency.yml) | 06:00 UTC on the 1st monthly, dispatch, PR touching `docs/rfcs/**`, `docs/auth/rfcs/**`, `scripts/sync-rfcs.ps1`, `scripts/rfc-index.ps1` or itself | Runs [sync-rfcs.ps1](../scripts/sync-rfcs.ps1) offline (C1-C5) then `-Online` (O1-O3) against `www.rfc-editor.org`. Blocking, `timeout-minutes: 20`, `permissions: contents: read` |
+
+**Why the last two are scheduled rather than commit-triggered.** Both watch for a change that happens **upstream while this repository sits still**, so no commit can trigger them: a new RFC starting to update one we depend on (RFC 7643 was updated by RFC 9865 and RFC 9967), a verified erratum changing what the text means without changing a mirrored byte, or a CVE-exception entry going stale. A commit-triggered gate is structurally incapable of finding any of them. The pre-push gate `docs: RFC corpus current + intact` runs only the **offline** half so pre-push stays deterministic and works without network; the online half runs on the clock here. A failure of this job is a reading assignment, not a build break - the workflow's own failure step spells out the read-assess-update-then-`-Update` sequence and explicitly forbids running `-Update` to silence it.
+
+All three build workflows use `context: .` and `file: ./Dockerfile`, and every `uses:` line is SHA-pinned with a trailing `# vX.Y.Z` comment. The validate job runs `npx prisma generate` **before** lint (type-aware ESLint rules need real Prisma types), runs the migration linter `src/scripts/lint-migrations.ts`, and runs E2E with `PERSISTENCE_BACKEND=inmemory` and `--maxWorkers=2` (the 2-core runner over-subscribes at the default 4 and produces `ECONNRESET` in parallel-HTTP specs).
+
+---
+
+## 3. Azure infrastructure element catalogue
+
+Exactly **six** ARM resource types are provisioned. Everything else visible in the subscription belongs to unrelated projects.
+
+| # | ARM type | API version in Bicep | Declared in | Purpose | Why this and not something else |
+|---|---|---|---|---|---|
+| A1 | `Microsoft.App/containerApps` | `2024-03-01` | [infra/containerapp.bicep](../infra/containerapp.bicep) | The running SCIM server | Serverless containers with built-in revisions + traffic splitting give blue/green for free; no orchestrator to operate |
+| A2 | `Microsoft.App/managedEnvironments` | `2024-03-01` | [infra/containerapp-env.bicep](../infra/containerapp-env.bicep) | Compute + networking + logging boundary shared by apps | Required parent of A1; also the unit of VNet integration and the `defaultDomain` |
+| A3 | `Microsoft.OperationalInsights/workspaces` | `2022-10-01` | [infra/containerapp-env.bicep](../infra/containerapp-env.bicep) | Container console/system log sink, 30-day retention | The only log destination ACA supports natively besides Azure Monitor |
+| A4 | `Microsoft.Network/virtualNetworks` (+ 3 subnets) | `2023-09-01` | [infra/networking.bicep](../infra/networking.bicep) | Deterministic address space for the ACA environment | Custom VNet is required for stable egress and future private endpoints |
+| A5 | `Microsoft.DBforPostgreSQL/flexibleServers` (+ database + firewall rule) | `2024-08-01` | [infra/postgres.bicep](../infra/postgres.bicep) | System of record for all SCIM data | Prisma targets PostgreSQL; Flexible Server is the managed single-node option |
+| A6 | `Microsoft.ContainerRegistry/registries` | `2023-07-01` | [infra/acr.bicep](../infra/acr.bicep) | Private image store | **Declared but never deployed by any script.** The live ACR was created out-of-band; see [Section 10](#10-drift-and-gap-register) |
+
+Two additional resources exist in the estate but are **platform-managed**, not authored by us: `capp-svc-lb` and `capp-svc-lb-ip` (both `Standard` SKU) in the auto-created infrastructure resource group `ME_scimserver-env_scimserver-prod_eastus`. Azure Container Apps creates these to front the environment's ingress.
+
+### A1 - Container App, as declared
+
+```mermaid
+flowchart TB
+    subgraph CA["Microsoft.App/containerApps@2024-03-01"]
+      direction TB
+      CFG["configuration<br/>activeRevisionsMode: Multiple"]
+      ING["ingress<br/>external: true<br/>targetPort: 8080<br/>transport: auto"]
+      REG["registries<br/>username+password OR system identity OR anonymous"]
+      SEC["secrets<br/>scim-shared-secret, jwt-secret,<br/>oauth-client-secret, database-url<br/>(+ ghcr-password when creds supplied)"]
+      TPL["template.containers[0] name=scimserver<br/>cpu 0.5 vCPU, memory 1Gi<br/>minReplicas 1, maxReplicas 1"]
+      PRB["probes on /scim/health<br/>Startup 10s + 5s x 30 = ~160s budget<br/>Liveness 30s/5s/3<br/>Readiness 10s/3s/3"]
+      ID["identity: SystemAssigned"]
+    end
+    CFG --> ING
+    CFG --> REG
+    CFG --> SEC
+    CA --> TPL --> PRB
+    CA --> ID
+```
+
+The ~160 s startup budget is deliberate: the entrypoint runs `npx prisma migrate deploy` before `node dist/main.js`, and a cold Burstable database plus a multi-migration catch-up can take well over a minute.
+
+Registry-auth selection logic in the template, in order:
+1. Both `ghcrUsername` and `ghcrPassword` supplied -> username + `passwordSecretRef: 'ghcr-password'` against `acrLoginServer`.
+2. Otherwise, `acrLoginServer != 'ghcr.io'` -> `identity: 'system'` (managed-identity pull).
+3. Otherwise -> **no** `registries` block at all, i.e. anonymous GHCR pull.
+
+### Container environment variables set by the template
+
+| Variable | Source | Value |
+|---|---|---|
+| `SCIM_SHARED_SECRET`, `JWT_SECRET`, `OAUTH_CLIENT_SECRET`, `DATABASE_URL` | `secretRef` | Container App secrets |
+| `PERSISTENCE_BACKEND` | literal | `prisma` |
+| `NODE_ENV` | literal | `production` |
+| `PORT` | literal | `8080` |
+| `CORS_ORIGIN` | param, default `''` | empty means allow-all, see below |
+| `SCIM_RG`, `SCIM_APP`, `SCIM_REGISTRY`, `SCIM_CURRENT_IMAGE` | ARM functions | metadata surfaced by the in-app "Copy Update Command" |
+| `LOG_LEVEL` | literal | `DEBUG` |
+| `LOG_FORMAT` | literal | `json` |
+| `LOG_FILE` | literal | `''` (disables file logging on ephemeral container disk) |
+| `LOG_RING_BUFFER_SIZE` | literal | `5000` |
+| `LOG_RETENTION_DAYS` | literal | `30` |
+| `LOG_SLOW_REQUEST_MS` | literal | `1000` |
+
+---
+
+## 4. Live estates - measured configuration
+
+Three estates are live. Names, regions, and resource groups differ in ways that matter operationally, so they are listed exactly as measured.
+
+| Attribute | **Dev** | **Canary prod** (proudbush) | **Customer prod** (calmsand) |
+|---|---|---|---|
+| Container App | `scimserver-dev` | `scimserver` | `scimserver-prod` |
+| Resource group | `scimserver-dev` | `scimserver-prod` | `scimserver-rg-prod` |
+| Subscription | `ProvIAM_Subscription` | `ProvIAM_Subscription` | `AnandSa-Test-150` |
+| Tenant | `f08e6aff-...` | `f08e6aff-...` | `9de357c6-...` |
+| Region | East US | East US | Central US |
+| Managed environment | `scimserver-env` (**in RG `scimserver-prod`**) | `scimserver-env` | not enumerable (cross-tenant) |
+| FQDN | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` |
+| Revision mode | **Single** (`latestRevision: true`, 100 %) | **Multiple** (`green-0714-1458` at 100 %) | Multiple (revision `scimserver-prod--green-0714-1516` observed serving) |
+| Image reference | `acrscimserver20622.azurecr.io/scimserver:0.54.86` (tag) | `ghcr.io/pranems/scimserver@sha256:599ee80d...c49e` (**digest-pinned**) | `ghcr.io` per self-report |
+| Managed identity | **None** | SystemAssigned, principal `52c90266-649c-4511-9472-4872b5c9738e` | not enumerable |
+| Registry auth | ACR admin user via secret `acrscimserver20622azurecrio-acrscimserver20622` | secret `ghcr-password` bound to server `acrscimserver20622.azurecr.io` | anonymous GHCR pull |
+| CPU / memory | 0.5 vCPU / 1 GiB | 0.5 vCPU / 1 GiB | not enumerable |
+| Replicas | min 1 / max 1 | min 1 / max 1 | not enumerable |
+| Workload profile | Consumption | Consumption | not enumerable |
+| PostgreSQL host | `scimserver-pg-dev-new2.postgres.database.azure.com` | `scimserver-pg-new2.postgres.database.azure.com` | `scimserver-prod-pg.postgres.database.azure.com` |
+| Database | `scimdb`, PostgreSQL 17 | `scimdb`, PostgreSQL 17 | `scimdb`, PostgreSQL 17 |
+| Running app version | **0.54.86** | 0.54.0-alpha.11 | 0.54.0-alpha.11 |
+| Node.js runtime in container | **v24.18.0** (Active LTS) | **v25.9.0** (EOL 2026-06-01) | **v25.9.0** (EOL 2026-06-01) |
+| Process uptime at capture | 1,135 s | n/a | 746,807 s (~8.6 days) |
+
+```mermaid
+flowchart TB
+    INET(["Internet / Entra ID provisioning service"])
+
+    subgraph T1["Tenant f08e6aff - subscription ProvIAM_Subscription"]
+      subgraph RGP["RG scimserver-prod (East US)"]
+        ENVP["managedEnvironment scimserver-env<br/>defaultDomain proudbush-ae90986e.eastus...<br/>staticIp 40.76.166.228<br/>Consumption, zoneRedundant false"]
+        APPP["containerApp scimserver<br/>Multiple revisions, digest-pinned GHCR image"]
+        VNETP["vnet scimserver-vnet 10.40.0.0/16"]
+        LAW["logAnalytics scimserver-logs<br/>PerGB2018, 30 days"]
+        ACR["ACR acrscimserver20622<br/>Basic, adminUser enabled"]
+        PGP["PG flexibleServer scimserver-pg-new2<br/>East US 2, B1ms, PG17"]
+      end
+      subgraph RGD["RG scimserver-dev"]
+        APPD["containerApp scimserver-dev<br/>Single revision, ACR tag image"]
+        PGD["PG flexibleServer scimserver-pg-dev-new2<br/>East US 2, B1ms, PG17"]
+        VNETD["vnet scimserver-dev-vnet (East US 2)<br/>UNUSED - see Gap G2"]
+      end
+    end
+
+    subgraph T2["Tenant 9de357c6 - subscription AnandSa-Test-150"]
+      subgraph RGC["RG scimserver-rg-prod (Central US)"]
+        APPC["containerApp scimserver-prod<br/>anonymous GHCR pull"]
+        PGC["PG scimserver-prod-pg"]
+      end
+    end
+
+    GHCR["ghcr.io/pranems/scimserver"]
+
+    INET --> APPP
+    INET --> APPD
+    INET --> APPC
+    ENVP --> APPP
+    ENVP --> APPD
+    ENVP --- VNETP
+    ENVP --- LAW
+    APPP --> PGP
+    APPD --> PGD
+    APPC --> PGC
+    GHCR --> APPP
+    GHCR --> APPC
+    ACR --> APPD
+    GHCR -->|"az acr import"| ACR
+```
+
+Two structural facts stand out in that graph and are easy to miss:
+
+- **The dev app does not have its own environment.** `scimserver-dev` lives in resource group `scimserver-dev` but its `environmentId` points at `scimserver-env` in resource group `scimserver-prod`. Dev and canary prod therefore share one managed environment, one Log Analytics workspace, one VNet, and one static egress IP.
+- **`scimserver-dev-vnet` (East US 2) is orphaned.** It has the same address space and the same three delegated subnets as the prod VNet, but no environment references it.
+
+---
+
+## 5. Network topology
+
+Both VNets carry the identical address plan from [infra/networking.bicep](../infra/networking.bicep).
+
+```mermaid
+flowchart LR
+    subgraph VNET["vnet 10.40.0.0/16"]
+      S1["aca-infra<br/>10.40.0.0/21<br/>delegated Microsoft.App/environments"]
+      S2["aca-runtime<br/>10.40.8.0/21<br/>delegated Microsoft.App/environments"]
+      S3["private-endpoints<br/>10.40.16.0/24<br/>no delegation"]
+    end
+    ENV["managedEnvironment<br/>vnetConfiguration.infrastructureSubnetId -> aca-infra<br/>internal: false"]
+    S1 --> ENV
+    ENV -->|"egress via environment static IP"| PG["PostgreSQL Flexible Server<br/>publicNetworkAccess: Enabled"]
+    S3 -.->|"reserved, no private endpoint deployed today"| PG
+```
+
+Measured facts:
+
+- All three subnets set `privateEndpointNetworkPolicies: Disabled` and `privateLinkServiceNetworkPolicies: Disabled`.
+- The environment binds **only** `aca-infra`. `aca-runtime` is delegated and reserved but currently unreferenced.
+- `internal: false` and `zoneRedundant: false`. The environment's static IP is `40.76.166.228`.
+- The database path is **public-network**, not private endpoint. Reachability is granted by the firewall rule `AllowAllAzureServices` (`0.0.0.0` to `0.0.0.0`, which is the Azure-specific "allow Azure services" sentinel, not a literal 0.0.0.0/0 internet allow).
+- Both PostgreSQL servers are in **East US 2** while both Container Apps are in **East US**. Every query therefore crosses a region boundary.
+
+Live firewall rules:
+
+| Server | Rule | Range |
+|---|---|---|
+| `scimserver-pg-new2` (canary prod) | `AllowMyIP-temp` | `40.117.66.214` - `40.117.66.214` |
+| `scimserver-pg-new2` | `AllowAllAzureServices` | `0.0.0.0` - `0.0.0.0` |
+| `scimserver-pg-dev-new2` (dev) | `AllowMyIP-temp` | `40.117.66.210` - `40.117.66.210` |
+| `scimserver-pg-dev-new2` | `AllowAzureServices` | `0.0.0.0` - `0.0.0.0` |
+| `scimserver-pg-dev-new2` | `AllowAllAzureServices` | `0.0.0.0` - `0.0.0.0` |
+
+---
+
+## 6. Data plane - PostgreSQL Flexible Server
+
+| Property | Dev `scimserver-pg-dev-new2` | Canary prod `scimserver-pg-new2` | Declared default in Bicep |
+|---|---|---|---|
+| Region | East US 2 | East US 2 | `resourceGroup().location` |
+| Tier / SKU | Burstable / `Standard_B1ms` | Burstable / `Standard_B1ms` | `Burstable` / `Standard_B1ms` |
+| PostgreSQL version | 17 | 17 | `17` (allowed 14-17) |
+| IOPS | 120 | 120 | n/a (tier-derived) |
+| Storage auto-grow | Disabled | Disabled | n/a |
+| Backup retention | 7 days | 7 days | `7` |
+| Geo-redundant backup | Disabled | Disabled | `Disabled` |
+| High availability | Disabled | Disabled | `Disabled` |
+| Public network access | Enabled | Enabled | `Enabled` |
+| Entra ID (AAD) auth | Disabled | Disabled | `Disabled` |
+| Password auth | Enabled | Enabled | `Enabled` |
+| Admin login | `scimadmin` | `scimadmin` | `scimadmin` |
+| Database | `scimdb` (UTF8, `en_US.utf8`) | `scimdb` | `scimdb` |
+| `max_connections` | 50 | **50** | n/a (tier default) |
+| `azure.extensions` | `CITEXT,PG_TRGM,PGCRYPTO` | `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` | set by deploy script to `CITEXT,PG_TRGM,PGCRYPTO` |
+| Storage declared | n/a | n/a | `storageSizeMB = 32768` -> 32 GB |
+
+`azure.extensions` is a **static** server parameter, so [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1) sets it and then issues `az postgres flexible-server restart`. The extensions are not optional: the baseline migration `api/prisma/migrations/20260223000000_postgresql_baseline/migration.sql` depends on them, and a missing extension surfaces as a Prisma **P3009** failure that crash-loops the container through the startup probe.
+
+The connection string shape emitted by the Bicep output is:
+
+```text
+postgresql://<adminLogin>:<adminPassword>@<serverFqdn>:5432/<databaseName>?sslmode=require
+```
+
+The application's Prisma connection pool is capped at **5** connections per process (self-reported by `/scim/admin/version` as `storage.connectionPool.maxConnections`). That number interacts badly with revision accumulation - see finding **G1**.
+
+---
+
+## 7. Image supply chain
+
+```mermaid
+flowchart LR
+    GIT["git commit on feat/* or master"]
+    subgraph GHA["GitHub Actions (ubuntu-latest)"]
+      VAL["validate job<br/>lint + migration lint + unit + E2E(inmemory) + web build"]
+      BLD["docker/build-push-action<br/>context . file ./Dockerfile<br/>platforms linux/amd64"]
+      TRV["Trivy scan<br/>HIGH,CRITICAL - exit-code 1"]
+    end
+    GHCR[("ghcr.io/pranems/scimserver<br/>tags: version, sha-, latest, test-branch")]
+    ACR[("acrscimserver20622.azurecr.io/scimserver<br/>Basic SKU")]
+    DEV["Container App scimserver-dev"]
+    CAN["Container App scimserver (canary prod)"]
+    CUS["Container App scimserver-prod (calmsand)"]
+
+    GIT --> VAL --> BLD --> GHCR
+    BLD --> TRV
+    GHCR -->|"az acr import --force"| ACR
+    ACR -->|"az containerapp update --image acr/scimserver:VERSION"| DEV
+    GHCR -->|"digest-pinned by promote-to-prod.ps1"| CAN
+    GHCR -->|"anonymous pull, digest-pinned"| CUS
+```
+
+**Why GHCR is the source of truth.** The calmsand tenant cannot pull from the ProvIAM-tenant ACR (cross-tenant ACR pull would require cross-tenant credentials), so calmsand pulls anonymously from GHCR. Consequently the CI-built GHCR artifact is the single deployable, and ACR is a **mirror** populated by `az acr import`, not an independent build. The dev pipeline enforces this ordering explicitly: stage 4.3 dispatches `publish-ghcr.yml`, 4.4 proves anonymous pull works (`docker logout ghcr.io` then `docker pull`), 4.5 imports into ACR, and 4.5b refuses to continue if the tag is not visible in ACR.
+
+**Digest pinning.** [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) resolves `docker buildx imagetools inspect ghcr.io/pranems/scimserver:<tag>`, parses `^Digest:\s+(sha256:[0-9a-f]+)`, and deploys `ghcr.io/pranems/scimserver@<digest>`. It refuses to promote if the digest cannot be parsed. The canary prod app's live image reference confirms this is in force: `ghcr.io/pranems/scimserver@sha256:599ee80d...`.
+
+**Registry inventory at capture.** ACR `acrscimserver20622` holds exactly one repository, `scimserver`, with the 10 most recent tags `0.54.86, 0.54.85, 0.54.84, 0.54.81, 0.54.80, 0.54.79, 0.54.78, 0.54.77, a3084258, f2dfe89f` (the last two are short-SHA tags from the older tagging convention). SKU `Basic`, `adminUserEnabled: true`, `publicNetworkAccess: Enabled`, retention policy present at 7 days but with `status: disabled`.
+
+### Image composition
+
+The root [Dockerfile](../Dockerfile) is four stages on `node:24-alpine`:
+
+| Stage | Purpose | Notable |
+|---|---|---|
+| `web-build` | `npm ci` + `npm run build` in `web/` | deletes `node_modules` after build |
+| `api-build` | `npm ci`, `npx prisma generate`, `npx tsc -p tsconfig.build.json` | sets a placeholder `DATABASE_URL` because `prisma.config.ts` calls `env('DATABASE_URL')` at config-load time even for `generate`, which never connects |
+| `prod-deps` | `npm ci --omit=dev`, then **grafts** `prisma`, `@prisma/engines`, `@prisma/engines-version` from `api-build` | grafting avoids reinstalling ~100 MB of transitive dev deps just to get `prisma migrate deploy`; then strips cockroachdb/mysql/sqlite/sqlserver Prisma runtimes, `typescript`, `@types`, and the Studio UI |
+| `runtime` | final image | `apk upgrade --no-cache libcrypto3 libssl3` (patches ahead of the base image cadence, e.g. CVE-2026-45447 in `PKCS7_verify`), non-root user `scim` uid 1001 / group `nodejs` gid 1001, `NODE_OPTIONS=--max_old_space_size=384`, `ARG IMAGE_TAG` written to `/app/.image-tag`, `HEALTHCHECK` that parses `http://127.0.0.1:8080/scim/health` and requires `status === 'ok'`, `EXPOSE 8080`, `CMD ["/app/docker-entrypoint.sh"]` |
+
+### Container boot sequence
+
+```mermaid
+stateDiagram-v2
+    [*] --> Entrypoint
+    Entrypoint --> CheckBackend: "docker-entrypoint.sh, set -e"
+    CheckBackend --> SkipMigrate: "PERSISTENCE_BACKEND is inmemory"
+    CheckBackend --> Migrate: "otherwise"
+    Migrate --> MigrateFailed: "prisma migrate deploy non-zero"
+    Migrate --> StartApp: "migrations applied"
+    SkipMigrate --> StartApp
+    MigrateFailed --> [*]: "exit 1, ACA restarts the replica"
+    StartApp --> Listening: "exec node dist/main.js"
+    Listening --> Ready: "startup probe GET /scim/health returns 200"
+    Ready --> Serving: "readiness probe passes, ingress routes traffic"
+    Serving --> Serving: "liveness probe every 30s"
+```
+
+---
+
+## 8. Deployment flows
+
+### 8.1 Greenfield provisioning - `deploy-azure.ps1`
+
+```mermaid
+flowchart TB
+    P0["Pre-flight<br/>Start-Transcript to scripts/logs/<br/>secret cache scripts/state/deploy-state-RG-APP.json<br/>az account show<br/>register Microsoft.App + Microsoft.ContainerService"]
+    P1["Step 1/5 Resource Group<br/>az group show, else az group create"]
+    P2["Step 2/5 Network<br/>vnet exists: ensure 3 subnets individually<br/>vnet missing: deploy infra/networking.bicep"]
+    P3["Step 3/5 PostgreSQL (only with -ProvisionPostgres)<br/>deploy infra/postgres.bicep<br/>set azure.extensions then restart server"]
+    P4["Step 4/5 Managed Environment<br/>skip if it already exists<br/>else deploy infra/containerapp-env.bicep --no-wait<br/>poll up to 900s then up to 600s"]
+    P5["Step 5/5 Container App<br/>skip if current image already equals desired<br/>else deploy infra/containerapp.bicep with a temp params file<br/>poll up to 300s"]
+    P6["Verify<br/>GET /scim/admin/version with Bearer SCIM secret<br/>18 attempts x 10s"]
+    P7["Print URL, SCIM base path, secrets, log commands, cost estimate"]
+
+    P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P7
+```
+
+Every step is idempotent by existence check, and every resource is created through `az deployment group create`. The script never calls `az containerapp create` or `az containerapp update` directly.
+
+The public entry points all funnel here:
+
+| Path | Behavior |
+|---|---|
+| [bootstrap.ps1](../bootstrap.ps1) | Cache-busting loader. Fetches `setup.ps1` from `raw.githubusercontent.com/pranems/SCIMServer/<branch-or-sha>` with `Pragma: no-cache` and `Invoke-Expression`s it. Deploys nothing itself |
+| [setup.ps1](../setup.ps1) | Prompts (or reads `SCIMSERVER_*` env vars, `SCIMSERVER_UNATTENDED=1` to suppress prompts), stages `scripts/deploy-azure.ps1` plus all four Bicep files into `%TEMP%`, then runs `deploy-azure.ps1 ... -ProvisionPostgres`. Auto-generates a 48-char base64url SCIM secret and 64-char JWT/OAuth secrets when unset |
+| [deploy.ps1](../deploy.ps1) | Standalone colleague-facing path. Uses `./scripts/deploy-azure.ps1` when present, else downloads the branch zip. Validates the Container App name against the Azure 2-32 char / lowercase / no-`--` rules in a retry loop |
+| [scripts/deploy-dev.ps1](../scripts/deploy-dev.ps1) | Thin wrapper that always sets `ProvisionPostgres=$true` and defaults `-DevResourceGroup` to `<ProdResourceGroup>-dev`, creating a fully isolated dev stack |
+
+### 8.2 Blue/green promotion - `promote-to-prod.ps1 -BlueGreen`
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant OP as "Operator / pipeline"
+    participant PS as "promote-to-prod.ps1"
+    participant GH as "GHCR"
+    participant ACA as "Azure Container Apps"
+    participant GRN as "green label FQDN"
+    participant PUB as "public FQDN"
+
+    OP->>PS: "-ProdResourceGroup -ProdAppName -ImageTag -BlueGreen -RunVerification"
+    PS->>PUB: "GET /scim/health on dev, then read current prod image"
+    PS->>GH: "docker buildx imagetools inspect TAG"
+    GH-->>PS: "Digest sha256 ..."
+    Note over PS: "Refuses to continue if the digest cannot be parsed"
+    PS->>ACA: "resolve blue = highest-weight ACTIVE revision (4 attempts, 5s apart)"
+    PS->>ACA: "assert blue is active, else exit 1"
+    PS->>ACA: "revision set-mode --mode multiple"
+    PS->>ACA: "ingress traffic set blue=100"
+    PS->>ACA: "update --image DIGEST --revision-suffix green-MMdd-HHmm"
+    PS->>ACA: "ingress traffic set blue=100 green=0"
+    PS->>ACA: "revision label add --label green"
+    PS->>GRN: "GET /scim/health x18 every 10s"
+    PS->>GRN: "OAuth token, then GET /scim/admin/version until runtime.hostname matches the green suffix (x30)"
+    PS->>GRN: "assert reported version equals the semver ImageTag"
+    PS->>GRN: "verify-deployment.ps1 on the green URL"
+    PS->>ACA: "ingress traffic set green=100 blue=0"
+    PS->>PUB: "verify-deployment.ps1 post-flip"
+    Note over PS,ACA: "Any failure triggers rollback#58; traffic blue=100 green=0 then revision deactivate green"
+```
+
+Three assertions in that flow exist because of specific past incidents, and they are worth keeping in mind when reading the code:
+
+- **Blue must be a live revision.** A 2026-06-24 promotion pinned 100 % of traffic to a deactivated revision and produced a 404 on the canary prod. The script now asserts `properties.active == true` on the resolved blue and exits 1 otherwise.
+- **The green URL must actually route to the new revision.** A stale `green` label can point at a previous green. The script demands that `runtime.hostname` from `/scim/admin/version` contains the freshly generated suffix.
+- **The served version must equal the tag.** GHCR builds from the remote ref while a local ACR build builds from the working tree, so a tag `0.53.4` once served v0.53.3. The version equality assertion closes that gap.
+
+Without `-BlueGreen` the script falls back to a legacy auto-flip: update the image with a new revision suffix, then poll the public FQDN 12 times at 10 s. No 0 % soak, no verification, no automatic rollback.
+
+### 8.3 The full dev pipeline - `dev-deployment-pipeline.ps1`
+
+| Stage | Gate |
+|---|---|
+| 0 | Prereqs (`git npm node docker az gh`, Docker daemon, `az account show`), tag confirmation, dev **before-state** snapshot to `test-results/dev-before-<sha>.json` |
+| 1 | 1.1 api build, 1.2 api lint (errors only), 1.3 `web` `tsc --noEmit` with a ratchet of 9 prod / 96 total, 1.5 web build, 1.6 size-limit |
+| 2 | Starts an ephemeral `postgres:17` container if nothing is on 5432; 2.1 api unit, 2.2 api E2E (prisma), 2.3 web vitest, 2.4 web coverage (78/70/65/75), 2.6 `test-all-modes.ps1` |
+| 3 | Eleven audit prompts recorded as `PENDING` (advisory, not executed by the script) |
+| 4 | 4.1 full-validation pipeline, 4.2 optional ACR mirror, 4.3 dispatch `publish-ghcr.yml` pinned to the current branch, 4.4 anonymous-pull proof, 4.5 `az acr import`, 4.5b tag-visible check, 4.6 `az containerapp update`, 4.6b version-echo poll, 4.7 `live-test.ps1` **gated on 4.6b** |
+| 5 | 5.3 Playwright against the dev FQDN with `E2E_TOKEN=changeme-scim` |
+| 6 | Post-deploy state diff vs the before-snapshot; fails on endpoint count delta or any missing ID |
+| 6.5 | Auto-canary to proudbush, blocked by any FAIL, any SKIPPED, the freeze file `scripts/.deploy-freeze`, or `SCIMSERVER_AUTOCANARY_DISABLE` |
+| 7 | Writes `test-results/dev-deploy-<timestamp>.md` including the exact cross-tenant calmsand promote commands |
+
+`--ref` pinning on the workflow dispatch (stage 4.3) exists because an unpinned dispatch once published from `master` instead of the working branch.
+
+### 8.4 Verification - `verify-deployment.ps1`
+
+Runs, in order: health probe; a **data and ID inventory snapshot** (`/scim/admin/endpoints?count=200` then per-endpoint `Users?count=1` and `Groups?count=1` for `totalResults`) written to `test-results/inventory-<label>.json`; an optional before/after diff that fails on endpoint-count delta, any missing ID, or any per-endpoint count **regression**; the live SCIM suite via `live-test.ps1`; and optionally Playwright with `--grep-invert 'Visual regression|Visual Snapshots'` (pixel baselines are data-coupled and would falsely abort a healthy flip).
+
+---
+
+## 9. Configuration surface by form factor
+
+| Variable | Consumed in | Default in code | F1 local | F2 compose | F4 standalone | F5 Azure |
+|---|---|---|---|---|---|---|
+| `PERSISTENCE_BACKEND` | [repository.module.ts](../api/src/infrastructure/repositories/repository.module.ts) | `prisma` | `inmemory` | `prisma` | `inmemory` | `prisma` |
+| `DATABASE_URL` | [prisma.service.ts](../api/src/modules/prisma/prisma.service.ts) | falls back to `postgresql://scim:scim@localhost:5432/scimdb` with a warning | unset | compose value | optional | Container App secret |
+| `PORT` | [main.ts](../api/src/main.ts) | `3000` | `6000` by convention | `8080` | `8080` | `8080` |
+| `API_PREFIX` | [main.ts](../api/src/main.ts) | `scim` | same | same | same | same |
+| `CORS_ORIGIN` | [cors-origin.ts](../api/src/security/cors-origin.ts) | empty / `*` -> allow-all; `false`/`none` -> disabled; CSV -> allowlist | unset | unset | unset | `''` (allow-all) |
+| `SCIM_SHARED_SECRET` | [shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts) | none; fatal in production, ephemeral auto-generated otherwise | auto | `devscimsharedsecret` | `changeme` | secret |
+| `OAUTH_CLIENT_ID` | [oauth.service.ts](../api/src/oauth/oauth.service.ts) | `scimserver-client` | same | same | same | same |
+| `OAUTH_CLIENT_SECRET` | [oauth.service.ts](../api/src/oauth/oauth.service.ts) | none | - | `devscimclientsecret` | `changeme-oauth` | secret |
+| `JWT_SECRET` | only reported as a boolean by the admin controller | none | - | `devjwtsecretkey123456` | `changeme-jwt` | secret |
+| `CREDENTIAL_KEK` | [credential-kek.ts](../api/src/security/credential-kek.ts) | `changeme-credential-kek` | default | `changeme-credential-kek` | default | **not set by Bicep** |
+| `LOG_LEVEL` | [log-levels.ts](../api/src/modules/logging/log-levels.ts) | `INFO` | - | - | - | `DEBUG` |
+| `LOG_FORMAT` | [log-levels.ts](../api/src/modules/logging/log-levels.ts) | forced `json` when production, else `pretty` | pretty | json | json | `json` |
+| `LOG_FILE` | [file-log-transport.ts](../api/src/modules/logging/file-log-transport.ts) | `logs/scimserver.log`; empty disables | default | default | default | `''` |
+| `LOG_RING_BUFFER_SIZE` | [scim-logger.service.ts](../api/src/modules/logging/scim-logger.service.ts) | service constant | - | - | - | `5000` |
+| `LOG_RETENTION_DAYS` | [logging.service.ts](../api/src/modules/logging/logging.service.ts) `|| 21`; admin controller `|| 30` | see note | - | - | - | `30` |
+| `LOG_SLOW_REQUEST_MS` | [log-levels.ts](../api/src/modules/logging/log-levels.ts) | `2000` | - | - | - | `1000` |
+
+Two nuances worth knowing before debugging a deployment:
+
+- **`JWT_SECRET` is plumbed everywhere but signs nothing.** [api/src/oauth/oauth.module.ts](../api/src/oauth/oauth.module.ts) builds its JWT options from `OAuthSigningKeyService` using an **asymmetric** key pair (`privateKeyPem`/`publicKeyPem`, `algorithm: keys.alg`, `keyid: keys.kid`) and pins `verifyOptions.algorithms = [keys.alg]` as the algorithm-confusion defense. `JWT_SECRET` survives only as a `jwtSecretConfigured` boolean on `/scim/admin/version`.
+- **`LOG_RETENTION_DAYS` has two different fallbacks** for the same variable (21 for the auto-prune path, 30 for the admin default). The Bicep sets it explicitly to 30, so Azure is unambiguous, but a local or standalone run is not.
+
+---
+
+## 10. Drift and gap register
+
+Every item below is a **measured** condition on the capture date, not a hypothetical. Severity reflects operational impact, not code quality.
+
+| ID | Severity | Finding | Evidence | Impact | Suggested action |
+|---|---|---|---|---|---|
+| **G1** | **High** | Canary prod has **11 active revisions, each running 1 replica**, while only `green-0714-1458` carries traffic | `az containerapp revision list` shows all 11 `active=True`, `replicas=1`, `runningState=RunningAtMaxScale`, weights `0,0,0,0,0,0,0,0,0,0,100` | 11 x 0.5 vCPU + 11 x 1 GiB billed continuously for 1 revision's worth of service. Worse: each replica opens a Prisma pool of 5 connections against a server whose `max_connections` is **50**, so 11 x 5 = **55 > 50** - the estate is over-subscribed on database connections | Deactivate all non-serving revisions (`az containerapp revision deactivate --revision <name>`), keeping at most the immediate previous one for rollback. Consider adding a post-flip deactivation step to `promote-to-prod.ps1` |
+| **G2** | Medium | `scimserver-dev-vnet` (East US 2) is provisioned with 3 delegated subnets but referenced by nothing | `az network vnet list` plus the dev app's `environmentId` pointing at `scimserver-env` in `scimserver-prod` | Dead resource; also means dev has **no** network isolation from canary prod | Either delete it, or give dev its own environment bound to it |
+| **G3** | Medium | Both production estates run **Node.js v25.9.0**, which reached end of life on **2026-06-01** | `/scim/admin/version` -> `runtime.node` on both prods; [endoflife.date/nodejs](https://endoflife.date/nodejs) | Unpatched runtime. Dev is already on v24.18.0 (Active LTS) after the base-image fix; the prods have simply not been promoted since | Promote the current image (which is Node 24) through the canary and then to calmsand. `scripts/audit-base-images.ps1` already gates the source; only the deployed artifact is stale |
+| **G4** | Medium | Application and database are in **different regions** (apps East US, databases East US 2) | `az containerapp show` location vs `az postgres flexible-server list` location | Adds cross-region latency to every query and a cross-region egress charge | Accept and document, or co-locate on the next database rebuild |
+| **G5** | Medium | Temporary personal-IP firewall rules persist on both databases (`AllowMyIP-temp` for `40.117.66.214` and `40.117.66.210`) | `az postgres flexible-server firewall-rule list` | Long-lived exceptions named "temp"; widen the reachable surface beyond Azure services | Remove when not actively debugging; add to the promotion checklist |
+| **G6** | Medium | ACR `acrscimserver20622` has `adminUserEnabled: true` and dev authenticates with that admin credential rather than a managed identity | `az acr show`; dev app secret `acrscimserver20622azurecrio-acrscimserver20622`; dev app `identity: None` | Shared long-lived registry credential; no per-app revocation | Enable SystemAssigned identity on the dev app and grant `AcrPull`, matching the canary prod pattern |
+| **G7** | Low | Canary prod's `registries[]` entry names `acrscimserver20622.azurecr.io` with a `ghcr-password` secret, but the running image is `ghcr.io/pranems/scimserver@sha256:...` | `az containerapp show` registries vs image | Stale/misleading registry credential mapping. Harmless while GHCR is anonymous, confusing during incident response | Clean up the registry block to match the image source |
+| **G8** | Low | ACR retention policy is configured at 7 days but with `status: disabled` | `az acr show --query policies.retentionPolicy` | Untagged manifests accumulate on a Basic SKU with a fixed storage allowance | Enable retention, or prune periodically |
+| **G9** | Low | `azure.extensions` drift: canary prod has `UUID-OSSP` in addition to the three the deploy script sets; dev does not | `az postgres flexible-server parameter show --name azure.extensions` | Environments are not byte-identical; a migration depending on `uuid-ossp` would pass prod and fail dev | Make the deploy script's extension list authoritative and reconcile both servers |
+| **G10** | Low | `Dockerfile.optimized` and `Dockerfile.ultra` are unreferenced and still declare `DATABASE_URL="file:./data.db"` with `prisma db push` | grep of all workflows, compose files, and deploy scripts | A reader or future script could pick a dead SQLite-era Dockerfile. This is exactly the failure mode behind the 2026-07-29 Node-25 EOL escape, where a spot-check hit the wrong Dockerfile | Delete both, or move them under an `archive/` path with a header stating they are not shipped |
+| **G11** | Low | [infra/acr.bicep](../infra/acr.bicep) is declared but deployed by no script; the live ACR was created out-of-band and its settings do not match the template (template defaults to `enableAdminUser: false`, live is `true`) | grep for `acr.bicep`; `az acr show` | Infrastructure-as-code does not describe a live resource | Either wire it into `deploy-azure.ps1` and reconcile, or delete it |
+| **G12** | Low | `CREDENTIAL_KEK` is not set by [infra/containerapp.bicep](../infra/containerapp.bicep), so all Azure estates run on the default `changeme-credential-kek` | Bicep env list; [credential-kek.ts](../api/src/security/credential-kek.ts) | Re-viewable credential secrets are wrapped with a publicly known KEK. Not on the auth path (token verification uses the bcrypt hash), so this is confidentiality-at-rest only | Add a `credential-kek` secret + env mapping to the template and set a private, deploy-stable value |
+| **G13** | Info | Dev runs `activeRevisionsMode: Single` while both prods run `Multiple` | `az containerapp show` | Dev cannot exercise the blue/green path that prod depends on | Accept (dev deploys are intentionally simple), but note that stage 6.5 auto-canary is the first place the blue/green code path runs |
+| **G14** | Info | Dev is at **0.54.86** while both prods are at **0.54.0-alpha.11** | `/scim/admin/version` on all three | Expected during a dev cycle; both prods are in lockstep with each other, which is the invariant that matters | No action; confirms no unintentional single-prod promotion |
+
+---
+
+## 11. Cost model
+
+Verified rate card from the [Azure Container Apps pricing page](https://azure.microsoft.com/en-us/pricing/details/container-apps/) (Consumption plan, pay-as-you-go, fetched 2026-07-29):
+
+| Meter | Active rate | Idle rate | Free grant per subscription per month |
+|---|---|---|---|
+| vCPU | `$0.000024` per vCPU-second | `$0.000003` per vCPU-second | 180,000 vCPU-seconds |
+| Memory | `$0.000003` per GiB-second | `$0.000003` per GiB-second | 360,000 GiB-seconds |
+| Requests | `$0.40` per million | n/a | 2,000,000 requests |
+
+A replica is considered **active** when vCPU usage exceeds 0.01 cores or received data exceeds 1,000 bytes per second; otherwise a `minReplicas`-pinned replica bills at the idle rate.
+
+### What that means for this estate
+
+One always-on replica at 0.5 vCPU / 1 GiB consumes, per 30-day month:
+
+- vCPU: `0.5 x 2,592,000 = 1,296,000` vCPU-seconds
+- Memory: `1 x 2,592,000 = 2,592,000` GiB-seconds
+
+Both exceed the free grant, so the grant covers roughly the first 14 % of vCPU-seconds and 14 % of GiB-seconds for a single replica. The dominant lever is therefore **replica count**, which is exactly what finding **G1** is about: the canary prod is currently paying for 11 replicas to serve one revision's traffic.
+
+```mermaid
+pie showData
+    title "Canary prod replicas by traffic weight (measured 2026-07-29)"
+    "Serving traffic (green-0714-1458)" : 1
+    "Idle stale revisions still running 1 replica each" : 10
+```
+
+The repo's own estimate, printed by [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1) at the end of a greenfield deploy, is **$20-45 per month** for a single estate: Container App $5-15, Log Analytics $0-5, PostgreSQL B1ms $15-25. Region-specific unit prices for PostgreSQL Flexible Server, Azure Container Registry, and Log Analytics change often enough that they are deliberately not restated here - use the [Azure pricing calculator](https://azure.microsoft.com/en-us/pricing/calculator/) and see [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md), which is the canonical cost doc and carries the pause/resume/delete cost-control commands.
+
+---
+
+## 12. Verification recipes
+
+Everything below is copy-pasteable and re-derives the facts in this document.
+
+### Azure control plane (ProvIAM tenant: dev + canary prod)
+
+```powershell
+az account set --subscription ProvIAM_Subscription
+
+# Full resource inventory
+az resource list --query "[?starts_with(resourceGroup,'scimserver')].{rg:resourceGroup,name:name,type:type,location:location,sku:sku.name}" -o table
+
+# Container Apps
+az containerapp show -n scimserver     -g scimserver-prod -o json
+az containerapp show -n scimserver-dev -g scimserver-dev  -o json
+
+# Revisions, replicas and traffic (finding G1)
+az containerapp revision list -n scimserver -g scimserver-prod `
+  --query "[].[name,properties.active,properties.replicas,properties.runningState,properties.trafficWeight]" -o tsv
+
+# Managed environment
+az containerapp env show -n scimserver-env -g scimserver-prod -o json
+
+# PostgreSQL
+az postgres flexible-server list -o table
+az postgres flexible-server parameter show -g scimserver-prod -s scimserver-pg-new2 --name max_connections   -o tsv
+az postgres flexible-server parameter show -g scimserver-prod -s scimserver-pg-new2 --name azure.extensions  --query value -o tsv
+az postgres flexible-server firewall-rule list -g scimserver-prod -n scimserver-pg-new2 -o table
+
+# Networking
+az network vnet list --query "[?starts_with(name,'scimserver')]" -o json
+
+# Registry
+az acr show -n acrscimserver20622 -o json
+az acr repository show-tags -n acrscimserver20622 --repository scimserver --orderby time_desc --top 10 -o tsv
+```
+
+### Azure control plane (AnandSa tenant: customer prod)
+
+```powershell
+az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950
+az account set --subscription AnandSa-Test-150
+az containerapp show -n scimserver-prod -g scimserver-rg-prod -o json
+```
+
+### Data plane (works for all three, no Azure credentials needed)
+
+```powershell
+$base = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+
+Invoke-RestMethod -Uri "$base/scim/health"
+
+$body = @{
+  grant_type    = 'client_credentials'
+  client_id     = 'scimserver-client'
+  client_secret = 'changeme-oauth'
+} | ConvertTo-Json
+
+$tok = Invoke-RestMethod -Uri "$base/scim/oauth/token" -Method Post `
+  -ContentType 'application/json' -Body $body
+
+Invoke-RestMethod -Uri "$base/scim/admin/version" `
+  -Headers @{ Authorization = "Bearer $($tok.access_token)" } | ConvertTo-Json -Depth 6
+```
+
+`/scim/admin/version` self-reports the estate's own infrastructure, which is why it works across the tenant boundary. Measured shape (customer prod, values abbreviated):
+
+```json
+{
+  "version": "0.54.0-alpha.11",
+  "service": {
+    "name": "SCIMServer API",
+    "environment": "production",
+    "apiPrefix": "scim",
+    "scimBasePath": "/scim/v2"
+  },
+  "runtime": {
+    "node": "v25.9.0",
+    "platform": "linux",
+    "arch": "x64",
+    "pid": 1,
+    "hostname": "scimserver-prod--green-0714-1516-6cc6df8d44-5hzd5",
+    "cpus": 4,
+    "containerized": true
+  },
+  "auth": {
+    "oauthClientSecretConfigured": true,
+    "jwtSecretConfigured": true,
+    "scimSharedSecretConfigured": true
+  },
+  "storage": {
+    "databaseProvider": "postgresql",
+    "persistenceBackend": "prisma",
+    "connectionPool": {
+      "maxConnections": 5
+    }
+  },
+  "container": {
+    "database": {
+      "host": "scimserver-prod-pg.postgres.database.azure.com",
+      "port": 5432,
+      "name": "scimdb",
+      "provider": "PostgreSQL 17"
+    }
+  },
+  "deployment": {
+    "resourceGroup": "scimserver-rg-prod",
+    "containerApp": "scimserver-prod",
+    "registry": "ghcr.io"
+  }
+}
+```
+
+### Logs
+
+```powershell
+az containerapp logs show -n scimserver -g scimserver-prod --type console --tail 50
+az containerapp logs show -n scimserver -g scimserver-prod --type system  --tail 30
+pwsh scripts/remote-logs.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+```
+
+---
+
+## 13. Reference - external sources
+
+| Topic | Source |
+|---|---|
+| Container Apps pricing (rate card in Section 11) | https://azure.microsoft.com/en-us/pricing/details/container-apps/ |
+| Container Apps revisions and traffic splitting | https://learn.microsoft.com/en-us/azure/container-apps/revisions |
+| Container Apps blue/green deployment | https://learn.microsoft.com/en-us/azure/container-apps/blue-green-deployment |
+| Container Apps VNet integration | https://learn.microsoft.com/en-us/azure/container-apps/networking |
+| Container Apps health probes | https://learn.microsoft.com/en-us/azure/container-apps/health-probes |
+| PostgreSQL Flexible Server compute and storage | https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-compute |
+| PostgreSQL Flexible Server limits (incl. `max_connections` by SKU) | https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-limits |
+| Azure Container Registry SKUs | https://learn.microsoft.com/en-us/azure/container-registry/container-registry-skus |
+| Node.js release and support schedule | https://nodejs.org/en/about/previous-releases and https://endoflife.date/nodejs |
+| Azure pricing calculator | https://azure.microsoft.com/en-us/pricing/calculator/ |
+
+---
+
+## 14. Self-improvement and design/architecture gate disposition
+
+Per the standing R7 (test/gate self-improvement) and Design & Architecture gate rules.
+
+**What this audit revealed that the current gate set does not cover.**
+
+| Observation | Existing gate that should have caught it | Verdict |
+|---|---|---|
+| G1 - 11 active revisions, 55 pooled connections against `max_connections=50` | None. `promote-to-prod.ps1` creates revisions and flips traffic but never deactivates the loser; no gate inspects revision count, replica count, or aggregate connection demand | **Gap. Scheduled** - add a post-flip deactivation step plus a Stage 4 assertion that `active revision count x pool size < max_connections` |
+| G3 - both prods running an EOL Node runtime while the source is on LTS | `scripts/audit-base-images.ps1` (Stage 1.10) gates the **Dockerfile**, not the **deployed artifact** | **Closed (a) applied** - [audit-deployment-doc.ps1](../scripts/audit-deployment-doc.ps1) check **C4** (`-Live`) reads `runtime.node` from `/scim/admin/version` on every estate and fails when the major is not Active/Maintenance LTS. Source and deployed checks share one LTS table ([node-lts.ps1](../scripts/node-lts.ps1)) so they cannot drift apart. The finding itself stays open until the prods are promoted |
+| G9 - `azure.extensions` drift between dev and prod | None | **Gap. Scheduled** - assert the extension list matches the deploy script's authoritative value during verification |
+| G12 - `CREDENTIAL_KEK` absent from the Bicep template | `endpointConfigFlagAudit` covers endpoint flags, not deployment env vars | **Gap. Scheduled** - add an env-var completeness check comparing the Bicep env list against the vars `api/src` actually reads |
+| G10 / G11 - dead Dockerfiles and an undeployed Bicep template | None; and this is the exact shape of the 2026-07-29 wrong-Dockerfile escape | **Partly closed (a) applied** - check **C3** now fails when any `Dockerfile*`, `docker-compose*.yml` or `infra/*.bicep` exists that this doc never names, so a new or dead element cannot stay invisible. Still **scheduled**: asserting each element is *referenced by a workflow/compose/script* or explicitly marked archived |
+| **Doc rot itself** - this document silently going stale | None; documentation has never been gated in this repo | **Closed (a) applied** - checks **C1** (infra changed => doc must change) and **C2** (`Last verified` within 90 days), wired as Stage 1.11. See [Section 0.1](#01-maintenance-contract---this-is-a-living-document) |
+
+**Design/architecture disposition for this change.** This commit adds documentation only; it introduces no class, no dependency edge, and no abstraction. SRP, coupling, pattern-consistency, and open/closed are not engaged. The YAGNI counter-check applies to the doc itself: it deliberately does **not** duplicate the cost/load tables owned by [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) or the walkthrough owned by [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md); it cross-links them instead. **Disposition: (a) applied** for the documentation scope, **(b) scheduled** for the five gate gaps listed above.
+
+---
+
+## 15. Change log
+
+| Date | Change |
+|---|---|
+| 2026-07-29 | Wired both infra gates into the **pre-push hook** (Fast tier of [pre-push-checks.ps1](../scripts/pre-push-checks.ps1)) so they run on every push rather than on request. Fixed C1, which was structurally incapable of firing at pre-push: it compared the working tree against `HEAD`, but at pre-push the tree is clean and the change lives in the commits being pushed, so the hook now passes the upstream ref as `-BaseRef`. Switched both gates from `Get-ChildItem -Recurse` to `git ls-files` enumeration after the first wired run added ~47s to every push - the recurse was walking `node_modules` (22.7s vs 0.08s, and it surfaced 4 vendored Dockerfiles that are not ours). Gates now run in 0.78s and 1.02s. Added [test-audit-deployment-doc.ps1](../scripts/test-audit-deployment-doc.ps1), a committed self-test that proves C1/C2/C3 each fire on their own condition and refuses to run on a dirty tree |
+| 2026-07-29 | Made the document **enforced**. Added [Section 0.1 maintenance contract](#01-maintenance-contract---this-is-a-living-document), a machine-readable `**Last verified:**` header field, and the Stage 1.11 gate [audit-deployment-doc.ps1](../scripts/audit-deployment-doc.ps1) (C1 change coverage, C2 freshness, C3 element coverage, C4 live-estate truth). Extracted the Node LTS table to [node-lts.ps1](../scripts/node-lts.ps1) so the source-image and deployed-artifact checks share one definition. Closed the G3 and doc-rot gate gaps and partly closed G10/G11 in Section 14 |
+| 2026-07-30 | Documented [rfc-currency.yml](../.github/workflows/rfc-currency.yml) in [Section F6](#f6---ci-ephemeral), which arrived when `origin/master` was merged into `feat/wif`, and explained why it and `trivyignore-review.yml` are scheduled rather than commit-triggered. **This edit was demanded by the gate, not remembered by a human:** check C1 blocked the push with `infra files changed but ... was not updated: .github/workflows/rfc-currency.yml`. First time the doc-currency gate fired on a real change, and it fired on a *merge* - the case most likely to slip past a person, because nobody feels like the author of a file that arrived via someone else's commit |
+| 2026-07-29 | Initial version. All Azure facts captured live from the ProvIAM control plane and from the `/scim/admin/version` data plane on all three estates. Repo version `0.54.86`; dev serving `0.54.86`; both prods serving `0.54.0-alpha.11`. 14 findings recorded in Section 10 |

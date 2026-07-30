@@ -33,11 +33,26 @@ export type { CopyableFieldProps } from './CopyableField';
 export { CopyJsonButton } from './CopyJsonButton';
 export type { CopyJsonButtonProps } from './CopyJsonButton';
 
+export { DownloadJsonButton } from './DownloadJsonButton';
+export type { DownloadJsonButtonProps } from './DownloadJsonButton';
+
 export { CopyableJsonBlock } from './CopyableJsonBlock';
 export type { CopyableJsonBlockProps } from './CopyableJsonBlock';
+export { JwtDecodeButton } from './JwtDecodeButton';
+export type { JwtDecodeButtonProps } from './JwtDecodeButton';
+
+export { SettingsJsonExport } from './SettingsJsonExport';
+export type { SettingsJsonExportProps } from './SettingsJsonExport';
+
+export { AuthDiagnosticsPanel } from './AuthDiagnosticsPanel';
+export type { AuthDiagnosticsPanelProps } from './AuthDiagnosticsPanel';
+export { AuthDecisionForRequest } from './AuthDiagnosticsPanel';
 
 export { EditableField } from './EditableField';
 export type { EditableFieldProps } from './EditableField';
+
+export { ConnectionPanel } from './ConnectionPanel';
+export type { ConnectionPanelProps } from './ConnectionPanel';
 
 export { EtagBadge } from './EtagBadge';
 export type { EtagBadgeProps } from './EtagBadge';

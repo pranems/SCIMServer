@@ -23,6 +23,7 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
       credentialHash: input.credentialHash,
       label: input.label ?? null,
       metadata: input.metadata ?? null,
+      secretEnvelope: input.secretEnvelope ?? null,
       active: true,
       createdAt: new Date(),
       expiresAt: input.expiresAt ?? null,
@@ -58,7 +59,53 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     return cred;
   }
 
+  async reactivate(id: string): Promise<EndpointCredentialModel | null> {
+    const cred = this.store.get(id);
+    if (!cred) return null;
+    cred.active = true;
+    return cred;
+  }
+
+  async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
+    let cleared = 0;
+    for (const cred of this.store.values()) {
+      if (cred.endpointId === endpointId && cred.secretEnvelope !== null) {
+        cred.secretEnvelope = null;
+        cleared += 1;
+      }
+    }
+    return cleared;
+  }
+
+  async clearAllSecretEnvelopes(): Promise<number> {
+    let cleared = 0;
+    for (const cred of this.store.values()) {
+      if (cred.secretEnvelope !== null) {
+        cred.secretEnvelope = null;
+        cleared += 1;
+      }
+    }
+    return cleared;
+  }
+
   async delete(id: string): Promise<void> {
     this.store.delete(id);
+  }
+
+  async updateMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<EndpointCredentialModel | null> {
+    const cred = this.store.get(id);
+    if (!cred) return null;
+    cred.metadata = metadata;
+    return cred;
+  }
+
+  async updateLabel(id: string, label: string | null): Promise<EndpointCredentialModel | null> {
+    const cred = this.store.get(id);
+    if (!cred) return null;
+    cred.label = label;
+    return cred;
   }
 }

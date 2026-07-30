@@ -180,6 +180,47 @@ Invoke-Gate -Name 'web: vite production build' -WorkingDir (Join-Path $repoRoot 
     npm run build 2>&1 | Out-Host
 }
 
+# Docs: every ```mermaid block must RENDER in a real browser - which is exactly
+# what the VS Code Markdown preview (a webview) and GitHub do. Parsing alone is
+# NOT enough: a diagram can pass the grammar check and still fail to render, and
+# a render failure is what the operator actually sees as a blank/error box. The
+# gate deliberately pins the same Mermaid version the VS Code extension bundles
+# (see the version-drift guard inside the script) - running a different version
+# is how two broken diagrams stayed green on 2026-07-27. Skips (does not fail)
+# when the tooling deps are absent, so a fresh clone is not blocked.
+Invoke-Gate -Name 'docs: mermaid diagrams render' -WorkingDir $repoRoot -Action {
+    if (-not (Test-Path (Join-Path $repoRoot 'node_modules/mermaid'))) {
+        Write-Host "Skipped (run 'npm install' at the repo root to enable this gate)" -ForegroundColor Yellow
+        $global:LASTEXITCODE = 0
+        return
+    }
+    node scripts/render-mermaid.mjs 2>&1 | Out-Host
+}
+
+# Infra: base images must sit on an Active/Maintenance LTS Node line. Trivy scans
+# for CVEs, never for SUPPORT STATUS, so an EOL runtime with no CVE filed yet is
+# invisible to it - which is how the shipped image ran EOL Node 25 for ~2 months
+# on 2026-07-29 with every gate green.
+Invoke-Gate -Name 'infra: base images on LTS' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/audit-base-images.ps1') -Quiet 2>&1 | Out-Host
+}
+
+# Infra: the canonical deployment doc must stay true. Any infra change (Dockerfile,
+# compose, Bicep, workflow, deploy/promote script) must update
+# docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md in the same change. Compares
+# against the upstream ref so the commits BEING PUSHED are what gets checked - at
+# pre-push the working tree is clean, so a HEAD-only comparison could never fire.
+Invoke-Gate -Name 'infra: deployment doc current' -WorkingDir $repoRoot -Action {
+    $upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    $script = Join-Path $repoRoot 'scripts/audit-deployment-doc.ps1'
+    if ($LASTEXITCODE -eq 0 -and $upstream) {
+        pwsh -NoProfile -ExecutionPolicy Bypass -File $script -BaseRef $upstream 2>&1 | Out-Host
+    } else {
+        # No upstream yet (new branch): fall back to uncommitted-only comparison.
+        pwsh -NoProfile -ExecutionPolicy Bypass -File $script 2>&1 | Out-Host
+    }
+}
+
 # Offline-only checks (C1-C5): coverage, SHA-256 integrity, update/obsolete
 # closure, freshness and README linkage. The network checks (O1-O3) are NOT run
 # here on purpose - pre-push must stay deterministic and work offline. They run

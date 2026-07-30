@@ -395,10 +395,10 @@ sequenceDiagram
     Src-->>Rc: 200 + body
     Note over Ap: PrimaryEnforcement = inferred (reject / normalize / passthrough)
 
-    Ap->>Rc: PATCH /Users/U {active:false}; GET /Users/U
+    Ap->>Rc: PATCH /Users/U {active:false}#59; GET /Users/U
     Note over Ap: UserSoftDeleteEnabled
 
-    Ap->>Rc: DELETE /Users/U; GET /Users/U
+    Ap->>Rc: DELETE /Users/U#59; GET /Users/U
     Note over Ap: UserHardDeleteEnabled
 
     Note over Ap: ... ~10 more probes ...

@@ -42,6 +42,10 @@ const mockDashboardData: DashboardResponse = {
       statusCode: 201,
       durationMs: 42,
       endpointId: 'ep-1',
+      endpointName: 'Endpoint One',
+      requestId: 'req-1',
+      authOutcome: 'accept',
+      authMethod: 'bearer_jwt',
     },
     {
       id: 'act-2',
@@ -174,6 +178,27 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('activity-list')).toBeInTheDocument();
     expect(screen.getByText('POST')).toBeInTheDocument();
     expect(screen.getByText('201')).toBeInTheDocument();
+  });
+
+  it('X5/X6: an activity row shows the auth chip, endpoint name + quick-open, and is clickable', () => {
+    (useDashboard as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockDashboardData,
+      isLoading: false,
+      error: null,
+    });
+
+    renderWithProviders(<DashboardPage />);
+
+    // X5 - the auth-method chip renders on the row (accept via bearer_jwt).
+    const chip = screen.getByTestId('dashboard-activity-auth-act-1');
+    expect(chip.textContent).toContain('auth ok');
+    expect(chip.textContent).toContain('OAuth JWT');
+    // X6 - the endpoint NAME + a quick-open button render.
+    expect(screen.getByText('Endpoint One')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-activity-endpoint-open-act-1')).toBeInTheDocument();
+    // X5 - the row itself is a clickable button (opens the Logs detail).
+    const row = screen.getByTestId('dashboard-activity-row-act-1');
+    expect(row.getAttribute('role')).toBe('button');
   });
 
   it('handles empty endpoints list', () => {

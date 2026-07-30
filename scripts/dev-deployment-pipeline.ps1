@@ -388,22 +388,40 @@ if (-not $SkipDeploy) {
         Add-Result -Stage '4.1' -Gate 'Docker compose build + live tests' -Status 'SKIPPED' -Detail '-SkipDocker'
     }
 
-    # 4.2 - ACR push
-    Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') } | Out-Null
-    Invoke-Gate '4.2b' "Tag + push $RegistryAcr/scimserver:$ImageTag" {
-        docker tag scimserver-api "$RegistryAcr/scimserver:$ImageTag"
-        docker tag scimserver-api "$RegistryAcr/scimserver:latest"
-        docker push "$RegistryAcr/scimserver:$ImageTag"
-        docker push "$RegistryAcr/scimserver:latest"
-    } | Out-Null
+    # 4.2 - Mirror the LOCAL image into ACR.
+    #
+    # This is now an OPTIONAL convenience mirror, not the deploy path. Since
+    # 2026-07-29 the deployable artifact is imported from GHCR (gate 4.5), so a
+    # local Docker failure must not fail the run or - worse - leave the deploy
+    # pointing at a tag that was never pushed. If the local build did not produce
+    # an image, skip with a reason rather than reporting a FAIL for a step that
+    # no longer gates anything.
+    $localImagePresent = $null -ne (docker image inspect scimserver-api --format '{{.Id}}' 2>$null)
+    if ($localImagePresent) {
+        Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') } | Out-Null
+        Invoke-Gate '4.2b' "Mirror local image -> $RegistryAcr/scimserver:$ImageTag" {
+            docker tag scimserver-api "$RegistryAcr/scimserver:$ImageTag"
+            docker tag scimserver-api "$RegistryAcr/scimserver:latest"
+            docker push "$RegistryAcr/scimserver:$ImageTag"
+            docker push "$RegistryAcr/scimserver:latest"
+        } | Out-Null
+    } else {
+        Add-Result -Stage '4.2a' -Gate "ACR login ($RegistryAcr)"                          -Status 'SKIPPED' -Detail 'no local image (Docker build did not run or failed); deploy uses the GHCR import path'
+        Add-Result -Stage '4.2b' -Gate "Mirror local image -> $RegistryAcr/scimserver:tag"  -Status 'SKIPPED' -Detail 'no local image; not on the deploy critical path since 2026-07-29'
+    }
 
     # 4.3 - GHCR push via CI workflow (uses GITHUB_TOKEN; no local PAT needed)
     $pkgJsonPath = Join-Path $repoRoot 'api/package.json'
     $version = (Get-Content $pkgJsonPath -Raw | ConvertFrom-Json).version
-    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml)" {
-        gh workflow run publish-ghcr.yml -f version=$version -f pushLatest=true
+    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $gitBranch)" {
+        # CRITICAL (2026-05-29 false-green lesson): pin the workflow to the
+        # CURRENT branch. Without --ref, `gh workflow run` dispatches on the
+        # repo default branch (master) and publishes the WRONG code, while the
+        # ACR/dev path ships the right code - a silent split that shipped a
+        # stale GHCR image (calmsand path) undetected until Playwright caught it.
+        gh workflow run publish-ghcr.yml --ref $gitBranch -f version=$version -f pushLatest=true
         Start-Sleep -Seconds 6
-        $runId = (gh run list --workflow=publish-ghcr.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+        $runId = (gh run list --workflow=publish-ghcr.yml --branch $gitBranch --limit 1 --json databaseId --jq '.[0].databaseId')
         gh run watch $runId --exit-status
     } | Out-Null
 
@@ -414,34 +432,80 @@ if (-not $SkipDeploy) {
         docker pull "${RegistryGhcr}:latest"
     } | Out-Null
 
-    # 4.6 - Deploy to dev
-    Invoke-Gate '4.6' "Deploy $RegistryAcr/scimserver:$ImageTag to $DevAppName" {
-        az containerapp update --name $DevAppName --resource-group $DevResourceGroup --image "$RegistryAcr/scimserver:$ImageTag" --revision-suffix "v$ImageTag" --output none
+    # 4.5 - Import the CI-BUILT image from GHCR into ACR.
+    #
+    # Deploying a LOCALLY built image is fragile. On 2026-07-29 the local Docker
+    # build failed (`npm error Exit handler never called!` inside `npm ci`) while
+    # GitHub Actions built the SAME commit perfectly. The push then failed, and
+    # the deploy still ran - pointing dev at a tag that had never been pushed and
+    # leaving a Failed revision behind. Importing the artifact CI already
+    # published is both more robust AND more correct: dev runs exactly the bits
+    # GHCR serves, so local Docker is no longer on the deployment critical path.
+    $acrName = $RegistryAcr.Split('.')[0]
+    Invoke-Gate '4.5' "Import ${RegistryGhcr}:$version -> $RegistryAcr/scimserver:$version" {
+        az acr import --name $acrName --source "${RegistryGhcr}:${version}" --image "scimserver:${version}" --force
     } | Out-Null
 
-    # Wait for new revision healthy + traffic
-    Write-Host "  Waiting for new revision to become healthy + serving traffic..." -ForegroundColor Yellow
-    $maxWait = 12
-    $devReady = $false
-    for ($i = 1; $i -le $maxWait; $i++) {
-        Start-Sleep -Seconds 10
-        try {
-            $tok = (Invoke-RestMethod -Uri "https://$DevFqdn/scim/oauth/token" -Method Post -Body '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"changeme-oauth"}' -ContentType 'application/json' -TimeoutSec 15).access_token
-            $v = Invoke-RestMethod -Uri "https://$DevFqdn/scim/admin/version" -Headers @{Authorization = "Bearer $tok"} -TimeoutSec 15
-            if ($v.runtime.hostname -match "v$ImageTag") {
-                $devReady = $true
-                break
-            }
-        } catch { }
-    }
-    if ($devReady) {
-        Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'PASS'
+    # 4.5b - NEVER point the Container App at a tag that does not exist. This is
+    # the check whose absence turned a failed build into a broken dev revision.
+    $acrTags = @(az acr repository show-tags --name $acrName --repository scimserver -o tsv 2>$null)
+    $tagPresent = $acrTags -contains $version
+    if ($tagPresent) {
+        Add-Result -Stage '4.5b' -Gate 'Deployable image tag exists in ACR' -Status 'PASS' -Detail "scimserver:$version"
     } else {
-        Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'FAIL' -Detail "did not switch within $($maxWait * 10)s"
+        Add-Result -Stage '4.5b' -Gate 'Deployable image tag exists in ACR' -Status 'FAIL' -Detail "scimserver:$version NOT in ACR - refusing to deploy"
     }
 
-    # 4.7 - Live SCIM tests vs dev
-    Invoke-Gate '4.7' 'Live SCIM tests vs dev (1,027 baseline)' { pwsh -NoProfile -File scripts/live-test.ps1 -BaseUrl "https://$DevFqdn" -ClientSecret 'changeme-oauth' } | Out-Null
+    if (-not $tagPresent) {
+        # Abort the deploy chain rather than breaking a working dev instance.
+        Add-Result -Stage '4.6'  -Gate "Deploy to $DevAppName"           -Status 'SKIPPED' -Detail 'image tag missing in ACR (4.5b FAIL)'
+        Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image'  -Status 'SKIPPED' -Detail 'deploy skipped'
+        Add-Result -Stage '4.7'  -Gate 'Live SCIM tests vs dev'          -Status 'SKIPPED' -Detail 'deploy skipped - running these would validate the OLD image'
+    }
+    else {
+        # 4.6 - Deploy to dev. Revision suffix carries the COMMIT so the running
+        # revision traces back to source; the image carries the VERSION.
+        Invoke-Gate '4.6' "Deploy $RegistryAcr/scimserver:$version to $DevAppName" {
+            az containerapp update --name $DevAppName --resource-group $DevResourceGroup --image "$RegistryAcr/scimserver:$version" --revision-suffix "v$ImageTag" --output none
+        } | Out-Null
+
+        # 4.6b - Confirm dev is actually SERVING the new build.
+        #
+        # This asserts the reported VERSION, not (as before) a regex against the
+        # runtime hostname. The hostname check was indirect and could pass or
+        # fail for reasons unrelated to which code is live.
+        Write-Host "  Waiting for dev to report version $version..." -ForegroundColor Yellow
+        $maxWait = 18
+        $devReady = $false
+        $reported = '(no response)'
+        for ($i = 1; $i -le $maxWait; $i++) {
+            Start-Sleep -Seconds 10
+            try {
+                $tok = (Invoke-RestMethod -Uri "https://$DevFqdn/scim/oauth/token" -Method Post -Body '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"changeme-oauth"}' -ContentType 'application/json' -TimeoutSec 15).access_token
+                $v = Invoke-RestMethod -Uri "https://$DevFqdn/scim/admin/version" -Headers @{Authorization = "Bearer $tok"} -TimeoutSec 15
+                $reported = $v.version
+                if ($reported -eq $version) { $devReady = $true; break }
+            } catch { }
+        }
+        if ($devReady) {
+            Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'PASS' -Detail "dev reports $version"
+        } else {
+            Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'FAIL' -Detail "expected $version, dev reports $reported after $($maxWait * 10)s"
+        }
+
+        # 4.7 - Live SCIM tests vs dev.
+        #
+        # GATED ON 4.6b. Previously this ran unconditionally, so when the deploy
+        # silently failed the suite exercised the PREVIOUS image and reported
+        # PASS - a false green that made a broken deploy look validated. A gate
+        # that validates the wrong artifact is worse than no gate, so if dev is
+        # not provably serving the new build we SKIP with a reason instead.
+        if ($devReady) {
+            Invoke-Gate '4.7' 'Live SCIM tests vs dev' { pwsh -NoProfile -File scripts/live-test.ps1 -BaseUrl "https://$DevFqdn" -ClientSecret 'changeme-oauth' } | Out-Null
+        } else {
+            Add-Result -Stage '4.7' -Gate 'Live SCIM tests vs dev' -Status 'SKIPPED' -Detail "dev is NOT serving $version - running these would validate the old image and report a false PASS"
+        }
+    }
 }
 
 # =============================================================================

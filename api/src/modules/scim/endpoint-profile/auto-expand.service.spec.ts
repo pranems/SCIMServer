@@ -452,4 +452,37 @@ describe('auto-expand.service', () => {
       });
     });
   });
+
+  // ─── Security: prototype-pollution guard (CWE-1321) ─────────────────────
+  describe('prototype-pollution guard', () => {
+    it('drops a __proto__ key from method.config (no object pollution)', () => {
+      // JSON.parse is the one path that makes "__proto__" a real own property.
+      const malicious = JSON.parse('{"__proto__": {"polluted": true}, "issuer": "https://idp"}');
+      const out = expandAuthentication({
+        schemaVersion: 1,
+        methods: [{ id: 'm-1', type: 'bearer', config: malicious }],
+      });
+      const cfg = out.methods[0].config!;
+      expect(Object.prototype.hasOwnProperty.call(cfg, '__proto__')).toBe(false);
+      expect(cfg.polluted).toBeUndefined();
+      expect(cfg.issuer).toBe('https://idp');
+      // Object's own prototype must be untouched.
+      expect(Object.getPrototypeOf(cfg)).toBe(Object.prototype);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it('drops a __proto__ key during shorthand attribute expansion', () => {
+      const malicious = JSON.parse('{"name": "userName", "__proto__": {"polluted": true}}');
+      const input: ShorthandProfileInput = {
+        schemas: [{ id: SCIM_CORE_USER_SCHEMA, name: 'User', attributes: [malicious] }],
+        resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: SCIM_CORE_USER_SCHEMA, schemaExtensions: [] }],
+      };
+      const result = expandProfile(input);
+      const userSchema = result.schemas.find(s => s.id === SCIM_CORE_USER_SCHEMA)!;
+      const attr = userSchema.attributes.find(a => a.name === 'userName')!;
+      expect(Object.prototype.hasOwnProperty.call(attr, '__proto__')).toBe(false);
+      expect((attr as unknown as Record<string, unknown>).polluted).toBeUndefined();
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+  });
 });

@@ -8,9 +8,11 @@ import type { Response, Request } from 'express';
 
 import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
+import { wireDescriptionFor } from '../../../oauth/auth-reason-catalog';
 import { LogCategory } from '../../logging/log-levels';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
+import { resolveRequestBodyForLog, type RawBodyRequest } from '../../logging/request-body-capture';
 
 /**
  * Global exception filter for SCIM endpoints.
@@ -47,6 +49,41 @@ export class ScimExceptionFilter implements ExceptionFilter {
       response.status(status).json(
         typeof exceptionResponse === 'object' ? exceptionResponse : { statusCode: status, message: exception.message }
       );
+      return;
+    }
+
+    // WI-D1: OAuth token endpoints (`*/oauth/token`) return the native,
+    // RFC-6749-conformant error as `application/json` - NOT wrapped in a SCIM
+    // envelope. The token endpoint is an OAuth surface, not a SCIM resource, so
+    // flattening its `{ error, error_description }` into a SCIM `detail` both
+    // mislabels the content-type and destroys the specific reason. We pass the
+    // OAuth body through and enrich it with a `correlation_id` + `timestamp`
+    // (RFC 6749 section 5.2 permits `error_description` / `error_uri`; Entra's
+    // reference implementation adds correlation_id + timestamp the same way).
+    if (this.isOAuthTokenEndpoint(url) && this.isOAuthErrorBody(exceptionResponse)) {
+      const oauthBody = this.buildOAuthErrorBody(exceptionResponse as Record<string, unknown>, exception.message, response);
+      // Keep the same auth-error logging as the SCIM path (WARN for 401/403).
+      if (status === 401 || status === 403) {
+        this.logger.warn(LogCategory.OAUTH, `OAuth token error ${status} on ${request?.method} ${request?.originalUrl}`, {
+          status,
+          error: oauthBody.error,
+          reason_code: oauthBody.reason_code,
+          correlation_id: oauthBody.correlation_id,
+        });
+      } else if (status >= 500) {
+        this.logger.error(LogCategory.OAUTH, `OAuth token error ${status} on ${request?.method} ${request?.originalUrl}`, exception, { status });
+      } else {
+        this.logger.info(LogCategory.OAUTH, `OAuth token error ${status} on ${request?.method} ${request?.originalUrl}`, {
+          status,
+          error: oauthBody.error,
+          reason_code: oauthBody.reason_code,
+        });
+      }
+      response
+        .status(status)
+        .setHeader('Content-Type', 'application/json; charset=utf-8')
+        .json(oauthBody);
+      this.persistErrorLog(request, response, status, oauthBody, exception);
       return;
     }
 
@@ -106,21 +143,30 @@ export class ScimExceptionFilter implements ExceptionFilter {
       body.status = String(body.status);
     }
 
-    // G.4: Auto-enrich with diagnostics extension when not already present
-    if (!body[SCIM_DIAGNOSTICS_URN]) {
+    // G.4: Auto-enrich the diagnostics extension. MERGE into any existing block
+    // (e.g. the resource-plane guard sets `reason_code`) so requestId/endpointId/
+    // logsUrl are added alongside it rather than being skipped. The requestId +
+    // endpointId are taken from the correlation context when present, else from
+    // the base RequestLoggingMeta the early correlation middleware stashed on the
+    // request - the meta path is what makes a GUARD-rejected 401 (which throws
+    // before the interceptor runs, and outside the ALS context) still carry the
+    // requestId correlator.
+    {
       const ctx = getCorrelationContext();
-      if (ctx) {
-        const diag: Record<string, unknown> = {};
-        if (ctx.requestId) diag.requestId = ctx.requestId;
-        if (ctx.endpointId) diag.endpointId = ctx.endpointId;
-        if (ctx.requestId) {
-          diag.logsUrl = ctx.endpointId
-            ? `/scim/endpoints/${ctx.endpointId}/logs/recent?requestId=${ctx.requestId}`
-            : `/scim/admin/log-config/recent?requestId=${ctx.requestId}`;
-        }
-        if (Object.keys(diag).length > 0) {
-          body[SCIM_DIAGNOSTICS_URN] = diag;
-        }
+      const meta = (request as unknown as Record<string, RequestLoggingMeta | undefined>)[REQUEST_LOGGING_META_KEY];
+      const requestId = ctx?.requestId ?? meta?.requestId;
+      const diagEndpointId = ctx?.endpointId ?? meta?.endpointId;
+      const diag: Record<string, unknown> =
+        (body[SCIM_DIAGNOSTICS_URN] as Record<string, unknown> | undefined) ?? {};
+      if (requestId && diag.requestId === undefined) diag.requestId = requestId;
+      if (diagEndpointId && diag.endpointId === undefined) diag.endpointId = diagEndpointId;
+      if (requestId && diag.logsUrl === undefined) {
+        diag.logsUrl = diagEndpointId
+          ? `/scim/endpoints/${diagEndpointId}/logs/recent?requestId=${requestId}`
+          : `/scim/admin/log-config/recent?requestId=${requestId}`;
+      }
+      if (Object.keys(diag).length > 0) {
+        body[SCIM_DIAGNOSTICS_URN] = diag;
       }
     }
 
@@ -153,11 +199,70 @@ export class ScimExceptionFilter implements ExceptionFilter {
       status,
       durationMs,
       requestHeaders: meta?.requestHeaders ?? { ...(request?.headers ?? {}) },
-      requestBody: meta?.requestBody ?? request?.body,
+      requestBody: resolveRequestBodyForLog(request as RawBodyRequest, meta),
       responseHeaders: response.getHeaders() as Record<string, unknown>,
       responseBody,
       error,
       endpointId: meta?.endpointId,
+      requestId: meta?.requestId,
     });
+  }
+
+  /** WI-D1: is this an OAuth token endpoint (global or per-endpoint)? */
+  private isOAuthTokenEndpoint(url: string): boolean {
+    // Strip any query string, then match the two token-endpoint shapes:
+    //   /scim/oauth/token                         (global)
+    //   /scim/endpoints/{id}/oauth/token          (per-endpoint)
+    const path = url.split('?')[0];
+    return /\/oauth\/token\/?$/.test(path);
+  }
+
+  /** WI-D1: does the thrown body look like an RFC-6749 OAuth error (has `error`)? */
+  private isOAuthErrorBody(exceptionResponse: unknown): boolean {
+    return (
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      typeof (exceptionResponse as Record<string, unknown>).error === 'string'
+    );
+  }
+
+  /**
+   * WI-D1: build the RFC-6749 token-error body, passing through the OAuth
+   * fields the controller set and enriching with correlation_id + timestamp.
+   * Only known OAuth keys are emitted (no SCIM envelope, no internal fields).
+   */
+  private buildOAuthErrorBody(raw: Record<string, unknown>, fallbackMessage: string, response?: Response): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      error: typeof raw.error === 'string' ? raw.error : 'invalid_request',
+    };
+    // When a curated reason_code is present (WI-D2/D3), the catalog is the
+    // source of truth for the tier-safe actor description - fall back to it so
+    // the wire text can never drift from the catalog.
+    const reasonCode = typeof raw.reason_code === 'string' ? raw.reason_code : undefined;
+    const catalogDescription = wireDescriptionFor(reasonCode);
+    const description =
+      typeof raw.error_description === 'string'
+        ? raw.error_description
+        : catalogDescription
+          ? catalogDescription
+          : typeof raw.message === 'string'
+            ? raw.message
+            : fallbackMessage;
+    if (description) body.error_description = description;
+    // Pass through the curated diagnostics fields when present (WI-D2/D3 set these).
+    if (reasonCode) body.reason_code = reasonCode;
+    if (typeof raw.error_uri === 'string') body.error_uri = raw.error_uri;
+
+    // Enrich with the correlation id (== X-Request-Id) + a timestamp so the
+    // caller can find the matching log entry, mirroring Entra's token errors.
+    // Prefer the ALS correlation context; fall back to the X-Request-Id header
+    // the RequestLoggingInterceptor already stamped on the response (the ALS
+    // context is not always in scope when the filter runs).
+    const ctx = getCorrelationContext();
+    const headerReqId = response?.getHeader('X-Request-Id');
+    const correlationId = ctx?.requestId ?? (typeof headerReqId === 'string' ? headerReqId : undefined);
+    if (correlationId) body.correlation_id = correlationId;
+    body.timestamp = new Date().toISOString();
+    return body;
   }
 }

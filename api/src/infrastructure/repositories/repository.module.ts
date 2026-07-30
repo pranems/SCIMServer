@@ -15,15 +15,24 @@ import {
   GROUP_REPOSITORY,
   GENERIC_RESOURCE_REPOSITORY,
   ENDPOINT_CREDENTIAL_REPOSITORY,
+  JWKS_HOST_ALLOWLIST_REPOSITORY,
+  CREDENTIAL_DEK_REPOSITORY,
+  SERVER_SETTING_REPOSITORY,
 } from '../../domain/repositories/repository.tokens';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
 import { PrismaGroupRepository } from './prisma/prisma-group.repository';
 import { PrismaGenericResourceRepository } from './prisma/prisma-generic-resource.repository';
 import { PrismaEndpointCredentialRepository } from './prisma/prisma-endpoint-credential.repository';
+import { PrismaJwksHostAllowlistRepository } from './prisma/prisma-jwks-host-allowlist.repository';
+import { PrismaCredentialDekRepository } from './prisma/prisma-credential-dek.repository';
+import { PrismaServerSettingRepository } from './prisma/prisma-server-setting.repository';
 import { InMemoryUserRepository } from './inmemory/inmemory-user.repository';
 import { InMemoryGroupRepository } from './inmemory/inmemory-group.repository';
 import { InMemoryGenericResourceRepository } from './inmemory/inmemory-generic-resource.repository';
 import { InMemoryEndpointCredentialRepository } from './inmemory/inmemory-endpoint-credential.repository';
+import { InMemoryJwksHostAllowlistRepository } from './inmemory/inmemory-jwks-host-allowlist.repository';
+import { InMemoryCredentialDekRepository } from './inmemory/inmemory-credential-dek.repository';
+import { InMemoryServerSettingRepository } from './inmemory/inmemory-server-setting.repository';
 import { PrismaModule } from '../../modules/prisma/prisma.module';
 
 @Module({})
@@ -56,8 +65,11 @@ export class RepositoryModule {
           { provide: GROUP_REPOSITORY, useClass: InMemoryGroupRepository },
           { provide: GENERIC_RESOURCE_REPOSITORY, useClass: InMemoryGenericResourceRepository },
           { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useClass: InMemoryEndpointCredentialRepository },
+          { provide: JWKS_HOST_ALLOWLIST_REPOSITORY, useClass: InMemoryJwksHostAllowlistRepository },
+          { provide: CREDENTIAL_DEK_REPOSITORY, useClass: InMemoryCredentialDekRepository },
+          { provide: SERVER_SETTING_REPOSITORY, useClass: InMemoryServerSettingRepository },
         ],
-        exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY],
+        exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY, CREDENTIAL_DEK_REPOSITORY, SERVER_SETTING_REPOSITORY],
       };
       return this.cachedModule;
     }
@@ -72,8 +84,11 @@ export class RepositoryModule {
         { provide: GROUP_REPOSITORY, useClass: PrismaGroupRepository },
         { provide: GENERIC_RESOURCE_REPOSITORY, useClass: PrismaGenericResourceRepository },
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useClass: PrismaEndpointCredentialRepository },
+        { provide: JWKS_HOST_ALLOWLIST_REPOSITORY, useClass: PrismaJwksHostAllowlistRepository },
+        { provide: CREDENTIAL_DEK_REPOSITORY, useClass: PrismaCredentialDekRepository },
+        { provide: SERVER_SETTING_REPOSITORY, useClass: PrismaServerSettingRepository },
       ],
-      exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY],
+      exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY, CREDENTIAL_DEK_REPOSITORY, SERVER_SETTING_REPOSITORY],
     };
     return this.cachedModule;
   }

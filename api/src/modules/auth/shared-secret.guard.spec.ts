@@ -2,6 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { SharedSecretGuard } from './shared-secret.guard';
+import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
 
 describe('SharedSecretGuard', () => {
   let guard: SharedSecretGuard;
@@ -109,6 +110,120 @@ describe('SharedSecretGuard', () => {
 
   it('should be defined', () => {
     expect(guard).toBeDefined();
+  });
+
+  // F3 + F4 - resource-plane bearer sub-reason + reason_code on the wire.
+  describe('F3/F4 - bearer reason codes', () => {
+    const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    let record: jest.Mock;
+    let g: SharedSecretGuard;
+
+    beforeEach(() => {
+      record = jest.fn();
+      g = new SharedSecretGuard(
+        mockConfigService,
+        mockOAuthService,
+        mockReflector,
+        mockLogger,
+        mockCredentialRepo,
+        mockEndpointService,
+        { record } as unknown as AuthDecisionRecordStore,
+      );
+    });
+
+    async function expectReject(context: any): Promise<any> {
+      try {
+        await g.canActivate(context);
+        throw new Error('expected reject');
+      } catch (err) {
+        return (err as UnauthorizedException).getResponse();
+      }
+    }
+
+    it('F3: an EXPIRED OAuth JWT surfaces bearer_oauth_expired (not bearer_invalid)', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(Object.assign(new Error('jwt expired'), { code: 'ERR_JWT_EXPIRED' }));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer not-the-shared-secret.jwt.value');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_oauth_expired');
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'reject', reasonCode: 'bearer_oauth_expired' }));
+    });
+
+    it('F3: a bad-signature OAuth JWT surfaces bearer_oauth_signature_invalid', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(Object.assign(new Error('bad sig'), { code: 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' }));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer not-the-shared-secret.jwt.value');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_oauth_signature_invalid');
+    });
+
+    it('F3: a non-JWT junk token still collapses to bearer_invalid', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(new Error('Invalid Compact JWS'));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer randomjunk');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_invalid');
+    });
+
+    it('F4: a missing bearer carries reason_code bearer_missing in diagnostics', async () => {
+      const { context } = createEndpointMockContext(endpointId, undefined);
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_missing');
+      expect(body.scimType).toBe('invalidToken');
+    });
+
+    it('F4: a token scoped to another endpoint carries bearer_token_scoped_other_endpoint', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({ endpoint_id: 'other-endpoint', client_id: 'c' });
+      const { context } = createEndpointMockContext(endpointId, 'Bearer scoped.elsewhere');
+      const body = await expectReject(context);
+      expect(body[DIAG]?.reason_code).toBe('bearer_token_scoped_other_endpoint');
+    });
+  });
+
+  describe('WI-11 - SharedSecretBearerAuthEnabled gate on the global secret', () => {
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=false REFUSES the global secret', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { SharedSecretBearerAuthEnabled: false } },
+        active: true,
+      });
+      const { context } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=true (default) still accepts the global secret', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { SharedSecretBearerAuthEnabled: true } },
+        active: true,
+      });
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+
+    it('an unset endpoint (no auth flags) still accepts the global secret (back-compat)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: {} },
+        active: true,
+      });
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+
+    it('a GLOBAL (non-endpoint) route always accepts the shared secret regardless of any flag', async () => {
+      const { context, request } = createMockContext('Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
   });
 
   describe('public routes', () => {
@@ -385,6 +500,72 @@ describe('SharedSecretGuard', () => {
       expect(request.authType).toBe('oauth');
     });
 
+    it('PERF: skips the per-endpoint credential bcrypt loop when the token is a JWT (falls through to OAuth)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        active: true,
+      });
+      // Even with active secret credentials present, a JWT must NOT be
+      // bcrypt-compared against any of them - the credential fetch is skipped.
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        {
+          id: 'cred-1',
+          endpointId,
+          credentialType: 'bearer',
+          credentialHash: '$2b$10$invalidhashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+          label: 'Test',
+          active: true,
+          createdAt: new Date(),
+          expiresAt: null,
+        },
+      ]);
+      const oauthPayload = { sub: 'client', client_id: 'c', scope: 's' };
+      mockOAuthService.validateAccessToken.mockResolvedValue(oauthPayload);
+
+      // A JWT-shaped token (eyJ... three base64url segments).
+      const jwt = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJjbGllbnQifQ.c2ln';
+      const { context, request } = createEndpointMockContext(endpointId, `Bearer ${jwt}`);
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('oauth');
+      // The expensive per-endpoint credential fetch + bcrypt loop is skipped.
+      expect(mockCredentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('PERF: skips the per-endpoint credential bcrypt loop when the token is the global shared secret (falls through to legacy)', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        active: true,
+      });
+      // Active secret credentials are present, but the global shared secret can
+      // never equal a random per-endpoint secret, so the credential fetch +
+      // bcrypt loop must be skipped and the legacy acceptor handles it.
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        {
+          id: 'cred-1',
+          endpointId,
+          credentialType: 'bearer',
+          credentialHash: '$2b$10$invalidhashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+          label: 'Test',
+          active: true,
+          createdAt: new Date(),
+          expiresAt: null,
+        },
+      ]);
+
+      // 'test-shared-secret' is the configured global secret (mockConfigService).
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+      // The expensive per-endpoint credential fetch + bcrypt loop is skipped.
+      expect(mockCredentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
     it('should not check per-endpoint credentials for non-endpoint URLs', async () => {
       // URL without /endpoints/:uuid/ pattern, using legacy secret
       const { context, request } = createMockContext('Bearer test-shared-secret');
@@ -417,6 +598,94 @@ describe('SharedSecretGuard', () => {
       const result = await guardNoRepo.canActivate(context);
       expect(result).toBe(true);
       expect(request.authType).toBe('legacy');
+    });
+  });
+
+  // Phase 2 (auth observability) - the resource plane records ONE
+  // AuthDecisionTrace per endpoint-scoped auth attempt capturing the whole
+  // method-selection cascade (which candidates were enabled, what was
+  // presented, which method won, and why the others were skipped).
+  describe('Phase 2 - resource-plane auth-decision tracing', () => {
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    let store: AuthDecisionRecordStore;
+
+    beforeEach(() => {
+      store = new AuthDecisionRecordStore();
+      guard = new SharedSecretGuard(
+        mockConfigService,
+        mockOAuthService,
+        mockReflector,
+        mockLogger,
+        mockCredentialRepo,
+        mockEndpointService,
+        store,
+      );
+    });
+
+    it('records an accept trace (plane=resource, method=endpoint_bearer) when a per-endpoint bearer credential matches', async () => {
+      const bcrypt = require('bcrypt');
+      const token = 'per-endpoint-token-123';
+      const hash = await bcrypt.hash(token, 4);
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        profile: { settings: { SecretTokenBearerAuthEnabled: 'True' } },
+        active: true,
+      });
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        { id: 'cred-1', credentialType: 'bearer', credentialHash: hash, label: 'x' },
+      ]);
+
+      const { context } = createEndpointMockContext(endpointId, `Bearer ${token}`);
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+
+      const recs = store.query({ endpointId });
+      expect(recs.length).toBeGreaterThan(0);
+      expect(recs[0].plane).toBe('resource');
+      expect(recs[0].outcome).toBe('accept');
+      expect(recs[0].method).toBe('endpoint_bearer');
+      const eb = recs[0].checks.find((c) => c.id === 'endpoint_bearer');
+      expect(eb?.status).toBe('pass');
+      // No raw token is ever stored.
+      expect(JSON.stringify(recs[0])).not.toContain(token);
+    });
+
+    it('records an accept trace (method=shared_secret) when the global secret matches', async () => {
+      const { context } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      await guard.canActivate(context);
+      const recs = store.query({ endpointId, outcome: 'accept' });
+      expect(recs[0].method).toBe('shared_secret');
+      const ss = recs[0].checks.find((c) => c.id === 'shared_secret');
+      expect(ss?.status).toBe('pass');
+    });
+
+    it('records a reject trace with the full method-selection cascade when every method fails', async () => {
+      mockOAuthService.validateAccessToken.mockRejectedValue(new Error('invalid'));
+      const { context } = createEndpointMockContext(endpointId, 'Bearer completely-wrong');
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+      const recs = store.query({ endpointId, outcome: 'reject' });
+      expect(recs.length).toBeGreaterThan(0);
+      const ids = recs[0].checks.map((c) => c.id);
+      expect(ids).toEqual(expect.arrayContaining(['token_presented', 'endpoint_bearer', 'oauth_jwt', 'shared_secret']));
+      // The cascade explains WHY each candidate did not win (received/detail set).
+      for (const c of recs[0].checks) {
+        expect(c.received).toBeDefined();
+      }
+      expect(JSON.stringify(recs[0])).not.toContain('completely-wrong');
+    });
+
+    it('records a reject trace with reason bearer_token_scoped_other_endpoint when an OAuth token is presented to the wrong endpoint', async () => {
+      mockOAuthService.validateAccessToken.mockResolvedValue({
+        client_id: 'c1',
+        endpoint_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      });
+      const { context } = createEndpointMockContext(endpointId, 'Bearer some-oauth-jwt');
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+      const recs = store.query({ endpointId, outcome: 'reject' });
+      expect(recs[0].reasonCode).toBe('bearer_token_scoped_other_endpoint');
+      const jwt = recs[0].checks.find((c) => c.id === 'oauth_jwt');
+      expect(jwt?.status).toBe('fail');
     });
   });
 });

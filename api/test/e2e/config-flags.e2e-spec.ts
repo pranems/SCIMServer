@@ -709,4 +709,72 @@ describe('Config Flags (E2E)', () => {
       expect(workEmail?.primary).toBe(false);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // Runtime egress (WIF JWKS fetch) numeric override flags
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Runtime egress number flags (JWKS fetch tuning)', () => {
+    it('persists in-range numeric overrides via PATCH profile.settings', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          profile: {
+            settings: {
+              JwksFetchTimeoutMs: 1500,
+              JwksFetchRetries: 4,
+              JwksFetchRetryBackoffMs: 50,
+              JwksCacheMaxAgeMs: 30000,
+            },
+          },
+        })
+        .expect(200);
+      expect(res.body.profile.settings.JwksFetchTimeoutMs).toBe(1500);
+      expect(res.body.profile.settings.JwksFetchRetries).toBe(4);
+      expect(res.body.profile.settings.JwksFetchRetryBackoffMs).toBe(50);
+      expect(res.body.profile.settings.JwksCacheMaxAgeMs).toBe(30000);
+
+      // GET re-reads the persisted values.
+      const got = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(got.body.profile.settings.JwksFetchTimeoutMs).toBe(1500);
+    });
+
+    it('rejects a timeout below the minimum (100 ms) with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { JwksFetchTimeoutMs: 50 } } })
+        .expect(400);
+      expect(res.body.detail ?? res.body.message).toMatch(/below the minimum 100/i);
+    });
+
+    it('rejects retries above the maximum (10) with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { JwksFetchRetries: 11 } } })
+        .expect(400);
+      expect(res.body.detail ?? res.body.message).toMatch(/exceeds the maximum 10/i);
+    });
+
+    it('rejects a non-numeric egress value with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { JwksCacheMaxAgeMs: 'soon' } } })
+        .expect(400);
+    });
+  });
 });

@@ -25,6 +25,9 @@ import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
@@ -50,6 +53,8 @@ interface GroupsTabProps {
 
 export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 3 group columns (Display Name|Members|Created).
+  const cols = useResizableColumns('groups', 3, 'groups-col');
   const search = useSearch({ strict: false }) as Partial<GroupsSearch>;
   const page = search.page ?? 1;
   // Phase N4: fall back to the persisted user preference when no URL override is set.
@@ -151,9 +156,9 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
       <table className={classes.table}>
         <thead>
           <tr>
-            <th className={mergeClasses(classes.th, classes.thDisplayName)}>Display Name</th>
-            <th className={mergeClasses(classes.th, classes.thMembers)}>Members</th>
-            <th className={mergeClasses(classes.th, classes.thCreated)}>Created</th>
+            <th className={mergeClasses(classes.th, classes.thDisplayName)} style={cols.headerProps(0).style}>Display Name<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+            <th className={mergeClasses(classes.th, classes.thMembers)} style={cols.headerProps(1).style}>Members<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+            <th className={mergeClasses(classes.th, classes.thCreated)} style={cols.headerProps(2).style}>Created</th>
           </tr>
         </thead>
         <tbody>
@@ -161,7 +166,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
             <tr
               key={group.id}
               className={classes.tr}
-              onClick={() => openDetail(group.id)}
+              {...clickableProps(() => openDetail(group.id), `Open group ${group.displayName ?? group.id}`)}
               style={{ cursor: 'pointer' }}
               data-testid={`group-row-${group.id}`}
             >

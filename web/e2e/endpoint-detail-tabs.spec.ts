@@ -111,7 +111,7 @@ test.describe('EndpointDetailPage - tab matrix', () => {
     { key: 'bulk', label: /^Bulk$/i, panelTestId: 'bulk-page' },
     { key: 'resource-types', label: /Resource Types/i, panelTestId: 'resource-types-tab' },
     { key: 'schemas', label: /^Schemas$/i, panelTestId: 'tab-schemas' },
-    { key: 'credentials', label: /^Credentials$/i, panelTestId: 'tab-credentials' },
+    { key: 'connect', label: /^Connect$/i, panelTestId: 'tab-credentials' },
     { key: 'settings', label: /^Settings$/i, panelTestId: 'settings-tab' },
   ];
 
@@ -215,5 +215,16 @@ test.describe('EndpointDetailPage - tab matrix', () => {
     // URL may include `?page=1` or other search params, so use a
     // loose regex that allows either end-of-string or query string.
     await expect(page).toHaveURL(/\/logs(\?|$)/);
+  });
+
+  // WI-11: the Settings tab surfaces the per-method auth-enablement switches.
+  test('WI-11: Settings tab exposes the per-method auth-enablement switches', async ({ page }) => {
+    const id = await openFirstEndpoint(page);
+    await page.goto(`/endpoints/${id}/settings`);
+    await expect(page.getByTestId('settings-tab')).toBeVisible({ timeout: 20_000 });
+
+    await expect(page.getByRole('switch', { name: /SecretTokenBearerAuthEnabled/i })).toBeVisible();
+    await expect(page.getByRole('switch', { name: /OAuthClientCredentialsAuthEnabled/i })).toBeVisible();
+    await expect(page.getByRole('switch', { name: /SharedSecretBearerAuthEnabled/i })).toBeVisible();
   });
 });

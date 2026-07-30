@@ -20,6 +20,7 @@
 import React from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Text,
   Badge,
@@ -29,23 +30,30 @@ import {
   Combobox,
   Option,
   Button,
+  Tooltip,
   Field,
 } from '@fluentui/react-components';
 import {
   ArrowReset24Regular,
   DocumentSearch24Regular,
   Open24Regular,
+  Open16Regular,
 } from '@fluentui/react-icons';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   useGlobalLogs,
   useGlobalLog,
   useEndpoints,
+  useAuthDecisions,
   type GlobalLogsParams,
 } from '../api/queries';
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
 import { TIME_RANGE_VALUES } from '../routes/search-schemas';
-import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton, AuthDecisionForRequest } from '../components/primitives';
+import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
+import { clickableProps, toggleChipProps } from '../utils/interactive';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
@@ -92,7 +100,18 @@ const useStyles = makeStyles({
   chip: {
     cursor: 'pointer',
   },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  // R5: horizontal-scroll wrapper so a narrow window scrolls instead of
+  // clipping; the table stays >= minWidth for readability and expands to
+  // fill wider windows.
+  tableScroll: { width: '100%', overflowX: 'auto' },
+  table: { width: '100%', minWidth: '720px', borderCollapse: 'collapse', tableLayout: 'fixed' },
+  // Percentage column widths (R5.1) - scale proportionally on resize.
+  colMethod: { width: '8%' },
+  colUrl: { width: '31%' },
+  colEndpoint: { width: '15%' },
+  colStatus: { width: '10%' },
+  colDuration: { width: '10%' },
+  colTime: { width: '16%' },
   th: {
     textAlign: 'left',
     padding: '10px 12px',
@@ -105,6 +124,7 @@ const useStyles = makeStyles({
     padding: '10px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     fontSize: '13px',
+    overflow: 'hidden',
   },
   tr: {
     cursor: 'pointer',
@@ -201,6 +221,15 @@ interface LogRow {
   status?: number;
   durationMs?: number;
   createdAt: string | Date;
+  /** X6 - the endpoint this request targeted, so the row can show its name. */
+  endpointId?: string;
+  /** P3 - the X-Request-Id correlation id echoed on each list item (U12). */
+  requestId?: string;
+  /** V10 - the auth decision persisted on the row itself (durable, instant). */
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
+  authCredentialId?: string;
 }
 
 export const LogsPage: React.FC = () => {
@@ -213,11 +242,21 @@ export const LogsPage: React.FC = () => {
   const status = search.status;
   const timeRange = search.timeRange;
   const detailId = search.detail;
+  const requestId = search.requestId;
 
   // Endpoint dropdown source. Loads in parallel; harmless if it 404s
   // (just renders an empty Combobox).
   const endpointsQuery = useEndpoints();
   const endpointOptions = endpointsQuery.data?.endpoints ?? [];
+  // X6 - endpointId -> name map so a log row can show the endpoint NAME + a
+  // quick-open link, not just the opaque id in the URL.
+  const endpointNameById = React.useMemo(
+    () => new Map(endpointOptions.map((e) => [e.id, e.name])),
+    [endpointOptions],
+  );
+
+  // X7 - drag-to-resize the 7 log columns (Method|URL|Endpoint|Status|Auth|Duration|Time).
+  const cols = useResizableColumns('logs', 7, 'logs-col');
 
   // Compose the filter object that drives both the query key + the URL
   // search params on the API call. Keep this single source of truth so
@@ -227,9 +266,23 @@ export const LogsPage: React.FC = () => {
     endpointId,
     status,
     since: timeRangeToSince(timeRange),
+    requestId,
   };
   const { data, isLoading, error } = useGlobalLogs(params);
   const detailQuery = useGlobalLog(detailId);
+
+  // U12 - the recent auth decisions, keyed by correlation id, so each request
+  // log row can show a glanceable auth-outcome chip without opening the row.
+  const authDecisions = useAuthDecisions({ limit: 100 });
+  const authByCorrelation = React.useMemo(() => {
+    const map = new Map<string, { outcome: 'accept' | 'reject'; reasonCode?: string }>();
+    for (const r of authDecisions.data?.records ?? []) {
+      if (r.correlationId && !map.has(r.correlationId)) {
+        map.set(r.correlationId, { outcome: r.outcome, reasonCode: r.reasonCode });
+      }
+    }
+    return map;
+  }, [authDecisions.data]);
 
   // Helper that merges a partial filter patch into the current URL,
   // resetting page to 1 (we don't track page in this view yet but the
@@ -274,7 +327,7 @@ export const LogsPage: React.FC = () => {
     });
   };
 
-  const hasFilters = Boolean(urlContains || endpointId || status || timeRange);
+  const hasFilters = Boolean(urlContains || endpointId || status || timeRange || requestId);
 
   if (error) {
     return (
@@ -299,6 +352,11 @@ export const LogsPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {/* U12 - the standalone auth-diagnostics panel is re-scoped to the
+          endpoint Connect -> Health surface. Per-request auth now lives inside
+          the request's own DetailDrawer (U11). The logs surface shows an auth
+          chip per row + the full decision inline in the drawer. */}
 
       {/* Phase D5 toolbar: endpoint + status + time range + free-text */}
       <div className={classes.toolbar} data-testid="logs-toolbar">
@@ -340,9 +398,7 @@ export const LogsPage: React.FC = () => {
                 appearance={status === s ? 'filled' : 'outline'}
                 color={statusColor(s)}
                 className={classes.chip}
-                onClick={() =>
-                  updateFilter({ status: status === s ? undefined : s })
-                }
+                {...toggleChipProps(() => updateFilter({ status: status === s ? undefined : s }), status === s)}
                 data-testid={`logs-status-chip-${s}`}
               >
                 {s}
@@ -359,9 +415,7 @@ export const LogsPage: React.FC = () => {
                 appearance={timeRange === tr ? 'filled' : 'outline'}
                 color="brand"
                 className={classes.chip}
-                onClick={() =>
-                  updateFilter({ timeRange: timeRange === tr ? undefined : tr })
-                }
+                {...toggleChipProps(() => updateFilter({ timeRange: timeRange === tr ? undefined : tr }), timeRange === tr)}
                 data-testid={`logs-time-chip-${tr}`}
               >
                 {TIME_RANGE_LABEL[tr]}
@@ -393,14 +447,17 @@ export const LogsPage: React.FC = () => {
           data-testid="logs-empty"
         />
       ) : (
+        <div className={classes.tableScroll}>
         <table className={classes.table}>
           <thead>
             <tr>
-              <th className={classes.th}>Method</th>
-              <th className={classes.th}>URL</th>
-              <th className={classes.th}>Status</th>
-              <th className={classes.th}>Duration</th>
-              <th className={classes.th}>Time</th>
+              <th className={mergeClasses(classes.th, classes.colMethod)} style={cols.headerProps(0).style}>Method<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+              <th className={mergeClasses(classes.th, classes.colUrl)} style={cols.headerProps(1).style}>URL<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+              <th className={mergeClasses(classes.th, classes.colEndpoint)} style={cols.headerProps(2).style}>Endpoint<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+              <th className={mergeClasses(classes.th, classes.colStatus)} style={cols.headerProps(3).style}>Status<ColumnResizeHandle {...cols.handleProps(3)} /></th>
+              <th className={mergeClasses(classes.th, classes.colStatus)} style={cols.headerProps(4).style}>Auth<ColumnResizeHandle {...cols.handleProps(4)} /></th>
+              <th className={mergeClasses(classes.th, classes.colDuration)} style={cols.headerProps(5).style}>Duration<ColumnResizeHandle {...cols.handleProps(5)} /></th>
+              <th className={mergeClasses(classes.th, classes.colTime)} style={cols.headerProps(6).style}>Time</th>
             </tr>
           </thead>
           <tbody>
@@ -408,7 +465,7 @@ export const LogsPage: React.FC = () => {
               <tr
                 key={log.id}
                 className={`${classes.tr} ${log.id === detailId ? classes.trSelected : ''}`}
-                onClick={() => openDetail(log.id)}
+                {...clickableProps(() => openDetail(log.id), `Open log ${log.method} ${log.url}`)}
                 data-testid={`logs-row-${log.id}`}
               >
                 <td className={classes.td}>
@@ -425,14 +482,63 @@ export const LogsPage: React.FC = () => {
                     value={log.url}
                     truncate
                     monospace
-                    maxWidth="500px"
+                    maxWidth="100%"
                     data-testid={`log-row-url-${log.id}`}
                   />
+                </td>
+                <td className={classes.td}>
+                  {log.endpointId ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                      <CopyableField
+                        value={endpointNameById.get(log.endpointId) ?? log.endpointId}
+                        truncate
+                        maxWidth="100%"
+                        data-testid={`log-row-endpoint-${log.id}`}
+                      />
+                      <Tooltip content="Open this endpoint" relationship="label" positioning="above">
+                        <Button
+                          appearance="subtle"
+                          size="small"
+                          icon={<Open16Regular />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void navigate({ to: '/endpoints/$endpointId', params: { endpointId: log.endpointId! } });
+                          }}
+                          aria-label={`Open endpoint ${endpointNameById.get(log.endpointId) ?? log.endpointId}`}
+                          data-testid={`log-row-endpoint-open-${log.id}`}
+                        />
+                      </Tooltip>
+                    </div>
+                  ) : (
+                    <Caption1 data-testid={`log-row-endpoint-${log.id}`}>-</Caption1>
+                  )}
                 </td>
                 <td className={classes.td}>
                   <Badge appearance="outline" color={statusColor(log.status)}>
                     {log.status ?? '-'}
                   </Badge>
+                </td>
+                <td className={classes.td}>
+                  {(() => {
+                    // V10/V12 - prefer the auth summary PERSISTED on the row
+                    // (durable, survives the short-TTL auth-decision store, no
+                    // second query). Fall back to the live auth-decision map for
+                    // rows written before the persisted fields existed.
+                    const persisted = log.authOutcome
+                      ? { outcome: log.authOutcome, reasonCode: log.authReason, method: log.authMethod }
+                      : undefined;
+                    const live = log.requestId ? authByCorrelation.get(log.requestId) : undefined;
+                    const auth = persisted ?? live;
+                    return (
+                      <AuthMethodChip
+                        outcome={auth?.outcome}
+                        method={(auth as { method?: string } | undefined)?.method ?? log.authMethod}
+                        reason={auth?.reasonCode}
+                        url={log.url}
+                        data-testid={`log-row-auth-${log.id}`}
+                      />
+                    );
+                  })()}
                 </td>
                 <td className={classes.td}>
                   <Caption1>{log.durationMs}ms</Caption1>
@@ -446,6 +552,7 @@ export const LogsPage: React.FC = () => {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* Phase D5 - DetailDrawer for log inspection */}
@@ -457,6 +564,8 @@ export const LogsPage: React.FC = () => {
             ? `${detailQuery.data.method} ${detailQuery.data.url}`
             : 'Log detail'
         }
+        jsonData={detailQuery.data}
+        jsonFilename={detailId ? `log-${detailId}` : 'log-detail'}
         data-testid="logs-detail-drawer"
         footer={
           <Button
@@ -501,6 +610,60 @@ export const LogsPage: React.FC = () => {
               <Caption1 className={classes.drawerSectionTitle}>Duration</Caption1>
               <Text>{detailQuery.data.durationMs ?? 0}ms</Text>
             </div>
+
+            {detailQuery.data.requestId && (
+              <div className={classes.drawerSection} data-testid="log-detail-correlation">
+                <Caption1 className={classes.drawerSectionTitle}>Correlation id</Caption1>
+                <CopyableField
+                  value={detailQuery.data.requestId}
+                  monospace
+                  maxWidth="100%"
+                  data-testid="log-detail-request-id"
+                />
+              </div>
+            )}
+
+            {/* V11 - durable one-line auth summary from the fields PERSISTED on
+                the row. Present even after the short-TTL auth-decision store
+                has expired, unlike the deep U11 diff below. */}
+            {detailQuery.data.authOutcome && (
+              <div className={classes.drawerSection} data-testid="log-detail-auth-summary">
+                <Caption1 className={classes.drawerSectionTitle}>Authentication</Caption1>
+                <Badge
+                  appearance="filled"
+                  color={detailQuery.data.authOutcome === 'accept' ? 'success' : 'danger'}
+                >
+                  {detailQuery.data.authOutcome === 'accept' ? 'auth ok' : 'auth fail'}
+                </Badge>
+                <Text block>
+                  {detailQuery.data.authOutcome === 'accept' ? 'Authenticated via ' : 'Rejected via '}
+                  <strong>{detailQuery.data.authMethod ?? 'unknown method'}</strong>
+                  {detailQuery.data.authCredentialId ? (
+                    <>
+                      {' using '}
+                      <strong>{detailQuery.data.authCredentialId}</strong>
+                    </>
+                  ) : null}
+                  {detailQuery.data.authReason && detailQuery.data.authReason !== 'ok' ? (
+                    <>
+                      {' because '}
+                      <strong>{detailQuery.data.authReason}</strong>
+                    </>
+                  ) : null}
+                </Text>
+              </div>
+            )}
+
+            {/* U11 - the authentication decision for this request, inline. */}
+            {detailQuery.data.requestId && (
+              <div className={classes.drawerSection}>
+                <AuthDecisionForRequest
+                  correlationId={detailQuery.data.requestId}
+                  persistedDecision={detailQuery.data.authDecision}
+                  data-testid="log-detail-auth-section"
+                />
+              </div>
+            )}
 
             <div className={classes.drawerSection}>
               <CopyableJsonBlock

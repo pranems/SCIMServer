@@ -213,4 +213,74 @@ describe('LoggingService.listLogs - in-memory filter parity (Phase D4)', () => {
     expect(res.total).toBe(1);
     expect(res.items[0].url).toContain('/Groups');
   });
+
+  // ── Phase 3 (auth-obs) - requestId correlation bridge ──
+  describe('requestId (X-Request-Id correlation bridge)', () => {
+    it('stores requestId on the row and surfaces it in list items', async () => {
+      service.recordRequest({
+        method: 'POST',
+        url: '/scim/endpoints/x/Users',
+        status: 201,
+        requestId: '11111111-1111-1111-1111-111111111111',
+      } as Parameters<typeof service.recordRequest>[0]);
+      const res = await service.listLogs({ includeAdmin: true });
+      expect(res.items[0].requestId).toBe('11111111-1111-1111-1111-111111111111');
+    });
+
+    it('filters listLogs by requestId', async () => {
+      service.recordRequest({
+        method: 'POST',
+        url: '/scim/endpoints/x/Users',
+        status: 201,
+        requestId: 'aaaaaaaa-0000-0000-0000-000000000001',
+      } as Parameters<typeof service.recordRequest>[0]);
+      service.recordRequest({
+        method: 'GET',
+        url: '/scim/endpoints/x/Users',
+        status: 200,
+        requestId: 'bbbbbbbb-0000-0000-0000-000000000002',
+      } as Parameters<typeof service.recordRequest>[0]);
+      const res = await service.listLogs({ requestId: 'aaaaaaaa-0000-0000-0000-000000000001' });
+      expect(res.total).toBe(1);
+      expect(res.items[0].method).toBe('POST');
+      expect(res.items[0].requestId).toBe('aaaaaaaa-0000-0000-0000-000000000001');
+    });
+
+    it('getLog returns the stored requestId', async () => {
+      service.recordRequest({
+        method: 'POST',
+        url: '/scim/endpoints/x/Users',
+        status: 201,
+        requestId: 'cccccccc-0000-0000-0000-000000000003',
+      } as Parameters<typeof service.recordRequest>[0]);
+      const list = await service.listLogs({ includeAdmin: true });
+      const detail = await service.getLog(list.items[0].id);
+      expect(detail?.requestId).toBe('cccccccc-0000-0000-0000-000000000003');
+    });
+
+    it('getLog detail carries the endpointId correlation (parity with the list row)', async () => {
+      service.recordRequest({
+        method: 'POST',
+        url: '/scim/v2/endpoints/ep-detail/Users',
+        status: 201,
+        endpointId: 'dddddddd-0000-0000-0000-000000000004',
+      } as Parameters<typeof service.recordRequest>[0]);
+      const list = await service.listLogs({ includeAdmin: true });
+      const listRow = list.items.find((r) => r.endpointId === 'dddddddd-0000-0000-0000-000000000004');
+      expect(listRow).toBeDefined();
+      const detail = await service.getLog(listRow!.id);
+      // The detail must expose the same endpointId the list row does.
+      expect(detail?.endpointId).toBe('dddddddd-0000-0000-0000-000000000004');
+    });
+
+    it('leaves requestId undefined when none was recorded', async () => {
+      service.recordRequest({
+        method: 'GET',
+        url: '/scim/endpoints/x/Users',
+        status: 200,
+      } as Parameters<typeof service.recordRequest>[0]);
+      const res = await service.listLogs({ includeAdmin: true });
+      expect(res.items[0].requestId).toBeUndefined();
+    });
+  });
 });

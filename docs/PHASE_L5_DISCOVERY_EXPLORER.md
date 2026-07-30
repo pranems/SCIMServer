@@ -108,7 +108,7 @@ This avoids "everything is missing-X" noise when one endpoint omits a (default) 
 flowchart TB
     Root[/discovery route/]
     Root --> Picker[Endpoint scope picker<br/>primary + optional secondary]
-    Root --> Tabs[Sub-tab list<br/>SPC | ResourceTypes | Schemas]
+    Root --> Tabs["Sub-tab list<br/>SPC | ResourceTypes | Schemas"]
     Root --> Toolbar[Action buttons<br/>Copy JSON / Copy URN / Open Workbench / Refresh]
 
     Tabs --> SpcSection[SpcSection<br/>capability flag rows]

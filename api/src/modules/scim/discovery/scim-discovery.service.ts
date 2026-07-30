@@ -9,6 +9,10 @@ import { ScimSchemaRegistry } from './scim-schema-registry';
 import { SCIM_SERVICE_PROVIDER_CONFIG } from './scim-schemas.constants';
 import { computeAuthenticationSchemes } from './authentication-schemes';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
+import {
+  getConfigBoolean,
+  ENDPOINT_CONFIG_FLAGS,
+} from '../../endpoint/endpoint-config.interface';
 
 /**
  * ScimDiscoveryService - Phase 6: Data-Driven Discovery
@@ -146,9 +150,16 @@ export class ScimDiscoveryService {
     // A2 - the advertised authenticationSchemes are COMPUTED from the endpoint's
     // enabled authentication methods (baseline oauthbearertoken always present;
     // each enabled method adds its scheme; primary on defaultMethodId).
+    // Q6.6 - when the endpoint's WifCredentialsEnabled flag is on, a WIF scheme
+    // is also advertised so discovery reflects the federated-identity token path.
+    const wifCredentialsEnabled = getConfigBoolean(
+      profile?.settings,
+      ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
+    );
     const authenticationSchemes = computeAuthenticationSchemes(
       SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
       profile?.authentication,
+      { wifCredentialsEnabled },
     );
     if (profile?.serviceProviderConfig) {
       return {

@@ -49,6 +49,19 @@ function overviewWith(configFlags: Record<string, unknown>): EndpointOverviewRes
     credentials: [],
     recentActivity: [],
     configFlags,
+    connectionInfo: {
+      endpointId: EP_ID,
+      displayName: 'prod',
+      urls: {
+        scimBaseUrl: 'https://x/scim/v2/endpoints/ep-1',
+        scimBaseUrlBare: 'https://x/scim/endpoints/ep-1',
+        tokenEndpoint: 'https://x/scim/endpoints/ep-1/oauth/token',
+        serviceProviderConfig: 'https://x/scim/v2/endpoints/ep-1/ServiceProviderConfig',
+        oauthMetadata: 'https://x/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+      },
+      enabledMethods: [],
+      disabledMethods: [],
+    },
   };
 }
 
@@ -94,6 +107,17 @@ describe('SettingsTab', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
+  it('exposes a Copy/Download settings-as-JSON export (PATCH-body shape)', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ StrictSchemaValidation: true, CredentialSecretVisibility: 'once' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getByTestId('settings-tab-export')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-tab-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-tab-export-download')).toBeInTheDocument();
+  });
+
   it('renders a Switch for every known boolean flag', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({}),
@@ -103,6 +127,11 @@ describe('SettingsTab', () => {
     expect(screen.getByRole('switch', { name: /StrictSchemaValidation/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /RequireIfMatch/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /PerEndpointCredentialsEnabled/i })).toBeInTheDocument();
+    // WI-11: the per-method auth-enablement flag family.
+    expect(screen.getByRole('switch', { name: /SecretTokenBearerAuthEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /OAuthClientCredentialsAuthEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /SharedSecretBearerAuthEnabled/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /WifCredentialsEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /UserSoftDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /UserHardDeleteEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /GroupHardDeleteEnabled/i })).toBeInTheDocument();
@@ -258,16 +287,176 @@ describe('SettingsTab', () => {
     expect(sw.disabled).toBe(true);
   });
 
-  it('renders the PrimaryEnforcement value as read-only info (not a Switch)', () => {
+  // ── WI-7: CredentialSecretVisibility enum control ─────────────────
+  it('renders the CredentialSecretVisibility control defaulting to always', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getByTestId('settings-credential-visibility')).toBeInTheDocument();
+    const always = screen.getByTestId('credential-visibility-always') as HTMLInputElement;
+    expect(always.checked).toBe(true);
+  });
+
+  it('reflects a stored CredentialSecretVisibility=once', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ CredentialSecretVisibility: 'once' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const once = screen.getByTestId('credential-visibility-once') as HTMLInputElement;
+    expect(once.checked).toBe(true);
+  });
+
+  it('selecting "once" fires useUpdateEndpointConfig with the enum value', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ CredentialSecretVisibility: 'always' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    await user.click(screen.getByTestId('credential-visibility-once'));
+    expect(mutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { CredentialSecretVisibility: 'once' } },
+    });
+  });
+
+  it('renders PrimaryEnforcement as an editable Dropdown (not a Switch, not read-only)', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({ PrimaryEnforcement: 'reject' }),
       isLoading: false, error: null,
     });
     wrap(<SettingsTab endpointId={EP_ID} />);
-    // PrimaryEnforcement key is rendered exactly once (as a row label).
-    expect(screen.getByText('PrimaryEnforcement')).toBeInTheDocument();
-    // Badge renders the value exactly.
-    expect(screen.getByText('reject')).toBeInTheDocument();
+    // Rendered as an enum Dropdown row reflecting the current value.
+    const dropdown = screen.getByTestId('settings-enum-PrimaryEnforcement-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown.textContent).toContain('reject');
+    // It is NOT a Switch.
     expect(screen.queryByRole('switch', { name: /PrimaryEnforcement/i })).toBeNull();
+  });
+
+  it('groups boolean flags into related-category cards', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getByTestId('settings-category-authentication-methods')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-category-validation-schema')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-category-patch-semantics')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-category-lifecycle-deletes')).toBeInTheDocument();
+    // The auth-method switches live under the Authentication methods card.
+    const authCard = screen.getByTestId('settings-category-authentication-methods');
+    expect(authCard.querySelector('[aria-label="WifCredentialsEnabled"]')).not.toBeNull();
+  });
+
+  it('renders the PersistRequestSecrets switch under Logging & privacy (defaults ON)', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const card = screen.getByTestId('settings-category-logging-privacy');
+    expect(card).toBeInTheDocument();
+    const sw = screen.getByRole('switch', { name: /PersistRequestSecrets/i });
+    expect(sw).toBeInTheDocument();
+    // Default (unset) shows ON - the request log keeps the full request for RCA.
+    expect(sw).toBeChecked();
+  });
+
+  it('toggling PersistRequestSecrets OFF fires the config update with false', async () => {
+    const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ PersistRequestSecrets: true }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    await user.click(screen.getByRole('switch', { name: /PersistRequestSecrets/i }));
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({ profile: { settings: { PersistRequestSecrets: false } } });
+    });
+  });
+
+  it('logLevel renders as an enum Dropdown with the log levels', () => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ logLevel: 'WARN' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const dropdown = screen.getByTestId('settings-enum-logLevel-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown.textContent).toContain('WARN');
+  });
+
+  // ── Runtime egress (WIF JWKS fetch) numeric overrides ─────────────
+  describe('runtime egress number settings', () => {
+    it('renders a number input for each of the 4 egress params', () => {
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({}),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      expect(screen.getByTestId('settings-number-settings')).toBeInTheDocument();
+      // Each input carries its type + bounds contract (validates the Playwright
+      // bounded-input assertions run against the same rendered DOM).
+      const bounds: Record<string, { min: string; max: string }> = {
+        JwksFetchTimeoutMs: { min: '100', max: '60000' },
+        JwksFetchRetries: { min: '0', max: '10' },
+        JwksFetchRetryBackoffMs: { min: '0', max: '10000' },
+        JwksCacheMaxAgeMs: { min: '0', max: '86400000' },
+      };
+      for (const [key, b] of Object.entries(bounds)) {
+        const input = screen.getByTestId(`settings-number-${key}-input`);
+        expect(input).toHaveAttribute('type', 'number');
+        expect(input).toHaveAttribute('min', b.min);
+        expect(input).toHaveAttribute('max', b.max);
+      }
+    });
+
+    it('reflects the persisted value and leaves unset fields blank (inherit default)', () => {
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({ JwksFetchTimeoutMs: 1500 }),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      const setInput = screen.getByTestId('settings-number-JwksFetchTimeoutMs-input') as HTMLInputElement;
+      expect(setInput.value).toBe('1500');
+      const unsetInput = screen.getByTestId('settings-number-JwksFetchRetries-input') as HTMLInputElement;
+      expect(unsetInput.value).toBe('');
+    });
+
+    it('fires the config update with the new numeric value on blur', async () => {
+      const user = userEvent.setup();
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({}),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      const input = screen.getByTestId('settings-number-JwksFetchTimeoutMs-input');
+      await user.click(input);
+      await user.type(input, '2500');
+      await user.tab(); // blur
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith({ profile: { settings: { JwksFetchTimeoutMs: 2500 } } });
+      });
+    });
+
+    it('rejects an out-of-range value with an error message and no update', async () => {
+      const user = userEvent.setup();
+      (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: overviewWith({}),
+        isLoading: false, error: null,
+      });
+      wrap(<SettingsTab endpointId={EP_ID} />);
+      const input = screen.getByTestId('settings-number-JwksFetchRetries-input');
+      await user.click(input);
+      await user.type(input, '99'); // max is 10
+      await user.tab();
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-feedback-error')).toBeInTheDocument();
+      });
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
   });
 });

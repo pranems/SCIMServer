@@ -1,9 +1,19 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable, Inject, Optional, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
+import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
+import {
+  resolveServerEgressDefaults,
+  mergeEgressPolicy,
+  type EgressPolicy,
+  type EgressPolicyOverrides,
+} from './egress-policy';
 
 export const JWKS_FETCH = Symbol('JWKS_FETCH');
+
+/** Hard cap on redirect hops the JWKS fetch will follow (each re-validated). */
+const MAX_JWKS_REDIRECTS = 3;
 
 export interface ExternalJwksVerifyResult {
   payload: Record<string, unknown>;
@@ -42,41 +52,98 @@ interface JwksCacheEntry {
  * a runtime `import()` rather than a `require()`.
  */
 @Injectable()
-export class ExternalJwksValidatorService {
+export class ExternalJwksValidatorService implements OnModuleInit {
   private readonly hostAllowlist: Set<string>;
-  private readonly maxAgeMs: number;
+  /** SERVER-level egress defaults (env-driven); endpoint overrides layer on top. */
+  private readonly serverEgress: EgressPolicy;
   private readonly cache = new Map<string, JwksCacheEntry>();
+  /** G3 single-flight: coalesce concurrent fetches for the same jwksUri. */
+  private readonly inflight = new Map<string, Promise<unknown>>();
+  /**
+   * W1.1 - memoized `jose` module. The import is kicked off at boot by
+   * `onModuleInit` so the FIRST token mint after a restart does not pay the
+   * ESM module load on the hot path (measured as part of the ~2.1s cold mint
+   * in the X11 latency analysis).
+   */
+  private josePromise?: Promise<typeof import('jose')>;
+  /**
+   * W1.3 - the canonical URL a configured `jwksUri` redirected to, remembered
+   * after the first successful fetch. A trust that stores the legacy
+   * `login.windows.net` host pays a redirect hop on EVERY cold fetch
+   * (measured ~130-160ms); remembering the target removes it from all
+   * subsequent fetches. The remembered target is re-validated against the
+   * SSRF allowlist on every use, so this is a latency shortcut ONLY - it can
+   * never widen what the fetcher is allowed to reach.
+   */
+  private readonly resolvedUri = new Map<string, string>();
 
   constructor(
     private readonly config: ConfigService,
     private readonly logger: ScimLogger,
     @Optional() @Inject(JWKS_FETCH) private readonly fetchFn?: typeof fetch,
+    @Optional() private readonly allowlistService?: JwksHostAllowlistService,
   ) {
     const raw = this.config.get<string>('JWKS_HOST_ALLOWLIST') ?? '';
     this.hostAllowlist = new Set(
       raw.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     );
-    const cfgMaxAge = Number(this.config.get<string>('JWKS_CACHE_MAX_AGE_MS'));
-    this.maxAgeMs = Number.isFinite(cfgMaxAge) && cfgMaxAge > 0 ? cfgMaxAge : 10 * 60 * 1000;
+    this.serverEgress = resolveServerEgressDefaults((k) => this.config.get<string>(k));
+  }
+
+  /**
+   * W1.1 - warm the ESM `jose` import at boot. Deliberately non-fatal: if the
+   * pre-load fails the service still works (the next `verify` retries the
+   * import), so a transient module-resolution problem can never break startup.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.loadJose();
+    } catch (err) {
+      this.logger.warn(LogCategory.AUTH, 'jose pre-load failed (non-fatal; will load on first use)', {
+        reason: (err as Error)?.message,
+      });
+    }
+  }
+
+  /** True once the `jose` module has been successfully pre-loaded. */
+  isJoseLoaded(): boolean {
+    return this.josePromise !== undefined;
+  }
+
+  /** Memoized `jose` import - one module load per process, not per mint. */
+  private loadJose(): Promise<typeof import('jose')> {
+    if (!this.josePromise) {
+      this.josePromise = import('jose');
+    }
+    return this.josePromise;
   }
 
   /**
    * Verify a JWT against the JWKS at `jwksUri`. Resolves to the decoded payload
    * + protected header on success; rejects on any failure (signature, alg,
    * SSRF, fetch outage, unknown kid).
+   *
+   * `egressOverrides` are the ENDPOINT-level robustness knobs (timeout, retries,
+   * backoff, cache max-age); when a field is set it OVERRIDES the server-level
+   * default, otherwise the server default applies.
    */
-  async verify(token: string, jwksUri: string): Promise<ExternalJwksVerifyResult> {
+  async verify(
+    token: string,
+    jwksUri: string,
+    egressOverrides?: EgressPolicyOverrides,
+  ): Promise<ExternalJwksVerifyResult> {
     this.assertJwksUriAllowed(jwksUri);
+    const policy = mergeEgressPolicy(this.serverEgress, egressOverrides);
 
-    const jose = await import('jose');
+    const jose = await this.loadJose();
     const kid = this.peekKid(token);
 
     // Try the cached key set first; refetch on a cache miss / unknown kid.
-    let keys = this.getFreshCached(jwksUri);
+    let keys = this.getFreshCached(jwksUri, policy.cacheMaxAgeMs);
     let triedRefetch = false;
 
     if (!keys || (kid && !this.cacheHasKid(keys, kid))) {
-      keys = await this.fetchJwks(jwksUri);
+      keys = await this.fetchJwks(jwksUri, policy);
       triedRefetch = true;
     }
 
@@ -86,7 +153,7 @@ export class ExternalJwksValidatorService {
       // A verification failure may be a rotated key the cache missed; refetch
       // once and retry (still fail closed if the refetch does not help).
       if (!triedRefetch) {
-        keys = await this.fetchJwks(jwksUri);
+        keys = await this.fetchJwks(jwksUri, policy);
         return await this.verifyWithKeys(jose, token, keys);
       }
       throw err;
@@ -120,48 +187,120 @@ export class ExternalJwksValidatorService {
       throw new Error(`jwksUri must use https (got "${url.protocol}").`);
     }
     const host = url.hostname.toLowerCase();
-    if (!this.hostAllowlist.has(host)) {
+    // WI-15: consult the shared effective allowlist (seed + env + persisted
+    // admin-editable union) when it is wired; otherwise fall back to the
+    // env-only Set this service parsed at construction (unchanged behavior for
+    // unit tests that construct the validator standalone).
+    const allowed = this.allowlistService
+      ? this.allowlistService.isAllowed(host)
+      : this.hostAllowlist.has(host);
+    if (!allowed) {
       this.logger.warn(LogCategory.AUTH, 'JWKS host not permitted by allowlist (SSRF guard)', {
         host,
-        allowlist: Array.from(this.hostAllowlist),
       });
       throw new Error(`JWKS host "${host}" is not permitted by the JWKS_HOST_ALLOWLIST.`);
     }
   }
 
-  /** Fetch + cache the JWKS. Fails closed (rejects) on any fetch/parse error. */
-  private async fetchJwks(jwksUri: string): Promise<unknown> {
-    const doFetch = this.fetchFn ?? globalThis.fetch;
-    try {
-      const res = await doFetch(jwksUri);
-      if (!res.ok) {
-        throw new Error(`JWKS fetch returned HTTP ${res.status}.`);
-      }
-      const keys = await res.json();
-      this.cache.set(jwksUri, { keys, fetchedAt: Date.now() });
-      return keys;
-    } catch (err) {
-      // Fail closed: if there is a still-valid cached copy, fall back to it;
-      // otherwise reject. NEVER skip the signature check.
-      const cached = this.cache.get(jwksUri);
-      if (cached) {
-        this.logger.warn(LogCategory.AUTH, 'JWKS fetch failed; using cached keys', {
-          jwksUri,
-          reason: (err as Error).message,
-        });
-        return cached.keys;
-      }
-      this.logger.error(LogCategory.AUTH, 'JWKS fetch failed and no cached keys (fail closed)', err, {
-        jwksUri,
-      });
-      throw new Error('JWKS unavailable; failing closed.');
-    }
+  /**
+   * Fetch + cache the JWKS. Hardened runtime egress:
+   *  - G3 single-flight: concurrent fetches for the same URI are coalesced.
+   *  - G1 timeout + G5 bounded retry with exponential backoff + jitter.
+   *  - G2 redirect re-validation: redirects are followed manually and each hop
+   *    is re-checked against the SSRF allowlist.
+   * Fails closed (rejects) on exhaustion unless a still-usable cached copy
+   * exists (fail-to-stale) - it NEVER skips the signature check.
+   */
+  private async fetchJwks(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
+    const existing = this.inflight.get(jwksUri);
+    if (existing) return existing;
+    const p = this.fetchJwksWithRetry(jwksUri, policy).finally(() => this.inflight.delete(jwksUri));
+    this.inflight.set(jwksUri, p);
+    return p;
   }
 
-  private getFreshCached(jwksUri: string): unknown {
+  private async fetchJwksWithRetry(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
+    let lastErr: unknown;
+    // total tries = retries + 1
+    for (let attempt = 0; attempt <= policy.retries; attempt++) {
+      if (attempt > 0 && policy.retryBackoffMs > 0) {
+        const backoff = policy.retryBackoffMs * Math.pow(2, attempt - 1);
+        const jitter = Math.floor(Math.random() * policy.retryBackoffMs);
+        await new Promise((r) => setTimeout(r, backoff + jitter));
+      }
+      try {
+        const keys = await this.fetchJwksOnce(jwksUri, policy);
+        this.cache.set(jwksUri, { keys, fetchedAt: Date.now() });
+        return keys;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    // All attempts failed. Fail-to-stale if a cached copy exists; else fail closed.
+    const cached = this.cache.get(jwksUri);
+    if (cached) {
+      this.logger.warn(LogCategory.AUTH, 'JWKS fetch failed; using cached keys', {
+        jwksUri,
+        reason: (lastErr as Error)?.message,
+      });
+      return cached.keys;
+    }
+    this.logger.error(LogCategory.AUTH, 'JWKS fetch failed and no cached keys (fail closed)', lastErr, {
+      jwksUri,
+    });
+    throw new Error('JWKS unavailable; failing closed.');
+  }
+
+  /** A single fetch attempt: timeout-bounded, redirects followed + re-validated. */
+  private async fetchJwksOnce(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
+    const doFetch = this.fetchFn ?? globalThis.fetch;
+    // W1.3 - start from the canonical target this URI previously resolved to,
+    // so a legacy host's redirect hop is paid once per process instead of on
+    // every cold fetch. Re-validated below on every hop, including this one.
+    const remembered = this.resolvedUri.get(jwksUri);
+    let current = remembered ?? jwksUri;
+    if (remembered) {
+      this.assertJwksUriAllowed(current);
+    }
+    for (let hop = 0; hop <= MAX_JWKS_REDIRECTS; hop++) {
+      const res = await doFetch(current, {
+        // G1 - abort a hung IdP rather than blocking the token mint.
+        signal: AbortSignal.timeout(policy.timeoutMs),
+        // G2 - do not blindly follow redirects; each hop is re-validated below.
+        redirect: 'manual',
+      });
+      const status = typeof res.status === 'number' ? res.status : undefined;
+      if (status !== undefined && status >= 300 && status < 400) {
+        if (hop >= MAX_JWKS_REDIRECTS) {
+          throw new Error('JWKS fetch exceeded the redirect limit.');
+        }
+        const location = typeof res.headers?.get === 'function' ? res.headers.get('location') : null;
+        if (!location) {
+          throw new Error(`JWKS fetch returned HTTP ${status} with no Location header.`);
+        }
+        const next = new URL(location, current);
+        // Re-validate the redirect target against the SSRF allowlist (a trusted
+        // host must not be able to redirect the fetch to an internal address).
+        this.assertJwksUriAllowed(next.toString());
+        current = next.toString();
+        continue;
+      }
+      if (!res.ok) {
+        throw new Error(`JWKS fetch returned HTTP ${status ?? 'error'}.`);
+      }
+      // W1.3 - remember where this URI actually resolved to (only when it moved).
+      if (current !== jwksUri) {
+        this.resolvedUri.set(jwksUri, current);
+      }
+      return await res.json();
+    }
+    throw new Error('JWKS fetch exceeded the redirect limit.');
+  }
+
+  private getFreshCached(jwksUri: string, maxAgeMs: number): unknown {
     const cached = this.cache.get(jwksUri);
     if (!cached) return undefined;
-    if (Date.now() - cached.fetchedAt > this.maxAgeMs) return undefined;
+    if (Date.now() - cached.fetchedAt > maxAgeMs) return undefined;
     return cached.keys;
   }
 

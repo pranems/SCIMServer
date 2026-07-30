@@ -2,11 +2,20 @@
   "name": "scimserver-repo-tooling",
   "version": "0.0.0",
   "private": true,
-  "description": "Repo-level tooling only. The shippable projects live in api/ and web/ and have their own package.json + lockfile; this file exists solely so documentation/quality scripts under scripts/ have declared, lockable entry points instead of ad-hoc global installs.",
+  "description": "Repo-level tooling only. The shippable projects live in api/ and web/ and have their own package.json + lockfile; this file exists solely so documentation/quality scripts under scripts/ have declared, lockable dependencies instead of ad-hoc global installs.",
   "type": "module",
   "scripts": {
+    "docs:mermaid": "node scripts/validate-mermaid.mjs",
+    "docs:mermaid:render": "node scripts/render-mermaid.mjs",
+    "docs:mermaid:doctor": "node scripts/doctor-mermaid.mjs",
+    "docs:html": "node scripts/export-docs-html.mjs",
     "rfcs:check": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1",
     "rfcs:check:online": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1 -Online",
     "rfcs:update": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1 -Update"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "markdown-it": "^14.3.0",
+    "mermaid": "11.15.0"
   }
 }

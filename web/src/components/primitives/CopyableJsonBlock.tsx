@@ -18,6 +18,8 @@
 import * as React from 'react';
 import { makeStyles, tokens } from '@fluentui/react-components';
 import { CopyJsonButton } from './CopyJsonButton';
+import { JwtDecodeButton } from './JwtDecodeButton';
+import { findJwtsInValue } from '../../utils/jwt-decode';
 
 const useStyles = makeStyles({
   root: {
@@ -59,6 +61,23 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     overflowY: 'auto',
   },
+  jwtSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    minWidth: 0,
+  },
+  jwtRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    minWidth: 0,
+  },
+  jwtPath: {
+    color: tokens.colorNeutralForeground3,
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: '11px',
+  },
 });
 
 export interface CopyableJsonBlockProps {
@@ -92,6 +111,8 @@ export const CopyableJsonBlock: React.FC<CopyableJsonBlockProps> = ({
       return String(value);
     }
   }, [value, indent]);
+  // W2 - any JWT-looking string values in this JSON get an inline decode button.
+  const jwts = React.useMemo(() => findJwtsInValue(value), [value]);
 
   return (
     <div className={classes.root} data-testid={testId}>
@@ -120,6 +141,19 @@ export const CopyableJsonBlock: React.FC<CopyableJsonBlockProps> = ({
       >
         {text}
       </pre>
+      {jwts.length > 0 && (
+        <div className={classes.jwtSection} data-testid={testId ? `${testId}-jwts` : undefined}>
+          {jwts.map((j, i) => (
+            <div className={classes.jwtRow} key={`${j.path}-${i}`}>
+              <span className={classes.jwtPath}>{j.path}</span>
+              <JwtDecodeButton
+                token={j.token}
+                data-testid={testId ? `${testId}-jwt-${i}` : `jwt-${i}`}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -51,7 +51,10 @@ const ROUTE_FILES: ReadonlyArray<RouteFile> = [
   { file: 'endpoints.$endpointId.groups.tsx', pageComponents: ['GroupsTab'] },
   { file: 'endpoints.$endpointId.activity.tsx', pageComponents: ['ActivityTab'] },
   { file: 'endpoints.$endpointId.schemas.tsx', pageComponents: ['SchemasTab'] },
-  { file: 'endpoints.$endpointId.credentials.tsx', pageComponents: ['CredentialsTab'] },
+  // P5 - the unified method-centric "Connect" tab (merged Credentials + Connect)
+  // lazy-loads CredentialsTab. The legacy /credentials route is a redirect
+  // (no page component) so it is excluded here.
+  { file: 'endpoints.$endpointId.connect.tsx', pageComponents: ['CredentialsTab'] },
   // Phase M2
   { file: 'endpoints.$endpointId.bulk.tsx', pageComponents: ['BulkTab'] },
   // Phase M3

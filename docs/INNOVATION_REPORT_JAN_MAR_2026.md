@@ -510,7 +510,7 @@ graph TB
 
     subgraph "Feb 23-24"
         P6["Phase 6<br/>Data-Driven Discovery<br/>Enterprise extension"]
-        P7["Phase 7<br/>ETag/Conditional<br/>Monotonic W/\"v{N}\""]
+        P7["Phase 7<br/>ETag/Conditional<br/>Monotonic W/#quot;v{N}#quot;"]
         P8["Phase 8<br/>Schema Validation<br/>1,664-line validator"]
     end
 

@@ -30,8 +30,24 @@ import {
   type ScimListResponse,
 } from './queries';
 import type { EndpointOverviewResponse, EndpointResponse } from '@scim/types/dashboard.types';
+import type { ConnectionInfo } from '@scim/types/connection-info.types';
 
 // ─── Shared helpers ──────────────────────────────────────────────────
+
+/** WI-3: minimal connection-info so `EndpointOverviewResponse` literals compile. */
+const SEED_CONNECTION_INFO: ConnectionInfo = {
+  endpointId: 'ep-1',
+  displayName: 'x',
+  urls: {
+    scimBaseUrl: 'https://x/scim/v2/endpoints/ep-1',
+    scimBaseUrlBare: 'https://x/scim/endpoints/ep-1',
+    tokenEndpoint: 'https://x/scim/endpoints/ep-1/oauth/token',
+    serviceProviderConfig: 'https://x/scim/v2/endpoints/ep-1/ServiceProviderConfig',
+    oauthMetadata: 'https://x/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+  },
+  enabledMethods: [],
+  disabledMethods: [],
+};
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -128,6 +144,7 @@ describe('useDeleteCredential', () => {
       credentials: [{ id: 'c1', credentialType: 'bearer', label: 'X', active: true, createdAt: '', expiresAt: null }],
       recentActivity: [],
       configFlags: {},
+      connectionInfo: SEED_CONNECTION_INFO,
     };
     queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);
 
@@ -158,6 +175,7 @@ describe('useDeleteCredential', () => {
       credentials: [{ id: 'c1', credentialType: 'bearer', label: 'X', active: true, createdAt: '', expiresAt: null }],
       recentActivity: [],
       configFlags: {},
+      connectionInfo: SEED_CONNECTION_INFO,
     };
     queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);
 
@@ -319,6 +337,7 @@ describe('useUpdateEndpointConfig', () => {
         StrictSchemaValidation: true,
         PerEndpointCredentialsEnabled: false,
       },
+      connectionInfo: SEED_CONNECTION_INFO,
     };
     queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);
 
@@ -358,6 +377,7 @@ describe('useUpdateEndpointConfig', () => {
       credentials: [],
       recentActivity: [],
       configFlags: { StrictSchemaValidation: true },
+      connectionInfo: SEED_CONNECTION_INFO,
     };
     queryClient.setQueryData(queryKeys.endpoints.detail(EP_ID), seedDetail);
     queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);

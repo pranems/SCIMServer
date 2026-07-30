@@ -4,6 +4,14 @@ import {
   getConfigBooleanWithDefault,
   getConfigString,
   getConfigStructured,
+  getConfigNumber,
+  getOptionalConfigBoolean,
+  getEffectiveAuthEnablement,
+  resolveEndpointAuthEnablement,
+  getEffectiveCredentialSecretVisibility,
+  normalizeCredentialSecretVisibility,
+  resolveEndpointEgressOverrides,
+  getEffectivePersistRequestSecrets,
   validateEndpointConfig,
   validateStructuredFlag,
   DEFAULT_ENDPOINT_CONFIG,
@@ -1320,6 +1328,279 @@ describe('endpoint-config.interface', () => {
 
       it('should return undefined for a null value', () => {
         expect(getConfigStructured({ WifTrust: null }, 'WifTrust')).toBeUndefined();
+      });
+    });
+  });
+
+  describe('WI-11 - per-method auth-enablement flag family', () => {
+    it('registers the three new flag keys', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED).toBe('SecretTokenBearerAuthEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED).toBe('OAuthClientCredentialsAuthEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED).toBe('SharedSecretBearerAuthEnabled');
+    });
+
+    describe('getOptionalConfigBoolean', () => {
+      it('returns undefined when the key is absent', () => {
+        expect(getOptionalConfigBoolean({}, 'SecretTokenBearerAuthEnabled')).toBeUndefined();
+      });
+      it('returns the parsed value when set (boolean or string)', () => {
+        expect(getOptionalConfigBoolean({ SecretTokenBearerAuthEnabled: true }, 'SecretTokenBearerAuthEnabled')).toBe(true);
+        expect(getOptionalConfigBoolean({ SecretTokenBearerAuthEnabled: 'False' }, 'SecretTokenBearerAuthEnabled')).toBe(false);
+      });
+    });
+
+    describe('getEffectiveAuthEnablement', () => {
+      it('a bare endpoint (no flags) accepts the shared secret, no per-endpoint methods', () => {
+        const eff = getEffectiveAuthEnablement({});
+        expect(eff).toEqual({
+          secretTokenBearer: false,
+          oauthClientCredentials: false,
+          sharedSecretBearer: true,
+        });
+      });
+
+      it('value-preserving: legacy PerEndpointCredentialsEnabled=true enables BOTH new per-endpoint methods', () => {
+        const eff = getEffectiveAuthEnablement({ PerEndpointCredentialsEnabled: true });
+        expect(eff.secretTokenBearer).toBe(true);
+        expect(eff.oauthClientCredentials).toBe(true);
+        // Shared secret still accepted (unset -> true).
+        expect(eff.sharedSecretBearer).toBe(true);
+      });
+
+      it('an explicit new flag OVERRIDES the legacy fallback', () => {
+        const eff = getEffectiveAuthEnablement({
+          PerEndpointCredentialsEnabled: true,
+          OAuthClientCredentialsAuthEnabled: false,
+        });
+        // bearer inherits legacy true; oauth_client explicitly off.
+        expect(eff.secretTokenBearer).toBe(true);
+        expect(eff.oauthClientCredentials).toBe(false);
+      });
+
+      it('SharedSecretBearerAuthEnabled=false makes the endpoint refuse the global secret', () => {
+        const eff = getEffectiveAuthEnablement({ SharedSecretBearerAuthEnabled: false });
+        expect(eff.sharedSecretBearer).toBe(false);
+      });
+
+      it('accepts string boolean values (Entra-style "True"/"False")', () => {
+        const eff = getEffectiveAuthEnablement({
+          SecretTokenBearerAuthEnabled: 'True',
+          SharedSecretBearerAuthEnabled: 'False',
+        });
+        expect(eff.secretTokenBearer).toBe(true);
+        expect(eff.sharedSecretBearer).toBe(false);
+      });
+    });
+
+    // W2.5 - the single per-method enablement source (co-location + value-preserving).
+    describe('resolveEndpointAuthEnablement', () => {
+      it('value-preserving: with NO method entries it returns exactly getEffectiveAuthEnablement', () => {
+        const config: EndpointConfig = { PerEndpointCredentialsEnabled: true, SharedSecretBearerAuthEnabled: false };
+        expect(resolveEndpointAuthEnablement(config, undefined)).toEqual(getEffectiveAuthEnablement(config));
+        expect(resolveEndpointAuthEnablement(config, [])).toEqual(getEffectiveAuthEnablement(config));
+      });
+
+      it('a bare endpoint with no flags and no methods resolves to the flat defaults', () => {
+        expect(resolveEndpointAuthEnablement({}, [])).toEqual({
+          secretTokenBearer: false,
+          oauthClientCredentials: false,
+          sharedSecretBearer: true,
+        });
+      });
+
+      it('an explicit bearer method entry OVERRIDES the flat flag (co-location)', () => {
+        // Flat flags would say secretTokenBearer=false, but the method entry enables it.
+        const eff = resolveEndpointAuthEnablement({}, [{ type: 'bearer', enabled: true }]);
+        expect(eff.secretTokenBearer).toBe(true);
+        // Untouched facets fall back to flat.
+        expect(eff.oauthClientCredentials).toBe(false);
+        expect(eff.sharedSecretBearer).toBe(true);
+      });
+
+      it('honors disabled-with-credential: a bearer method enabled:false overrides a legacy-enabling flag', () => {
+        // Legacy flag enables both methods; the explicit method entry disables bearer.
+        const eff = resolveEndpointAuthEnablement({ PerEndpointCredentialsEnabled: true }, [
+          { type: 'bearer', enabled: false },
+        ]);
+        expect(eff.secretTokenBearer).toBe(false);
+        // oauth_client has no method entry -> still inherits the legacy flag.
+        expect(eff.oauthClientCredentials).toBe(true);
+      });
+
+      it('treats an entry with undefined enabled as enabled (A2 discovery convention)', () => {
+        const eff = resolveEndpointAuthEnablement({}, [{ type: 'oauth-client' }]);
+        expect(eff.oauthClientCredentials).toBe(true);
+      });
+
+      it('maps each facet to its method type (bearer / oauth-client / shared-secret)', () => {
+        const eff = resolveEndpointAuthEnablement({ SharedSecretBearerAuthEnabled: true }, [
+          { type: 'oauth-client', enabled: true },
+          { type: 'shared-secret', enabled: false },
+        ]);
+        expect(eff.oauthClientCredentials).toBe(true);
+        expect(eff.sharedSecretBearer).toBe(false);
+        // bearer has no entry -> flat default false.
+        expect(eff.secretTokenBearer).toBe(false);
+      });
+
+      it('ignores unrelated method types', () => {
+        const config: EndpointConfig = { PerEndpointCredentialsEnabled: true };
+        const eff = resolveEndpointAuthEnablement(config, [{ type: 'wif-7523', enabled: false }]);
+        // wif is not a resolved facet -> the flat values are unchanged.
+        expect(eff).toEqual(getEffectiveAuthEnablement(config));
+      });
+    });
+
+    // WI-7: CredentialSecretVisibility precedence (server ceiling).
+    describe('getEffectiveCredentialSecretVisibility', () => {
+      it('defaults to "always" when nothing is set', () => {
+        expect(getEffectiveCredentialSecretVisibility(undefined, {})).toBe('always');
+      });
+
+      it('server "once" forces "once" even when the endpoint says "always"', () => {
+        expect(
+          getEffectiveCredentialSecretVisibility('once', { CredentialSecretVisibility: 'always' }),
+        ).toBe('once');
+      });
+
+      it('server "always" lets the endpoint opt into "once"', () => {
+        expect(
+          getEffectiveCredentialSecretVisibility('always', { CredentialSecretVisibility: 'once' }),
+        ).toBe('once');
+      });
+
+      it('server "always" + endpoint "always" -> "always"', () => {
+        expect(
+          getEffectiveCredentialSecretVisibility('always', { CredentialSecretVisibility: 'always' }),
+        ).toBe('always');
+      });
+
+      it('is case-insensitive and falls back to "always" on invalid values', () => {
+        expect(getEffectiveCredentialSecretVisibility('ONCE', {})).toBe('once');
+        expect(getEffectiveCredentialSecretVisibility('bogus', { CredentialSecretVisibility: 'nope' })).toBe('always');
+      });
+    });
+
+    describe('normalizeCredentialSecretVisibility', () => {
+      it('normalizes valid values and rejects the rest', () => {
+        expect(normalizeCredentialSecretVisibility('always')).toBe('always');
+        expect(normalizeCredentialSecretVisibility('Once')).toBe('once');
+        expect(normalizeCredentialSecretVisibility('x')).toBeUndefined();
+        expect(normalizeCredentialSecretVisibility(42)).toBeUndefined();
+      });
+    });
+
+    describe('validateEndpointConfig - CredentialSecretVisibility', () => {
+      it('accepts always/once (case-insensitive)', () => {
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'always' })).not.toThrow();
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'ONCE' })).not.toThrow();
+      });
+
+      it('rejects an invalid enum value', () => {
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'sometimes' })).toThrow(
+          /Allowed values: "always", "once"/,
+        );
+      });
+
+      it('rejects a non-string value', () => {
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: true })).toThrow(
+          /Expected string/,
+        );
+      });
+    });
+
+    // Runtime egress robustness - number-typed flags (JWKS fetch tuning).
+    describe('validateEndpointConfig - egress number flags', () => {
+      it('accepts in-range numbers and numeric strings', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 1500 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: '1500' })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchRetries: 0 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchRetries: 10 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksFetchRetryBackoffMs: 0 })).not.toThrow();
+        expect(() => validateEndpointConfig({ JwksCacheMaxAgeMs: 86400000 })).not.toThrow();
+      });
+
+      it('rejects a value below the minimum', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 50 })).toThrow(/below the minimum 100/);
+        expect(() => validateEndpointConfig({ JwksFetchRetries: -1 })).toThrow(/below the minimum 0/);
+      });
+
+      it('rejects a value above the maximum', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 60001 })).toThrow(/exceeds the maximum 60000/);
+        expect(() => validateEndpointConfig({ JwksFetchRetries: 11 })).toThrow(/exceeds the maximum 10/);
+      });
+
+      it('rejects a non-numeric value', () => {
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: 'abc' })).toThrow(/finite number/);
+        expect(() => validateEndpointConfig({ JwksFetchTimeoutMs: true })).toThrow(/Expected a number or numeric string/);
+      });
+
+      it('leaves the egress flags OUT of DEFAULT_ENDPOINT_CONFIG (fall through to server)', () => {
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksFetchTimeoutMs).toBeUndefined();
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksFetchRetries).toBeUndefined();
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksFetchRetryBackoffMs).toBeUndefined();
+        expect(DEFAULT_ENDPOINT_CONFIG.JwksCacheMaxAgeMs).toBeUndefined();
+      });
+    });
+
+    describe('getConfigNumber', () => {
+      it('reads native numbers and numeric strings, undefined otherwise', () => {
+        expect(getConfigNumber({ JwksFetchTimeoutMs: 1500 }, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBe(1500);
+        expect(getConfigNumber({ JwksFetchTimeoutMs: '1500' }, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBe(1500);
+        expect(getConfigNumber({}, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBeUndefined();
+        expect(getConfigNumber({ JwksFetchTimeoutMs: 'x' }, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBeUndefined();
+        expect(getConfigNumber(undefined, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS)).toBeUndefined();
+      });
+    });
+
+    describe('resolveEndpointEgressOverrides', () => {
+      it('returns only the explicitly-set fields', () => {
+        expect(resolveEndpointEgressOverrides({ JwksFetchTimeoutMs: 1500, JwksFetchRetries: 4 })).toEqual({
+          timeoutMs: 1500,
+          retries: 4,
+        });
+      });
+
+      it('returns an empty object when nothing is set (server defaults apply)', () => {
+        expect(resolveEndpointEgressOverrides({})).toEqual({});
+        expect(resolveEndpointEgressOverrides(undefined)).toEqual({});
+      });
+
+      it('coerces numeric strings', () => {
+        expect(
+          resolveEndpointEgressOverrides({
+            JwksFetchRetryBackoffMs: '50',
+            JwksCacheMaxAgeMs: '30000',
+          }),
+        ).toEqual({ retryBackoffMs: 50, cacheMaxAgeMs: 30000 });
+      });
+    });
+
+    describe('getEffectivePersistRequestSecrets', () => {
+      it('inherits the server default when the endpoint leaves it unset', () => {
+        expect(getEffectivePersistRequestSecrets(undefined, true)).toBe(true);
+        expect(getEffectivePersistRequestSecrets({}, true)).toBe(true);
+        expect(getEffectivePersistRequestSecrets({}, false)).toBe(false);
+      });
+
+      it('endpoint value OVERRIDES the server default (both directions)', () => {
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: false }, true)).toBe(false);
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: true }, false)).toBe(true);
+      });
+
+      it('accepts string boolean values (Entra-style)', () => {
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'False' }, true)).toBe(false);
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'True' }, false)).toBe(true);
+      });
+
+      it('is NOT baked into DEFAULT_ENDPOINT_CONFIG (stays inheritable)', () => {
+        expect(DEFAULT_ENDPOINT_CONFIG.PersistRequestSecrets).toBeUndefined();
+      });
+
+      it('is validated as a boolean flag', () => {
+        expect(() => validateEndpointConfig({ PersistRequestSecrets: true })).not.toThrow();
+        expect(() => validateEndpointConfig({ PersistRequestSecrets: 'False' })).not.toThrow();
+        expect(() => validateEndpointConfig({ PersistRequestSecrets: 'Maybe' })).toThrow();
       });
     });
   });

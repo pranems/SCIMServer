@@ -207,6 +207,52 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(401);
     });
 
+    it('Phase 2: a rejected resource-plane auth records a decision trace with the method-selection cascade', async () => {
+      const basePath = scimBasePath(endpointId);
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', 'Bearer p2-resource-reject-probe')
+        .set('Accept', 'application/scim+json')
+        .expect(401);
+
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/auth-decisions?outcome=reject&limit=50`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const rec = (res.body.records as Array<Record<string, unknown>>).find(
+        (r) => r.plane === 'resource',
+      );
+      expect(rec).toBeDefined();
+      expect(rec!.outcome).toBe('reject');
+      const checks = rec!.checks as Array<{ id: string; status: string; expected?: string; received?: string }>;
+      const ids = checks.map((c) => c.id);
+      // The cascade names each candidate + why it did not win.
+      expect(ids).toEqual(expect.arrayContaining(['token_presented', 'endpoint_bearer', 'oauth_jwt', 'shared_secret']));
+      for (const c of checks) expect(c.received).toBeDefined();
+      // The raw token is never stored.
+      expect(JSON.stringify(rec)).not.toContain('p2-resource-reject-probe');
+    });
+
+    it('Phase 2: a successful per-endpoint bearer auth records an accept trace (method=endpoint_bearer)', async () => {
+      const basePath = scimBasePath(endpointId);
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${perEndpointToken}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/auth-decisions?outcome=accept&limit=50`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const rec = (res.body.records as Array<Record<string, unknown>>).find(
+        (r) => r.plane === 'resource' && r.method === 'endpoint_bearer',
+      );
+      expect(rec).toBeDefined();
+      const eb = (rec!.checks as Array<{ id: string; status: string }>).find((c) => c.id === 'endpoint_bearer');
+      expect(eb?.status).toBe('pass');
+    });
+
     it('should reject revoked per-endpoint credential', async () => {
       const basePath = scimBasePath(endpointId);
 
@@ -348,6 +394,143 @@ describe('Per-Endpoint Credentials (E2E)', () => {
           expiresAt: pastDate,
         })
         .expect(400);
+    });
+  });
+
+  // ───────── WI-11 - per-method auth-enablement flag family ─────────
+  describe('WI-11 - per-method auth-enablement flags', () => {
+    const legacyToken = getLegacyToken();
+
+    it('allows a bearer credential create when only SecretTokenBearerAuthEnabled is on', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SecretTokenBearerAuthEnabled: true });
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'wi11-bearer' })
+        .expect(201);
+    });
+
+    it('blocks an oauth_client create when OAuthClientCredentialsAuthEnabled is off (bearer only)', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: false });
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'oauth_client', label: 'wi11-oc' })
+        .expect(403);
+    });
+
+    it('value-preserving: legacy PerEndpointCredentialsEnabled=true still allows bearer create', async () => {
+      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'wi11-legacy' })
+        .expect(201);
+    });
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=false REFUSES the global shared secret', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SharedSecretBearerAuthEnabled: false });
+      // The global shared secret (legacyToken) is refused on this endpoint's routes.
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(401);
+    });
+
+    it('an endpoint with SharedSecretBearerAuthEnabled=true (default) still accepts the global secret', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SharedSecretBearerAuthEnabled: true });
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+    });
+
+    it('a default endpoint (no auth flags) still accepts the global secret (back-compat)', async () => {
+      const ep = await createEndpointWithConfig(app, token, {});
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+    });
+  });
+
+  // ───────── W2.5 - per-method enablement co-location (profile.authentication.methods[]) ─────────
+  describe('W2.5 - per-method enablement co-location', () => {
+    it('resource-guard honors a bearer method enabled:false even though the flat flag enables it (disabled-with-credential)', async () => {
+      // Flat flag ON -> bearer creds allowed + authenticate today.
+      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      const credRes = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'w2.5-coloc' })
+        .expect(201);
+      const bearer = credRes.body.token;
+      const basePath = scimBasePath(ep);
+
+      // Baseline: the per-endpoint bearer authenticates (flat flag enables it).
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${bearer}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+
+      // Co-locate an explicit DISABLE on the bearer method via the A1 API.
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/authentication/methods`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'bearer', enabled: false })
+        .expect(201);
+
+      // The SAME bearer is now REJECTED: methods[].enabled overrides the flat flag.
+      await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${bearer}`)
+        .set('Accept', 'application/scim+json')
+        .expect(401);
+    });
+
+    it('value-preserving: an endpoint with NO method entries still authenticates via the flat flag', async () => {
+      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      const credRes = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'w2.5-vp' })
+        .expect(201);
+      const bearer = credRes.body.token;
+
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${bearer}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
+    });
+
+    it('co-location enables a method the flat flag leaves off (bearer enabled:true with no flat flag)', async () => {
+      // No flat per-endpoint flag -> bearer create is normally blocked; enable
+      // the method explicitly first so the create-gate + guard both allow it.
+      const ep = await createEndpointWithConfig(app, token, {});
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/authentication/methods`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'bearer', enabled: true })
+        .expect(201);
+      // The create-gate now allows the bearer credential (co-located enable).
+      const credRes = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'bearer', label: 'w2.5-enable' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${credRes.body.token}`)
+        .set('Accept', 'application/scim+json')
+        .expect(200);
     });
   });
 });

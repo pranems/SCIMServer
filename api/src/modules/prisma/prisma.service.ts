@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
+import { resolveRuntimeConfig } from '../../bootstrap/runtime-config';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -24,7 +25,25 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       console.warn(`[PrismaService] DATABASE_URL not set – using fallback '${fallback}'.`);
     }
 
-    const pool = new pg.Pool({ connectionString: effectiveUrl, max: 5 });
+    // ── Connection pool (X15-F3) ──
+    // Prisma 7 requires a driver adapter, so this is a RAW pg.Pool and every
+    // option we do not pass takes the `pg` default. That silently dropped a
+    // bound that Prisma v6 had: `pg` defaults `connectionTimeoutMillis` to 0,
+    // meaning WAIT FOREVER for a connection, where v6 defaulted `pool_timeout`
+    // to 10 s. Under pool exhaustion that turned a fast, legible failure into a
+    // hung request. Every option is therefore passed EXPLICITLY - never rely on
+    // a library default you have not asserted.
+    //
+    // `max` is a GLOBAL budget, not a local choice: poolMax * maxReplicas must
+    // stay under the database's max_connections. Re-derive it whenever the
+    // replica ceiling or the DB tier changes.
+    const db = resolveRuntimeConfig((k) => process.env[k]).groups.database;
+    const pool = new pg.Pool({
+      connectionString: effectiveUrl,
+      max: db.poolMax.effective as number,
+      connectionTimeoutMillis: db.poolAcquireTimeoutMs.effective as number,
+      idleTimeoutMillis: db.poolIdleTimeoutMs.effective as number,
+    });
     const adapter = new PrismaPg(pool);
 
     super({

@@ -2,7 +2,7 @@
  * SettingsPage tests.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { SettingsPage } from './SettingsPage';
@@ -17,10 +17,26 @@ vi.mock('../api/queries', async () => {
     // tests don't have to mock them.
     useLogConfig: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
     useUpdateLogConfig: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
+    // WI-15 - JWKS host allowlist hooks. Benign defaults so pre-existing
+    // tests need not mock them.
+    useJwksHostAllowlist: vi.fn(() => ({ data: undefined, isLoading: false })),
+    useAddJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    useRemoveJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    useUpdateJwksHost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    usePatchJwksHosts: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    // WI-8 - server security settings hooks.
+    useSecuritySettings: vi.fn(() => ({ data: undefined, isLoading: false })),
+    useUpdateSecuritySettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+    // Server-level connection secrets (shown when visibility=always). Benign
+    // default: not revealed (secrets hidden).
+    useServerConnectionSecrets: vi.fn(() => ({
+      data: { revealed: false, visibility: 'once', sharedSecret: null, oauthClientId: null, oauthClientSecret: null },
+      isLoading: false,
+    })),
   };
 });
 
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings, useServerConnectionSecrets } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -93,6 +109,49 @@ describe('SettingsPage log config (Phase L4)', () => {
     expect(screen.getByTestId('log-config-section')).toBeInTheDocument();
   });
 
+  it('exposes a Copy/Download log-config-as-JSON export', () => {
+    (useLogConfig as ReturnType<typeof vi.fn>).mockReturnValue({ data: sampleConfig, isLoading: false, isError: false, error: null });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('log-config-export')).toBeInTheDocument();
+    expect(screen.getByTestId('log-config-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('log-config-export-download')).toBeInTheDocument();
+  });
+
+  it('R4b: renders the SCIMServer-level connection info card with global URLs', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('server-connection-info-card')).toBeInTheDocument();
+    // The GLOBAL token endpoint (not per-endpoint) is shown.
+    expect(screen.getByTestId('server-conn-token-endpoint').textContent).toContain('/scim/oauth/token');
+    expect(screen.getByTestId('server-conn-jwks-uri').textContent).toContain('/scim/oauth/jwks');
+    expect(screen.getByTestId('server-conn-oauth-metadata').textContent).toContain('/.well-known/oauth-authorization-server');
+    // Copy/Download JSON export affordances.
+    expect(screen.getByTestId('server-connection-info-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('server-connection-info-export-download')).toBeInTheDocument();
+  });
+
+  it('hides the global secrets when visibility is once (default mock)', () => {
+    wrap(<SettingsPage />);
+    expect(screen.queryByTestId('server-conn-shared-secret')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('server-conn-oauth-client-secret')).not.toBeInTheDocument();
+  });
+
+  it('shows the global secrets when CredentialSecretVisibility is always', () => {
+    (useServerConnectionSecrets as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        revealed: true,
+        visibility: 'always',
+        sharedSecret: 'shared-token-xyz',
+        oauthClientId: 'global-client',
+        oauthClientSecret: 'global-secret',
+      },
+      isLoading: false,
+    });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('server-conn-shared-secret').textContent).toContain('shared-token-xyz');
+    expect(screen.getByTestId('server-conn-oauth-client-id').textContent).toContain('global-client');
+    expect(screen.getByTestId('server-conn-oauth-client-secret').textContent).toContain('global-secret');
+  });
+
   it('renders the global level Combobox seeded from availableLevels', () => {
     (useLogConfig as ReturnType<typeof vi.fn>).mockReturnValue({ data: sampleConfig, isLoading: false, isError: false, error: null });
     wrap(<SettingsPage />);
@@ -152,5 +211,170 @@ describe('SettingsPage onboarding reset (Phase N2)', () => {
     btn.click();
     expect(localStorage.getItem('scimserver.onboarding.completedAt')).toBeNull();
     expect(localStorage.getItem('scimserver.onboarding.forceOpen')).toBe('1');
+  });
+});
+
+// ─── WI-15: JwksHostAllowlistSection ─────────────────────────────────
+
+describe('SettingsPage JWKS host allowlist (WI-15)', () => {
+  const view = {
+    seed: ['login.microsoftonline.com', 'accounts.google.com'],
+    env: ['idp.env.example.com'],
+    persisted: ['login.acme.example.com', 'sts.contoso.example.com'],
+    persistedEntries: [
+      { id: 'e1', host: 'login.acme.example.com', label: null },
+      { id: 'e2', host: 'sts.contoso.example.com', label: null },
+    ],
+    effective: [
+      'login.microsoftonline.com',
+      'accounts.google.com',
+      'idp.env.example.com',
+      'login.acme.example.com',
+      'sts.contoso.example.com',
+    ],
+  };
+
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.54.0', runtime: { node: 'v24', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    (useJwksHostAllowlist as ReturnType<typeof vi.fn>).mockReturnValue({ data: view, isLoading: false });
+    (useAddJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    (useRemoveJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    (useUpdateJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+    (usePatchJwksHosts as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+  });
+
+  it('renders the JWKS host card', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('jwks-hosts-card')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-hosts-input')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-hosts-add-button')).toBeInTheDocument();
+  });
+
+  it('lists each persisted host with a remove button', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('jwks-host-row-login.acme.example.com')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-host-remove-login.acme.example.com')).toBeInTheDocument();
+    expect(screen.getByTestId('jwks-host-row-sts.contoso.example.com')).toBeInTheDocument();
+  });
+
+  it('shows the seed + env hosts as built-in / always-allowed', () => {
+    wrap(<SettingsPage />);
+    const builtin = screen.getByTestId('jwks-hosts-builtin');
+    expect(builtin.textContent).toContain('login.microsoftonline.com');
+    expect(builtin.textContent).toContain('idp.env.example.com');
+  });
+
+  it('shows the empty state when there are no persisted hosts', () => {
+    (useJwksHostAllowlist as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...view, persisted: [], persistedEntries: [] },
+      isLoading: false,
+    });
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('jwks-hosts-empty')).toBeInTheDocument();
+  });
+
+  it('disables the Add button until a host is typed, then calls the add mutation lowercased', () => {
+    const mutate = vi.fn();
+    (useAddJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    const addBtn = screen.getByTestId('jwks-hosts-add-button');
+    expect(addBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId('jwks-hosts-input'), { target: { value: 'NEW.Idp.Example.COM' } });
+    expect(addBtn).not.toBeDisabled();
+    addBtn.click();
+    expect(mutate).toHaveBeenCalledWith(
+      { host: 'new.idp.example.com' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('clicking Remove calls the remove mutation with the host', () => {
+    const mutate = vi.fn();
+    (useRemoveJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    screen.getByTestId('jwks-host-remove-sts.contoso.example.com').click();
+    expect(mutate).toHaveBeenCalledWith('sts.contoso.example.com');
+  });
+
+  it('R1: Edit-in-place calls the update mutation with the id + new host lowercased', () => {
+    const mutate = vi.fn();
+    (useUpdateJwksHost as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    fireEvent.click(screen.getByTestId('jwks-host-edit-login.acme.example.com'));
+    fireEvent.change(screen.getByTestId('jwks-host-edit-input-login.acme.example.com'), { target: { value: 'Renamed.Example.COM' } });
+    fireEvent.click(screen.getByTestId('jwks-host-save-login.acme.example.com'));
+    expect(mutate).toHaveBeenCalledWith(
+      { id: 'e1', host: 'renamed.example.com' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('R1: the PATCH selective add/remove box calls patch with parsed host lists', () => {
+    const mutate = vi.fn();
+    (usePatchJwksHosts as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    fireEvent.change(screen.getByTestId('jwks-hosts-patch-add'), { target: { value: 'A.example.com, b.example.com' } });
+    fireEvent.change(screen.getByTestId('jwks-hosts-patch-remove'), { target: { value: 'old.example.com' } });
+    fireEvent.click(screen.getByTestId('jwks-hosts-patch-button'));
+    expect(mutate).toHaveBeenCalledWith(
+      { add: ['a.example.com', 'b.example.com'], remove: ['old.example.com'] },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+});
+
+// ─── WI-8: SecuritySettingsSection ───────────────────────────────────
+
+describe('SettingsPage security settings (WI-8)', () => {
+  beforeEach(() => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { version: '0.54.0', runtime: { node: 'v24', platform: 'linux', arch: 'x64' }, service: { uptimeSeconds: 60 }, storage: { persistenceBackend: 'prisma', databaseProvider: 'postgresql' } },
+      isLoading: false,
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({ data: { status: 'ok', uptime: 60 }, isLoading: false });
+    (useSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { credentialSecretVisibility: 'always', kek: { configured: true, isDefault: true } },
+      isLoading: false,
+    });
+    (useUpdateSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
+  });
+
+  it('renders the security settings card with the visibility group + KEK status', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('security-settings-card')).toBeInTheDocument();
+    expect(screen.getByTestId('security-visibility-group')).toBeInTheDocument();
+    const always = screen.getByTestId('security-visibility-always') as HTMLInputElement;
+    expect(always.checked).toBe(true);
+    expect(screen.getByTestId('security-kek-status').textContent).toContain('default');
+  });
+
+  it('exposes a Copy/Download security-settings-as-JSON export (PUT-body shape)', () => {
+    wrap(<SettingsPage />);
+    expect(screen.getByTestId('security-settings-export')).toBeInTheDocument();
+    expect(screen.getByTestId('security-settings-export-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('security-settings-export-download')).toBeInTheDocument();
+  });
+
+  it('reflects a server value of once', () => {
+    (useSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { credentialSecretVisibility: 'once', kek: { configured: true, isDefault: false } },
+      isLoading: false,
+    });
+    wrap(<SettingsPage />);
+    const once = screen.getByTestId('security-visibility-once') as HTMLInputElement;
+    expect(once.checked).toBe(true);
+    expect(screen.getByTestId('security-kek-status').textContent).toContain('configured');
+  });
+
+  it('selecting once fires the update mutation with the enum value', () => {
+    const mutate = vi.fn();
+    (useUpdateSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
+    wrap(<SettingsPage />);
+    screen.getByTestId('security-visibility-once').click();
+    expect(mutate).toHaveBeenCalledWith({ credentialSecretVisibility: 'once' });
   });
 });

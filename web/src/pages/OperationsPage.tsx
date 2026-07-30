@@ -28,6 +28,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   makeStyles,
+  mergeClasses,
   tokens,
   Card,
   Subtitle1,
@@ -56,13 +57,27 @@ import {
   type DatabaseUserRow,
   type DatabaseGroupRow,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
+import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 
 type OperationsTabKey = 'users' | 'groups' | 'statistics';
 
 const PAGE_SIZE = 50;
+
+/**
+ * Format an ISO timestamp as a short local date for the `created`
+ * column. The full value is preserved in the CSV export; the table cell
+ * only needs a scannable date (the raw ISO string forced the column wide
+ * and clipped awkwardly under the R5 overflow:hidden cell).
+ */
+function formatCreated(iso: string | null | undefined): string {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
+}
 
 const useStyles = makeStyles({
   page: {
@@ -87,6 +102,14 @@ const useStyles = makeStyles({
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: tokens.fontSizeBase300,
+    // R5 (copilot-instructions.md): a table whose cells truncate MUST use
+    // `table-layout:fixed` + explicit column widths, otherwise the browser
+    // sizes each column to its natural content width - a long email-shaped
+    // userName then balloons the first column (measured 591px of 856px on
+    // dev), pushing the active/endpoint/created columns off-screen so the
+    // grid reads as a single-column list. Fixed layout makes the <th>
+    // widths below authoritative and lets the inner TruncatedText clip.
+    tableLayout: 'fixed',
   },
   rowHeader: {
     textAlign: 'left',
@@ -98,6 +121,23 @@ const useStyles = makeStyles({
   rowCell: {
     padding: '8px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
+    // Belt + braces with tableLayout:fixed: guarantees no inner descendant
+    // can visually overflow its bounded column.
+    overflow: 'hidden',
+  },
+  // Explicit column widths (R5). Percentages (not px + one `auto`) so the
+  // columns scale PROPORTIONALLY under table-layout:fixed at ANY viewport:
+  // a px-fixed metadata set + an `auto` name column starves the name column
+  // to a few px on narrow screens (measured 26px at a 588px table), while
+  // pure percentages keep the name column dominant-but-bounded everywhere.
+  // Name + one metadata trio each sum to 100%.
+  colName: { width: '40%' },
+  colActive: { width: '14%' },
+  colMembers: { width: '14%' },
+  colEndpoint: { width: '20%' },
+  colCreated: { width: '26%' },
+  nameText: {
+    fontWeight: tokens.fontWeightSemibold,
   },
   endpointBadgeLink: {
     textDecoration: 'none',
@@ -259,6 +299,8 @@ const UsersSection: React.FC<{
   onPage: (p: number) => void;
 }> = ({ data, isLoading, error, search, activeOnly, page, onSearch, onActiveOnly, onPage }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 4 columns (userName|active|endpoint|created).
+  const cols = useResizableColumns('operations-users', 4, 'operations-users-col');
 
   const rows = data?.users ?? [];
   const pagination = data?.pagination;
@@ -319,17 +361,21 @@ const UsersSection: React.FC<{
           <table className={classes.rowTable}>
             <thead>
               <tr>
-                <th className={classes.rowHeader}>userName</th>
-                <th className={classes.rowHeader}>active</th>
-                <th className={classes.rowHeader}>endpoint</th>
-                <th className={classes.rowHeader}>created</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colName)} style={cols.headerProps(0).style}>userName<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colActive)} style={cols.headerProps(1).style}>active<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)} style={cols.headerProps(2).style}>endpoint<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colCreated)} style={cols.headerProps(3).style}>created</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((u) => (
                 <tr key={u.id} data-testid={`operations-user-row-${u.id}`}>
                   <td className={classes.rowCell}>
-                    <Text weight="semibold">{u.userName ?? '-'}</Text>
+                    <TruncatedText
+                      text={u.userName ?? '-'}
+                      className={classes.nameText}
+                      data-testid={`operations-user-row-${u.id}-username`}
+                    />
                     <br />
                     <CopyableField
                       value={u.id}
@@ -359,7 +405,7 @@ const UsersSection: React.FC<{
                     )}
                   </td>
                   <td className={classes.rowCell}>
-                    <Caption1>{u.createdAt ?? '-'}</Caption1>
+                    <Caption1>{formatCreated(u.createdAt)}</Caption1>
                   </td>
                 </tr>
               ))}
@@ -422,6 +468,8 @@ const GroupsSection: React.FC<{
   onPage: (p: number) => void;
 }> = ({ data, isLoading, error, search, page, onSearch, onPage }) => {
   const classes = useStyles();
+  // X7 - drag-to-resize the 4 columns (displayName|members|endpoint|created).
+  const cols = useResizableColumns('operations-groups', 4, 'operations-groups-col');
   const rows = data?.groups ?? [];
   const pagination = data?.pagination;
 
@@ -475,17 +523,21 @@ const GroupsSection: React.FC<{
           <table className={classes.rowTable}>
             <thead>
               <tr>
-                <th className={classes.rowHeader}>displayName</th>
-                <th className={classes.rowHeader}>members</th>
-                <th className={classes.rowHeader}>endpoint</th>
-                <th className={classes.rowHeader}>created</th>
+                <th className={mergeClasses(classes.rowHeader, classes.colName)} style={cols.headerProps(0).style}>displayName<ColumnResizeHandle {...cols.handleProps(0)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colMembers)} style={cols.headerProps(1).style}>members<ColumnResizeHandle {...cols.handleProps(1)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colEndpoint)} style={cols.headerProps(2).style}>endpoint<ColumnResizeHandle {...cols.handleProps(2)} /></th>
+                <th className={mergeClasses(classes.rowHeader, classes.colCreated)} style={cols.headerProps(3).style}>created</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((g) => (
                 <tr key={g.id} data-testid={`operations-group-row-${g.id}`}>
                   <td className={classes.rowCell}>
-                    <Text weight="semibold">{g.displayName ?? '-'}</Text>
+                    <TruncatedText
+                      text={g.displayName ?? '-'}
+                      className={classes.nameText}
+                      data-testid={`operations-group-row-${g.id}-displayname`}
+                    />
                     <br />
                     <CopyableField
                       value={g.id}
@@ -513,7 +565,7 @@ const GroupsSection: React.FC<{
                     )}
                   </td>
                   <td className={classes.rowCell}>
-                    <Caption1>{g.createdAt ?? '-'}</Caption1>
+                    <Caption1>{formatCreated(g.createdAt)}</Caption1>
                   </td>
                 </tr>
               ))}

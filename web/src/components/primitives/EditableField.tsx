@@ -77,6 +77,14 @@ const useStyles = makeStyles({
     flex: '1 1 auto',
     minWidth: 0,
   },
+  // Fluent Input/Textarea have no intrinsic full width - without this they
+  // render at a fixed default width and never stretch to fill inputCell,
+  // which made WIF trust fields look fixed-width and not resize with the
+  // window (R5). width:100% lets the field expand/shrink with its flex cell.
+  field: {
+    width: '100%',
+    maxWidth: '100%',
+  },
   buttons: {
     display: 'inline-flex',
     flex: '0 0 auto',
@@ -116,6 +124,10 @@ export interface EditableFieldProps {
   monospace?: boolean;
   /** Hide the inline "buttons" affordance row (rarely useful). */
   hideButtons?: boolean;
+  /** Optional inline validation message rendered under the field. */
+  validationMessage?: string;
+  /** Validation state driving the message styling. Default 'error'. */
+  validationState?: 'error' | 'warning' | 'success' | 'none';
 }
 
 const HISTORY_CAP = 50;
@@ -131,6 +143,8 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   'data-testid': testId,
   monospace = false,
   hideButtons = false,
+  validationMessage,
+  validationState = 'error',
 }) => {
   const classes = useStyles();
   const { copy, status } = useCopyToClipboard();
@@ -223,6 +237,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       placeholder={placeholder}
       disabled={disabled}
       rows={rows}
+      className={classes.field}
       data-testid={inputTestId}
       style={monospace ? { fontFamily: 'Consolas, "Courier New", monospace', fontSize: '12px' } : undefined}
     />
@@ -232,13 +247,20 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       onChange={(_, d) => handleChange(d.value)}
       placeholder={placeholder}
       disabled={disabled}
+      className={classes.field}
       data-testid={inputTestId}
       style={monospace ? { fontFamily: 'Consolas, "Courier New", monospace', fontSize: '12px' } : undefined}
     />
   );
 
   return (
-    <Field label={label} className={classes.root} data-testid={testId}>
+    <Field
+      label={label}
+      className={classes.root}
+      data-testid={testId}
+      validationMessage={validationMessage}
+      validationState={validationMessage ? (validationState === 'none' ? undefined : validationState) : undefined}
+    >
       <div className={classes.inputRow}>
         <div className={classes.inputCell}>{fieldContents}</div>
         {!hideButtons && (

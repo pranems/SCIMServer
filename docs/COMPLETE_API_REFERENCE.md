@@ -465,6 +465,64 @@ Authorization: Bearer changeme-scim
 
 ---
 
+### PUT /scim/admin/endpoints/:endpointId/credentials/:credentialId
+
+Edit a `wif` trust in place (only `wif` credentials are editable; bearer/oauth_client secrets are rotated). Applies the same validation + public-key projection as create, replaces the metadata, and can also change the `label`. Never returns a secret. Optional `verify: true` runs the reachability gate first and rejects with `422` if it fails (nothing persisted). Returns `400` for a non-wif credential or a dropped required field; `404` for an unknown/cross-endpoint id.
+
+```http
+PUT /scim/admin/endpoints/a1b2c3d4-.../credentials/cred-uuid-... HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+Content-Type: application/scim+json
+```
+
+```json
+{
+  "credentialType": "wif",
+  "label": "Contoso Entra (prod)",
+  "verify": true,
+  "wif": {
+    "expectedIssuer": "https://login.microsoftonline.com/<tenant>/v2.0",
+    "expectedSubject": "sp-object-id",
+    "expectedAudience": "api://scim-app",
+    "jwksUri": "https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys",
+    "allowedTenantId": "<tenant>",
+    "requiredRoles": ["Scim.Provision"],
+    "roleEnforcement": "off"
+  }
+}
+```
+
+**Response:** 200 with the updated public trust (no secret). `422` when `verify:true` and the reachability checks fail (body carries `scimType: "invalidValue"` + `checks[]`).
+
+> **U8 tenant gleaning (v0.54.32):** if `allowedTenantId` is omitted on create/edit, the server infers it from the Entra directory tenant GUID embedded in `expectedIssuer` (preferred) or `jwksUri`, and records a non-secret `allowedTenantIdSource` (`issuer` | `jwksUri`) on the stored trust. A trust with no inferable GUID and no explicit tenant is still rejected `400`.
+>
+> **U7 last-verified (v0.54.33):** a passing `verify:true` create/edit stamps a `lastVerifiedAt` ISO timestamp on the trust metadata (carried forward across non-verifying edits), surfaced on the endpoint overview + connection-info so the UI can show a Verified/Unverified state per trust.
+
+---
+
+### POST /scim/admin/endpoints/:endpointId/wif/verify
+
+Config-time reachability + liveness check for a WIF trust's issuer + JWKS URI. Non-throwing: returns a per-check checklist. SSRF-gated by the JWKS host allowlist (a disallowed host is a failed check, never fetched). Requires `WifCredentialsEnabled: true`.
+
+```http
+POST /scim/admin/endpoints/a1b2c3d4-.../wif/verify HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+Content-Type: application/scim+json
+```
+
+```json
+{
+  "expectedIssuer": "https://login.microsoftonline.com/<tenant>/v2.0",
+  "jwksUri": "https://login.windows.net/<tenant>/discovery/v2.0/keys"
+}
+```
+
+**Response:** 200 with `{ "ok": boolean, "checks": [ { "id", "label", "ok", "detail" } ] }` (checks: `issuerFormat`, `issuerHostAllowed`, `issuerReachable`, `jwksFormat`, `jwksHostAllowed`, `jwksReachable`, `jwksServesKeys`).
+
+---
+
 ## Admin - Logs & Audit Trail
 
 ### GET /scim/admin/logs
@@ -1798,8 +1856,13 @@ The `urn:scimserver:api:messages:2.0:Diagnostics` extension is automatically add
 | 79 | GET | `/scim/endpoints/:id/logs/stream` | Bearer | EndpointLogController |
 | 80 | GET | `/scim/endpoints/:id/logs/download` | Bearer | EndpointLogController |
 | 81 | GET | `/scim/endpoints/:id/logs/history` | Bearer | EndpointLogController |
+| 81a | GET | `/scim/endpoints/:id/logs/:logId` | Bearer | EndpointLogController (tenant-isolated full request/response detail for the clickable endpoint-Logs drawer; 404 unless the log is scoped to the endpoint) |
 | 82 | POST | `/scim/oauth/token` | Public | OAuthController |
 | 83 | GET | `/scim/oauth/test` | Public | OAuthController |
+| 83a | GET | `/scim/docs/auth-errors` | Public | AuthErrorsCatalogController (WI-D2 reason-code catalog; `?plane=wif\|oauth_client\|bearer`) |
+| 83b | GET | `/scim/admin/auth-decisions` | Bearer | AuthDecisionsController (WI-D5 global recent auth decisions; `?outcome=`, `?reasonCode=`, `?limit=`) |
+| 83c | GET | `/scim/admin/endpoints/:endpointId/auth-decisions` | Bearer | AuthDecisionsController (WI-D5 per-endpoint recent auth decisions) |
+| 83d | GET | `/scim/admin/settings/security/connection-secrets` | Bearer | AdminSecuritySettingsController (server-level global secrets - SCIM shared secret + global OAuth client id/secret - inlined only when server CredentialSecretVisibility is `always`) |
 | 84 | GET | `/scim/admin/dashboard` | Bearer | DashboardController |
 | 85 | GET | `/scim/admin/endpoints/:endpointId/overview` | Bearer | DashboardController |
 | 86 | GET | `/` | Public | WebController (serves SPA) |

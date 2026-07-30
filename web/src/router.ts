@@ -37,6 +37,7 @@ import { settingsTabRoute } from './routes/endpoints.$endpointId.settings';
 import { activityTabRoute } from './routes/endpoints.$endpointId.activity';
 import { schemasTabRoute } from './routes/endpoints.$endpointId.schemas';
 import { credentialsTabRoute } from './routes/endpoints.$endpointId.credentials';
+import { connectTabRoute } from './routes/endpoints.$endpointId.connect';
 import { bulkTabRoute } from './routes/endpoints.$endpointId.bulk';
 import { resourceTypesTabRoute } from './routes/endpoints.$endpointId.resource-types';
 import { logsRoute } from './routes/logs';
@@ -60,6 +61,8 @@ const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   activityTabRoute,
   schemasTabRoute,
   credentialsTabRoute,
+  // WI-5 - Connect tab (connection-info surface)
+  connectTabRoute,
   // Phase M2 - Bulk Operations UI
   bulkTabRoute,
   // Phase M3 - Custom Resource Types UI

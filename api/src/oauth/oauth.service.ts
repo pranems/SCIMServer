@@ -140,40 +140,137 @@ export class OAuthService {
    *
    * Credential validation (matching the per-endpoint `oauth-client` client_id /
    * secret) is the caller's responsibility; this method only issues the token.
+   *
+   * Q6.4 - `options.trustedScope` lets the WIF flow mint with an
+   * admin-configured scope verbatim (the scope is set by the operator on the
+   * `wif` trust, not requested by the caller, so it bypasses the caller-scope
+   * filter). `options.ttlSec` sets the lifetime, clamped to the Entra-spec
+   * 1-6h window.
    */
   generateEndpointAccessToken(
     endpointId: string,
     clientId: string,
     requestedScope?: string,
+    options?: {
+      ttlSec?: number;
+      trustedScope?: string;
+      sourceIssuer?: string;
+      sourceSubject?: string;
+      /**
+       * W3.6 - the `exp` (epoch seconds) of the assertion that authorized this
+       * mint. The issued token is capped so it can NEVER outlive its own
+       * authorization (SyncFabric guide 13.5). Omitted for non-federated mints.
+       */
+      assertionExpiresAt?: number;
+      /**
+       * W3.8 (guide 13.4) - provenance. `authMethod` names the profile that
+       * authorized the mint (e.g. `syncfabric-rfc7523`, `client_secret`) so a
+       * downstream consumer can tell them apart. The `source*` values describe
+       * the federated principal and are omitted entirely for non-federated
+       * mints. None of these is an authorization input - they are attribution.
+       */
+      authMethod?: string;
+      sourceTenantId?: string;
+      sourceObjectId?: string;
+      sourceAuthorizedParty?: string;
+    },
   ): Promise<AccessToken> {
     const defaultScopes = ['scim.read', 'scim.write', 'scim.manage'];
-    const requestedScopes = requestedScope ? requestedScope.split(' ').filter(Boolean) : [];
-    const allowed = requestedScopes.filter((s) => defaultScopes.includes(s));
-    const grantedScopes = allowed.length > 0 ? allowed : defaultScopes;
+
+    let grantedScope: string;
+    if (options?.trustedScope && options.trustedScope.trim().length > 0) {
+      // Admin-configured (WIF) scope - trusted, used verbatim.
+      grantedScope = options.trustedScope.trim();
+    } else {
+      const requestedScopes = requestedScope ? requestedScope.split(' ').filter(Boolean) : [];
+      const allowed = requestedScopes.filter((s) => defaultScopes.includes(s));
+      grantedScope = (allowed.length > 0 ? allowed : defaultScopes).join(' ');
+    }
+
+    // Clamp the lifetime to the Entra WIF 1-6h window; default 1h.
+    const TTL_FLOOR = 3600;
+    const TTL_CEIL = 21600;
+    let expiresIn = TTL_FLOOR;
+    if (typeof options?.ttlSec === 'number' && Number.isFinite(options.ttlSec)) {
+      expiresIn = Math.min(TTL_CEIL, Math.max(TTL_FLOOR, Math.floor(options.ttlSec)));
+    }
+
+    // W3.6 (guide 13.5) - never issue a token that outlives the verified
+    // assertion that authorized it. This cap is applied AFTER the static
+    // window clamp so the 1h floor can never raise the lifetime back above the
+    // assertion: a 6h configured TTL against a 1h assertion yields 1h, and an
+    // assertion with only minutes left yields only those minutes.
+    if (
+      typeof options?.assertionExpiresAt === 'number' &&
+      Number.isFinite(options.assertionExpiresAt)
+    ) {
+      const remaining = Math.floor(options.assertionExpiresAt - Date.now() / 1000);
+      if (remaining < expiresIn) {
+        // Keep at least 1s so an almost-expired assertion still yields a usable
+        // (if very short) token rather than a zero/negative lifetime.
+        expiresIn = Math.max(1, remaining);
+      }
+    }
 
     const payload = {
       sub: clientId,
       client_id: clientId,
       aud: `${this.audience}:${endpointId}`,
       endpoint_id: endpointId,
-      scope: grantedScopes.join(' '),
+      scope: grantedScope,
       token_type: 'access_token',
+      // W3.8 (guide 13.6) - a unique per-token identifier. It gives every
+      // issued token a stable handle for log correlation and is the
+      // prerequisite for any future replay denylist / revocation list.
+      jti: crypto.randomUUID(),
+      // W3.8 (guide 13.4) - which auth profile authorized this mint. Without
+      // it a consumer cannot distinguish an RFC 7523 token from a future RFC
+      // 8693 one, nor a federated mint from a plain client_secret mint.
+      ...(options?.authMethod && options.authMethod.trim().length > 0
+        ? { auth_method: options.authMethod.trim() }
+        : {}),
+      // WI-17 - when the token is minted from a federated (WIF) assertion, stamp
+      // the winning trust's issuer so telemetry + downstream consumers can
+      // attribute which identity provider drove the call. Omitted for plain
+      // oauth_client mints (no source issuer).
+      ...(options?.sourceIssuer && options.sourceIssuer.trim().length > 0
+        ? { src_iss: options.sourceIssuer.trim() }
+        : {}),
+      // W3.2 - the issued token's `sub`/`client_id` identify the OAuth CLIENT
+      // (the endpoint's own client identity), never the federated assertion
+      // subject. When the mint was driven by a WIF assertion, the source
+      // subject is preserved as a DISTINCT `src_sub` claim for attribution
+      // only, keeping the OAuth client identity and the federated principal as
+      // separate values (RFC 6749 client_id vs the RFC 7523 assertion sub).
+      ...(options?.sourceSubject && options.sourceSubject.trim().length > 0
+        ? { src_sub: options.sourceSubject.trim() }
+        : {}),
+      // W3.8 (guide 13.4) - the rest of the federated principal, for
+      // attribution + multi-tenant analytics. Absent on non-federated mints.
+      ...(options?.sourceTenantId && options.sourceTenantId.trim().length > 0
+        ? { source_tid: options.sourceTenantId.trim() }
+        : {}),
+      ...(options?.sourceObjectId && options.sourceObjectId.trim().length > 0
+        ? { source_oid: options.sourceObjectId.trim() }
+        : {}),
+      ...(options?.sourceAuthorizedParty && options.sourceAuthorizedParty.trim().length > 0
+        ? { source_azp: options.sourceAuthorizedParty.trim() }
+        : {}),
     };
 
-    const expiresIn = 3600;
     const accessToken = this.jwtService.sign(payload, { expiresIn: `${expiresIn}s` });
 
     this.logger.info(LogCategory.OAUTH, 'Per-endpoint access token generated', {
       endpointId,
       clientId,
-      scopes: grantedScopes,
+      scopes: grantedScope,
       expiresIn,
     });
 
     return Promise.resolve({
       accessToken,
       expiresIn,
-      scope: grantedScopes.join(' '),
+      scope: grantedScope,
     });
   }
 
@@ -189,7 +286,19 @@ export class OAuthService {
       this.logger.debug(LogCategory.OAUTH, 'Token validation failed', {
         reason: error instanceof Error ? error.message : String(error),
       });
-      throw new UnauthorizedException('Invalid or expired token');
+      // F3 - preserve the specific failure category so the resource guard can
+      // surface bearer_oauth_expired vs bearer_oauth_signature_invalid instead
+      // of the generic bearer_invalid. jsonwebtoken throws TokenExpiredError /
+      // NotBeforeError / JsonWebTokenError('invalid signature'); map those to a
+      // jose-style `code` on the thrown exception (the wire message stays generic).
+      const name = error instanceof Error ? error.name : '';
+      const message = error instanceof Error ? error.message : '';
+      let code: string | undefined;
+      if (name === 'TokenExpiredError' || name === 'NotBeforeError') code = 'ERR_JWT_EXPIRED';
+      else if (name === 'JsonWebTokenError' && /signature/i.test(message)) code = 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED';
+      const unauthorized = new UnauthorizedException('Invalid or expired token');
+      if (code) (unauthorized as unknown as { code: string }).code = code;
+      throw unauthorized;
     }
   }
 

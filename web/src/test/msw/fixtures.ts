@@ -20,6 +20,7 @@ import type {
   VersionInfo,
   HealthResponse,
 } from '@scim/types/dashboard.types';
+import type { ConnectionInfo } from '@scim/types/connection-info.types';
 
 /** Test endpoint id used as the "default" subject of detail/overview/etc. handlers. */
 export const FIXTURE_ENDPOINT_ID = 'ep-msw-1';
@@ -124,6 +125,39 @@ export const FIXTURE_ENDPOINT_STATS: EndpointStatsResponse = {
   requestLogs: { total: 100 },
 };
 
+export const FIXTURE_CONNECTION_INFO: ConnectionInfo = {
+  endpointId: FIXTURE_ENDPOINT_ID,
+  displayName: FIXTURE_ENDPOINT_DISPLAY_NAME,
+  urls: {
+    scimBaseUrl: `https://scim.example.com/scim/v2/endpoints/${FIXTURE_ENDPOINT_ID}`,
+    scimBaseUrlBare: `https://scim.example.com/scim/endpoints/${FIXTURE_ENDPOINT_ID}`,
+    tokenEndpoint: `https://scim.example.com/scim/endpoints/${FIXTURE_ENDPOINT_ID}/oauth/token`,
+    serviceProviderConfig: `https://scim.example.com/scim/v2/endpoints/${FIXTURE_ENDPOINT_ID}/ServiceProviderConfig`,
+    oauthMetadata: `https://scim.example.com/scim/endpoints/${FIXTURE_ENDPOINT_ID}/.well-known/oauth-authorization-server`,
+  },
+  enabledMethods: [
+    {
+      method: 'oauth_client',
+      label: 'OAuth2 client credentials',
+      entraAuthenticationMethod: 'OAuth2 Client Credentials Grant',
+      entraFields: {
+        tenantUrl: `https://scim.example.com/scim/v2/endpoints/${FIXTURE_ENDPOINT_ID}`,
+        tokenEndpoint: `https://scim.example.com/scim/endpoints/${FIXTURE_ENDPOINT_ID}/oauth/token`,
+        clientIdentifier: FIXTURE_ENDPOINT_ID,
+        clientSecret: null,
+      },
+      clientSecretState: 'set-shown-once',
+    },
+  ],
+  disabledMethods: [
+    {
+      method: 'wif',
+      reason: 'WifCredentialsEnabled is not set',
+      enableHint: 'Set WifCredentialsEnabled=True in endpoint Settings',
+    },
+  ],
+};
+
 export const FIXTURE_ENDPOINT_OVERVIEW: EndpointOverviewResponse = {
   endpoint: {
     id: FIXTURE_ENDPOINT_ID,
@@ -167,6 +201,7 @@ export const FIXTURE_ENDPOINT_OVERVIEW: EndpointOverviewResponse = {
       durationMs: 42,
     },
   ],
+  connectionInfo: FIXTURE_CONNECTION_INFO,
 };
 
 export const FIXTURE_VERSION: VersionInfo = {

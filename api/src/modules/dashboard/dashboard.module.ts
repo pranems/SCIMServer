@@ -11,14 +11,33 @@
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase B1
  */
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { EndpointModule } from '../endpoint/endpoint.module';
 import { LoggingModule } from '../logging/logging.module';
 import { StatsModule } from '../stats/stats.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { DashboardController } from './dashboard.controller';
+import { ConnectionInfoService } from '../scim/services/connection-info.service';
+import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
+import { CredentialSecurityService } from '../../security/credential-security.service';
+import { CredentialEncryptionService } from '../../security/credential-encryption.service';
 
 @Module({
-  imports: [StatsModule, EndpointModule, LoggingModule, RepositoryModule.register()],
+  imports: [ConfigModule, StatsModule, EndpointModule, LoggingModule, RepositoryModule.register()],
   controllers: [DashboardController],
+  // ConnectionInfoService is a pure, stateless assembler (WI-2/WI-3). It is
+  // provided directly here (rather than importing ScimModule) to keep
+  // DashboardModule self-contained and avoid a module cycle; two instances of a
+  // stateless service are harmless. The secret resolver + its two security
+  // deps are added so the overview BFF's embedded connectionInfo can inline
+  // secrets when CredentialSecretVisibility=always (identical policy to the
+  // connection-info controller). CredentialEncryptionService re-provisions the
+  // same DEK idempotently, so a second instance is harmless.
+  providers: [
+    ConnectionInfoService,
+    ConnectionSecretResolverService,
+    CredentialSecurityService,
+    CredentialEncryptionService,
+  ],
 })
 export class DashboardModule {}

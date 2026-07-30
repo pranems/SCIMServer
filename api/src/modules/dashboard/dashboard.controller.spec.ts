@@ -21,6 +21,17 @@ import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import type { DashboardResponse, EndpointOverviewResponse } from '../../shared/types/dashboard.types';
+import { ConnectionInfoService } from '../scim/services/connection-info.service';
+import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
+
+/** Minimal Express-like request stub for the overview host derivation (WI-3). */
+function reqStub(): any {
+  return {
+    headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'scim.example.com' },
+    protocol: 'https',
+    get: () => 'scim.example.com',
+  };
+}
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -128,6 +139,21 @@ describe('DashboardController', () => {
         { provide: EndpointService, useValue: mockEndpointWithGet },
         { provide: LoggingService, useValue: mockLoggingService },
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: mockCredentialRepo },
+        // WI-3: the pure connection-info assembler (real instance).
+        ConnectionInfoService,
+        // Secret resolver stubbed to withhold everything (visibility=once
+        // default for these tests), preserving the no-secret-leak assertions.
+        {
+          provide: ConnectionSecretResolverService,
+          useValue: {
+            resolveForEndpoint: jest.fn().mockResolvedValue({
+              sharedSecret: null,
+              bearerToken: null,
+              oauthClientSecret: null,
+              anyEndpointSecretRevealed: false,
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -310,13 +336,13 @@ describe('DashboardController', () => {
     });
 
     it('returns the canonical overview shape (key allowlist)', async () => {
-      const result: EndpointOverviewResponse = await controller.getEndpointOverview(endpointId);
+      const result: EndpointOverviewResponse = await controller.getEndpointOverview(endpointId, reqStub());
 
       // Top-level keys lock - never add an undocumented key without
       // updating the test, the response contract doc, and the frontend
       // hook's TypeScript shape.
       expect(Object.keys(result).sort()).toEqual(
-        ['configFlags', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
+        ['configFlags', 'connectionInfo', 'credentials', 'endpoint', 'recentActivity', 'stats'].sort(),
       );
       expect(Object.keys(result.endpoint).sort()).toEqual(
         ['active', 'createdAt', 'displayName', 'id', 'name', 'preset', 'scimBasePath'].sort(),
@@ -327,7 +353,7 @@ describe('DashboardController', () => {
     });
 
     it('reads stats from StatsProjectionService (zero DB queries)', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       expect(mockStatsService.getEndpointStats).toHaveBeenCalledWith(endpointId);
       expect(result.stats.userCount).toBe(500);
@@ -336,12 +362,12 @@ describe('DashboardController', () => {
     });
 
     it('extracts preset from endpoint profile', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
       expect(result.endpoint.preset).toBe('entra-id');
     });
 
     it('returns empty credentials array when none exist', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
       expect(result.credentials).toEqual([]);
     });
 
@@ -361,7 +387,7 @@ describe('DashboardController', () => {
         } as any,
       ]);
 
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       expect(result.credentials).toHaveLength(1);
       const cred = result.credentials[0];
@@ -371,6 +397,83 @@ describe('DashboardController', () => {
       expect(cred.active).toBe(true);
       // Critical: hash is stripped from the projection.
       expect((cred as unknown as Record<string, unknown>).credentialHash).toBeUndefined();
+    });
+
+    it('projects the public WIF trust fields for a wif credential', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValueOnce([
+        {
+          id: 'wif-1',
+          endpointId,
+          credentialType: 'wif',
+          label: 'Contoso Entra',
+          active: true,
+          createdAt: new Date('2026-02-01T00:00:00Z'),
+          expiresAt: null,
+          credentialHash: '',
+          metadata: {
+            expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
+            expectedSubject: 'sp-obj-id',
+            expectedAudience: 'api://app',
+            jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
+            allowedTenantId: 'tenant-guid',
+            requiredRoles: ['Scim.Provision'],
+            scope: 'scim.read scim.write',
+            assertionProfile: 'jwt-bearer',
+            // An internal seam field that MUST NOT leak through the display
+            // projection (closed allowlist).
+            roleScopeMap: { 'Scim.Provision': ['scim.write'] },
+          },
+        } as any,
+      ]);
+
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
+      const cred = result.credentials[0];
+      expect(cred.credentialType).toBe('wif');
+      expect(cred.wif).toBeDefined();
+      const trust = cred.wif!;
+      expect(trust.expectedIssuer).toBe('https://login.microsoftonline.com/t/v2.0');
+      expect(trust.expectedSubject).toBe('sp-obj-id');
+      expect(trust.expectedAudience).toBe('api://app');
+      expect(trust.jwksUri).toBe('https://login.microsoftonline.com/t/discovery/v2.0/keys');
+      expect(trust.allowedTenantId).toBe('tenant-guid');
+      expect(trust.requiredRoles).toEqual(['Scim.Provision']);
+      expect(trust.scope).toBe('scim.read scim.write');
+      // Closed-allowlist guard: the seam field is not projected.
+      expect(Object.keys(trust).sort()).toEqual(
+        [
+          'allowedTenantId',
+          'allowedTenantIdSource',
+          'assertionProfile',
+          'expectedAudience',
+          'expectedIssuer',
+          'expectedSubject',
+          'issuedTokenTtlSec',
+          'jwksUri',
+          'lastVerifiedAt',
+          'requiredRoles',
+          'roleEnforcement',
+          'scope',
+        ].sort(),
+      );
+      expect((trust as unknown as Record<string, unknown>).roleScopeMap).toBeUndefined();
+    });
+
+    it('does not attach a wif field to non-wif credentials', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValueOnce([
+        {
+          id: 'bearer-1',
+          endpointId,
+          credentialType: 'bearer',
+          label: 'Entra',
+          active: true,
+          createdAt: new Date('2026-02-01T00:00:00Z'),
+          expiresAt: null,
+          credentialHash: 'hash',
+        } as any,
+      ]);
+
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
+      expect(result.credentials[0].wif).toBeUndefined();
     });
 
     it('returns recent activity scoped to the endpoint (last 10)', async () => {
@@ -392,7 +495,7 @@ describe('DashboardController', () => {
         hasPrev: false,
       });
 
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       // Capped at 10 entries even when the upstream returns more.
       expect(result.recentActivity.length).toBeLessThanOrEqual(10);
@@ -406,7 +509,7 @@ describe('DashboardController', () => {
     });
 
     it('returns config flags from profile.settings (all non-undefined)', async () => {
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
 
       expect(result.configFlags).toEqual({
         StrictSchemaValidation: true,
@@ -420,7 +523,7 @@ describe('DashboardController', () => {
         new NotFoundException('Endpoint "missing" not found'),
       );
 
-      await expect(controller.getEndpointOverview('missing')).rejects.toBeInstanceOf(
+      await expect(controller.getEndpointOverview('missing', reqStub())).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -442,7 +545,7 @@ describe('DashboardController', () => {
         },
       });
 
-      const result = await controller.getEndpointOverview(endpointId);
+      const result = await controller.getEndpointOverview(endpointId, reqStub());
       expect(result.configFlags).toEqual({});
       expect(result.endpoint.preset).toBe('minimal');
     });

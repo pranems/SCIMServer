@@ -22,6 +22,8 @@ import {
   CardHeader,
   Text,
   Badge,
+  Button,
+  Tooltip,
   Subtitle1,
   Body1,
   Caption1,
@@ -34,11 +36,13 @@ import {
   History24Regular,
   ChartMultiple24Regular,
   DataPie24Regular,
+  Open16Regular,
 } from '@fluentui/react-icons';
 import { useDashboard, useActivitySummary } from '../api/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { DashboardResponse, DashboardEndpoint } from '@scim/types/dashboard.types';
 import { EmptyState, KpiChart, LoadingSkeleton } from '../components/primitives';
+import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 
 const useStyles = makeStyles({
   page: {
@@ -196,6 +200,7 @@ function methodColor(method: string): 'brand' | 'success' | 'warning' | 'danger'
 
 export const DashboardPage: React.FC = () => {
   const classes = useStyles();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useDashboard();
 
   if (isLoading) {
@@ -315,6 +320,13 @@ export const DashboardPage: React.FC = () => {
               <div
                 key={activity.id}
                 className={`${classes.activityItem} ${activity.statusCode >= 400 ? classes.errorItem : ''}`}
+                onClick={() => void navigate({ to: '/logs', search: { detail: activity.id } as never })}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void navigate({ to: '/logs', search: { detail: activity.id } as never }); } }}
+                title="Open this request in the Logs view"
+                style={{ cursor: 'pointer' }}
+                data-testid={`dashboard-activity-row-${activity.id}`}
               >
                 <Badge
                   appearance="filled"
@@ -323,15 +335,42 @@ export const DashboardPage: React.FC = () => {
                 >
                   {activity.method}
                 </Badge>
-                <Caption1 style={{ fontFamily: 'monospace', flex: 1 }}>
+                <Caption1 style={{ fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {activity.path}
                 </Caption1>
+                {activity.endpointId && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
+                    <Caption1 style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activity.endpointName ?? activity.endpointId}>
+                      {activity.endpointName ?? '(endpoint)'}
+                    </Caption1>
+                    <Tooltip content="Open this endpoint" relationship="label" positioning="above">
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<Open16Regular />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void navigate({ to: '/endpoints/$endpointId', params: { endpointId: activity.endpointId } });
+                        }}
+                        aria-label={`Open endpoint ${activity.endpointName ?? activity.endpointId}`}
+                        data-testid={`dashboard-activity-endpoint-open-${activity.id}`}
+                      />
+                    </Tooltip>
+                  </span>
+                )}
                 <Badge
                   appearance="outline"
                   color={activity.statusCode >= 400 ? 'danger' : 'success'}
                 >
                   {activity.statusCode}
                 </Badge>
+                <AuthMethodChip
+                  outcome={activity.authOutcome}
+                  method={activity.authMethod}
+                  reason={activity.authReason}
+                  url={activity.path}
+                  data-testid={`dashboard-activity-auth-${activity.id}`}
+                />
                 <Caption1>{activity.durationMs}ms</Caption1>
               </div>
             ))}

@@ -25,8 +25,15 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { Dismiss24Regular } from '@fluentui/react-icons';
+import { CopyJsonButton } from './CopyJsonButton';
+import { DownloadJsonButton } from './DownloadJsonButton';
 
 const useStyles = makeStyles({
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
   body: {
     paddingTop: '8px',
     paddingBottom: '8px',
@@ -62,6 +69,14 @@ export interface DetailDrawerProps {
   children: React.ReactNode;
   /** Optional sticky footer slot - typically action buttons. */
   footer?: React.ReactNode;
+  /**
+   * When provided, the header renders "Copy as JSON" + "Download JSON" actions
+   * that serialise this COMPLETE record (all fields, including any not rendered
+   * in the body). Pass the raw underlying object, not the visible subset.
+   */
+  jsonData?: unknown;
+  /** Download file name (without extension) for the Download JSON action. */
+  jsonFilename?: string;
   /** Override the default test id. */
   'data-testid'?: string;
 }
@@ -73,6 +88,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   width = '480px',
   children,
   footer,
+  jsonData,
+  jsonFilename = 'detail',
   ...rest
 }) => {
   const classes = useStyles();
@@ -95,13 +112,34 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
       <DrawerHeader>
         <DrawerHeaderTitle
           action={
-            <Button
-              appearance="subtle"
-              aria-label="Close drawer"
-              icon={<Dismiss24Regular />}
-              onClick={onClose}
-              data-testid={`${testId}-close`}
-            />
+            <div className={classes.headerActions}>
+              {jsonData !== undefined && (
+                <>
+                  <CopyJsonButton
+                    value={jsonData}
+                    label="Copy as JSON"
+                    iconOnly
+                    ariaLabel="Copy full record as JSON"
+                    data-testid={`${testId}-copy-json`}
+                  />
+                  <DownloadJsonButton
+                    value={jsonData}
+                    filename={jsonFilename}
+                    label="Download JSON"
+                    iconOnly
+                    ariaLabel="Download full record as JSON"
+                    data-testid={`${testId}-download-json`}
+                  />
+                </>
+              )}
+              <Button
+                appearance="subtle"
+                aria-label="Close drawer"
+                icon={<Dismiss24Regular />}
+                onClick={onClose}
+                data-testid={`${testId}-close`}
+              />
+            </div>
           }
           data-testid={`${testId}-title`}
         >

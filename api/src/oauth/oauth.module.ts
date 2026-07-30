@@ -5,8 +5,14 @@ import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 import { JwksController } from './jwks.controller';
 import { OAuthMetadataController } from './oauth-metadata.controller';
+import { AuthErrorsCatalogController } from './auth-errors-catalog.controller';
 import { OAuthSigningKeyService } from './oauth-signing-key.service';
 import { OAuthSigningModule } from './oauth-signing.module';
+import { ExternalJwksValidatorService, JWKS_FETCH } from './external-jwks-validator.service';
+import { WifAssertionValidatorService } from './wif-assertion-validator.service';
+import { WifDiscoveryResolverService } from './wif-discovery-resolver.service';
+import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
+import { AuthDecisionRecordStore } from './auth-decision-record.store';
 import { OAUTH_ISSUER } from './oauth.constants';
 
 /**
@@ -46,8 +52,20 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
       useFactory: (keys: OAuthSigningKeyService) => buildJwtModuleOptions(keys),
     }),
   ],
-  controllers: [OAuthController, JwksController, OAuthMetadataController],
-  providers: [OAuthService],
-  exports: [OAuthService], // Export for use in SCIM authentication
+  controllers: [OAuthController, JwksController, OAuthMetadataController, AuthErrorsCatalogController],
+  providers: [
+    OAuthService,
+    ExternalJwksValidatorService,
+    WifAssertionValidatorService,
+    WifDiscoveryResolverService,
+    JwksHostAllowlistService,
+    AuthDecisionRecordStore,
+    // Register the JWKS fetch implementation as an injectable so it can be
+    // overridden in tests. The default wraps the platform `fetch` (bound to
+    // globalThis), preserving the production behavior of the `?? globalThis.fetch`
+    // fallback while giving E2E tests a provider to override.
+    { provide: JWKS_FETCH, useFactory: () => globalThis.fetch.bind(globalThis) },
+  ],
+  exports: [OAuthService, ExternalJwksValidatorService, WifAssertionValidatorService, WifDiscoveryResolverService, JwksHostAllowlistService, AuthDecisionRecordStore], // Export for use in SCIM authentication + WIF
 })
 export class OAuthModule {}

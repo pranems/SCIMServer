@@ -26,6 +26,7 @@ import { ManualGroupDto } from '../dto/manual-group.dto';
 import { ManualUserDto } from '../dto/manual-user.dto';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
+import { decodeJwt, type DecodedJwt } from '../../../oauth/jwt-decode.util';
 
 interface VersionInfo {
   version: string;
@@ -133,10 +134,38 @@ export class AdminController {
     return created.id;
   }
 
+  /**
+   * W2 - decode (never verify) a JWT / encoded token so an operator can inspect
+   * what a `Bearer` / `client_assertion` / `access_token` value contains. A JWT
+   * is signed, not encrypted, so its header + claims are readable by any holder
+   * of the token; this returns them without touching the signature (only a
+   * presence flag). Admin-gated. The response is non-secret claim data; the
+   * submitted `token` body key is redacted by the request logger when
+   * PersistRequestSecrets is off. Always 200 - the caller inspects `isJwt`.
+   */
+  @Post('decode-jwt')
+  @HttpCode(200)
+  decodeJwtToken(@Body() body: { token?: string }): DecodedJwt {
+    return decodeJwt(body?.token);
+  }
+
   @Post('logs/clear')
   @HttpCode(204)
   async clearLogs(): Promise<void> {
     await this.loggingService.clearLogs();
+  }
+
+  // Force-drain the buffered request-log writes to the database. Request logs
+  // are buffered (flushed every few seconds / at 50 entries), so a row created
+  // moments ago may not yet be queryable. This endpoint makes the pending
+  // writes immediately durable + queryable - used by operators chasing a fresh
+  // row and by tests that read back a row right after producing it. Uses
+  // `flushPending` (not `flushLogs`) so it reliably drains even while a
+  // background flush is in progress.
+  @Post('logs/flush')
+  @HttpCode(204)
+  async flushLogs(): Promise<void> {
+    await this.loggingService.flushPending();
   }
 
   @Post('logs/prune')
@@ -168,6 +197,10 @@ export class AdminController {
     // surfaces it so the UI can restrict the global Logs page to a
     // single endpoint without going through the endpoint-scoped route.
     @Query('endpointId') endpointId?: string,
+    // Phase 3 (auth-obs): filter global logs by the X-Request-Id
+    // correlation id so the auth-audit UI can deep-link to the
+    // request log that produced a given auth decision.
+    @Query('requestId') requestId?: string,
   ) {
     return this.loggingService.listLogs({
       page: page ? Number(page) : undefined,
@@ -183,6 +216,7 @@ export class AdminController {
       hideKeepalive: hideKeepalive === 'true',
       minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
       endpointId: endpointId || undefined,
+      requestId: requestId || undefined,
     });
   }
 

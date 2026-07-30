@@ -8,8 +8,17 @@ import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { AdminConnectionInfoController } from './controllers/admin-connection-info.controller';
+import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
+import { AuthDecisionsController } from './controllers/auth-decisions.controller';
+import { RuntimeConfigController } from './controllers/runtime-config.controller';
+import { AdminSecuritySettingsController } from './controllers/admin-security-settings.controller';
 import { AdminAuthenticationMethodController } from './controllers/admin-authentication-method.controller';
 import { EndpointOAuthController } from './controllers/endpoint-oauth.controller';
+import { EndpointOAuthMetadataController } from './controllers/endpoint-oauth-metadata.controller';
+import { ASSERTION_TOKEN_PROVIDER } from './controllers/assertion-token-provider';
+import { ClientSecretTokenProvider } from './controllers/client-secret-token-provider';
+import { WifAssertionTokenProvider } from './controllers/wif-assertion-token.provider';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -27,6 +36,10 @@ import { EndpointScimGroupsService } from './services/endpoint-scim-groups.servi
 import { EndpointScimGenericService } from './services/endpoint-scim-generic.service';
 import { BulkProcessorService } from './services/bulk-processor.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
+import { ConnectionInfoService } from './services/connection-info.service';
+import { ConnectionSecretResolverService } from './services/connection-secret-resolver.service';
+import { CredentialEncryptionService } from '../../security/credential-encryption.service';
+import { CredentialSecurityService } from '../../security/credential-security.service';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
@@ -42,7 +55,12 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     SchemasController,
     AdminController,
     AdminCredentialController,
+    AdminConnectionInfoController,
     AdminAuthenticationMethodController,
+    AdminJwksHostController,
+    AdminSecuritySettingsController,
+    AuthDecisionsController,
+    RuntimeConfigController,
     EndpointOAuthController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
@@ -50,6 +68,10 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimDiscoveryController,
     ScimMeController,
     EndpointLogController,
+    // Per-endpoint RFC 8414 metadata (WI-12) - MUST be registered before the
+    // generic controller so its 2-segment `.well-known/oauth-authorization-server`
+    // route wins over the generic `:resourceType/:id` wildcard.
+    EndpointOAuthMetadataController,
     // Generic controller MUST be registered LAST - its wildcard :resourceType
     // param would otherwise shadow built-in routes like /Users, /Groups, etc.
     EndpointScimGenericController,
@@ -63,6 +85,18 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimGenericService,
     BulkProcessorService,
     EndpointContextStorage,
+    ConnectionInfoService,
+    ConnectionSecretResolverService,
+    CredentialEncryptionService,
+    CredentialSecurityService,
+    // W2.3 - the client_secret mint provider (credential lookup + bcrypt + mint).
+    ClientSecretTokenProvider,
+    // Q6 - bind the A3 assertion-provider seam to the WIF validate+issue pipeline.
+    WifAssertionTokenProvider,
+    {
+      provide: ASSERTION_TOKEN_PROVIDER,
+      useExisting: WifAssertionTokenProvider,
+    },
     // Exception filters: NestJS applies APP_FILTERs in reverse order (last registered = runs first).
     // GlobalExceptionFilter catches non-HttpException errors (raw Error, TypeError, PrismaError).
     // ScimExceptionFilter catches HttpException and formats as SCIM error.

@@ -13,13 +13,18 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md S14
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase B1
  */
-import { Controller, Get, Inject, Param } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, Param, Req } from '@nestjs/common';
+import type { Request } from 'express';
 
 import { StatsProjectionService } from '../stats/stats-projection.service';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
+import { ConnectionInfoService } from '../scim/services/connection-info.service';
+import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
+import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
+import type { EndpointConfig } from '../endpoint/endpoint-config.interface';
 import type {
   DashboardResponse,
   DashboardEndpoint,
@@ -27,7 +32,41 @@ import type {
   EndpointOverviewResponse,
   EndpointOverviewActivity,
   EndpointOverviewCredential,
+  EndpointOverviewWifTrust,
 } from '../../shared/types/dashboard.types';
+
+/**
+ * Project a WIF credential's stored metadata to the public display shape,
+ * hard-allowlisting the trust-configuration keys. A WIF credential has no
+ * secret, but this closed allowlist guarantees a future metadata addition
+ * (e.g. an internal seam field) cannot silently leak through the overview.
+ */
+function projectWifTrust(
+  metadata: Record<string, unknown> | null | undefined,
+): EndpointOverviewWifTrust | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const asString = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+  const roles = metadata.requiredRoles;
+  const enforcement = metadata.roleEnforcement;
+  return {
+    expectedIssuer: asString(metadata.expectedIssuer),
+    expectedSubject: asString(metadata.expectedSubject),
+    expectedAudience: asString(metadata.expectedAudience),
+    jwksUri: asString(metadata.jwksUri),
+    allowedTenantId: asString(metadata.allowedTenantId),
+    allowedTenantIdSource:
+      metadata.allowedTenantIdSource === 'issuer' || metadata.allowedTenantIdSource === 'jwksUri'
+        ? metadata.allowedTenantIdSource
+        : null,
+    requiredRoles: Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : null,
+    scope: asString(metadata.scope),
+    assertionProfile: asString(metadata.assertionProfile),
+    issuedTokenTtlSec: typeof metadata.issuedTokenTtlSec === 'number' ? metadata.issuedTokenTtlSec : null,
+    roleEnforcement:
+      enforcement === 'off' || enforcement === 'shadow' || enforcement === 'enforce' ? enforcement : null,
+    lastVerifiedAt: asString(metadata.lastVerifiedAt),
+  };
+}
 
 /** Cached version string read once at construction */
 let cachedVersion: string | null = null;
@@ -57,6 +96,11 @@ export class DashboardController {
     private readonly loggingService: LoggingService,
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
+    private readonly connectionInfo: ConnectionInfoService,
+    private readonly secretResolver: ConnectionSecretResolverService,
+    @Optional()
+    @Inject(AuthDecisionRecordStore)
+    private readonly decisionStore?: AuthDecisionRecordStore,
   ) {}
 
   /**
@@ -106,7 +150,13 @@ export class DashboardController {
       };
     });
 
-    // Map recent logs to activity entries
+    // Map recent logs to activity entries. X5/X6 - carry the persisted auth
+    // decision (method/outcome/reason + requestId) and resolve the endpoint
+    // NAME (not just the id) so the dashboard activity row can render the same
+    // auth-method chip + a quick-open link the Logs page has.
+    const endpointNameById = new Map<string, string>(
+      endpointList.endpoints.map((ep) => [ep.id, ep.name]),
+    );
     const recentActivity: DashboardActivity[] = recentLogs.items.map((log: any) => ({
       id: log.id,
       timestamp: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt),
@@ -115,6 +165,11 @@ export class DashboardController {
       statusCode: log.status ?? 0,
       durationMs: log.durationMs ?? 0,
       endpointId: log.endpointId ?? '',
+      endpointName: log.endpointId ? endpointNameById.get(log.endpointId) : undefined,
+      requestId: log.requestId ?? undefined,
+      authOutcome: log.authOutcome ?? undefined,
+      authMethod: log.authMethod ?? undefined,
+      authReason: log.authReason ?? undefined,
     }));
 
     return {
@@ -157,6 +212,7 @@ export class DashboardController {
   @Get('endpoints/:endpointId/overview')
   async getEndpointOverview(
     @Param('endpointId') endpointId: string,
+    @Req() req: Request,
   ): Promise<EndpointOverviewResponse> {
     // Throws NotFoundException for unknown endpoints - propagates as 404.
     const endpoint = await this.endpointService.getEndpoint(endpointId, 'full');
@@ -176,6 +232,9 @@ export class DashboardController {
       id: c.id,
       credentialType: c.credentialType,
       label: c.label ?? null,
+      // X3/X4 - operator-supplied free-text description (never a secret),
+      // stored in metadata.description on any credential type.
+      description: typeof c.metadata?.description === 'string' ? c.metadata.description : null,
       active: c.active,
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
       expiresAt: c.expiresAt
@@ -183,6 +242,15 @@ export class DashboardController {
           ? c.expiresAt.toISOString()
           : String(c.expiresAt)
         : null,
+      // Surface the public WIF trust fields so the UI can display + edit
+      // the full trust. projectWifTrust returns null for non-wif rows and
+      // hard-allowlists the keys so no secret/internal field can leak.
+      ...(c.credentialType === 'wif' ? { wif: projectWifTrust(c.metadata) } : {}),
+      // U2 - the public client id for an oauth_client credential, so each
+      // credential row can show its own Connect-to-Entra bundle. Never a secret.
+      ...(c.credentialType === 'oauth_client' && typeof c.metadata?.clientId === 'string'
+        ? { oauthClientId: c.metadata.clientId }
+        : {}),
     }));
 
     // Recent activity projection - same shape as DashboardActivity but
@@ -198,6 +266,12 @@ export class DashboardController {
         path: log.url,
         statusCode: log.status ?? 0,
         durationMs: log.durationMs ?? 0,
+        // X5 - carry the persisted auth decision so the per-endpoint activity
+        // row renders the same auth-method chip + is clickable to its detail.
+        requestId: log.requestId ?? undefined,
+        authOutcome: log.authOutcome ?? undefined,
+        authMethod: log.authMethod ?? undefined,
+        authReason: log.authReason ?? undefined,
       }));
 
     // Profile is optional in the EndpointResponse type; preset and
@@ -212,6 +286,30 @@ export class DashboardController {
       profile.settings && typeof profile.settings === 'object'
         ? { ...(profile.settings as Record<string, unknown>) }
         : {};
+
+    // WI-3: assemble the connection-info (absolute URLs + per-method Entra
+    // field set) so the Overview UI never hand-builds URLs. Host is derived
+    // from the request exactly as the connection-info controller does.
+    const proto = req.headers['x-forwarded-proto']?.toString() ?? req.protocol;
+    const host = req.headers['x-forwarded-host']?.toString() ?? req.get('host');
+    // When CredentialSecretVisibility=always, inline the actual secrets so the
+    // Connect tab (which reads this BFF) can show every connection parameter
+    // (incl. the global shared_secret, which has no per-credential reveal path).
+    const overviewSecrets = await this.secretResolver.resolveForEndpoint(
+      configFlags as EndpointConfig,
+      credentialRows,
+    );
+    const connectionInfo = this.connectionInfo.assemble(
+      endpoint,
+      credentialRows,
+      `${proto}://${host}`,
+      overviewSecrets,
+      this.decisionStore
+        ? ConnectionInfoService.buildAuthHealth(
+            this.decisionStore.latestByMethodForEndpoint(endpoint.id),
+          )
+        : undefined,
+    );
 
     return {
       endpoint: {
@@ -233,6 +331,7 @@ export class DashboardController {
       credentials,
       recentActivity,
       configFlags,
+      connectionInfo,
     };
   }
 }

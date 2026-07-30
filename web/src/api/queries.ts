@@ -16,7 +16,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D2 (TanStack Query)
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A4
  */
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import type {
   DashboardResponse,
   EndpointListResponse,
@@ -26,6 +26,8 @@ import type {
   VersionInfo,
   HealthResponse,
 } from '@scim/types/dashboard.types';
+import type { ConnectionInfo } from '@scim/types/connection-info.types';
+import type { AuthDecisionsResponse } from '@scim/types/auth-decision.types';
 import { getStoredToken, notifyTokenInvalid, clearStoredToken } from '../auth/token';
 import { ScimApiError } from './scim-error';
 
@@ -75,6 +77,7 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
     let parsedBody: unknown;
     let scimType: string | undefined;
     let detail: string | undefined;
+    let reasonCode: string | undefined;
     if (contentType.includes('json') && text.length > 0) {
       try {
         parsedBody = JSON.parse(text);
@@ -82,6 +85,22 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
           const body = parsedBody as Record<string, unknown>;
           if (typeof body.scimType === 'string') scimType = body.scimType;
           if (typeof body.detail === 'string') detail = body.detail;
+          // WI-D8: an OAuth token endpoint returns a flat RFC-6749 error body
+          // (`error`, `error_description`, `reason_code`) instead of a SCIM
+          // envelope. Surface the reason_code so parseScimError can render the
+          // specific auth remediation, and prefer error_description for detail.
+          if (typeof body.reason_code === 'string') reasonCode = body.reason_code;
+          if (!detail && typeof body.error_description === 'string') detail = body.error_description;
+          if (!detail && typeof body.error === 'string') detail = body.error;
+          // F4: the resource-plane (SCIM) 401 carries the specific auth
+          // reason_code inside the Diagnostics extension URN, not at top level.
+          // Read it so parseScimError renders the specific bearer remediation.
+          if (!reasonCode) {
+            const diag = body['urn:scimserver:api:messages:2.0:Diagnostics'];
+            if (diag && typeof diag === 'object' && typeof (diag as Record<string, unknown>).reason_code === 'string') {
+              reasonCode = (diag as Record<string, unknown>).reason_code as string;
+            }
+          }
         }
       } catch {
         // Server claimed JSON but body did not parse - fall through to text fallback.
@@ -95,6 +114,7 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
     throw new ScimApiError({
       status: res.status,
       scimType,
+      reasonCode,
       detail,
       rawBody: parsedBody ?? (text.length > 0 ? text : undefined),
       requestId: extractRequestId(res),
@@ -503,6 +523,23 @@ export const endpointLogsQueryOptions = (params: EndpointLogsParams) => {
   };
 };
 
+/**
+ * Per-endpoint log detail - powers the clickable DetailDrawer on the endpoint
+ * Logs tab (mirrors the SCIMServer-level Logs page). Fetches the full
+ * request/response headers + parsed bodies for one log row, tenant-isolated to
+ * this endpoint (`GET /scim/endpoints/:id/logs/:logId`). Disabled until a row
+ * is selected.
+ */
+export const endpointLogDetailQueryOptions = (endpointId: string, logId: string | undefined) => ({
+  queryKey: ['endpoint-logs', endpointId, 'detail', logId] as const,
+  queryFn: () => fetchWithAuth<GlobalLogDetail>(`/scim/endpoints/${endpointId}/logs/${logId!}`),
+  enabled: Boolean(logId),
+  staleTime: 60_000,
+});
+
+export const useEndpointLog = (endpointId: string, logId: string | undefined) =>
+  useQuery(endpointLogDetailQueryOptions(endpointId, logId));
+
 export interface GlobalLogsParams {
   urlContains?: string;
   pageSize?: number;
@@ -520,6 +557,12 @@ export interface GlobalLogsParams {
   since?: string;
   /** ISO 8601 upper bound. Currently unused by the picker but accepted. */
   until?: string;
+  /**
+   * Phase 3 (auth-obs) - filter to the single request log that carries
+   * this X-Request-Id. Powers the "View request log" deep-link from an
+   * auth decision to its originating request.
+   */
+  requestId?: string;
 }
 
 export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
@@ -530,6 +573,7 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
   if (typeof params.status === 'number') qs.set('status', String(params.status));
   if (params.since) qs.set('since', params.since);
   if (params.until) qs.set('until', params.until);
+  if (params.requestId) qs.set('requestId', params.requestId);
   return {
     // Cache key includes every filter dimension so changing one of
     // them yields a distinct cache entry (no accidental stale-data
@@ -541,6 +585,7 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
       params.status ?? '',
       params.since ?? '',
       params.until ?? '',
+      params.requestId ?? '',
       pageSize,
     ] as const,
     queryFn: () => fetchWithAuth<AdminLogsResponse>(`/scim/admin/logs?${qs.toString()}`),
@@ -575,6 +620,29 @@ export interface GlobalLogDetail {
   responseBody?: unknown;
   errorMessage?: string;
   reportableIdentifier?: string;
+  /**
+   * Phase 3 (auth-obs) - the X-Request-Id correlation id that ties this
+   * request log to any auth decision recorded for the same request. Used
+   * to cross-link the Logs surfaces with the Auth Audit surfaces.
+   */
+  requestId?: string;
+  /**
+   * V10 - the auth decision persisted on the request-log row itself
+   * (outcome / method / reason / winning credential). Durable: survives the
+   * short-TTL auth-decision store, so the drawer shows an "Authenticated via"
+   * summary even for old rows.
+   */
+  authOutcome?: 'accept' | 'reject';
+  authMethod?: string;
+  authReason?: string;
+  authCredentialId?: string;
+  /**
+   * W1 - the FULL auth decision trace persisted on this request-log row (checks
+   * with expected/received, decoded claims, plane, subTraces). Durable: renders
+   * the expected-vs-received diff permanently, independent of the short-TTL
+   * AuthDecisionRecordStore.
+   */
+  authDecision?: AuthDecisionRecordLike;
 }
 
 export const globalLogDetailQueryOptions = (id: string | undefined) => ({
@@ -1361,11 +1429,371 @@ function restoreListSnapshots(
 export function useCreateCredential(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { label?: string; expiresAt?: string }) =>
+    mutationFn: (body: {
+      label?: string;
+      description?: string;
+      expiresAt?: string;
+      credentialType?: string;
+      wif?: Record<string, unknown>;
+      verify?: boolean;
+    }) =>
       fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/**
+ * WI-14 - resolve the WIF signing-trust fields from the source IdP's OIDC
+ * discovery document. Config-time only; nothing is persisted. Returns
+ * { expectedIssuer, jwksUri, expectedAudience }.
+ */
+export function useResolveWifDiscovery(endpointId: string) {
+  return useMutation({
+    mutationFn: (body: { discoveryUrl?: string; preset?: string; tenantId?: string }) =>
+      fetchWithAuth<{ expectedIssuer: string; jwksUri: string; expectedAudience: string }>(
+        `/scim/admin/endpoints/${endpointId}/wif/resolve`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+  });
+}
+
+/**
+ * Item 4 - edit a saved WIF trust in place (PUT). Replaces the public trust
+ * metadata; invalidates the overview so the trust display refreshes.
+ */
+export function useUpdateWifCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ credentialId, wif, label, description, verify }: { credentialId: string; wif: Record<string, unknown>; label?: string; description?: string; verify?: boolean }) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ credentialType: 'wif', wif, ...(label !== undefined ? { label } : {}), ...(description !== undefined ? { description } : {}), ...(verify ? { verify: true } : {}) }),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** Item 6 - a single reachability/liveness check in a WIF trust verification. */
+export interface WifVerifyCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+/** Item 6 - the result of verifying a WIF trust's issuer + JWKS reachability. */
+export interface WifVerifyResult {
+  ok: boolean;
+  checks: WifVerifyCheck[];
+  /** V7 - present when the verify targeted a saved trust and persisted it. */
+  lastVerifiedAt?: string;
+}
+
+/**
+ * Item 6 - verify a WIF trust's issuer + JWKS URI are reachable and actually
+ * serve what they should, at config time. SSRF-gated server-side. Returns a
+ * per-check checklist for the UI to render.
+ */
+export function useVerifyWifTrust(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { expectedIssuer?: string; jwksUri?: string; credentialId?: string }) =>
+      fetchWithAuth<WifVerifyResult>(`/scim/admin/endpoints/${endpointId}/wif/verify`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (result, body) => {
+      // V7 - when the verify targeted a SAVED trust and persisted lastVerifiedAt,
+      // refresh the overview so the trust card flips Unverified -> Verified.
+      if (body.credentialId && result?.lastVerifiedAt) {
+        void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      }
+    },
+  });
+}
+
+/** WI-D7 - one WIF trust's assertion-debug dry-run result. */
+export interface WifDebugTrustResult {
+  expectedIssuer: string;
+  outcome: 'accept' | 'reject';
+  reasonCode?: string;
+  /** The per-check trace (same read model the AuthDiagnosticsPanel renders). */
+  trace: AuthDecisionRecordLike;
+}
+
+/** WI-D7 - the assertion-debugger response (one result per configured trust). */
+export interface WifDebugAssertionResponse {
+  overallOutcome: 'accept' | 'reject';
+  results: WifDebugTrustResult[];
+}
+
+/**
+ * WI-D7 - the trace subset the debugger returns. It is an `AuthDecisionRecord`
+ * WITHOUT the store-only `id`/`recordedAt` (nothing is persisted for a
+ * dry-run).
+ */
+export interface AuthDecisionRecordLike {
+  plane: 'token-mint' | 'resource';
+  method: 'wif' | 'oauth_client' | 'shared_secret' | 'bearer_jwt';
+  outcome: 'accept' | 'reject';
+  reasonCode?: string;
+  checks: Array<{ id: string; status: 'pass' | 'fail' | 'skipped'; expected?: string; received?: string; detail?: string }>;
+  decodedClaims?: Record<string, unknown>;
+  joseHeader?: Record<string, unknown>;
+}
+
+/**
+ * WI-D7 - the assertion debugger. Paste a `client_assertion` and dry-run it
+ * against every configured WIF trust for the endpoint using the exact same
+ * server-side checks a real mint runs (real JWKS fetch + claim matching), but
+ * WITHOUT minting a token. Admin-only. Returns the per-check trace so the
+ * operator sees precisely which claim is wrong before wiring the IdP.
+ */
+export function useDebugWifAssertion(endpointId: string) {
+  return useMutation({
+    mutationFn: (assertion: string) =>
+      fetchWithAuth<WifDebugAssertionResponse>(
+        `/scim/admin/endpoints/${endpointId}/wif/debug-assertion`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ assertion }),
+        },
+      ),
+  });
+}
+
+/** WI-15 - the effective JWKS host allowlist view (seed + env + persisted). */
+export interface JwksAllowlistPersistedEntry {
+  id: string;
+  host: string;
+  label: string | null;
+}
+
+export interface JwksAllowlistView {
+  seed: string[];
+  env: string[];
+  persisted: string[];
+  effective: string[];
+  /** R1 - persisted rows with id + label, for edit/remove by id in the UI. */
+  persistedEntries: JwksAllowlistPersistedEntry[];
+}
+
+const JWKS_HOSTS_KEY = ['admin', 'jwks-hosts'] as const;
+
+/** WI-15 - read the JWKS host allowlist (server-global). */
+export function useJwksHostAllowlist() {
+  return useQuery({
+    queryKey: JWKS_HOSTS_KEY,
+    queryFn: () => fetchWithAuth<JwksAllowlistView>('/scim/admin/settings/jwks-hosts'),
+  });
+}
+
+/** WI-15 - add a host to the persisted JWKS allowlist layer (hot-reloaded). */
+export function useAddJwksHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { host: string; label?: string }) =>
+      fetchWithAuth<JwksAllowlistView>('/scim/admin/settings/jwks-hosts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/** R1 - edit a persisted JWKS allowlist entry by id (host and/or label). */
+export function useUpdateJwksHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, host, label }: { id: string; host: string; label?: string }) =>
+      fetchWithAuth<JwksAllowlistView>(`/scim/admin/settings/jwks-hosts/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ host, label }),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/** R1 - selectively add AND/OR remove JWKS hosts in a single PATCH call. */
+export function usePatchJwksHosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { add?: string[]; remove?: string[] }) =>
+      fetchWithAuth<{ added: number; removed: number; view: JwksAllowlistView }>(
+        '/scim/admin/settings/jwks-hosts',
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/** WI-15 - remove a host from the persisted JWKS allowlist layer. */
+export function useRemoveJwksHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (host: string) =>
+      fetchWithAuth(`/scim/admin/settings/jwks-hosts/${encodeURIComponent(host)}`, {
+        method: 'DELETE',
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: JWKS_HOSTS_KEY });
+    },
+  });
+}
+
+/**
+ * WI-2/WI-4 - fetch the assembled connection-info for an endpoint (absolute
+ * URLs + per-method Entra field set; no secrets). The per-endpoint Overview
+ * BFF already embeds this same shape (WI-3), so prefer `useEndpointOverview`
+ * when the overview is already loaded; this dedicated hook is for surfaces that
+ * only need the connection block.
+ */
+export function useConnectionInfo(endpointId: string) {
+  return useQuery<ConnectionInfo>({
+    queryKey: ['admin', 'endpoints', endpointId, 'connection-info'],
+    queryFn: () =>
+      fetchWithAuth<ConnectionInfo>(`/scim/admin/endpoints/${endpointId}/connection-info`),
+    enabled: endpointId.length > 0,
+  });
+}
+
+/** WI-8 - the server-scope security settings (visibility + KEK status). */
+export interface SecuritySettings {
+  credentialSecretVisibility: 'always' | 'once';
+  kek: { configured: boolean; isDefault: boolean };
+}
+
+const SECURITY_SETTINGS_KEY = ['admin', 'settings', 'security'] as const;
+
+/** WI-8 - read the server security settings. */
+export function useSecuritySettings() {
+  return useQuery<SecuritySettings>({
+    queryKey: SECURITY_SETTINGS_KEY,
+    queryFn: () => fetchWithAuth<SecuritySettings>('/scim/admin/settings/security'),
+  });
+}
+
+/** WI-8 - set the server-scope CredentialSecretVisibility. */
+export function useUpdateSecuritySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { credentialSecretVisibility: 'always' | 'once' }) =>
+      fetchWithAuth<SecuritySettings>('/scim/admin/settings/security', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: SECURITY_SETTINGS_KEY });
+    },
+  });
+}
+
+/**
+ * WI-8 - reveal a retained credential secret (admin-only, audit-logged). Returns
+ * `{retained:true, clientSecret|token}` when the secret was kept, or
+ * `{retained:false, reason}` when the effective visibility is `once`, the
+ * credential predates retention, or the envelope cannot be decrypted.
+ */
+export interface RevealResult {
+  id: string;
+  credentialType: string;
+  clientId?: string;
+  clientSecret?: string;
+  token?: string;
+  retained: boolean;
+  reason?: string;
+}
+
+export function useRevealCredential(endpointId: string) {
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth<RevealResult>(
+        `/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/reveal`,
+        { method: 'POST' },
+      ),
+  });
+}
+
+/**
+ * R3 - reveal the retained secrets for the Connect tab. Given the connection
+ * methods (each may carry `credentialId` + `secretRetained`), this reveals the
+ * secret for every retained credential in parallel and returns a
+ * `method -> secret` map. Used by the Connect tab to ALWAYS display the secret
+ * when the effective `CredentialSecretVisibility` is `always` (the reveal
+ * endpoint stays the authority - a non-retained credential simply yields no
+ * entry). Cached for 30 s so opening the tab does not spam the audit log.
+ */
+export interface ConnectionRevealMethod {
+  method: string;
+  credentialId?: string | null;
+  secretRetained?: boolean;
+}
+
+export function useConnectionRetainedSecrets(
+  endpointId: string,
+  methods: ConnectionRevealMethod[],
+): Partial<Record<string, string>> {
+  const retained = methods.filter((m) => m.secretRetained && m.credentialId);
+  const results = useQueries({
+    queries: retained.map((m) => ({
+      queryKey: ['connection-reveal', endpointId, m.credentialId] as const,
+      queryFn: () =>
+        fetchWithAuth<RevealResult>(
+          `/scim/admin/endpoints/${endpointId}/credentials/${m.credentialId}/reveal`,
+          { method: 'POST' },
+        ),
+      staleTime: 30_000,
+    })),
+  });
+  const out: Record<string, string> = {};
+  retained.forEach((m, i) => {
+    const r = results[i]?.data;
+    if (r?.retained) {
+      const secret = r.clientSecret ?? r.token;
+      if (secret) out[m.method] = secret;
+    }
+  });
+  return out;
+}
+
+/**
+ * WI-9 - rotate a credential: mint a fresh secret (shown once, retained if the
+ * effective visibility is `always`) and deactivate the old one. For an
+ * oauth_client the public client_id is preserved. Returns the one-time secret.
+ */
+export interface RotateResult {
+  id: string;
+  credentialType: string;
+  label: string | null;
+  clientId?: string;
+  clientSecret?: string;
+  token?: string;
+  rotatedFrom: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export function useRotateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth<RotateResult>(
+        `/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/rotate`,
+        { method: 'POST' },
+      ),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
@@ -1403,6 +1831,49 @@ export function useDeleteCredential(endpointId: string) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** V2 - reactivate a previously revoked credential (POST .../activate). */
+export function useActivateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/activate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** V2 - deactivate a credential without removing it from the list (soft). */
+export function useDeactivateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** V3 - edit a credential's label (PATCH) without rotating the secret. */
+export function useEditCredentialLabel(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { credentialId: string; label: string | null }) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${vars.credentialId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ label: vars.label }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
   });
 }
@@ -1764,6 +2235,79 @@ export interface CreateEndpointBody {
   profilePreset?: string;
   profile?: Record<string, unknown>;
 }
+
+// ─── WI-D6: Auth Decision diagnostics ────────────────────────────────
+
+/**
+ * WI-D6: recent Auth Decision Records for the diagnostics panel.
+ *
+ * Two scopes mirror the backend WI-D5 API:
+ *  - per-endpoint: `GET /scim/admin/endpoints/:id/auth-decisions`
+ *  - global:       `GET /scim/admin/auth-decisions`
+ *
+ * Pass an `endpointId` for the per-endpoint scope (Connect tab + endpoint
+ * Logs tab); omit it for the global scope (admin Logs page). Short cache -
+ * these are recent, short-TTL diagnostics that change as auth attempts arrive.
+ */
+export interface AuthDecisionsParams {
+  endpointId?: string;
+  outcome?: 'accept' | 'reject';
+  reasonCode?: string;
+  limit?: number;
+}
+
+export const authDecisionsQueryOptions = (params: AuthDecisionsParams = {}) => {
+  const qs = new URLSearchParams();
+  if (params.outcome) qs.set('outcome', params.outcome);
+  if (params.reasonCode) qs.set('reasonCode', params.reasonCode);
+  if (params.limit) qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const path = params.endpointId
+    ? `/scim/admin/endpoints/${params.endpointId}/auth-decisions${suffix}`
+    : `/scim/admin/auth-decisions${suffix}`;
+  return {
+    queryKey: [
+      'auth-decisions',
+      params.endpointId ?? '',
+      params.outcome ?? '',
+      params.reasonCode ?? '',
+      params.limit ?? '',
+    ] as const,
+    queryFn: () => fetchWithAuth<AuthDecisionsResponse>(path),
+    staleTime: 5_000,
+  };
+};
+
+export const useAuthDecisions = (params: AuthDecisionsParams = {}, options?: { enabled?: boolean }) =>
+  useQuery({ ...authDecisionsQueryOptions(params), enabled: options?.enabled ?? true });
+
+// ─── Server-level connection secrets (shown when visibility=always) ──
+
+/**
+ * The SCIMServer-level global connection secrets, returned by
+ * `GET /scim/admin/settings/security/connection-secrets` ONLY when the server
+ * CredentialSecretVisibility is `always`. When `once`, `revealed` is false and
+ * every value is null. Short cache; refetched when the visibility flips.
+ */
+export interface ServerConnectionSecrets {
+  revealed: boolean;
+  visibility: 'always' | 'once';
+  sharedSecret: string | null;
+  oauthClientId: string | null;
+  oauthClientSecret: string | null;
+}
+
+export const serverConnectionSecretsQueryOptions = () => ({
+  queryKey: ['server-connection-secrets'] as const,
+  queryFn: () =>
+    fetchWithAuth<ServerConnectionSecrets>('/scim/admin/settings/security/connection-secrets'),
+  staleTime: 15_000,
+});
+
+export const useServerConnectionSecrets = () =>
+  useQuery(serverConnectionSecretsQueryOptions());
+
+
 
 export function useCreateEndpoint() {
   const qc = useQueryClient();

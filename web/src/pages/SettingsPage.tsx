@@ -18,14 +18,18 @@ import {
   Dropdown,
   Option,
   Switch,
+  Radio,
+  RadioGroup,
   Input,
   Field,
   Divider,
   Button,
+  Link,
 } from '@fluentui/react-components';
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig } from '../api/queries';
+import { useNavigate } from '@tanstack/react-router';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings, useServerConnectionSecrets } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
-import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock } from '../components/primitives';
+import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock, SettingsJsonExport } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { resetOnboarding } from '../hooks/useOnboarding';
 
@@ -56,6 +60,10 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusSmall,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
+  // WI-15 - JWKS host add row
+  jwksAddRow: { display: 'flex', gap: '12px', alignItems: 'flex-end' },
+  jwksAddField: { flex: 1 },
+  jwksDivider: { marginTop: '8px', marginBottom: '8px' },
 });
 
 export const SettingsPage: React.FC = () => {
@@ -161,12 +169,407 @@ export const SettingsPage: React.FC = () => {
         )}
       </div>
 
+      {/* R4b - SCIMServer-level (global) connection info for admins */}
+      <ServerConnectionInfoCard />
+
       {/* Phase L4 - log config admin */}
       <LogConfigSection />
+
+      {/* WI-15 - JWKS host allowlist admin */}
+      <JwksHostAllowlistSection />
+
+      {/* WI-8 - server-scope credential security settings */}
+      <SecuritySettingsSection />
 
       {/* Phase N2 - re-open onboarding wizard */}
       <OnboardingResetCard />
     </div>
+  );
+};
+
+// ─── R4b: ServerConnectionInfoCard ───────────────────────────────
+//
+// SCIMServer-level (global, not per-endpoint) connection info an admin gives
+// to a client that connects at the server scope: the base URL, the GLOBAL
+// OAuth token endpoint (/scim/oauth/token), the global JWKS URI, the RFC 8414
+// OAuth AS metadata URL, and the SCIM ServiceProviderConfig. URLs are derived
+// from the browser origin (same approach the per-endpoint ConnectionPanel
+// uses), so they always match this deployment. No secret is ever shown. The
+// per-endpoint equivalent lives on each endpoint's Connect tab.
+
+const ServerConnectionInfoCard: React.FC = () => {
+  const classes = useStyles();
+  const navigate = useNavigate();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const prefix = 'scim';
+  const urls = {
+    baseUrl: origin,
+    tokenEndpoint: `${origin}/${prefix}/oauth/token`,
+    jwksUri: `${origin}/${prefix}/oauth/jwks`,
+    oauthMetadata: `${origin}/.well-known/oauth-authorization-server`,
+    scimServiceProviderConfig: `${origin}/${prefix}/v2/ServiceProviderConfig`,
+  };
+  // When the server CredentialSecretVisibility is `always`, surface the global
+  // secrets so an admin can copy every server-scope connection parameter for an
+  // Entra gallery app in one place. Withheld (null) when `once`.
+  const { data: secrets } = useServerConnectionSecrets();
+  const revealed = secrets?.revealed ?? false;
+  const exportValue = revealed
+    ? {
+        ...urls,
+        sharedSecret: secrets?.sharedSecret ?? null,
+        oauthClientId: secrets?.oauthClientId ?? null,
+        oauthClientSecret: secrets?.oauthClientSecret ?? null,
+      }
+    : urls;
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="server-connection-info-card">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>Server connection info (SCIMServer level)</Subtitle1>
+        <SettingsJsonExport
+          value={exportValue}
+          filename="scimserver-connection-info.json"
+          copyLabel="Copy as JSON"
+          data-testid="server-connection-info-export"
+        />
+      </div>
+      <Caption1>
+        SCIMServer-level (global) values for a client that connects at the server scope. Each
+        endpoint also has its own per-endpoint values on its Connect tab. Labels follow Microsoft
+        Entra ID; other IdPs (Okta, OneLogin, Ping, custom clients) use the equivalent field.
+        {revealed
+          ? ' Secrets are shown because CredentialSecretVisibility is "always".'
+          : ' Secrets are hidden (CredentialSecretVisibility is "once"); set it to "always" below to show them.'}
+      </Caption1>
+
+      <div className={classes.row}>
+        <Text>Base URL</Text>
+        <CopyableField value={urls.baseUrl} monospace data-testid="server-conn-base-url" />
+      </div>
+      <div className={classes.row}>
+        <Text>OAuth token endpoint (global)</Text>
+        <CopyableField value={urls.tokenEndpoint} monospace data-testid="server-conn-token-endpoint" />
+      </div>
+      <div className={classes.row}>
+        <Text>JWKS URI</Text>
+        <CopyableField value={urls.jwksUri} monospace data-testid="server-conn-jwks-uri" />
+      </div>
+      <div className={classes.row}>
+        <Text>OAuth metadata (RFC 8414)</Text>
+        <CopyableField value={urls.oauthMetadata} monospace data-testid="server-conn-oauth-metadata" />
+      </div>
+      <div className={classes.row}>
+        <Text>ServiceProviderConfig</Text>
+        <CopyableField value={urls.scimServiceProviderConfig} monospace data-testid="server-conn-spc" />
+      </div>
+
+      {revealed && (
+        <>
+          <div className={classes.row}>
+            <Text>Secret Token (SCIM shared secret)</Text>
+            {secrets?.sharedSecret ? (
+              <CopyableField value={secrets.sharedSecret} monospace data-testid="server-conn-shared-secret" />
+            ) : (
+              <Caption1 data-testid="server-conn-shared-secret-unset">Not configured</Caption1>
+            )}
+          </div>
+          <div className={classes.row}>
+            <Text>OAuth client id (global)</Text>
+            {secrets?.oauthClientId ? (
+              <CopyableField value={secrets.oauthClientId} monospace data-testid="server-conn-oauth-client-id" />
+            ) : (
+              <Caption1>Not configured</Caption1>
+            )}
+          </div>
+          <div className={classes.row}>
+            <Text>OAuth client secret (global)</Text>
+            {secrets?.oauthClientSecret ? (
+              <CopyableField value={secrets.oauthClientSecret} monospace data-testid="server-conn-oauth-client-secret" />
+            ) : (
+              <Caption1 data-testid="server-conn-oauth-client-secret-unset">Not configured</Caption1>
+            )}
+          </div>
+        </>
+      )}
+
+      <Caption1>
+        For per-endpoint connection details,{' '}
+        <Link
+          data-testid="server-conn-link-endpoints"
+          onClick={() => void navigate({ to: '/endpoints' })}
+        >
+          open an endpoint and its Connect tab
+        </Link>
+        .
+      </Caption1>
+    </Card>
+  );
+};
+
+// ─── WI-15 / R1: JwksHostAllowlistSection ────────────────────────
+//
+// Server-global JWKS host allowlist manager. The effective allowlist is the
+// UNION of a compiled well-known seed + the JWKS_HOST_ALLOWLIST env + a
+// persisted admin-editable layer. R1: the seed is prepopulated into the
+// persisted table, so every allowlist host is a full CRUD row (add / edit /
+// remove) - plus a PATCH-based selective bulk add-and-remove box. Convenience/
+// flexibility feature - no deny-list, no lock flag.
+
+const JwksHostAllowlistSection: React.FC = () => {
+  const classes = useStyles();
+  const { data, isLoading } = useJwksHostAllowlist();
+  const addHost = useAddJwksHost();
+  const removeHost = useRemoveJwksHost();
+  const updateHost = useUpdateJwksHost();
+  const patchHosts = usePatchJwksHosts();
+  const [newHost, setNewHost] = useState('');
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editHost, setEditHost] = useState('');
+  const [bulkAdd, setBulkAdd] = useState('');
+  const [bulkRemove, setBulkRemove] = useState('');
+
+  const onAdd = (): void => {
+    const host = newHost.trim().toLowerCase();
+    if (host === '') return;
+    addHost.mutate({ host }, { onSuccess: () => setNewHost('') });
+  };
+
+  const onStartEdit = (id: string, host: string): void => {
+    setEditId(id);
+    setEditHost(host);
+  };
+  const onSaveEdit = (): void => {
+    if (!editId) return;
+    const host = editHost.trim().toLowerCase();
+    if (host === '') return;
+    updateHost.mutate({ id: editId, host }, { onSuccess: () => { setEditId(null); setEditHost(''); } });
+  };
+
+  const parseHosts = (raw: string): string[] =>
+    raw.split(/[\s,]+/).map((h) => h.trim().toLowerCase()).filter(Boolean);
+
+  const onPatch = (): void => {
+    const add = parseHosts(bulkAdd);
+    const remove = parseHosts(bulkRemove);
+    if (add.length === 0 && remove.length === 0) return;
+    patchHosts.mutate({ add, remove }, { onSuccess: () => { setBulkAdd(''); setBulkRemove(''); } });
+  };
+
+  const entries = data?.persistedEntries ?? [];
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="jwks-hosts-card">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>JWKS host allowlist (WIF SSRF guard)</Subtitle1>
+        {data && (
+          <SettingsJsonExport
+            value={data}
+            filename="scimserver-jwks-host-allowlist.json"
+            copyLabel="Copy as JSON"
+            data-testid="jwks-hosts-export"
+          />
+        )}
+      </div>
+      <Caption1>
+        Server-global. The effective allowlist is the union of a built-in well-known
+        IdP seed (prepopulated as editable rows below), the JWKS_HOST_ALLOWLIST env var,
+        and the persisted hosts. Add, edit, or remove a host to change which IdP JWKS /
+        discovery endpoints are trusted - no redeploy.
+      </Caption1>
+
+      <div className={classes.jwksAddRow}>
+        <Field label="Add a host (bare hostname, no scheme/path)" className={classes.jwksAddField}>
+          <Input
+            value={newHost}
+            onChange={(_e, d) => setNewHost(d.value)}
+            placeholder="login.example.com"
+            data-testid="jwks-hosts-input"
+          />
+        </Field>
+        <Button
+          appearance="primary"
+          onClick={onAdd}
+          disabled={newHost.trim() === '' || addHost.isPending}
+          data-testid="jwks-hosts-add-button"
+        >
+          {addHost.isPending ? 'Adding...' : 'Add host'}
+        </Button>
+      </div>
+
+      {/* R1 - PATCH selective bulk add + remove */}
+      <div className={classes.jwksAddRow} data-testid="jwks-hosts-patch-row">
+        <Field label="Selectively add (comma/space separated)" className={classes.jwksAddField}>
+          <Input
+            value={bulkAdd}
+            onChange={(_e, d) => setBulkAdd(d.value)}
+            placeholder="a.example.com, b.example.com"
+            data-testid="jwks-hosts-patch-add"
+          />
+        </Field>
+        <Field label="Selectively remove" className={classes.jwksAddField}>
+          <Input
+            value={bulkRemove}
+            onChange={(_e, d) => setBulkRemove(d.value)}
+            placeholder="old.example.com"
+            data-testid="jwks-hosts-patch-remove"
+          />
+        </Field>
+        <Button
+          appearance="secondary"
+          onClick={onPatch}
+          disabled={(bulkAdd.trim() === '' && bulkRemove.trim() === '') || patchHosts.isPending}
+          data-testid="jwks-hosts-patch-button"
+        >
+          {patchHosts.isPending ? 'Applying...' : 'Apply changes'}
+        </Button>
+      </div>
+
+      <ScimErrorMessage error={addHost.error ?? removeHost.error ?? updateHost.error ?? patchHosts.error} />
+
+      {isLoading && <Caption1>Loading...</Caption1>}
+      {data && (
+        <div data-testid="jwks-hosts-list">
+          {entries.length === 0 && (
+            <Caption1 data-testid="jwks-hosts-empty">No hosts configured yet.</Caption1>
+          )}
+          {entries.map((entry) => (
+            <div key={entry.id} className={classes.categoryRow} data-testid={`jwks-host-row-${entry.host}`}>
+              {editId === entry.id ? (
+                <>
+                  <Input
+                    value={editHost}
+                    onChange={(_e, d) => setEditHost(d.value)}
+                    data-testid={`jwks-host-edit-input-${entry.host}`}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      appearance="primary"
+                      size="small"
+                      onClick={onSaveEdit}
+                      disabled={editHost.trim() === '' || updateHost.isPending}
+                      data-testid={`jwks-host-save-${entry.host}`}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      onClick={() => { setEditId(null); setEditHost(''); }}
+                      data-testid={`jwks-host-cancel-${entry.host}`}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Text>
+                    {entry.host}
+                    {entry.label ? ` (${entry.label})` : ''}
+                  </Text>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      onClick={() => onStartEdit(entry.id, entry.host)}
+                      data-testid={`jwks-host-edit-${entry.host}`}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      onClick={() => removeHost.mutate(entry.host)}
+                      disabled={removeHost.isPending}
+                      data-testid={`jwks-host-remove-${entry.host}`}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          <Divider className={classes.jwksDivider} />
+          <Caption1 data-testid="jwks-hosts-builtin">
+            Built-in safety floor (compiled seed + env), always allowed even if a row is removed:{' '}
+            {[...data.seed, ...data.env].join(', ')}
+          </Caption1>
+        </div>
+      )}
+    </Card>
+  );
+};
+
+// ─── WI-8: SecuritySettingsSection ───────────────────────────────
+//
+// Server-scope credential security: the CredentialSecretVisibility ceiling
+// (always | once) and the read-only KEK status. Setting the server value to
+// `once` forces `once` on every endpoint (most-restrictive-wins) and purges
+// any retained secret ciphertext.
+
+const SecuritySettingsSection: React.FC = () => {
+  const classes = useStyles();
+  const { data, isLoading } = useSecuritySettings();
+  const update = useUpdateSecuritySettings();
+
+  const visibility = data?.credentialSecretVisibility ?? 'always';
+
+  const onChange = (next: 'always' | 'once'): void => {
+    if (next === visibility) return;
+    update.mutate({ credentialSecretVisibility: next });
+  };
+
+  return (
+    <Card className={classes.logConfigCard} data-testid="security-settings-card">
+      <div className={classes.logConfigHeader}>
+        <Subtitle1>Credential secret security (server)</Subtitle1>
+        {data && (
+          <SettingsJsonExport
+            value={{ credentialSecretVisibility: data.credentialSecretVisibility }}
+            filename="scimserver-security-settings.json"
+            copyLabel="Copy settings as JSON"
+            data-testid="security-settings-export"
+          />
+        )}
+      </div>
+      <Caption1>
+        Server-scope ceiling for whether per-endpoint credential secrets are retained
+        (encrypted at rest) and re-viewable by an admin. Setting this to &quot;once&quot; forces
+        every endpoint to &quot;once&quot; and purges any retained secret copies, regardless of the
+        per-endpoint setting.
+      </Caption1>
+
+      {isLoading && <Caption1>Loading...</Caption1>}
+      {data && (
+        <>
+          <Field label="CredentialSecretVisibility (server ceiling)">
+            <RadioGroup
+              layout="horizontal"
+              value={visibility}
+              disabled={update.isPending}
+              onChange={(_e, d) => onChange(d.value as 'always' | 'once')}
+              data-testid="security-visibility-group"
+            >
+              <Radio value="always" label="always (retain + reveal)" data-testid="security-visibility-always" />
+              <Radio value="once" label="once (show at create only)" data-testid="security-visibility-once" />
+            </RadioGroup>
+          </Field>
+
+          <div className={classes.row}>
+            <Text>Credential KEK</Text>
+            <Text data-testid="security-kek-status">
+              {data.kek.isDefault
+                ? 'default (cosmetic - set a private CREDENTIAL_KEK in prod)'
+                : 'configured (private)'}
+            </Text>
+          </div>
+        </>
+      )}
+
+      <ScimErrorMessage error={update.error} />
+    </Card>
   );
 };
 
@@ -241,10 +644,16 @@ const LogConfigSection: React.FC = () => {
     <Card className={classes.logConfigCard} data-testid="log-config-section">
       <div className={classes.logConfigHeader}>
         <Subtitle1>Log configuration</Subtitle1>
-        <Caption1>
-          Audit trail for changes flows into <code>/scim/admin/logs</code> and the LogStreamDrawer (Pulse icon in the header).
-        </Caption1>
+        <SettingsJsonExport
+          value={{ globalLevel: cfg.globalLevel, categoryLevels: cfg.categoryLevels }}
+          filename="scimserver-log-config.json"
+          copyLabel="Copy settings as JSON"
+          data-testid="log-config-export"
+        />
       </div>
+      <Caption1>
+        Audit trail for changes flows into <code>/scim/admin/logs</code> and the LogStreamDrawer (Pulse icon in the header).
+      </Caption1>
 
       <div className={classes.logConfigGrid}>
         <Field label="Global level">

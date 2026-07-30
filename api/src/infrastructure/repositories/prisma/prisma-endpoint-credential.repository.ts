@@ -18,6 +18,7 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
         credentialHash: input.credentialHash,
         label: input.label ?? null,
         metadata: input.metadata ? (input.metadata as any) : undefined,
+        secretEnvelope: input.secretEnvelope ?? null,
         expiresAt: input.expiresAt ?? null,
       },
     });
@@ -75,6 +76,19 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
+  async reactivate(id: string): Promise<EndpointCredentialModel | null> {
+    try {
+      const row = await this.prisma.endpointCredential.update({
+        where: { id },
+        data: { active: true },
+      });
+      return this.toModel(row);
+    } catch {
+      // Record not found or DB error - return null (parity with deactivate).
+      return null;
+    }
+  }
+
   async delete(id: string): Promise<void> {
     try {
       await this.prisma.endpointCredential.delete({ where: { id } });
@@ -86,6 +100,50 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
+  async updateMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<EndpointCredentialModel | null> {
+    try {
+      const row = await this.prisma.endpointCredential.update({
+        where: { id },
+        data: { metadata: metadata as any },
+      });
+      return this.toModel(row);
+    } catch {
+      // Not found or invalid id.
+      return null;
+    }
+  }
+
+  async updateLabel(id: string, label: string | null): Promise<EndpointCredentialModel | null> {
+    try {
+      const row = await this.prisma.endpointCredential.update({
+        where: { id },
+        data: { label },
+      });
+      return this.toModel(row);
+    } catch {
+      return null;
+    }
+  }
+
+  async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
+    const result = await this.prisma.endpointCredential.updateMany({
+      where: { endpointId, secretEnvelope: { not: null } },
+      data: { secretEnvelope: null },
+    });
+    return result.count;
+  }
+
+  async clearAllSecretEnvelopes(): Promise<number> {
+    const result = await this.prisma.endpointCredential.updateMany({
+      where: { secretEnvelope: { not: null } },
+      data: { secretEnvelope: null },
+    });
+    return result.count;
+  }
+
   private toModel(row: any): EndpointCredentialModel {
     return {
       id: row.id,
@@ -94,6 +152,7 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
       credentialHash: row.credentialHash,
       label: row.label ?? null,
       metadata: row.metadata as Record<string, unknown> | null,
+      secretEnvelope: row.secretEnvelope ?? null,
       active: row.active,
       createdAt: row.createdAt,
       expiresAt: row.expiresAt ?? null,

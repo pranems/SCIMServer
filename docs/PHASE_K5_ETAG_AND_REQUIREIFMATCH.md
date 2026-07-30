@@ -32,7 +32,7 @@ flowchart LR
     end
 
     subgraph FE["Frontend (K5)"]
-        ET[parseResourceEtag<br/>W/&quot;v3&quot; -> {versionNumber:3, kind:'version'}]
+        ET["parseResourceEtag<br/>W/#quot;v3#quot; -> {versionNumber:3, kind:'version'}"]
         EB[EtagBadge<br/>monospace v3 chip]
         CD[ConflictDialog<br/>diff + refresh + force-overwrite]
         FM[formatIfMatchValue]

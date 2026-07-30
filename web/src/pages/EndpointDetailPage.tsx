@@ -75,7 +75,7 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'bulk' | 'resource-types';
+type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'connect' | 'bulk' | 'resource-types';
 
 interface EndpointDetailPageProps {
   endpointId: string;
@@ -91,7 +91,8 @@ function pathToTab(pathname: string, endpointId: string): TabValue {
   if (pathname.startsWith(`${base}/bulk`)) return 'bulk';
   if (pathname.startsWith(`${base}/resource-types`)) return 'resource-types';
   if (pathname.startsWith(`${base}/schemas`)) return 'schemas';
-  if (pathname.startsWith(`${base}/credentials`)) return 'credentials';
+  if (pathname.startsWith(`${base}/credentials`)) return 'connect';
+  if (pathname.startsWith(`${base}/connect`)) return 'connect';
   if (pathname.startsWith(`${base}/logs`)) return 'logs';
   if (pathname.startsWith(`${base}/settings`)) return 'settings';
   return 'overview';
@@ -170,8 +171,8 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
       navigate({ to: '/endpoints/$endpointId/schemas', params: { endpointId } });
       return;
     }
-    if (next === 'credentials') {
-      navigate({ to: '/endpoints/$endpointId/credentials', params: { endpointId } });
+    if (next === 'connect') {
+      navigate({ to: '/endpoints/$endpointId/connect', params: { endpointId } });
       return;
     }
     if (next === 'logs') {
@@ -265,7 +266,7 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="bulk">Bulk</Tab>
         <Tab value="resource-types">Resource types</Tab>
         <Tab value="schemas">Schemas</Tab>
-        <Tab value="credentials">Credentials</Tab>
+        <Tab value="connect" data-testid="endpoint-tab-connect">Connect</Tab>
         <Tab value="logs">Logs</Tab>
         <Tab value="settings">Settings</Tab>
       </TabList>

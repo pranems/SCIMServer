@@ -35,7 +35,16 @@ scimserver-deploy-*.json
 *.sqlite
 
 # IDE
-.vscode/
+# NOTE: this MUST be `.vscode/*` (contents), not `.vscode/` (the directory).
+# Git cannot re-include a file whose PARENT DIRECTORY is excluded, so with
+# `.vscode/` the `!.vscode/extensions.json` negation below is silently ignored.
+.vscode/*
+# ...the extension RECOMMENDATIONS are a shared, non-personal file and MUST be
+# committed. Ignoring the whole .vscode folder is why nobody cloning this repo was
+# ever prompted to install bierner.markdown-mermaid, which silently renders every
+# Mermaid diagram as a plain code block with no error message.
+# See scripts/doctor-mermaid.mjs and the "Mermaid Diagram Rule" in copilot-instructions.md.
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo

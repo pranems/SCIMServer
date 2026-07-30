@@ -188,3 +188,77 @@ describe('Phase K3 - parseScimError', () => {
     expect(parsed.rawBody).toEqual(body);
   });
 });
+
+// ─── WI-D8: auth reason-code catalog + reason-code-first lookup ──────
+
+describe('WI-D8 - auth reason_code catalog + parsing', () => {
+  const AUTH_REASON_KEYS = [
+    'wif_no_trust_configured',
+    'wif_no_trust_accepted',
+    'jwks_host_not_allowlisted',
+    'jwks_scheme_not_https',
+    'jwks_unreachable',
+    'assertion_malformed',
+    'assertion_signature_invalid',
+    'assertion_alg_not_allowed',
+    'assertion_expired',
+    'wif_issuer_mismatch',
+    'wif_subject_mismatch',
+    'wif_audience_mismatch',
+    'wif_tenant_mismatch',
+    'wif_missing_role',
+    'assertion_missing_claim',
+    'oauth_client_auth_failed',
+    'grant_type_unsupported',
+    'missing_credentials',
+    'mutually_exclusive_credentials',
+    'unsupported_assertion_type',
+    'bearer_missing',
+    // F3/F4 - resource-plane bearer sub-reasons
+    'bearer_token_scoped_other_endpoint',
+    'bearer_shared_secret_refused',
+    'bearer_oauth_expired',
+    'bearer_oauth_signature_invalid',
+    'bearer_invalid',
+  ] as const;
+
+  it('every auth reason code has a catalog entry with a title + explanation', () => {
+    for (const key of AUTH_REASON_KEYS) {
+      const entry = SCIM_ERROR_CATALOG[key];
+      expect(entry, `missing catalog entry for '${key}'`).toBeDefined();
+      expect(entry.title.length).toBeGreaterThan(0);
+      expect(entry.explanation.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('parseScimError prefers the reasonCode entry over the status fallback', () => {
+    // A 400/invalid_client OAuth error carrying a specific reason code should
+    // surface the WIF audience remediation, NOT the generic status message.
+    const e = new ScimApiError({
+      status: 400,
+      reasonCode: 'wif_audience_mismatch',
+      detail: 'audience mismatch',
+    });
+    const parsed = parseScimError(e);
+    expect(parsed.reasonCode).toBe('wif_audience_mismatch');
+    expect(parsed.catalogEntry).toBe(SCIM_ERROR_CATALOG.wif_audience_mismatch);
+    expect(parsed.catalogEntry.title).toMatch(/audience/i);
+  });
+
+  it('reasonCode wins over scimType when both are present', () => {
+    const e = new ScimApiError({
+      status: 400,
+      scimType: 'invalidValue',
+      reasonCode: 'oauth_client_auth_failed',
+      detail: 'auth failed',
+    });
+    const parsed = parseScimError(e);
+    expect(parsed.catalogEntry).toBe(SCIM_ERROR_CATALOG.oauth_client_auth_failed);
+  });
+
+  it('falls back to the status entry when the reasonCode is unknown', () => {
+    const e = new ScimApiError({ status: 401, reasonCode: 'not_a_real_code', detail: 'x' });
+    const parsed = parseScimError(e);
+    expect(parsed.catalogEntry).toBe(SCIM_ERROR_CATALOG.__http_401__);
+  });
+});

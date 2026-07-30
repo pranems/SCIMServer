@@ -99,6 +99,27 @@ describe('EndpointDetailPage', () => {
     expect(screen.getByRole('tab', { name: /settings/i })).toBeInTheDocument();
   });
 
+  it('renders the Connect tab (WI-5)', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
+    });
+
+    renderDetail();
+    await screen.findByTestId('endpoint-detail-page');
+    expect(screen.getByTestId('endpoint-tab-connect')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /connect/i })).toBeInTheDocument();
+  });
+
+  it('marks the Connect tab selected when URL is /endpoints/$endpointId/connect', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
+    });
+
+    renderDetail('/endpoints/ep-1/connect');
+    const connectTab = await screen.findByRole('tab', { name: /connect/i });
+    await waitFor(() => expect(connectTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
   it('marks Overview tab as selected on bare /endpoints/$endpointId URL', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockEndpoint, isLoading: false, error: null,

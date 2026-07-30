@@ -1,8 +1,8 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Version**: 0.53.1  
-> **Last Updated**: June 2, 2026
+> **Version**: 0.54.80  
+> **Last Updated**: July 28, 2026
 
 ---
 
@@ -177,6 +177,11 @@ docker-compose up           # Full stack
 - **Docker runtime port**: `8080` (image `ENV PORT=8080`, `EXPOSE 8080`, healthcheck on `:8080`).
 - **SCIM path compatibility**: requests to `/scim/v2/*` are rewritten to `/scim/*` at runtime middleware.
 - **Production auth secrets required**: `SCIM_SHARED_SECRET`, `JWT_SECRET`, and `OAUTH_CLIENT_SECRET`.
+- **Runtime tuning values are environment-dependent, and most are NOT yet configurable.** Before changing any timeout, retry, cache TTL, pool size, buffer, or cap, read [perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) (X15) - it is the source-audited inventory of every such value with `file:line`, the three-tier configurability model, and a recommended value per deployment form factor. Three live traps recorded there:
+  - `REQUEST_TIMEOUT_MS` sets **socket inactivity** and `keepAliveTimeout`, NOT request duration. `server.requestTimeout` and `server.headersTimeout` are never set, so requests are actually bounded by Node's implicit 300 s (X15-F2).
+  - The Prisma pool is `max: 5` hardcoded and passes no `connectionTimeoutMillis`, so the `pg` default `0` applies - there is **no acquire timeout** (X15-F3).
+  - `JWKS_CACHE_MAX_AGE_MS` defaults to 10 min, which is ~144x more aggressive than [Microsoft's published guidance](https://learn.microsoft.com/en-us/entra/identity-platform/signing-key-rollover) for its own signing keys (24 h TTL + 1 h background refresh). **Do not simply raise it** - the long TTL is only safe once W1.4 lands the background refresher (X15-F1).
+- **When adding a new environment-dependent numeric setting**, follow the tier-2 pattern already implemented in [api/src/oauth/egress-policy.ts](../api/src/oauth/egress-policy.ts): a hardcoded default, a bounds constant shared with the endpoint-config validator, a server env resolver that falls through on invalid input rather than throwing, and a merge that lets a per-endpoint override win while clamping at both levels.
 
 ---
 

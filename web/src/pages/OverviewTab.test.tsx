@@ -62,6 +62,21 @@ const mockOverview: EndpointOverviewResponse = {
   ],
   recentActivity: [],
   configFlags: { StrictSchemaValidation: true },
+  connectionInfo: {
+    endpointId: 'ep-1',
+    displayName: 'Production',
+    urls: {
+      scimBaseUrl: 'https://example.com/scim/v2/endpoints/ep-1',
+      scimBaseUrlBare: 'https://example.com/scim/endpoints/ep-1/v2',
+      tokenEndpoint: 'https://example.com/scim/endpoints/ep-1/oauth/token',
+      serviceProviderConfig:
+        'https://example.com/scim/v2/endpoints/ep-1/ServiceProviderConfig',
+      oauthMetadata:
+        'https://example.com/scim/endpoints/ep-1/.well-known/oauth-authorization-server',
+    },
+    enabledMethods: [],
+    disabledMethods: [],
+  },
 };
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -180,6 +195,9 @@ describe('OverviewTab', () => {
           path: '/scim/endpoints/ep-1/Users',
           statusCode: 201,
           durationMs: 42,
+          requestId: 'req-l1',
+          authOutcome: 'accept',
+          authMethod: 'wif',
         },
         {
           id: 'l2',
@@ -205,6 +223,12 @@ describe('OverviewTab', () => {
     // The HTTP method + status code should be visible to a human.
     expect(screen.getByText('POST')).toBeInTheDocument();
     expect(screen.getByText('201')).toBeInTheDocument();
+    // X5 - the auth-method chip renders on the row (accept via WIF), and the
+    // row is a clickable button that opens the request in the Logs view.
+    const chip = screen.getByTestId('overview-activity-auth-l1');
+    expect(chip.textContent).toContain('auth ok');
+    expect(chip.textContent).toContain('WIF');
+    expect(screen.getByTestId('overview-activity-row-l1').getAttribute('role')).toBe('button');
   });
 
   it('shows an EmptyState in the Recent Activity slot when none exist', () => {

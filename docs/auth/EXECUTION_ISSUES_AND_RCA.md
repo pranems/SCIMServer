@@ -1,8 +1,516 @@
-# Auth - Execution Issues and RCA Ledger
+# Auth build execution - issues, root-cause analysis, and fixes
 
-Per the repo standing rule "Execution Issue RCA Ledger", this records issues hit
-during auth-related work with symptom / root-cause / fix / why-the-fix-works /
-prevention + a detection-stage escape analysis.
+> **What this is.** A complete, introspective ledger of EVERY issue of EVERY type encountered while executing the reconciled 11-step authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies)), from Pre-Q.A through A4 plus the interstitial security pass and the final 3-form-factor checkpoint. For each issue it records the **symptom**, the **root-cause analysis (RCA)**, the **fix**, **why that fix works**, and the **prevention** (the gate or convention that stops the next one).
+>
+> **Why it exists.** None of these issues appear in the planning / design / architecture docs, because they arise from unforeseen combinations of circumstances (framework defaults, environment drift, tooling quirks, test-harness gaps) that the design stage cannot anticipate. Capturing them is how the gate set self-densifies over time - it is the concrete artifact behind the [self-improvement discipline (R7)](../../.github/copilot-instructions.md). This doc is the companion to the [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md) (which tracks *what shipped*) and the [EXECUTION_DECISIONS_AND_RATIONALE.md](EXECUTION_DECISIONS_AND_RATIONALE.md) (which tracks *what was decided and why*); this one tracks *what went wrong on the way and what we learned*.
+>
+> **Provenance / completeness.** This ledger was reconciled against the **full 4,666-line session transcript** of the build (not just in-context recollection): a systematic scan for error/RED/fix/rejection signals across every step, plus a narration-phrase pass (`false positive`, `root cause`, `no-op`, `silently`, etc.). That scan surfaced **no substantive issue not already listed below** - every diagnosed problem in the transcript maps to one of the 17 entries. The early backbone/enabling steps (Pre-Q.A -> A2) genuinely had low issue density because they reused established patterns; the clusters are at Q6 (new external-dependency + test-harness surface) and the final checkpoint (environment drift + the live-only test bug). One verified-and-dismissed non-issue: the `jose` ESM-only constraint (Q2) was an *anticipated design choice* (dynamic `import('jose')`), not a failure - it loaded cleanly in jest on the first RED run.
+>
+> **Method note (now a standing discipline).** This doc was retrofitted at build end, which is why one recurrence count was initially understated (~50x lint-ceiling churn first recorded as "3+"). The standing fix is disciplines **D1 (capture each RCA at fix-confirmation time)** and **D2 (reconcile against the full transcript at build end)** in [docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md#2-maintenance-protocol-the-three-disciplines) - future ledgers are written incrementally so compaction cannot erode fidelity. The generalizable patterns from this build are promoted into that central doc (PA-1, PA-2, PB-1, PC-1, PD-1, PE-1/2/3).
+
+---
+
+## 1. Methodology - how issues are classified
+
+Every issue is tagged with a **type**, a **severity**, the **step** it surfaced in, and the **detection stage** (which quality gate caught it). The most valuable column is **detection stage vs earliest-possible**: when a gate catches an issue LATER than it could have, that delta is itself a finding.
+
+### 1.1 Type taxonomy
+
+| Type | Meaning | Example |
+|---|---|---|
+| **T1 Harness/DI** | Test infrastructure or dependency-injection wiring gap that makes a test lie or fail to run | An optional DI token with no default provider silently ignores its test override |
+| **T2 Framework surprise** | A framework default behaved differently than the design assumed | NestJS wraps a thrown error into a different envelope shape |
+| **T3 Test correctness** | The test (not the product) was wrong - a false positive or a false green | A loose substring regex matches a legitimate field name |
+| **T4 Environment drift** | A value differs between local / Docker / Azure form factors | The Docker OAuth secret is not the local default |
+| **T5 Security finding** | A real vulnerability class surfaced by a scanner or review | CWE-1321 prototype pollution at an object-write sink |
+| **T6 Tooling friction** | A CLI / shell / API quirk that blocked or corrupted an operation | A REST API rejecting an over-length comment field |
+| **T7 Process/git** | A workflow / version-control / environment-prep step that bit | A remote branch advancing mid-work; a backend needing a DB |
+
+### 1.2 Severity
+
+| Severity | Definition |
+|---|---|
+| **High** | Could have shipped a real defect OR produced a false-green gate (a passing test that proves nothing) |
+| **Medium** | Real product or contract correctness issue caught before ship; or a recurring friction that costs material time |
+| **Low** | One-off friction, cosmetic, or environment-prep; no risk of shipping a defect |
+
+### 1.3 Severity distribution
+
+```mermaid
+pie showData
+    title Issues by severity (17 total)
+    "High (false-green or security)" : 4
+    "Medium (correctness / recurring)" : 6
+    "Low (friction / one-off)" : 7
+```
+
+### 1.4 Type distribution
+
+```mermaid
+pie showData
+    title Issues by type
+    "T1 Harness/DI" : 2
+    "T2 Framework surprise" : 2
+    "T3 Test correctness" : 3
+    "T4 Environment drift" : 2
+    "T5 Security" : 1
+    "T6 Tooling friction" : 5
+    "T7 Process/git" : 2
+```
+
+---
+
+## 2. Master dashboard
+
+| ID | Title | Type | Sev | Step | Detected at | Status | Fix |
+|---|---|---|---|---|---|---|---|
+| I-01 | `JWKS_FETCH` test override silently no-op (optional DI token unbound) | T1 | High | Q6 | Stage 2 (E2E) | Fixed | 8fe8b9b |
+| I-02 | `createTestApp` had no provider-override hook | T1 | Medium | Q6 | Stage 2 (E2E) | Fixed | 8fe8b9b |
+| I-03 | SCIM exception filter rewraps OAuth `{error}` into `{detail}` | T2 | Medium | Q1 | Stage 2 (E2E) | Adapted | 3527df5 |
+| I-04 | `415` on form-urlencoded token POST (content-type middleware) | T2 | Medium | A3 | Stage 2 (E2E) | Fixed | 524e75e |
+| I-05 | Loose `token|clientSecret|credentialHash` regex false-matched `issuedTokenTtlSec` | T3 | High | Q6/checkpoint | Stage 4 (Docker) | Fixed | ffc4133 |
+| I-06 | Recurring unnecessary-type-assertion lint warnings in specs | T3 | Low | many | Stage 1 (lint) | Fixed (xN) | each step |
+| I-07 | TS cast errors needing `as unknown as` (JWK, EndpointCredentialModel) | T3 | Low | Q6 | Stage 1 (tsc) | Fixed | 8fe8b9b |
+| I-08 | Docker compose OAuth secret is `devscimclientsecret`, not `changeme-oauth` | T4 | Medium | checkpoint | Stage 4 (Docker) | Documented | (runner arg) |
+| I-09 | `/health` 404 on Docker (wrong health path assumption) | T4 | Low | checkpoint | Stage 4 (Docker) | Worked around | n/a |
+| I-10 | CWE-1321 prototype pollution at 4 object-write sinks | T5 | High | security/A4 | CodeQL (async) | Fixed | ab943ab, 481bd38 |
+| I-11 | CodeQL `dismissed_comment` 280-char limit (HTTP 422) | T6 | Low | security | Stage 3 (triage) | Worked around | n/a |
+| I-12 | `gh api` PATCH broke `ConvertFrom-Json` (non-JSON warning on pipe) | T6 | Low | security | Stage 3 (triage) | Worked around | n/a |
+| I-13 | Ledger run-log append: trailing whitespace defeats `replace_string` | T6 | Low | every step | authoring | Convention | `Add-Content` |
+| I-14 | Terminal cwd drift -> `jest`/`vitest` from repo root hangs | T6 | Medium | many | authoring | Convention | explicit `cd` |
+| I-15 | `git commit -m` special chars (`|` `(` `)` `"`) mis-parsed -> pathspec error | T6 | Low | checkpoint | committing | Convention | plain message |
+| I-16 | Remote `feat/wif` advanced mid-work (multer 2.1.1 -> 2.2.0) | T7 | Low | mid-build | push | Convention | fetch+rebase+`npm ci` |
+| I-17 | E2E needs Postgres unless `PERSISTENCE_BACKEND=inmemory` | T7 | Low | every E2E | first E2E run | Convention | env var |
+
+> The `Fix` column lists the commit that carries the fix where one exists; "Convention"/"Documented"/"Worked around" mean the resolution was a practice or a one-time action rather than a code change.
+
+---
+
+## 3. Detection-stage escape analysis
+
+The single most useful introspection: did the gate that caught each issue catch it as early as it could have?
+
+| ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier gates |
+|---|---|---|---|---|
+| I-01 | Stage 2 E2E (accept test 401'd) | Stage 2 E2E | none | Surfaced immediately as a RED on the first accept test - the cost was debug time, not an escape. |
+| I-05 | Stage 4 Docker live | Stage 4.3 **local-node** live (per-step) | one stage | Q6 batched ALL live-tests to the integration checkpoint, so the 9z-AT section was authored but never executed against a live node until Docker. A per-step local-node live run would have caught it one stage earlier. |
+| I-08 | Stage 4 Docker live | Stage 4.2 (first compose run) | none | Genuine first-contact discovery, not an escape - the secret value simply differs by environment. |
+| I-10 | CodeQL async scan | Stage 1 SAST (CodeQL per-PR) | none | CodeQL is the SAST gate; it fired on schedule. The A0-A3 code added 3 new sinks; pre-existing sinks were already tracked. |
+
+**Headline lesson (I-05):** batching live-tests to a checkpoint defers the discovery of *live-only test bugs*. The standing per-step norm ("local-node live after each step") exists precisely to avoid this; Q6 traded it for batch efficiency and paid one stage of latency. Reinforced in [Section 7](#7-self-improvement-actions).
+
+---
+
+## 4. Detailed catalog
+
+### T1 - Test-harness / DI wiring
+
+#### I-01 (High) - `JWKS_FETCH` test override silently no-op
+
+- **Symptom.** The Q6 WIF E2E ([wif-assertion.e2e-spec.ts](../../api/test/e2e/wif-assertion.e2e-spec.ts)) injected a mocked JWKS `fetch` via `overrideProvider(JWKS_FETCH).useValue(fetchMock)`, but the two "accept" tests returned `401 invalid_client`. The server log showed `JWKS fetch returned HTTP 400` - the **real** `globalThis.fetch` was hitting the live Microsoft URL, not the mock.
+- **Root cause.** [ExternalJwksValidatorService](../../api/src/oauth/external-jwks-validator.service.ts) declares the fetch dependency as `@Optional() @Inject(JWKS_FETCH) fetchFn?: typeof fetch` and falls back to `this.fetchFn ?? globalThis.fetch`. In NestJS, `overrideProvider(TOKEN)` only *replaces an existing provider binding*. Because `JWKS_FETCH` was never registered as a provider in any module (it was a pure optional token), there was nothing to override - the override resolved to nothing, the injected value stayed `undefined`, and the `?? globalThis.fetch` fallback ran the real network call. The override was **silently ignored**.
+- **Fix.** Register a default provider for the token in [oauth.module.ts](../../api/src/oauth/oauth.module.ts):
+  ```ts
+  { provide: JWKS_FETCH, useFactory: () => globalThis.fetch.bind(globalThis) }
+  ```
+- **Why the fix works.** There is now a real binding for `JWKS_FETCH`, so `overrideProvider(JWKS_FETCH)` has a target to replace. Production behavior is unchanged: the default factory returns the same `globalThis.fetch` the `?? globalThis.fetch` fallback used, so the only effect is that the token is now overridable in tests.
+- **Prevention.** New convention: **any `@Optional()` DI token that a test will override MUST have a default provider registered in its module.** An unbound optional token cannot be overridden - the override is a no-op and the test exercises production wiring while appearing to mock it. Proposed as a standing rule in [Section 7](#7-self-improvement-actions).
+
+#### I-02 (Medium) - `createTestApp` had no provider-override hook
+
+- **Symptom.** There was no way for the WIF E2E to override `JWKS_FETCH` because [app.helper.ts](../../api/test/e2e/helpers/app.helper.ts) `createTestApp()` compiled the testing module internally with no extension point.
+- **Root cause.** The helper hard-coded `Test.createTestingModule({ imports: [AppModule] }).compile()` with no callback to mutate the builder.
+- **Fix.** Added an optional `customize?: (builder: TestingModuleBuilder) => TestingModuleBuilder` parameter; when present it is applied before `.compile()`. Backward compatible (all existing callers pass nothing).
+- **Why the fix works.** The override (`builder => builder.overrideProvider(JWKS_FETCH).useValue(fetchMock)`) now runs against the same builder that compiles the app, so the binding (added by I-01's fix) is replaced before instantiation.
+- **Prevention.** Shared E2E bootstrap helpers should expose a builder-customize seam from day one; retrofitting one mid-feature is a sign the harness was under-designed for testability.
+
+### T2 - Framework-behavior surprises
+
+#### I-03 (Medium) - SCIM exception filter rewraps OAuth `{error}` into `{detail}`
+
+- **Symptom.** The per-endpoint token endpoint throws RFC 6749 section 5.2 errors as `{ error: 'invalid_client', error_description: ... }`, but the E2E and live assertions for those errors had to check `res.body.detail === 'invalid_client'`, not `res.body.error`.
+- **Root cause.** The global [ScimExceptionFilter](../../api/src/modules/scim/filters/scim-exception.filter.ts) catches every `HttpException` and reformats it into the SCIM error envelope (`{ schemas, detail, status }`). The token endpoint rides the same filter, so its OAuth-shaped body is rewrapped: the `error` string lands in `detail`.
+- **Resolution (adapt, not fix).** This is acceptable behavior for the current scope - the token endpoint shares the SCIM envelope. The tests were written to assert the *actual* contract (`detail`) rather than the *assumed* one (`error`). A future step (the A3 error catalog) can carve the token endpoint out of the SCIM filter if a raw OAuth body is required.
+- **Why this resolution is correct.** The product behavior is internally consistent and documented; the tests assert the real wire contract. Forcing the OAuth shape now would mean special-casing the filter for one route without a consumer that requires it.
+- **Prevention.** When a new endpoint rides an existing global filter/interceptor, assert its **actual** serialized body in a test before assuming the framework leaves it untouched. Global filters are contract-shaping middleware.
+
+#### I-04 (Medium) - `415 Unsupported Media Type` on form-urlencoded token POST
+
+- **Symptom.** A `application/x-www-form-urlencoded` POST to `/scim/endpoints/:id/oauth/token` (the RFC 6749 section 3.2 content type) returned `415` instead of reaching the controller.
+- **Root cause.** The [ScimContentTypeValidationMiddleware](../../api/src/modules/scim/middleware/scim-content-type-validation.middleware.ts) enforces `application/scim+json` (or `application/json`) on all `endpoints/*` routes per RFC 7644 section 3.1. The token endpoint sits under that prefix, so the SCIM content-type rule rejected the form body before the route ran.
+- **Fix.** Exempt `*/oauth/token` paths from the SCIM content-type rule (a regex carve-out in the middleware), and register an explicit `express.urlencoded({ extended: true })` body parser in [main.ts](../../api/src/main.ts) + [app.helper.ts](../../api/test/e2e/helpers/app.helper.ts).
+- **Why the fix works.** The token endpoint is an OAuth surface, not a SCIM resource surface - it must accept the OAuth-standard form encoding. The carve-out scopes the exemption to the token path only, so every real SCIM route keeps the strict `scim+json` rule.
+- **Prevention.** Cross-protocol endpoints (OAuth living under a SCIM prefix) need an explicit content-type policy decision. A blanket prefix-scoped middleware will capture sub-routes that belong to a different protocol.
+
+### T3 - Test-assertion correctness
+
+#### I-05 (High) - Loose no-secret regex false-matched `issuedTokenTtlSec`
+
+- **Symptom.** The Docker (Prisma) checkpoint failed exactly one assertion: `9z-AT.T4: wif credential response carries NO secret/hash/token`. No secret actually leaked - the WIF response is correct.
+- **Root cause.** The assertion used `-not ($json -match "token|clientSecret|credentialHash")`. PowerShell `-match` is a **case-insensitive substring regex**, so the alternation `token` matched the `Token` inside the legitimate public field name `issuedTokenTtlSec`. The gate flagged a correct response as a leak - a **false positive** that, in the mirror case, is a **false-green farm**: the same loose pattern would also miss `"clientSecret"` if it were nested in a differently-cased key.
+- **Fix.** Tighten all three WIF no-secret assertions (`9z-AQ.T9`, `9z-AT.T4`, `9z-AU.T4`) to **JSON-key-precise** patterns: `'"token"|"clientSecret"|"credentialHash"'`.
+- **Why the fix works.** `JSON.stringify` renders every key as `"<key>":`. A genuine secret key therefore appears in the serialized body as the quoted token `"token"` and still fails the gate, while `issuedTokenTtlSec` serializes as `"issuedTokenTtlSec":` - which does **not** contain the quoted substring `"token"` (the inner `Token` is bracketed by letters, not quotes). The gate now keys on JSON structure, not on a word appearing anywhere.
+- **Prevention.** This is the live-test analog of **copilot-instructions rule R1** ("measure the real signal, not a property that merely looks right"). Standing rule: **assertions about the presence/absence of a key in a serialized payload MUST match the structural form of a key (`"<key>"`), never a bare substring.** A bare-substring gate is simultaneously a false-positive and a false-negative generator.
+
+#### I-06 (Low, recurring) - Unnecessary-type-assertion lint warnings in specs
+
+- **Symptom.** The ESLint warning count crept above the frozen baseline of **464** (to 465/466) on essentially **every step that added spec code** - a full-transcript scan found the 464-ceiling-bump-and-restore cycle diagnosed ~50 times across the build. The offenders were always `@typescript-eslint/no-unnecessary-type-assertion` (a `as X` cast that TypeScript already infers) or `no-explicit-any` in new spec code.
+- **Root cause.** When writing fast spec scaffolding, casts like `(cfg as Record<string, unknown>).polluted` or `logger.info as jest.Mock` were added defensively but were redundant once the surrounding types were correct.
+- **Fix.** Removed the redundant cast each time; re-ran lint to confirm return to 464.
+- **Why the fix works.** The receiver already accepts the original type, so the assertion changes nothing and the linter is correct to flag it. Removing it is behavior-neutral.
+- **Prevention.** The pre-push hook runs ESLint as a hard gate, so this never reached `main`. The high recurrence (~50 bump-and-restore cycles) is the signal: treat the **464 warning ceiling as a ratchet** and lint the *touched files only* before committing, not just at push time - the cost of catching it at push is a full re-lint per step.
+
+#### I-07 (Low) - TS cast errors needing `as unknown as`
+
+- **Symptom.** Two E2E/spec compile errors: `Conversion of type 'JWK' to 'Record<string, unknown>' may be a mistake` and the same for `EndpointCredentialModel`.
+- **Root cause.** A single-step cast between two types with no structural overlap (a `jose` `JWK` to an index signature, a partial literal to a full model) is rejected by TypeScript unless routed through `unknown`.
+- **Fix.** `as unknown as Record<string, unknown>` (and dropped the cast entirely where the mock accepted `any`).
+- **Why the fix works.** `unknown` is the explicit "I am deliberately widening then re-narrowing" escape hatch; it documents intent and satisfies the compiler without `any`.
+- **Prevention.** Prefer building test fixtures with the real type (or a typed factory) over casting a literal; reach for `as unknown as` only at genuine type-system boundaries (third-party `JWK`).
+
+### T4 - Cross-environment drift
+
+#### I-08 (Medium) - Docker OAuth secret differs from the local default
+
+- **Symptom.** `scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` failed at step 1 (token) with `401 invalid_client` against Docker compose.
+- **Root cause.** [docker-compose.yml](../../docker-compose.yml) sets `OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-devscimclientsecret}` - the compose default is `devscimclientsecret`, while the local-node and dev-Azure environments use `changeme-oauth`. The live-test runner defaults `-ClientSecret "changeme-oauth"`, so the unqualified Docker invocation authenticated with the wrong secret.
+- **Resolution.** Pass the matching secret per form factor: `-ClientSecret "devscimclientsecret"` for compose. (Local node + dev Azure keep `changeme-oauth`.)
+- **Why this is correct.** The secrets are intentionally different per environment; the runner is correctly parameterized. The fix is to supply the right argument, not to homogenize the secrets.
+- **Prevention.** The per-environment auth values (OAuth secret, SCIM shared secret, base URL) are the kind of thing that belongs in a single documented table. This doc and [/memories/repo/auth-exec-progress.md](../../.github/copilot-instructions.md) now record: **Docker = `devscimclientsecret`, local/dev-Azure = `changeme-oauth`.**
+
+#### I-09 (Low) - `/health` 404 on Docker
+
+- **Symptom.** A probe of `http://localhost:8080/health` returned `404` even though the container reported `healthy`.
+- **Root cause.** The assumed health path was wrong; the container has its own healthcheck on a different path, and the app does not expose `/health` at the root.
+- **Resolution (work around).** Verified liveness by fetching an OAuth token (a real, contract-meaningful probe) instead of guessing a health route.
+- **Why this is correct.** A successful RS256 token issuance proves the app booted, the signing key loaded, and the OAuth surface is live - a stronger readiness signal than a health ping.
+- **Prevention.** Use a contract endpoint (token issuance, a discovery GET) for readiness probes rather than assuming a conventional `/health` path exists.
+
+### T5 - Security findings
+
+#### I-10 (High) - CWE-1321 prototype pollution at object-write sinks
+
+- **Symptom.** CodeQL flagged 3 `js/remote-property-injection` alerts (68, 184, 235) where a property *name* written into an object derived from request-shaped input, plus 2 `js/user-controlled-bypass` alerts (234, 236) on allowlist-guarded switches.
+- **Root cause.** Code paths that do `target[userKey] = value` where `userKey` can be a `JSON.parse`-materialised `__proto__` / `constructor` / `prototype` own-property are a prototype-pollution vector. The four real sinks: [auto-expand.service.ts](../../api/src/modules/scim/endpoint-profile/auto-expand.service.ts) `stripUndefined` + `stripSecretsFromConfig`, [generic-patch-engine.ts](../../api/src/domain/patch/generic-patch-engine.ts) extension-URN + `setNested` writes, and (added in A4) the [wif-assertion-token.provider.ts](../../api/src/modules/scim/controllers/wif-assertion-token.provider.ts) `roleScopeMap` read. The 2 `user-controlled-bypass` alerts were **false positives** - they sit on positive allowlist checks (`KNOWN_METHOD_TYPES`, the secret-strip content filter), which are defense-in-depth filters, not authorization gates.
+- **Fix.** New single-source guard [safe-object-key.ts](../../api/src/security/safe-object-key.ts) `isUnsafeObjectKey(key)` (the `__proto__`/`constructor`/`prototype` deny-set); a `if (isUnsafeObjectKey(k)) continue;` guard at each write sink; an in-sink `DANGEROUS_KEYS` re-check in the patch engine. The 2 bypass alerts were dismissed as false positives (with a sub-280-char justification, see I-11). Alerts 68/184/235 auto-close on the next scan.
+- **Why the fix works.** A request-supplied key can never reach an object-write sink without passing the deny-set check, so `Object.prototype` cannot be polluted. The guard is structural (one function, used everywhere) rather than per-site ad-hoc, so a new sink only needs to call the same helper. Proven by 2 new prototype-pollution tests (RED: `cfg.polluted === true` before the guard; GREEN after) plus the existing V19 suite.
+- **Prevention.** Two standing rules already exist (the no-secret structural guarantee; the V19 proto-pollution suite). This finding reinforces: **every dynamic `obj[userControlledKey] = value` write MUST go through `isUnsafeObjectKey` at the sink**, even when an upstream `guardPrototypePollution(path)` exists - defense in depth, because the upstream guard validates a *path string*, not the *final key*.
+
+### T6 - Tooling / shell friction
+
+#### I-11 (Low) - CodeQL `dismissed_comment` 280-char limit
+
+- **Symptom.** `gh api -X PATCH .../alerts/234 -f dismissed_comment="<long justification>"` returned `HTTP 422: Only 280 characters are allowed`.
+- **Root cause.** The GitHub code-scanning dismiss API caps `dismissed_comment` at 280 characters; the first justification was 283.
+- **Resolution.** Shortened the comment to under 280 characters while keeping the substance (defense-in-depth filter, not an authZ gate; no-secret guarantee is structural + contract-tested).
+- **Prevention.** Pre-trim CodeQL dismiss comments to <= 280 characters. Recorded in [/memories/repo/auth-exec-progress.md](EXECUTION_LEDGER.md).
+
+#### I-12 (Low) - `gh api` PATCH broke `ConvertFrom-Json`
+
+- **Symptom.** Piping `gh api -X PATCH ... | ConvertFrom-Json` failed with `Conversion from JSON failed ... Unexpected character ... 'g'`.
+- **Root cause.** `gh` emitted a non-JSON warning/notice on stdout *before* the JSON body, so the PowerShell `ConvertFrom-Json` parser hit the leading text. (The underlying PATCH may even have succeeded; the pipe consumer broke, not the API call.)
+- **Resolution.** Verify the dismissal with a separate read (`gh api .../alerts/234 | Select number,state`) rather than parsing the PATCH response inline; retry the PATCH on a clean pipe.
+- **Prevention.** Do not pipe `gh api` mutation responses straight into a strict JSON parser; capture, inspect, then parse - or verify the side effect with a follow-up read.
+
+#### I-13 (Low) - Ledger run-log append defeats `replace_string`
+
+- **Symptom.** Editing [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md) run-log rows via the string-replace edit tool repeatedly failed to match.
+- **Root cause.** The ledger has trailing-whitespace quirks on table rows; the exact-match replace tool needs byte-perfect context, which the invisible trailing spaces broke.
+- **Resolution.** Append run-log rows with the terminal (`Add-Content -Path ... -Value '| ... |'`) instead of an in-file string replace; use the replace tool only for the status-table cells (which are stable).
+- **Prevention.** For append-only, whitespace-sensitive logs, prefer `Add-Content` over context-matched edits.
+
+#### I-14 (Medium, recurring) - Terminal cwd drift hangs `jest`/`vitest`
+
+- **Symptom.** Several `npx jest ...` / `npx vitest ...` invocations produced no output and had to be killed; they had started in the **repo root** instead of `api/` or `web/`, where there is no jest/vitest config, so the runner hung or no-op'd.
+- **Root cause.** A new or backgrounded terminal does not inherit the previous command's `cd`; some tool-simplified commands also reset to the workspace root.
+- **Resolution.** Prefix every test invocation with an explicit `cd C:\...\api` (or `web`); kill and re-run from the right directory when a runner produces no output.
+- **Prevention.** Never assume terminal cwd persists across invocations. Always `cd` explicitly in the same command as the runner. Recorded as a workflow gotcha in memory.
+
+#### I-15 (Low) - `git commit -m` special chars mis-parsed
+
+- **Symptom.** A commit message containing `token|clientSecret|credentialHash` and `(...)` and escaped quotes produced `error: pathspec '...' did not match any file(s)` - the shell split the message on the special characters and treated fragments as path arguments.
+- **Root cause.** Unquoted/awkwardly-quoted `|`, `(`, `)`, `"` inside a `-m` string under PowerShell's parser leaked out of the string.
+- **Resolution.** Re-issued the commit with a plain-prose message free of shell metacharacters.
+- **Prevention.** Keep commit `-m` bodies free of `|`, raw parentheses, and nested quotes; describe patterns in words ("quoted JSON-key patterns") rather than pasting the regex.
+
+### T7 - Process / git / environment
+
+#### I-16 (Low) - Remote `feat/wif` advanced mid-build (multer bump)
+
+- **Symptom.** Mid-build, `origin/feat/wif` had advanced (a `master` merge bumped `multer` 2.1.1 -> 2.2.0 and added a CodeQL batch).
+- **Root cause.** The shared feature branch receives direct CVE/dependency bumps; local unpushed commits then sit behind the remote.
+- **Resolution.** `git fetch` + rebase the local unpushed commit onto the remote before pushing; run `npm ci` in `api/` after the lockfile changed; do **not** revert the dependency bump.
+- **Why this is correct.** Rebasing unpushed commits is safe (no published history rewritten); the pre-push hook re-runs the gates on the rebased result.
+- **Prevention.** Fetch + rebase before every push on a shared branch; `npm ci` whenever `package-lock.json` moved.
+
+#### I-17 (Low) - E2E needs Postgres unless inmemory
+
+- **Symptom.** The first E2E run attempted to connect to Postgres at `localhost:5432` and failed in a DB-less shell.
+- **Root cause.** The default `PERSISTENCE_BACKEND` is `prisma`, which requires a live Postgres; the local dev shell has none.
+- **Resolution.** Run E2E with `$env:PERSISTENCE_BACKEND='inmemory'` to exercise the in-memory backend (the cross-backend parity gate covers the Prisma path separately at the Docker checkpoint).
+- **Prevention.** Default local E2E to the inmemory backend; reserve Prisma-backed runs for Docker compose (where Postgres is part of the stack).
+
+---
+
+## 5. Cross-cutting lessons
+
+1. **Loose matching is a two-sided farm.** A bare-substring assertion (I-05) generates false positives *and* false negatives. Always assert on the structural form of the thing (a JSON key is `"<key>":`, not the word). This is R1 applied to live-tests.
+2. **Optional DI tokens need default providers to be overridable (I-01).** An unbound `@Optional()` token cannot be mocked - the override silently no-ops and the test runs production wiring. Register a behavior-preserving default provider.
+3. **Batching live-tests defers live-only bug discovery (I-05).** The per-step local-node live norm exists to catch live-only test bugs one stage earlier; trading it for batch efficiency costs latency. Author *and smoke-run* each live section against one live node before batching.
+4. **Global filters/interceptors are contract-shaping (I-03, I-04).** A new endpoint under an existing prefix inherits its middleware (content-type rules, error rewrapping). Assert the *actual* serialized body and decide content-type policy explicitly.
+5. **Environment values drift by form factor (I-08, I-09).** Secrets, ports, and health paths differ across local / Docker / Azure. Parameterize the runner and document the per-environment values in one place.
+6. **RCA the test before the product (I-05).** When a gate fails, the first question is "is the gate correct?" - a wrong gate is as dangerous as a wrong product, because it erodes trust in green.
+7. **Defense in depth at the sink (I-10).** An upstream path-guard does not remove the need for a final key-guard at the write sink; validate the actual key, structurally, where the write happens.
+
+---
+
+## 6. Per-step issue density
+
+```mermaid
+flowchart LR
+    PreQA[Pre-Q.A] --> PreQB[Pre-Q.B]
+    PreQB --> A0[A0]
+    A0 --> Q0[Q0]
+    Q0 --> Q1[Q1: I-03]
+    Q1 --> Q2[Q2]
+    Q2 --> A1[A1]
+    A1 --> A2[A2]
+    A2 --> A3[A3: I-04]
+    A3 --> SEC[Security: I-10 I-11 I-12]
+    SEC --> Q6[Q6: I-01 I-02 I-06 I-07]
+    Q6 --> A4[A4: I-10 roleScopeMap]
+    A4 --> CHK[Checkpoint: I-05 I-08 I-09 I-15]
+```
+
+The heaviest issue clusters are **Q6** (the test-harness/DI work - new external dependency surface) and the **final checkpoint** (where environment drift and the live-only test bug surfaced). The pure-backbone inert steps (A0, A2) and the foundational signing work (Pre-Q.B) produced no issues - they reused established patterns.
+
+---
+
+## 7. Self-improvement actions
+
+Per the [R7 self-improvement discipline](../../.github/copilot-instructions.md), every issue ends in one of: improvement applied in-place, improvement scheduled, or improvement explicitly not needed.
+
+### 7.1 Applied in-place (this execution)
+
+| Issue | Improvement landed |
+|---|---|
+| I-01 / I-02 | Default `JWKS_FETCH` provider + `createTestApp` customize hook ([8fe8b9b](EXECUTION_LEDGER.md)). |
+| I-05 | All three WIF no-secret live assertions tightened to JSON-key precision ([ffc4133](EXECUTION_LEDGER.md)). |
+| I-10 | `isUnsafeObjectKey` single-source guard at every object-write sink ([ab943ab](EXECUTION_LEDGER.md), [481bd38](EXECUTION_LEDGER.md)). |
+
+### 7.2 New standing conventions (proposed for the gate set)
+
+1. **Optional-DI-token default-provider rule.** Any `@Optional() @Inject(TOKEN)` dependency that a test overrides MUST have a default provider registered in its module - otherwise `overrideProvider` is a silent no-op. (From I-01.)
+2. **Structural-key assertion rule.** Presence/absence-of-key assertions over a serialized payload MUST match the structural key form (`"<key>"`), never a bare substring. (From I-05; the live-test analog of R1.)
+3. **Author-and-smoke-run-before-batch rule.** A new `live-test.ps1` section MUST be executed against at least one live node (local node, port 6000/8080) in the same step it is authored, before deferring the rest of the live matrix to a batched checkpoint. (From I-05.)
+4. **Per-environment auth-value table.** The OAuth secret / SCIM shared secret / base URL for each form factor (local `changeme-oauth`, Docker `devscimclientsecret`, dev Azure `changeme-oauth`) is recorded in repo memory and this doc. (From I-08.)
+
+### 7.3 The recurring practice this doc establishes
+
+> **Standing rule (the reason this doc exists):** every multi-step build, feature, or significant change MUST produce - or append to - an **execution-issues-and-RCA** doc that captures EVERY issue of EVERY type encountered, each with symptom / root-cause / fix / why-the-fix-works / prevention, plus a detection-stage escape analysis. These issues are not anticipated at design time (they come from framework defaults, environment drift, tooling quirks, and test-harness gaps), so capturing them is the only way the gate set self-densifies. This is the concrete artifact behind R7, and it is now a documented norm in [copilot-instructions.md](../../.github/copilot-instructions.md).
+
+---
+
+## 8. Post-merge integration addendum (jose 5->6 + master reconcile, 2026-06-29)
+
+> **Scope.** Sections 1-7 cover the 11-step build proper (17 issues). This addendum captures the issues from the *integration tail* - reconciling `feat/wif` with `origin/master` (jose 5.10.0 -> 6.2.3 + dependabot minor bumps) and re-running the heavy validation pipeline across all form factors. Per the standing RCA-ledger rule, every issue of every type is recorded here with the same symptom / RCA / fix / why / prevention structure, numbered I-18+ to extend the build ledger. Captured at fix-confirmation time per discipline D1.
+
+### 8.1 Addendum dashboard
+
+| ID | Title | Type | Sev | Surfaced in | Detected at | Status | Fix |
+|---|---|---|---|---|---|---|---|
+| I-18 | WIF credentials Playwright spec used `?tab=` query param instead of the path-based route | T3 | Medium | Playwright vs dev | Stage 5.3 (first-ever live run) | Fixed | 16d4c02 |
+| I-19 | Playwright Chromium binary drift after dependabot `@playwright/test` bump (128 specs RED) | T6 | Low | Playwright vs dev | Stage 5.4 (browser sync) | Worked around | (binary install) |
+
+> **Verified-and-dismissed non-issue: the jose 5 -> 6 major bump.** NOT an issue - de-risked and clean. The WIF code loads jose via dynamic `import('jose')` (no API-surface coupling), the jose-6 PR touched only a jest ESM-transform config, a runtime smoke confirmed `jwtVerify` + `createLocalJWKSet` exist in v6, and every tier stayed green (unit 4011/0, E2E 1283/0, Docker live 1109/0, local live 1109/0, dev live 1109/0). Recorded for completeness, not as a defect - the v6 ESM-only constraint was an anticipated design property, exactly like the Q2 note in the provenance header.
+
+### 8.2 I-18 (Medium, T3) - WIF spec used `?tab=` instead of the path-based route
+
+- **Symptom.** Three `wif-credentials.spec.ts` tests failed against dev with `getByTestId('tab-credentials')` timeout / "element(s) not found", before any WIF assertion ran. The failure was **identical before and after** a clean web-bundle redeploy.
+- **Root cause.** The spec deep-linked the credentials tab via `page.goto('/endpoints/<id>?tab=credentials')`. But [EndpointDetailPage](../../web/src/pages/EndpointDetailPage.tsx) selects the active tab from the URL **path** (`activeTab = pathToTab(pathname, endpointId)`) using TanStack file-based child routes (`/endpoints/<id>/credentials`, rendered through `<Outlet />`); there is no `?tab=` handling anywhere. The unknown search param was ignored, the index (overview) route stayed matched, OverviewTab rendered, and the CredentialsTab carrying `data-testid="tab-credentials"` never mounted. `?tab=` is a stale pre-migration mental model that survives only in comments - including the header of the sibling [endpoint-detail-tabs.spec.ts](../../web/e2e/endpoint-detail-tabs.spec.ts), whose *code* nonetheless uses the correct path URL and passes.
+- **Why it escaped until now.** The spec was authored during the Q6 build but **never executed against a live, rendered CredentialsTab** - the WIF UI bundle had not been deployed to any reachable environment (dev's `api/public` carried zero `Federated Identity` markers until this session's clean rebuild). It shipped as "written coverage" that had never gone RED -> GREEN. This session's clean rebuild deployed the WIF UI for the first time, the spec ran in a real browser for the first time, and the wrong URL surfaced immediately.
+- **Fix.** Switched the helper to `page.goto('/endpoints/<id>/credentials')`, matching the proven pattern in `endpoint-detail-tabs.spec.ts`, and corrected the stale header comment ([16d4c02](EXECUTION_LEDGER.md)).
+- **Why the fix works.** The path URL matches the real `credentials` child route, so `pathToTab` returns `'credentials'`, the `<Outlet />` mounts CredentialsTab, and `tab-credentials` + the WIF section render. Verified vs dev (clean revision `v84cc2efweb`): 2 passed, 1 expected-skip (the first endpoint has `WifCredentialsEnabled` off, so the form-only test self-skips), 0 failed.
+- **Prevention.** (a) **Stage 0 RED-first applies to E2E specs too** - a UI spec must run against a live rendered surface (go RED, then GREEN) before it counts as coverage; a never-executed spec is a hypothesis, not coverage. (b) **Deploy-then-Playwright ordering** - a spec for a new UI surface MUST run against an environment where that surface is actually deployed; if the bundle predates the surface, the spec exercises nothing. (c) **One shared tab-navigation helper** - the path-based deep-link should be shared, not re-derived per spec, so the stale `?tab=` model cannot reappear.
+
+### 8.3 I-19 (Low, T6) - Playwright Chromium binary drift after dependabot bump
+
+- **Symptom.** The first Playwright run vs dev reported 128 failed / 3 passed, every failure `browserType.launch: Executable doesn't exist at ...chromium_headless_shell-1228...`.
+- **Root cause.** The merged dependabot bump moved `@playwright/test` to a version expecting Chromium build v1228, but the machine still had the prior browser binary. This is exactly the class the Stage 5.4 "browser-binary sync" one-shot step exists for.
+- **Fix / resolution.** `npx playwright install chromium` (downloaded headless-shell v1228); the count immediately recovered from 128 RED to 5 RED (the 5 being I-18's 3 plus 2 pre-existing baseline-drift specs).
+- **Prevention.** When a diff bumps `@playwright/test`, run `npx playwright install` as a one-shot before the Stage 5.3 run. A large "Executable doesn't exist" failure block is binary drift, never a code regression - read the error class before classifying.
+
+### 8.4 Diagnostic lesson - necessary but not sufficient (two independent defects on one path)
+
+The WIF specs had **two** independent blockers stacked on the same code path, and fixing the first did not turn them green:
+
+1. The deployed dev bundle genuinely **lacked the WIF UI** (0 `Federated Identity` markers) - a real deployment-staleness fact, fixed by the clean `--no-cache` rebuild + redeploy.
+2. Even with the fresh bundle live, the spec **still failed** because the `?tab=` URL never reached the tab (I-18).
+
+The lesson: when a clean rebuild does not change a failure, do not conclude "the rebuild was pointless" - conclude "there is a SECOND defect." The rebuild was *necessary* (the WIF UI had to be deployed for the spec to ever pass) but not *sufficient* (the URL also had to be right). Reading the actual error + the page ARIA snapshot (per R3 visual-regression-diagnosis) instead of hand-waving the unchanged failure as "flaky / environmental" is what surfaced the real I-18 root cause.
+
+### 8.5 Escape analysis (addendum)
+
+| ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier |
+|---|---|---|---|---|
+| I-18 | Stage 5.3 (first live Playwright run, this session) | Stage 0 (RED-first) at authoring time | many stages | The spec was committed during Q6 without ever running against a deployed WIF UI - no environment had the surface live, so it never went RED. The earliest catch is RED-first at authoring: run the spec, watch it fail for the right reason, then make it pass. |
+| I-19 | Stage 5.4 (browser sync) | Stage 5.4 | none | Binary drift is precisely what the Stage 5.4 one-shot exists for; it fired as designed. The only cost was one RED run before the install. |
+
+**Headline (I-18):** a spec that has never executed against its target is not coverage. The auth-build analog was I-05 (a live-test section authored but not smoke-run before batching); I-18 is the UI/Playwright instance of the same class - *author-and-run-before-counting-it-as-coverage*. This reinforces the existing standing convention rather than adding a new one.
+
+---
+
+## 9. Wave 3 addendum (RFC 7523 correctness: W3.2 + W3.4, 2026-07-24)> **Scope.** Sections 1-8 cover the 11-step WIF build + its integration tail. This addendum captures the (low-severity) frictions from the Wave 3 correctness items - **W3.2** (issued-token identity separation, v0.54.76) and **W3.4** (RFC 8707 resource policy, v0.54.77) - plus the getLog-parity fix (v0.54.75). Per the standing RCA-ledger rule, every issue of every type is recorded, numbered I-20+.
+
+### 10.1 Addendum dashboard
+
+| ID | Title | Type | Sev | Surfaced in | Detected at | Status | Fix |
+|---|---|---|---|---|---|---|---|
+| I-20 | Adding an optional threaded param broke exact-arg `toHaveBeenCalledWith` mock assertions (3 sites) | T3 | Low (recurring) | W3.2 + W3.4 | Stage 2 (full unit suite) | Fixed (x3) | 84a05c8c, 0abc07fb |
+| I-21 | Pre-existing specs asserted the OLD conflated WIF identity (issued sub == assertion sub) | T3 | Medium | W3.2 | Stage 2 (unit) + Stage 2 (E2E) | Fixed | 84a05c8c |
+
+> **Verified-and-dismissed non-issues.** (a) The issued-`client_id` change (W3.2) is NOT a resource-authz regression - the resource guard authorizes by the `endpoint_id` claim, and `client_id`/`sub` are used only for log enrichment (verified in [oauth-jwt.authenticator.ts](../../api/src/modules/auth/authenticators/oauth-jwt.authenticator.ts) before the change shipped). (b) The v0.54.74 flush-backlog flake did NOT recur on the dev live-test (1,327/1,327), confirming the FK-drop root-cause fix.
+
+### 10.2 I-20 (Low, recurring, T3) - optional-param addition breaks exact-arg mock assertions
+
+- **Symptom.** Threading a new optional param (`sourceSubject` on `generateEndpointAccessToken`; `requestResource` on `mintFromAssertion`/`validateWithTrace`) turned three green `expect(fn).toHaveBeenCalledWith(a, b, c)` assertions RED with `Received: a, b, c, undefined` - the extra trailing `undefined` arg.
+- **Root cause.** `toHaveBeenCalledWith` matches the FULL argument list exactly; a new trailing optional arg (even `undefined`) is a mismatch. Expected TDD churn, not a defect.
+- **Fix / why it works.** Updated each assertion to include the new trailing arg (`undefined` where no value is presented), and ADDED a positive threading test at each site (parser captures `resource`; provider + controller forward it). The assertions now match the real call shape and additionally lock the new param's propagation.
+- **Prevention.** No new gate needed - the **full unit suite caught every arity drift on the first run** (zero escape). This is the gate working as designed. Convention reinforced: when threading a new optional param through a signature, expect `toHaveBeenCalledWith` sites to go RED and update them in the same change (they are the propagation contract).
+
+### 10.3 I-21 (Medium, T3) - specs codified the old identity conflation as "correct"
+
+- **Symptom.** After W3.2 made the issued `client_id` = the endpoint identity (not the assertion `sub`), the WIF provider unit test, the WI-17 source-issuer test, and the `wif-assertion` E2E mint test all failed - each asserted `issued sub == assertion subject`, the exact bug W3.2 fixes.
+- **Root cause.** The pre-W3.2 tests baked the conflation into their expectations (`generateEndpointAccessToken` called with `wifMetadata.expectedSubject`; E2E `expect(payload.sub).toBe(SUBJECT)`). A test that asserts the buggy behavior is a false green - it would have blocked the correct fix.
+- **Fix / why it works.** Corrected each to assert the SEPARATION (issued `sub`/`client_id` == endpointId or `targetClientId`, `!=` assertion subject; `src_sub` == assertion subject). The corrected tests now fail if the conflation ever returns - a regression net for the fix.
+- **Prevention.** This is the R10 lesson (a green gate only proves what it asserts; a test can codify a broken state as the baseline). When fixing a correctness bug, first find the tests that assert the OLD behavior and flip them to assert the new contract - they become the regression net. No new standing rule (R10 + Stage 0 RED-first already cover it); dispositioned **accepted** (existing rules sufficient).
+
+### 10.4 Escape analysis (addendum)
+
+| ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier |
+|---|---|---|---|---|
+| I-20 | Stage 2 (full unit) | Stage 2 (full unit) | none | Arity drift is caught by the suite on the first run - working as designed; cost was a one-line assertion update x3. |
+| I-21 | Stage 2 (unit + E2E) | Stage 0 (RED-first) | none | The RED-first write of the W3.2 test immediately surfaced the sibling specs that asserted the old identity - they went RED together and were corrected in the same change. No escape to dev (dev live-test 9z-BX green). |
+
+**Headline:** both Wave 3 frictions were **zero-escape, immediately-caught test-assertion updates** - the RED-first discipline (Stage 0) and the full-suite gate (Stage 2) did exactly their job. The self-improvement disposition is **(c) no new improvement needed**: the existing gates caught everything at authoring time, and R10 + Stage 0 already encode the "don't codify the old behavior as the baseline" lesson (I-21).
+
+---
+
+## 10. Wave 1 addendum (perf foundation, 2026-07-28)
+
+### 10.-1 I-24 (High, T1 harness/DI) - a "pure helper" import that took out 65 tests at once
+
+- **Symptom.** After adding a UUID guard for the log `requestId`, all three E2E suites failed
+  COMPLETELY - 65 of 65 tests - with `TypeError: Cannot read properties of undefined (reading
+  'close')` in `afterAll`, masking the real error: `Nest can't resolve dependencies of the
+  RequestLoggingInterceptor (?, ScimLogger) ... the dependency at index [0] appears to be
+  undefined at runtime`.
+- **Root cause.** The guard imported `isUuid` from `bootstrap/correlation-middleware.ts`, which
+  imports `ScimLogger`. `logging.service.ts` then imported the guard, closing the cycle
+  `logging.service -> storable-request-id -> correlation-middleware -> scim-logger -> logging`.
+  A circular import leaves one module's exports `undefined` at evaluation time, so Nest received
+  `undefined` for a constructor parameter.
+- **Why it was invisible until runtime.** `tsc` compiled it **cleanly**. TypeScript resolves types
+  across cycles happily; only the runtime value is undefined. So the build gate is structurally
+  incapable of catching this class.
+- **Fix.** Move the predicate to `src/shared/uuid.ts` - a LEAF module with no Nest and no app
+  imports - and have both consumers import from there.
+- **Prevention.** A shared predicate/helper pulled into a service must live in a leaf module. When
+  adding an import to a widely-imported service, check what the SOURCE module itself imports, not
+  just what you are importing. The tell for this class is a `Nest can't resolve dependencies ...
+  appears to be undefined at runtime` error immediately after a new import - read past the
+  `afterAll` teardown noise, which is a symptom, not the cause.
+- **Detection-stage escape analysis.** Caught immediately by the targeted E2E re-run in the same
+  step. Note the build gate passed, so a change relying on `npm run build` alone would have shipped
+  it.
+
+### 10.0 I-23 (High, T2 test-correctness) - a live-test section that passed VACUOUSLY, including its secret-leak check
+
+- **Symptom.** The new `9z-BZ` live section (W1.7c runtime-config surface) was smoke-run against a
+  local node immediately after authoring it, per the standing author-and-smoke-run-before-batch
+  convention. Four assertions failed (`T4` envelope keys, `T5` schema URN, `T6` group list,
+  `T10`/`T11`), reporting nonsense like `got: Count,IsFixedSize,IsReadOnly,IsSynchronized,Length,...`.
+- **Root cause.** `Invoke-WebRequest` returned `.Content` as a **`System.Byte[]`**, not a string.
+  Piping a byte array into `ConvertFrom-Json` **enumerates** it, so `$rc` became an `Object[]` of
+  1,732 integers instead of the parsed payload. The API response itself was correct throughout.
+- **The dangerous part is what did NOT fail.** Three assertions **PASSED** on that broken parse:
+  `T7` ("all **0** effective values sit inside their published bounds"), `T8` (provenance valid for
+  zero settings), and - worst - `T9`, the **secret-leak check**, which ran `-like` against a byte
+  array and found nothing because there was nothing to find. A security assertion that passes
+  because its haystack is the wrong type is a false-green, and it would have shipped as one had the
+  four loud failures not been sitting next to it.
+- **Fix.** Decode explicitly (`[System.Text.Encoding]::UTF8.GetString(...)` when `.Content` is
+  `byte[]`), and make every loop-based assertion require a **non-zero count** to pass:
+  `T7`/`T8` now demand `>= 15` settings and `T9` demands a payload longer than 100 chars. Each
+  message prints the count it actually checked (`all 15 effective values...`, `no secret-bearing
+  key or value in the 1732-char payload`), so a future regression to zero is visible in the log
+  rather than silently green. Re-run: **12/12**, then the full local suite **1341/1341**.
+- **Prevention.** This is the live-test instance of rule **R10** (*presence is not correctness*),
+  and it generalizes: **an assertion that iterates a collection MUST also assert the collection is
+  non-empty**, otherwise "no violations found" and "nothing was examined" are indistinguishable.
+  Every existing `foreach`-based live assertion is a candidate for the same audit. It also
+  reinforces PG-2: `Invoke-WebRequest.Content` is a library default whose *type* varies by response
+  - do not assume it, decode it.
+- **Detection-stage escape analysis.** Caught at the earliest possible gate (the smoke-run in the
+  same step that authored it), which is exactly what that convention exists for. Had the section
+  been batched to a later checkpoint, the four loud failures would have been debugged then - but
+  the three vacuous passes might never have been noticed at all, because they look identical to
+  success.
+
+### 10.1 I-22 (Low, T3) - a zero max-age cache is NOT stale within the same millisecond
+
+- **Symptom.** Two new W1.3 tests were intermittently failing (1-2 failures per run, varying).
+  They set `JWKS_CACHE_MAX_AGE_MS=0` expecting every `verify()` to be a cold fetch, but the second
+  fetch was sometimes served from cache.
+- **Root cause.** `getFreshCached` treats an entry as fresh while `Date.now() - fetchedAt > maxAge`
+  is FALSE. With `maxAge = 0`, a second call in the SAME millisecond gives `0 > 0` = false, i.e. a
+  cache HIT. Whether the test passed depended on how many milliseconds the surrounding crypto took.
+- **Fix.** The tests now let ~5ms elapse before the second verify. The production semantics were
+  left alone deliberately: changing the comparison to `>=` to make `maxAge=0` mean "never cache"
+  would be a behaviour change in a security-adjacent path made solely to suit a test.
+- **Prevention.** When a test needs a boundary condition ("expired", "stale", "just past the
+  limit"), assert it by CROSSING the boundary, never by sitting exactly on it. A test parked on an
+  inclusive/exclusive boundary is a coin flip whose bias is set by unrelated code speed.
+
+### 10.2 Observation (not a defect) - allowlist revocation does not invalidate cached JWKS
+
+While writing the W1.3 re-validation test, the harness surfaced this existing behaviour: if a host
+is removed from `JWKS_HOST_ALLOWLIST` **after** its keys were cached, `verify()` still succeeds
+until the cache entry ages out. The remembered redirect target IS re-validated - no request is
+issued to the revoked host - but `fetchJwksWithRetry`'s **fail-to-stale** path then returns the
+previously-cached keys rather than propagating the SSRF rejection.
+
+This is arguably correct (the keys were obtained legitimately while the host was trusted, and
+failing closed on every allowlist edit would be an outage risk), and it is **unchanged by W1.3** -
+the shortcut can never widen what the fetcher reaches. It is recorded here rather than silently
+"fixed", because tightening it means choosing an exposure window (up to `cacheMaxAgeMs`) over an
+availability risk, and that is a security decision for the operator, not a side-quest inside perf
+work. **Owner action:** decide whether a host revocation should purge that host's cache entries;
+if yes, it belongs with the W1.4 cache rework, not before it.
+
+**Update (2026-07-28, X15).** The runtime-tuning audit
+([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md),
+issue 12 in its section 6) raises the stakes on this decision: X15-F1 recommends taking
+`cacheMaxAgeMs` from 10 minutes to **24 hours** to match Microsoft's published guidance.
+The exposure window named above is bounded by `cacheMaxAgeMs`, so that change would widen
+it from 10 minutes to a full day. The two must therefore be decided **together** inside
+W1.4, not sequentially. A middle option now exists that did not before: make an **SSRF
+rejection specifically non-stale-eligible** (distinct from a network failure, which stays
+stale-eligible), which purges nothing and keeps the availability property for real outages
+while closing the revocation window. That is the recommended resolution.
+
+---
+
+## 11. Reference
+- Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
+- Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)
+- Self-improvement + gate discipline: [.github/copilot-instructions.md](../../.github/copilot-instructions.md)
+
+---
+
+## Appendix A - client_secret_basic token-endpoint fix (merged from master)
+
+The following issue was documented independently on `master` for the RFC-6749 section 2.3.1 `client_secret_basic` fix and is preserved here after the master->feat/wif merge so the CHANGELOG reference stays valid.
 
 ## Issue 3 - Entra Test Connection fails on user-only endpoints: `/Groups` returns 404 where Entra expects 200
 

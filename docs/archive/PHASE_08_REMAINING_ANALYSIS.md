@@ -1231,7 +1231,7 @@ graph TB
     subgraph "Phase 8 Part 2 Addition"
         WC[GenericResourceController<br/>/Devices, /Applications, ...]
         RS[GenericResourceService]
-        RR[GenericResourceRepository<br/>(ScimResource table)]
+        RR["GenericResourceRepository<br/>(ScimResource table)"]
         RT[ResourceTypeRegistry]
         ART[AdminResourceTypeController]
         ERT[EndpointResourceType table]

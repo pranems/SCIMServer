@@ -91,20 +91,25 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 
 ### Data Model
 
+8 tables in PostgreSQL 17 (extensions `citext`, `pgcrypto`, `pg_trgm`). `RequestLog`
+is the durable request/audit trail; it is deliberately **not** a foreign key to
+`Endpoint` (its `endpointId` is a correlation column) so an append-only audit row
+survives the deletion of the endpoint it describes.
+
 ```mermaid
 erDiagram
-    Endpoint ||--o{ ScimResource : "owns"
-    Endpoint ||--o{ RequestLog : "logs"
-    Endpoint ||--o{ EndpointCredential : "authenticates"
-    ScimResource ||--o{ ResourceMember : "group has"
-    ScimResource ||--o{ ResourceMember : "member of"
+    Endpoint ||--o{ ScimResource : "owns (cascade)"
+    Endpoint ||--o{ EndpointCredential : "authenticates (cascade)"
+    ScimResource ||--o{ ResourceMember : "group has (cascade)"
+    ScimResource ||--o{ ResourceMember : "member of (set null)"
+    Endpoint }o..o{ RequestLog : "correlated by endpointId (NO FK)"
 
     Endpoint {
         uuid id PK
         string name UK
         string displayName
         string description
-        jsonb profile
+        jsonb profile "schemas/resourceTypes/spConfig/settings"
         boolean active
         datetime createdAt
         datetime updatedAt
@@ -112,23 +117,46 @@ erDiagram
 
     ScimResource {
         uuid id PK
-        string scimId
         uuid endpointId FK
-        string resourceType
+        string resourceType "User/Group/custom"
+        uuid scimId
+        text externalId "caseExact"
         citext userName
         citext displayName
-        string externalId
         boolean active
-        jsonb payload
-        int version
-        datetime deletedAt
+        jsonb payload "full SCIM resource"
+        int version "ETag"
+        string meta
         datetime createdAt
         datetime updatedAt
     }
 
-    RequestLog {
+    ResourceMember {
+        uuid id PK
+        uuid groupResourceId FK
+        uuid memberResourceId FK "nullable, set null"
+        string value
+        string type
+        string display
+        datetime createdAt
+    }
+
+    EndpointCredential {
         uuid id PK
         uuid endpointId FK
+        string credentialType "bearer/oauth_client/wif"
+        string credentialHash "bcrypt"
+        string label
+        jsonb metadata "clientId/scopes/WIF trust"
+        string secretEnvelope "DEK-encrypted, opt-in"
+        boolean active
+        datetime expiresAt
+        datetime createdAt
+    }
+
+    RequestLog {
+        uuid id PK
+        uuid endpointId "correlation, NOT a FK"
         string method
         string url
         int status
@@ -137,29 +165,45 @@ erDiagram
         string requestBody
         string responseHeaders
         string responseBody
-        string identifier
+        string errorMessage
+        string errorStack
+        string identifier "derived userName/displayName"
+        uuid requestId "X-Request-Id correlator"
+        string authOutcome "accept/reject"
+        string authMethod
+        string authReason
+        uuid authCredentialId
+        string authDecision "full redacted AuthDecisionTrace JSON"
         datetime createdAt
     }
 
-    EndpointCredential {
+    JwksHostAllowlistEntry {
         uuid id PK
-        uuid endpointId FK
-        string credentialType
+        string host UK
         string label
-        string tokenHash
-        boolean active
-        jsonb metadata
-        datetime expiresAt
         datetime createdAt
+    }
+
+    CredentialDek {
+        uuid id PK
+        string wrappedDek "KEK-wrapped DEK"
+        string kekSalt
+        boolean active
+        datetime createdAt
+    }
+
+    ServerSetting {
+        string key PK
+        string value
         datetime updatedAt
     }
-
-    ResourceMember {
-        uuid id PK
-        uuid groupId FK
-        uuid memberId FK
-    }
 ```
+
+> **Log lifecycle.** `RequestLog` rows are written by a buffered batch writer and
+> pruned by age (auto-prune, default 21-day retention via `LOG_RETENTION_DAYS`),
+> **not** by endpoint deletion. A row whose endpoint was deleted keeps its
+> `endpointId` and stays queryable by it; the endpoint name simply no longer
+> resolves in the UI. See [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md).
 
 ### Request Flow
 
@@ -1234,6 +1278,12 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 | `OAUTH_CLIENT_ID` | `scimserver-client` | OAuth client identifier |
 | `OAUTH_CLIENT_SECRET` | Auto-generated (dev) | OAuth client secret. **Required** in production |
 | `OAUTH_CLIENT_SCOPES` | `scim.read,scim.write,scim.manage` | Comma-separated allowed scopes |
+| `CREDENTIAL_KEK` | `changeme-credential-kek` | Key-encryption-key for the re-viewable-credential-secret feature (WI-6 active - envelope-encryption foundation). Must match across all instances/redeploys; not on the auth path; default is cosmetic until rotated. See [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 6A |
+| `JWKS_HOST_ALLOWLIST` | (empty = all rejected) | Comma-separated IdP hostnames SCIMServer may fetch JWKS from (anti-SSRF choke point). **Required before WIF** can validate an assertion; empty fails closed. e.g. `login.microsoftonline.com`. Forthcoming (WI-15): prepopulated well-known seed + persisted, admin-editable hot-reload layer. See [docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md](docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md) section 5D |
+| `JWKS_CACHE_MAX_AGE_MS` | `600000` | Max age (ms) of a cached JWKS before it is refetched. Server-level default; per-endpoint override `JwksCacheMaxAgeMs`. Bounds 0 - 86400000 |
+| `JWKS_FETCH_TIMEOUT_MS` | `5000` | Per-attempt timeout (ms) for the runtime WIF JWKS fetch (a hung IdP is aborted). Server-level default; per-endpoint override `JwksFetchTimeoutMs`. Bounds 100 - 60000 |
+| `JWKS_FETCH_RETRIES` | `2` | Retries for a failed runtime JWKS fetch (total tries = retries + 1). Server-level default; per-endpoint override `JwksFetchRetries`. Bounds 0 - 10 |
+| `JWKS_FETCH_RETRY_BACKOFF_MS` | `200` | Base retry backoff (ms); exponential with jitter. Server-level default; per-endpoint override `JwksFetchRetryBackoffMs`. Bounds 0 - 10000 |
 
 ### Logging
 
@@ -1244,6 +1294,7 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 | `LOG_INCLUDE_PAYLOADS` | `false` (prod) / `true` (dev) | Include request/response bodies in logs |
 | `LOG_INCLUDE_STACKS` | `true` | Include stack traces in error logs |
 | `LOG_MAX_PAYLOAD_SIZE` | `8192` | Max payload size in log entries (bytes) |
+| `PERSIST_REQUEST_SECRETS` | `true` | Server-level default for whether the RequestLog stores + displays the COMPLETE request/response (headers + body, secrets included) for fast RCA. Set `false` to redact secret-bearing values (Authorization, client_secret, access_token, ...) before persist/display. Per-endpoint override: the `PersistRequestSecrets` config flag (endpoint overrides server). Console/file structured logs always redact regardless. |
 | `LOG_SLOW_REQUEST_MS` | `2000` | Slow request threshold (ms) |
 | `LOG_CATEGORY_LEVELS` | (none) | Per-category level overrides |
 | `LOG_RETENTION_DAYS` | `30` | Auto-prune retention period |
@@ -1428,7 +1479,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 | [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | Azure Container Apps deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](docs/DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker build, run, and test guide |
 | [SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md) | RFC compliance matrix |
-| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
 | [TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md) | Architecture deep dive |
 
 ---
@@ -1451,4 +1502,4 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE).
