@@ -8,7 +8,10 @@
     "docs:mermaid": "node scripts/validate-mermaid.mjs",
     "docs:mermaid:render": "node scripts/render-mermaid.mjs",
     "docs:mermaid:doctor": "node scripts/doctor-mermaid.mjs",
-    "docs:html": "node scripts/export-docs-html.mjs"
+    "docs:html": "node scripts/export-docs-html.mjs",
+    "rfcs:check": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1",
+    "rfcs:check:online": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1 -Online",
+    "rfcs:update": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1 -Update"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",

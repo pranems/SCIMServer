@@ -108,6 +108,9 @@
 
 | Document | Description |
 |----------|-------------|
+| [rfcs/README.md](rfcs/README.md) | **The mirrored RFC corpus and its currency gate.** Verbatim RFC 7642 / 7643 / 7644 / 9865 / 9967 text, the exact-section index, the errata-are-not-in-the-text warning, and how [scripts/sync-rfcs.ps1](../scripts/sync-rfcs.ps1) keeps the mirror provably current (8 checks; C3 is self-extending, so a newly published RFC that updates 7643 makes the gate demand it with no script edit). |
+| [rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) | **Which attribute / sub-attribute shapes are legal, and which are not.** Exhaustive level x cardinality x type matrix; 8 allowed cases and 6 forbidden cases with worked JSON; why RFC 7644's `*1subAttr` path ABNF independently caps depth at two; the `Schema`-resource carve-out; the extension-URN "looks like 3 levels" trap; 3 legal ways to model deeper data; the 12 errata that settle the ambiguities (incl. 8415, which struck `complex` from `subAttributes.type`); Entra ID + Okta deviation matrix. |
+| [rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md) | Canonical JSON extracted from RFC 7643 S8.7.1 + S3.1 + S2.2-S2.4, for diffing against what the server publishes |
 | [SCIM_REFERENCE.md](SCIM_REFERENCE.md) | SCIM v2 protocol reference with example payloads |
 | [SCIM_COMPLIANCE.md](SCIM_COMPLIANCE.md) | RFC 7643/7644 compliance matrix + Entra compatibility |
 | [SCIM_RFC_COMPLIANCE_LAYER.md](SCIM_RFC_COMPLIANCE_LAYER.md) | Technical compliance implementation details |

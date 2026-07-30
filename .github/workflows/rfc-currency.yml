@@ -1,0 +1,72 @@
+# Verifies that the mirrored RFC corpus under docs/rfcs/ and docs/auth/rfcs/ is
+# still current with the IETF RFC Editor.
+#
+# WHY A SCHEDULED JOB AND NOT ONLY PRE-PUSH
+# -----------------------------------------
+# The three ways an RFC mirror rots are all things that happen UPSTREAM while
+# this repository sits still:
+#   * a newly published RFC starts updating one we depend on
+#     (RFC 7643 was updated by RFC 9865 in Oct 2025 and RFC 9967 in May 2026)
+#   * an erratum is verified, changing what the text means without changing
+#     a byte of the mirror (RFC 7643 erratum 8415, verified 2025-10-28)
+#   * the mirrored bytes drift from upstream
+# None of those are triggered by a commit, so a commit-triggered gate can never
+# find them. Pre-push runs the OFFLINE checks (C1-C5); this job runs the ONLINE
+# ones (O1-O3) on a clock. Same split-by-trigger reasoning as
+# .github/workflows/trivyignore-review.yml.
+name: RFC corpus currency
+
+on:
+  schedule:
+    # 06:00 UTC on the 1st of each month, aligned with the Stage X.1 / X.2
+    # monthly meta-audit cadence in .github/copilot-instructions.md.
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+  pull_request:
+    # A PR that touches the corpus or the gate re-verifies against upstream
+    # immediately rather than waiting for the next month.
+    paths:
+      - 'docs/rfcs/**'
+      - 'docs/auth/rfcs/**'
+      - 'scripts/sync-rfcs.ps1'
+      - 'scripts/rfc-index.ps1'
+      - '.github/workflows/rfc-currency.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  rfc-currency:
+    name: Verify RFC mirrors against www.rfc-editor.org
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Offline checks (C1-C5)
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/sync-rfcs.ps1
+
+      - name: Online checks (C1-C5 + O1-O3)
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/sync-rfcs.ps1 -Online
+
+      # A failure here is not a build break, it is a READING ASSIGNMENT: the
+      # standard moved. The remedy is to read what changed, update the affected
+      # explainer/analysis docs, and only then run `-Update`. Never run -Update
+      # to silence this job.
+      - name: Explain a failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host '::error::The mirrored RFC corpus is no longer current with the RFC Editor.'
+          Write-Host 'Do NOT just run -Update to make this green. The sequence is:'
+          Write-Host '  1. Read the RFC or erratum named in the failure above.'
+          Write-Host '  2. Assess the impact on docs/rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md,'
+          Write-Host '     docs/auth/rfcs/RFC_*_EXPLAINED.md and any analysis doc citing it.'
+          Write-Host '  3. Update those docs.'
+          Write-Host '  4. Run: pwsh -NoProfile -File scripts/sync-rfcs.ps1 -Update'
+          Write-Host '  5. Commit the doc changes and the refreshed manifest together.'
+          Write-Host 'Reference: docs/rfcs/README.md#keeping-this-corpus-current'

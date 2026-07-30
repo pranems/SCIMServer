@@ -4,6 +4,8 @@ Authoritative plain-text copies of the IETF RFCs that the SCIMServer authenticat
 
 > **The umbrella that ties these together is [../AUTHENTICATION_ARCHITECTURE.md](../AUTHENTICATION_ARCHITECTURE.md).** Start there for how the pieces compose; use the explainers for one RFC at a time; use the `.txt` mirrors for the normative wording.
 
+> **Currency is machine-enforced.** Every file in this folder is inventoried in [../../rfcs/rfc-manifest.json](../../rfcs/rfc-manifest.json) and verified by [../../../scripts/sync-rfcs.ps1](../../../scripts/sync-rfcs.ps1): SHA-256 integrity, coverage, README linkage, and - with `-Online` - upstream text drift, status changes, newly published RFCs that update these, and newly verified errata. Do not add or remove a `.txt` here without running `pwsh -File scripts/sync-rfcs.ps1 -Update`. See [../../rfcs/README.md#keeping-this-corpus-current](../../rfcs/README.md#keeping-this-corpus-current).
+
 ## Foundations (OAuth core + token usage)
 
 | File | RFC | Title | Role | Explainer |
@@ -55,6 +57,17 @@ These are cited by the design but not copied in (stable, widely available, or ow
 - RFC 7522 - the SAML 2.0 sibling of RFC 7523 (not used by WIF).
 - RFC 7662 - OAuth 2.0 Token Introspection (also defines where `act` / `may_act` appear).
 - RFC 7617 - HTTP Basic auth (the `httpbasic` SCIM scheme, deliberately not designed).
+
+### Surfaced by the corpus gate, waived with a reason
+
+The first run of the check C3 update/obsolete closure (2026-07-29) found four published RFCs that **update** documents mirrored here and had never been noticed. Each now carries an explicit `waivers[]` entry in [../../rfcs/rfc-manifest.json](../../rfcs/rfc-manifest.json) and is re-reported as a warning on every run, so none of them can go quiet again.
+
+| RFC | Updates | Disposition |
+|---|---|---|
+| [RFC 8252](https://www.rfc-editor.org/info/rfc8252) - OAuth 2.0 for Native Apps | 6749 | **Waived - not applicable.** No native-app client and no user-agent redirect flow. Re-evaluate if Phase Q4 ships the authorization-code grant. |
+| [RFC 8996](https://www.rfc-editor.org/info/rfc8996) - Deprecating TLS 1.0/1.1 (BCP 195) | 6749, 6750 | **Waived - already satisfied.** Azure Container Apps ingress terminates TLS 1.2+, and the Entra SCIM contract mandates TLS 1.2 with a pinned cipher list. |
+| [RFC 7797](https://www.rfc-editor.org/info/rfc7797) - JWS Unencoded Payload Option | 7519 | **Waived - not implemented.** Validators require standard base64url JWS compact serialization. Tracked because a validator that silently honoured `b64:false` would be a signature-bypass surface. |
+| [RFC 8725](https://www.rfc-editor.org/info/rfc8725) - JWT Best Current Practices | 7519 | **Waived on process, NOT on merit.** Genuinely load-bearing for WIF assertion validation (alg confusion, `aud` / `iss` pinning, `kid` handling). **Follow-up: mirror `rfc8725.txt` + `RFC_8725_EXPLAINED.md` here, then delete the waiver.** |
 
 ## SCIM core RFCs
 
