@@ -31,6 +31,14 @@ export interface CreateRequestLogOptions {
 
 @Injectable()
 export class LoggingService implements OnModuleDestroy, OnModuleInit {
+  /**
+   * Shape Postgres accepts for a `uuid` column. Used to reject a malformed
+   * path param before it reaches the database, where it would raise P2023.
+   * @see getLog
+   */
+  private static readonly UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
   // ── Auto-prune configuration ──
@@ -913,6 +921,17 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
       };
     }
+
+    // `RequestLog.id` is `@db.Uuid`. Handing Postgres anything that is not a
+    // uuid raises PrismaClientKnownRequestError P2023 ("Inconsistent column
+    // data: Error creating UUID"), which escapes `@Get('logs/:id')` as an
+    // unhandled 500 rather than the intended 404. That is how
+    // `GET /scim/admin/logs/stream` - a path with no route, falling through to
+    // `:id` - returned 500 on every Prisma estate while the InMemory backend
+    // returned 404 for the identical request. Resolve a syntactically
+    // impossible id to null here so both backends agree and no malformed input
+    // reaches the database.
+    if (!LoggingService.UUID_PATTERN.test(id)) return null;
 
     const row = await this.prisma.requestLog.findUnique({ where: { id } });
     if (!row) return null;
