@@ -1,8 +1,8 @@
 # Per-Endpoint TLS Version Policy: Feasibility, Options, and Recommendation
 
-**Status:** Research and design record. **No production code changed, and none is planned yet** - see [Section 11](#11-open-questions-for-the-operator), which must be answered before any phase starts.
-**Why this is on `master` even though the feature is not:** the durable value here is the **"why not"**, not the plan. The layer analysis in [Section 3](#3-the-fundamental-constraint) answers "can endpoint X be made TLS-1.3-only?" permanently, for any future asker; [Section 4](#4-measured-evidence-not-assumption) records a **silent-no-op API** that would otherwise be rediscovered the hard way; and [Section 7](#7-the-security-trap-in-o2-and-how-to-avoid-it) documents a property of the code as it ships today. Deleting this on abandonment would guarantee the question is re-litigated from zero.
-**Originally authored on:** `feat/per-endpoint-tls-policy` (worktree `SCIMServer-tls-policy`), based on `origin/master` at `e4e5488a`. Cherry-picked to `master` as `d2b5cfb4` with the probe; the branch's TLS 1.3 standalone stack (`docker/tls13/`) was deliberately **not** brought along - it is a form-factor harness, not a design record, and is kept on the branch until a recurring need justifies it.
+**Status:** **CLOSED - no production code changed, and none is planned.** The operator confirmed on 2026-07-30 that the TLS-1.3-only ask was **incident only**, which closes every phase below. Full disposition per option in [Section 11.1](#111-answered-2026-07-30---q1-incident-only). This document is retained as the **decision record**, not as a plan.
+**Why this is on `master` even though nothing shipped:** the durable value is the **"why not"**. The layer analysis in [Section 3](#3-the-fundamental-constraint) answers "can endpoint X be made TLS-1.3-only?" permanently, for any future asker; [Section 4](#4-measured-evidence-not-assumption) records a **silent-no-op API** that would otherwise be rediscovered the hard way; and [Section 7](#7-the-security-trap-in-o2-and-how-to-avoid-it) documents a property of the code **as it ships today**, independent of TLS policy. Deleting this on closure would guarantee the question is re-litigated from zero.
+**Originally authored on:** `feat/per-endpoint-tls-policy` (worktree `SCIMServer-tls-policy`), based on `origin/master` at `e4e5488a`. Cherry-picked to `master` as `d2b5cfb4` with the probe; the branch's TLS 1.3 standalone stack (`docker/tls13/`) was deliberately **not** brought along - it is a form-factor harness, not a design record, and stays on that branch.
 **Last verified:** 2026-07-30 - the probe was re-run on `master` and reproduces both findings (mechanism A silently does not enforce; mechanism B rejects at the handshake), with both negative controls passing.
 **Evidence artifact:** [scripts/tls-sni-policy-probe.mjs](../../scripts/tls-sni-policy-probe.mjs) - run it with `node scripts/tls-sni-policy-probe.mjs`.
 
@@ -222,6 +222,8 @@ Required guard rails if O2 is built:
 
 ## 8. Recommendation
 
+> **SUPERSEDED 2026-07-30 by the answer to Q1 - see [Section 11.1](#111-answered-2026-07-30---q1-incident-only).** The ask was incident only, so **no phase below was built**. O1 (documented proxy recipe) resolved the incident; O3 is dropped permanently rather than deferred, because its gate ("a customer needs 1.3-only WITHOUT a gateway") can no longer open. The phased plan is retained unchanged as the starting point if the question ever returns as a product capability - the sequencing and its reasoning are the reusable part.
+
 Build it in three phases, smallest and most certain first. Each phase is independently useful and independently shippable.
 
 ```mermaid
@@ -290,7 +292,40 @@ Per the standing gate in [.github/copilot-instructions.md](../../.github/copilot
 
 ## 11. Open questions for the operator
 
-1. Is the near-term need the **customer incident** only, or a **product capability** for future customers? Phase 1 alone covers the incident.
+### 11.1 ANSWERED, 2026-07-30 - Q1: incident only
+
+> **Q1. Is the near-term need the customer incident only, or a product capability for future customers?**
+>
+> **Operator answer (2026-07-30): the TLS-1.3-only ask was INCIDENT ONLY.**
+
+That answer closes this work. It is recorded here rather than in a chat log because the whole point of keeping this document is to stop the question being re-litigated from zero.
+
+**Disposition of every option, given "incident only":**
+
+| Option | Disposition |
+|---|---|
+| O1 documentation only | **This is the answer.** The self-hosted proxy recipe reproduces a TLS-1.3-only endpoint today and unblocked the incident. Nothing further ships. |
+| O2 app-layer `MinTlsVersion` setting | **Not built.** It exists to serve a product capability nobody has asked for, and section 7 shows it cannot be trusted on Azure without an Application Gateway supplying an authoritative signal. |
+| O3 in-process SNI router | **Dropped permanently**, not merely deferred. Phase 3 was already gated on "a customer needs 1.3-only WITHOUT an external gateway"; with no product capability in scope, that gate can never open. Building it would bring certificates, DNS and TLS termination into a codebase that deliberately delegates all three. |
+| O4 port per policy | **Not built.** Its only remaining value was as a local test rig for O3. |
+| O5 proxy-config generator | **Not built.** It exists to keep a per-endpoint setting in sync with a proxy; there is no per-endpoint setting. |
+| O6 Application Gateway | **Not provisioned.** Kept as the documented supported answer IF the question returns as a product ask. |
+| O7 record the negotiated version | **Not built**, though it was the cheapest and most independently useful item. See below. |
+
+**What is deliberately kept despite the closure:**
+
+1. **This document**, as the durable "why not". Section 3 answers "can endpoint X be made TLS-1.3-only?" permanently.
+2. **[scripts/tls-sni-policy-probe.mjs](../../scripts/tls-sni-policy-probe.mjs)**, because the silent-no-op it records (mechanism A) is a trap independent of whether we ever build this. Anyone reaching for the obvious implementation has a ready falsification test.
+3. **The section 7 security finding**, which is a property of the code as it ships today and has nothing to do with TLS policy. It is now a standing rule in the [Cross-Cutting Security Gate Map](../../.github/copilot-instructions.md).
+
+**What is NOT kept:** the branch's TLS 1.3 standalone stack (`docker/tls13/`) stays on `feat/per-endpoint-tls-policy` and is not merged. It is a form-factor harness, not a design record, and an incident-only answer does not justify carrying a second Docker stack on `master`. If a TLS-1.3-only question recurs, recover it from that branch rather than rebuilding it.
+
+**The one item worth reconsidering on its own merits (O7).** Recording the negotiated TLS version per request was never really about this incident - it answers "what does this client actually negotiate?" for **every** integration, permanently, and costs nothing. It is being dropped with the rest only because it has no requester today. If an integration question ever needs that data, reopen O7 alone; it does not depend on any other option here. Note the section 7 caveat still applies: on Azure the app terminates nothing, so without an Application Gateway injecting `ssl_connection_protocol` the honest recorded value is `unknown`, and it must be recorded as `unknown` rather than guessed.
+
+### 11.2 Remaining questions - moot unless Q1 is revisited
+
+These were only ever conditional on Q1 being answered "product capability". They are retained so a future reopening starts from the right questions rather than from scratch.
+
 2. If it becomes a product capability, is an **Application Gateway** acceptable in front of the Azure deployments? If yes, O6 plus Phase 1 and 2 is by far the best value and Phase 3 can be dropped permanently.
 3. Would endpoints ever be allowed **their own hostname**? That is the prerequisite for O3, and it has value well beyond TLS.
 4. Should the observe-mode default be **on for every endpoint**, so the negotiated version is always recorded? Recommended yes, since the data is useful for every integration and costs nothing.
