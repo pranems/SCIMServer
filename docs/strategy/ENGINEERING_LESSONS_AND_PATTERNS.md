@@ -91,13 +91,14 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (13 seeded)
-    "A Test/gate integrity" : 4
+    title Patterns by category (22 seeded)
+    "A Test/gate integrity" : 7
     "B Environment/deploy" : 2
-    "C Framework/middleware" : 2
-    "D Security at sinks" : 1
+    "C Framework/middleware" : 3
+    "D Security at sinks" : 2
     "E Process/introspection" : 3
     "F Design/architecture" : 1
+    "G Config/op defaults" : 4
 ```
 
 ### Category A - Test-harness and gate integrity (the false-green family)
@@ -111,6 +112,9 @@ The most dangerous class: a gate that is GREEN but proves nothing. Every pattern
 | **PA-3** | Measure the outcome, not the property | (visual) asserting `getComputedStyle().textOverflow === 'ellipsis'` greenlit a bug where `display` prevented the ellipsis from ever rendering | Assert the achieved result (`scrollWidth > clientWidth`, bounded width), not that a CSS property was set | Rule R1 (visual-layout) | Finding-D 2026-05-29 |
 | **PA-4** | A stale/failing gate is a signal to fix the test, not lower the bar | 121 Playwright fails were dismissed as noise; one was a real bug. A vitest layout assertion in JSDOM is a false-positive farm | Delete stale specs; move layout assertions to Playwright; a visual-regression FAIL is "investigate," never "regenerate baselines" | Rules R2, R3; Stage 5.2 hygiene | Finding-C/D |
 | **PA-5** | When the artifact is provably fine but the human still cannot see it, the fault is in the VIEWER - and no artifact gate can ever catch that. **Enumerate EVERY component that can claim the viewer role, including ones the platform ships itself.** | "I cannot see the diagrams" recurred three times. Round 1 found 20 real mermaid syntax errors and concluded syntax WAS the cause. Round 2 had a green 596/596 render gate and provably healthy content, and found viewer-side defects (gitignored `.vscode/extensions.json`, workspace trust) that were real but still not the cause. Round 3 found the actual cause: VS Code 1.104+ ships a **built-in** mermaid renderer, and the separately-installed marketplace extension was a **second** renderer - two Mermaid builds injected into one preview webview, racing over the same DOM nodes, output blank with no error. The gate had pinned its version to the *marketplace* renderer because it only ever looked in `~/.vscode/extensions` | For any artifact a human VIEWS, (a) the gate set needs a **viewer-side doctor** beside the content gate, (b) triage runs **environment first, content second**, (c) the doctor must enumerate **all** providers of the viewer role and flag a **duplicate-provider conflict** - a redundant second provider presents as total silence, not as an error, and makes every other signal read healthy, and (d) the gate must pin to the provider the platform ships, not the optional one. Also: initialize the renderer with the VIEWER's real config (we used `securityLevel:'loose'` while both renderers use `'strict'`) and fail a **degenerate** render (renders, but 0x0 or no text) | [scripts/doctor-mermaid.mjs](../../scripts/doctor-mermaid.mjs) + [scripts/mermaid-renderers.mjs](../../scripts/mermaid-renderers.mjs); Mermaid Diagram Rule 2 + 9 (R0) + 10 | 2026-07-28 |
+| **PA-6** | **The test double must fail the way the real dependency fails, or the RED is vacuous** | A spec written to lock a Postgres uuid-cast failure passed **18 of 19 against the UNFIXED service**, because the Prisma mock resolved `null` for every input. A mock that cannot reproduce the failure mode cannot prove the fix. The same shape recurred twice in one session (`findUnique` and `createMany`) | When a defect is caused by a dependency **rejecting** input, the double must reject it too - with the real error shape (`code: 'P2023'`, `name: 'PrismaClientKnownRequestError'`). Then add a **negative control asserting the double really does reject**, so the double itself cannot silently regress. This is PA-3 (measure the outcome) transplanted into the test-double layer: a green mock proves the mock is permissive, not that the code is correct | (convention; both specs carry the control) | 2026-07-30 log-uuid chain |
+| **PA-7** | **The process's own stdout is an unasserted signal channel - read it during live runs** | Two defects (a dead code path and an audit-log destruction vector) were emitting `prisma:error ... invalid input syntax for type uuid` on almost every request, through a full 1,368-assertion live run, with **every gate green**. Neither was found by a gate; both were found by scrolling the server log | No gate in this repo asserts on server stdout, so any failure the application **catches and logs** is invisible by construction. During a live run, capture the server output (`... *>&1 \| Tee-Object -FilePath <log>`) and **count driver/framework error lines**; treat a non-zero count as a finding even when every assertion passes. Report the count before and after a fix (here: **5 -> 0**) - it is a measured outcome, not an impression | (convention; candidate for a live-gate check) | 2026-07-30 log-uuid chain |
+| **PA-8** | **Prove a new live-test section is a real gate by running it against the unfixed build** | A section can be written, run once against the fixed code, and pass - which proves only that it does not crash. A section that would pass either way is decoration | Before trusting a new live section, run it against a deliberately reverted build and confirm (a) the intended assertions FAIL, and (b) the surrounding assertions still PASS, so it fails for the right reason and only that reason. Here 9z-CC failed exactly T3+T4 (`found 0 resolved of 2`) with T1/T2/T5 green | (convention; precedent 9z-CA, repeated for 9z-CC) | 2026-07-30 |
 
 ### Category B - Cross-environment and deployment drift
 
@@ -129,6 +133,7 @@ Global middleware and framework defaults shape contracts in ways the design stag
 |---|---|---|---|---|---|
 | **PC-1** | Global filters/interceptors are contract-shaping | The SCIM exception filter rewrapped the OAuth `{error}` body into `{detail}`; the content-type middleware 415'd a form-urlencoded token POST | A new endpoint under an existing prefix inherits its middleware. Assert the ACTUAL serialized body; decide content-type/error policy explicitly per cross-protocol route | (convention; A3 carve-out) | auth I-03, I-04 |
 | **PC-2** | Cross-backend parity is not optional | An InMemory endpoint-create was missing the duplicate-name guard that Prisma had; it escaped for months with no unit lock | Any file with an `isInMemoryBackend` branch MUST be walked through the parity matrix; run both backends | Stage 2.5 + 2.6; `crossBackendParityAudit` | Finding-B 2026-05 |
+| **PC-3** | **A `try/catch` spanning a multi-step fallback can make later steps unreachable** | `resolveUserDisplayName` looked up by `scimId` then fell back to `userName`. The fallback ran only when the first lookup returned **null** - but for a userName-shaped input the first query **threw**, so control left the function entirely. The fallback was dead code, and the outer `catch` returned `null`, which is exactly what "not found" looks like | A catch that spans several steps converts "step 1 failed" into "the whole thing found nothing." When step N+1 exists **because** step N can miss, step N must be able to MISS rather than THROW - guard its precondition instead of relying on the catch. Review any `try` block containing a sequential fallback chain: ask whether an early throw silently skips the rest | (convention; guarded with the shared `isUuid` predicate) | 2026-07-30 |
 
 ### Category D - Security at sinks
 
@@ -137,6 +142,7 @@ Place the guard where the dangerous operation happens, structurally.
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
 |---|---|---|---|---|---|
 | **PD-1** | Defense-in-depth at the write sink | CodeQL flagged `obj[userKey] = value` sinks where `userKey` could be `__proto__` (CWE-1321), even behind an upstream path-guard | Guard the FINAL key at the sink with a single-source `isUnsafeObjectKey`, not only the path upstream; one helper used everywhere beats per-site ad-hoc | (security guard + tests) | auth I-10 |
+| **PD-2** | **Fix the CLASS, not the instance: enumerate every column of a constrained type reachable from caller input** | v0.54.85 closed an audit-log destruction vector on `RequestLog.requestId` (`@db.Uuid`, fed from the client's `X-Request-Id`). It stopped there. `RequestLog.endpointId` is the **same column type, same table, same batch insert**, fed from a raw URL path segment (`originalUrl.match(/\/endpoints\/([^/]+)/)`) - so the identical vector stayed open for months. Because rows flush via one `createMany` and the buffer is drained **before** the insert, one poisoned row still destroyed up to 49 unrelated audit rows, reachable **unauthenticated** | When a defect is "untrusted input reaches a column/API with a narrower type than `string`", the unit of remediation is the **type**, not the call site. Enumerate every column of that type (`grep '@db.Uuid'`), trace each to its source, and guard them together behind **one** helper - two helpers are how the halves drift. Then name the class in the security gate map so the next column is caught at review. Same reasoning the repo already applies to `node-lts.ps1` (one LTS table, two consumers) | Security Gate Map row "Non-uuid input reaching a `@db.Uuid` column"; [storable-uuid.ts](../../api/src/modules/logging/storable-uuid.ts) | v0.54.85 + v0.54.89 |
 
 ### Category E - Process and introspection (the meta-patterns)
 
@@ -179,10 +185,15 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PA-2 (structural assertion) | 1 (high-sev: false-green) | YES - immediate (high severity) |
 | PA-3 / PA-4 (visual/stale gates) | 2+ (Finding-C, Finding-D) | YES (R1/R2/R3) |
 | PA-5 (viewer-side blindness) | 3 (mermaid invisibility 2026-07-27, and twice on 2026-07-28) | YES - Mermaid Diagram Rule 2 + 9 (R0) + 10 + the doctor and shared renderer-discovery scripts |
+| PA-6 (vacuous RED from a permissive test double) | 2 (both in the 2026-07-30 log-uuid chain: `findUnique`, `createMany`) | convention + negative controls in both specs; promote to a rule on a 3rd sighting |
+| PA-7 (unasserted stdout / caught-and-logged failures) | 2 (dead fallback + audit-batch loss, both invisible to a 1,368-assertion green run) | convention; candidate live-gate check (count driver-error lines during a live run) |
+| PA-8 (prove a live section against the unfixed build) | 2 (9z-CA 2026-07-30, 9z-CC 2026-07-30) | convention; promote if a decorative section ever ships |
 | PB-1 (env value table) | 1 | YES (convention recorded) |
 | PC-1 (contract-shaping middleware) | 2 (I-03, I-04) | convention; revisit if a 3rd escape |
 | PC-2 (cross-backend parity) | 1 (high-sev: Finding-B) | YES (Stage 2.5/2.6) |
+| PC-3 (try/catch makes a fallback unreachable) | 1 (medium-sev: dead code path disguised as a clean degrade) | convention; promote on a 2nd sighting |
 | PD-1 (sink guard) | 1 (high-sev: security) | YES (guard + tests) |
+| PD-2 (fix the class, enumerate every column of the type) | 2 (high-sev, same vector: `requestId` v0.54.85, `endpointId` v0.54.89) | YES - Security Gate Map row + one shared guard module |
 | PE-1 / PE-2 (capture timing + transcript) | 1 (operator-surfaced) | YES - this doc + RCA rule |
 | PE-3 (smoke before batch) | 1 | convention; revisit if a 2nd escape |
 | PG-1 (env-dependent value = clamped setting) | 1 (multi-site: pool, body limits, log buffer, pagination) | scheduled (W1.7); promote to a rule after the 2nd sighting |
