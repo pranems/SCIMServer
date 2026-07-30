@@ -72,6 +72,8 @@ This table is the whole design problem in one view. The single field that identi
 
 Two plausible in-process implementations exist. Rather than reason about OpenSSL semantics, both were measured with [scripts/tls-sni-policy-probe.mjs](../../scripts/tls-sni-policy-probe.mjs), each carrying a negative control so the probe proves itself before its output is believed.
 
+**Certificate validation stays ON throughout.** The probe generates a throwaway self-signed certificate and passes it back as an explicit trust anchor (`ca: [cert]`) rather than setting `rejectUnauthorized: false`. That matters twice over: the disabled-validation form is a real anti-pattern (CodeQL `js/disabling-certificate-validation`, CWE-295/297), and it is also a **weaker measurement** - it leaves open the possibility that a handshake "succeeded" while the certificate was unacceptable. Pinning the one certificate we generated isolates the TLS **version** decision, which is the only variable under test.
+
 Reproduce:
 
 ```powershell

@@ -119,11 +119,21 @@ export function parseSni(buf) {
   }
 }
 
-/** Attempt one handshake. Resolves with the negotiated protocol or the error code. */
-function probe(port, servername, maxVersion) {
+/**
+ * Attempt one handshake. Resolves with the negotiated protocol or the error code.
+ *
+ * `ca` is the probe's OWN self-signed certificate, passed as an explicit trust
+ * anchor. An earlier version used `rejectUnauthorized: false`, which CodeQL
+ * correctly flags (`js/disabling-certificate-validation`, CWE-295/297) - and
+ * which was also weaker as a measurement: it left open the possibility that a
+ * handshake "succeeded" while the certificate was unacceptable. Pinning the one
+ * certificate we generated keeps validation ON, so every result below isolates
+ * the TLS VERSION decision, which is the only variable under test.
+ */
+function probe(port, servername, maxVersion, ca) {
   return new Promise((resolve) => {
     const sock = tls.connect(
-      { port, host: '127.0.0.1', servername, maxVersion, rejectUnauthorized: false },
+      { port, host: '127.0.0.1', servername, maxVersion, ca: [ca] },
       () => {
         const protocol = sock.getProtocol();
         sock.destroy();
@@ -163,7 +173,7 @@ async function mechanismA({ key, cert }) {
   const { port } = server.address();
   const M = 'A: one tls.Server + addContext per SNI host';
 
-  const control = await probe(port, HOST_RELAXED, 'TLSv1.2');
+  const control = await probe(port, HOST_RELAXED, 'TLSv1.2', cert);
   record(
     M,
     `${HOST_RELAXED}, client max TLSv1.2`,
@@ -173,7 +183,7 @@ async function mechanismA({ key, cert }) {
     true,
   );
 
-  const subject = await probe(port, HOST_STRICT, 'TLSv1.2');
+  const subject = await probe(port, HOST_STRICT, 'TLSv1.2', cert);
   record(
     M,
     `${HOST_STRICT} whose context sets minVersion TLSv1.3, client max TLSv1.2`,
@@ -183,7 +193,7 @@ async function mechanismA({ key, cert }) {
     false,
   );
 
-  const sanity = await probe(port, HOST_STRICT, 'TLSv1.3');
+  const sanity = await probe(port, HOST_STRICT, 'TLSv1.3', cert);
   record(
     M,
     `${HOST_STRICT}, client max TLSv1.3`,
@@ -219,7 +229,7 @@ async function mechanismB({ key, cert }) {
   const { port } = router.address();
   const M = 'B: SNI router + one tls.Server per policy';
 
-  const control = await probe(port, HOST_RELAXED, 'TLSv1.2');
+  const control = await probe(port, HOST_RELAXED, 'TLSv1.2', cert);
   record(
     M,
     `${HOST_RELAXED}, client max TLSv1.2`,
@@ -229,7 +239,7 @@ async function mechanismB({ key, cert }) {
     true,
   );
 
-  const subject = await probe(port, HOST_STRICT, 'TLSv1.2');
+  const subject = await probe(port, HOST_STRICT, 'TLSv1.2', cert);
   record(
     M,
     `${HOST_STRICT} routed to the 1.3-only listener, client max TLSv1.2`,
@@ -239,7 +249,7 @@ async function mechanismB({ key, cert }) {
     false,
   );
 
-  const sanity = await probe(port, HOST_STRICT, 'TLSv1.3');
+  const sanity = await probe(port, HOST_STRICT, 'TLSv1.3', cert);
   record(
     M,
     `${HOST_STRICT}, client max TLSv1.3`,
