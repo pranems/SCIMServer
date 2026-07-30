@@ -1024,8 +1024,52 @@ export class ScimSchemaHelpers {
     mode: 'create' | 'replace' | 'patch',
   ): void {
     const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const rfcCompliantSubAttributes = getConfigBoolean(
+      config,
+      ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+    );
 
     if (!isStrict) {
+      // RfcCompliantSubAttributes is STANDALONE: it is not gated on
+      // StrictSchemaValidation, because the two answer different questions
+      // (how carefully do I police a payload vs is this schema shape legal at
+      // all). A lenient endpoint must still be able to refuse a shape RFC 7643
+      // §2.3.8 forbids, so this pass runs here too - including for PATCH, which
+      // returns early below.
+      if (rfcCompliantSubAttributes) {
+        const nestingSchemas = this.buildSchemaDefinitions(dto, endpointId);
+        if (nestingSchemas.length > 0) {
+          const nestingCache = this.getSchemaCache(endpointId);
+          const nesting = SchemaValidator.validateSubAttributeNesting(
+            dto,
+            nestingSchemas,
+            nestingCache
+              ? {
+                  coreAttrMap: nestingCache.coreAttrMap,
+                  extensionSchemaMap: nestingCache.extensionSchemaMap,
+                }
+              : undefined,
+          );
+          if (!nesting.valid) {
+            const nestingDetails = nesting.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+            throw createScimError({
+              status: 400,
+              scimType: nesting.errors[0]?.scimType ?? 'invalidValue',
+              detail: `Schema validation failed: ${nestingDetails}`,
+              diagnostics: {
+                errorCode: 'VALIDATION_SCHEMA',
+                triggeredBy: 'RfcCompliantSubAttributes',
+                attributePaths: nesting.errors.map((e) => e.path),
+                activeConfig: {
+                  StrictSchemaValidation: false,
+                  RfcCompliantSubAttributes: true,
+                },
+              },
+            });
+          }
+        }
+      }
+
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       // Type/unknown/canonical validation remains strict-gated
       if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
@@ -1058,15 +1102,9 @@ export class ScimSchemaHelpers {
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
-      // RfcCompliantSubAttributes (default false) turns on RFC 7643 §2.3.8
-      // (no complex sub-attributes) and §1.2 (multi-valued SIMPLE sub-attributes
-      // are legal). It rides inside the strict path because that is the only
-      // path that walks sub-attributes at all - with StrictSchemaValidation OFF
-      // there is no sub-attribute validation to make compliant.
-      rfcCompliantSubAttributes: getConfigBoolean(
-        config,
-        ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
-      ),
+      // Strict path: the flag ALSO relaxes RFC 7643 §1.2 multi-valued SIMPLE
+      // sub-attributes, which only matters where validation actually rejects.
+      rfcCompliantSubAttributes,
     }, cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
 
     if (!result.valid) {

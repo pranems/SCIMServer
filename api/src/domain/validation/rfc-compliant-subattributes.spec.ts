@@ -100,6 +100,125 @@ const multiValuedSimpleSubAttr: SchemaAttributeDefinition = {
 const nestedPayload = { address: { street: '1 Main St', geo: { lat: 47.6, lon: -122.3 } } };
 const multiValuedPayload = { licenses: [{ value: 'E5', skus: ['EXCHANGE', 'TEAMS'] }] };
 
+/**
+ * STANDALONE contract. `RfcCompliantSubAttributes` is deliberately NOT gated on
+ * `StrictSchemaValidation`. The two answer different questions:
+ *
+ *   StrictSchemaValidation  - "how carefully do I police an inbound payload?"
+ *   RfcCompliantSubAttributes - "is this schema shape legal at all?"
+ *
+ * An endpoint running lenient for Entra interop must still be able to refuse a
+ * schema shape RFC 7643 forbids. `validateSubAttributeNesting` is the dedicated
+ * R1-only pass that runs on the NON-strict path, and it must not drag any of
+ * strict mode's other checks (unknown attributes, type coercion, required)
+ * along with it - doing so would silently turn strict mode on.
+ */
+describe('RfcCompliantSubAttributes - standalone pass (strict OFF)', () => {
+  it('R1 fires with StrictSchemaValidation OFF', () => {
+    const result = SchemaValidator.validateSubAttributeNesting(
+      nestedPayload,
+      schemaOf(nestedComplexAttr),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.path === 'address.geo')).toBe(true);
+    expect(result.errors[0].scimType).toBe('invalidValue');
+    expect(result.errors[0].message).toMatch(/2\.3\.8/);
+  });
+
+  it('does NOT report unknown attributes (that is strict mode is job, not ours)', () => {
+    const result = SchemaValidator.validateSubAttributeNesting(
+      { address: { street: '1 Main St', totallyUnknown: 'x' }, alsoUnknown: 1 },
+      schemaOf(nestedComplexAttr),
+    );
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('does NOT report type mismatches', () => {
+    const result = SchemaValidator.validateSubAttributeNesting(
+      { address: { street: 12345 } },
+      schemaOf(nestedComplexAttr),
+    );
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('does NOT report missing required attributes', () => {
+    const requiredAttr: SchemaAttributeDefinition = {
+      ...legalComplexAttr,
+      subAttributes: [{ ...simpleSub('givenName'), required: true }, simpleSub('familyName')],
+    };
+
+    const result = SchemaValidator.validateSubAttributeNesting({ name: {} }, schemaOf(requiredAttr));
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts a legal complex attribute', () => {
+    const result = SchemaValidator.validateSubAttributeNesting(
+      { name: { givenName: 'Barbara' } },
+      schemaOf(legalComplexAttr),
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts a multi-valued SIMPLE sub-attribute (R2 shape must not trip R1)', () => {
+    const result = SchemaValidator.validateSubAttributeNesting(
+      multiValuedPayload,
+      schemaOf(multiValuedSimpleSubAttr),
+    );
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('walks every element of a multi-valued complex attribute', () => {
+    const multiValuedNested: SchemaAttributeDefinition = {
+      ...nestedComplexAttr,
+      name: 'addresses',
+      multiValued: true,
+    };
+
+    const result = SchemaValidator.validateSubAttributeNesting(
+      {
+        addresses: [
+          { street: 'ok' },
+          { street: '1 Main St', geo: { lat: 47.6, lon: -122.3 } },
+        ],
+      },
+      schemaOf(multiValuedNested),
+    );
+
+    expect(result.errors.some(e => e.path === 'addresses[1].geo')).toBe(true);
+  });
+
+  it('walks extension-schema attributes too, not just core', () => {
+    const EXT = 'urn:example:params:scim:schemas:extension:2.0:User';
+    const schemas: SchemaDefinition[] = [
+      { id: CORE_URN, attributes: [legalComplexAttr] },
+      { id: EXT, attributes: [nestedComplexAttr] },
+    ];
+
+    const result = SchemaValidator.validateSubAttributeNesting(
+      { [EXT]: { address: { street: '1 Main St', geo: { lat: 1, lon: 2 } } } },
+      schemas,
+    );
+
+    expect(result.errors.some(e => e.path.includes('geo'))).toBe(true);
+  });
+
+  it('ignores an unassigned (null) complex attribute', () => {
+    const result = SchemaValidator.validateSubAttributeNesting(
+      { address: null },
+      schemaOf(nestedComplexAttr),
+    );
+
+    expect(result.errors).toEqual([]);
+  });
+});
+
 describe('RfcCompliantSubAttributes', () => {
   describe('flag OFF (default) - legacy behavior is preserved exactly', () => {
     it('R1 legacy: ACCEPTS a payload whose schema declares a COMPLEX sub-attribute', () => {

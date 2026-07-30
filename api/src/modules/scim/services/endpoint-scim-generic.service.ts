@@ -887,8 +887,43 @@ export class EndpointScimGenericService {
     mode: 'create' | 'replace' | 'patch',
   ): void {
     const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const rfcCompliantSubAttributes = getConfigBoolean(
+      config,
+      ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
+    );
 
     if (!isStrict) {
+      // RfcCompliantSubAttributes is STANDALONE - see the twin block in
+      // ScimServiceHelpers.validatePayloadSchema. Kept behaviourally identical
+      // here so a custom resource type cannot drift from Users/Groups.
+      if (rfcCompliantSubAttributes) {
+        const nestingSchemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+        if (nestingSchemas.length > 0) {
+          const nesting = SchemaValidator.validateSubAttributeNesting(
+            dto,
+            nestingSchemas,
+            this.getAttrMapsForRT(resourceType, endpointId),
+          );
+          if (!nesting.valid) {
+            const nestingDetails = nesting.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+            throw createScimError({
+              status: 400,
+              scimType: nesting.errors[0]?.scimType ?? 'invalidValue',
+              detail: `Schema validation failed: ${nestingDetails}`,
+              diagnostics: {
+                errorCode: 'VALIDATION_SCHEMA',
+                triggeredBy: 'RfcCompliantSubAttributes',
+                attributePaths: nesting.errors.map((e) => e.path),
+                activeConfig: {
+                  StrictSchemaValidation: false,
+                  RfcCompliantSubAttributes: true,
+                },
+              },
+            });
+          }
+        }
+      }
+
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       if (mode === 'patch') return;
       const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
@@ -918,13 +953,7 @@ export class EndpointScimGenericService {
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
-      // Mirrors ScimServiceHelpers.validatePayloadSchema so the generic
-      // (custom resource type) path enforces RFC 7643 sub-attribute rules
-      // identically. Default false = current behavior.
-      rfcCompliantSubAttributes: getConfigBoolean(
-        config,
-        ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
-      ),
+      rfcCompliantSubAttributes,
     }, this.getAttrMapsForRT(resourceType, endpointId));
 
     if (!result.valid) {
