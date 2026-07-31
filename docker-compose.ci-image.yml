@@ -1,16 +1,40 @@
 # Local-only override so the Docker form factor can be exercised WITHOUT a local
-# build. The npm registry is TLS-blocked on this host, so `docker build` cannot
-# run `npm ci`; the image is built in CI instead and pulled here.
+# build.
+#
+# WHY A LOCAL BUILD IS IMPOSSIBLE ON A CORP-MANAGED DEVICE
+# An earlier version of this comment said "the npm registry is TLS-blocked on
+# this host". That was wrong, and the same wrong claim had been committed in two
+# other docs - npm works fine on the HOST, through the corporate feed proxy. It
+# is the CONTAINER that cannot resolve: `docker build` gets no host `~/.npmrc`,
+# so npm inside the image falls back to registry.npmjs.org, and THAT egress is
+# blocked by design. Measured 2026-07-31:
+#
+#   docker run --rm node:24-alpine npm view react version
+#     registry = https://registry.npmjs.org/
+#     Terminated                          (no response, 40s timeout)
+#
+# So `npm ci` in the web-build and api-build stages dies with npm's unhelpful
+# "Exit handler never called!". It is not OOM (31 GB free when measured) and not
+# a code defect. See docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md.
+#
+# Running the CI image is also strictly more faithful than a local build: it is
+# the exact artifact that ships.
 #
 # Usage:
+#   $env:SCIM_CI_IMAGE = 'ghcr.io/pranems/scimserver:sha-<sha>'
 #   docker compose -f docker-compose.yml -f docker-compose.ci-image.yml up -d --no-build
+#
+# The tag is an ENV VAR with a `latest` default rather than a hardcoded pin. It
+# used to be pinned to 0.54.0-alpha.12, which had long since gone stale - a
+# pinned tag in a file nobody re-reads silently tests the wrong artifact, which
+# is worse than not testing at all.
 #
 # JWKS_HOST_ALLOWLIST is set because the base compose file omits it, which makes
 # 5 WIF-verify live assertions (9z-AV.T7/T8, 9z-BK.T2/T3/T4) fail for an
 # environment reason unrelated to the code under test.
 services:
   api:
-    image: ghcr.io/pranems/scimserver:0.54.0-alpha.12
+    image: ${SCIM_CI_IMAGE:-ghcr.io/pranems/scimserver:latest}
     pull_policy: missing
     environment:
       JWKS_HOST_ALLOWLIST: login.microsoftonline.com,login.windows.net
