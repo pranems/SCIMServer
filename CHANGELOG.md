@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Exhaustive browser coverage of the endpoint configuration surface** - new [web/e2e/settings-matrix.spec.ts](web/e2e/settings-matrix.spec.ts), 16 specs, run against the dev Azure estate.
+
+  An audit of the settings surface against the existing suite found that **2 of 28 configuration flags had behavioural browser coverage** (`RfcCompliantSubAttributes`, `CustomResourceTypesEnabled`). A third, `CredentialSecretVisibility`, had a spec whose own comment conceded it was "READ-ONLY ... It does NOT click a different radio" - a presence-only assertion, which rule R10 says is not correctness. The remaining 25 flags, both enum dropdowns and all four numeric inputs were never driven by a browser at all. Every one of those controls renders, so a human glance and a presence assertion both pass while a control wired to nothing ships unnoticed.
+
+  28 booleans is 2^28 states, so "exhaustive" is defined over the SURFACE rather than the cartesian product:
+
+  | Dimension | Coverage |
+  |---|---|
+  | Boolean flag Switches | **21 / 21** toggled in a real browser, each verified by reading the persisted value back from the admin API |
+  | Enum dropdowns | both, **every selectable option**, asserting a non-empty distinct persisted value and that the choice survives a reload |
+  | Numeric inputs | all 4 JWKS knobs, typed and persisted |
+  | Behavioural SCIM outcome | 7 flags measured in BOTH states against the server's real accept/reject decision |
+  | Presets | all 6 instantiated, each building its create payload from its own published `/Schemas` |
+
+  The control list is scraped from the rendered DOM rather than hardcoded, so a newly added flag is covered the moment it appears instead of silently escaping a stale list.
+
+  Result on dev: **16 / 16 passed**; full suite **213 passed, 0 failed, 7 skipped** (up from 197).
+
+### Fixed
+- Nothing in this entry - see the defect note below, which is reported but NOT yet fixed.
+
+### Known defect (found by the new spec, not yet fixed)
+- **A 401 from the SCIM data plane destroys the admin UI session.** [web/src/api/queries.ts](web/src/api/queries.ts) treats any 401 as an expired admin token at three call sites - `apiFetch`, `useScimRequest` (Workbench) and `useScimBulk` (Bulk tab) - calling `clearStoredToken()` + `notifyTokenInvalid()` and raising the "Authentication Required / Token expired or invalid" dialog.
+
+  But a 401 from an endpoint-scoped SCIM route is frequently the correct, configured outcome. Measured on dev against a throwaway endpoint:
+
+  | Call | Before disabling `SharedSecretBearerAuthEnabled` | After |
+  |---|---|---|
+  | `GET /scim/admin/endpoints` | 200 | **200** |
+  | `GET /scim/admin/endpoints/{id}` | 200 | **200** |
+  | `GET /scim/v2/endpoints/{id}/Users` | 200 | **401** (correct) |
+
+  The admin API never rejects the token, so the dialog is a false alarm. Operator impact: disabling any per-endpoint auth method in the Settings tab logs you out, and the Workbench - which exists to probe endpoints, including negative auth tests - logs you out every time it receives an expected 401. The server behaviour is correct; only the client's 401 classification is wrong.
+
+
 ### Deployed
 - **v0.55.0 is live on dev and on the proudbush canary, and both are finally off an end-of-life runtime.** Dev and the canary had been serving **Node v25.9.0**, which reached EOL on 2026-06-01 - an unpatched runtime for ~2 months. Both now run **v24.18.1** (Krypton LTS).
 
