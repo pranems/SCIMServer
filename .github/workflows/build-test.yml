@@ -55,6 +55,16 @@ jobs:
             api/package-lock.json
             web/package-lock.json
 
+      # Runs BEFORE any install, and in CI rather than only at pre-push, because
+      # the pre-push gate cannot see a Dependabot PR, a fork PR, or anyone
+      # pushing with --no-verify. A lockfile entry resolved through a corporate
+      # feed proxy carries an internal host and a sha1 integrity among ~725
+      # sha512 siblings - it leaks an internal endpoint from a public repo and
+      # weakens the lockfile's own tamper-evidence, and no other gate here can
+      # see it. See docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md.
+      - name: Verify lockfile provenance
+        run: node scripts/check-lockfile-provenance.mjs
+
       - name: Install API dependencies
         working-directory: api
         run: npm ci --no-audit --no-fund
