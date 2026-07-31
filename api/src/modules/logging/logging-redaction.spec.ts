@@ -102,11 +102,16 @@ describe('LoggingService - RequestLog secret persistence (F1)', () => {
 
   it('endpoint PersistRequestSecrets=false OVERRIDES a true server default', async () => {
     // Server default true (env unset); endpoint explicitly opts into redaction.
+    // The id must be a real UUID: `RequestLog.endpointId` is `@db.Uuid` and is
+    // now coerced to null at the persistence boundary, so a placeholder like
+    // 'ep-redact' would silently drop the correlation this test asserts.
+    // See storable-uuid.ts.
+    const epRedact = 'e9ed4c70-1a3f-4a2e-9f4a-2b7c5d1e0001';
     cachedSettings = { PersistRequestSecrets: false };
     const service = await makeService();
-    record(service, 'ep-redact');
+    record(service, epRedact);
     const row = rowsOf(service)[0];
-    expect(row.endpointId).toBe('ep-redact');
+    expect(row.endpointId).toBe(epRedact);
     expect(row.requestBody).not.toContain('super-secret');
     expect(row.requestBody).toContain('[REDACTED]');
     await service.onModuleDestroy?.();

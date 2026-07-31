@@ -232,6 +232,16 @@ Invoke-Gate -Name 'supply chain: lockfile provenance' -WorkingDir $repoRoot -Act
     node scripts/check-lockfile-provenance.mjs 2>&1 | Out-Host
 }
 
+# Docs: the pattern catalog's category pie must match the patterns actually in
+# the file. A stale pie renders perfectly - Mermaid has no idea what the numbers
+# mean - so the render gate passes on any integers. Two branches that each
+# appended patterns produced a merge where BOTH sides' counts were wrong
+# (22 and 14, against a real 24). The doc is consulted at the start of planning
+# and design, so an understated count hides accumulated experience.
+Invoke-Gate -Name 'docs: patterns pie matches catalog' -WorkingDir $repoRoot -Action {
+    node scripts/check-patterns-pie.mjs 2>&1 | Out-Host
+}
+
 # Offline-only checks (C1-C5): coverage, SHA-256 integrity, update/obsolete
 # closure, freshness and README linkage. The network checks (O1-O3) are NOT run
 # here on purpose - pre-push must stay deterministic and work offline. They run

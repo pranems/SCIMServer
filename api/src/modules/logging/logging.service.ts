@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { resolveRuntimeConfig } from '../../bootstrap/runtime-config';
-import { toStorableRequestId } from './storable-request-id';
+import { toStorableRequestId, toStorableEndpointId } from './storable-uuid';
+import { isUuid } from '../../shared/uuid';
 import { ModuleRef } from '@nestjs/core';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
@@ -269,7 +270,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         id: randomUUID(),
         method,
         url,
-        endpointId: endpointId ?? null,
+        endpointId: toStorableEndpointId(endpointId),
         status: status ?? null,
         durationMs: durationMs ?? null,
         createdAt: new Date(),
@@ -319,7 +320,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // Include the derived identifier INLINE so the flush is a single batch
       // insert (no per-row UPDATE backfill). `identifier` is a real column.
       identifier: identifier ?? null,
-      endpointId: endpointId ?? null,
+      endpointId: toStorableEndpointId(endpointId),
       requestId: toStorableRequestId(requestId),
       authOutcome,
       authMethod,
@@ -567,8 +568,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // on the cast (previously surfaced as a 500). A non-UUID can never match a
       // UUID column, so return an empty set instead (parity with the in-memory
       // string-equality branch), using the nil UUID as a guaranteed-no-match.
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.requestId);
-      where.requestId = isUuid ? filters.requestId : '00000000-0000-0000-0000-000000000000';
+      const isUuidFilter = isUuid(filters.requestId);
+      where.requestId = isUuidFilter ? filters.requestId : '00000000-0000-0000-0000-000000000000';
     }
     if (filters.method) where.method = filters.method.toUpperCase();
     if (typeof filters.status === 'number') where.status = filters.status;
@@ -914,6 +915,17 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       };
     }
 
+    // `RequestLog.id` is `@db.Uuid`. Handing Postgres anything that is not a
+    // uuid raises PrismaClientKnownRequestError P2023 ("Inconsistent column
+    // data: Error creating UUID"), which escapes `@Get('logs/:id')` as an
+    // unhandled 500 rather than the intended 404. That is how
+    // `GET /scim/admin/logs/stream` - a path with no route, falling through to
+    // `:id` - returned 500 on every Prisma estate while the InMemory backend
+    // returned 404 for the identical request. Resolve a syntactically
+    // impossible id to null here so both backends agree and no malformed input
+    // reaches the database.
+    if (!isUuid(id)) return null;
+
     const row = await this.prisma.requestLog.findUnique({ where: { id } });
     if (!row) return null;
     // Parse bodies once for identifier + returned payload
@@ -1010,11 +1022,20 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
    */
   private async resolveUserDisplayName(identifier: string): Promise<string | null> {
     try {
-      // Try to find user by SCIM ID first
-      let user = await this.prisma.scimResource.findFirst({
-        where: { scimId: identifier, resourceType: 'User' },
-        select: { userName: true, payload: true },
-      });
+      // `ScimResource.scimId` is `@db.Uuid` while `userName` is `@db.Citext`,
+      // so a userName-shaped identifier makes the scimId query raise P2023
+      // rather than return null. Because the userName fallback below only runs
+      // when the first lookup returns null, an unguarded scimId query threw and
+      // jumped to the outer catch, making the fallback unreachable and leaving
+      // every userName-identified row unresolved. Skip the uuid column when the
+      // identifier cannot possibly be a uuid - same guard the `requestId`
+      // filter in listLogs already applies for the same reason.
+      let user = isUuid(identifier)
+        ? await this.prisma.scimResource.findFirst({
+            where: { scimId: identifier, resourceType: 'User' },
+            select: { userName: true, payload: true },
+          })
+        : null;
 
       // If not found by SCIM ID, try by userName
       if (!user) {
