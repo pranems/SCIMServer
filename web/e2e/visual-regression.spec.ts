@@ -131,6 +131,54 @@ const SNAPSHOT_OPTIONS = {
   maxDiffPixelRatio: 0.002,
 };
 
+/**
+ * Creates a throwaway endpoint for the endpoint-detail snapshots.
+ *
+ * These two snapshots used to click whichever endpoint sorted FIRST on
+ * /endpoints, which made the baseline a hostage to the target estate's data:
+ * on 2026-07-31 a bulk endpoint import changed which endpoint sorted first
+ * (dev went 33 -> 58 endpoints) and both baselines broke, purely because a
+ * different endpoint with a different row count and schema count was being
+ * photographed. Nothing about the UI had changed.
+ *
+ * A freshly-created endpoint on a pinned preset has a deterministic shape -
+ * zero users, a known schema set - so the snapshot asserts the CHROME rather
+ * than whatever data happens to be in the environment. The endpoint's name and
+ * description are already masked by ENDPOINT_DETAIL_LIVE_SELECTORS, so a
+ * per-run unique name does not leak into the image.
+ */
+async function createSnapshotEndpoint(page: Page): Promise<string | null> {
+  const token = process.env.E2E_TOKEN || 'changeme-scim';
+  await page.goto('/endpoints');
+  await page.waitForLoadState('networkidle');
+  return page.evaluate(async (t: string) => {
+    const res = await fetch('/scim/admin/endpoints', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `vr-snapshot-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+        profilePreset: 'rfc-standard',
+      }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()).id as string;
+  }, token);
+}
+
+async function deleteSnapshotEndpoint(page: Page, id: string | null): Promise<void> {
+  if (!id) return;
+  const token = process.env.E2E_TOKEN || 'changeme-scim';
+  await page.evaluate(
+    async ({ t, epId }: { t: string; epId: string }) => {
+      await fetch(`/scim/admin/endpoints/${epId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${t}` },
+      });
+    },
+    { t: token, epId: id },
+  );
+}
+
 test.describe('Phase H3 - Visual regression baselines', () => {
   test('Dashboard (light theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'light'));
@@ -278,61 +326,52 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   });
 
   test('Endpoint detail - Users tab', async ({ page }) => {
-    await page.goto('/endpoints');
-    await page.waitForLoadState('networkidle');
-    const firstCard = page.locator('[data-testid^="endpoint-"]').first();
-    if (!(await firstCard.isVisible().catch(() => false))) {
-      test.skip(true, 'No endpoints seeded - skip endpoint-detail snapshot');
+    const id = await createSnapshotEndpoint(page);
+    test.skip(!id, 'Could not create the snapshot fixture endpoint');
+    try {
+      await page.goto(`/endpoints/${id}`);
+      await page.waitForLoadState('networkidle');
+      await page.getByRole('tab', { name: /users/i }).click();
+      await page.waitForLoadState('networkidle');
+      await expect(page).toHaveScreenshot('endpoint-detail-users.png', {
+        ...SNAPSHOT_OPTIONS,
+        mask: locatorsFor(page, [
+          ...ENDPOINT_DETAIL_LIVE_SELECTORS,
+          '[data-testid="users-tab"]',
+          '[data-testid="users-empty"]',
+        ]),
+        fullPage: true,
+        // The fixture endpoint is created fresh with zero users, so the panel
+        // height is deterministic. The tolerance stays only for font/AA noise.
+        maxDiffPixelRatio: 0.03,
+      });
+    } finally {
+      await deleteSnapshotEndpoint(page, id);
     }
-    await firstCard.click();
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('tab', { name: /users/i }).click();
-    await page.waitForLoadState('networkidle');
-    await expect(page).toHaveScreenshot('endpoint-detail-users.png', {
-      ...SNAPSHOT_OPTIONS,
-      mask: locatorsFor(page, [
-        ...ENDPOINT_DETAIL_LIVE_SELECTORS,
-        '[data-testid="users-tab"]',
-        '[data-testid="users-empty"]',
-      ]),
-      fullPage: true,
-      // The Users tab renders a data-driven table whose ROW COUNT (and thus
-      // panel height) varies per dev-environment provisioning - masking the
-      // table cells does not stop the panel's bottom edge from shifting. Use
-      // the same live-data-drift tolerance as the Overview tab so the snapshot
-      // is stable against user-count changes rather than a chrome/layout change.
-      maxDiffPixelRatio: 0.03,
-    });
   });
 
   test('Endpoint detail - Schemas tab', async ({ page }) => {
-    await page.goto('/endpoints');
-    await page.waitForLoadState('networkidle');
-    const firstCard = page.locator('[data-testid^="endpoint-"]').first();
-    if (!(await firstCard.isVisible().catch(() => false))) {
-      test.skip(true, 'No endpoints seeded - skip endpoint-detail snapshot');
-    }
-    await firstCard.click();
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('tab', { name: /schemas/i }).click();
-    await page.waitForLoadState('networkidle');
-    await expect(page).toHaveScreenshot('endpoint-detail-schemas.png', {
-      ...SNAPSHOT_OPTIONS,
+    const id = await createSnapshotEndpoint(page);
+    test.skip(!id, 'Could not create the snapshot fixture endpoint');
+    try {
+      await page.goto(`/endpoints/${id}`);
+      await page.waitForLoadState('networkidle');
+      await page.getByRole('tab', { name: /schemas/i }).click();
+      await page.waitForLoadState('networkidle');
+      await expect(page).toHaveScreenshot('endpoint-detail-schemas.png', {
+        ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, [
         ...ENDPOINT_DETAIL_LIVE_SELECTORS,
         '[data-testid="schemas-tree"]',
         '[data-testid="schemas-empty"]',
       ]),
-      fullPage: true,
-      // Same live-data-drift tolerance as the Overview and Users tabs. The
-      // schemas TREE is data-driven (attribute count varies with the endpoint's
-      // profile), so masking its cells does not stop the panel's bottom edge
-      // from shifting - the mask itself changes height. Without this the
-      // snapshot fails on data drift rather than on a chrome/layout regression,
-      // which is exactly what happened on 2026-07-29: this tab was the only one
-      // of the three that never received the tolerance when Overview and Users
-      // did, so its baseline silently rotted while theirs stayed green.
-      maxDiffPixelRatio: 0.03,
-    });
+        fullPage: true,
+        // The fixture endpoint is created on a pinned preset, so the schema
+        // tree is deterministic. Tolerance retained only for font/AA noise.
+        maxDiffPixelRatio: 0.03,
+      });
+    } finally {
+      await deleteSnapshotEndpoint(page, id);
+    }
   });
 });

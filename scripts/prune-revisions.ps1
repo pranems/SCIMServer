@@ -89,8 +89,21 @@ if ($toDeactivate.Count -eq 0) {
 $failed = @()
 foreach ($r in $toDeactivate) {
     if ($PSCmdlet.ShouldProcess($r.name, 'deactivate revision')) {
-        az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r.name 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { $failed += $r.name } else { Write-Host "  deactivated $($r.name)" -ForegroundColor DarkGray }
+        $out = az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r.name 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            # Azure's revision list is eventually consistent, so a revision another
+            # run just deactivated can still appear active here. Deactivating an
+            # already-inactive revision is a no-op, not a failure - treat it as
+            # such rather than aborting the whole prune. Seen on calmsand
+            # 2026-07-31 when the promotion script's own prune had already run.
+            if ("$out" -match 'already|not active|inactive|InvalidRevision') {
+                Write-Host "  already inactive: $($r.name)" -ForegroundColor DarkGray
+            } else {
+                $failed += $r.name
+            }
+        } else {
+            Write-Host "  deactivated $($r.name)" -ForegroundColor DarkGray
+        }
     }
 }
 

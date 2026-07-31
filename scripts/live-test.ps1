@@ -14795,3 +14795,30 @@ $jsonContent | Out-File -FilePath $latestFile -Encoding utf8
 Write-Host "`n📊 Live test results JSON written to: test-results/$runId.json" -ForegroundColor Cyan
 
 Write-Host "`n========================================`n" -ForegroundColor Magenta
+
+# ============================================
+# EXIT CODE - the gate signal
+# ============================================
+# Origin: 2026-07-31. This script had NO exit statement anywhere in ~14,800
+# lines, so it always exited 0 no matter how many assertions failed. Every
+# caller that gates on $LASTEXITCODE was therefore reading a success signal
+# that could never be false:
+#
+#   verify-deployment.ps1  -> "Live SCIM suite passed"
+#   promote-to-prod.ps1    -> post-flip verification "PASSED"
+#   dev-deployment-pipeline.ps1
+#
+# It surfaced during the 0.55.1 promotion to customer-facing prod, where the
+# live suite reported "Tests Passed: 1361 / Tests Failed: 8" and the promotion
+# still declared verification PASSED and flipped traffic. A gate that cannot
+# fail is not a gate.
+#
+# NOTE for callers: piping this script's output (e.g. `| Select-String ...`)
+# replaces $LASTEXITCODE with the exit code of the LAST command in the
+# pipeline, which will be 0. Gate on the unpiped invocation, or capture the
+# output to a file and inspect it separately.
+if ($testsFailed -gt 0) {
+    Write-Host "EXIT 1 - $testsFailed assertion(s) failed." -ForegroundColor Red
+    exit 1
+}
+exit 0
