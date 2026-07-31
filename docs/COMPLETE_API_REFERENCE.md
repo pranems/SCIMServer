@@ -180,7 +180,8 @@ Content-Type: application/json
 
 **Response (201 Created):**
 
-```json
+```jsonc
+// Schematic shape - "..." marks an elided sub-object, not a literal value.
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "name": "entra-prod",
@@ -376,7 +377,8 @@ Host: localhost:8080
 Authorization: Bearer changeme-scim
 ```
 
-```json
+```jsonc
+// Schematic shape - "..." marks an elided sub-object, not a literal value.
 {
   "metadata": {
     "name": "entra-id",
@@ -1492,7 +1494,8 @@ Authorization: Bearer changeme-scim
 
 **Response (200 OK):**
 
-```json
+```jsonc
+// Schematic shape - "..." marks an elided sub-object, not a literal value.
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
   "totalResults": 1,

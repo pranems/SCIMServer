@@ -318,7 +318,8 @@ DELETE /scim/admin/log-config/recent
 
 **Response format:**
 
-```json
+```jsonc
+// Schematic shape - "..." marks elided fields, not literal values.
 {
   "count": 25,
   "entries": [
@@ -942,7 +943,8 @@ Configurable via:
 
 The `GET /scim/admin/log-config/audit` endpoint returns audit trail entries - CONFIG, ENDPOINT, and AUTH category logs from the ring buffer:
 
-```json
+```jsonc
+// Schematic shape - "..." marks elided fields, not literal values.
 {
   "count": 12,
   "entries": [

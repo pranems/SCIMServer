@@ -232,6 +232,10 @@ export function audit(truth) {
     const norm = (path) =>
       path
         .replace(/^\/scim/, '')
+        // RFC 7644 S1.3: main.ts rewrites /scim/v2/* onto /scim/*, so the
+        // versioned public path never appears in a controller decorator. Both
+        // forms must compare equal or every versioned example looks undocumented.
+        .replace(/^\/v2(?=\/|$)/, '')
         .replace(/:[A-Za-z0-9_]+/g, '{}')
         .replace(/\{[^}]*\}/g, '{}')
         .replace(/\/+$/, '')
@@ -277,6 +281,36 @@ export function audit(truth) {
       failures.push(`[C10] ${d}: names retired infrastructure without marking it retired: ${hits.slice(0, 6).join('; ')}${hits.length > 6 ? ' ...' : ''}`);
     }
   }
+
+  // C11 - every literal ```json block must parse. The house rule says a block
+  // with placeholders or comments is a SCHEMATIC and must be fenced ```jsonc
+  // instead, which keeps this check airtight. Found 9 blocks that were really
+  // HTTP examples (a request line followed by a body) mis-fenced as json.
+  for (const d of docs) {
+    const text = read(p(d));
+    const blocks = [...text.matchAll(/```json\r?\n([\s\S]*?)```/g)];
+    const bad = [];
+    for (const b of blocks) {
+      const line = text.slice(0, b.index).split(/\r?\n/).length;
+      try {
+        JSON.parse(b[1]);
+      } catch (err) {
+        bad.push(`L${line}: ${String(err.message).slice(0, 60)}`);
+      }
+    }
+    if (bad.length) {
+      failures.push(`[C11] ${d}: ${bad.length} \`\`\`json block(s) do not parse (use \`\`\`jsonc for schematics, \`\`\`http for request examples): ${bad.slice(0, 3).join(' | ')}${bad.length > 3 ? ' ...' : ''}`);
+    }
+  }
+
+  // NOTE: a C12 "doc references a route that no longer exists" check was built
+  // and then REMOVED. Docs are full of illustrative paths with truncated ids
+  // (`/endpoints/a1b2c3d4-.../stats`), and no normalisation separated those
+  // from genuinely dead routes without a false-positive rate that would get the
+  // whole gate switched off. C9 already covers the direction that matters (a
+  // real route missing from the reference); the reverse direction is left to
+  // review. Recorded here so the next person does not rebuild it and rediscover
+  // the same noise.
 
   return { failures, warnings, docs };
 }

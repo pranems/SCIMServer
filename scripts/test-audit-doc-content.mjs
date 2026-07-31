@@ -129,7 +129,33 @@ await run(
   '[C10]',
 );
 
+await run(
+  'C11 unparseable json block',
+  { 'A.md': '```json\nPOST /scim/admin/endpoints\n{ "name": "x" }\n```\n' },
+  ['A.md'],
+  {},
+  '[C11]',
+);
+
 console.log('\n=== positive controls: each check must NOT fire ===');
+
+await run(
+  'C11 vs a jsonc schematic',
+  { 'A.md': '```jsonc\n// Schematic\n{ "profile": { "..." } }\n```\n' },
+  ['A.md'],
+  {},
+  '[C11]',
+  false,
+);
+
+await run(
+  'C11 vs valid json',
+  { 'A.md': '```json\n{ "name": "x" }\n```\n' },
+  ['A.md'],
+  {},
+  '[C11]',
+  false,
+);
 
 await run(
   'C10 vs the ACR name acrscimserver20622',

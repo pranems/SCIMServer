@@ -78,7 +78,7 @@ flowchart LR
 
 A profile has four sections:
 
-```json
+```jsonc
 {
   "profile": {
     "schemas": [],              // Schema definitions (core + extensions)
@@ -109,7 +109,7 @@ A profile has four sections:
 
 ### Minimal Example
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "hr-endpoint",
@@ -166,7 +166,7 @@ Every custom extension requires three things:
 
 Same three-part pattern, but the binding goes on the Group resource type:
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "group-ext",
@@ -262,7 +262,7 @@ You can bind multiple extensions to a single resource type. Each extension is a 
 
 **Usage** - Creating a user with all three extensions:
 
-```json
+```http
 POST /scim/endpoints/{endpointId}/Users
 {
   "schemas": [
@@ -285,7 +285,7 @@ POST /scim/endpoints/{endpointId}/Users
 
 ## 5. Extensions on Both User and Group
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "dual-ext",
@@ -437,7 +437,7 @@ With `StrictSchemaValidation: "True"`, a `POST /Users` that omits the required e
 
 Custom resource types let you manage resources beyond User and Group (e.g., `Device`, `Application`, `License`).
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "with-devices",
@@ -515,7 +515,7 @@ Custom resource types can also have schema extensions:
 
 > **Important**: `schemas` and `resourceTypes` use **Replace** merge semantics. You must send the complete arrays - including all existing schemas/RTs plus the new extension.
 
-```json
+```http
 PATCH /scim/admin/endpoints/{id}
 {
   "profile": {
@@ -644,7 +644,7 @@ curl -X POST "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Groups" \
 
 Extension data roundtrips through GET - both single-resource and list responses. `schemas[]` is built dynamically from visible extension URN keys:
 
-```json
+```http
 GET /scim/endpoints/{endpointId}/Users/{userId}
 
 {
@@ -668,7 +668,7 @@ GET /scim/endpoints/{endpointId}/Users/{userId}
 
 Merge an entire extension block without specifying paths:
 
-```json
+```http
 PATCH /scim/endpoints/{endpointId}/Users/{userId}
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
