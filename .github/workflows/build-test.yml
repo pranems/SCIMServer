@@ -9,6 +9,15 @@ on:
       - 'feat/**'
       - 'ci/**'
       - 'fix/**'
+      # A release branch is the single thing that most needs CI, and it was the
+      # only common prefix missing here - pushing release/0.55.0 produced ZERO
+      # runs, silently. That matters more on a corp-managed device than it looks:
+      # `npm ci` inside a container cannot reach registry.npmjs.org (egress is
+      # blocked by design, and the corporate .npmrc does not exist in the image),
+      # so the Docker image CANNOT be built locally at all. CI is not a
+      # convenience for the container form factor here - it is the only way to
+      # produce or validate the artifact.
+      - 'release/**'
   # Required so the workflow runs on Dependabot (and any fork) PRs into master.
   # Without this, branch protection blocks every Dependabot PR forever because
   # the validate / build-and-push contexts never appear (no push trigger fires
