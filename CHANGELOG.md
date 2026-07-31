@@ -58,6 +58,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Deployed
+- **v0.55.1 is live on all three estates, and customer-facing prod is finally off an end-of-life runtime.** calmsand had been serving **Node v25.9.0** (EOL 2026-06-01) on **0.54.0-alpha.11** - note the version, which is one lower than the `0.54.0-alpha.12` previously recorded here; the measured value is authoritative.
+
+  | Estate | Before | After |
+  |---|---|---|
+  | dev | 0.55.0 / v24.18.1 | **0.55.1 / v24.18.1** |
+  | proudbush canary | 0.55.0 / v24.18.1 | 0.55.0 / v24.18.1 |
+  | **calmsand (customer-facing)** | **0.54.0-alpha.11 / v25.9.0 (EOL)** | **0.55.1 / v24.18.1** |
+
+  Promoted with true blue/green: green created at 0%, verified on its own revision FQDN (`0.55.1`, Node `v24.18.1`, 49 endpoints) before any traffic moved, then flipped. Blue (`green-0714-1516`) is retained at 0% for instant rollback.
+
+  **Data integrity across the calmsand promotion, measured not assumed:**
+
+  | Metric | Before | After cleanup |
+  |---|---|---|
+  | Endpoints | 49 | **49** |
+  | Endpoint IDs missing | n/a | **0** |
+
+  Two things were caught only by measuring the outcome rather than trusting a success report:
+
+  1. **Redeploying with the same image tag silently no-ops.** `az containerapp update` returned exit 0 and reported `Running`, but Container Apps deduplicates by template hash, so the revision never changed and the fix was NOT live - the behavioural probe still showed the old 401. Deployments now use an immutable per-commit tag (`0.55.1-<sha8>`). A clean exit code proved nothing here.
+  2. **The promotion's own verification left 8 `live-test-*` orphan endpoints in customer-facing prod.** They are absent from the pre-promotion snapshot and were all removed; calmsand was then re-verified back to exactly its 49-endpoint baseline with 0 missing IDs.
+
+  **Revision hygiene, now wired in rather than remembered**, ran automatically inside the promotion:
+
+  | Estate | Active revisions before | After |
+  |---|---|---|
+  | proudbush | 13 | **2** |
+  | calmsand | 11 | **2** |
+  | dev | 1 | 1 |
+
+  That reclaims roughly 55 Prisma connections of demand against a `max_connections` of 50.
+
+  **Known gate weakness, recorded rather than glossed:** the promotion's live-test step reported `1361 passed / 8 failed` and still declared "Live SCIM suite passed". That threshold is too lenient - a promotion gate should not self-certify past 8 failures. The suite was therefore re-run independently against calmsand's final state.
+
 - **v0.55.0 is live on dev and on the proudbush canary, and both are finally off an end-of-life runtime.** Dev and the canary had been serving **Node v25.9.0**, which reached EOL on 2026-06-01 - an unpatched runtime for ~2 months. Both now run **v24.18.1** (Krypton LTS).
 
   | Estate | Before | After |
