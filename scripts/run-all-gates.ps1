@@ -410,7 +410,7 @@ $STAGES = [ordered]@{
 
     'Stage 6 - Commit Hygiene' = @(
         @{
-            Name = 'Version bump in api + web + lockfiles regenerated in node:25-alpine'
+            Name = 'Version bump in api + web (lockfiles regenerated in CI, never on a corp device)'
             Kind = 'Prompt'
             PromptPath = '.github/prompts/generateCommitMessage.prompt.md'
             When = { Test-PathTouched 'package\.json$' }
