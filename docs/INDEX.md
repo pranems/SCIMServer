@@ -3,7 +3,7 @@
 > **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
 
 > **Version:** 0.55.1 - **Updated:** 2026-07-31  
-> 6 presets - **27 endpoint settings controls** (21 boolean flags + 2 enums + 4 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
+> 6 presets - **28 endpoint settings controls** (21 boolean flags + 3 enums + 4 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
 
 ### Start here
 
@@ -56,7 +56,7 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 86 route handlers, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 117 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |

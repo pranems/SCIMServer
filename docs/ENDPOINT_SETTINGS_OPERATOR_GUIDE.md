@@ -78,7 +78,6 @@ flowchart LR
 |---|---|
 | `SchemaDiscoveryEnabled` | Expose `/Schemas`, `/ResourceTypes` and `/ServiceProviderConfig` under this endpoint. |
 | `EnforceResourceTypes` | ON (default): a query on an un-served resource type returns **404**. Turn OFF so a LIST on an un-served type (e.g. `/Groups` on a user-only endpoint) returns **200 empty + warning**. This is specifically needed for Entra's Test Connection probe. |
-| `CustomResourceTypesEnabled` | Allow registering custom resource types beyond User and Group. |
 
 ### 2.6 Authentication
 
@@ -99,6 +98,7 @@ These five decide **who may call this endpoint's SCIM data plane**. They are cov
 | Setting | What it actually does |
 |---|---|
 | `logLevel` | Per-endpoint log verbosity override. Falls back to the server global level when unset. Values: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `OFF`. |
+| `logFileEnabled` | ON (default): this endpoint's entries are also written to the rotating log **file**, not only to the in-memory ring buffer and the database. Turn OFF for a high-volume endpoint whose traffic you do not want on disk. Independent of `logLevel` - the level decides *what* is logged, this decides *where* it goes. |
 | `PersistRequestSecrets` | ON (default): the request log stores and displays the **complete** request/response for this endpoint - headers and body, secrets included - for fast RCA. Turn OFF to redact secret-bearing values (`Authorization`, `client_secret`, `access_token`) before they are persisted or shown. Console and file logs always redact regardless. |
 
 ### 2.8 Runtime egress (WIF JWKS fetch)

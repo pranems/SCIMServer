@@ -107,10 +107,16 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 
 When the production instance has active users, deploy a **separate dev resource group** for development. This gives full blast-radius isolation - the production deployment is never touched during development.
 
-### Architecture (CURRENT - 2026-05-29)
+### Architecture (CURRENT - 2026-07-31)
+
+There are **three** live estates. The canonical, gate-enforced record is [docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md); this is the short version.
 
 ```
-scimserver-prod         <- PROD (users) - do not touch
+scimserver-rg-prod      <- PROD, CUSTOMER-FACING (separate Azure AD tenant)
+`-- Container App: scimserver-prod (ghcr.io/pranems/scimserver:<tag>, anonymous pull)
+    FQDN: scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io
+
+scimserver-prod         <- PROD, parallel canary (same tenant as dev)
 |-- VNet, subnets
 |-- Container Apps Env + Log Analytics
 |-- PostgreSQL Flexible Server (scimserver-pg-new2)
@@ -123,6 +129,8 @@ scimserver-dev          <- DEV (your iteration) - fully isolated
 `-- Container App: scimserver-dev (acrscimserver20622.azurecr.io/scimserver:<sha>)
     FQDN: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
 ```
+
+> The customer-facing estate lives in a **different Azure AD tenant**, so it cannot pull from the dev-tenant ACR. That is why it pulls the identical image anonymously from GHCR instead. Promotion is canary-first: prove the parallel prod, then promote the customer-facing one on an explicit go-ahead.
 
 Both apps also accept `ghcr.io/pranems/scimserver:<sha>` and `ghcr.io/pranems/scimserver:latest` (public anonymous-pull image, identical bits, used by the public bootstrap path).
 

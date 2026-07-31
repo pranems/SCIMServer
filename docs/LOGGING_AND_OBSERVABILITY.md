@@ -1032,7 +1032,7 @@ Authorization: Bearer changeme-scim
     "platform": "linux",
     "arch": "x64",
     "pid": 1,
-    "hostname": "scimserver2-abc123",
+    "hostname": "scimserver-dev-abc123",
     "cpus": 2,
     "containerized": true,
     "memory": {
@@ -1055,17 +1055,17 @@ Authorization: Bearer changeme-scim
   },
   "container": {
     "app": {
-      "name": "scimserver2",
-      "image": "ghcr.io/pranems/scimserver:0.35.0",
+      "name": "scimserver-dev",
+      "image": "ghcr.io/pranems/scimserver:0.55.1",
       "runtime": "node",
       "platform": "linux/amd64"
     }
   },
   "deployment": {
-    "resourceGroup": "scimserver-rg",
-    "containerApp": "scimserver2",
+    "resourceGroup": "scimserver-dev",
+    "containerApp": "scimserver-dev",
     "registry": "ghcr.io/pranems",
-    "currentImage": "ghcr.io/pranems/scimserver:0.35.0"
+    "currentImage": "ghcr.io/pranems/scimserver:0.55.1"
   }
 }
 ```

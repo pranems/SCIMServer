@@ -687,7 +687,7 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 
 ## API Reference (Summary)
 
-**86 route handlers** across 20 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
+**117 route handlers** across 31 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
 
 ### Health & Version
 
@@ -1413,7 +1413,7 @@ SCIMServer/
 |   |   |   +-- app/              # Root module
 |   |   |   +-- auth/             # SharedSecretGuard (3-tier auth)
 |   |   |   +-- scim/             # SCIM protocol implementation
-|   |   |   |   +-- controllers/  # 12 controllers (admin, SCIM, discovery)
+|   |   |   |   +-- controllers/  # 20 controller files (admin, SCIM, discovery)
 |   |   |   |   +-- services/     # Users, Groups, Generic, Bulk services
 |   |   |   |   +-- discovery/    # Schema registry, discovery service
 |   |   |   |   +-- endpoint-profile/  # Profile engine (presets, expand, validate)
@@ -1472,7 +1472,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 86 route handlers, full request/response examples |
+| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 117 route handlers, full request/response examples |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Quick start - endpoint lifecycle recipes |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md) | Profile system - presets, expansion, validation |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | All 16 configuration flags |

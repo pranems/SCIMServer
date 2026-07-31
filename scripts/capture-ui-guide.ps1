@@ -59,7 +59,15 @@ param(
 
     [int]$ViewportHeight = 900,
 
-    [switch]$Apply
+    [switch]$Apply,
+
+    # Capture only the surfaces whose filename matches this wildcard. Re-shooting
+    # all 10 to add one produces 9 pointless binary diffs, and the hygiene rule
+    # says a re-shoot must be intentional rather than blind.
+    [string]$Only,
+
+    # Endpoint id used by surfaces that need a concrete endpoint (detail page).
+    [string]$EndpointId = 'e8edd907-0dfb-415d-b834-abf0d20eb0e0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -84,7 +92,13 @@ $surfaces = @(
     @{ File = 'prod-07-manual-provision.png'; Route = '/manual-provision'; Auth = $true }
     @{ File = 'prod-08-logs.png';            Route = '/logs';             Auth = $true }
     @{ File = 'prod-09-settings.png';        Route = '/settings';         Auth = $true }
+    @{ File = 'prod-10-endpoint-detail.png'; Route = "/endpoints/$EndpointId"; Auth = $true }
 )
+
+if ($Only) {
+    $surfaces = @($surfaces | Where-Object { $_.File -like $Only })
+    if ($surfaces.Count -eq 0) { throw "-Only '$Only' matched no curated surface." }
+}
 
 Write-Host "=== capture-ui-guide ===" -ForegroundColor Cyan
 Write-Host "BaseUrl : $BaseUrl"

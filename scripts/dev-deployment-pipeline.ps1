@@ -335,6 +335,12 @@ Invoke-Gate '1.12' 'Docs freshness (user-facing set)' {
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'audit-doc-freshness.ps1') -SkipCoupling -Quiet
 } | Out-Null
 
+# 1.13 - the docs must not merely be fresh, they must be TRUE. Counts, settings,
+# routes and reason codes are compared against the source they describe.
+Invoke-Gate '1.13' 'Docs content matches source' {
+    node (Join-Path $PSScriptRoot 'audit-doc-content.mjs')
+} | Out-Null
+
 # =============================================================================
 # Stage 2 - Local test gates
 # =============================================================================

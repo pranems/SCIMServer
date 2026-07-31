@@ -237,6 +237,18 @@ Invoke-Gate -Name 'docs: user-facing docs current' -WorkingDir $repoRoot -Action
     }
 }
 
+# Docs: what the docs CLAIM must match what the source CONTAINS. The freshness
+# gate above checks currency MARKERS - version header, provenance date, links -
+# and none of that reads the prose. A doc can pass every one of those while
+# telling the reader there are 86 route handlers when there are 117, and a
+# freshly stamped document asserting a wrong number is worse than an obviously
+# stale one because the stamp invites trust. Measured 2026-07-31: 22 route
+# handlers undocumented, a phantom setting that exists nowhere in the source,
+# and a retired FQDN offered as "Azure (live production)".
+Invoke-Gate -Name 'docs: doc claims match source' -WorkingDir $repoRoot -Action {
+    node scripts/audit-doc-content.mjs 2>&1 | Out-Host
+}
+
 # Supply chain: no lockfile entry may carry corporate-feed-proxy provenance. A
 # Microsoft corp-managed device redirects npm to a feed proxy that serves only a
 # legacy shasum, so any entry npm rewrites there comes back with an internal

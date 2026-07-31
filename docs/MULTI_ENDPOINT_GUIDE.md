@@ -268,7 +268,7 @@ curl -X PUT /scim/admin/log-config/endpoint/{id}/TRACE
 
 ## Controllers & Routing
 
-All 20 controllers participate in multi-endpoint routing:
+These controllers participate in multi-endpoint routing:
 
 | Controller | Route Prefix | Endpoint-Scoped |
 |-----------|-------------|-----------------|

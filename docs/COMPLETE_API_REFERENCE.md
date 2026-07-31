@@ -2,9 +2,9 @@
 
 > **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
 
-> **Version:** 0.55.1 - **Updated:** June 3, 2026  
+> **Version:** 0.55.1 - **Updated:** 2026-07-31  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
-> **86 route handlers** across 20 controllers (includes 2 dashboard analytics routes and the web SPA catch-all)
+> **117 route handlers** across 31 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 
 ---
 
@@ -15,6 +15,11 @@
 - [Health & Version](#health--version)
 - [Admin - Endpoint Management](#admin---endpoint-management)
 - [Admin - Per-Endpoint Credentials](#admin---per-endpoint-credentials)
+- [Admin - Authentication Methods](#admin---authentication-methods)
+- [Admin - JWKS Host Allowlist](#admin---jwks-host-allowlist)
+- [Admin - Security Settings](#admin---security-settings)
+- [Admin - Connection Info](#admin---connection-info)
+- [Admin - Auth Diagnostics](#admin---auth-diagnostics)
 - [Admin - Logs & Audit Trail](#admin---logs--audit-trail)
 - [Admin - Log Configuration](#admin---log-configuration)
 - [Admin - Database Browser](#admin---database-browser)
@@ -522,6 +527,287 @@ Content-Type: application/scim+json
 ```
 
 **Response:** 200 with `{ "ok": boolean, "checks": [ { "id", "label", "ok", "detail" } ] }` (checks: `issuerFormat`, `issuerHostAllowed`, `issuerReachable`, `jwksFormat`, `jwksHostAllowed`, `jwksReachable`, `jwksServesKeys`).
+
+---
+
+### POST /scim/admin/endpoints/:endpointId/wif/resolve
+
+Derives the expected issuer and JWKS URI from an identity-provider tenant, so an operator does not have to hand-type them. Requires `WifCredentialsEnabled: true`.
+
+**Request body:** the identity-provider discovery input (for Entra, the tenant id). Returns `400` when the body does not identify a resolvable issuer.
+
+---
+
+### POST /scim/admin/endpoints/:endpointId/wif/debug-assertion
+
+The **assertion debugger**. Dry-runs a `client_assertion` against **every** configured trust and returns a per-trust verdict without minting a token. This is the fastest way to answer "why is my assertion rejected?" when several trusts are configured, because it shows which one came closest instead of one aggregate failure.
+
+```http
+POST /scim/admin/endpoints/e8edd907-.../wif/debug-assertion HTTP/1.1
+Authorization: Bearer changeme-scim
+Content-Type: application/json
+```
+
+```json
+{
+  "assertion": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZha2Uta2lkIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2V4YW1wbGUifQ.c2ln"
+}
+```
+
+**Response:** 200 with `overallOutcome` plus one `results[]` entry per configured trust:
+
+```json
+{
+  "overallOutcome": "reject",
+  "results": [
+    {
+      "expectedIssuer": "pr-1-iss",
+      "outcome": "reject",
+      "reasonCode": "jwks_unreachable",
+      "trace": {
+        "plane": "token-mint",
+        "method": "wif",
+        "outcome": "reject",
+        "reasonCode": "jwks_unreachable",
+        "checks": [
+          {
+            "id": "jwks_signature",
+            "status": "fail",
+            "expected": "https://login.microsoftonline.com/tid-1/discovery/v2.0/keys",
+            "received": "verification failed",
+            "detail": "JWKS unavailable; failing closed."
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+---
+
+### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/rotate
+
+Issues a new secret for an existing credential, keeping its id and label. The new secret is returned **once**.
+
+### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/reveal
+
+Re-displays a credential secret when the endpoint's `CredentialSecretVisibility` is `always`. When it is `once`, the secret was never retained and the response says so rather than returning a value.
+
+### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/activate
+
+Re-activates a deactivated credential (the inverse of `DELETE`, which deactivates rather than destroying).
+
+---
+
+## Admin - Authentication Methods
+
+The structured, per-method authentication model that sits alongside the flat enablement flags.
+
+### GET /scim/admin/endpoints/:endpointId/authentication/methods
+
+```json
+{
+  "methods": []
+}
+```
+
+An endpoint using only the flat flags (`SharedSecretBearerAuthEnabled`, `SecretTokenBearerAuthEnabled`, ...) returns an empty array. That is not an error - it means no structured method objects have been declared for it.
+
+### POST /scim/admin/endpoints/:endpointId/authentication/methods
+
+Declares a structured authentication method (id, type, plane, priority, config, credential reference).
+
+### DELETE /scim/admin/endpoints/:endpointId/authentication/methods/:methodId
+
+Removes a declared method.
+
+---
+
+## Admin - JWKS Host Allowlist
+
+Server-wide allowlist governing which hosts a WIF trust may fetch signing keys from. Fetching **fails closed**: a host that is not allowlisted is never contacted.
+
+### GET /scim/admin/settings/jwks-hosts
+
+```json
+{
+  "seed": [
+    "accounts.google.com",
+    "login.chinacloudapi.cn",
+    "login.microsoftonline.com",
+    "login.microsoftonline.us",
+    "login.partner.microsoftonline.cn",
+    "www.googleapis.com"
+  ],
+  "env": [],
+  "persisted": [
+    "accounts.google.com",
+    "login.chinacloudapi.cn",
+    "login.microsoftonline.com",
+    "login.microsoftonline.us",
+    "login.partner.microsoftonline.cn",
+    "login.windows.net",
+    "www.googleapis.com"
+  ],
+  "effective": [
+    "accounts.google.com",
+    "login.chinacloudapi.cn",
+    "login.microsoftonline.com",
+    "login.microsoftonline.us",
+    "login.partner.microsoftonline.cn",
+    "login.windows.net",
+    "www.googleapis.com"
+  ],
+  "persistedEntries": [
+    {
+      "id": "3370a84a-fa9f-4cb5-ba83-862d771c1064",
+      "host": "accounts.google.com",
+      "label": "well-known IdP (seed)"
+    }
+  ]
+}
+```
+
+The four arrays are deliberately separate so you can see **where each host came from**: `seed` is compiled in, `env` comes from configuration, `persisted` is what an operator added, and `effective` is the union actually enforced.
+
+> Note that the legacy Entra v1 host `login.windows.net` is **not** seeded. Entra can publish keys there while issuing a `v2.0` issuer, so it usually has to be added by hand.
+
+### POST /scim/admin/settings/jwks-hosts
+
+```json
+{
+  "host": "login.windows.net",
+  "label": "AAD v1 issuer"
+}
+```
+
+### PUT /scim/admin/settings/jwks-hosts/:id
+
+Edits one persisted entry (host and/or label).
+
+### PATCH /scim/admin/settings/jwks-hosts
+
+Selectively adds and removes hosts in a single call.
+
+### DELETE /scim/admin/settings/jwks-hosts/:host
+
+Removes a persisted host. Seeded hosts remain in `effective`.
+
+---
+
+## Admin - Security Settings
+
+### GET /scim/admin/settings/security
+
+```json
+{
+  "credentialSecretVisibility": "always",
+  "kek": {
+    "configured": true,
+    "isDefault": true
+  }
+}
+```
+
+`kek.isDefault: true` means the key-encryption key is still the built-in development default. Set your own before storing production credentials.
+
+### PUT /scim/admin/settings/security
+
+Updates the server-wide credential secret visibility.
+
+---
+
+## Admin - Connection Info
+
+### GET /scim/admin/endpoints/:endpointId/connection-info
+
+Returns, per **enabled** authentication method, the exact field names your identity provider asks for, the values to paste, and live health. This is the route behind the Connect tab.
+
+**Response keys:** `endpointId`, `displayName`, `urls`, `enabledMethods`, `disabledMethods`.
+
+```json
+{
+  "enabledMethods": [
+    {
+      "method": "bearer",
+      "label": "Per-endpoint bearer token (Secret Token)",
+      "entraAuthenticationMethod": "Secret Token",
+      "entraFields": {
+        "tenantUrl": "https://<host>/scim/v2/endpoints/<endpointId>",
+        "secretToken": "<redacted>"
+      },
+      "validity": "ok",
+      "authHealth": {
+        "lastOutcome": "accept",
+        "lastAttemptAt": "2026-07-31T18:26:50.000Z",
+        "lastCorrelationId": "822b4fa8-cdcc-44d9-a2ed-f849fab4906e"
+      }
+    }
+  ]
+}
+```
+
+See [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) for the full per-method field mapping.
+
+---
+
+## Admin - Auth Diagnostics
+
+### GET /scim/admin/auth-decisions
+
+Recent authentication decisions across **all** endpoints. Short-TTL and in-memory; decoded non-secret claims only, never the raw assertion or token.
+
+**Query:** `?outcome=accept|reject`, `?reasonCode=<code>`, `?limit=<n>`.
+
+### GET /scim/admin/endpoints/:endpointId/auth-decisions
+
+The same, scoped to one endpoint. Each record carries the ordered `checks[]` with `expected` versus `received`, the `decodedClaims`, the `joseHeader`, and the `correlationId` that joins it to its request log row.
+
+### GET /scim/docs/auth-errors
+
+The machine-readable reason-code catalog: every code with its wire error, visibility tier, actor description and remediation.
+
+```json
+{
+  "count": 26,
+  "description": "Stable auth-failure reason codes.",
+  "docsUrl": "/docs/AUTHENTICATION_GUIDE.md",
+  "reasons": []
+}
+```
+
+### POST /scim/admin/decode-jwt
+
+Non-verifying JWT decoder, for reading a token you are holding. It **never** validates the signature.
+
+```json
+{
+  "isJwt": true,
+  "header": {
+    "alg": "RS256",
+    "kid": "demo",
+    "typ": "JWT"
+  },
+  "payload": {
+    "iss": "https://login.microsoftonline.com/tid/v2.0",
+    "aud": "api://demo",
+    "sub": "subject-id",
+    "exp": 4070908800
+  },
+  "signaturePresent": true
+}
+```
+
+### GET /scim/admin/runtime-config
+
+The effective runtime schema/resource configuration, plus `invariantWarnings` when the loaded configuration is internally inconsistent.
+
+**Response keys:** `schemas`, `groups`, `invariantWarnings`.
+
+### POST /scim/admin/logs/flush
+
+Forces buffered log rows to be written immediately. Useful before reading logs straight after a request in a test.
 
 ---
 
@@ -1674,6 +1960,99 @@ Content-Type: application/json
 | `client_id` | Default: `scimserver-client` (set via `OAUTH_CLIENT_ID`) |
 | `client_secret` | Set via `OAUTH_CLIENT_SECRET` env var |
 | `scope` | Space-separated: `scim.read`, `scim.write`, `scim.manage` |
+
+---
+
+### POST /scim/endpoints/:endpointId/oauth/token
+
+The **per-endpoint** token endpoint. Distinct from the server-level `/scim/oauth/token` above: this one mints a token scoped to a single endpoint, using either that endpoint's `oauth_client` credential or a WIF `jwt-bearer` assertion.
+
+**Client-secret grant:**
+
+```json
+{
+  "grant_type": "client_credentials",
+  "client_id": "client-id-e8edd907-0dfb-415d-b834-abf0d20eb0e0",
+  "client_secret": "<the clientSecret>"
+}
+```
+
+**Federated (RFC 7523) grant** - no stored secret:
+
+```json
+{
+  "grant_type": "client_credentials",
+  "client_id": "e8edd907-0dfb-415d-b834-abf0d20eb0e0",
+  "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+  "client_assertion": "<a JWT signed by a trusted identity provider>"
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "access_token": "<jwt>",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "scim"
+}
+```
+
+Send exactly one of `client_secret` or `client_assertion`; sending both is `mutually_exclusive_credentials` and sending neither is `missing_credentials`. For WIF, the token lifetime is **capped to the assertion's own lifetime**, so a token can never outlive the authorization that produced it. Failure reason codes are listed in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
+
+> The minted token is **never written to the request log**. A token-mint log row records only `clientId`, `endpointId`, `expiresIn` and `scopes`.
+
+---
+
+### GET /scim/endpoints/:endpointId/.well-known/oauth-authorization-server
+
+RFC 8414 authorization-server metadata for one endpoint, so a client can discover the token endpoint and signing keys without being told them.
+
+```json
+{
+  "issuer": "https://<host>/scim/endpoints/<endpointId>",
+  "token_endpoint": "https://<host>/scim/endpoints/<endpointId>/oauth/token",
+  "jwks_uri": "https://<host>/scim/oauth/jwks",
+  "grant_types_supported": ["client_credentials"],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post",
+    "private_key_jwt"
+  ],
+  "scopes_supported": ["scim.read", "scim.write", "scim.manage"],
+  "token_endpoint_auth_signing_alg_values_supported": ["RS256", "ES256"],
+  "x_scimserver_wif_profiles": [
+    {
+      "name": "syncfabric-rfc7523",
+      "client_id_binding": "target-client-id",
+      "assertion_subject_binding": "independent",
+      "resource_parameter_supported": true
+    }
+  ]
+}
+```
+
+---
+
+### GET /scim/oauth/jwks
+
+The server's public signing keys, so a relying party can verify a token this server minted. Public by design; no authentication.
+
+```json
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "n": "13HPWZUy99fQj92YJwnwUXRpy064fv3gh4Zs7aWCCI2jMcnMV8Ga...",
+      "e": "AQAB",
+      "kid": "z_4_lIs-gjAggvn_hEJDH4Gw-G4qZkUk9u_MKcE4l4U",
+      "alg": "RS256",
+      "use": "sig"
+    }
+  ]
+}
+```
 
 ---
 
