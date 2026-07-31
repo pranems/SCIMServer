@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deployed
+- **v0.55.0 is live on dev and on the proudbush canary, and both are finally off an end-of-life runtime.** Dev and the canary had been serving **Node v25.9.0**, which reached EOL on 2026-06-01 - an unpatched runtime for ~2 months. Both now run **v24.18.1** (Krypton LTS).
+
+  | Estate | Before | After |
+  |---|---|---|
+  | dev | 0.54.0-alpha.12 / Node v25.9.0 | **0.55.0 / Node v24.18.1** |
+  | proudbush canary | 0.54.0-alpha.12 / Node v25.9.0 | **0.55.0 / Node v24.18.1** |
+  | calmsand (customer) | 0.54.0-alpha.12 | unchanged - awaiting explicit go-ahead |
+
+  Validation actually run, per form factor:
+
+  | Form factor | Live SCIM | Playwright |
+  |---|---|---|
+  | Local standalone (node, inmemory) | **1373 / 1373** | n/a |
+  | Docker compose (CI image + PostgreSQL 17) | **1372 / 1372** | 78 pass / 56 skip |
+  | Dev Azure | **1373 / 1373** | **197 pass, 0 fail, 7 skip** |
+  | Proudbush canary (post-flip) | 1368 / 1373 (see below) | **191 pass, 0 fail, 13 skip** |
+
+  The Docker Playwright run skipped 56 because its volume was wiped and the skips are data-conditional ("Tenant has zero endpoints"); the dev and canary runs are the meaningful ones.
+
+- **Entra provisioning validated end-to-end against dev across four config variations** (`entra-id`, `entra-id-minimal`, `rfc-standard`, `user-only`) in tenant **Provisioning IAM Team 08** - **45 / 45 assertions**. Each variation reproduces the real Entra call sequence: Test Connection probe, `POST /Users`, filtered re-read, `PATCH replace active=false` soft-disable, `POST /Groups`, `PATCH add members`, `DELETE`. Request payloads are built **from each endpoint's published `/Schemas`** rather than hardcoded, so the run exercises the discovery contract instead of the harness's assumptions - the presets genuinely differ (`entra-id` requires `userName,displayName,emails`; `rfc-standard` requires only `userName`; `user-only` exposes no Group resource at all).
+
+- **The blue/green promotion was interrupted mid-flight and the design held.** The tooling had already created green at **0%** weight with blue pinned at 100% when the process died. Traffic was never flipped, so the canary served the old revision throughout with no impact. Resumed by verifying green on its `--green` label FQDN first, then flipping.
+
+### Known
+- **The proudbush canary is missing `login.windows.net` from its JWKS host allowlist, and always was.** 5 live assertions (`9z-AV.T7/T8`, `9z-BK.T2/T3/T4`) fail there because they verify a reachable Entra issuer whose JWKS is served from that host. **This is pre-existing data state, not a v0.55.0 regression**, and the evidence is direct: blue and green share one database (`scimserver-pg-new2`), so they see the same allowlist, and blue returns **404** for `/scim/admin/settings/jwks-hosts` because that endpoint did not exist in 0.54.0-alpha.12 - which is precisely why the gap was invisible on that estate until now.
+
+  | Estate | persisted JWKS hosts |
+  |---|---|
+  | dev | 7 - includes `login.windows.net` |
+  | proudbush | 6 - **missing `login.windows.net`** |
+
+  Deliberately **not** fixed as part of this promotion: adding a host to the allowlist widens a trust boundary on a production system, which is a separate decision from shipping a version. It needs an explicit call, not a side effect of a deploy.
+
 ### Fixed
 - **Three silent audit-log-loss defects, found because a GREEN test run was printing errors (v0.55.0).** The Prisma-backend E2E suite passed 87 suites / 1,439 tests while emitting 78 `prisma:error` lines to stdout. Nothing failed, because every consumer of those failures is a `catch` that logs and continues. They were investigated only because [ENGINEERING_LESSONS_AND_PATTERNS.md](docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md) PA-7 records that process stdout is an unasserted signal channel.
   - **An unclearable timer.** `LoggingService.onModuleInit` armed the one-shot startup prune with a bare `setTimeout(() => void this.runAutoPrune(), 5_000)` and kept **no handle**, so `onModuleDestroy` could cancel the recurring interval but never that one. Any process that started and stopped inside 5 seconds left an orphan that woke up and queried a closed pool. The handle is now retained and cleared.
