@@ -38,7 +38,26 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   private autoPruneRetentionDays: number = Number(process.env.LOG_RETENTION_DAYS) || 21;
   private autoPruneIntervalMs: number = Number(process.env.LOG_PRUNE_INTERVAL_MS) || 60 * 60 * 1000; // default: 1 hour
   private autoPruneTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Handle for the one-shot startup prune. It used to be fired and forgotten,
+   * which made it UNCLEARABLE: `onModuleDestroy` could only cancel the recurring
+   * interval, so a process that started and stopped inside the 5s window left an
+   * orphan timer that woke up afterwards and queried a closed pool.
+   */
+  private initialPruneTimer: ReturnType<typeof setTimeout> | null = null;
   private autoPruneEnabled: boolean = (process.env.LOG_AUTO_PRUNE ?? 'true').toLowerCase() !== 'false';
+
+  /**
+   * Set at the very start of `onModuleDestroy`, before anything is awaited.
+   *
+   * Clearing timers is not sufficient on its own: `recordRequest` SCHEDULES a
+   * new flush timer, and a request already in flight when shutdown begins can
+   * therefore create a timer AFTER `onModuleDestroy` has cleared them - with
+   * nothing left to cancel it. This flag makes shutdown one-way, so no new work
+   * is scheduled and any late callback returns instead of touching a connection
+   * that is being torn down.
+   */
+  private shuttingDown = false;
 
   // ── Buffered logging for performance ──
   // Buffering trades real-time logging (up to 3s data loss on crash) for reduced
@@ -46,6 +65,12 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   // Originally introduced to mitigate SQLite single-writer contention; retained
   // for PostgreSQL to reduce connection pool pressure.
   private logBuffer: Prisma.RequestLogCreateManyInput[] = [];
+  /**
+   * Audit rows this process gave up on, after a failing batch was retried and
+   * the buffer still hit its cap. Non-zero means real audit loss and should be
+   * investigated - it is surfaced in the warning that increments it.
+   */
+  private droppedLogRows = 0;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
   /**
@@ -128,14 +153,16 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   async onModuleInit(): Promise<void> {
     if (this.autoPruneEnabled && !this.isInMemoryBackend) {
       this.logger.info(LogCategory.DATABASE, `Auto-prune enabled: retention=${this.autoPruneRetentionDays}d, interval=${this.autoPruneIntervalMs}ms`);
-      // Run initial prune after a short delay (don't block startup)
-      setTimeout(() => void this.runAutoPrune(), 5_000);
+      // Run initial prune after a short delay (don't block startup). The handle
+      // is retained so shutdown can cancel it - see initialPruneTimer.
+      this.initialPruneTimer = setTimeout(() => void this.runAutoPrune(), 5_000);
       // Schedule recurring prune
       this.autoPruneTimer = setInterval(() => void this.runAutoPrune(), this.autoPruneIntervalMs);
     }
   }
 
   private async runAutoPrune(): Promise<void> {
+    if (this.shuttingDown) return;
     try {
       const pruned = await this.pruneOldLogs(this.autoPruneRetentionDays);
       if (pruned > 0) {
@@ -331,10 +358,14 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
     this.logBuffer.push(data);
 
-    // Flush immediately if buffer is full, otherwise schedule a delayed flush
+    // Flush immediately if buffer is full, otherwise schedule a delayed flush.
+    // Once shutdown has begun we must NOT arm a new timer - onModuleDestroy has
+    // already cleared timers and will not run again, so anything scheduled here
+    // would fire unowned against a connection that is being closed. The entry
+    // still lands in the buffer, and onModuleDestroy's final flush drains it.
     if (this.logBuffer.length >= this.flushMaxBuffer) {
       void this.flushLogs();
-    } else if (!this.flushTimer) {
+    } else if (!this.flushTimer && !this.shuttingDown) {
       this.flushTimer = setTimeout(() => void this.flushLogs(), this.flushIntervalMs);
     }
   }
@@ -351,10 +382,14 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
    * could misassign identifiers when inserts interleaved). One batch insert is
    * both faster and correct.
    */
-  async flushLogs(): Promise<void> {
+  async flushLogs(opts?: { duringShutdown?: boolean }): Promise<void> {
     if (this.isInMemoryBackend) {
       return;
     }
+
+    // A late callback that survived teardown must not touch the connection. The
+    // shutdown flush itself passes duringShutdown so it can still drain.
+    if (this.shuttingDown && !opts?.duringShutdown) return;
 
     if (this.flushInProgress || this.logBuffer.length === 0) return;
     this.flushInProgress = true;
@@ -370,7 +405,35 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // Single batch insert (identifier included inline - no UPDATE backfill).
       await this.prisma.requestLog.createMany({ data: batch });
     } catch (persistError) {
-      this.logger.error(LogCategory.DATABASE, 'Failed to flush request log batch', persistError as Error);
+      // The batch was already removed from the buffer by the splice above, so
+      // simply logging here DESTROYS every row in it. That is the third time
+      // this exact shape has caused silent audit loss in this service (the
+      // v0.54.85 requestId vector, the v0.54.89 endpointId vector, and a
+      // recurring `Transaction already closed` from the Prisma driver adapter
+      // seen ~21 times per full E2E run). Whatever the underlying cause, losing
+      // the audit record is never the right response to a failed write.
+      //
+      // Put the batch back at the FRONT so ordering is preserved and the next
+      // flush retries it. Requeue is bounded: an endpoint that is permanently
+      // failing must not grow the buffer without limit, so past the cap we drop
+      // the OLDEST entries and report exactly how many - loss becomes explicit
+      // and counted rather than silent.
+      const cap = this.flushMaxBuffer * 10;
+      this.logBuffer.unshift(...batch);
+      if (this.logBuffer.length > cap) {
+        const dropped = this.logBuffer.length - cap;
+        this.logBuffer.splice(0, dropped);
+        this.droppedLogRows += dropped;
+        this.logger.warn(
+          LogCategory.DATABASE,
+          `Request-log buffer exceeded ${cap} entries while retrying; dropped ${dropped} oldest entries (${this.droppedLogRows} total this process)`,
+        );
+      }
+      this.logger.error(
+        LogCategory.DATABASE,
+        `Failed to flush request log batch of ${batch.length}; requeued for retry`,
+        persistError as Error,
+      );
     } finally {
       this.flushInProgress = false;
     }
@@ -405,17 +468,31 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     }
   }
 
-  /** Flush remaining log entries and stop timers on application shutdown. */
+  /**
+   * Flush remaining log entries and stop timers on application shutdown.
+   *
+   * Order matters. `shuttingDown` is set FIRST, before any await, so that a
+   * request still in flight cannot arm a fresh flush timer behind our back
+   * while we are draining. Then every timer handle is cleared - including the
+   * one-shot startup prune, which used to be unclearable - and only then is the
+   * final flush awaited, while the connection is still open (PrismaService
+   * closes it later, in onApplicationShutdown).
+   */
   async onModuleDestroy(): Promise<void> {
+    this.shuttingDown = true;
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
+    }
+    if (this.initialPruneTimer) {
+      clearTimeout(this.initialPruneTimer);
+      this.initialPruneTimer = null;
     }
     if (this.autoPruneTimer) {
       clearInterval(this.autoPruneTimer);
       this.autoPruneTimer = null;
     }
-    await this.flushLogs();
+    await this.flushLogs({ duringShutdown: true });
   }
 
   async clearLogs(): Promise<number> {

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Inject, Optional } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown, OnModuleDestroy, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { PrismaClient } from '../../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -7,8 +7,9 @@ import { LogCategory } from '../logging/log-levels';
 import { resolveRuntimeConfig } from '../../bootstrap/runtime-config';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy, OnApplicationShutdown {
   private readonly pool: pg.Pool;
+  private closed = false;
 
   @Optional() @Inject(ScimLogger)
   private readonly scimLogger?: ScimLogger;
@@ -71,7 +72,33 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     this.scimLogger?.info(LogCategory.DATABASE, `Using database: ${process.env.DATABASE_URL || 'postgresql://scim:scim@localhost:5432/scimdb (fallback)'}`);
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /**
+   * Deliberately does NOT close the connection.
+   *
+   * Nest runs EVERY module's `onModuleDestroy` in the same phase and guarantees
+   * no ordering between two modules. `LoggingService.onModuleDestroy()` drains
+   * the audit-log buffer with `splice(0)` and then awaits a `createMany`, so if
+   * this hook ended the pool first that flush threw
+   * `Cannot use a pool after calling end on the pool`, its catch swallowed the
+   * error, and up to 50 already-drained audit rows were lost silently.
+   *
+   * That was observed for real on 2026-07-30: the Prisma E2E suite was green at
+   * 87/1439 while printing that error to stdout. `main.ts` enables shutdown
+   * hooks, so it fires on SIGTERM - which Azure Container Apps sends on every
+   * revision swap, deploy and scale-in.
+   *
+   * Teardown therefore happens in `onApplicationShutdown`, which Nest documents
+   * as running after every `onModuleDestroy` has settled.
+   */
+  onModuleDestroy(): void {
+    // Intentionally empty - see the note above before adding anything here.
+  }
+
+  /** Final phase: every module has finished flushing, so it is safe to close. */
+  async onApplicationShutdown(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+
     const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase();
     if (backend !== 'inmemory') {
       await this.$disconnect();

@@ -167,14 +167,19 @@ describe('PrismaService', () => {
     });
   });
 
-  // ── onModuleDestroy ────────────────────────────────────────────────────────
+  // ── shutdown ───────────────────────────────────────────────────────────────
+  //
+  // Connection teardown moved from `onModuleDestroy` to `onApplicationShutdown`
+  // on 2026-07-30, because Nest gives no ordering guarantee between two modules'
+  // `onModuleDestroy` hooks and LoggingService flushes drained audit rows in
+  // its own. See prisma-shutdown-ordering.spec.ts for the ordering assertions.
 
-  describe('onModuleDestroy', () => {
+  describe('onApplicationShutdown', () => {
     it('should skip $disconnect but still end pool when inmemory', async () => {
       process.env.PERSISTENCE_BACKEND = 'inmemory';
       const service = new PrismaService();
 
-      await service.onModuleDestroy();
+      await service.onApplicationShutdown();
 
       expect(service.$disconnect).not.toHaveBeenCalled();
       expect(mockPoolEnd).toHaveBeenCalledTimes(1);
@@ -184,7 +189,7 @@ describe('PrismaService', () => {
       process.env.PERSISTENCE_BACKEND = 'prisma';
       const service = new PrismaService();
 
-      await service.onModuleDestroy();
+      await service.onApplicationShutdown();
 
       expect(service.$disconnect).toHaveBeenCalledTimes(1);
       expect(mockPoolEnd).toHaveBeenCalledTimes(1);
@@ -194,7 +199,7 @@ describe('PrismaService', () => {
       delete process.env.PERSISTENCE_BACKEND;
       const service = new PrismaService();
 
-      await service.onModuleDestroy();
+      await service.onApplicationShutdown();
 
       expect(mockPoolEnd).toHaveBeenCalledTimes(1);
     });
