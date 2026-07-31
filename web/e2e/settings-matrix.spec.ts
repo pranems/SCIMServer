@@ -609,27 +609,34 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
 
       // Turn the flag OFF through the real Switch.
       //
-      // The save confirmation is deliberately NOT asserted here. Measured on
-      // dev 2026-07-31: disabling this flag makes the SCIM data plane return
-      // 401 (correct), and the web client's shared 401 handler treats ANY 401
-      // as an expired ADMIN session - it calls clearStoredToken() and raises
-      // the "Authentication Required" dialog, which replaces the MessageBar.
-      // The admin API itself keeps returning 200 throughout, so the dialog is
-      // a false alarm and a real UI defect. Asserting on the MessageBar would
-      // make this test a hostage to that bug; asserting on the persisted value
-      // and the server's actual decision measures what this flag really does.
+      // Regression guard (fixed 2026-07-31): disabling this flag makes the
+      // SCIM data plane return 401, which is correct. The web client used to
+      // treat ANY 401 as an expired ADMIN session - it called
+      // clearStoredToken() and raised the "Authentication Required" dialog,
+      // even though the admin API kept returning 200 throughout. So this test
+      // asserts BOTH that the flag works AND that changing it does not log the
+      // operator out.
       await openSettings(page, id!);
       await page.getByTestId('settings-flag-SharedSecretBearerAuthEnabled').click();
+      await expect(page.getByTestId('settings-feedback-success')).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByRole('alertdialog', { name: /Authentication Required/i }),
+        'a data-plane 401 must not end the admin session',
+      ).toHaveCount(0);
 
-      await expect
-        .poll(async () => asBool((await readSettings(page, id!))['SharedSecretBearerAuthEnabled']), {
-          timeout: 20_000,
-          message: 'the Switch must actually persist the flag as off',
-        })
-        .toBe(false);
+      const persisted = asBool((await readSettings(page, id!))['SharedSecretBearerAuthEnabled']);
+      expect(persisted, 'the Switch must actually persist the flag as off').toBe(false);
 
       const after = await probe();
       expect(after, 'with shared-secret auth off the global secret must be rejected').toBe(401);
+
+      // The Users tab now hits a 401 on every load. That must surface as an
+      // error in the page, never as a logout.
+      await page.goto(`/endpoints/${id}/users`);
+      await expect(
+        page.getByRole('alertdialog', { name: /Authentication Required/i }),
+        'a 401 from the Users tab must not end the admin session either',
+      ).toHaveCount(0);
 
       await setSettingViaApi(page, id!, 'SharedSecretBearerAuthEnabled', true);
       await reauth(page);

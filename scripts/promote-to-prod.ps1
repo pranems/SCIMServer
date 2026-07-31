@@ -742,6 +742,21 @@ if ($RunVerification -and (Test-Path $verifyScript)) {
     Write-Host "   ✅ Post-flip verification passed." -ForegroundColor Green
 }
 
+# ─── Revision hygiene (standing norm since 2026-07-31) ───────────────
+# Every promotion creates a revision, and old ones stay ACTIVE at 0% traffic
+# while still running a replica that holds a Prisma connection pool. Measured
+# on proudbush 2026-07-31: 13 active revisions, 12 idle, 65 connections of
+# demand against a max_connections of 50. Keep 2 - green (serving) plus blue
+# (the rollback target this script just pinned).
+$pruneScript = Join-Path $PSScriptRoot 'prune-revisions.ps1'
+if (Test-Path $pruneScript) {
+    try {
+        & $pruneScript -ResourceGroup $ProdResourceGroup -AppName $ProdAppName -Keep 2
+    } catch {
+        Write-Host "   ⚠️  Revision prune failed (promotion itself is unaffected): $_" -ForegroundColor Yellow
+    }
+}
+
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host "  ✅ Promotion Complete (TRUE blue/green)" -ForegroundColor Green

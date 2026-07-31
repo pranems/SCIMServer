@@ -558,6 +558,21 @@ if (-not $SkipDeploy) {
             Add-Result -Stage '6.1' -Gate 'Data integrity check' -Status 'FAIL' -Detail $_.Exception.Message
         }
     }
+
+    # ─── Stage 6.2 - Revision hygiene (standing norm since 2026-07-31) ───
+    # Old revisions stay ACTIVE at 0% traffic and each still runs a replica
+    # holding a Prisma connection pool. Measured on proudbush 2026-07-31: 13
+    # active revisions, 12 idle, 65 connections of demand against a
+    # max_connections of 50. Reclaim it on every deploy rather than waiting
+    # for the database to be the thing that notices.
+    if (-not $DryRun) {
+        try {
+            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep 2
+            Add-Result -Stage '6.2' -Gate 'Revision hygiene (keep newest 2 active)' -Status 'PASS' -Detail 'stale revisions deactivated'
+        } catch {
+            Add-Result -Stage '6.2' -Gate 'Revision hygiene (keep newest 2 active)' -Status 'FAIL' -Detail $_.Exception.Message
+        }
+    }
 }
 
 # =============================================================================

@@ -27,20 +27,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Result on dev: **16 / 16 passed**; full suite **213 passed, 0 failed, 7 skipped** (up from 197).
 
 ### Fixed
-- Nothing in this entry - see the defect note below, which is reported but NOT yet fixed.
+- **v0.55.1 - a 401 from the SCIM data plane no longer destroys the admin UI session.** Found by the new settings-matrix spec driving the real Settings tab.
 
-### Known defect (found by the new spec, not yet fixed)
-- **A 401 from the SCIM data plane destroys the admin UI session.** [web/src/api/queries.ts](web/src/api/queries.ts) treats any 401 as an expired admin token at three call sites - `apiFetch`, `useScimRequest` (Workbench) and `useScimBulk` (Bulk tab) - calling `clearStoredToken()` + `notifyTokenInvalid()` and raising the "Authentication Required / Token expired or invalid" dialog.
+  [web/src/api/queries.ts](web/src/api/queries.ts) treated any 401 as an expired admin token at three call sites - `fetchWithAuth`, `useScimRequest` (Workbench) and `useScimBulk` (Bulk tab) - calling `clearStoredToken()` + `notifyTokenInvalid()` and raising the "Authentication Required / Token expired or invalid" dialog.
 
-  But a 401 from an endpoint-scoped SCIM route is frequently the correct, configured outcome. Measured on dev against a throwaway endpoint:
+  But a 401 from an endpoint-scoped SCIM route is frequently the correct, deliberately-configured outcome. Measured on dev against a throwaway endpoint, before and after disabling `SharedSecretBearerAuthEnabled`:
 
-  | Call | Before disabling `SharedSecretBearerAuthEnabled` | After |
+  | Call | Before | After |
   |---|---|---|
   | `GET /scim/admin/endpoints` | 200 | **200** |
   | `GET /scim/admin/endpoints/{id}` | 200 | **200** |
   | `GET /scim/v2/endpoints/{id}/Users` | 200 | **401** (correct) |
 
-  The admin API never rejects the token, so the dialog is a false alarm. Operator impact: disabling any per-endpoint auth method in the Settings tab logs you out, and the Workbench - which exists to probe endpoints, including negative auth tests - logs you out every time it receives an expected 401. The server behaviour is correct; only the client's 401 classification is wrong.
+  The admin API never rejected the token, so the dialog was a false alarm. The server was right; the client's 401 classification was wrong.
+
+  Operator impact before the fix: disabling any per-endpoint auth method in the Settings tab logged you out, and the Workbench - which exists to probe endpoints, *including* negative auth tests - logged you out on every expected 401. `fetchWithAuth` is also used for the Users, Groups and Me tabs, so simply opening an endpoint whose auth was configured off logged you out.
+
+  The fix adds `isScimDataPlanePath()`, which classifies `/scim/endpoints/...` and `/scim/v2/endpoints/...` as data plane. Only a non-data-plane 401 ends the session. The pattern is anchored at the start of the path so the near-miss `/scim/admin/endpoints/:id` is still correctly treated as an admin route.
+
+  Locked by tests at two levels: 4 new vitest cases (predicate classification both ways, plus `fetchWithAuth` preserving the session on a data-plane 401 and still clearing it on an admin 401), and browser assertions in settings-matrix.spec.ts that no `Authentication Required` dialog appears after toggling an auth flag or opening the Users tab of an endpoint whose auth is off.
 
 
 ### Deployed

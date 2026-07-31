@@ -592,7 +592,23 @@ When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to 
 - **Expected canary-ahead window:** after an auto-canary run, proudbush will intentionally be one version AHEAD of calmsand until the operator approves the calmsand promote. This drift is EXPECTED and must NOT be flagged as the v0.52.3-style stale-prod mistake. The stale-prod rule applies only when a MANUAL dual-promote leaves one behind unintentionally.
 - Prod promotion requires Stage 4.4 (dev live tests) green on the exact image SHA being promoted, not the "latest" tag.
 
-### Deployment Topology (CURRENT - corrected 2026-05-29 post-promote)
+### Revision Hygiene Rule (CRITICAL - added 2026-07-31)
+
+Origin: 2026-07-31. A routine look at the proudbush canary found **13 ACTIVE revisions, 12 of them serving 0% traffic**, the oldest dating to 2026-05-18. An Azure Container Apps revision at 0% traffic is not free: it still runs a replica, and for this app that replica still holds a **5-connection Prisma pool**. Against a PostgreSQL `max_connections` of 50 that is 65 connections of demand for 50 available. Nothing in the deploy path ever reclaimed them, and no gate looked - the app was healthy, every test was green, and the database was quietly the resource that would run out first.
+
+**The rule.** After EVERY deployment or promotion, prune stale revisions so that only the **newest 2** remain active: the one serving traffic, plus one previous revision as the rollback target. Use [scripts/prune-revisions.ps1](scripts/prune-revisions.ps1).
+
+```powershell
+pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app> -Keep 2
+```
+
+1. **Wired in, not remembered.** The prune runs automatically at the end of [scripts/promote-to-prod.ps1](scripts/promote-to-prod.ps1) (after the blue/green flip and its post-flip verification, so blue is still retained) and as Stage 6.2 of [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1). Do not rely on running it by hand.
+2. **A revision serving traffic is NEVER deactivated**, even if it falls outside the newest N. The script aborts rather than leave an app with nothing serving, and re-reads the revision list afterwards to verify the outcome instead of trusting the exit code.
+3. **`-Keep 2` is the floor, not a preference.** `-Keep 1` removes the rollback target and warns; never use it on a prod estate.
+4. **Deactivating is reversible and stateless.** Revisions are compute only - the database is external - so pruning cannot lose data. Verified on proudbush: after 13 -> 2 the serving revision's uptime was unchanged (never restarted) and all 24 endpoints were intact.
+5. **Applies to every estate**: dev, the proudbush canary, and customer-facing calmsand.
+
+
 
 There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update incorrectly marked calmsand as RETIRED; it is in fact the customer-facing prod and was just promoted to v0.52.3 alongside the proudbush instance.
 

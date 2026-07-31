@@ -2,7 +2,7 @@
  * Query key factory and fetchWithAuth tests.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { queryKeys, fetchWithAuth } from './queries';
+import { queryKeys, fetchWithAuth, isScimDataPlanePath } from './queries';
 
 // Mock the token module
 vi.mock('../auth/token', () => ({
@@ -230,3 +230,89 @@ describe('URL contract validation', () => {
     expect(calledUrl).toBe('/scim/admin/endpoints/ep-1/stats');
   });
 });
+
+// ─── A 401 from the SCIM data plane must NOT end the admin session ───
+//
+// Origin: 2026-07-31, found by web/e2e/settings-matrix.spec.ts driving the
+// real Settings tab. Disabling `SharedSecretBearerAuthEnabled` on ONE endpoint
+// raised the app's "Authentication Required / Token expired or invalid"
+// dialog. Measured against dev at the time:
+//
+//   GET /scim/admin/endpoints        200  ->  200   (admin token still fine)
+//   GET /scim/v2/endpoints/{id}/Users 200 ->  401   (correct, as configured)
+//
+// The admin API never rejected the token, so the dialog was a false alarm.
+// The server was right; the CLIENT's 401 classification was wrong - it
+// treated every 401 as "your admin bearer expired" and called
+// clearStoredToken().
+//
+// Operator impact: turning off any per-endpoint auth method logged you out,
+// and the Workbench - which exists to probe endpoints, INCLUDING negative
+// auth tests - logged you out on every expected 401.
+
+describe('isScimDataPlanePath', () => {
+  it('classifies endpoint-scoped SCIM routes as data plane', () => {
+    expect(isScimDataPlanePath('/scim/endpoints/ep-1/Users')).toBe(true);
+    expect(isScimDataPlanePath('/scim/endpoints/ep-1/Groups?count=1')).toBe(true);
+    expect(isScimDataPlanePath('/scim/endpoints/ep-1/Me')).toBe(true);
+    expect(isScimDataPlanePath('/scim/endpoints/ep-1/Bulk')).toBe(true);
+    expect(isScimDataPlanePath('/scim/endpoints/ep-1/oauth/token')).toBe(true);
+    expect(isScimDataPlanePath('/scim/v2/endpoints/ep-1/Users')).toBe(true);
+    expect(isScimDataPlanePath('/scim/v2/endpoints/ep-1/Schemas')).toBe(true);
+  });
+
+  it('classifies admin routes as NOT data plane', () => {
+    expect(isScimDataPlanePath('/scim/admin/endpoints')).toBe(false);
+    // The nearest miss: an admin route whose path also contains "endpoints/".
+    expect(isScimDataPlanePath('/scim/admin/endpoints/ep-1')).toBe(false);
+    expect(isScimDataPlanePath('/scim/admin/endpoints/ep-1/overview')).toBe(false);
+    expect(isScimDataPlanePath('/scim/admin/dashboard')).toBe(false);
+    expect(isScimDataPlanePath('/scim/admin/version')).toBe(false);
+    expect(isScimDataPlanePath('/scim/health')).toBe(false);
+  });
+});
+
+describe('fetchWithAuth 401 scoping', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function mock401() {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve('Unauthorized'),
+      headers: { get: () => null },
+    });
+  }
+
+  it('does NOT clear the admin session when an endpoint-scoped SCIM route returns 401', async () => {
+    const { clearStoredToken, notifyTokenInvalid } = await import('../auth/token');
+    mock401();
+
+    // The caller must still see the failure...
+    await expect(fetchWithAuth('/scim/endpoints/ep-1/Users')).rejects.toThrow();
+
+    // ...but the admin session must survive it.
+    expect(clearStoredToken).not.toHaveBeenCalled();
+    expect(notifyTokenInvalid).not.toHaveBeenCalled();
+  });
+
+  it('still clears the admin session when an ADMIN route returns 401', async () => {
+    const { clearStoredToken, notifyTokenInvalid } = await import('../auth/token');
+    mock401();
+
+    await expect(fetchWithAuth('/scim/admin/endpoints')).rejects.toThrow('Authentication required');
+
+    expect(clearStoredToken).toHaveBeenCalled();
+    expect(notifyTokenInvalid).toHaveBeenCalled();
+  });
+});
+

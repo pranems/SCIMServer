@@ -35,6 +35,43 @@ import { ScimApiError } from './scim-error';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
+/**
+ * Is this an endpoint-scoped SCIM route (the "data plane") rather than an
+ * admin route?
+ *
+ * This distinction decides whether a 401 should end the admin session.
+ * Only admin routes authenticate with the admin bearer token, so a 401 from
+ * one of those means the token is bad. An endpoint-scoped SCIM route is
+ * governed by THAT ENDPOINT's own auth configuration - its 401 is frequently
+ * the correct, deliberately-configured answer and says nothing about the
+ * admin session.
+ *
+ * Origin: 2026-07-31. Every 401 used to clear the stored token, so disabling
+ * an endpoint's auth method logged the operator out, and the Workbench -
+ * whose whole purpose is probing endpoints, including negative auth tests -
+ * logged them out on every expected 401. Measured on dev at the time: the
+ * admin API kept returning 200 throughout while the data plane correctly
+ * returned 401, so the "Token expired" dialog was a pure false alarm.
+ *
+ * Note the near-miss this must not catch: `/scim/admin/endpoints/:id` also
+ * contains "endpoints/" but is an ADMIN route, so the pattern is anchored at
+ * the start of the path.
+ */
+export function isScimDataPlanePath(path: string): boolean {
+  const withoutQuery = path.split('?')[0] ?? '';
+  return /^\/scim\/(v2\/)?endpoints\//.test(withoutQuery);
+}
+
+/**
+ * Applies the 401 policy for a completed request: an admin-route 401 ends the
+ * session, a data-plane 401 is left for the caller to surface as an error.
+ */
+function handleUnauthorized(path: string): void {
+  if (isScimDataPlanePath(path)) return;
+  clearStoredToken();
+  notifyTokenInvalid();
+}
+
 /** Authenticated fetch wrapper with automatic 401 handling */
 export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredToken();
@@ -57,8 +94,7 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   if (res.status === 401) {
-    clearStoredToken();
-    notifyTokenInvalid();
+    handleUnauthorized(path);
     throw new ScimApiError({
       status: 401,
       detail: 'Authentication required',
@@ -1199,10 +1235,12 @@ export function useScimRequest() {
       const end = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
       // 401 still triggers the standard token-clear flow so a stale
-      // bearer doesn't get stuck in the workbench.
+      // bearer doesn't get stuck in the workbench - but ONLY for admin
+      // routes. The workbench exists to probe endpoint-scoped SCIM routes,
+      // including deliberate negative auth tests, and those 401s must not
+      // end the operator's session.
       if (res.status === 401) {
-        clearStoredToken();
-        notifyTokenInvalid();
+        handleUnauthorized(args.path);
       }
 
       const requestId = extractRequestId(res);
@@ -1263,9 +1301,10 @@ export function useScimBulk(endpointId: string) {
       });
       const end = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
+      // Bulk is always an endpoint-scoped SCIM route, so a 401 here reflects
+      // that endpoint's auth configuration and must not end the session.
       if (res.status === 401) {
-        clearStoredToken();
-        notifyTokenInvalid();
+        handleUnauthorized(`/scim/endpoints/${endpointId}/Bulk`);
       }
 
       const requestId = extractRequestId(res);
