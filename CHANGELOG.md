@@ -27,25 +27,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Result on dev: **16 / 16 passed**; full suite **213 passed, 0 failed, 7 skipped** (up from 197).
 
 ### Fixed
-- **v0.55.1 - a 401 from the SCIM data plane no longer destroys the admin UI session.** Found by the new settings-matrix spec driving the real Settings tab.
+- **v0.55.1 - an endpoint's data-plane auth policy no longer governs the admin plane.** This is the deeper half of the "logged out by my own settings change" defect, and it is server-side.
+
+  Setting `SharedSecretBearerAuthEnabled=false` on ONE endpoint made the admin UI unusable *for that endpoint*. Measured on dev:
+
+  | Route | Before | After |
+  |---|---|---|
+  | `GET /scim/admin/endpoints` | 200 | 200 |
+  | `GET /scim/admin/endpoints/{id}` | 200 | 200 |
+  | **`GET /scim/admin/endpoints/{id}/overview`** | 200 | **401** |
+  | **`GET /scim/admin/endpoints/{id}/stats`** | 200 | **401** |
+  | `GET /scim/admin/dashboard` | 200 | 200 |
+  | `GET /scim/v2/endpoints/{id}/Users` | 200 | 401 (correct) |
+
+  The inconsistency is what proved this was accidental rather than a policy. `SharedSecretGuard.extractEndpointId()` matched `/endpoints/<uuid>/` on ANY url, and that pattern requires a **trailing slash** - so whether endpoint-scoped auth applied depended purely on whether the route happened to have a sub-path. `/admin/endpoints/{id}` was unaffected; `/admin/endpoints/{id}/overview` was not. No test asserted the admin-route 401, and the one existing test covers only the data plane.
+
+  The global shared secret is an **admin** credential. An endpoint's choice about which credentials its own SCIM data plane accepts says nothing about who may view or configure it. Admin-plane routes are now excluded from endpoint-scoped extraction.
+
+  Locked by a new E2E case asserting the data plane is still correctly refused (401) while `/overview`, `/stats` and the sibling `/admin/endpoints/{id}` all answer the admin bearer (200).
+
+- **v0.55.1 - a 401 from the SCIM data plane no longer destroys the admin UI session.** The client half of the same defect, found by the new settings-matrix spec driving the real Settings tab.
 
   [web/src/api/queries.ts](web/src/api/queries.ts) treated any 401 as an expired admin token at three call sites - `fetchWithAuth`, `useScimRequest` (Workbench) and `useScimBulk` (Bulk tab) - calling `clearStoredToken()` + `notifyTokenInvalid()` and raising the "Authentication Required / Token expired or invalid" dialog.
 
-  But a 401 from an endpoint-scoped SCIM route is frequently the correct, deliberately-configured outcome. Measured on dev against a throwaway endpoint, before and after disabling `SharedSecretBearerAuthEnabled`:
+  But a 401 from an endpoint-scoped SCIM route is frequently the correct, deliberately-configured outcome. Operator impact before the fix: the Workbench - which exists to probe endpoints, *including* negative auth tests - logged you out on every expected 401, and `fetchWithAuth` also serves the Users, Groups and Me tabs, so merely opening such an endpoint logged you out.
 
-  | Call | Before | After |
-  |---|---|---|
-  | `GET /scim/admin/endpoints` | 200 | **200** |
-  | `GET /scim/admin/endpoints/{id}` | 200 | **200** |
-  | `GET /scim/v2/endpoints/{id}/Users` | 200 | **401** (correct) |
+  The fix adds `isScimDataPlanePath()`; only a non-data-plane 401 ends the session. The pattern is anchored at the path start so the near-miss `/scim/admin/endpoints/:id` is still correctly an admin route.
 
-  The admin API never rejected the token, so the dialog was a false alarm. The server was right; the client's 401 classification was wrong.
-
-  Operator impact before the fix: disabling any per-endpoint auth method in the Settings tab logged you out, and the Workbench - which exists to probe endpoints, *including* negative auth tests - logged you out on every expected 401. `fetchWithAuth` is also used for the Users, Groups and Me tabs, so simply opening an endpoint whose auth was configured off logged you out.
-
-  The fix adds `isScimDataPlanePath()`, which classifies `/scim/endpoints/...` and `/scim/v2/endpoints/...` as data plane. Only a non-data-plane 401 ends the session. The pattern is anchored at the start of the path so the near-miss `/scim/admin/endpoints/:id` is still correctly treated as an admin route.
-
-  Locked by tests at two levels: 4 new vitest cases (predicate classification both ways, plus `fetchWithAuth` preserving the session on a data-plane 401 and still clearing it on an admin 401), and browser assertions in settings-matrix.spec.ts that no `Authentication Required` dialog appears after toggling an auth flag or opening the Users tab of an endpoint whose auth is off.
+  Locked by 4 vitest cases (predicate classification both ways, plus `fetchWithAuth` preserving the session on a data-plane 401 and still clearing it on an admin 401) and browser assertions that no `Authentication Required` dialog appears after toggling an auth flag or opening the Users tab of an endpoint whose auth is off.
 
 
 ### Deployed

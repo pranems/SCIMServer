@@ -214,8 +214,30 @@ export class SharedSecretGuard implements CanActivate {
 
   /**
    * Extract endpointId from URL pattern /endpoints/:endpointId/...
+   *
+   * ADMIN-plane routes are deliberately excluded. An endpoint id is extracted
+   * here so the request can be authenticated against THAT ENDPOINT's auth
+   * configuration, which is meaningful for its SCIM data plane and meaningless
+   * for administering it: the global shared secret is an admin credential, and
+   * an endpoint's choice about which credentials its own data plane accepts
+   * says nothing about who may view or configure it.
+   *
+   * Origin: 2026-07-31. Setting SharedSecretBearerAuthEnabled=false on one
+   * endpoint made the admin UI unusable for it - GET /admin/endpoints/:id/overview
+   * and /stats began returning 401, so the operator could no longer view the
+   * endpoint they had just configured, while the sibling route
+   * GET /admin/endpoints/:id kept working.
+   *
+   * That inconsistency is what showed the behaviour was accidental rather than
+   * a policy: the pattern below requires a TRAILING SLASH after the uuid, so
+   * whether endpoint-scoped auth applied depended purely on whether the route
+   * happened to have a sub-path.
+   *
+   *   /scim/admin/endpoints/:id           -> no trailing segment -> unaffected
+   *   /scim/admin/endpoints/:id/overview  -> trailing segment    -> 401
    */
   private extractEndpointId(request: Request): string | null {
+    if (/\/admin\/endpoints\//i.test(request.url)) return null;
     const match = request.url.match(/\/endpoints\/([0-9a-f-]{36})\//i);
     return match ? match[1] : null;
   }

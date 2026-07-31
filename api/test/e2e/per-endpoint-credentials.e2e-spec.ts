@@ -448,6 +448,50 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(200);
     });
 
+    // ── The endpoint's DATA-PLANE auth policy must not govern the ADMIN plane ──
+    //
+    // Origin: 2026-07-31. Turning SharedSecretBearerAuthEnabled off on a single
+    // endpoint made the admin UI unusable for it: GET /admin/endpoints/:id/overview
+    // and /stats both started returning 401, so the operator could no longer view
+    // the endpoint they had just configured.
+    //
+    // The cause was accidental, not a policy. The guard extracted an endpoint id
+    // from ANY url matching /endpoints/<uuid>/ - and that regex requires a
+    // TRAILING SLASH, which is the whole reason the behaviour looked arbitrary:
+    //   /scim/admin/endpoints/:id            -> no trailing segment -> 200
+    //   /scim/admin/endpoints/:id/overview   -> trailing segment    -> 401
+    // A deliberate policy would not depend on whether a route happens to have a
+    // sub-path. The global shared secret is an ADMIN credential; an endpoint's
+    // choice about which credentials its own SCIM data plane accepts says
+    // nothing about who may administer it.
+    it('admin overview/stats stay reachable when the endpoint refuses the global secret on its data plane', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SharedSecretBearerAuthEnabled: false });
+
+      // Data plane: correctly refused.
+      await request(app.getHttpServer())
+        .get(`${scimBasePath(ep)}/Users`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(401);
+
+      // Admin plane: must still answer the admin bearer.
+      await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${ep}/overview`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${ep}/stats`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+
+      // Sibling admin routes were never affected; assert them so a future
+      // change cannot "fix" the two above by breaking these instead.
+      await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${ep}`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200);
+    });
+
     it('a default endpoint (no auth flags) still accepts the global secret (back-compat)', async () => {
       const ep = await createEndpointWithConfig(app, token, {});
       await request(app.getHttpServer())
