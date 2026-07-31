@@ -93,6 +93,8 @@ $surfaces = @(
     @{ File = 'prod-08-logs.png';            Route = '/logs';             Auth = $true }
     @{ File = 'prod-09-settings.png';        Route = '/settings';         Auth = $true }
     @{ File = 'prod-10-endpoint-detail.png'; Route = "/endpoints/$EndpointId"; Auth = $true }
+    @{ File = 'prod-11-endpoint-bulk.png';   Route = "/endpoints/$EndpointId/bulk"; Auth = $true }
+    @{ File = 'prod-12-endpoint-resource-types.png'; Route = "/endpoints/$EndpointId/resource-types"; Auth = $true }
 )
 
 if ($Only) {

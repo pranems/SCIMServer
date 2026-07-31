@@ -51,6 +51,30 @@
       "maxAgeDays": 90
     },
     {
+      "path": "docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md",
+      "title": "Endpoint configuration flags reference",
+      "sources": ["api/src/modules/endpoint/endpoint-config.interface.ts"],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/CUSTOM_EXTENSIONS_RFC_GUIDE.md",
+      "title": "Custom schema extensions",
+      "sources": ["api/src/domain/validation/schema-validator.ts", "api/src/modules/scim/discovery/"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md",
+      "title": "Mirroring production data into dev",
+      "sources": ["scripts/replicate-endpoints.ps1"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/OBSERVABILITY_TRACEABILITY_AND_DIAGNOSTICS.md",
+      "title": "Correlation, logging, errors and diagnostics",
+      "sources": ["api/src/modules/logging/", "api/src/oauth/auth-decision-trace.ts"],
+      "maxAgeDays": 120
+    },
+    {
       "path": "docs/UI_GUIDE.md",
       "title": "Admin UI tour",
       "sources": ["web/src/pages/", "web/src/routes/"],

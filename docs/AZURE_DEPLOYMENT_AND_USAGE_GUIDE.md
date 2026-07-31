@@ -20,6 +20,7 @@
 - [Infrastructure Components](#infrastructure-components)
 - [Monitoring & Logs](#monitoring--logs)
 - [Updating & Redeployment](#updating--redeployment)
+- [Promoting between environments](#promoting-between-environments)
 - [Troubleshooting](#troubleshooting)
 - [Cost Estimation](#cost-estimation)
 
@@ -325,12 +326,47 @@ https://your-app.azurecontainerapps.io/admin
 .\scripts\deploy-azure.ps1 `
   -ResourceGroup "rg-scim" `
   -AppName "scimserver" `
-  -ImageTag "0.40.0" `
+  -ImageTag "0.55.1" `
   -ScimSecret "existing-secret" `
   -JwtSecret "existing-jwt-secret" `
   -OauthClientSecret "existing-oauth-secret" `
   -DatabaseUrl "postgresql://..."
 ```
+
+> **Use an immutable tag.** Re-deploying the *same* tag silently does nothing: Azure Container Apps dedupes by template hash, so `az containerapp update` returns success while the running revision never changes. Tag per commit (`0.55.1-<sha8>`) so every deploy is a real deploy.
+
+### Promoting between environments
+
+Deployment and **promotion** are different operations. Deploying stands up or updates one environment; promoting moves an already-validated image along a chain, and the chain is deliberately canary-first.
+
+```mermaid
+flowchart LR
+    D["dev<br/>scimserver-dev"] -->|"validated: live tests<br/>+ Playwright"| C["canary prod<br/>scimserver<br/><i>same tenant as dev</i>"]
+    C -->|"proven green<br/>+ explicit go-ahead"| P["customer prod<br/>scimserver-prod<br/><i>separate tenant</i>"]
+```
+
+```powershell
+# 1. canary first (same tenant as dev)
+pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver `
+  -ImageTag <version> -BlueGreen -RunVerification
+
+# 2. only after that is green, and only on an explicit go-ahead:
+#    the customer-facing estate is in a DIFFERENT Azure AD tenant, so re-auth first
+az login --tenant <customer-tenant-id>
+az account set --subscription <customer-subscription>
+pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod `
+  -ImageTag <version> -Subscription <customer-subscription>
+```
+
+**What `-BlueGreen` does.** It pins the current revision (blue) at 100%, creates the new revision (green) at 0%, soaks and verifies green on its own `--green` label FQDN, and only then flips traffic. Any failure rolls back automatically. Customers stay on blue throughout, so a bad image never serves traffic.
+
+**Revision hygiene.** Promotion ends by pruning to the newest **2** revisions - the one serving traffic plus one rollback target. This is not cosmetic: a revision at 0% traffic still runs a replica, and each replica still holds a database connection pool. Left unpruned they exhaust `max_connections` long before anything else complains. A revision serving traffic is never deactivated.
+
+```powershell
+pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app> -Keep 2
+```
+
+Full estate detail, including which registry each environment pulls from and why, is in [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md).
 
 ### Deployment State Recovery
 

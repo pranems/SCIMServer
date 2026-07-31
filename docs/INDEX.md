@@ -17,13 +17,15 @@
 
 ### The documentation contract
 
-The **user-facing** set listed in [.doc-manifest.json](.doc-manifest.json) is **enforced, not aspirational**. [scripts/audit-doc-freshness.ps1](../scripts/audit-doc-freshness.ps1) fails a push when a doc advertises a stale product version, loses its `**Last verified:**` stamp, carries a dead link, or when a source path the doc is bound to changes without the doc changing too.
+The **user-facing** set listed in [.doc-manifest.json](.doc-manifest.json) is **enforced, not aspirational**. [scripts/audit-doc-freshness.ps1](../scripts/audit-doc-freshness.ps1) fails a push when a doc advertises a stale product version, loses its `**Last verified:**` stamp, carries a dead link, or when a source path the doc is bound to changes without the doc changing too. [scripts/audit-doc-content.mjs](../scripts/audit-doc-content.mjs) then checks what those docs **claim** against what the source **contains**: route and settings counts, coverage of every setting and auth reason code, phantom settings, API route coverage, retired infrastructure, and json-block parseability.
 
 ```powershell
 npm run docs:freshness          # currency only
 npm run docs:freshness:coupled  # + the "Update Docs with Code" coupling check
 npm run docs:freshness:fix      # restamp versions and provenance dates
-npm run docs:freshness:selftest # prove every check can still FAIL
+npm run docs:content            # do the docs match the source?
+npm run docs:content:selftest   # prove every content check can still FAIL
+npm run docs:freshness:selftest # prove every currency check can still FAIL
 ```
 
 Everything else under `docs/` is internal design and phase notes, deliberately not gated.
