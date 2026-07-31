@@ -1,0 +1,184 @@
+name: Regenerate lockfile
+
+# WHY THIS EXISTS
+# ---------------
+# Microsoft corp-managed developer devices redirect npm to a corporate feed
+# proxy (https://packagefeedproxy.microsoft.io/npm/). Package RESOLUTION works
+# there, but LOCKFILE GENERATION does not produce a committable lockfile: the
+# proxy serves only a legacy `shasum` and no `integrity` field, so any entry npm
+# rewrites comes back with an internal `resolved` URL and a **sha1** integrity
+# while every other entry in the file is sha512. Committing that would leak an
+# internal endpoint into a public repo and weaken the lockfile's own hash
+# guarantee. Measured and documented in
+# docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md Section 5.
+#
+# So the lockfile is regenerated HERE, on a clean runner talking to the public
+# registry, and downloaded as an artifact. This runner does NOT write to the
+# repo - the operator commits the artifact deliberately, so a lockfile change
+# is always a reviewed human action.
+#
+# HOW TO USE
+#   1. Edit api/package.json (or web/package.json) on your branch - add the
+#      override / bump the dep.
+#   2. Run this workflow against that branch (Actions tab, or `gh workflow run`).
+#   3. Download the `regenerated-lockfiles` artifact, drop the lockfile in, commit.
+#
+# QUARANTINE NOTE
+# Nothing here bypasses the corporate Minimum Release control. This runner is
+# not a corp-managed device and is not subject to it, but we hold ourselves to
+# the same bar: only pin versions that are already >= 7 days old. The job prints
+# each changed package's publish age so that is verifiable in review.
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Which workspace lockfile to regenerate'
+        required: true
+        default: 'api'
+        type: choice
+        options: [api, web, both]
+  push:
+    branches:
+      - 'chore/regen-lockfile*'
+
+permissions:
+  contents: read
+
+jobs:
+  regen:
+    name: regen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+
+      - name: Confirm this runner uses the PUBLIC registry
+        run: |
+          set -euo pipefail
+          reg="$(npm config get registry)"
+          echo "registry = $reg"
+          case "$reg" in
+            https://registry.npmjs.org*) echo "OK - public registry" ;;
+            *) echo "::error::Unexpected registry '$reg'. This job only produces a committable lockfile against registry.npmjs.org."; exit 1 ;;
+          esac
+
+      - name: Regenerate lockfiles
+        run: |
+          set -euo pipefail
+          ws="${{ inputs.workspace || 'both' }}"
+          for d in api web; do
+            if [ "$ws" != "both" ] && [ "$ws" != "$d" ]; then continue; fi
+            if [ ! -f "$d/package.json" ]; then continue; fi
+            echo "::group::npm install --package-lock-only ($d)"
+            ( cd "$d" && npm install --package-lock-only --no-audit --no-fund )
+            echo "::endgroup::"
+          done
+
+      - name: Show what changed
+        run: |
+          set -euo pipefail
+          git --no-pager diff --stat -- '*/package-lock.json' || true
+          echo "::group::changed lockfile entries"
+          git --no-pager diff -U0 -- '*/package-lock.json' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || echo '(no changes)'
+          echo "::endgroup::"
+
+      # This is the whole point of the job. If either check trips, the artifact
+      # is NOT worth committing and we fail loudly rather than hand the operator
+      # a poisoned lockfile.
+      - name: Verify the lockfile is not contaminated
+        run: |
+          set -euo pipefail
+          rc=0
+          for f in api/package-lock.json web/package-lock.json; do
+            [ -f "$f" ] || continue
+            echo "--- $f ---"
+
+            # C1: every `resolved` must point at the public registry. A corporate
+            # feed proxy rewrites these to an internal host, which must never
+            # land in a public repo.
+            bad_host="$(grep -oE '"resolved": "https?://[^/"]+' "$f" \
+                        | sed 's/.*:\/\///' | sort -u | grep -v '^registry\.npmjs\.org$' || true)"
+            if [ -n "$bad_host" ]; then
+              echo "::error file=$f::non-public resolved host(s): $bad_host"
+              rc=1
+            else
+              echo "  resolved hosts: registry.npmjs.org only  OK"
+            fi
+
+            # C2: every `integrity` must be sha512. The corporate proxy only
+            # serves a legacy shasum, which npm records as sha1 - a real
+            # downgrade of the lockfile's tamper-evidence.
+            weak="$(grep -cE '"integrity": "sha(1|256|384)-' "$f" || true)"
+            if [ "$weak" != "0" ]; then
+              echo "::error file=$f::$weak integrity value(s) are not sha512"
+              grep -nE '"integrity": "sha(1|256|384)-' "$f" | head -20
+              rc=1
+            else
+              echo "  integrity: sha512 only  OK"
+            fi
+          done
+          exit $rc
+
+      - name: Report publish age of every changed package
+        run: |
+          set -euo pipefail
+          # Corporate policy quarantines packages younger than 7 days. This job
+          # does not enforce that control (the runner is not a corp device), but
+          # it prints the age so a reviewer can confirm we did not pin something
+          # that a developer on a managed device would be unable to install.
+          #
+          # The changed set is computed by DIFFING THE TWO LOCKFILE MAPS, not by
+          # parsing `git diff` text. The first cut parsed the diff and silently
+          # printed an empty table - a report step that reports nothing looks
+          # identical to a report step that found nothing, which is the exact
+          # green-but-blind failure mode this repo has been bitten by. This
+          # version cannot be silently empty: it fails if it cannot read a map.
+          for d in api web; do
+            [ -f "$d/package-lock.json" ] || continue
+            git show "HEAD:$d/package-lock.json" > "/tmp/old-$d.json" 2>/dev/null || echo '{}' > "/tmp/old-$d.json"
+            node -e '
+              const d = process.argv[1];
+              const rd = f => { try { return JSON.parse(require("fs").readFileSync(f,"utf8")).packages || {}; } catch { return null; } };
+              const oldP = rd(`/tmp/old-${d}.json`), newP = rd(`${d}/package-lock.json`);
+              if (!newP) { console.error(`::error::could not read ${d}/package-lock.json`); process.exit(1); }
+              const out = [];
+              for (const [k, v] of Object.entries(newP)) {
+                if (!k.startsWith("node_modules/") || !v.version) continue;
+                const before = oldP && oldP[k] ? oldP[k].version : undefined;
+                if (before !== v.version) out.push([k.replace(/^node_modules\//, ""), before || "(new)", v.version]);
+              }
+              console.log(JSON.stringify(out));
+            ' "$d" > "/tmp/changed-$d.json"
+
+            count="$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/changed-$d.json','utf8')).length)")"
+            echo "--- $d: $count changed package version(s) ---"
+            [ "$count" = "0" ] && continue
+
+            printf '%-38s %-12s %-12s %-26s %s\n' PACKAGE FROM TO PUBLISHED AGE_DAYS
+            node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/changed-$d.json','utf8')).map(r=>r.join(' ')).join('\n'))" \
+            | while read -r name from to; do
+                t="$(npm view "$name@$to" time --json 2>/dev/null \
+                     | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{try{console.log(JSON.parse(s)['$to']||'')}catch{console.log('')}})" || true)"
+                if [ -n "$t" ]; then
+                  age="$(node -e "console.log(((Date.now()-Date.parse('$t'))/86400000).toFixed(1))")"
+                  warn=''
+                  node -e "process.exit(((Date.now()-Date.parse('$t'))/86400000) < 7 ? 1 : 0)" || warn='  <-- UNDER 7 DAYS, quarantined on corp devices'
+                  printf '%-38s %-12s %-12s %-26s %s%s\n' "$name" "$from" "$to" "$t" "$age" "$warn"
+                else
+                  printf '%-38s %-12s %-12s %-26s %s\n' "$name" "$from" "$to" "(unknown)" "?"
+                fi
+              done
+          done
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: regenerated-lockfiles
+          path: |
+            api/package-lock.json
+            web/package-lock.json
+          if-no-files-found: error
+          retention-days: 7

@@ -221,6 +221,27 @@ Invoke-Gate -Name 'infra: deployment doc current' -WorkingDir $repoRoot -Action 
     }
 }
 
+# Supply chain: no lockfile entry may carry corporate-feed-proxy provenance. A
+# Microsoft corp-managed device redirects npm to a feed proxy that serves only a
+# legacy shasum, so any entry npm rewrites there comes back with an internal
+# `resolved` host and a sha1 integrity among 725 sha512 siblings. That leaks an
+# internal endpoint from a public repo AND weakens the lockfile's own
+# tamper-evidence, and it is invisible to every other gate we own. Measured
+# 2026-07-30; see docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md Section 5.
+Invoke-Gate -Name 'supply chain: lockfile provenance' -WorkingDir $repoRoot -Action {
+    node scripts/check-lockfile-provenance.mjs 2>&1 | Out-Host
+}
+
+# Docs: the pattern catalog's category pie must match the patterns actually in
+# the file. A stale pie renders perfectly - Mermaid has no idea what the numbers
+# mean - so the render gate passes on any integers. Two branches that each
+# appended patterns produced a merge where BOTH sides' counts were wrong
+# (22 and 14, against a real 24). The doc is consulted at the start of planning
+# and design, so an understated count hides accumulated experience.
+Invoke-Gate -Name 'docs: patterns pie matches catalog' -WorkingDir $repoRoot -Action {
+    node scripts/check-patterns-pie.mjs 2>&1 | Out-Host
+}
+
 # Offline-only checks (C1-C5): coverage, SHA-256 integrity, update/obsolete
 # closure, freshness and README linkage. The network checks (O1-O3) are NOT run
 # here on purpose - pre-push must stay deterministic and work offline. They run

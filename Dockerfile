@@ -3,10 +3,10 @@
 # Phase 3: PostgreSQL-backed (no more SQLite / better-sqlite3)
 #
 # Stages:
-#   1. web-build   — React/Vite frontend → static dist/
-#   2. api-build   — NestJS compile, Prisma generate (full devDeps)
-#   3. prod-deps   — Production node_modules + prisma CLI only
-#   4. runtime     — Minimal Alpine with compiled output
+#   1. web-build   - React/Vite frontend → static dist/
+#   2. api-build   - NestJS compile, Prisma generate (full devDeps)
+#   3. prod-deps   - Production node_modules + prisma CLI only
+#   4. runtime     - Minimal Alpine with compiled output
 #############################
 
 #############################
@@ -31,7 +31,7 @@ COPY api/ ./
 COPY --from=web-build /web/dist ./public
 
 # Generate Prisma 7 client (→ src/generated/prisma), compile TS
-# Phase 3: No db push needed — migrations run at container startup against PostgreSQL
+# Phase 3: No db push needed - migrations run at container startup against PostgreSQL
 # DATABASE_URL must be set because prisma.config.ts uses env('DATABASE_URL')
 # which throws at config-load time if missing - even for `prisma generate`
 # which never opens a connection. The placeholder is overridden at runtime
@@ -64,12 +64,12 @@ COPY --from=api-build /app/node_modules/@prisma/engines-version ./node_modules/@
 RUN find ./node_modules -name "*.md" -delete 2>/dev/null || true && \
     find ./node_modules -name "*.map" -delete 2>/dev/null || true && \
     find ./node_modules -path "*/effect" -prune -o -name "test*" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    # Phase 3: Keep PostgreSQL WASM query compiler, remove others — saves ~56 MB
+    # Phase 3: Keep PostgreSQL WASM query compiler, remove others - saves ~56 MB
     find ./node_modules/@prisma/client/runtime -name "*.cockroachdb.*" -delete 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.mysql.*" -delete 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.sqlite.*" -delete 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.sqlserver.*" -delete 2>/dev/null || true && \
-    # Remove packages not needed at runtime — saves ~50 MB
+    # Remove packages not needed at runtime - saves ~50 MB
     rm -rf ./node_modules/typescript 2>/dev/null || true && \
     rm -rf ./node_modules/@types 2>/dev/null || true && \
     rm -rf ./node_modules/@prisma/studio-core/dist/ui 2>/dev/null || true && \
@@ -85,13 +85,30 @@ WORKDIR /app
 # `apk upgrade` pulls the latest patched OS packages from the live Alpine repo
 # (the base image is built periodically and lags behind security fixes), e.g.
 # openssl/libcrypto3/libssl3 3.5.7-r0 fixing CVE-2026-45447 (PKCS7_verify UAF).
+#
+# npm is REMOVED from the runtime image. It is a build-time tool the running
+# container never needs - the app starts with `node dist/main.js`, and the only
+# former npm usage (`npx prisma migrate deploy`) now invokes the grafted Prisma
+# CLI directly. Keeping it was not free: npm's OWN bundled dependencies under
+# /usr/local/lib/node_modules/npm accounted for 5 of the 7 HIGH/CRITICAL
+# findings blocking the Trivy gate, including the only CRITICAL:
+#   tar 7.5.15             CVE-2026-59873 (CRITICAL, gzip-bomb DoS) + CVE-2026-59874
+#   brace-expansion 5.0.6  CVE-2026-13149 + CVE-2026-14257
+#   undici 6.26.0          CVE-2026-12151
+# None are our dependencies, so no package.json or lockfile change could ever
+# fix them - which is why the Dependabot PRs opened against this gate also
+# failed. Deleting the tool deletes the attack surface, and shrinks the image.
 RUN apk upgrade --no-cache libcrypto3 libssl3 && \
     apk add --no-cache openssl && \
     rm -rf /var/cache/apk/* && \
+    rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg && \
     addgroup -g 1001 -S nodejs && \
     adduser -S scim -u 1001
 
-# Production environment — Phase 3: PostgreSQL connection via DATABASE_URL env var
+# Production environment - Phase 3: PostgreSQL connection via DATABASE_URL env var
 ENV NODE_ENV=production \
     PORT=8080 \
     NODE_OPTIONS="--max_old_space_size=384"
