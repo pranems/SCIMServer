@@ -99,12 +99,25 @@ git diff package-lock.json | Select-Object -First 30
 
 ## Step 6 - Verify lockfile reproducibility
 
-The standing rule (copilot-instructions.md Stage 6.1) requires lockfiles to be regenerated inside `node:24-alpine` for cross-platform CI reproducibility. After `npm audit fix`, run:
+> **CORRECTED 2026-07-30.** The previous recipe here ran `npm ci && npm install` inside a `node:24-alpine` container. **That cannot work on a Microsoft corp-managed device**: containers do not inherit the host `~/.npmrc`, so npm inside the container resolves against the public registry, which is egress-blocked by the corporate secure-supply-chain control. It dies at ~73s with npm's unhelpful `Exit handler never called!`. See [docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md](../../docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md).
+
+Regenerate lockfiles **in CI**, or on a machine that is not corp-managed. **Do not generate them locally on a corp device.** Measured 2026-07-30: `npm install --package-lock-only` on this workstation rewrote a `resolved` URL to an internal feed (`ms-feed-12.pkgs.visualstudio.com`) **and downgraded that entry's `integrity` from sha512 to sha1**, because the corporate feed serves only a legacy `shasum`. Committing that would leak an internal endpoint into this public repo, weaken the lockfile's own hash guarantee, and break CI.
+
+If a lockfile is regenerated locally anyway, run **both** checks before staging and **revert** any contaminated entry rather than patching it - the correct sha512 is unobtainable from a corp device, and hand-writing an integrity hash is never acceptable:
 
 ```powershell
-docker run --rm -v "${PWD}:/app" -w /app node:24-alpine sh -c "cd api && rm -rf node_modules && npm ci && npm install"
-docker run --rm -v "${PWD}:/app" -w /app node:24-alpine sh -c "cd web && rm -rf node_modules && npm ci && npm install"
+# MUST return only registry.npmjs.org
+Select-String -Path api/package-lock.json,web/package-lock.json -Pattern '"resolved":\s*"([^"]+)"' -AllMatches |
+  ForEach-Object { $_.Matches } |
+  ForEach-Object { ([uri]$_.Groups[1].Value).Host } |
+  Sort-Object -Unique
+
+# MUST return only sha512
+Select-String -Path api/package-lock.json,web/package-lock.json -Pattern '"integrity":\s*"(sha\d+)' -AllMatches |
+  ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
 ```
+
+**Never** lower or bypass `min-release-age`, and never pass `--registry` at a public endpoint to work around a quarantined version. If a fix version is less than 7 days old, prefer an older version that also clears the CVE, or wait. Check with `npm view <pkg> time --json`.
 
 Commit the regenerated lockfiles in the SAME commit as the CVE fix.
 

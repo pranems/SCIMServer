@@ -91,9 +91,9 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (13 seeded)
+    title Patterns by category (14 seeded)
     "A Test/gate integrity" : 4
-    "B Environment/deploy" : 2
+    "B Environment/deploy" : 3
     "C Framework/middleware" : 2
     "D Security at sinks" : 1
     "E Process/introspection" : 3
@@ -120,6 +120,7 @@ Values that differ silently across local / Docker / Azure.
 |---|---|---|---|---|---|
 | **PB-1** | Per-environment value table | The live-test runner's default OAuth secret (`changeme-oauth`) is wrong for Docker compose (`devscimclientsecret`); the unqualified run 401'd | Secrets / ports / base URLs differ by form factor; keep a documented table and pass the matching value per target; never assume the default fits all | Rule: "Per-environment auth-value table" | auth I-08 |
 | **PB-2** | Probe readiness with a contract endpoint | `/health` 404'd on Docker (assumed path); guessing a health route wastes a cycle | Use a real contract call (token issuance, a discovery GET) as the readiness probe - it proves more than a health ping | (convention) | auth I-09 |
+| **PB-3** | **Check WHICH ENDPOINT was contacted before concluding the network is blocked** | A failing `npm` call was diagnosed with `npm view <pkg> --registry https://registry.npmjs.org`, which **explicitly overrode the machine's configured registry**, hit a deliberately egress-blocked public endpoint, and produced the conclusion "the npm registry is BLOCKED on this machine, do not chase npm". npm actually worked fine through the corporate feed proxy the whole time. The wrong conclusion reached agent memory AND two committed docs, and cost a full session of working around a functioning tool (a CVE fix deferred, image builds routed to CI, a compose override written) | A blocked-network diagnosis MUST start from the **configured** endpoint (`npm config get registry`, `git config remote.origin.url`, the proxy env vars), not from a hand-specified one. Overriding the configuration and then blaming the network inverts cause and effect. Corollary: a corporate control that is WORKING often presents exactly like a broken machine - egress-blocked public endpoints, TLS alerts, mysterious timeouts - so establish intent before declaring breakage | Rule N2 in [NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md](NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md); memory corrected | 2026-07-30 |
 
 ### Category C - Framework and middleware behavior
 
@@ -180,6 +181,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PA-3 / PA-4 (visual/stale gates) | 2+ (Finding-C, Finding-D) | YES (R1/R2/R3) |
 | PA-5 (viewer-side blindness) | 3 (mermaid invisibility 2026-07-27, and twice on 2026-07-28) | YES - Mermaid Diagram Rule 2 + 9 (R0) + 10 + the doctor and shared renderer-discovery scripts |
 | PB-1 (env value table) | 1 | YES (convention recorded) |
+| PB-3 (diagnose the configured endpoint, not an overridden one) | 2 (same symptom misdiagnosed twice: 2026-07-29 "machine-wide block", 2026-07-30 "registry blocked") | YES - Rule N2 in the npm supply-chain policy doc; both memory and the two committed docs corrected |
 | PC-1 (contract-shaping middleware) | 2 (I-03, I-04) | convention; revisit if a 3rd escape |
 | PC-2 (cross-backend parity) | 1 (high-sev: Finding-B) | YES (Stage 2.5/2.6) |
 | PD-1 (sink guard) | 1 (high-sev: security) | YES (guard + tests) |
