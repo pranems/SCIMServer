@@ -14428,6 +14428,181 @@ try {
 Write-Host "`n--- 9z-CA: RfcCompliantSubAttributes Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CB: malformed log id must be 404, never 500
+$script:currentSection = "9z-CB: malformed admin log id"
+# ============================================
+# Origin: 2026-07-30. GET /scim/admin/logs/stream returned HTTP 500 on every
+# Prisma estate (dev, proudbush, calmsand). There is no `logs/stream` route, so
+# the request fell through to @Get('logs/:id'); RequestLog.id is @db.Uuid, so
+# Prisma raised P2023 and it escaped as an unhandled 500.
+#
+# This section is deliberately backend-sensitive: the InMemory backend already
+# answered 404, so a green run here on local :6000 proves nothing on its own.
+# The gate is the Docker / Azure (Prisma) run. Keeping one assertion set for
+# both is what locks the cross-backend parity the bug broke.
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-CB: MALFORMED ADMIN LOG ID" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $cbMalformed = @('stream', 'not-a-uuid', '12345', 'undefined')
+
+    foreach ($cbId in $cbMalformed) {
+        $cbStatus = 0
+        $cbBody = ''
+        try {
+            $cbResp = Invoke-WebRequest -Uri "$baseUrl/scim/admin/logs/$cbId" -Method GET -Headers $headers
+            $cbStatus = $cbResp.StatusCode
+        } catch {
+            $cbStatus = $_.Exception.Response.StatusCode.value__
+            $cbBody = [string]$_.ErrorDetails.Message
+        }
+
+        Test-Result -Success ($cbStatus -eq 404) `
+            -Message "9z-CB.T1[$cbId]: malformed log id returns 404 (got $cbStatus)"
+
+        # Assert the OUTCOME, not merely the status. A 500 body carries the
+        # generic 'Internal server error'; a correct 404 carries 'Log not found'.
+        Test-Result -Success ($cbBody -match 'Log not found') `
+            -Message "9z-CB.T2[$cbId]: body is the SCIM 'Log not found' error (got: $(if ($cbBody.Length -gt 60) { $cbBody.Substring(0,60) } else { $cbBody }))"
+
+        # No persistence-layer detail may reach the client.
+        Test-Result -Success (-not ($cbBody -match 'Prisma|P2023|Inconsistent column data')) `
+            -Message "9z-CB.T3[$cbId]: no persistence-layer detail leaked in the error body"
+    }
+
+    # A syntactically valid but absent uuid must produce the SAME shape, which
+    # proves the guard did not simply swallow every id.
+    $cbAbsentStatus = 0
+    $cbAbsentBody = ''
+    try {
+        $cbAbsent = Invoke-WebRequest -Uri "$baseUrl/scim/admin/logs/3f2504e0-4f89-11d3-9a0c-0305e82c3301" -Method GET -Headers $headers
+        $cbAbsentStatus = $cbAbsent.StatusCode
+    } catch {
+        $cbAbsentStatus = $_.Exception.Response.StatusCode.value__
+        $cbAbsentBody = [string]$_.ErrorDetails.Message
+    }
+    Test-Result -Success ($cbAbsentStatus -eq 404) `
+        -Message "9z-CB.T4: absent-but-valid uuid also returns 404 (got $cbAbsentStatus)"
+    Test-Result -Success ($cbAbsentBody -match 'Log not found') `
+        -Message "9z-CB.T5: absent-but-valid uuid returns the same 'Log not found' body"
+
+    # Positive control: a REAL log id must still resolve, so the guard cannot be
+    # passing by rejecting everything. Without this the section above would stay
+    # green even if getLog were replaced by `return null`.
+    $cbList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=1" -Method GET -Headers $headers
+    $cbRealId = $null
+    if ($cbList.items -and @($cbList.items).Count -gt 0) { $cbRealId = @($cbList.items)[0].id }
+
+    if ($cbRealId) {
+        $cbReal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/$cbRealId" -Method GET -Headers $headers
+        Test-Result -Success ($cbReal.id -eq $cbRealId) `
+            -Message "9z-CB.T6 (positive control): a real log id still resolves to its row"
+    } else {
+        Test-Result -Success $false `
+            -Message "9z-CB.T6 (positive control): no log rows available to verify a real id still resolves"
+    }
+
+    # Unauthenticated access must still be rejected before id parsing.
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/stream" -Method GET | Out-Null
+        Test-Result -Success $false -Message "9z-CB.T7: malformed log id without a token should be 401"
+    } catch {
+        $cbNoAuth = $_.Exception.Response.StatusCode.value__
+        Test-Result -Success ($cbNoAuth -eq 401) `
+            -Message "9z-CB.T7: malformed log id without a token returns 401 (got $cbNoAuth)"
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CB: malformed admin log id section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CB: Malformed Admin Log Id Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-CC: log display-name resolution reaches the userName fallback
+$script:currentSection = "9z-CC: log display-name resolution"
+# ============================================
+# Origin: 2026-07-30, read out of the SERVER LOG of a Prisma live run while
+# validating 9z-CB. Every GET /scim/admin/logs printed:
+#   prisma:error ... invalid input syntax for type uuid: "live-9z-V-user-..."
+# `resolveUserDisplayName` looks up by `scimId` (@db.Uuid) first and falls back
+# to `userName` (@db.Citext). A userName-shaped identifier made the FIRST query
+# raise P2023, so control jumped to the outer catch and the fallback was
+# UNREACHABLE - every userName-identified row kept its raw identifier while the
+# catch made it look like a clean degrade.
+#
+# Backend-aware on purpose: display-name resolution is a Prisma-branch feature
+# (the InMemory listLogs branch returns the stored identifier verbatim), so on
+# InMemory this asserts only that nothing regressed to an error.
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-CC: LOG DISPLAY-NAME RESOLUTION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $ccVersion = Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Method GET -Headers $headers
+    $ccBackend = $ccVersion.storage.persistenceBackend
+    Write-Host "  backend: $ccBackend" -ForegroundColor DarkGray
+
+    $ccEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-dispname-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $ccId = $ccEp.id
+
+    # userName deliberately has NO '@' - mapLog only attempts resolution for a
+    # non-email identifier on a /Users URL, which is the exact path that broke.
+    $ccUserName = "livecc-user-$(Get-Random)"
+    $ccDisplay = "Ada Lovelace CC"
+    $ccUserBody = @{
+        schemas     = @('urn:ietf:params:scim:schemas:core:2.0:User')
+        userName    = $ccUserName
+        displayName = $ccDisplay
+        active      = $true
+    } | ConvertTo-Json -Depth 5
+
+    $ccUser = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ccId/Users" -Method POST -Headers $headers -Body $ccUserBody -ContentType 'application/scim+json'
+    Test-Result -Success ($null -ne $ccUser.id) -Message "9z-CC.T1: created a user with a non-email userName ($ccUserName)"
+
+    # Drive a read so a /Users log row exists, then drain the buffer.
+    Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$ccId/Users/$($ccUser.id)" -Method GET -Headers $headers | Out-Null
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers | Out-Null } catch {}
+
+    $ccLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?includeAdmin=true&pageSize=200&endpointId=$ccId" -Method GET -Headers $headers
+    $ccRows = @($ccLogs.items | Where-Object { $_.url -like '*/Users*' -and $_.reportableIdentifier })
+    Test-Result -Success ($ccRows.Count -gt 0) `
+        -Message "9z-CC.T2: at least one /Users log row carries a reportableIdentifier (examined $($ccLogs.items.Count) rows)"
+
+    # The identifier must never be left as the raw userName on Prisma - that is
+    # the exact symptom of the fallback being unreachable.
+    $ccResolved = @($ccRows | Where-Object { $_.reportableIdentifier -eq $ccDisplay })
+    $ccRaw = @($ccRows | Where-Object { $_.reportableIdentifier -eq $ccUserName })
+
+    if ($ccBackend -eq 'prisma') {
+        Test-Result -Success ($ccResolved.Count -gt 0) `
+            -Message "9z-CC.T3: userName identifier resolves to the display name '$ccDisplay' (found $($ccResolved.Count) resolved of $($ccRows.Count))"
+        Test-Result -Success ($ccRaw.Count -eq 0) `
+            -Message "9z-CC.T4: no row is left holding the RAW userName (fallback was reachable)"
+    } else {
+        # InMemory keeps the stored identifier verbatim by design.
+        Test-Result -Success ($ccRows.Count -gt 0) `
+            -Message "9z-CC.T3: [inmemory] identifier is preserved verbatim, no resolution attempted"
+        Test-Result -Success $true `
+            -Message "9z-CC.T4: [inmemory] display-name resolution is a Prisma-branch feature, not applicable"
+    }
+
+    # A uuid-shaped identifier must STILL go through the scimId path, so the
+    # guard cannot be passing by simply skipping resolution altogether.
+    $ccByIdRows = @($ccLogs.items | Where-Object { $_.url -like "*/Users/$($ccUser.id)*" })
+    Test-Result -Success ($ccByIdRows.Count -gt 0) `
+        -Message "9z-CC.T5 (positive control): the GET-by-id request produced its own log row"
+
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ccId" -Method DELETE -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-CC: display-name resolution section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CC: Log Display-Name Resolution Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

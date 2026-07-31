@@ -196,11 +196,16 @@ describe('LoggingService.listLogs - in-memory filter parity (Phase D4)', () => {
   });
 
   it('honors endpointId filter (the one filter that always worked)', async () => {
-    seed({ method: 'GET', url: '/scim/endpoints/A/Users', status: 200, endpointId: 'A' });
-    seed({ method: 'GET', url: '/scim/endpoints/B/Users', status: 200, endpointId: 'B' });
-    const res = await service.listLogs({ endpointId: 'A' });
+    // Real UUIDs on purpose: `endpointId` is a `@db.Uuid` column and non-uuid
+    // values are now nulled at the persistence boundary on BOTH backends, so a
+    // placeholder id would make this filter match nothing. See storable-uuid.ts.
+    const epA = 'aaaaaaaa-0000-0000-0000-00000000000a';
+    const epB = 'bbbbbbbb-0000-0000-0000-00000000000b';
+    seed({ method: 'GET', url: `/scim/endpoints/${epA}/Users`, status: 200, endpointId: epA });
+    seed({ method: 'GET', url: `/scim/endpoints/${epB}/Users`, status: 200, endpointId: epB });
+    const res = await service.listLogs({ endpointId: epA });
     expect(res.total).toBe(1);
-    expect(res.items[0].url).toContain('/A/');
+    expect(res.items[0].url).toContain(`/${epA}/`);
   });
 
   it('combines multiple filters with AND semantics', async () => {

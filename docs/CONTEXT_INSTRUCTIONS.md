@@ -1,8 +1,8 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Version**: 0.54.80  
-> **Last Updated**: July 28, 2026
+> **Version**: 0.54.89  
+> **Last Updated**: July 30, 2026
 
 ---
 
