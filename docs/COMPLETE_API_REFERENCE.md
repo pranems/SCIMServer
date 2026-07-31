@@ -1,6 +1,8 @@
 # Complete API Reference
 
-> **Version:** 0.53.0 - **Updated:** June 3, 2026  
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
+
+> **Version:** 0.55.1 - **Updated:** June 3, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
 > **86 route handlers** across 20 controllers (includes 2 dashboard analytics routes and the web SPA catch-all)
 

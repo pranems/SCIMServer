@@ -9,6 +9,10 @@
     "docs:mermaid:render": "node scripts/render-mermaid.mjs",
     "docs:mermaid:doctor": "node scripts/doctor-mermaid.mjs",
     "docs:html": "node scripts/export-docs-html.mjs",
+    "docs:freshness": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/audit-doc-freshness.ps1 -SkipCoupling",
+    "docs:freshness:coupled": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/audit-doc-freshness.ps1",
+    "docs:freshness:fix": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/audit-doc-freshness.ps1 -SkipCoupling -Fix",
+    "docs:freshness:selftest": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test-audit-doc-freshness.ps1",
     "rfcs:check": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1",
     "rfcs:check:online": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1 -Online",
     "rfcs:update": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/sync-rfcs.ps1 -Update"

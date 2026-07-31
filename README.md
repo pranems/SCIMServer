@@ -1,5 +1,7 @@
 # SCIMServer
 
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
+
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
 [![Version](https://img.shields.io/badge/version-0.55.1-blue)]()
@@ -1479,7 +1481,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 | [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | Azure Container Apps deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](docs/DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker build, run, and test guide |
 | [SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md) | RFC compliance matrix |
-| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
 | [TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md) | Architecture deep dive |
 
 ---
@@ -1502,4 +1504,4 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the MIT License, as declared in [api/package.json](api/package.json).

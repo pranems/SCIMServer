@@ -1,6 +1,8 @@
 # Multi-Endpoint Architecture Guide
 
-> **Version:** 0.53.0 - **Updated:** June 3, 2026  
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
+
+> **Version:** 0.55.1 - **Updated:** June 3, 2026  
 > **Source of truth:** [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 
 ---

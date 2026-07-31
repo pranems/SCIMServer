@@ -328,6 +328,13 @@ Invoke-Gate '1.3' 'Web tsc --noEmit (baseline-or-better)' {
 Invoke-Gate '1.5' 'Web prod build' { npm run build } 'web' | Out-Null
 Invoke-Gate '1.6' 'Web size-limit budgets' { npm run size } 'web' | Out-Null
 
+# 1.12 - the user-facing documentation must still describe what we are about to
+# deploy. Runs in currency-only mode here (no diff to couple against at deploy
+# time); the coupling half (F4) is enforced at pre-push and on pull requests.
+Invoke-Gate '1.12' 'Docs freshness (user-facing set)' {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'audit-doc-freshness.ps1') -SkipCoupling -Quiet
+} | Out-Null
+
 # =============================================================================
 # Stage 2 - Local test gates
 # =============================================================================

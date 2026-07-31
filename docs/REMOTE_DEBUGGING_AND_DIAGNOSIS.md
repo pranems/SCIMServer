@@ -1,6 +1,9 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Version:** 3.1 - **Source-verified against:** v0.53.0 - **Updated:** June 3, 2026  
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
+
+> **Version:** 3.2 - **Source-verified against:** v0.55.1 - **Updated:** 2026-07-31  
+> Route and module structure re-verified against v0.55.1 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  
 > Complete guide for diagnosing production issues without SSH access.
 
 ---

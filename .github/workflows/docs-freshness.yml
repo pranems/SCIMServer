@@ -1,0 +1,72 @@
+# Documentation freshness automation.
+#
+# Every other gate in this repo checks whether the CODE is correct. None of them
+# checked whether the DOCUMENTATION still describes that code, which is how 12
+# user-facing guides kept advertising v0.53.0 while the product shipped 0.55.1
+# with every test green the whole time.
+#
+# Three triggers, deliberately:
+#
+#   1. pull_request  - blocking. This is Google's "Update Docs with Code" rule:
+#      if a source path a doc is bound to changed, the doc must change too. The
+#      binding lives in docs/.doc-manifest.json.
+#   2. schedule      - non-blocking. Catches TIME-based decay (a provenance
+#      stamp aging past its budget), which no code change can trigger.
+#   3. workflow_dispatch - the on-demand step, runnable at any time.
+#
+# The gate itself has a self-test (scripts/test-audit-doc-freshness.ps1) that
+# proves each check can FAIL. A gate nobody has watched fail is not a gate.
+#
+# References:
+#   scripts/audit-doc-freshness.ps1     the gate
+#   docs/.doc-manifest.json             the doc-to-source contract
+#   .github/copilot-instructions.md     Stage 1.12
+
+name: Docs freshness
+
+on:
+  pull_request:
+    branches: [master]
+  schedule:
+    # Mondays 05:00 UTC, an hour after the trivyignore review.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      skipCoupling:
+        description: "Skip the source-coupling check (F4) and audit currency only"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # F4 diffs against the base ref, so we need more than a shallow clone.
+          fetch-depth: 0
+
+      - name: Self-test the gate
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/test-audit-doc-freshness.ps1
+
+      - name: Audit documentation freshness
+        shell: pwsh
+        run: |
+          $skip = "${{ github.event.inputs.skipCoupling }}" -eq 'true'
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+            # Blocking: compare against the PR base so only what this PR changes
+            # is judged.
+            pwsh -NoProfile -File scripts/audit-doc-freshness.ps1 -BaseRef "origin/${{ github.base_ref }}"
+          }
+          elseif ($skip -or $env:GITHUB_EVENT_NAME -eq 'schedule') {
+            # Time-based decay only; no diff to couple against.
+            pwsh -NoProfile -File scripts/audit-doc-freshness.ps1 -SkipCoupling
+          }
+          else {
+            pwsh -NoProfile -File scripts/audit-doc-freshness.ps1 -SkipCoupling
+          }

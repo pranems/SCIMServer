@@ -1,5 +1,7 @@
 # SCIMServer Documentation Index
 
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
+
 > **Version:** 0.55.1 - **Updated:** 2026-07-31  
 > 6 presets - **27 endpoint settings controls** (21 boolean flags + 2 enums + 4 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
 
@@ -8,10 +10,23 @@
 | If you want to... | Read |
 |---|---|
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
-| Wire up authentication (4 methods) and connect Entra ID | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
+| Wire up authentication (4 methods), connect Entra ID, or diagnose an auth failure | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | Tour the admin UI screen by screen | [UI_GUIDE.md](UI_GUIDE.md) |
 | Look up a REST route | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
 | Deploy it anywhere | [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) |
+
+### The documentation contract
+
+The **user-facing** set listed in [.doc-manifest.json](.doc-manifest.json) is **enforced, not aspirational**. [scripts/audit-doc-freshness.ps1](../scripts/audit-doc-freshness.ps1) fails a push when a doc advertises a stale product version, loses its `**Last verified:**` stamp, carries a dead link, or when a source path the doc is bound to changes without the doc changing too.
+
+```powershell
+npm run docs:freshness          # currency only
+npm run docs:freshness:coupled  # + the "Update Docs with Code" coupling check
+npm run docs:freshness:fix      # restamp versions and provenance dates
+npm run docs:freshness:selftest # prove every check can still FAIL
+```
+
+Everything else under `docs/` is internal design and phase notes, deliberately not gated.
 
 ---
 
@@ -321,7 +336,7 @@ These are the definitive source files for key aspects of the system:
 | Profile types | [api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) |
 | Built-in presets | [api/src/modules/scim/endpoint-profile/presets/](../api/src/modules/scim/endpoint-profile/presets/) |
 | Schema validator | [api/src/domain/validation/schema-validator.ts](../api/src/domain/validation/schema-validator.ts) |
-| SCIM constants | [api/src/modules/scim/utils/scim-constants.ts](../api/src/modules/scim/utils/scim-constants.ts) |
+| SCIM constants | [api/src/modules/scim/common/scim-constants.ts](../api/src/modules/scim/common/scim-constants.ts) |
 | Filter parser | [api/src/modules/scim/filters/scim-filter-parser.ts](../api/src/modules/scim/filters/scim-filter-parser.ts) |
 | Patch engines | [api/src/domain/patch/](../api/src/domain/patch/) |
 | Live tests | [scripts/live-test.ps1](../scripts/live-test.ps1) |
