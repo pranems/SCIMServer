@@ -130,21 +130,48 @@ jobs:
           # does not enforce that control (the runner is not a corp device), but
           # it prints the age so a reviewer can confirm we did not pin something
           # that a developer on a managed device would be unable to install.
-          pkgs="$(git --no-pager diff -U0 -- '*/package-lock.json' \
-                  | grep -oE '"node_modules/[^"]+"' | sed 's|"node_modules/||;s|"||' \
-                  | sort -u || true)"
-          if [ -z "$pkgs" ]; then echo "(no changed packages)"; exit 0; fi
-          printf '%-40s %-12s %-26s %s\n' PACKAGE VERSION PUBLISHED AGE_DAYS
-          for p in $pkgs; do
-            v="$(node -e "const l=require('./api/package-lock.json');const e=l.packages['node_modules/$p'];console.log(e?e.version:'')" 2>/dev/null || true)"
-            [ -n "$v" ] || continue
-            t="$(npm view "$p@$v" time --json 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);console.log(j['$v']||'')}catch(e){console.log('')}})" || true)"
-            if [ -n "$t" ]; then
-              age="$(node -e "console.log(((Date.now()-Date.parse('$t'))/86400000).toFixed(1))")"
-              printf '%-40s %-12s %-26s %s\n' "$p" "$v" "$t" "$age"
-            else
-              printf '%-40s %-12s %-26s %s\n' "$p" "$v" "(unknown)" "?"
-            fi
+          #
+          # The changed set is computed by DIFFING THE TWO LOCKFILE MAPS, not by
+          # parsing `git diff` text. The first cut parsed the diff and silently
+          # printed an empty table - a report step that reports nothing looks
+          # identical to a report step that found nothing, which is the exact
+          # green-but-blind failure mode this repo has been bitten by. This
+          # version cannot be silently empty: it fails if it cannot read a map.
+          for d in api web; do
+            [ -f "$d/package-lock.json" ] || continue
+            git show "HEAD:$d/package-lock.json" > "/tmp/old-$d.json" 2>/dev/null || echo '{}' > "/tmp/old-$d.json"
+            node -e '
+              const d = process.argv[1];
+              const rd = f => { try { return JSON.parse(require("fs").readFileSync(f,"utf8")).packages || {}; } catch { return null; } };
+              const oldP = rd(`/tmp/old-${d}.json`), newP = rd(`${d}/package-lock.json`);
+              if (!newP) { console.error(`::error::could not read ${d}/package-lock.json`); process.exit(1); }
+              const out = [];
+              for (const [k, v] of Object.entries(newP)) {
+                if (!k.startsWith("node_modules/") || !v.version) continue;
+                const before = oldP && oldP[k] ? oldP[k].version : undefined;
+                if (before !== v.version) out.push([k.replace(/^node_modules\//, ""), before || "(new)", v.version]);
+              }
+              console.log(JSON.stringify(out));
+            ' "$d" > "/tmp/changed-$d.json"
+
+            count="$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/changed-$d.json','utf8')).length)")"
+            echo "--- $d: $count changed package version(s) ---"
+            [ "$count" = "0" ] && continue
+
+            printf '%-38s %-12s %-12s %-26s %s\n' PACKAGE FROM TO PUBLISHED AGE_DAYS
+            node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/changed-$d.json','utf8')).map(r=>r.join(' ')).join('\n'))" \
+            | while read -r name from to; do
+                t="$(npm view "$name@$to" time --json 2>/dev/null \
+                     | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{try{console.log(JSON.parse(s)['$to']||'')}catch{console.log('')}})" || true)"
+                if [ -n "$t" ]; then
+                  age="$(node -e "console.log(((Date.now()-Date.parse('$t'))/86400000).toFixed(1))")"
+                  warn=''
+                  node -e "process.exit(((Date.now()-Date.parse('$t'))/86400000) < 7 ? 1 : 0)" || warn='  <-- UNDER 7 DAYS, quarantined on corp devices'
+                  printf '%-38s %-12s %-12s %-26s %s%s\n' "$name" "$from" "$to" "$t" "$age" "$warn"
+                else
+                  printf '%-38s %-12s %-12s %-26s %s\n' "$name" "$from" "$to" "(unknown)" "?"
+                fi
+              done
           done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
