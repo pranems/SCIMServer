@@ -8,7 +8,7 @@
 | If you want to... | Read |
 |---|---|
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
-| Wire up authentication (5 methods) | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
+| Wire up authentication (4 methods) and connect Entra ID | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | Tour the admin UI screen by screen | [UI_GUIDE.md](UI_GUIDE.md) |
 | Look up a REST route | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
 | Deploy it anywhere | [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) |
