@@ -1,7 +1,17 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.53.0 - **Updated:** June 3, 2026  
-> 86 API route handlers - 20 controllers - 6 presets - 16 config flags - 7,335 checks (3,874 API unit + 1,217 API E2E + 1,068 web vitest + 134 Playwright + 1,047 live SCIM + 15 PowerShell)
+> **Version:** 0.55.1 - **Updated:** 2026-07-31  
+> 6 presets - **27 endpoint settings controls** (21 boolean flags + 2 enums + 4 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
+
+### Start here
+
+| If you want to... | Read |
+|---|---|
+| Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+| Wire up authentication (5 methods) | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
+| Tour the admin UI screen by screen | [UI_GUIDE.md](UI_GUIDE.md) |
+| Look up a REST route | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
+| Deploy it anywhere | [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) |
 
 ---
 

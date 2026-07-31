@@ -1,8 +1,14 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** Active | **Last Updated:** 2026-06-03 | **Version:** 0.53.0
+> **Status:** Active | **Last Updated:** 2026-07-31 | **Version:** 0.55.1
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
-> Screenshots below are from the **live customer-facing production** instance (`scimserver-prod.calmsand-...`), verified at v0.53.0.
+> **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (`scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.1 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
+>
+> ```powershell
+> pwsh scripts/capture-ui-guide.ps1 -BaseUrl '<dev fqdn>' -Token '<scim secret>' -Apply
+> ```
+>
+> They were previously shot from the customer-facing production instance at v0.53.0. Dev is now the capture target because it carries a richer, deliberately-seeded data set (58 endpoints) and does not put customer tenant names in public documentation.
 
 ---
 

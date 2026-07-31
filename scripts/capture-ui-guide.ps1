@@ -104,7 +104,12 @@ $surfacesJson = ($surfaces | ForEach-Object {
 }) | ConvertTo-Json -Compress -Depth 4
 if ($surfaces.Count -eq 1) { $surfacesJson = "[$surfacesJson]" }
 
-$captureScript = Join-Path $stageDir '_capture.mjs'
+# The helper MUST live inside web/ - Node resolves bare imports relative to the
+# SCRIPT FILE's own directory, not the cwd, so a helper written under
+# test-results/ can never find `playwright` in web/node_modules no matter what
+# Push-Location does. That is why this script previously failed every run with
+# ERR_MODULE_NOT_FOUND. Output still goes to $stageDir.
+$captureScript = Join-Path $webDir '_ui-guide-capture.mjs'
 @"
 import { chromium } from 'playwright';
 
@@ -160,6 +165,7 @@ try {
 }
 finally {
     Pop-Location
+    Remove-Item $captureScript -Force -ErrorAction SilentlyContinue
     Remove-Item Env:CAP_BASE_URL, Env:CAP_TOKEN, Env:CAP_TOKEN_KEY, Env:CAP_OUT_DIR, Env:CAP_VW, Env:CAP_VH, Env:CAP_SURFACES -ErrorAction SilentlyContinue
 }
 

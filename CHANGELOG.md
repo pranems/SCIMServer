@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **User-facing documentation rebuilt from measured sources, not from older docs.** An audit found ~19 user-facing docs still claiming **v0.53.0**, quoting a test total of "7,277" that corresponded to nothing measurable, and describing presets that do not exist (`okta`, `salesforce`, `workday`, `generic`, `strict-rfc`). More serious than the staleness were the holes: the **Credentials, Bulk, Logs, Workbench and Connect** surfaces had no user-facing how-to at all, and there was no unified authentication guide despite five auth methods shipping.
+
+  Two new guides, every value in them captured from a running server:
+
+  | Doc | What it covers | How it was produced |
+  |---|---|---|
+  | [docs/ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](docs/ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) | all **27** settings controls in plain English, plus a preset matrix | one endpoint instantiated per preset on live dev, published contract read back, endpoints deleted |
+  | [docs/AUTHENTICATION_GUIDE.md](docs/AUTHENTICATION_GUIDE.md) | the **5** data-plane auth methods, admin-vs-data-plane separation, real 401 diagnostics | full credential lifecycle exercised live: bearer mint -> 200, oauth_client mint -> token exchange -> 200 |
+
+  The measured preset matrix corrects the record substantially:
+
+  | Preset | Schemas | ResourceTypes | User attrs | Required on create | `/Groups` |
+  |---|---|---|---|---|---|
+  | `entra-id` | 7 | 2 | 22 | userName, displayName, emails | 200 |
+  | `entra-id-minimal` | 7 | 2 | 8 | userName, displayName, emails | 200 |
+  | `rfc-standard` | 3 | 2 | 24 | userName | 200 |
+  | `minimal` | 2 | 2 | 8 | userName | 200 |
+  | `user-only` | 2 | 1 | 10 | userName | **404** |
+  | `user-only-with-custom-ext` | 3 | 1 | 8 | userName | **404** |
+
+  **All 10 UI screenshots re-captured** from live dev at v0.55.1 / Node v24.18.1, 1440x900. They previously came from the customer-facing production instance at v0.53.0; dev is now the capture target because it carries a richer seeded data set and keeps customer tenant names out of public docs.
+
+  This also **fixed [scripts/capture-ui-guide.ps1](scripts/capture-ui-guide.ps1), which could never have worked**: it wrote its Playwright helper into `test-results/` while `playwright` lives in `web/node_modules`. Node resolves bare imports relative to the script file's own directory, not the cwd, so `Push-Location $webDir` did nothing and every run died with `ERR_MODULE_NOT_FOUND`. The helper is now written inside `web/` and removed afterwards.
+
+  README, INDEX and UI_GUIDE now carry measured counts: **8,973 checks** (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright).
+
 - **Exhaustive browser coverage of the endpoint configuration surface** - new [web/e2e/settings-matrix.spec.ts](web/e2e/settings-matrix.spec.ts), 16 specs, run against the dev Azure estate.
 
   An audit of the settings surface against the existing suite found that **2 of 28 configuration flags had behavioural browser coverage** (`RfcCompliantSubAttributes`, `CustomResourceTypesEnabled`). A third, `CredentialSecretVisibility`, had a spec whose own comment conceded it was "READ-ONLY ... It does NOT click a different radio" - a presence-only assertion, which rule R10 says is not correctness. The remaining 25 flags, both enum dropdowns and all four numeric inputs were never driven by a browser at all. Every one of those controls renders, so a human glance and a presence assertion both pass while a control wired to nothing ships unnoticed.

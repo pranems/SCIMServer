@@ -2,7 +2,7 @@
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
-[![Version](https://img.shields.io/badge/version-0.53.0-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.1-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
@@ -62,7 +62,7 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 | **Observability** | Structured JSON logging, SSE live stream, ring buffer, per-endpoint log isolation, file rotation, auto-prune |
 | **Deployment** | Docker Compose (1 command), Azure Container Apps (1 script), local dev, pre-built GHCR image |
 | **Web UI** | React + Vite admin console - dashboard, endpoint CRUD, Workbench, Bulk UI, custom resource types, discovery diff, operations, logs, settings |
-| **Testing** | 3,816 API unit + 1,217 API E2E + 1,068 web vitest + 1,027 live SCIM + 134 Playwright + 15 PowerShell = 7,277 total checks |
+| **Testing** | 4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright = **8,973 checks**, all measured on 2026-07-31 against v0.55.1 |
 
 ---
 
