@@ -332,10 +332,39 @@ have meant the assertions could not detect the feature's absence.
 
 ---
 
-## 9. References
+## 9. Planned evolution (NOT yet implemented)
+
+> **This section is a design record.** As of **v0.55.1** the flag behaves exactly
+> as sections 1 to 8 describe. Nothing below is live. Do not cite it as
+> documentation of shipped behavior.
+
+A deeper re-reading of RFC 7643, plus a measured survey of two live estates,
+produced three intended changes. The full analysis, including the evidence, is in
+[rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md)
+sections 12 to 15.
+
+| # | Change | Why |
+|---|---|---|
+| 1 | **`OFF` becomes fully permissive** - accepts a multi-valued simple sub-attribute as well as nesting | Today `OFF` is inconsistent: permissive about nesting, strict about cardinality. One polarity is easier to reason about: *off accepts anything, on conforms*. This is a loosening, so nothing that works stops working. |
+| 2 | **`ON` grows from 2 rules to the full catalogue** - adds schema-definition rules D1 to D11 alongside today's P1 and P2 | The flag claims RFC conformance but only checks two things, and both only at payload time. A schema that no compliant client could PATCH is currently accepted and published. |
+| 3 | **The flag is renamed** | `RfcCompliantSubAttributes` names only part of what it would govern - most of the new rules are *attribute* rules, not sub-attribute rules. It is set on **zero** endpoints across all three estates today, so a rename is free now and breaking later. |
+
+Two results from the survey shaped the design and are worth carrying forward:
+
+- A **literal** reading of section 2.3.8 ("a complex attribute has no uniqueness
+or case sensitivity") would reject **our own built-in schemas**, which emit
+`uniqueness: "none"` on complex attributes as a harmless default. The enforceable
+rule has to target a *meaningful* value, not mere presence.
+- The name-grammar rule found **two real malformed attributes** on a live
+customer endpoint, named after filter expressions
+(`emails[type eq "work"].primary`). Nothing else in the codebase detects this.
+
+---
+
+## 10. References
 
 - [RFC 7643 §2.3.8 - Complex attributes](rfcs/rfc7643.txt)
 - [RFC 7643 §1.2 - Definitions](rfcs/rfc7643.txt)
 - [RFC 7644 §3.5.2 - PATCH path grammar](rfcs/rfc7644.txt)
-- [SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) - full combination matrix, errata and ISV/IdP survey
+- [SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) - full combination matrix, the machine-checkable rule catalogue (P1-P2, D1-D11), the measured live-estate survey, the `referenceTypes` divergence, errata and the IdP/ISV survey
 - [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - all endpoint flags
