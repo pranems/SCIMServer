@@ -1,19 +1,45 @@
-# Trivy CVE allowlist — OPS-3 / build-and-push security gate.
+# Trivy CVE allowlist - OPS-3 / build-and-push security gate.
 #
 # Each entry MUST include the CVE ID, the package, the rationale, and an
 # expiry date. CI re-evaluates on every build; an unjustified entry will be
 # spotted in code review.
 #
-# REQUIRED machine-readable fields (parsed by api/scripts/check-trivyignore.mjs):
+# REQUIRED machine-readable fields (parsed by api/src/scripts/check-trivyignore.ts):
+#   Class:       judgment | quarantine-window
 #   Reviewed:    <YYYY-MM-DD>   when the rationale below was last validated
 #   Re-check-by: <YYYY-MM-DD>   deadline for the next periodic review
-#                               (script default cadence: 90 days)
+#
+# ENTRY CLASSES - pick the right one, the cadences differ by 13x
+# ---------------------------------------------------------------------------
+# Class: judgment
+#   A standing decision that the CVE is not worth acting on - e.g. upstream
+#   published a "fix" and then deprecated it, or the vulnerable sink is not
+#   reachable in our usage. Open-ended. Default cadence: 90 days.
+#   This is the DEFAULT when no `Class:` field is present, so pre-existing
+#   entries keep working.
+#
+# Class: quarantine-window
+#   A fix EXISTS and we intend to take it, but the fixed version is younger
+#   than the 7-day corporate minimum release age, so installing it today would
+#   violate the supply-chain policy. This is purely a TIMING wait.
+#   Additionally REQUIRED:
+#     Fixed-version:      <the version that resolves the CVE>
+#     Fix-available-from: <YYYY-MM-DD - the date it clears the 7-day window>
+#   Capped at 14 days (MAX_QUARANTINE_WINDOW_DAYS). The checker also flags the
+#   entry as actionable the moment `Fix-available-from` passes, independent of
+#   `Re-check-by`, so a known-fixed HIGH CVE is never left suppressed.
+#   NEVER extend one of these to buy time. If it must outlive the cap it is a
+#   `judgment` entry and needs a written rationale.
+#
+# Why the distinction exists: a 7-day timing hold and an indefinite judgment
+# call look identical in this file, so the 90-day default silently swallowed
+# the former. See docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md.
 #
 # Trivy itself only reads bare CVE IDs; the surrounding comments are for
 # humans and the review-staleness check (.github/workflows/trivyignore-review.yml).
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CVE-2026-4800 — lodash 4.17.21 → "fixed" in 4.18.0
+# CVE-2026-4800 - lodash 4.17.21 → "fixed" in 4.18.0
 # Package: lodash (transitive via @chevrotain/cst-dts-gen, @chevrotain/gast,
 #                  pulled in by Prisma 7's @prisma/internals)
 # Rationale: lodash 4.18.0 was published, then deprecated by the maintainers
@@ -21,11 +47,43 @@
 #            instead." (visible via `npm view lodash@4.18.0`). Forcing 4.18.0
 #            via npm overrides reintroduces a regression worse than the CVE
 #            (which requires attacker-controlled input to a lodash sink we do
-#            not expose — chevrotain only uses lodash internally for AST work
+#            not expose - chevrotain only uses lodash internally for AST work
 #            on Prisma schema files at build time, never at request time).
 # Owner:       @pranems
+# Class:       judgment
 # Reviewed:    2026-04-30
 # Re-check-by: 2026-07-30
 # Re-check action: when chevrotain or lodash publishes a real fix, drop the
 #                  override and remove this entry.
 CVE-2026-4800
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-18446 (GHSA-7p8r-x3mc-p8w7) - fast-uri 3.1.4, HIGH
+# Package: fast-uri, pinned by an explicit override in api/package.json.
+#          Reached via prisma -> @prisma/dev -> @prisma/streams-local -> ajv.
+# Advisory published 2026-08-03T19:16Z. "fast-uri vulnerable to host confusion
+#          via backslash authority introducer."
+#
+# Why suppressed, and only until 2026-08-10:
+#   Fixed versions 2.4.4 / 3.1.5 / 4.1.2 were all published within the last
+#   7 days, so the corporate feed proxy does not serve them - measured:
+#   `npm view fast-uri versions` tops out at 4.1.1. Taking the fix today is
+#   impossible without violating the NPM Minimum Release control, and CI holds
+#   itself to the same bar (see .github/workflows/regen-lockfile.yml).
+#   This is a TIMING wait, not a judgement that the CVE is acceptable.
+#
+# Reachability while we wait: fast-uri parses JSON-Schema $ref URIs inside ajv,
+#   which this repo reaches only through Prisma's CLI/dev tooling. It is not on
+#   any request path, so the host-confusion vector is not exposed to callers.
+#
+# Owner:              @pranems
+# Class:              quarantine-window
+# Fixed-version:      4.1.2
+# Fix-available-from: 2026-08-10
+# Reviewed:           2026-08-04
+# Re-check-by:        2026-08-10
+# Re-check action: bump the `fast-uri` override in api/package.json to 4.1.2,
+#                  regenerate the lockfile via the regen-lockfile workflow (NOT
+#                  locally - a corp device produces a contaminated lockfile),
+#                  and DELETE this entry in the same commit.
+CVE-2026-18446
