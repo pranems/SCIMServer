@@ -1,11 +1,14 @@
 # Consolidated auth + WIF + performance delivery plan (X13)
 
-Status: PLAN (source at `feat/wif`, api v0.54.63). This doc **consolidates and
-sequences** three previously separate analysis streams into one delivery backlog:
+Status: PLAN (source re-verified against `origin/master` `21ca0a95`, api v0.55.2, on
+2026-08-04). **Branch note:** `feat/wif` is no longer a feature branch - it, `master`,
+and `release/0.55.0` all resolve to the same commit, so "source at `feat/wif`" now just
+means mainline. This doc **consolidates and sequences** three previously separate
+analysis streams into one delivery backlog:
 
 1. **X11 - WIF token-mint latency** ([../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)) - the perf options (cold ~2,161 ms -> tens of ms).
 2. **X12 - auth-source refactoring** ([AUTH_SOURCE_REFACTORING_ANALYSIS.md](AUTH_SOURCE_REFACTORING_ANALYSIS.md)) - the `ResourceAuthenticator` / provider strategy seam.
-3. **SyncFabric roadmap** ([SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)) - RFC 8693, RFC 7523 binding corrections, persona model, security + metadata truthfulness, migration (its Phases -1..6 and file-by-file Section 25).
+3. **SyncFabric roadmap** - the canonical guide, **revision 6 (2026-08-04)** - RFC 8693, RFC 7523 binding corrections, persona model, security + metadata truthfulness, migration (its Phases -1..6 and file-by-file Section 25). The in-repo mirror [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md) was refreshed to revision 6 on 2026-08-04 and is byte-identical to the canonical copy at `OneDrive - Microsoft\Documents\SCIMServer\auth\`. (Before that date it had been a revision-2 mirror, 4,318 lines against the canonical 5,470.)
 4. **X15 - runtime tuning + configuration** ([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md), added 2026-07-28) - the configuration layer under the X11 options: the three-tier model, per-environment recommended values, and three findings that **redesign W1.4** and add **W1.7**.
 
 It is grounded in the **current** `feat/wif` source (state confirmed below), the
@@ -85,19 +88,23 @@ flowchart LR
 
 ## 1. Current-source state (confirmed, grounds the estimates)
 
-| Item | Current state (feat/wif) | Source of truth |
+> **Re-verified against `origin/master` `21ca0a95` (v0.55.2) on 2026-08-04.** Rows marked
+> **[was stale]** were wrong before this pass - Waves 1 and 2 shipped without the table being
+> updated, so the plan was understating its own progress and would have caused re-work.
+
+| Item | Current state (mainline) | Source of truth |
 |---|---|---|
 | Token endpoint HTTP status | **200 + no-store** - W0.2 delivered (v0.54.66): `@HttpCode(200)` + `Cache-Control: no-store` + `Pragma: no-cache` on both token handlers; errors keep 400/401 | [oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) + [endpoint-oauth.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) |
-| `PERSIST_REQUEST_SECRETS` default | **true** - assertions/tokens persisted by default | [logging.service.ts#L86](../../api/src/modules/logging/logging.service.ts#L86) |
+| `PERSIST_REQUEST_SECRETS` default | **true** - assertions/tokens persisted by default. **Unchanged and still the top-priority P0.** | [logging.service.ts#L124](../../api/src/modules/logging/logging.service.ts#L124) |
 | RFC 8693 handler | **not implemented** (rejected at runtime) | no `subject_token` parse path |
 | Metadata advertises token-exchange | **no** - W0.3 delivered (v0.54.64): capability-derived, token-exchange only when the RFC 8693 handler is active | [endpoint-oauth-metadata.controller.ts](../../api/src/modules/scim/controllers/endpoint-oauth-metadata.controller.ts) |
-| `assertionProfile` field | persisted (`jwt-bearer` / `token-exchange`) but **inert** | [admin-credential.controller.ts#L97](../../api/src/modules/scim/controllers/admin-credential.controller.ts#L97) |
-| Resource-plane strategy seam | **none** - 491-line `SharedSecretGuard` inlines all methods | [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) |
+| `assertionProfile` field | **[was stale] LIVE, not inert** - projected onto the profile set: `assertionProfile === 'token-exchange' ? [WIF_PROFILE_RFC8693] : [WIF_PROFILE_RFC7523]` | [assertion-token-provider.ts#L43](../../api/src/modules/scim/controllers/assertion-token-provider.ts) |
+| Resource-plane strategy seam | **[was stale] DELIVERED (Wave 2)** - `ResourceAuthenticator` plus three authenticators (`endpoint-credential`, `global-shared-secret`, `oauth-jwt`); `SharedSecretGuard` is now **260 lines**, not 491 | [resource-authenticator.ts](../../api/src/modules/auth/authenticators/resource-authenticator.ts) + [authenticators/](../../api/src/modules/auth/authenticators/) |
 | Mint `client_secret` path | **inlined** in the controller | [endpoint-oauth.controller.ts#L189](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts#L189) |
-| JWKS pre-warm / background refresh | **none** (lazy fetch, 10-min TTL - X15-F1: Microsoft's guidance for its own keys is 24 h TTL + 1 h background refresh) | [external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts) |
-| `jose` load | lazy `await import('jose')` on hot path | [external-jwks-validator.service.ts#L93](../../api/src/oauth/external-jwks-validator.service.ts#L93) |
+| JWKS pre-warm / background refresh | **still none** (lazy fetch, 10-min TTL - X15-F1: Microsoft's guidance for its own keys is 24 h TTL + 1 h background refresh). W1.3 (canonical `jwks_uri` redirect memo) **did** ship. The stale fallback has **no maximum age** - see [EXTERNAL_JWKS_VALIDATOR.md](EXTERNAL_JWKS_VALIDATOR.md) guarantee 5 | [external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts) |
+| `jose` load | **[was stale] W1.1 DELIVERED** - memoized `josePromise`, warmed at boot by `onModuleInit` (non-fatal on failure), so the first mint after a restart no longer pays the ESM load | [external-jwks-validator.service.ts#L63-L100](../../api/src/oauth/external-jwks-validator.service.ts) |
 | Credential lookup | `findActiveByEndpoint` (all types, no index by type) | [wif-assertion-token.provider.ts](../../api/src/modules/scim/controllers/wif-assertion-token.provider.ts) |
-| Issued token `jti` / `typ=at+jwt` | **absent** | [oauth.service.ts](../../api/src/oauth/oauth.service.ts) |
+| Issued token `jti` / `typ=at+jwt` | **[was stale] SPLIT** - `jti: crypto.randomUUID()` is **present** (oauth.service.ts#L225); `typ=at+jwt` is still **absent** (signed via `jwtService.sign` with `signOptions.algorithm` only; no `at+jwt` string exists anywhere in `api/src`), so RFC 9068 conformance remains unproven | [oauth.service.ts#L225](../../api/src/oauth/oauth.service.ts) + [oauth.module.ts#L33](../../api/src/oauth/oauth.module.ts) |
 | Persona catalog | **none** | n/a |
 | WifTrustV2 versioned aggregate | **none** (flat `metadata`) | [admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts) |
 
@@ -424,7 +431,7 @@ Per the standing DA-gate:
 - X15 runtime tuning + configuration: [../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md)
 - X12 refactor: [AUTH_SOURCE_REFACTORING_ANALYSIS.md](AUTH_SOURCE_REFACTORING_ANALYSIS.md)
 - X10 standards: [AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)
-- SyncFabric guide (Phases -1..6, file-by-file Section 25, test strategy Section 23): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)
+- SyncFabric guide (Phases -1..6, file-by-file Section 25, test strategy Section 23): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md) - **revision 6**, refreshed 2026-08-04, byte-identical to the canonical copy.
 - Pattern ledger + DA-gate: [../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md), [.github/copilot-instructions.md](../../.github/copilot-instructions.md)
 
 ## 10. Change log
@@ -434,3 +441,4 @@ Per the standing DA-gate:
 | 0.54.61 | This consolidated delivery plan (X13): interlocks the X11 perf, X12 refactor, and SyncFabric roadmap streams into one sequenced release train (Waves 0-6) with ~25 consolidated work items (each with goal/tasks/acceptance/deps/estimate/risk), a current-source state table, dependency + critical-path Mermaid diagrams, a relative-complexity estimate rollup (~119 core points), empirical gates, a per-item DoD contract, and the DA-gate disposition. Core sequencing rule: the X12 seam (W2) precedes RFC 8693 (W4) so new methods EXTEND not EDIT; the security hotfix (W0) ships first; the perf foundation (W1) de-risks all external-JWKS methods. Plan only - no runtime change. |
 | 0.54.63 | Operator-decision revision: **W0.1 secret redaction DECLINED** (`PERSIST_REQUEST_SECRETS` stays default true; runtime opt-out only), so Wave 0 is now just the 200/no-store + capability-truthful-metadata correctness items (15 -> 7 points, ~116 core). Added **W2.5** (consolidate the overlapping `PerEndpointCredentialsEnabled` legacy umbrella into the per-method flags + co-locate enablement with each method via the `AuthenticationMethod` model, so each `ResourceAuthenticator` owns `isEnabled()` and metadata derives from the same source) with a design answer on why co-locating enablement is good design. Cross-refs the delivered X14 copy/download-JSON drawer UI. |
 | 0.54.81 | **X15 runtime-tuning intake** ([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md)) folded into Wave 1. Added **W1.7** (runtime configuration surface: a/plumbing + bounds + effective-config boot log, b/DB + HTTP knobs, c/`GET /scim/admin/runtime-config`), taking Wave 1 from 24 to 36 points and core from 116 to 128. **W1.4 redesigned** to Microsoft's published signing-key algorithm (per-`kid` cache, 24 h TTL, 1 h background refresh, 5-min rate limit on unknown-`kid` refetch) with a hard constraint that the TTL raise ships with the refresher and an overlap-window rotation test. **W1.5 resequenced BEFORE W1.4** (build the deadline/caps safety envelope before the riskier cache change) and its caps ship configurable from birth. Two new findings scheduled into W1.7b: X15-F2 (`server.requestTimeout`/`headersTimeout` never set, keep-alive wrongly coupled to the request timeout) and X15-F3 (the Prisma v7 driver-adapter migration silently dropped the pool acquire timeout). |
+| 0.55.2 | **Current-source re-verification (2026-08-04).** Section 1's state table had gone stale in the understating direction: Waves 1 and 2 shipped without it being updated, so the plan described work as outstanding that was already delivered. Corrected against `origin/master` `21ca0a95`: the resource-plane strategy seam is **DELIVERED** (`ResourceAuthenticator` + three authenticators; `SharedSecretGuard` down from 491 to 260 lines), **W1.1 is DELIVERED** (`jose` memoized and warmed at boot by `onModuleInit`), **W1.3 is DELIVERED** (canonical `jwks_uri` redirect memo), `assertionProfile` is **LIVE not inert** (projected to `WIF_PROFILE_RFC7523`/`RFC8693`), and the issued token now carries `jti` while `typ=at+jwt` is still absent (so RFC 9068 conformance stays unproven). `PERSIST_REQUEST_SECRETS` remains `true` and remains the top-priority P0. Also repointed the SyncFabric-guide references from the in-repo revision-2 mirror to the canonical revision-5 copy, and recorded that the JWKS stale fallback has no maximum age. Documentation only - no runtime change. |

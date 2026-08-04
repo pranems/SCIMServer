@@ -50,7 +50,7 @@ The three docs were written at different times and used three numbering schemes.
 | **Pre-Q.A** | §7.2 pre-work | Pre-Q.A | `structured` config flag-type + validator | enabling |
 | **Pre-Q.B** | §7.2 pre-work | Pre-Q.B | RS256/ES256 externalized signing key + published JWKS | enabling |
 | **Q0** | Q0 | folded into A2 + Q6.1 | enrich `WWW-Authenticate`, add `aud` claim, RFC 8414 metadata | enabling |
-| **A0** | - | - | `profile.authentication.methods[]` model (inert) | backbone |
+| **A0** | - | - | `profile.authentication.methods[]` model (**live** - enforced at 5 runtime call sites since A1/A3; shipped inert, no longer is) | backbone |
 | **Q1** | Q1 | Q1 (prereq) | per-endpoint `oauth-client` credential + per-endpoint issuer | critical path |
 | **Q2** | Q2 | Q2 (prereq) | `jose` external JWKS validator | critical path |
 | **A1** | - | Q6.2 D5 | admin `/authentication/methods` CRUD + orthogonal create gate | backbone |

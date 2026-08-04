@@ -1,10 +1,11 @@
 ---
-name: syncfabricScimserverAuthEvolution
 description: Refresh and critically re-evaluate SyncFabric-to-SCIMServer authentication, WIF, 1P, IdP/ISV emulation, performance, environments, and implementation guidance from the latest sources, with persistent self-improvement.
-argument-hint: Optional flags - --scope=delta|full, --auth=all|wif|1p|<method>, --syncfabric=<path>, --scimserver=<path>, --guide=<path>, --write=guide-only|repo-docs
+mode: agent
 ---
 
 # SyncFabric and SCIMServer Authentication Evolution
+
+**Argument hint:** `--scope=delta|full`, `--auth=all|wif|1p|<method>`, `--syncfabric=<path>`, `--scimserver=<path>`, `--guide=<path>`, `--write=guide-only|repo-docs`
 
 ## Intent
 
@@ -33,17 +34,37 @@ Use:
 /syncfabricScimserverAuthEvolution --guide=C:\path\to\guide.md
 ```
 
+### Availability
+
+This workflow is `/`-invokable from two surfaces, which name it differently:
+
+| Surface | Slash command | Registration |
+|---|---|---|
+| VS Code chat | `/syncfabricScimserverAuthEvolution` | This file, in `%APPDATA%\Code\User\prompts\`. The command name is the filename minus `.prompt.md`. |
+| Copilot CLI | `/syncfabric-scimserver-auth-evolution` | `%USERPROFILE%\.copilot\skills\syncfabric-scimserver-auth-evolution\SKILL.md`, which only loads this file. |
+
+**This file is the single source of behavior.** The CLI skill is a launcher and must never carry its own
+copy of the phases, defaults, or guardrails; if it drifts, delete the duplication rather than
+maintaining two definitions. Frontmatter here must stay limited to the VS Code prompt-file schema keys
+(`description`, `mode`, and optionally `tools` / `model`) - CLI-style keys such as `name` and
+`argument-hint` belong in the skill launcher, not here.
+
 ### Defaults
 
 ```text
 syncfabricRepo = C:\one\AD-IAM-Services-SyncFabric
-scimserverRepo = C:\Users\v-prasrane\source\repos\SCIMServer
+scimserverRepo = C:\Users\v-prasrane\source\repos\SCIMServer-master
 syncfabricReference = origin/master
-scimserverReference = origin/feat/wif, otherwise the current tracked upstream
+scimserverReference = origin/master
 scope = delta
 auth = all
 write = guide-only
 ```
+
+> **Worktree caution (verified 2026-07-31).** SCIMServer has multiple worktrees. `...\SCIMServer` is
+> on a release branch (`release/0.55.0`), `...\SCIMServer-tls-policy` is on a feature branch, and only
+> `...\SCIMServer-master` tracks `master`. Always resolve the worktree that actually has `master`
+> checked out before reading source; do not assume the shortest path is the right one.
 
 If `--guide` is absent, locate the newest existing file named:
 
@@ -230,6 +251,16 @@ git fetch --all --prune
 
 Do not merge, rebase, pull, checkout, or update the current branch.
 
+> **PowerShell hazard, added 2026-07-31.** `git diff $prev..origin/master` does **not** work in
+> PowerShell. The parser reads `$prev..origin` as member access on `$prev`, so the expression expands
+> to something like `..origin/master` and git returns a usage error rather than an empty diff -
+> which is easy to misread as "no changes". Always build the range as a single string first:
+>
+> ```powershell
+> $range = "$prev..origin/master"
+> git -C $repo --no-pager diff --name-only $range
+> ```
+
 ### 1.3 Select references
 
 SyncFabric:
@@ -240,10 +271,188 @@ SyncFabric:
 
 SCIMServer:
 
-- prefer `origin/feat/wif` while that branch exists;
-- otherwise use the branch's tracked upstream;
+- default to `origin/master`; `feat/wif` was merged into `master` and is now historical only;
+- if a named feature branch is explicitly requested, compare it against `origin/master` rather than treating it as the baseline;
+- resolve the worktree that actually has the target branch checked out (see the worktree caution under Defaults);
 - compare local branch and upstream;
 - record merge-base and ancestry.
+
+### 1.3.1 Range completeness rule
+
+**The analysed range must terminate at the reference you report.** In the 2026-07-31 run the delta
+analysis covered `f8fa96f4..f1362f37` while `origin/master` had advanced to `6bd2ac8e`, leaving an
+unanalysed tail. Re-resolve the reference SHA immediately before writing conclusions, and if it moved:
+
+- analyse the tail range separately;
+- state explicitly in the guide which range each conclusion covers;
+- never report a head SHA you did not actually analyse.
+
+### 1.3.2 Large-delta strategy
+
+When either side exceeds ~50 commits since the previous snapshot, do not attempt a linear read.
+
+1. Filter the range by auth vocabulary (Phase 2.1) to a candidate commit set.
+2. Bucket candidates into *wire-contract*, *rollout/enablement*, *first-hop identity*, and *internal refactor*.
+3. Analyse wire-contract commits in full; sample the rest for false negatives.
+4. State the bucket counts in the guide so a reader can judge coverage.
+5. Prefer delegating each side's classification to a separate bounded agent, but bank each result to a
+   durable file the moment it returns - a completed analysis must survive an interrupted session.
+
+### 1.3.3 Small-delta strategy: let the file list settle it
+
+The mirror image of 1.3.2, added 2026-07-31 after a one-commit SyncFabric delta.
+
+When a delta is small, compute the **union of changed paths first** and compare it against the
+authentication surface before reading any diff hunk. If the two sets are disjoint, every file in the
+surface is byte-identical to the previous snapshot **by construction**, and that is a stronger
+statement than any blob-by-blob sample. Record it as a proof, not as an impression.
+
+```powershell
+git diff --stat <previousSnapshot>..<currentReference>
+```
+
+Rules:
+
+- State the complete changed-path list in the guide when it is short enough to print. A reader can then
+  re-derive the verdict without trusting the analysis.
+- Still inspect any newly added configuration file for auth-relevant settings (authority, application
+  ID, audience, scope, certificate, federation). A new file is not covered by "unchanged blobs".
+- Do not use this shortcut to skip Phase 2 classification of the commits themselves; it establishes
+  invariance of the *runtime surface*, not irrelevance of the *commit*.
+
+### 1.3.4 Release branches and other non-`master` references
+
+Added 2026-07-31, when the requested reference was `release/0.55.0` rather than `master`.
+
+When the analysed reference is not the repository's mainline:
+
+- record `merge-base`, commits ahead, and commits behind, and state whether mainline is a strict
+  ancestor;
+- if it is a strict ancestor, say so explicitly, because it lets every conclusion be reported as
+  holding at both references;
+- if it has diverged, analyse the divergence separately and never present a release-branch conclusion
+  as a mainline conclusion;
+- read the version from `package.json` on the analysed reference rather than assuming it matches the
+  branch name. A branch called `release/0.55.0` can legitimately carry version `0.55.1`.
+
+### 1.3.5 Prove invariance before reading diffs
+
+Added 2026-07-31 after a run in which **both** repositories were runtime-invariant.
+
+Sections 1.3.2 and 1.3.3 describe what to do once you know the delta's size. This section fixes the
+*order*, because the order determines whether the verdict is a proof or a sample.
+
+Work the tiers in sequence and stop at the first one that yields a proof:
+
+| Tier | Action | Yields |
+|---|---|---|
+| 1 | Compute the **changed-path union** for the whole delta, before reading any diff content. Intersect it with the authentication surface. | If the intersection is empty: **invariance proved by construction.** Stop. |
+| 2 | If the intersection is non-empty, compare **blob SHAs** for every file in the authentication surface - not only the files in the diff. | If all identical: **invariance proved at byte level.** Clear each apparent hit individually and stop. |
+| 3 | Only now read diff content, and only for files that actually differ. | Full analysis. |
+
+Two rules make this trustworthy:
+
+1. **Define the authentication surface by pattern, then enumerate it at the current head.** Comparing
+   only the files that appear in the diff proves nothing about files that do not; comparing every file
+   matching the surface pattern proves something about all of them. A run that reports "78 of 78 auth
+   blobs identical" has said something a diff listing cannot say.
+2. **An apparent hit must be cleared by content, not by path.** When a configuration file that also
+   holds authentication settings appears in the delta, filter its diff for the authentication
+   vocabulary and report the result explicitly - for example, "the `features.ini` diff contains zero
+   lines matching `workloadIdentity|firstParty|credentialLocation|clientCredentials|tokenExchange|oauth|assertion`."
+
+### 1.3.6 A zero-change run is a result, not a failed run
+
+Added 2026-07-31.
+
+When the delta changes nothing, the finding **is** that the contract is stable, and that is what makes
+it safe for the other repository to build against. Report it as the headline, not as an apology.
+
+Then spend the recovered effort on evidence the delta was never going to supply. In descending order
+of observed value:
+
+1. **Committed proofs and captures** added since the last run - a real token capture closes empirical
+   gates that no amount of source reading can.
+2. **Unmerged branches**, by content (see 1.3.7).
+3. **Documentation drift and mirror staleness** - stale vendored copies of this workflow's own
+   artifacts are a recurring defect and are invisible in a runtime diff.
+4. **Citation counts** against the canonical guide, which measure how far the guide has become an
+   implementation contract (see 4.1.2).
+
+### 1.3.7 Check unmerged branches by content, never by name
+
+Added 2026-07-31 after branch names proved to be the least reliable signal in the repository.
+
+In one run, two branches named `fix/profile-enforcement-gaps` and `fix/profile-enforcement-phase1`
+were both **0 commits ahead** of mainline and carried nothing, while `feat/per-endpoint-tls-policy` -
+a name containing no authentication vocabulary - carried a genuinely new architectural axis affecting
+how every authentication method can be reached.
+
+For every branch not merged into the analysed reference:
+
+- record commits ahead and behind before reading anything;
+- if 0 ahead, say so and stop - regardless of how relevant the name sounds;
+- if ahead, classify by **changed paths**, and do not skip a branch because its name looks unrelated
+  to authentication. Transport, proxy, and infrastructure branches can change the reachability of the
+  authentication surface without touching a single authentication file.
+
+### 1.3.8 Tier-2 comparison must detect deletions and renames
+
+Added 2026-08-04, after finding that the invariance procedure could not have seen a removed file.
+
+Enumerating the authentication surface at `HEAD` and comparing each file backwards to the previous
+snapshot only ever inspects files that **still exist**. A file deleted or renamed between the two
+snapshots never enters the enumeration, so it is silently reported as "unchanged" by omission. The
+verdict is then a proof about the surviving files only, presented as a proof about the whole surface.
+
+Every tier-2 comparison must therefore compare the two file lists as **sets**, not just the blobs of
+the current list:
+
+```powershell
+$oldList = git -C $repo ls-tree -r --name-only $prev | Where-Object { $_ -match $surfaceRegex }
+$newList = git -C $repo ls-tree -r --name-only $curr | Where-Object { $_ -match $surfaceRegex }
+Compare-Object $oldList $newList   # '<=' is a deletion or rename-away, '=>' is a new or renamed-in file
+```
+
+Report deletions and additions explicitly, even when both are zero. "0 deleted" is evidence; a silent
+absence is not.
+
+### 1.3.9 A surface cardinality is a measurement, not remembered text
+
+Added 2026-08-04, after a prior run's reported count was found to be wrong by one while its verdict
+was correct.
+
+Any number describing a repository - files on the authentication surface, commits in a delta, call
+sites of a function, tests in a suite - is a **measurement of a moving target**. It must be re-derived
+from source on every run and never copied forward from the previous revision's prose.
+
+A carried-forward count is uniquely durable in the wrong way: nothing in the workflow forces it to be
+re-checked, so it can survive many revisions while being wrong. Two consequences:
+
+- when a run reports a count, it must have computed it in that run;
+- when a run finds a previously published count to be wrong, it must correct **every occurrence**,
+  say plainly that the earlier number was wrong, and state whether the conclusion that number
+  supported is affected. Usually it is not - which is exactly why the error survives.
+
+### 1.3.10 Resolve an author or keyword hint against the baseline before treating it as new
+
+Added 2026-08-04, after a run was asked to look for a named author's workload-identity commits and
+found that all of them predated the comparison baseline.
+
+An instruction to "look at commits by X" or "look for changes to Y" identifies a **body of work**, not
+a time window. The person giving the hint usually knows the work exists but not when it landed
+relative to the last analysis.
+
+Before reporting either presence or absence:
+
+1. search the current delta for the hint;
+2. if absent, search the **full history** and list what was found with dates;
+3. compare those dates to the previous snapshot;
+4. state the resolution explicitly - "this work is real, it is dated A to B, it is at or before the
+   baseline, and it is already analysed in sections N and M."
+
+"Already covered, here is where" is a complete and useful answer. Silently reporting "no changes
+found" wastes the hint, and re-deriving already-analysed work wastes the run.
 
 ### 1.4 Determine previous snapshots
 
@@ -464,6 +673,117 @@ Map:
 - live-test and workflow support.
 
 Do not assume the number or names of methods from docs. Derive them from routes, guards, providers, DTOs, persistence, and tests.
+
+### 4.1.1 Registry breadth is not capability
+
+Verified 2026-07-31: the SCIMServer admin registry accepts **ten** method types while only **four**
+have a runtime provider, and SCIM discovery maps all ten to scheme names. Every run must:
+
+- enumerate the declared method-type registry (`admin-authentication-method.controller.ts`);
+- enumerate the actually-wired providers;
+- report the intersection **and** the difference;
+- flag any surface (metadata, discovery, connection info, UI) that publishes a registry type without
+  a provider as a truthfulness defect, not a cosmetic one.
+
+Never report "supports N methods" from a registry constant alone.
+
+### 4.1.2 The canonical guide is an implementation contract
+
+Verified 2026-07-31: SCIMServer source contains **22** citations of this workflow's guide section and
+wave labels (`W2.2`, `W3.4`, `W3.7`, `guide 7.1`, "the SyncFabric guide Section 17"). The guide is no
+longer an external proposal - the team implements from it. Therefore every run must:
+
+1. grep SCIMServer source for guide citations and count them;
+2. for each guide *proposal*, determine whether it shipped, partially shipped, or is untouched;
+3. maintain an explicit **implementation status ledger** in the guide rather than leaving proposals
+   ambiguous;
+4. reconcile proposed file paths against where the code actually landed, and treat the shipped
+   location as canonical;
+5. never restate a shipped item as an outstanding recommendation - that destroys the guide's
+   credibility as a work list.
+
+### 4.1.3 Verify a delegated negative claim by mechanism, not by label
+
+Added 2026-07-31 after two delegated exploration results were wrong in the same direction.
+
+A sub-agent reported that the SCIMServer authentication-methods model was inert and that its JWKS
+client failed closed. Both were false. The first failed because nothing in the codebase is named after
+the design document: the model is consulted through a helper called `resolveEndpointAuthEnablement`,
+so a search for a resolver named after "authentication method" finds nothing and concludes absence.
+
+This is operating principle 3 - no name-based conclusions - reappearing inside a tool rather than
+inside a person, and it is more dangerous there because the output reads as a completed search.
+
+Therefore:
+
+1. **Delegation is for breadth. Verification is not delegable.** Every load-bearing claim taken from a
+   sub-agent must be re-read at the cited `path:line` before it enters the guide.
+2. **Treat a delegated *negative* claim as unverified by default.** "X is not implemented", "nothing
+   consults Y", and "there is no cap on Z" are the highest-risk outputs, because absence of a search
+   hit is indistinguishable from absence of the feature.
+3. **Search for the mechanism, not the label.** To test whether a persisted structure is inert, follow
+   the *data path* (`profile?.authentication?.methods` reaching a decision), not the vocabulary.
+4. **Record every correction in the guide.** A validation report that lists which delegated findings
+   were wrong, and why, is worth more than one that only lists checks that passed.
+
+### 4.1.4 A new authentication family may move away from federation
+
+Added 2026-07-31 after SyncFabric added AWS Identity Center discovery.
+
+The workflow had drifted toward an implicit assumption that SyncFabric is migrating uniformly toward
+federated credentials. It is not. It is federating **the SCIM target surface**. While the WIF programme
+was in flight, a new connector family landed that authenticates with long-lived static IAM access keys
+plus STS `AssumeRole`.
+
+Therefore:
+
+1. **Scope every directional claim to the surface it was proved on.** "SyncFabric is eliminating static
+   secrets" is false as stated; "SyncFabric's SCIM target authentication is federated" is true.
+2. **When a new family uses static credentials, check whether the platform offered a federated
+   option.** AWS supports `AssumeRoleWithWebIdentity`, so a static key pair there is a design choice
+   rather than a platform limit - and that distinction is the whole content of the recommendation.
+3. **Classify the family even when the target repository need not emulate it.** A family that does not
+   touch the SCIM contract still changes the shape of the taxonomy the guide presents, and presenting
+   a taxonomy that implies uniformity is itself a defect.
+4. **Look for identity attribution defects in any assume-role or impersonation path.** A fixed session
+   or actor name collapses per-tenant attribution in the *customer's* audit log, which is the hardest
+   class of problem for the customer to diagnose and the cheapest for the service to fix.
+
+### 4.1.5 Credential-type enums get semantically overloaded
+
+Added 2026-07-31.
+
+`KnownSecretType` in SyncFabric now carries, for one connector family, an AWS access key ID in
+`ClientIdentifier`, a secret access key in `ClientSecret`, an AWS **region** in `Server`, and an IAM
+**role name** in `InstanceName`.
+
+The consequence is specific and worth stating rather than generalising: any claim that credential
+handling, redaction, rotation, or telemetry can be reasoned about generically **from the secret type**
+must be re-tested per connector family, because the type no longer determines what the value is. When
+a run makes such a claim, it must name the families it was verified against.
+
+### 4.1.6 Beware name-based traps in the authentication vocabulary
+
+Added 2026-08-04, after four newly added `ApplicationIdentifierDelos` constants surfaced in an
+authentication keyword filter and were nearly classified as workload-identity changes.
+
+Authentication vocabulary is not reserved vocabulary. In SyncFabric, "application identifier" denotes a
+**ConnectedDirectory** identifier used by HybridSync and CloudSync - not an Entra application ID. A
+filter tuned for `application`, `identity`, `principal`, `credential`, or `token` will surface these
+and other homonyms.
+
+Before classifying a keyword hit as authentication-relevant:
+
+- read the declaring type and its namespace, not just the constant name;
+- establish which **plane** it belongs to - SCIM target authentication, management-plane authorization,
+  directory topology, or deployment configuration;
+- if it belongs to a different plane, record it as cleared **with the reason**, so a later run does not
+  re-investigate the same false positive.
+
+The corollary is also true and was seen in the same run: a management-plane authorization change - the
+removal of two RBAC feature flags making check-access unconditional - is genuinely security-relevant
+and genuinely **not** part of the SCIM target contract. Adjacent is not the same as in-scope, in
+either direction.
 
 ### 4.2 Trace each method end to end
 
@@ -912,6 +1232,68 @@ For each architectural decision:
 
 Include a compact complexity budget and simplification delta.
 
+### 9.4 A gate must be able to fail
+
+Added 2026-07-31, prompted by SCIMServer commit `d55faf97`, "fix(gates): live-test could never fail a
+deployment".
+
+A gate that cannot fail is worse than no gate. It produces the paperwork of assurance without the
+assurance, and it actively suppresses the question it was created to keep open.
+
+Every empirical gate, release gate, or acceptance criterion this workflow defines must therefore carry,
+as part of its own definition:
+
+- the **condition** it asserts;
+- the **observation** that satisfies it;
+- a **demonstration that it fails** when the condition is false - a negative test, an injected fault,
+  or a recorded failing run.
+
+When a run carries a gate forward without that third element, it must say so, because an untested gate
+is an open question wearing a closed label.
+
+### 9.4.1 A merge-semantics test needs a strict-subset input
+
+Added 2026-08-04, as a specific corollary of 9.4, after SCIMServer commit `41c293cc` replaced a test
+that could not detect the behaviour named in its own title.
+
+The test was called *"should replace SPC when provided in partial profile"* and supplied **every**
+key of the section under test. Under wholesale replacement and under per-key merge, a complete input
+produces identical output - so the test passed regardless of which behaviour the source implemented.
+It asserted nothing about merging while appearing to be the merge test.
+
+Whenever this workflow evaluates or specifies a test over merge, patch, override, or replace
+semantics:
+
+- the partial input **must be a strict subset** of the current value, so that at least one key exists
+  in the current state and not in the partial;
+- the assertion must distinguish the two candidate behaviours by the fate of exactly those absent
+  keys;
+- the negative control must be **demonstrated** - flipping the source to the other behaviour turns the
+  test red - not assumed.
+
+Generalised: a test whose input makes two candidate behaviours indistinguishable is a gate that cannot
+fail, and 9.4 applies to it in full.
+
+### 9.5 Configuration-plane semantics are part of the authentication contract
+
+Added 2026-08-04, after a refresh in which no token-path file changed on either side and yet the
+authentication analysis changed materially.
+
+An authentication runtime is only as safe as the configuration that reaches it. A run must not
+conclude "authentication is unchanged" from runtime-blob invariance alone. Also examine, on the ISV
+side:
+
+- how a partial configuration update is merged, **per section**, and whether any auth-bearing section
+  is replaced wholesale while a neighbouring section merges per key;
+- whether concurrent configuration writes can lose an update - read-modify-write plus wholesale
+  replacement plus no version guard is a silent lost-update race;
+- whether every auth configuration mutation emits a **structured** audit event, and specifically
+  whether the highest-blast-radius mutation is covered;
+- whether the documented semantics match the implemented semantics in every place they are stated.
+
+When runtime blobs are invariant but configuration semantics changed, state both plainly and do not
+let the first finding imply the second.
+
 ---
 
 ## Phase 10 - Update the canonical guide
@@ -919,6 +1301,36 @@ Include a compact complexity budget and simplification delta.
 ### 10.1 Update in place
 
 Revise the guide rather than appending a second report.
+
+**A guide must not contradict itself.** Added 2026-07-31: revision 3 corrected two conclusions in its
+body ("advertises RFC 8693", "returns HTTP 201") while leaving both standing in its executive summary.
+Operating principle 14 - one canonical guide, no appended contradictions - governs a document's
+internal consistency, not only its relationship to older documents. Every run must therefore:
+
+- grep the guide for each newly superseded claim and fix **every** occurrence, summary included;
+- prefer deleting a disproved bullet over annotating it, and record the deletion with its evidence in
+  a short note, so a reader of an older revision can see the requirement was met rather than dropped;
+- treat a contradiction between a summary and a body as a defect of the same severity as a wrong fact.
+
+**Filename suffixes are not recency - and neither is location.** Extended 2026-07-31 after a run
+found the canonical session copy of the guide holding **revision 3** while **revision 4** existed only
+inside a git worktree. Editing the file the run happened to find would have silently reverted a whole
+revision of work.
+
+Before the first edit of any run:
+
+1. **Enumerate every copy** of the guide reachable from the session directory, the source repositories,
+   and any worktree, and read the revision number from each header.
+2. **If the copy at the canonical path is not the highest revision, do not edit it.** Verify the higher
+   revision is a strict **superset** first - compare the level-2 section sets and confirm none was
+   dropped - then promote it into the canonical path, preserving the older file under an explicitly
+   superseded name.
+3. **Record the promotion in the guide**, so a reader can see why the revision number jumped relative
+   to the file they remember.
+4. The header must carry a revision number and an identity table for every sibling copy, including its
+   location and whether it is canonical, an authoring copy, a stale mirror, or superseded. A file
+   cannot state its own hash, so record authoritative hashes in the memory run log and reference them
+   from the header.
 
 Mandatory updates:
 
@@ -990,14 +1402,23 @@ Validate:
 - sequential numbered sections;
 - every JSON block parses;
 - every PowerShell block parses;
-- Mermaid blocks parse with an available renderer;
+- Mermaid blocks parse with the **real** `mermaid.parse()` engine, not a regex linter - a regex linter
+  has already passed a diagram the real parser rejected;
 - URLs resolve with GET when HEAD is unsupported;
 - no stale snapshot SHA remains in current-source headers;
 - no unresolved `TODO`, `TBD`, or `FIXME` unless explicitly an open action;
 - no raw tokens/secrets/private keys;
 - no fabricated production domain or app ID presented as real;
 - ASCII requirement;
-- guide hash, line count, diagram count, and example count.
+- guide hash, line count, diagram count, and example count. **Hash the file BYTES on disk** (for example
+  `Get-FileHash`). A validator that reads the file with universal-newline translation hashes a different
+  byte sequence and yields a different, useless value - two hashes for one file defeats the purpose of
+  recording one;
+- **every backtick-quoted repository path resolves in one of the two repos, or is explicitly labelled
+  as a proposed/not-yet-created file** - an unresolved path that is *not* labelled is a defect;
+- **fenced code must not be nested inside a blockquote** when it needs to be machine-validated; put
+  the prose in the blockquote and the fenced block immediately after it, otherwise the `> ` prefix
+  makes JSON and PowerShell validation fail spuriously.
 
 ### 11.3 Repository verification
 
@@ -1179,17 +1600,60 @@ End with:
 ## Prompt metadata
 
 ```yaml
-promptVersion: 1.0.1
+promptVersion: 1.4.0
 created: 2026-07-23
-lastExecution: 2026-07-23
-executionCount: 1
+lastExecution: 2026-07-31
+executionCount: 4
 canonicalMemory: .memory/syncfabricScimserverAuthEvolution.memory.md
+lastSyncFabricSnapshot: ac6fb8667cc753e2960003aa611bca803e9dcd1d
+lastScimServerSnapshot: e741c3738a2670f4de6e60351af152f11425af84
+lastScimServerReference: origin/master
+lastGuideRevision: 5
+lastGuideSha256: AD9FA4115644D41E5076CAD4A7E91BF0EB4DBF5C7C069BE5738F37E04E5A8194
+lastGuideSha256Note: SHA-256 of the file BYTES on disk (CRLF), per Get-FileHash. Do not record a hash computed over newline-translated text.
 ```
+
+> **Standing requirement - self-improvement is mandatory, not optional.**
+> Every execution of this prompt **must** end by updating this metadata block, appending a changelog
+> entry, and appending a run entry to the memory file - even when the run finds no source change.
+> A run that does not improve the prompt is an incomplete run. If a run genuinely produced no new
+> lesson, record that explicitly as `no-new-lessons` in the changelog with the reason, rather than
+> silently skipping the step.
 
 ## Prompt changelog
 
 - 2026-07-23, v1.0.0: Initial cross-repository prompt. Added delta-first source refresh, complete 1P analysis, endpoint-persona modeling, standards and performance critique, multi-environment workflows, canonical guide updates, artifact verification, persistent memory, and controlled prompt evolution.
 - 2026-07-23, v1.0.1: First-run improvement. Added mandatory total-deadline/cardinality checks for JWKS work and route-level pre-persistence redaction proof for bearer-credential paths.
+- 2026-07-31, v1.2.0: Second-run improvement, driven by a ~86/~90 commit double-sided delta.
+  - Corrected the SCIMServer defaults: `feat/wif` is merged, so the reference is now `origin/master`, and the repo path is the `SCIMServer-master` worktree.
+  - Added a worktree-resolution caution after reading source from the wrong worktree was identified as a live risk.
+  - Added section 1.3.1 **range completeness rule** after the run analysed `f8fa96f4..f1362f37` while master had advanced to `6bd2ac8e`, leaving an unanalysed tail.
+  - Added section 1.3.2 **large-delta strategy** with auth-vocabulary filtering, four-way bucketing, and a requirement to bank delegated analysis results immediately so they survive interruption.
+  - Added section 4.1.1 **registry breadth is not capability** after confirming ten registry method types against four real providers.
+  - Added section 4.1.2 **the canonical guide is an implementation contract** after finding 22 guide citations in SCIMServer source; runs must now maintain an explicit implementation status ledger and reconcile proposed paths against shipped locations.
+  - Added two artifact-verification rules: all backticked repo paths must resolve or be labelled proposed, and machine-validated fenced blocks must not be nested in blockquotes.
+  - Recorded the last analysed snapshots and guide hash in metadata so the next run cannot silently reuse a stale baseline.
+- 2026-07-31, v1.2.1: Availability and schema hardening.
+  - Replaced the non-schema frontmatter keys `name` and `argument-hint` with the VS Code prompt-file schema keys `description` and `mode: agent`; the argument hint now lives in the body so it renders instead of warning.
+  - Registered a Copilot CLI launcher skill at `~/.copilot/skills/syncfabric-scimserver-auth-evolution/SKILL.md` that loads this file rather than duplicating its rules, so the workflow is `/`-invokable on both surfaces from one source of truth.
+  - Added the **Availability** subsection recording that surface-specific naming differs and that only this file may hold behavior.
+- 2026-07-31, v1.3.0: Third-run improvement, driven by a deliberately small double-sided delta (1 SyncFabric commit, 9 SCIMServer commits) analysed against a **release branch** rather than mainline.
+  - Added section 1.3.3 **small-delta strategy**. The mirror of the large-delta rule: compute the union of changed paths first, and when it is disjoint from the authentication surface, report invariance as a proof by construction rather than as a blob sample. Motivated by `6bd2ac8e..c6f63afc`, whose entire content was two Delos gateway configuration files.
+  - Added section 1.3.4 **release branches and other non-mainline references**, after the run was asked to analyse `release/0.55.0`. Requires recording merge-base, ahead/behind, and strict-ancestry, and requires reading the version from `package.json` rather than inferring it from the branch name - the branch named `release/0.55.0` carried version `0.55.1`.
+  - Added section 4.1.3 **verify a delegated negative claim by mechanism, not by label**, after two sub-agent findings were wrong in the same direction. The instructive one reported the authentication-methods model as inert because the consuming helper is named `resolveEndpointAuthEnablement` and does not contain the searched vocabulary. Delegated negatives are now unverified by default, and corrections must be published in the guide's validation report.
+  - Extended section 10.1 with an **internal-consistency** requirement, after revision 3 of the guide corrected two claims in its body while leaving both standing in its executive summary. A summary that contradicts its own body is a defect of the same severity as a wrong fact.
+  - Extended section 10.1 with a **filename suffixes are not recency** requirement plus a header identity table, after the highest-numbered copy of the guide turned out to be the oldest.
+  - Recorded `lastScimServerReference` in metadata so a future run cannot mistake a release-branch snapshot for a mainline one.
+- 2026-07-31, v1.4.0: Fourth-run improvement, driven by a **double-sided invariance run** (6 SyncFabric commits, 13 SCIMServer commits) in which neither authentication runtime changed.
+  - Added section 1.3.5 **prove invariance before reading diffs**. Compute the changed-path union first, intersect it against the authentication surface, and stop at the first branch that yields a proof. SCIMServer terminated at "union contains zero runtime files"; SyncFabric needed the second tier and produced 78-of-78 identical blobs. This ordering makes the verdict a proof over the whole surface rather than a sample of whatever files were inspected, and it costs minutes.
+  - Added section 1.3.6 **a zero-change run is a result, not a failed run**. Report invariance as the finding, and spend the recovered effort on evidence the delta did not supply - committed proofs, unmerged branches, documentation drift, and citation counts. This run's three most valuable findings all came from that recovered effort.
+  - Added section 1.3.7 **check unmerged branches by content, never by name**. Two SCIMServer branches named `fix/profile-enforcement-*` were 0 commits ahead of mainline and carried nothing; a branch whose name mentions no authentication concept (`feat/per-endpoint-tls-policy`) carried a genuinely new architectural axis. Branch names are the least reliable signal in the repository.
+  - Extended section 10.1 from "filename suffixes are not recency" to **location is not recency**, after the canonical session copy of the guide was found to be a full revision behind a copy living inside a git worktree. A run that edits the file it finds without comparing revisions will silently revert work. Comparison must be by content - confirm superset-ness of the section set - before promoting or overwriting.
+  - Added section 4.1.4 **a new authentication family may move away from federation**. SyncFabric added AWS Identity Center discovery using long-lived static IAM keys plus STS `AssumeRole` while the WIF programme was in flight. Runs must not assume a monotonic migration toward federated credentials, and must scope claims to the surface actually federating.
+  - Added section 4.1.5 **credential-type enums get semantically overloaded**. `KnownSecretType.ClientIdentifier` now carries an AWS access key ID and `Server` carries a region. Any claim that credential handling can be reasoned about generically from the secret *type* must be re-tested rather than inherited.
+  - Added section 9.4 **a gate must be able to fail**, prompted by SCIMServer `d55faf97` ("live-test could never fail a deployment"). Every empirical gate this workflow defines must carry, in its own acceptance criteria, a demonstration that it fails when the condition is false.
+  - Added a PowerShell hazard note to section 1.2: `$prev..origin/master` parses as property access and silently produces a `git diff` usage error. Assign the full range string to a variable first.
+  - Recorded `lastGuideRevision` alongside the hash so the revision-identity check is mechanical.
 
 ---
 

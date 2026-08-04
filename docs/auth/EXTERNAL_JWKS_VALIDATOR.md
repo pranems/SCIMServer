@@ -34,7 +34,7 @@ flowchart TD
 | 2 | **SSRF host allowlist** | the `jwksUri` host MUST be on `JWKS_HOST_ALLOWLIST` and the scheme MUST be https. A disallowed host is rejected **before any network call** - the critical anti-SSRF choke point ([architecture section 5.1](AUTHENTICATION_ARCHITECTURE.md#51-placement-table)). |
 | 3 | **Cache by URI** with bounded max-age (`JWKS_CACHE_MAX_AGE_MS`, default 10 min) | a `Map` cache; a fresh entry skips the fetch. |
 | 4 | **Refetch on unknown `kid`** | the header `kid` is peeked; if the cached set lacks it (key rotation), the JWKS is refetched once. |
-| 5 | **Fail closed** | a fetch failure with no usable cached key REJECTS. It never falls back to skipping the signature check. A stale-but-present cache is used as a degraded fallback (logged), never "no check". |
+| 5 | **Fail closed, then fail to stale** | a fetch failure with **no** cached key REJECTS, and it never falls back to skipping the signature check. If a cached copy exists it is served as a degraded fallback (logged at WARN), never "no check". **Caveat - the stale fallback is unbounded:** [external-jwks-validator.service.ts:240-247](../../api/src/oauth/external-jwks-validator.service.ts) returns `this.cache.get(jwksUri)` with **no age test**, unlike `getFreshCached` (line 301) which does enforce `maxAgeMs`. A key set cached weeks ago is therefore still served while the IdP is unreachable. See the open finding below. |
 
 ## Runtime egress hardening (configurable)
 
@@ -73,7 +73,7 @@ config-time discovery/verify paths.
 > | Refresh cadence | every 1 h | on expiry only (no proactive refresh) |
 > | Cache granularity | per `kid` | per `jwksUri` (whole key set) |
 > | Unknown-`kid` refetch | yes, **rate-limited to once per 5 min** | yes, **no rate limit** (guarantee 4 above) |
-> | On fetch failure | serve last-known-good | serve stale (guarantee 5 - already correct) |
+> | On fetch failure | serve last-known-good | serve stale, but with **no maximum stale age** - see guarantee 5. Entra's "last-known-good" is implicitly bounded by its 24 h refresh cycle; ours is bounded by nothing, so a revoked key stays acceptable for as long as the IdP is unreachable. W1.4 must add a hard stale ceiling alongside the TTL raise. |
 >
 > The 10-minute TTL is the direct cause of the periodic ~2,161 ms cold mint measured in
 > [../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md),
