@@ -1420,6 +1420,23 @@ Validate:
   the prose in the blockquote and the fenced block immediately after it, otherwise the `> ` prefix
   makes JSON and PowerShell validation fail spuriously.
 
+**A structural edit must be followed by a section-inventory comparison.** Added 2026-08-04, after an
+insertion performed against a level-2 heading silently consumed that heading - the body survived, the
+heading did not. No existing check could see it: fences stayed balanced, tables stayed well-formed,
+ASCII stayed clean, and every anchor that still existed still resolved. Capture the ordered list of
+level-2 headings before and after a structural edit and compare them; a missing or duplicated section
+number is a failure.
+
+**The validator must itself have a demonstrated negative control.** Added 2026-08-04, after the table
+checker reported two false failures because it split rows on `|` without honouring the Markdown escape
+`\|`. A checker whose failure mode has never been exercised is a gate that cannot be trusted to fail
+correctly, and section 9.4 applies to it as much as to any release gate. Each validation run must
+therefore:
+
+- feed the checker a deliberately broken input and confirm it reports the failure;
+- when a check fires, establish whether the **document** or the **checker** is wrong before editing
+  the document - a false positive fixed by changing the document corrupts the artifact.
+
 ### 11.3 Repository verification
 
 Record final status of both repositories and distinguish:
@@ -1600,17 +1617,21 @@ End with:
 ## Prompt metadata
 
 ```yaml
-promptVersion: 1.4.0
+promptVersion: 1.5.0
 created: 2026-07-23
-lastExecution: 2026-07-31
-executionCount: 4
+lastExecution: 2026-08-04
+executionCount: 5
 canonicalMemory: .memory/syncfabricScimserverAuthEvolution.memory.md
-lastSyncFabricSnapshot: ac6fb8667cc753e2960003aa611bca803e9dcd1d
-lastScimServerSnapshot: e741c3738a2670f4de6e60351af152f11425af84
+lastSyncFabricSnapshot: da0c7b46f16882b17d40a8e7386cce22e4fdb7ee
+lastScimServerSnapshot: 21ca0a95557be1cb643f1b7d9da4a05897843f36
 lastScimServerReference: origin/master
-lastGuideRevision: 5
-lastGuideSha256: AD9FA4115644D41E5076CAD4A7E91BF0EB4DBF5C7C069BE5738F37E04E5A8194
-lastGuideSha256Note: SHA-256 of the file BYTES on disk (CRLF), per Get-FileHash. Do not record a hash computed over newline-translated text.
+lastScimServerVersion: 0.55.2
+lastGuideRevision: 6
+lastGuideSha256: SEE_MEMORY_RUN_LOG
+lastGuideSha256Note: SHA-256 of the file BYTES on disk (CRLF), per Get-FileHash. Do not record a hash computed over newline-translated text. The authoritative value for each revision lives in the memory run log.
+lastSyncFabricAuthSurfaceCount: 77
+lastScimServerAuthSurfaceCount: 92
+authSurfaceCountNote: These are MEASUREMENTS at the snapshots above, recorded only so a later run can detect drift. Per section 1.3.9 they must be re-derived every run and never reported without recomputing.
 ```
 
 > **Standing requirement - self-improvement is mandatory, not optional.**
@@ -1654,6 +1675,16 @@ lastGuideSha256Note: SHA-256 of the file BYTES on disk (CRLF), per Get-FileHash.
   - Added section 9.4 **a gate must be able to fail**, prompted by SCIMServer `d55faf97` ("live-test could never fail a deployment"). Every empirical gate this workflow defines must carry, in its own acceptance criteria, a demonstration that it fails when the condition is false.
   - Added a PowerShell hazard note to section 1.2: `$prev..origin/master` parses as property access and silently produces a `git diff` usage error. Assign the full range string to a variable first.
   - Recorded `lastGuideRevision` alongside the hash so the revision-identity check is mechanical.
+- 2026-08-04, v1.5.0: Fifth-run improvement, driven by an **asymmetric run** - 23 SyncFabric commits with no authentication change, and only 6 SCIMServer commits, one of which changed how authentication configuration is merged. This is the first run where "the runtime did not change" and "authentication behaviour is unaffected" were not the same statement.
+  - Added section 1.3.8 **tier-2 comparison must detect deletions and renames**. Enumerating the surface at `HEAD` and comparing backwards can only inspect files that still exist, so a deleted or renamed file is silently reported as unchanged by omission. Tier-2 now compares the two file lists as sets with `Compare-Object` and reports additions and deletions explicitly, even when both are zero.
+  - Added section 1.3.9 **a surface cardinality is a measurement, not remembered text**, after v1.4.0's "78 of 78" was found to be 77 at every commit checked. The verdict was right and the count was wrong, which is exactly why it survived a revision: nothing forced it to be re-checked. Counts must be recomputed each run, and a correction must fix every occurrence and state whether the supported conclusion is affected.
+  - Added section 1.3.10 **resolve an author or keyword hint against the baseline before treating it as new**. This run was asked to look for a named author's workload-identity commits; all of them predated the baseline and were already analysed. "Already covered, here is where" is a complete answer, and reaching it requires searching full history, not just the delta, when the delta comes up empty.
+  - Added section 4.1.6 **beware name-based traps in the authentication vocabulary**, after four `ApplicationIdentifierDelos` constants surfaced in an auth keyword filter but turned out to be ConnectedDirectory identifiers for CloudSync. Classify by declaring type and plane, and record cleared false positives with their reason so a later run does not re-investigate them. The converse also applies: an unconditional-RBAC change is security-relevant and still out of scope for the SCIM target contract.
+  - Added section 9.4.1 **a merge-semantics test needs a strict-subset input**, as a corollary of 9.4. A test named for replacement supplied every key of the section under test, so wholesale replace and per-key merge produced identical output and it passed either way. Merge tests require a strict-subset partial and a demonstrated negative control.
+  - Added section 9.5 **configuration-plane semantics are part of the authentication contract**. Runtime-blob invariance does not license the conclusion that authentication is unchanged. Runs must examine per-section merge semantics, concurrent-write safety, structured audit coverage of the highest-blast-radius mutation, and doc-versus-implementation agreement.
+  - Added an artifact-verification rule to section 11.2: **a structural edit must be followed by a section-inventory comparison.** An insertion performed against a level-2 heading silently consumed that heading; fences stayed balanced, tables stayed well-formed, and every surviving anchor still resolved, so nothing in the previous check set could catch it.
+  - Added a validator-correctness rule to section 11.2: **the validator itself must have a demonstrated negative control**, after the table checker reported two false failures by splitting on Markdown-escaped `\|`. A checker that has never been shown to fail correctly is subject to 9.4 like any other gate.
+  - Recorded the measured auth-surface cardinalities in metadata explicitly labelled as drift-detection measurements, not as reusable constants.
 
 ---
 

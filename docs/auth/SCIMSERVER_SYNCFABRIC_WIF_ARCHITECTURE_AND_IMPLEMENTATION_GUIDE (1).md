@@ -110,15 +110,48 @@ SCIMServer `origin/master` at `e741c373` - which is byte-identical to `release/0
 
 > **Two facts dominate the current state and must be read before anything else.**
 >
-> 1. **The P0 credential-persistence defect is still open on `master`.** `PERSIST_REQUEST_SECRETS`
->    still defaults to `true`, and `logging-redaction.spec.ts:80-87` now *asserts* that default,
->    so remediation must change a test that encodes the unsafe behavior. Migration
->    `20260724000000_drop_requestlog_endpoint_fk` lets exposed rows outlive their endpoints.
+> 1. **Request-secret persistence is BY DESIGN, not a defect.** See
+>    [the operator decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design).
+>    `PERSIST_REQUEST_SECRETS` defaults to `true` deliberately, so that the request log captures
+>    the full authentication exchange and is actually useful for diagnosing a failing SCIM client.
+>    `logging-redaction.spec.ts:80-87` asserting that default is **correct** - it locks intended
+>    behaviour. Prior revisions of this guide called this a "P0 defect" and repeatedly proposed
+>    flipping it; that proposal was **declined by the operator** and must not be re-raised.
 > 2. **Ten registry method types, four runtime providers.** The admin registry accepts
 >    `shared-secret`, `bearer`, `oauth-client`, `external-jwt`, `wif-7523`, `wif-8693`,
 >    `oauth-authcode`, `mtls`, `dpop`, and `httpbasic`, but only the global shared secret,
 >    per-endpoint bearer, per-endpoint OAuth client credentials, and RFC 7523 WIF have providers.
 >    Registry acceptance is not capability.
+
+### 0.1 Operator decision record - `PERSIST_REQUEST_SECRETS` defaults true, by design
+
+**Decision:** `PERSIST_REQUEST_SECRETS` **defaults to `true` and stays that way.** Request logs
+persist the authentication material exchanged on the request, including assertions, bearer tokens,
+`client_secret` values and `Authorization` headers.
+
+**Status:** Settled. First recorded as declined in the delivery plan at v0.54.63
+("W0.1 secret redaction DECLINED - `PERSIST_REQUEST_SECRETS` stays default true; runtime opt-out
+only"). Re-affirmed by the operator on **2026-08-04**.
+
+**Rationale.** SCIMServer is a **diagnostic SCIM test target**. Its value is that an integrator can
+see exactly what their client sent, including the credential, when an exchange fails. A redacted
+request log makes the most common class of integration failure - "my assertion is being rejected and
+I cannot see why" - undiagnosable. The tool is deliberately optimised for that, and the deployments
+that run it are test estates, not customer data planes.
+
+**This is therefore not a finding, not a defect, and not a P0.** Any future analysis that
+rediscovers `(process.env.PERSIST_REQUEST_SECRETS ?? 'true')` should record it as *intended
+behaviour verified* and move on. Re-proposing the flip wastes review cycles and has now been
+declined twice.
+
+**What remains legitimately in scope** (none of which changes the default):
+
+| Item | Why it is still worth doing |
+|---|---|
+| Per-endpoint `PersistRequestSecrets` override | Already exists. Lets a specific endpoint opt OUT where an integrator does not want capture. Keep it working. |
+| Operator-facing clarity | The behaviour must be *obvious* to whoever runs an estate - documented in the settings reference and visible in the UI, so nobody is surprised by what a log contains. |
+| Retention and access | Rows persist, and migration `20260724000000_drop_requestlog_endpoint_fk` lets them outlive their endpoint. Retention limits and who can read logs are separate, still-open questions from *whether* to capture. |
+| Never widen the blast radius | Capture belongs in the request log only. It must not leak into exports, telemetry, error envelopes, or third-party sinks. |
 
 However, the current release branch is still not a complete SyncFabric counterpart:
 
@@ -710,7 +743,7 @@ a selector-casing bug fix. It does, however, sharpen the Delos picture recorded 
 | RFC 8693 advertised but not implemented | **Corrected** - still unimplemented, but no longer falsely advertised | parser rejects non-`client_credentials`; metadata reports `syncFabricRfc8693: false` |
 | No explicit HTTP 200 on token success | **Fixed** | `@HttpCode(200)` plus `no-store`/`no-cache` on both endpoint and global token controllers |
 | `client_id` unenforced and conflated with assertion `sub` | **Partly fixed** | mismatched `client_id` rejected via `wif_client_id_mismatch`; a **missing** `client_id` is still accepted; connection info now separates `targetClientId` from `expectedAssertionSubject` |
-| `PERSIST_REQUEST_SECRETS` defaults true, so token secrets are persisted | **Still true - P0 OPEN** | `logging.service.ts:124-125` reads `(process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false'`; redaction applies only when the effective flag is false. Line number corrected at revision 4; revision 3 cited `:94-100`, which the intervening commit `7ce0fa74` shifted. |
+| `PERSIST_REQUEST_SECRETS` defaults true, so token secrets are persisted | **BY DESIGN - not a finding** | `logging.service.ts:124-125` reads `(process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false'`; redaction applies only when the effective flag is false. This is the intended diagnostic behaviour - see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design). Line number corrected at revision 4; revision 3 cited `:94-100`, which the intervening commit `7ce0fa74` shifted. |
 | Unverified-`iss` ordering followed by try-every-trust | **Still true** | full loop retained; only refinement is filtering RFC 8693-only trusts out first |
 | JWKS has no stale cap, byte/key/cardinality caps, or total deadline | **Still true** | defaults unchanged; any cached entry is served after a fetch failure regardless of age |
 | Credential index lacks a credential-type component | **Still true** | `schema.prisma` still declares only `@@index([endpointId, active])` |
@@ -1709,7 +1742,7 @@ approximate for this refresh.
 | RFC 8707 `resource` policy | **Implemented** | `ignore` / `optionalExact` / `requiredExact` |
 | Reject a **missing** `client_id` for the RFC 7523 profile | **Not implemented** | `clientId?` optional in the union |
 | RFC 8693 token-exchange handler | **Not implemented** | grant-type check rejects it before routing |
-| Default-off secret persistence | **Not implemented - P0** | `PERSIST_REQUEST_SECRETS ?? 'true'` |
+| Default-off secret persistence | **DECLINED - not planned** | Intended behaviour; see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design) |
 | Exact issuer/profile index instead of try-every-trust | **Not implemented** | full candidate loop retained |
 | JWKS stale-age / byte / key / cardinality caps | **Not implemented** | defaults unchanged |
 | Credential index including credential type | **Not implemented** | `@@index([endpointId, active])` only |
@@ -1755,7 +1788,7 @@ implemented providers before publishing it.
 | `identityModel` | **Partial** | Still mostly telemetry | Different acquisition provenance | Misleading enforcement expectation | Use only as expected-claim policy after empirical validation. |
 | Token endpoint status | **Done** | `@HttpCode(200)` | OAuth token response should be 200 | - | - |
 | Cache headers | **Done** | `Cache-Control: no-store`, `Pragma: no-cache` | OAuth response must not be cached | - | - |
-| **Persisted request logs** | **Open - P0** | `PERSIST_REQUEST_SECRETS` still defaults **true**; a per-endpoint `PersistRequestSecrets` override now exists but the unsafe default stands, and `logging-redaction.spec.ts:80-87` asserts it | Assertions and issued tokens are bearer credentials | Credential disclosure through DB, log API, exports, or backups - now worse, because `20260724000000_drop_requestlog_endpoint_fk` lets rows outlive their endpoints | Redact auth token routes unconditionally, flip the default off, **rewrite the asserting test**, purge history, decide on rotation. |
+| **Persisted request logs** | **By design - accepted** | `PERSIST_REQUEST_SECRETS` defaults **true** deliberately so the request log shows the full authentication exchange; a per-endpoint `PersistRequestSecrets` override allows opt-out, and `logging-redaction.spec.ts:80-87` correctly locks the intended default | Assertions and issued tokens are bearer credentials | Accepted for a diagnostic test target. Residual, still-open concerns are **retention and access**, not capture - `20260724000000_drop_requestlog_endpoint_fk` lets rows outlive their endpoints | Keep the per-endpoint opt-out working; make the behaviour obvious to operators; bound retention and log-read access; never widen capture beyond the request log. See [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design). |
 | Token request size | **Partial** | Global HTTP and body runtime limits added; no assertion-specific cap | Normal JWT assertions are far smaller | Memory/CPU and multi-trust amplification | Add a token-route and assertion byte cap before decode or trust lookup. |
 | Multi-trust fallback | **Open** | Unverified issuer orders candidates; no match still tries every trust sequentially (RFC 8693-only trusts are now pre-filtered) | Exact issuer is already configured on every trust | One request can amplify crypto and JWKS network work by trust count | Index exact issuer; reject no-match without remote work after a compatibility migration; cap active trusts. |
 | JWKS stale fallback | **Open** | Any cached key set can be reused after refresh exhaustion, regardless of age | Availability should not become indefinite trust extension | Revoked/rotated keys can remain accepted during a long outage | Add a hard stale-if-error limit and expose stale age. |
@@ -5119,7 +5152,7 @@ Although it adds RFC 8693 functionality, it reduces the number of implicit behav
 
 1. **Close the RequestLog credential-disclosure path before live-token testing** - *still the top priority*
    - unconditional auth-secret route redaction;
-   - flip the default: `PERSIST_REQUEST_SECRETS` must default **off**;
+   - **do NOT flip the default** - `PERSIST_REQUEST_SECRETS` staying `true` is intended behaviour and the flip has been declined twice; see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design);
    - **rewrite `logging-redaction.spec.ts:80-87`**, which currently asserts default persistence of
      Basic auth credentials, `client_secret`, and `access_token` - the test encodes the defect;
    - sentinel regression tests;
@@ -5454,7 +5487,7 @@ suppresses the question.
 |---|---|---|---|
 | A1 | Commit the refreshed guide, prompt, and memory mirrors from the `SCIMServer-auth-docs` worktree | **Blocking** | Mainline mirrors are revision-2 era and contain two claims this guide has since disproved |
 | A2 | Add transport policy as an explicit persona axis, with handshake-level telemetry beside token-level telemetry | High | A TLS mismatch emits nothing at the token endpoint and reads as a networking fault |
-| A3 | Flip `PERSIST_REQUEST_SECRETS` to default `false` | **P0** | Unchanged and still open at `e741c373` |
+| A3 | ~~Flip `PERSIST_REQUEST_SECRETS` to default `false`~~ | **WITHDRAWN** | Declined by the operator (2026-08-04, and previously at v0.54.63). Capture is intended diagnostic behaviour; retention and access remain in scope, capture does not. See [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design) |
 | A4 | Require `client_id` for the SyncFabric RFC 7523 profile | High | A missing value is still accepted |
 | A5 | Key any future replay denylist on `uti`, not `jti` | Medium | Entra does not emit `jti` |
 | A6 | Surface `azpacr` in the auth decision trace | Medium | Cheap, and it distinguishes secret-authenticated from certificate-authenticated callers, which is also the fastest way to confirm which SyncFabric acquisition path actually ran |
@@ -5579,7 +5612,7 @@ and the issued token now carries `jti` while `typ=at+jwt` remains absent.
 
 | Finding | Status at `21ca0a95` | Evidence |
 |---|---|---|
-| **P0 - RequestLog credential disclosure** | **STILL OPEN.** `PERSIST_REQUEST_SECRETS` defaults `true`. | `logging.service.ts:124` reads `(process.env.PERSIST_REQUEST_SECRETS ?? 'true')`; the flag registry documents the default as true. |
+| **RequestLog secret capture** | **NOT A FINDING - by design, re-affirmed 2026-08-04.** `PERSIST_REQUEST_SECRETS` defaults `true` intentionally. | `logging.service.ts:124`. The default is deliberate and the asserting test is correct; see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design). |
 | JWKS unbounded stale age | **STILL OPEN.** | `external-jwks-validator.service.ts:240-247` returns `this.cache.get(jwksUri)` with no age test, while `getFreshCached` (line 301) does enforce `maxAgeMs`. |
 | Ten accepted method types vs implemented providers | **STILL OPEN.** | `KNOWN_METHOD_TYPES` holds ten values; `mtls` and `dpop` do not appear in the `authentication-schemes.ts` scheme map at all. |
 | Missing `client_id` accepted | **STILL OPEN.** | A mismatched `client_id` is rejected with `wif_client_id_mismatch` (`wif-assertion-token.provider.ts:173,194`); a missing one is not. |
