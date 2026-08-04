@@ -1,7 +1,9 @@
 # Schema Attribute Customization Guide
 
-> **Version**: 1.0 - **Date**: April 28, 2026 - **Status**: ✅ Complete (source-verified)  
-> **SCIMServer**: v0.40.0 - **Audience**: Operators, ISV admins, Entra ID integration engineers  
+> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.1`
+
+> **Version**: 1.1 - **Date**: 2026-08-04 - **Status**: Complete (PATCH merge semantics re-verified against `mergeProfilePartial()` on 2026-08-04; the full line-by-line source pass dates from v0.40.0)  
+> **Audience**: Operators, ISV admins, Entra ID integration engineers  
 > **Scope**: Per-endpoint attribute characteristic changes - canonicalValues, required, mutability, uniqueness, caseExact, returned
 
 ---
@@ -256,19 +258,22 @@ Save `response.profile.schemas` - the full array you'll modify and return.
 Find the attribute in the schemas array and change/add the characteristics you want.
 
 **Top-level attribute** - directly in `schemas[].attributes[]`:
-```json
+```jsonc
+// Schematic shape - "..." marks the remaining characteristics.
 { "name": "title", "type": "string", "canonicalValues": ["Engineer", "PM"], ... }
 ```
 
 **Sub-attribute** - inside `schemas[].attributes[].subAttributes[]`:
-```json
+```jsonc
+// Schematic shape - "..." marks the remaining characteristics.
 { "name": "addresses", "subAttributes": [
     { "name": "country", "canonicalValues": ["US", "IN"], ... }
 ]}
 ```
 
 **Extension attribute** - in the extension schema's `attributes[]`:
-```json
+```jsonc
+// Schematic shape - "..." marks the remaining characteristics.
 { "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
   "attributes": [{ "name": "department", "canonicalValues": ["HR", "Finance"], ... }]}
 ```
@@ -289,10 +294,18 @@ Content-Type: application/json
 
 > **CRITICAL**: `profile.schemas` is **replaced wholesale**. Include ALL schemas with ALL attributes. Omitting a schema or attribute removes it from the endpoint.
 
+> **You do not need to resend `resourceTypes`.** Omitting a section preserves it. But the
+> retained resource types are re-validated against your new `schemas[]`, so dropping a
+> schema URN that an existing resource type binds to fails the whole PATCH with
+> `400 Profile validation failed: ResourceType "..." references schema "..." which is not
+> in the schemas array.` Nothing is persisted when that happens. See
+> [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md#profile-merging-on-patch).
+
 ### Step 4 (Optional) - Enable StrictSchemaValidation
 
 If not already enabled, add to the same PATCH:
-```json
+```jsonc
+// Schematic shape - "[ ... ]" stands for the complete schemas array from Step 2.
 {
   "profile": {
     "schemas": [ ... ],
@@ -498,7 +511,8 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Characteristic:** `canonicalValues` on sub-attribute  
 **Schema:** `urn:ietf:params:scim:schemas:core:2.0:User` → `addresses` → `country`
 
-```json
+```jsonc
+// Schematic shape - "...other sub-attributes..." marks the elided RFC sub-attributes.
 { "name": "addresses", "type": "complex", "multiValued": true,
   "subAttributes": [
     { "name": "country", "type": "string", "caseExact": false,

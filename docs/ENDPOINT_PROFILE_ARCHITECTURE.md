@@ -1,7 +1,9 @@
 # Endpoint Profile Architecture
 
-> **Version:** 0.53.0 - **Updated:** June 3, 2026  
-> **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/)
+> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.1`
+
+> **Updated:** 2026-08-04  
+> **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 
 ---
 
@@ -196,7 +198,8 @@ The auto-expand engine (implemented in `auto-expand.service.ts`) converts shorth
 
 When a schema uses `"attributes": "all"`, it's expanded to the complete RFC 7643 attribute list for that schema URN:
 
-```json
+```jsonc
+// Schematic shape - "..." marks elided attributes, not a literal value.
 // Input (shorthand)
 { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" }
 
@@ -214,7 +217,8 @@ When a schema uses `"attributes": "all"`, it's expanded to the complete RFC 7643
 
 For partial attribute definitions, the engine merges with the RFC baseline:
 
-```json
+```jsonc
+// Schematic shape - two documents shown for before/after comparison.
 // Input: operator overrides just required
 { "name": "displayName", "required": true }
 
@@ -312,22 +316,187 @@ These caches enable O(1) lookups during request processing instead of scanning t
 
 ## Profile Merging on PATCH
 
-When updating an endpoint via PATCH, profile sections are merged with different strategies:
+`PATCH /scim/admin/endpoints/{endpointId}` accepts a **partial** profile. Each of the five
+sections is merged with its own strategy by `mergeProfilePartial()` in
+[endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts) (lines 768-815),
+and the **merged** document is then re-validated as a whole by `validateAndExpandProfile()`.
 
-| Section | Merge Strategy | Rationale |
-|---------|---------------|-----------|
-| `settings` | **Deep merge** | Individual flags can be toggled without re-specifying all |
-| `schemas` | **Replace** | Schema definitions are structural - partial merge would be ambiguous |
-| `resourceTypes` | **Replace** | Resource types are structural |
-| `serviceProviderConfig` | **Replace** | SPC is a unit configuration |
+### The two rules that govern every PATCH
+
+1. **A section you omit is preserved.** Every branch is guarded by
+   `if (partial.<section> !== undefined)`, so leaving `schemas` out of the body cannot
+   wipe it. Toggling one flag never endangers the schema set.
+2. **A section you include is taken at face value.** For `schemas` and `resourceTypes`
+   the whole array is swapped in. Sending a one-element `schemas` array leaves the
+   endpoint with exactly one schema.
+
+### Merge strategy per section
+
+| Section | Strategy when **present** | Effect when **omitted** | Source line | Rationale |
+|---------|---------------------------|-------------------------|-------------|-----------|
+| `schemas` | **Replace whole array** | Preserved unchanged | 785-787 | Schema definitions are structural - a positional merge would be ambiguous |
+| `resourceTypes` | **Replace whole array** | Preserved unchanged | 789-791 | Resource types are structural and reference schemas by URN |
+| `serviceProviderConfig` | **Per-key merge** - `{ ...current, ...partial }`. A top-level key you send (`patch`, `bulk`, `filter`, `sort`, `etag`, `changePassword`) is replaced **wholesale**; a top-level key you omit is kept | Preserved unchanged | 793-795 | Each capability is an independent sub-object |
+| `settings` | **Per-key merge** - validated by `validateEndpointConfig()` first, then `{ ...current, ...partial }`. `ProfileSettings` is a flat map of scalars, so the effect is per-flag | Preserved unchanged | 797-805 | Individual flags can be toggled without re-specifying all |
+| `authentication` | **Replace wholesale** | Preserved unchanged | 807-809 | The admin authentication-methods API computes the full block and submits it |
+
+> **Correction (2026-08-04):** earlier revisions of this table listed
+> `serviceProviderConfig` as **Replace**. The source performs a spread merge, so
+> omitted top-level capability keys survive a PATCH. Only the keys you actually send
+> are overwritten.
+
+### Decision flow
+
+```mermaid
+flowchart TD
+    START["PATCH /scim/admin/endpoints/{id}<br/>body.profile = partial"] --> HAS{"is there an<br/>existing profile?"}
+    HAS -->|no| FULL["validateAndExpandProfile(partial)<br/>treat the partial as a FULL profile"]
+    HAS -->|yes| COPY["merged = { ...current }"]
+
+    COPY --> S1{"partial.schemas<br/>present?"}
+    S1 -->|yes| S1R["merged.schemas = partial.schemas<br/>REPLACE whole array"]
+    S1 -->|"no (undefined)"| S1K["keep current.schemas"]
+
+    S1R --> S2{"partial.resourceTypes<br/>present?"}
+    S1K --> S2
+    S2 -->|yes| S2R["merged.resourceTypes = partial.resourceTypes<br/>REPLACE whole array"]
+    S2 -->|"no (undefined)"| S2K["keep current.resourceTypes"]
+
+    S2R --> S3{"partial.serviceProviderConfig<br/>present?"}
+    S2K --> S3
+    S3 -->|yes| S3R["spread merge per top-level key"]
+    S3 -->|"no (undefined)"| S3K["keep current SPC"]
+
+    S3R --> S4{"partial.settings<br/>present?"}
+    S3K --> S4
+    S4 -->|yes| S4V["validateEndpointConfig(partial.settings)"]
+    S4V -->|invalid| ERR400["400 BadRequest<br/>nothing is written"]
+    S4V -->|valid| S4R["spread merge per flag"]
+    S4 -->|"no (undefined)"| S4K["keep current settings"]
+
+    S4R --> S5{"partial.authentication<br/>present?"}
+    S4K --> S5
+    S5 -->|yes| S5R["merged.authentication = partial.authentication<br/>REPLACE wholesale"]
+    S5 -->|"no (undefined)"| S5K["keep current authentication"]
+
+    S5R --> VAL["validateAndExpandProfile(merged)"]
+    S5K --> VAL
+    FULL --> VAL
+    VAL -->|"errors[]"| ERR400
+    VAL -->|valid| PERSIST["persist JSONB + refresh cache<br/>+ fire profileChangeListener<br/>+ emit ENDPOINT_UPDATED"]
+    PERSIST --> OK200["200 OK<br/>full endpoint response"]
+```
+
+### Toggling one flag - the safe, minimal PATCH
 
 ```bash
-# Only updates RequireIfMatch, all other settings preserved
+# Only updates RequireIfMatch. schemas, resourceTypes, SPC and every other
+# flag are preserved because they are absent from the body.
 curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
   -d '{"profile": {"settings": {"RequireIfMatch": true}}}'
 ```
+
+### Changing schemas or resourceTypes - always read-modify-write
+
+Because both arrays are replaced wholesale, the only safe pattern is to fetch the
+current profile, edit the arrays in place, and send the **complete** arrays back.
+
+```powershell
+$base = "http://localhost:8080"
+$id   = "<endpointId>"
+$h    = @{ Authorization = "Bearer changeme-scim"; "Content-Type" = "application/json" }
+
+# 1. READ - single-get defaults to view=full, so profile is included
+$current = Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id`?view=full" -Method GET -Headers $h
+
+# 2. MODIFY - append the new extension schema, keep every existing one
+$newSchema = @{
+  id          = "urn:example:params:scim:schemas:extension:device:2.0:Device"
+  name        = "Device"
+  description = "Custom device extension"
+  attributes  = @(
+    @{ name = "serialNumber"; type = "string"; multiValued = $false; required = $false;
+       mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+  )
+}
+
+# Bind the new schema to the User resource type as an extension
+$resourceTypes = $current.profile.resourceTypes
+($resourceTypes | Where-Object { $_.id -eq 'User' }).schemaExtensions += @{
+  schema = $newSchema.id; required = $false
+}
+
+# 3. WRITE - send the COMPLETE arrays back
+$body = @{
+  profile = @{
+    schemas       = @($current.profile.schemas) + $newSchema
+    resourceTypes = @($resourceTypes)
+  }
+} | ConvertTo-Json -Depth 12
+
+Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id" -Method PATCH -Headers $h -Body $body
+```
+
+### Structural integrity is validated across sections
+
+`validateAndExpandProfile()` runs on the **merged** document, so a `resourceTypes[]` entry
+may only reference a schema URN that is present in the merged `schemas[]`. Replacing
+`schemas` without carrying the URNs the resource types depend on is rejected. Captured from
+a live run against `localhost:6000` on 2026-08-04:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/scim+json
+
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "detail": "Profile validation failed: ResourceType \"Group\" references schema \"urn:ietf:params:scim:schemas:core:2.0:Group\" which is not in the schemas array.",
+  "status": "400",
+  "urn:scimserver:api:messages:2.0:Diagnostics": {
+    "requestId": "9eee4966-9472-4938-a98f-01307e175c11",
+    "endpointId": "59a49745-61a3-4e9a-ad5d-4d3f1e4be49c",
+    "logsUrl": "/scim/endpoints/59a49745-61a3-4e9a-ad5d-4d3f1e4be49c/logs/recent?requestId=9eee4966-9472-4938-a98f-01307e175c11"
+  }
+}
+```
+
+Source of the `detail` string: [endpoint-profile.service.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.service.ts) line 131.
+
+A rejected PATCH is atomic - `mergeProfilePartial()` throws before `prisma.endpoint.update()`
+is reached, so the stored profile is left exactly as it was. Verified live: after this 400
+the endpoint still had its previous single resource type.
+
+### When the change takes effect
+
+Immediately, on the next SCIM request. There is no restart and no TTL. After a successful
+PATCH the service replaces the cached endpoint object synchronously, which discards the
+lazily-built `_schemaCaches`, then fires `profileChangeListener` and broadcasts
+`ENDPOINT_UPDATED` on SSE. Discovery (`/Schemas`, `/ResourceTypes`), schema validation and
+characteristic enforcement all read the new profile on the very next call.
+
+### Live verification of this section
+
+Every claim above was measured against a running v0.55.0 server (inmemory backend,
+`localhost:6000`) on 2026-08-04 - 17 assertions, 0 failures. The claims are outcome-level
+(array contents, preserved key sets, persisted state after a rejection), not
+status-code-level.
+
+| # | Claim | Measured outcome |
+|---|-------|------------------|
+| C1 | Omitting a section preserves it | A settings-only PATCH left all 7 schemas, both resource types and all 6 SPC keys byte-identical, while the flag did change |
+| C2 | `settings` merges per flag | A second single-flag PATCH did not clear the flag set by the first |
+| C3 | `serviceProviderConfig` is a **per-key merge** | Sending only `sort` overwrote `sort` and preserved `patch`, `bulk`, `filter`, `changePassword`, `etag` |
+| C4 | `schemas` / `resourceTypes` are replaced | A 1-element `schemas` array took the endpoint from 7 schemas to 1; the EnterpriseUser extension that was not resent was gone |
+| C5 | Cross-section validation, atomic rejection | Adding a `Group` resource type with no Group schema returned `400` with the documented `detail`, and the stored profile was unchanged afterwards |
+| C6 | Read-modify-write goes live immediately | A newly added extension URN appeared in `GET /endpoints/{id}/Schemas` and bound to the User type in `/ResourceTypes` with no restart |
+| C7 | Top-level fields follow omit-preserves | A `displayName`-only PATCH left `name` and the whole profile intact |
+
+C3 is the assertion that corrected this document: the previous revision's **Replace** row
+would have predicted the other five SPC keys disappearing, and they did not.
 
 ---
 

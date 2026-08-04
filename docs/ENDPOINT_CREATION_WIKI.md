@@ -1,8 +1,8 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.1`
+> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.1`
 
-> **Version:** 0.55.1 - **Updated:** June 2, 2026
+> **Version:** 0.55.1 - **Updated:** 2026-08-04
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
 > **Source of truth:** [endpoint.controller.ts](../api/src/modules/endpoint/controllers/endpoint.controller.ts) - [built-in-presets.ts](../api/src/modules/scim/endpoint-profile/built-in-presets.ts)
 
@@ -23,6 +23,7 @@ This is the "start here" page. For deeper reference see:
 - [Recipe 1 - All supported features](#recipe-1---all-supported-features)
 - [Recipe 2 - Everything without manager](#recipe-2---everything-without-manager)
 - [Recipe 3 - Everything without group support](#recipe-3---everything-without-group-support)
+- [Recipe 4 - Change schemas or resource types on an endpoint that already exists](#recipe-4---change-schemas-or-resource-types-on-an-endpoint-that-already-exists)
 - [Turning individual features on/off (flags)](#turning-individual-features-onoff-flags)
 - [Verify your endpoint](#verify-your-endpoint)
 - [Clean up](#clean-up)
@@ -218,6 +219,88 @@ Invoke-RestMethod -Uri "$base/scim/admin/endpoints" -Method Post -Headers $H -Co
 > **Shortcut:** if you do **not** need the Microsoft extensions, the built-in `user-only`
 > preset already removes Groups - just use `profilePreset = "user-only"` instead of the
 > inline-profile approach above.
+
+---
+
+## Recipe 4 - Change schemas or resource types on an endpoint that already exists
+
+You created the endpoint, and now you need different schemas or resource types. Use
+`PATCH /scim/admin/endpoints/{id}` with a partial `profile`.
+
+**The one rule that matters:** `schemas` and `resourceTypes` are **replaced**, never merged
+into. Omit a section and it is preserved untouched; include it and the whole array is
+swapped for what you sent. So never hand-write a short array - always read the current
+profile, edit it, and send the complete arrays back.
+
+```mermaid
+flowchart LR
+    R["1. READ<br/>GET /scim/admin/endpoints/{id}?view=full"] --> M["2. MODIFY<br/>edit profile.schemas and<br/>profile.resourceTypes in place"]
+    M --> W["3. WRITE<br/>PATCH /scim/admin/endpoints/{id}<br/>with the COMPLETE arrays"]
+    W --> V{"merged profile<br/>valid?"}
+    V -->|no| E["400 Profile validation failed<br/>nothing is persisted"]
+    V -->|yes| S["200 OK<br/>live on the very next SCIM request"]
+```
+
+### Add a custom extension schema and bind it to Users
+
+```powershell
+$id = $ep.id      # from Quick Start, or look it up by name
+
+# 1. READ the current profile
+$current = Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id`?view=full" -Headers $H
+
+# 2. MODIFY - define the new extension schema
+$newSchema = @{
+  id          = "urn:example:params:scim:schemas:extension:device:2.0:Device"
+  name        = "Device"
+  description = "Custom device extension"
+  attributes  = @(
+    @{ name = "serialNumber"; type = "string"; multiValued = $false; required = $false
+       caseExact = $false; mutability = "readWrite"; returned = "default"; uniqueness = "none" }
+  )
+}
+
+# ...and bind it to the User resource type
+$rts = $current.profile.resourceTypes
+($rts | Where-Object { $_.id -eq 'User' }).schemaExtensions += @{ schema = $newSchema.id; required = $false }
+
+# 3. WRITE - send the COMPLETE arrays back
+$body = @{
+  profile = @{
+    schemas       = @($current.profile.schemas) + $newSchema
+    resourceTypes = @($rts)
+  }
+} | ConvertTo-Json -Depth 30
+
+Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id" -Method Patch -Headers $H `
+  -ContentType 'application/json' -Body $body | Select-Object id, name
+
+# 4. Confirm it landed in discovery
+Invoke-RestMethod -Uri "$base/scim/endpoints/$id/Schemas" -Headers $H |
+  Select-Object -ExpandProperty Resources | Select-Object id, name
+```
+
+### What each section does on a PATCH
+
+| You send | What happens | You omit it |
+|----------|--------------|-------------|
+| `profile.schemas` | Whole array replaced | Preserved |
+| `profile.resourceTypes` | Whole array replaced | Preserved |
+| `profile.serviceProviderConfig` | Only the capability keys you send are overwritten | Preserved |
+| `profile.settings` | Only the flags you send are overwritten | Preserved |
+| `displayName` / `description` / `active` | Replaced | Preserved |
+
+### Common rejections
+
+| Response | Why | Fix |
+|----------|-----|-----|
+| `400 ... ResourceType "Group" references schema "..." which is not in the schemas array.` | You replaced `schemas` and dropped a URN that a resource type still binds to. The retained resource types are re-validated against your new schemas. | Carry every referenced schema URN, or drop the resource type in the same PATCH |
+| `400 ... Tighten-only violation ...` | You loosened an RFC characteristic on a core attribute | Only tighten - see [SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md](SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md) |
+| Your custom attributes vanished | You sent a short `schemas` array by hand instead of the full one | Redo as read-modify-write |
+
+The change is live immediately - no restart. Deeper reference:
+[ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md#profile-merging-on-patch)
+and [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md).
 
 ---
 

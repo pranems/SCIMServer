@@ -589,11 +589,13 @@ When PATCHing an endpoint's `profile` field:
 | `settings` | **Deep merge** | Individual flags are independent; merging allows updating one flag without resending all |
 | `schemas` | **Full replace** | Schemas are interdependent; partial merge creates invalid states |
 | `resourceTypes` | **Full replace** | Same as schemas  structural, must be consistent |
-| `serviceProviderConfig` | **Full replace** | Capabilities are a coherent unit |
+| `serviceProviderConfig` | **Full replace** (see implementation note below - shipped as a per-key merge) | Capabilities are a coherent unit |
 
 **Example  change one setting without touching schemas:**
-```json
+```http
 PATCH /admin/endpoints/:id
+Content-Type: application/json
+
 {
   "profile": {
     "settings": { "UserSoftDeleteEnabled": "True" }
@@ -603,8 +605,10 @@ PATCH /admin/endpoints/:id
 This deep-merges into existing settings. Schemas, resourceTypes, and SPC remain unchanged.
 
 **Example  replace schemas entirely:**
-```json
+```http
 PATCH /admin/endpoints/:id
+Content-Type: application/json
+
 {
   "profile": {
     "schemas": [ ...new schemas... ]
@@ -1830,6 +1834,15 @@ All design decisions finalized during the March 912, 2026 design sessions.
 | D13 | `custom` built-in preset | **Dropped**  redundant | Just POST with inline `profile` instead |
 | D14 | Auto-expand opt-out | **No opt-out**  always expand and store canonical form | Simplicity; prevents partial/ambiguous stored state |
 | Q6 | Tighten-only override mechanism | **Deferred** | No concrete use case yet; revisit when needed |
+
+> **Implementation note (verified 2026-08-04):** D3 was implemented with one deliberate
+> divergence. `serviceProviderConfig` is **not** fully replaced - `mergeProfilePartial()`
+> spreads it (`{ ...current, ...partial }`), so only the top-level capability keys present
+> in the request are overwritten and omitted ones survive. `schemas` and `resourceTypes`
+> are full-replace as decided, and the later `authentication` block is replaced wholesale.
+> A section absent from the request is always preserved. Canonical table:
+> [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md#profile-merging-on-patch).
+
 ---
 
 ## 15. Implementation Plan

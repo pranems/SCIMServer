@@ -121,6 +121,25 @@
       "maxAgeDays": 120
     },
     {
+      "path": "docs/SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md",
+      "title": "Attribute characteristic customization",
+      "sources": [
+        "api/src/modules/scim/endpoint-profile/tighten-only-validator.ts",
+        "api/src/modules/endpoint/dto/update-endpoint.dto.ts"
+      ],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/ENDPOINT_PROFILE_ARCHITECTURE.md",
+      "title": "Endpoint profile system and PATCH merge semantics",
+      "sources": [
+        "api/src/modules/scim/endpoint-profile/",
+        "api/src/modules/endpoint/services/endpoint.service.ts",
+        "api/src/modules/endpoint/dto/update-endpoint.dto.ts"
+      ],
+      "maxAgeDays": 120
+    },
+    {
       "path": "docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md",
       "title": "PATCH behaviour",
       "sources": ["api/src/domain/patch/", "api/src/modules/scim/utils/scim-patch-path.ts"],

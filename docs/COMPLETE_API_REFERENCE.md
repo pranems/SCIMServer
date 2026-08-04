@@ -282,7 +282,8 @@ Authorization: Bearer changeme-scim
 
 ### PATCH /scim/admin/endpoints/:endpointId
 
-Update endpoint properties. Settings are deep-merged; schemas/resourceTypes/SPC are replaced.
+Update endpoint properties. The body is a **partial** document: any top-level field or
+`profile` section you omit is left untouched.
 
 ```http
 PATCH /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
@@ -303,6 +304,105 @@ Content-Type: application/json
 ```
 
 **Response (200 OK):** Updated endpoint object.
+
+#### Merge semantics per profile section
+
+| Section | Strategy when **present** | Effect when **omitted** |
+|---------|---------------------------|-------------------------|
+| `schemas` | Whole array **replaced** | Preserved unchanged |
+| `resourceTypes` | Whole array **replaced** | Preserved unchanged |
+| `serviceProviderConfig` | Per-key merge - only the top-level capability keys you send are overwritten | Preserved unchanged |
+| `settings` | Per-key merge - only the flags you send are overwritten | Preserved unchanged |
+| `authentication` | Block **replaced** wholesale | Preserved unchanged |
+
+Source: `mergeProfilePartial()` in [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts) lines 768-815. Full walk-through with a decision diagram: [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md#profile-merging-on-patch).
+
+#### Updating schemas and resourceTypes
+
+Both arrays are **replaced**, never appended to. Send the complete set every time -
+including the core `User` and `Group` entries - or the ones you leave out are gone.
+Fetch the current profile first with `GET /scim/admin/endpoints/{id}?view=full`.
+
+```http
+PATCH /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+Content-Type: application/json
+
+{
+  "profile": {
+    "schemas": [
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "name": "User",
+        "attributes": "all"
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "name": "Group",
+        "attributes": "all"
+      },
+      {
+        "id": "urn:example:params:scim:schemas:extension:device:2.0:Device",
+        "name": "Device",
+        "description": "Custom device extension",
+        "attributes": [
+          {
+            "name": "serialNumber",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none"
+          }
+        ]
+      }
+    ],
+    "resourceTypes": [
+      {
+        "id": "User",
+        "name": "User",
+        "endpoint": "/Users",
+        "description": "User Account",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [
+          {
+            "schema": "urn:example:params:scim:schemas:extension:device:2.0:Device",
+            "required": false
+          }
+        ]
+      },
+      {
+        "id": "Group",
+        "name": "Group",
+        "endpoint": "/Groups",
+        "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "schemaExtensions": []
+      }
+    ]
+  }
+}
+```
+
+`"attributes": "all"` is shorthand that the auto-expand engine turns into the full
+RFC 7643 attribute list for a known core schema. Custom schemas need an explicit
+attribute array.
+
+#### Error responses
+
+| Status | Cause |
+|--------|-------|
+| `400` | `Profile validation failed: ...` - the **merged** profile is invalid. Most common: a `resourceTypes[].schema` or `schemaExtensions[].schema` URN that is not present in the merged `schemas[]`, or a tighten-only violation on a core attribute |
+| `400` | An unknown or malformed key in `profile.settings`, rejected by `validateEndpointConfig()` before the merge |
+| `404` | `Endpoint with ID "..." not found` |
+
+Validation runs on the merged document **before** anything is persisted, so a rejected
+PATCH leaves the stored profile untouched.
+
+Deeper guides: [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) for extensions and custom resource types, [SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md](SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md) for attribute characteristics.
 
 ---
 
