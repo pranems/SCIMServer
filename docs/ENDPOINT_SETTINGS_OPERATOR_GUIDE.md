@@ -111,6 +111,18 @@ Four numeric knobs controlling how the server fetches signing keys when verifyin
 | `JwksFetchRetries` | 0 - 10 | 2 |
 | `JwksFetchRetryBackoffMs` | 0 - 10000 | 200 |
 | `JwksCacheMaxAgeMs` | 0 - 86400000 (0 = always refetch) | 600000 |
+| `JwksTotalDeadlineMs` | 100 - 120000 | 10000 |
+| `JwksMaxResponseBytes` | 1024 - 10485760 | 1048576 |
+| `JwksMaxKeys` | 1 - 1000 | 100 |
+| `JwksMaxCacheEntries` | 1 - 1000 | 50 |
+
+The last four are the **W1.5 safety envelope**. `JwksFetchTimeoutMs` bounds a single
+attempt; `JwksTotalDeadlineMs` bounds the whole fetch - every attempt, every backoff
+sleep and every redirect hop combined - which is the number that actually caps how long
+a token mint can wait on a slow IdP. `JwksMaxResponseBytes` and `JwksMaxKeys` bound what
+a single response may cost (`JwksMaxKeys` defaults to 100 rather than something tighter
+because a signing-key cache legitimately holds 10-1000 keys across issuers), and
+`JwksMaxCacheEntries` bounds how many key sets are retained at once, evicting the oldest.
 
 ---
 
