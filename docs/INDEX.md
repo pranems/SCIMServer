@@ -50,6 +50,8 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Government, BLEU (France), China - sovereign cloud deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker Compose build/run, 4-stage Dockerfile, healthcheck, testing |
 | [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) | Running instances, connection info, credentials, Azure costs |
+| [TENANT_09_MIGRATION_PLAN.md](TENANT_09_MIGRATION_PLAN.md) | **Ephemeral tenant cutover 08 -> 09** - measured tenant-08 inventory, coupling register, identity/RBAC bootstrap, data-carry strategy comparison, phased plan P0-P8, risks and effort estimates |
+| [NEW_TENANT_DEPLOY_RCA_2026-05-19.md](NEW_TENANT_DEPLOY_RCA_2026-05-19.md) | The prior 07 -> 08 cross-tenant deploy: 8 issues, root causes, and the preventatives shipped |
 | [PROD_TO_DEV_MIRRORING_AND_FIXTURES.md](PROD_TO_DEV_MIRRORING_AND_FIXTURES.md) | Mirror prod data into dev (IDs intact) + synthetic shape-coverage fixtures |
 | [README_VISUAL_STUDIO_DEBUG.md](README_VISUAL_STUDIO_DEBUG.md) | VS Code debugging - launch configs, remote attach |
 | [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | Zero-access diagnosis - SSE, ring buffer, per-endpoint isolation, 4 workflows |
