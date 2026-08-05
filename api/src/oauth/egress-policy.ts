@@ -30,6 +30,22 @@ export interface EgressPolicy {
   retryBackoffMs: number;
   /** Max age of a cached JWKS before a refetch (ms). */
   cacheMaxAgeMs: number;
+  /**
+   * W1.5 - total wall-clock budget for the WHOLE fetch operation: every
+   * attempt, every backoff sleep, and every redirect hop combined.
+   *
+   * `timeoutMs` bounds one attempt, which is not a bound on the operation:
+   * with `retries: 5` and a 200 ms base backoff the ladder alone sleeps 6.2 s
+   * before the last attempt even starts. This is the number that actually caps
+   * the token-mint hot path.
+   */
+  totalDeadlineMs: number;
+  /** W1.5 - reject a JWKS response body larger than this (bytes). */
+  maxResponseBytes: number;
+  /** W1.5 - reject a key set containing more than this many keys. */
+  maxKeys: number;
+  /** W1.5 - cardinality cap on the JWKS cache; oldest entry is evicted past it. */
+  maxCacheEntries: number;
 }
 
 /** A partial policy (e.g. endpoint-level overrides); unset fields fall through. */
@@ -41,6 +57,13 @@ export const EGRESS_POLICY_DEFAULTS: EgressPolicy = {
   retries: 2,
   retryBackoffMs: 200,
   cacheMaxAgeMs: 10 * 60 * 1000,
+  totalDeadlineMs: 10_000,
+  maxResponseBytes: 1_048_576,
+  // Deliberately generous: Microsoft states a signing-key cache should hold
+  // 10-1000 keys across issuers, so a tight cap (e.g. 10) would reject a
+  // legitimate multi-issuer key set.
+  maxKeys: 100,
+  maxCacheEntries: 50,
 };
 
 /** Inclusive clamp bounds - the same bounds the endpoint-config validator enforces. */
@@ -49,6 +72,10 @@ export const EGRESS_POLICY_BOUNDS = {
   retries: { min: 0, max: 10 },
   retryBackoffMs: { min: 0, max: 10_000 },
   cacheMaxAgeMs: { min: 0, max: 24 * 60 * 60 * 1000 },
+  totalDeadlineMs: { min: 100, max: 120_000 },
+  maxResponseBytes: { min: 1_024, max: 10_485_760 },
+  maxKeys: { min: 1, max: 1_000 },
+  maxCacheEntries: { min: 1, max: 1_000 },
 } as const;
 
 function clamp(value: number, min: number, max: number): number {
@@ -72,11 +99,20 @@ export function resolveServerEgressDefaults(get: (key: string) => string | undef
   const retryBackoffMs = readNumber(get('JWKS_FETCH_RETRY_BACKOFF_MS')) ?? EGRESS_POLICY_DEFAULTS.retryBackoffMs;
   // JWKS_CACHE_MAX_AGE_MS predates this module; keep honoring it as the server default.
   const cacheMaxAgeMs = readNumber(get('JWKS_CACHE_MAX_AGE_MS')) ?? EGRESS_POLICY_DEFAULTS.cacheMaxAgeMs;
+  // W1.5 caps.
+  const totalDeadlineMs = readNumber(get('JWKS_TOTAL_DEADLINE_MS')) ?? EGRESS_POLICY_DEFAULTS.totalDeadlineMs;
+  const maxResponseBytes = readNumber(get('JWKS_MAX_RESPONSE_BYTES')) ?? EGRESS_POLICY_DEFAULTS.maxResponseBytes;
+  const maxKeys = readNumber(get('JWKS_MAX_KEYS')) ?? EGRESS_POLICY_DEFAULTS.maxKeys;
+  const maxCacheEntries = readNumber(get('JWKS_MAX_CACHE_ENTRIES')) ?? EGRESS_POLICY_DEFAULTS.maxCacheEntries;
   return {
     timeoutMs: clamp(timeoutMs, EGRESS_POLICY_BOUNDS.timeoutMs.min, EGRESS_POLICY_BOUNDS.timeoutMs.max),
     retries: clamp(Math.trunc(retries), EGRESS_POLICY_BOUNDS.retries.min, EGRESS_POLICY_BOUNDS.retries.max),
     retryBackoffMs: clamp(retryBackoffMs, EGRESS_POLICY_BOUNDS.retryBackoffMs.min, EGRESS_POLICY_BOUNDS.retryBackoffMs.max),
     cacheMaxAgeMs: clamp(cacheMaxAgeMs, EGRESS_POLICY_BOUNDS.cacheMaxAgeMs.min, EGRESS_POLICY_BOUNDS.cacheMaxAgeMs.max),
+    totalDeadlineMs: clamp(totalDeadlineMs, EGRESS_POLICY_BOUNDS.totalDeadlineMs.min, EGRESS_POLICY_BOUNDS.totalDeadlineMs.max),
+    maxResponseBytes: clamp(Math.trunc(maxResponseBytes), EGRESS_POLICY_BOUNDS.maxResponseBytes.min, EGRESS_POLICY_BOUNDS.maxResponseBytes.max),
+    maxKeys: clamp(Math.trunc(maxKeys), EGRESS_POLICY_BOUNDS.maxKeys.min, EGRESS_POLICY_BOUNDS.maxKeys.max),
+    maxCacheEntries: clamp(Math.trunc(maxCacheEntries), EGRESS_POLICY_BOUNDS.maxCacheEntries.min, EGRESS_POLICY_BOUNDS.maxCacheEntries.max),
   };
 }
 
@@ -96,5 +132,9 @@ export function mergeEgressPolicy(server: EgressPolicy, overrides?: EgressPolicy
     retries: pick(overrides.retries, server.retries, EGRESS_POLICY_BOUNDS.retries.min, EGRESS_POLICY_BOUNDS.retries.max, true),
     retryBackoffMs: pick(overrides.retryBackoffMs, server.retryBackoffMs, EGRESS_POLICY_BOUNDS.retryBackoffMs.min, EGRESS_POLICY_BOUNDS.retryBackoffMs.max),
     cacheMaxAgeMs: pick(overrides.cacheMaxAgeMs, server.cacheMaxAgeMs, EGRESS_POLICY_BOUNDS.cacheMaxAgeMs.min, EGRESS_POLICY_BOUNDS.cacheMaxAgeMs.max),
+    totalDeadlineMs: pick(overrides.totalDeadlineMs, server.totalDeadlineMs, EGRESS_POLICY_BOUNDS.totalDeadlineMs.min, EGRESS_POLICY_BOUNDS.totalDeadlineMs.max),
+    maxResponseBytes: pick(overrides.maxResponseBytes, server.maxResponseBytes, EGRESS_POLICY_BOUNDS.maxResponseBytes.min, EGRESS_POLICY_BOUNDS.maxResponseBytes.max, true),
+    maxKeys: pick(overrides.maxKeys, server.maxKeys, EGRESS_POLICY_BOUNDS.maxKeys.min, EGRESS_POLICY_BOUNDS.maxKeys.max, true),
+    maxCacheEntries: pick(overrides.maxCacheEntries, server.maxCacheEntries, EGRESS_POLICY_BOUNDS.maxCacheEntries.min, EGRESS_POLICY_BOUNDS.maxCacheEntries.max, true),
   };
 }

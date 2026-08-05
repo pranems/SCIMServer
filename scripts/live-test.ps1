@@ -14603,6 +14603,86 @@ try {
 Write-Host "`n--- 9z-CC: Log Display-Name Resolution Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CD: JWKS safety envelope (W1.5)
+$script:currentSection = "9z-CD: JWKS safety envelope (W1.5)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-CD: JWKS safety envelope (W1.5)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    # W1.5 ships the total deadline + response caps CONFIGURABLE FROM BIRTH
+    # rather than as hardcoded literals. These four per-endpoint numeric knobs
+    # OVERRIDE the server env defaults and are bounds-checked by the admin
+    # config validator, exactly like the existing 9z-BF egress knobs.
+    $cdEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-w15-caps-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $cdId = $cdEp.id
+    try {
+        # (1) In-range overrides persist and round-trip.
+        $cdPatch = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{
+                JwksTotalDeadlineMs  = 8000
+                JwksMaxResponseBytes = 262144
+                JwksMaxKeys          = 250
+                JwksMaxCacheEntries  = 25
+            } }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($cdPatch.profile.settings.JwksTotalDeadlineMs -eq 8000) `
+            -Message "9z-CD.T1: JwksTotalDeadlineMs override persists via PATCH (8000)"
+        Test-Result -Success ($cdPatch.profile.settings.JwksMaxResponseBytes -eq 262144) `
+            -Message "9z-CD.T2: JwksMaxResponseBytes override persists via PATCH (262144)"
+        Test-Result -Success ($cdPatch.profile.settings.JwksMaxKeys -eq 250) `
+            -Message "9z-CD.T3: JwksMaxKeys override persists via PATCH (250)"
+
+        $cdGet = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method GET -Headers $headers
+        Test-Result -Success ($cdGet.profile.settings.JwksMaxCacheEntries -eq 25) `
+            -Message "9z-CD.T4: GET re-reads the persisted JwksMaxCacheEntries (25)"
+
+        # (2) Each cap enforces its documented bounds with a 400.
+        $cdBoundCases = @(
+            @{ Key = 'JwksTotalDeadlineMs';  Value = 50;        Label = 'below min (100)' },
+            @{ Key = 'JwksTotalDeadlineMs';  Value = 999999;    Label = 'above max (120000)' },
+            @{ Key = 'JwksMaxResponseBytes'; Value = 10;        Label = 'below min (1024)' },
+            @{ Key = 'JwksMaxKeys';          Value = 0;         Label = 'below min (1)' },
+            @{ Key = 'JwksMaxKeys';          Value = 5000;      Label = 'above max (1000)' },
+            @{ Key = 'JwksMaxCacheEntries';  Value = 0;         Label = 'below min (1)' }
+        )
+        $cdRejected = 0
+        foreach ($case in $cdBoundCases) {
+            $wasRejected = $false
+            try {
+                $body = @{ profile = @{ settings = @{ $case.Key = $case.Value } } } | ConvertTo-Json -Depth 5
+                Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method PATCH -Headers $headers -Body $body | Out-Null
+            } catch {
+                $wasRejected = ($_.Exception.Response.StatusCode.value__ -eq 400)
+            }
+            if ($wasRejected) { $cdRejected++ }
+            Test-Result -Success $wasRejected `
+                -Message "9z-CD.T5: $($case.Key)=$($case.Value) $($case.Label) rejected with 400"
+        }
+        # Guard against a vacuous loop - if the case list were empty every
+        # assertion above would silently pass by never running.
+        Test-Result -Success ($cdBoundCases.Count -eq 6 -and $cdRejected -eq 6) `
+            -Message "9z-CD.T6: all $($cdBoundCases.Count) bound cases were exercised and rejected ($cdRejected/6)"
+
+        # (3) A generous maxKeys is accepted - Microsoft states a key cache holds
+        # 10-1000 keys across issuers, so 1000 must remain configurable.
+        $cdMax = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ JwksMaxKeys = 1000 } }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($cdMax.profile.settings.JwksMaxKeys -eq 1000) `
+            -Message "9z-CD.T7: JwksMaxKeys accepts the documented maximum of 1000"
+    } finally {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method DELETE -Headers $headers | Out-Null
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CD: JWKS safety envelope section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CD: JWKS Safety Envelope Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

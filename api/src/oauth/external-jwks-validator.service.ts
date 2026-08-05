@@ -23,6 +23,21 @@ export interface ExternalJwksVerifyResult {
 /** Allowed signature algorithms - asymmetric only (no HMAC, no `none`). */
 const ALLOWED_ALGS = ['RS256', 'ES256'];
 
+/**
+ * W1.5 - a response that breached a configured cap (byte size, key count).
+ *
+ * Deterministic: the same IdP returning the same oversized body will breach the
+ * cap on every attempt, so retrying wastes the total deadline and then reports
+ * the generic exhaustion message, hiding the real cause. These fail fast and
+ * propagate their own message.
+ */
+export class JwksPolicyViolationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JwksPolicyViolationError';
+  }
+}
+
 /** Cached JWKS entry: the raw key set + the time it was fetched. */
 interface JwksCacheEntry {
   keys: unknown;
@@ -221,29 +236,62 @@ export class ExternalJwksValidatorService implements OnModuleInit {
 
   private async fetchJwksWithRetry(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
     let lastErr: unknown;
+    // W1.5 - one budget for the WHOLE operation. `policy.timeoutMs` bounds a
+    // single attempt, which is not a bound on the work: retries + exponential
+    // backoff can run for tens of seconds on the token-mint hot path.
+    const deadlineAt = Date.now() + policy.totalDeadlineMs;
+    let deadlineExceeded = false;
     // total tries = retries + 1
     for (let attempt = 0; attempt <= policy.retries; attempt++) {
       if (attempt > 0 && policy.retryBackoffMs > 0) {
         const backoff = policy.retryBackoffMs * Math.pow(2, attempt - 1);
         const jitter = Math.floor(Math.random() * policy.retryBackoffMs);
-        await new Promise((r) => setTimeout(r, backoff + jitter));
+        // Never sleep past the deadline - an unbounded sleep is the single
+        // biggest contributor to the worst-case cold path.
+        const sleepFor = Math.min(backoff + jitter, Math.max(0, deadlineAt - Date.now()));
+        if (sleepFor > 0) await new Promise((r) => setTimeout(r, sleepFor));
+      }
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) {
+        deadlineExceeded = true;
+        break;
       }
       try {
-        const keys = await this.fetchJwksOnce(jwksUri, policy);
-        this.cache.set(jwksUri, { keys, fetchedAt: Date.now() });
+        // The attempt may not outlive the total budget either.
+        const attemptTimeoutMs = Math.min(policy.timeoutMs, remaining);
+        const keys = await this.fetchJwksOnce(jwksUri, policy, attemptTimeoutMs);
+        this.cacheKeys(jwksUri, keys, policy);
         return keys;
       } catch (err) {
         lastErr = err;
+        // W1.5 - a cap breach is deterministic; retrying only burns the budget
+        // and then reports the generic exhaustion message instead of the cause.
+        if (err instanceof JwksPolicyViolationError) throw err;
+        if (Date.now() >= deadlineAt) {
+          deadlineExceeded = true;
+          break;
+        }
       }
     }
-    // All attempts failed. Fail-to-stale if a cached copy exists; else fail closed.
+    // All attempts failed (or the budget ran out). Fail-to-stale if a cached
+    // copy exists; else fail closed.
     const cached = this.cache.get(jwksUri);
     if (cached) {
       this.logger.warn(LogCategory.AUTH, 'JWKS fetch failed; using cached keys', {
         jwksUri,
         reason: (lastErr as Error)?.message,
+        deadlineExceeded,
       });
       return cached.keys;
+    }
+    if (deadlineExceeded) {
+      this.logger.error(LogCategory.AUTH, 'JWKS fetch exceeded its total deadline (fail closed)', lastErr, {
+        jwksUri,
+        totalDeadlineMs: policy.totalDeadlineMs,
+      });
+      throw new Error(
+        `JWKS unavailable: exceeded the ${policy.totalDeadlineMs} ms total deadline; failing closed.`,
+      );
     }
     this.logger.error(LogCategory.AUTH, 'JWKS fetch failed and no cached keys (fail closed)', lastErr, {
       jwksUri,
@@ -251,8 +299,80 @@ export class ExternalJwksValidatorService implements OnModuleInit {
     throw new Error('JWKS unavailable; failing closed.');
   }
 
+  /**
+   * W1.5 - cache write with a cardinality cap. Without it the cache is an
+   * unbounded map keyed by a caller-influenced URI, so a large trust set (or a
+   * hostile one) grows process memory without limit. Evicts the oldest entry.
+   */
+  private cacheKeys(jwksUri: string, keys: unknown, policy: EgressPolicy): void {
+    if (!this.cache.has(jwksUri) && this.cache.size >= policy.maxCacheEntries) {
+      let oldestUri: string | undefined;
+      let oldestAt = Number.POSITIVE_INFINITY;
+      for (const [uri, entry] of this.cache.entries()) {
+        if (entry.fetchedAt < oldestAt) {
+          oldestAt = entry.fetchedAt;
+          oldestUri = uri;
+        }
+      }
+      if (oldestUri !== undefined) {
+        this.cache.delete(oldestUri);
+        this.logger.debug(LogCategory.AUTH, 'JWKS cache at capacity; evicted oldest entry', {
+          evicted: oldestUri,
+          maxCacheEntries: policy.maxCacheEntries,
+        });
+      }
+    }
+    this.cache.set(jwksUri, { keys, fetchedAt: Date.now() });
+  }
+
+  /**
+   * W1.5 - read the response body under a byte cap, then bound the key count.
+   *
+   * Falls back to `res.json()` when the response object has no `text()` (some
+   * unit-test doubles), so the cap applies wherever the body can be measured
+   * without breaking those callers.
+   */
+  private async readKeySet(
+    res: { text?: () => Promise<string>; json: () => Promise<unknown> },
+    policy: EgressPolicy,
+    jwksUri: string,
+  ): Promise<unknown> {
+    let parsed: unknown;
+    if (typeof res?.text === 'function') {
+      const body: string = await res.text();
+      const bytes = Buffer.byteLength(body, 'utf-8');
+      if (bytes > policy.maxResponseBytes) {
+        this.logger.warn(LogCategory.AUTH, 'JWKS response exceeded the byte cap', {
+          jwksUri,
+          bytes,
+          maxResponseBytes: policy.maxResponseBytes,
+        });
+        throw new JwksPolicyViolationError(
+          `JWKS response too large: ${bytes} bytes exceeds the ${policy.maxResponseBytes}-byte cap.`,
+        );
+      }
+      parsed = JSON.parse(body);
+    } else {
+      parsed = await res.json();
+    }
+
+    const keyArray = (parsed as { keys?: unknown[] })?.keys;
+    if (Array.isArray(keyArray) && keyArray.length > policy.maxKeys) {
+      this.logger.warn(LogCategory.AUTH, 'JWKS key set exceeded the key-count cap', {
+        jwksUri,
+        keyCount: keyArray.length,
+        maxKeys: policy.maxKeys,
+      });
+      throw new JwksPolicyViolationError(
+        `JWKS contains too many keys: ${keyArray.length} exceeds the maxKeys cap of ${policy.maxKeys}.`,
+      );
+    }
+    return parsed;
+  }
+
   /** A single fetch attempt: timeout-bounded, redirects followed + re-validated. */
-  private async fetchJwksOnce(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
+  private async fetchJwksOnce(jwksUri: string, policy: EgressPolicy, attemptTimeoutMs?: number): Promise<unknown> {
+    const timeoutMs = attemptTimeoutMs ?? policy.timeoutMs;
     const doFetch = this.fetchFn ?? globalThis.fetch;
     // W1.3 - start from the canonical target this URI previously resolved to,
     // so a legacy host's redirect hop is paid once per process instead of on
@@ -264,8 +384,9 @@ export class ExternalJwksValidatorService implements OnModuleInit {
     }
     for (let hop = 0; hop <= MAX_JWKS_REDIRECTS; hop++) {
       const res = await doFetch(current, {
-        // G1 - abort a hung IdP rather than blocking the token mint.
-        signal: AbortSignal.timeout(policy.timeoutMs),
+        // G1 - abort a hung IdP rather than blocking the token mint. W1.5 caps
+        // this at whatever remains of the TOTAL deadline.
+        signal: AbortSignal.timeout(timeoutMs),
         // G2 - do not blindly follow redirects; each hop is re-validated below.
         redirect: 'manual',
       });
@@ -292,7 +413,8 @@ export class ExternalJwksValidatorService implements OnModuleInit {
       if (current !== jwksUri) {
         this.resolvedUri.set(jwksUri, current);
       }
-      return await res.json();
+      // W1.5 - byte cap + key-count cap before the body is trusted.
+      return await this.readKeySet(res, policy, jwksUri);
     }
     throw new Error('JWKS fetch exceeded the redirect limit.');
   }

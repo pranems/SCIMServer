@@ -280,6 +280,45 @@ export const ENDPOINT_CONFIG_FLAGS = {
   JWKS_CACHE_MAX_AGE_MS: 'JwksCacheMaxAgeMs',
 
   /**
+   * W1.5 safety envelope. Per-endpoint override of the TOTAL wall-clock budget
+   * for a whole JWKS fetch - every attempt, every backoff sleep, and every
+   * redirect hop combined. `JwksFetchTimeoutMs` bounds ONE attempt, which is not
+   * a bound on the operation: with 5 retries and a 200 ms base backoff the ladder
+   * alone sleeps 6.2 s. Overrides the server default (env
+   * `JWKS_TOTAL_DEADLINE_MS`, default 10000) when set. Bounds: 100 - 120000 ms.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.totalDeadlineMs
+   */
+  JWKS_TOTAL_DEADLINE_MS: 'JwksTotalDeadlineMs',
+
+  /**
+   * W1.5 safety envelope. Per-endpoint override of the maximum JWKS response
+   * body size in bytes; a larger body is rejected without being parsed.
+   * Overrides the server default (env `JWKS_MAX_RESPONSE_BYTES`, default
+   * 1048576) when set. Bounds: 1024 - 10485760 bytes.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.maxResponseBytes
+   */
+  JWKS_MAX_RESPONSE_BYTES: 'JwksMaxResponseBytes',
+
+  /**
+   * W1.5 safety envelope. Per-endpoint override of the maximum number of keys
+   * accepted in a JWKS. Deliberately generous by default - Microsoft states a
+   * signing-key cache should hold 10-1000 keys across issuers, so a tight cap
+   * would reject a legitimate multi-issuer key set. Overrides the server default
+   * (env `JWKS_MAX_KEYS`, default 100) when set. Bounds: 1 - 1000.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.maxKeys
+   */
+  JWKS_MAX_KEYS: 'JwksMaxKeys',
+
+  /**
+   * W1.5 safety envelope. Per-endpoint override of the JWKS cache cardinality
+   * cap; past it the OLDEST entry is evicted. Without a cap the cache is an
+   * unbounded map keyed by a caller-influenced URI. Overrides the server default
+   * (env `JWKS_MAX_CACHE_ENTRIES`, default 50) when set. Bounds: 1 - 1000.
+   * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.maxCacheEntries
+   */
+  JWKS_MAX_CACHE_ENTRIES: 'JwksMaxCacheEntries',
+
+  /**
    * Request-log privacy. When true (the default, inherited from the server-level
    * `PERSIST_REQUEST_SECRETS` env when unset here), the RequestLog stores and
    * displays the COMPLETE request/response for this endpoint - headers and body,
@@ -602,6 +641,51 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'Overrides the server default (env JWKS_CACHE_MAX_AGE_MS, default 600000) when set. ' +
       'Bounds: 0 - 86400000 ms (0 = always refetch).',
   },
+  JWKS_TOTAL_DEADLINE_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_TOTAL_DEADLINE_MS,
+    type: 'number',
+    default: undefined,
+    min: 100,
+    max: 120000,
+    description:
+      'W1.5 safety envelope: TOTAL budget (ms) for a whole JWKS fetch - all attempts, backoff sleeps ' +
+      'and redirect hops combined. JwksFetchTimeoutMs bounds one attempt, not the operation. ' +
+      'Overrides the server default (env JWKS_TOTAL_DEADLINE_MS, default 10000) when set. ' +
+      'Bounds: 100 - 120000 ms.',
+  },
+  JWKS_MAX_RESPONSE_BYTES: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_MAX_RESPONSE_BYTES,
+    type: 'number',
+    default: undefined,
+    min: 1024,
+    max: 10485760,
+    description:
+      'W1.5 safety envelope: maximum JWKS response body size (bytes); a larger body is rejected before ' +
+      'it is parsed. Overrides the server default (env JWKS_MAX_RESPONSE_BYTES, default 1048576) when set. ' +
+      'Bounds: 1024 - 10485760 bytes.',
+  },
+  JWKS_MAX_KEYS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_MAX_KEYS,
+    type: 'number',
+    default: undefined,
+    min: 1,
+    max: 1000,
+    description:
+      'W1.5 safety envelope: maximum number of keys accepted in a JWKS. Deliberately generous - Microsoft ' +
+      'states a key cache should hold 10-1000 keys across issuers. ' +
+      'Overrides the server default (env JWKS_MAX_KEYS, default 100) when set. Bounds: 1 - 1000.',
+  },
+  JWKS_MAX_CACHE_ENTRIES: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_MAX_CACHE_ENTRIES,
+    type: 'number',
+    default: undefined,
+    min: 1,
+    max: 1000,
+    description:
+      'W1.5 safety envelope: JWKS cache cardinality cap; past it the OLDEST entry is evicted. Without a cap ' +
+      'the cache is an unbounded map keyed by a caller-influenced URI. ' +
+      'Overrides the server default (env JWKS_MAX_CACHE_ENTRIES, default 50) when set. Bounds: 1 - 1000.',
+  },
   PERSIST_REQUEST_SECRETS: {
     key: ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS,
     type: 'boolean',
@@ -773,8 +857,26 @@ export function getConfigNumber(config: EndpointConfig | undefined, key: string)
  */
 export function resolveEndpointEgressOverrides(
   config: EndpointConfig | undefined,
-): { timeoutMs?: number; retries?: number; retryBackoffMs?: number; cacheMaxAgeMs?: number } {
-  const overrides: { timeoutMs?: number; retries?: number; retryBackoffMs?: number; cacheMaxAgeMs?: number } = {};
+): {
+  timeoutMs?: number;
+  retries?: number;
+  retryBackoffMs?: number;
+  cacheMaxAgeMs?: number;
+  totalDeadlineMs?: number;
+  maxResponseBytes?: number;
+  maxKeys?: number;
+  maxCacheEntries?: number;
+} {
+  const overrides: {
+    timeoutMs?: number;
+    retries?: number;
+    retryBackoffMs?: number;
+    cacheMaxAgeMs?: number;
+    totalDeadlineMs?: number;
+    maxResponseBytes?: number;
+    maxKeys?: number;
+    maxCacheEntries?: number;
+  } = {};
   const timeoutMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS);
   if (timeoutMs !== undefined) overrides.timeoutMs = timeoutMs;
   const retries = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_RETRIES);
@@ -783,6 +885,15 @@ export function resolveEndpointEgressOverrides(
   if (retryBackoffMs !== undefined) overrides.retryBackoffMs = retryBackoffMs;
   const cacheMaxAgeMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_CACHE_MAX_AGE_MS);
   if (cacheMaxAgeMs !== undefined) overrides.cacheMaxAgeMs = cacheMaxAgeMs;
+  // W1.5 safety envelope.
+  const totalDeadlineMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_TOTAL_DEADLINE_MS);
+  if (totalDeadlineMs !== undefined) overrides.totalDeadlineMs = totalDeadlineMs;
+  const maxResponseBytes = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_MAX_RESPONSE_BYTES);
+  if (maxResponseBytes !== undefined) overrides.maxResponseBytes = maxResponseBytes;
+  const maxKeys = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_MAX_KEYS);
+  if (maxKeys !== undefined) overrides.maxKeys = maxKeys;
+  const maxCacheEntries = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_MAX_CACHE_ENTRIES);
+  if (maxCacheEntries !== undefined) overrides.maxCacheEntries = maxCacheEntries;
   return overrides;
 }
 
