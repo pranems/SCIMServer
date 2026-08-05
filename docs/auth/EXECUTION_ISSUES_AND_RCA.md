@@ -474,6 +474,8 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ### 10.2 Observation (not a defect) - allowlist revocation does not invalidate cached JWKS
 
+> **RESOLVED 2026-08-05 in W1.4** (v0.55.5). The recommended middle option below was taken: an SSRF/allowlist rejection is now raised as a distinct `JwksHostNotPermittedError` and is explicitly **not stale-eligible**, while a network failure still is. Nothing is purged, so the availability property for real outages is unchanged, and the post-revocation window is closed. The pre-existing W1.3 test that asserted the opposite ("the verify itself still succeeds") was updated in the same commit with the reasoning recorded inline. See [W1_4_JWKS_CACHE_CADENCE.md](W1_4_JWKS_CACHE_CADENCE.md) section 4.2. The original text is kept below because the decision - and why it was deferred rather than fixed on the spot - is the useful part.
+
 While writing the W1.3 re-validation test, the harness surfaced this existing behaviour: if a host
 is removed from `JWKS_HOST_ALLOWLIST` **after** its keys were cached, `verify()` still succeeds
 until the cache entry ages out. The remembered redirect target IS re-validated - no request is
@@ -679,6 +681,71 @@ One non-obvious detail worth recording: **credential cards are filtered by the A
 | I-34 | Stage 5.3 skip audit | Stage 5.3, any run | **months** | Same blind spot as I-31. |
 
 **Headline.** All four escaped for one shared reason: **the gate scored the suite, not the coverage.** 13 skips and an unknown number of vacuous conditionals were compatible with "0 failed" and were therefore reported as success. This is R10 ("presence is not correctness") applied to the test suite itself - the suite's own green is a presence signal, and the outcome that matters is whether each test can actually fail. Dispositions: **(a) applied** for all four in this commit chain; the skip-reason audit is now a standing step whenever the Playwright suite is run against dev.
+
+---
+
+## 10C. Wave 1 addendum IV - W1.4 JWKS cache cadence (2026-08-05)
+
+Scope: the cache redesign (24 h TTL + background refresh + rate-limited unknown-`kid` + hard stale ceiling + `Cache-Control`). Three issues, all Low-to-Medium, and one of them is a **method success** rather than a defect - it is recorded because the method is the reusable part.
+
+| # | Type | Severity | One-line symptom |
+|---|---|---|---|
+| I-35 | Test correctness (method success) | Medium | A live assertion looked like feature evidence but passed against a build without the feature |
+| I-36 | Framework surprise | Low | Two pre-existing tests failed because W1.4 deliberately changed the behaviour they encoded |
+| I-37 | Test harness | Low | Widening a shared interface broke unrelated spec fixtures at compile time |
+
+### 10C.1 I-35 - the negative control worked, and reclassified an assertion (Medium)
+
+**Symptom.** Not a failure. Following the I-30 rule ("run the new assertions against the previous build before deploying; anything that still passes is not testing the change"), the `9z-CE` assertions were run against dev at 0.55.3, which contains no W1.4. Measured:
+
+| Assertion | Against a build WITHOUT W1.4 | Verdict |
+|---|---|---|
+| T1-T3 round-trip | PASS | not testing W1.4 |
+| T5 bounds rejections | **FAIL** (0 of 6) | load-bearing |
+| T7 24 h ceiling accepted | **PASS** | **reclassified** |
+| T8 unregistered round-trip | PASS | control, as designed |
+
+**Root cause of the finding.** `T7` asserts `JwksCacheMaxAgeMs` accepts `86400000`. That was already true before W1.4 - the key and its 24 h ceiling both predate this item; W1.4 raises the **default** to the ceiling, it does not create the ceiling. Written without the control, `T7` would sit in the suite looking like evidence the feature shipped.
+
+**Fix.** `T7` is relabelled in the suite itself as `(regression guard, not W1.4-discriminating)`, with the measurement and date in the comment above it. It is kept, because "the raise did not break the ceiling" is worth locking - it is just not proof of delivery.
+
+**Why this matters.** I-30 was found by accident. This time the control was run deliberately, cost about a minute, and reclassified an assertion **before** it could mislead a future reader. The technique generalises past config: **the cheapest way to find out what a test is testing is to run it against a build that lacks the feature.**
+
+**Prevention.** Already a standing rule from I-30. This run is the evidence that it pays for itself; the addition here is that the OUTCOME of the control belongs in the suite as a label, not just in a commit message.
+
+### 10C.2 I-36 - two pre-existing tests encoded the behaviour W1.4 changes (Low)
+
+**Symptom.** After implementing, `external-jwks-validator.service.spec.ts` failed with `JwksHostNotPermittedError` where it expected success, and the W1.3 test comment read: *"The verify itself still succeeds ... allowlist revocation does not retroactively invalidate cached keys. That is existing behaviour, unchanged by W1.3."*
+
+**Root cause.** Not a regression - the opposite. That test faithfully encoded the RCA 10.2 open question, and W1.4 exists partly to resolve it. The failure is the test doing its job: a deliberate behaviour change should break the test that pinned the old behaviour.
+
+**Fix.** Updated the assertion to expect rejection, and replaced the comment with an explanation of *why* the outcome changed, pointing at RCA 10.2. The property the test has always really guarded - that no request reaches the revoked host - is asserted unchanged.
+
+**Why the fix works.** It keeps the test's original purpose intact while re-pointing the outcome at the new, deliberate contract, and leaves a reader able to reconstruct the decision without archaeology.
+
+**Prevention.** Convention, stated: when a change makes an existing test fail *by design*, the update MUST record the intent inline. A silently "fixed" assertion is indistinguishable from a bug being papered over - the same reasoning as R3 for visual-regression baselines.
+
+### 10C.3 I-37 - widening a shared interface broke unrelated fixtures (Low)
+
+**Symptom.** `egress-policy.spec.ts` failed to compile: `Type '{...}' is missing the following properties from type 'EgressPolicy': refreshIntervalMs, unknownKidMinIntervalMs, staleIfErrorMs`. A `toEqual` on a fully-resolved policy also failed with three unexpected keys.
+
+**Root cause.** `EgressPolicy` is a fully-concrete interface (every field required, by design - it is the resolved policy). Adding a field is therefore a breaking change for every object literal typed as one, including test fixtures. Two fixtures plus one exhaustive `toEqual` were affected.
+
+**Fix.** Added the three fields to both fixtures and extended the `reads each env var` test to actually exercise the three new env vars rather than just satisfying the type.
+
+**Why the fix works.** The exhaustive `toEqual` is the feature, not the friction: it is what guarantees a new policy field cannot be added without a test acknowledging it. Loosening it to `toMatchObject` would remove the only thing that noticed.
+
+**Prevention.** Keep the exhaustive assertion. Note for future policy additions: expect exactly three edits - the two fixtures and the env-var test - and treat a fourth failure as a real finding.
+
+### 10C.4 Escape analysis
+
+| Issue | Caught by | Earliest gate that could have | Escape delta | Note |
+|---|---|---|---|---|
+| I-35 | Stage 4 negative control (deliberate) | same | **none** | The rule from I-30 fired as intended, pre-deploy, and improved the suite rather than catching a defect. This is what a self-improving gate looks like when it is working. |
+| I-36 | Stage 2 (API unit) | same | none | Immediate and unambiguous. |
+| I-37 | Stage 1 (tsc build) | same | none | Compile-time, by construction. |
+
+**Headline.** Zero escapes. The notable entry is I-35, where a rule added in response to an earlier escape (I-30) paid for itself on the very next item - it found a mislabelled assertion **before** it entered the suite as folklore. Dispositions: **(a) applied** for all three in this commit chain.
 
 ---
 

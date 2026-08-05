@@ -14709,6 +14709,112 @@ try {
 Write-Host "`n--- 9z-CD: JWKS Safety Envelope Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CE: JWKS cache cadence (W1.4)
+$script:currentSection = "9z-CE: JWKS cache cadence (W1.4)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-CE: JWKS cache cadence (W1.4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+try {
+    $ceEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name          = "live-w14-cadence-$(Get-Random)"
+        profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $ceId = $ceEp.id
+
+    try {
+        # --- T1-T3: the three cadence knobs persist and re-read ---------------
+        $ceSet = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{
+                settings = @{
+                    JwksRefreshIntervalMs       = 900000
+                    JwksUnknownKidMinIntervalMs = 60000
+                    JwksStaleIfErrorMs          = 7200000
+                }
+            }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($ceSet.profile.settings.JwksRefreshIntervalMs -eq 900000) `
+            -Message "9z-CE.T1: JwksRefreshIntervalMs persisted"
+        Test-Result -Success ($ceSet.profile.settings.JwksUnknownKidMinIntervalMs -eq 60000) `
+            -Message "9z-CE.T2: JwksUnknownKidMinIntervalMs persisted"
+        Test-Result -Success ($ceSet.profile.settings.JwksStaleIfErrorMs -eq 7200000) `
+            -Message "9z-CE.T3: JwksStaleIfErrorMs persisted"
+
+        $ceGet = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method GET -Headers $headers
+        Test-Result -Success (
+            $ceGet.profile.settings.JwksRefreshIntervalMs -eq 900000 -and
+            $ceGet.profile.settings.JwksUnknownKidMinIntervalMs -eq 60000 -and
+            $ceGet.profile.settings.JwksStaleIfErrorMs -eq 7200000
+        ) -Message "9z-CE.T4: all three cadence values re-read from GET"
+
+        # --- T5: bounds rejections - the LOAD-BEARING assertions ---------------
+        # Per RCA I-30, the round-trip above is provided by the settings store,
+        # not by W1.4. Only a bounds rejection requires a registry entry, so
+        # these are the assertions that actually discriminate the feature.
+        $ceBounds = @(
+            @{ Key = "JwksRefreshIntervalMs";       Value = 59999;      Label = "refresh below min 60000" },
+            @{ Key = "JwksRefreshIntervalMs";       Value = 86400001;   Label = "refresh above max 86400000" },
+            @{ Key = "JwksUnknownKidMinIntervalMs"; Value = -1;         Label = "unknown-kid below min 0" },
+            @{ Key = "JwksUnknownKidMinIntervalMs"; Value = 3600001;    Label = "unknown-kid above max 3600000" },
+            @{ Key = "JwksStaleIfErrorMs";          Value = -1;         Label = "stale ceiling below min 0" },
+            @{ Key = "JwksStaleIfErrorMs";          Value = 604800001;  Label = "stale ceiling above max 604800000" }
+        )
+        $ceRejected = 0
+        foreach ($b in $ceBounds) {
+            $body = @{ profile = @{ settings = @{ $b.Key = $b.Value } } } | ConvertTo-Json -Depth 5
+            try {
+                Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method PATCH -Headers $headers -Body $body | Out-Null
+                Test-Result -Success $false -Message "9z-CE.T5: $($b.Label) should have been rejected"
+            } catch {
+                $ceRejected++
+                Test-Result -Success ($_.Exception.Response.StatusCode.value__ -eq 400) `
+                    -Message "9z-CE.T5: $($b.Label) rejected with 400"
+            }
+        }
+        # Non-vacuous guard: if the loop never ran, the six assertions above
+        # would be silently absent rather than failing.
+        Test-Result -Success ($ceRejected -eq 6) `
+            -Message "9z-CE.T6 (guard): all 6 bounds cases were exercised (got $ceRejected)"
+
+        # --- T7: the 24h TTL maximum is accepted ------------------------------
+        # HONEST LABEL (measured 2026-08-05 by the I-30 negative control): this
+        # assertion PASSES against a build with no W1.4 in it, because
+        # JwksCacheMaxAgeMs and its 24h ceiling both predate W1.4. It is a
+        # REGRESSION GUARD - W1.4 raises the DEFAULT to the ceiling, and this
+        # proves the ceiling itself still accepts that value - not evidence the
+        # feature shipped. T5 is the assertion that discriminates.
+        $ceMax = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ JwksCacheMaxAgeMs = 86400000 } }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($ceMax.profile.settings.JwksCacheMaxAgeMs -eq 86400000) `
+            -Message "9z-CE.T7 (regression guard, not W1.4-discriminating): JwksCacheMaxAgeMs accepts the 24h maximum (86400000)"
+
+        # --- T8/T9: controls (RCA I-30) ---------------------------------------
+        $ceInvented = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ JwksTotallyUnregisteredCadenceXyz = 12345 } }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($ceInvented.profile.settings.JwksTotallyUnregisteredCadenceXyz -eq 12345) `
+            -Message "9z-CE.T8 (control): an UNREGISTERED cadence key also round-trips, so T1-T4 are persistence checks"
+
+        $ceInventedBounded = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ settings = @{ JwksTotallyUnregisteredCadenceXyz = 999999999 } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+            $ceInventedBounded = $false
+        } catch { $ceInventedBounded = $true }
+        Test-Result -Success (-not $ceInventedBounded) `
+            -Message "9z-CE.T9 (control): the unregistered key has NO bounds, while the three W1.4 keys do (T5) - that gap IS the registry entry"
+    } finally {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ceId" -Method DELETE -Headers $headers | Out-Null
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CE: JWKS cache cadence section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CE: JWKS Cache Cadence Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

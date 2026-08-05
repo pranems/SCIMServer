@@ -317,6 +317,12 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see api/src/oauth/egress-policy.ts EGRESS_POLICY_BOUNDS.maxCacheEntries
    */
   JWKS_MAX_CACHE_ENTRIES: 'JwksMaxCacheEntries',
+  /** W1.4 - background refresh cadence for cached JWKS. */
+  JWKS_REFRESH_INTERVAL_MS: 'JwksRefreshIntervalMs',
+  /** W1.4 - floor between synchronous refetches triggered by an unknown kid. */
+  JWKS_UNKNOWN_KID_MIN_INTERVAL_MS: 'JwksUnknownKidMinIntervalMs',
+  /** W1.4 - hard ceiling on the age of cached keys served after a failed refetch. */
+  JWKS_STALE_IF_ERROR_MS: 'JwksStaleIfErrorMs',
 
   /**
    * Request-log privacy. When true (the default, inherited from the server-level
@@ -686,6 +692,44 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'the cache is an unbounded map keyed by a caller-influenced URI. ' +
       'Overrides the server default (env JWKS_MAX_CACHE_ENTRIES, default 50) when set. Bounds: 1 - 1000.',
   },
+  JWKS_REFRESH_INTERVAL_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_REFRESH_INTERVAL_MS,
+    type: 'number',
+    default: undefined,
+    min: 60000,
+    max: 86400000,
+    description:
+      'W1.4 cache cadence: how old a cached JWKS may get before the BACKGROUND sweep refreshes it (ms). ' +
+      'Set below JwksCacheMaxAgeMs so the refresh lands while the entry is still fresh - that is what keeps ' +
+      'the steady-state hot path a cache hit instead of paying a synchronous fetch at every TTL expiry. ' +
+      'Overrides the server default (env JWKS_REFRESH_INTERVAL_MS, default 3600000 = 1h) when set. ' +
+      'Bounds: 60000 - 86400000 ms.',
+  },
+  JWKS_UNKNOWN_KID_MIN_INTERVAL_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_UNKNOWN_KID_MIN_INTERVAL_MS,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 3600000,
+    description:
+      'W1.4 cache cadence: minimum interval between SYNCHRONOUS JWKS refetches triggered by a token bearing ' +
+      'an unknown kid (ms). Without a floor the caller controls our outbound request rate for free - every ' +
+      'request with an unrecognised kid forces a fetch, an amplification vector against the IdP. 0 disables ' +
+      'the limit (pre-W1.4 behaviour). Overrides the server default ' +
+      '(env JWKS_UNKNOWN_KID_MIN_INTERVAL_MS, default 300000 = 5 min) when set. Bounds: 0 - 3600000 ms.',
+  },
+  JWKS_STALE_IF_ERROR_MS: {
+    key: ENDPOINT_CONFIG_FLAGS.JWKS_STALE_IF_ERROR_MS,
+    type: 'number',
+    default: undefined,
+    min: 0,
+    max: 604800000,
+    description:
+      'W1.4 cache cadence: HARD ceiling on the age of cached keys that may be served when a refetch fails ' +
+      '(fail-to-stale). Before W1.4 that path had no age test, so a rotated-out key stayed acceptable for as ' +
+      'long as the IdP was unreachable. 0 disables fail-to-stale entirely (strictest posture). Overrides the ' +
+      'server default (env JWKS_STALE_IF_ERROR_MS, default 172800000 = 48h) when set. Bounds: 0 - 604800000 ms.',
+  },
   PERSIST_REQUEST_SECRETS: {
     key: ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS,
     type: 'boolean',
@@ -866,6 +910,9 @@ export function resolveEndpointEgressOverrides(
   maxResponseBytes?: number;
   maxKeys?: number;
   maxCacheEntries?: number;
+  refreshIntervalMs?: number;
+  unknownKidMinIntervalMs?: number;
+  staleIfErrorMs?: number;
 } {
   const overrides: {
     timeoutMs?: number;
@@ -876,6 +923,9 @@ export function resolveEndpointEgressOverrides(
     maxResponseBytes?: number;
     maxKeys?: number;
     maxCacheEntries?: number;
+    refreshIntervalMs?: number;
+    unknownKidMinIntervalMs?: number;
+    staleIfErrorMs?: number;
   } = {};
   const timeoutMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_FETCH_TIMEOUT_MS);
   if (timeoutMs !== undefined) overrides.timeoutMs = timeoutMs;
@@ -894,6 +944,16 @@ export function resolveEndpointEgressOverrides(
   if (maxKeys !== undefined) overrides.maxKeys = maxKeys;
   const maxCacheEntries = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_MAX_CACHE_ENTRIES);
   if (maxCacheEntries !== undefined) overrides.maxCacheEntries = maxCacheEntries;
+  // W1.4 cache cadence.
+  const refreshIntervalMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_REFRESH_INTERVAL_MS);
+  if (refreshIntervalMs !== undefined) overrides.refreshIntervalMs = refreshIntervalMs;
+  const unknownKidMinIntervalMs = getConfigNumber(
+    config,
+    ENDPOINT_CONFIG_FLAGS.JWKS_UNKNOWN_KID_MIN_INTERVAL_MS,
+  );
+  if (unknownKidMinIntervalMs !== undefined) overrides.unknownKidMinIntervalMs = unknownKidMinIntervalMs;
+  const staleIfErrorMs = getConfigNumber(config, ENDPOINT_CONFIG_FLAGS.JWKS_STALE_IF_ERROR_MS);
+  if (staleIfErrorMs !== undefined) overrides.staleIfErrorMs = staleIfErrorMs;
   return overrides;
 }
 

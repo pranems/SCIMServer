@@ -115,6 +115,9 @@ Four numeric knobs controlling how the server fetches signing keys when verifyin
 | `JwksMaxResponseBytes` | 1024 - 10485760 | 1048576 |
 | `JwksMaxKeys` | 1 - 1000 | 100 |
 | `JwksMaxCacheEntries` | 1 - 1000 | 50 |
+| `JwksRefreshIntervalMs` | 60000 - 86400000 | 3600000 |
+| `JwksUnknownKidMinIntervalMs` | 0 - 3600000 | 300000 |
+| `JwksStaleIfErrorMs` | 0 - 604800000 | 172800000 |
 
 The last four are the **W1.5 safety envelope**. `JwksFetchTimeoutMs` bounds a single
 attempt; `JwksTotalDeadlineMs` bounds the whole fetch - every attempt, every backoff
@@ -123,6 +126,19 @@ a token mint can wait on a slow IdP. `JwksMaxResponseBytes` and `JwksMaxKeys` bo
 a single response may cost (`JwksMaxKeys` defaults to 100 rather than something tighter
 because a signing-key cache legitimately holds 10-1000 keys across issuers), and
 `JwksMaxCacheEntries` bounds how many key sets are retained at once, evicting the oldest.
+
+The three W1.4 cadence knobs control *when* keys are re-read rather than how a
+single fetch behaves. `JwksCacheMaxAgeMs` is how long a cached key set stays
+fresh (now 24 h by default, matching Microsoft's published guidance for its
+signing keys); `JwksRefreshIntervalMs` is the age at which a BACKGROUND sweep
+refreshes it, which is what keeps the hot path a cache hit rather than paying a
+fetch at every expiry. `JwksUnknownKidMinIntervalMs` rate-limits the
+synchronous refetch that a token with an unrecognised `kid` triggers - that path
+is caller-controlled, so without a floor it is an amplification vector against
+the IdP. `JwksStaleIfErrorMs` is the hard ceiling on how old cached keys may be
+and still be served when a refetch fails: raise it to favour availability during
+a long IdP outage, lower it (or set `0`) to favour freshness. Note that an
+allowlist revocation is never stale-eligible regardless of this value.
 
 ---
 

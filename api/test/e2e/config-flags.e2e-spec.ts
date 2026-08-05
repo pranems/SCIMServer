@@ -777,4 +777,75 @@ describe('Config Flags (E2E)', () => {
         .expect(400);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // W1.4 - JWKS cache cadence (refresh / unknown-kid / stale ceiling)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('W1.4 JWKS cache cadence number flags', () => {
+    it('persists the three cadence overrides and re-reads them', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          profile: {
+            settings: {
+              JwksRefreshIntervalMs: 900000,
+              JwksUnknownKidMinIntervalMs: 60000,
+              JwksStaleIfErrorMs: 7200000,
+            },
+          },
+        })
+        .expect(200);
+      expect(res.body.profile.settings.JwksRefreshIntervalMs).toBe(900000);
+      expect(res.body.profile.settings.JwksUnknownKidMinIntervalMs).toBe(60000);
+      expect(res.body.profile.settings.JwksStaleIfErrorMs).toBe(7200000);
+
+      const got = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(got.body.profile.settings.JwksRefreshIntervalMs).toBe(900000);
+      expect(got.body.profile.settings.JwksUnknownKidMinIntervalMs).toBe(60000);
+      expect(got.body.profile.settings.JwksStaleIfErrorMs).toBe(7200000);
+    });
+
+    // RCA I-30: a round-trip is provided by the config STORE, not by the
+    // feature - an unregistered key round-trips identically. Bounds rejection
+    // is the assertion that can only pass once the key is REGISTERED, so these
+    // are the tests that actually discriminate W1.4.
+    it.each([
+      ['JwksRefreshIntervalMs', 59_999, /below the minimum 60000/i],
+      ['JwksRefreshIntervalMs', 86_400_001, /exceeds the maximum 86400000/i],
+      ['JwksUnknownKidMinIntervalMs', -1, /below the minimum 0/i],
+      ['JwksUnknownKidMinIntervalMs', 3_600_001, /exceeds the maximum 3600000/i],
+      ['JwksStaleIfErrorMs', -1, /below the minimum 0/i],
+      ['JwksStaleIfErrorMs', 604_800_001, /exceeds the maximum 604800000/i],
+    ])('rejects out-of-range %s = %s with 400', async (key, value, expected) => {
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { [key as string]: value } } })
+        .expect(400);
+      expect(res.body.detail ?? res.body.message).toMatch(expected as RegExp);
+    });
+
+    it('CONTROL: an UNREGISTERED key round-trips and has no bounds', async () => {
+      // Proves the bounds rejections above are a property of registration, not
+      // of the settings store. Without this control the round-trip test would
+      // pass against a build containing none of W1.4 (RCA I-30).
+      const endpointId = await createEndpointWithConfig(app, token, {});
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { JwksTotallyUnregisteredCadenceXyz: 999_999_999 } } })
+        .expect(200);
+      expect(res.body.profile.settings.JwksTotallyUnregisteredCadenceXyz).toBe(999_999_999);
+    });
+  });
 });

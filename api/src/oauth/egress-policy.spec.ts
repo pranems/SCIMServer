@@ -22,6 +22,9 @@ describe('egress-policy', () => {
           JWKS_FETCH_RETRIES: '4',
           JWKS_FETCH_RETRY_BACKOFF_MS: '150',
           JWKS_CACHE_MAX_AGE_MS: '120000',
+          JWKS_REFRESH_INTERVAL_MS: '900000',
+          JWKS_UNKNOWN_KID_MIN_INTERVAL_MS: '60000',
+          JWKS_STALE_IF_ERROR_MS: '7200000',
         }),
       );
       expect(p).toEqual({
@@ -34,6 +37,10 @@ describe('egress-policy', () => {
         maxResponseBytes: EGRESS_POLICY_DEFAULTS.maxResponseBytes,
         maxKeys: EGRESS_POLICY_DEFAULTS.maxKeys,
         maxCacheEntries: EGRESS_POLICY_DEFAULTS.maxCacheEntries,
+        // W1.4 cache cadence.
+        refreshIntervalMs: 900000,
+        unknownKidMinIntervalMs: 60000,
+        staleIfErrorMs: 7200000,
       });
     });
 
@@ -66,6 +73,10 @@ describe('egress-policy', () => {
       maxResponseBytes: 1_048_576,
       maxKeys: 100,
       maxCacheEntries: 50,
+      // W1.4 cache cadence.
+      refreshIntervalMs: 3_600_000,
+      unknownKidMinIntervalMs: 300_000,
+      staleIfErrorMs: 172_800_000,
     };
 
     it('returns the server policy when there are no overrides', () => {
@@ -113,6 +124,10 @@ describe('egress-policy', () => {
       maxResponseBytes: 1_048_576,
       maxKeys: 100,
       maxCacheEntries: 50,
+      // W1.4 cache cadence.
+      refreshIntervalMs: 3_600_000,
+      unknownKidMinIntervalMs: 300_000,
+      staleIfErrorMs: 172_800_000,
     };
 
     it('has floor defaults for every new cap', () => {
