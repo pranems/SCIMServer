@@ -501,9 +501,91 @@ while closing the revocation window. That is the recommended resolution.
 
 ---
 
+## 10A. Wave 1 addendum II - W1.5 JWKS safety envelope (2026-08-04)
+
+> **Scope.** Section 10 covers the 2026-07-28 perf-foundation frictions (I-22 to I-24). This addendum covers **W1.5** - the JWKS total deadline plus response caps, api v0.55.3 - and continues the numbering at **I-25**. Feature doc: [W1_5_JWKS_SAFETY_ENVELOPE.md](W1_5_JWKS_SAFETY_ENVELOPE.md). Per the standing rule, every issue of every type is recorded, including the low-severity tooling friction.
+>
+> **Capture timing.** Written incrementally at fix-confirmation time per discipline **D1**, not retrofitted at build end.
+
+### 10A.1 Addendum dashboard
+
+| ID | Title | Type | Sev | Surfaced in | Detected at | Status | Fix |
+|---|---|---|---|---|---|---|---|
+| I-25 | A `maxKeys` test PASSED before the cap existed - duplicate-`kid` rejection matched the assertion's `/keys/i` pattern | T3 | **High** | W1.5 | Stage 0 (RED run, per-test inspection) | Fixed | 85bd9aa4 |
+| I-26 | Live suite ran against a **4-day-old process serving 0.55.0**; readiness probe printed the version but never asserted it | T4 | **High** | W1.5 | Stage 4 (live, local node) | Fixed (runner) | 85bd9aa4 |
+| I-27 | Lint ratchet appeared breached (511 vs remembered 504); the baseline had moved AND the change added one | T3 | Low | W1.5 | Stage 1 (lint) | Fixed | 85bd9aa4 |
+| I-28 | Two documentation gates blocked the push (F1 version coupling; C3/C5 doc-claims-vs-source) | T7 | Low | W1.5 | Stage 1 (pre-push) | Fixed | ba8435dd, ad214675 |
+| I-29 | A fresh `git worktree` could not run tests - `node_modules` is not shared and the npm registry is TLS-blocked on this machine | T7 | Low | W1.5 | Stage 0 (setup) | Worked around | n/a |
+
+```mermaid
+pie showData
+    title W1.5 issues by severity (5 total)
+    "High (false signal)" : 2
+    "Low (friction / gates working)" : 3
+```
+
+Both High-severity entries are **false signals rather than product defects**: a test that passed for the wrong reason, and a suite that ran against the wrong binary. Neither would have been visible in a suite total; both were caught by checking *which* assertions ran and *what* they ran against.
+
+> **Verified-and-dismissed non-issues.** (a) The `res.json()` fallback in `readKeySet` is a deliberate compatibility choice for existing test doubles that expose no `text()`, not an unguarded path - the byte cap simply does not apply where the body cannot be measured, and every real `Response` has `text()`. (b) The 7 failures in the first live run were **entirely** attributable to I-26 (wrong binary) and did not recur once the correct build was under test - 1,385/1,385.
+
+### 10A.2 I-25 (High, T3) - a test that passed before the feature existed
+
+- **Symptom.** On the RED run, `rejects a key set with more keys than maxKeys` **passed** - before any cap had been written. Three other W1.5 behaviour tests failed as expected.
+- **Root-cause analysis.** The fixture reused a single key three times: `{ keys: [k, k, k] }`. `jose.createLocalJWKSet` rejects a key set containing duplicate `kid` values, and that rejection message satisfied the assertion's loose `/keys/i` pattern. The test was green for a reason wholly unrelated to the behaviour under test, and would have stayed green if the cap had never been implemented at all.
+- **Fix.** Three **distinct** keys (`kid-1`, `kid-2`, `kid-3`) so the key set is valid and `kid-1` resolves; a tightened pattern (`/too many keys|maxKeys|key count/i`); and a companion boundary test asserting a set of **exactly** `maxKeys` is accepted.
+- **Why the fix works.** The positive and negative controls now differ by exactly one key, and the key set is valid in both. Nothing but the cap can produce the rejection, so the test can only pass once the cap exists and is off-by-one-correct.
+- **Prevention.** Same class as **I-05** (a loose `token` regex matching `issuedTokenTtlSec`). The generalizable rule: **a loose `/keyword/i` assertion is a false-green generator whenever the code under test shares vocabulary with its dependencies** - and a JWKS validator shares all of its vocabulary with `jose`. No new gate: Stage 0 caught it, because the RED run was inspected **per test** rather than by suite total. That inspection habit is the control, and it is now stated explicitly in the feature doc.
+
+### 10A.3 I-26 (High, T4) - a live suite that tested a 4-day-old binary
+
+- **Symptom.** The first full live run reported **7 failures**, all in sections unrelated to W1.5 (`9z-BF`, WIF verify, and others).
+- **Root-cause analysis.** The server under test never started: `EADDRINUSE` on port 6000. A `node` process from **07/31** was still listening there, serving **0.55.0**. The live suite connected to that. The readiness probe *printed* `ready: 0.55.0` and proceeded - it compared nothing. The 7 failures were real behavioural differences between 0.55.0 and 0.55.3, correctly detected against entirely the wrong subject.
+- **Fix.** The runner now reads the expected version from `api/package.json`, **asserts** the served version equals it, and **aborts** with an explicit message rather than run a suite that would produce a signal about nothing. Stale listeners are enumerated (pid, name, start time) and terminated before start.
+- **Why the fix works.** A live suite's result is only meaningful relative to a known subject. Asserting the subject's identity converts a silent false signal into a loud refusal - the failure mode becomes "I refuse to run" instead of "here are 7 failures in code you did not touch".
+- **Prevention.** This is the **same defect class** fixed earlier in this branch's history for the deploy pipeline, where Stage 4.6b now asserts `/scim/admin/version` reports the new build before the dev live-test is trusted. The lesson generalizes beyond both instances: **printing a value is not checking it.** A readiness probe that emits a version without comparing it is decoration. Disposition: **(a) applied** - the local runner now asserts, matching the pipeline.
+
+### 10A.4 I-27 (Low, T3) - a remembered baseline is not a baseline
+
+- **Symptom.** Post-implementation lint reported **511** warnings against a remembered ceiling of **504**, implying the change had added 7.
+- **Root-cause analysis.** Two independent facts, either of which alone would have produced a wrong conclusion: the ceiling on clean `master` had legitimately moved to **510** since 504 was memorized, **and** this change genuinely added **one** (`res: any` in `readKeySet`). Trusting the remembered number would have overstated the damage 7x; trusting the new number without measuring would have silently raised the ratchet.
+- **Fix.** Measured the baseline on clean `master` (510), then typed the parameter structurally (`{ text?: () => Promise<string>; json: () => Promise<unknown> }`) rather than raising the ceiling. Final count: **510**, the baseline exactly.
+- **Why the fix works.** The ratchet is only meaningful against a measured current value. Fixing the one real warning keeps the ceiling where it is, which is the point of a ratchet.
+- **Prevention.** **When a ratchet appears breached, measure the ratchet before assuming the change broke it.** Convention, not a new gate - the lint gate itself is working correctly.
+
+### 10A.5 I-28 (Low, T7) - two documentation gates blocked the push, correctly
+
+- **Symptom.** `git push` was refused twice after every code gate passed.
+- **Root-cause analysis.** Both refusals were true findings. (1) The version bump to 0.55.3 left **22 user-facing docs** advertising 0.55.2 - the F1 version-coupling check. (2) The four new settings made three documented counts wrong (`INDEX.md` claimed "28 endpoint settings controls" and "4 numerics"; the flags reference claimed "4 numeric") and left all four settings undocumented in the operator guide - the C3/C5 doc-claims-vs-source checks.
+- **Fix.** `audit-doc-freshness.ps1 -Fix` stamped the doc set; counts corrected to 32/8; the four settings documented in [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](../ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) with a paragraph explaining what the envelope does.
+- **Why this is recorded as an issue at all.** It is friction, and the standing rule records friction. But it is friction with a positive sign: these gates exist because of an earlier escape where 12 docs advertised a two-minor-old version, and they caught real drift **the same day the feature landed**. Recording it makes the gate's value visible rather than treating it as an obstacle.
+- **Prevention.** Already in place and working. Convention reinforced: **a feature that adds settings has a documentation surface** - counts, operator guide, flags reference - and the gates will find it, so it is cheaper to update them in the feature commit.
+
+### 10A.6 I-29 (Low, T7) - a worktree that cannot be provisioned
+
+- **Symptom.** A fresh `git worktree` created for the feature branch could not run any test: no `api/node_modules`.
+- **Root-cause analysis.** `node_modules` is not shared between git worktrees, and this machine cannot reach `registry.npmjs.org` - a machine-wide TLS block (the Windows host fails the same handshake; only npmjs is affected). So `npm ci` cannot provision a new worktree at all.
+- **Fix.** Moved the branch into an already-provisioned worktree and removed the unusable one. The two RED spec files written in it were preserved and restored first.
+- **Why the fix works.** It sidesteps a constraint that cannot be resolved locally rather than fighting it.
+- **Prevention.** **While the registry block persists, create feature branches inside an existing provisioned worktree.** A new worktree is only viable if `node_modules` is copied from a provisioned one. Recorded in the repo-scoped environment notes alongside the registry-block entry.
+
+### 10A.7 Escape analysis (addendum II)
+
+| ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier |
+|---|---|---|---|---|
+| I-25 | Stage 0 (RED, per-test) | Stage 0 (RED, per-test) | none | Caught at the earliest possible moment **only because the RED run was read per test**. A suite-total reading ("4 failed / 20 passed") would have shown a plausible number and let a permanently-vacuous test ship. |
+| I-26 | Stage 4 (live) | Stage 4 (live) | none, but **the signal was nearly inverted** | The gate could not have fired earlier - it is a live-only condition. The danger was not lateness but direction: it produced 7 *false* failures. Had the stale build happened to be behaviourally identical, it would instead have produced a false PASS. |
+| I-27 | Stage 1 (lint) | Stage 1 (lint) | none | Working as designed. |
+| I-28 | Stage 1 (pre-push) | Stage 1 (pre-push) | none | Working as designed, and by construction: the coupling check fires on the version bump. |
+| I-29 | Stage 0 (setup) | Stage 0 (setup) | none | Immediate and unmissable. |
+
+**Headline.** Zero escapes: every issue was caught by the earliest gate capable of catching it. The two High-severity entries are notable not for *when* they were caught but for *how nearly they were missed* - both would have passed a summary-level reading (a suite total; a printed version line). The self-improvement disposition is **(a) applied** for I-26 (the live runner now asserts the served version, matching the pipeline's Stage 4.6b) and **(c) accepted, existing rules sufficient** for the rest: R10 ("presence is not correctness") and Stage 0 per-test RED inspection already encode I-25's lesson, and the lint and documentation gates behaved exactly as designed.
+
+---
+
 ## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)
+- Wave feature docs: [W0.2](W0_2_TOKEN_ENDPOINT_200_NO_STORE.md), [W1.5](W1_5_JWKS_SAFETY_ENVELOPE.md)
 - Self-improvement + gate discipline: [.github/copilot-instructions.md](../../.github/copilot-instructions.md)
 
 ---

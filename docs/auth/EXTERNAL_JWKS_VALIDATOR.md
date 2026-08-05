@@ -58,6 +58,8 @@ merged from server-level env defaults and per-endpoint overrides
 
 ### W1.5 - the safety envelope
 
+> Full feature doc: [W1_5_JWKS_SAFETY_ENVELOPE.md](W1_5_JWKS_SAFETY_ENVELOPE.md) - includes the worst-case derivation (a documented-maximum configuration could previously spend **3 h 3 m** on a single fetch), the five design decisions, and the issue/RCA record.
+
 `JwksFetchTimeoutMs` bounds **one attempt**. That is not a bound on the work: with
 `retries: 5` and a 200 ms base backoff the ladder alone sleeps
 `200 + 400 + 800 + 1600 + 3200 = 6.2 s` before the last attempt even starts, and every
