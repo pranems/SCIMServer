@@ -593,6 +593,95 @@ Both High-severity entries are **false signals rather than product defects**: a 
 
 ---
 
+## 10B. Wave 1 addendum III - Playwright skip elimination (2026-08-05)
+
+Scope: no production code. A sweep to remove skipped browser tests before starting W1.4, which turned up two latent cross-spec races and one class of vacuous assertion that no gate could see.
+
+**Outcome: 207 passed / 13 skipped / 0 failed -> 218 passed / 2 skipped / 0 failed.**
+
+| # | Type | Severity | One-line symptom |
+|---|---|---|---|
+| I-31 | Test correctness | **High** | 8 specs skipped with "Tenant has zero endpoints" against a tenant serving 58 |
+| I-32 | Test harness / concurrency | **High** | Two specs failed intermittently because another spec's fixture became "the first endpoint" and was then deleted |
+| I-33 | Test correctness | Medium | Assertions wrapped in `if (count > 0)` passed having asserted nothing |
+| I-34 | Test correctness | Medium | A data-dependent skip meant the "Additional attributes" assertions never ran on dev |
+
+```mermaid
+pie showData
+    title 10B issues by severity
+    "High" : 2
+    "Medium" : 2
+```
+
+### 10B.1 I-31 - `.count()` is not a readiness signal (High)
+
+**Symptom.** `export.spec.ts` reported "No endpoints available on this environment"; seven `wif-credentials.spec.ts` tests and several others reported "Tenant has zero endpoints." Dev was serving 58 endpoints throughout.
+
+**Root cause.** The guard was `test.skip((await cards.count()) === 0, ...)` executed right after `waitForLoadState('networkidle')`. Playwright's `.count()` is a **snapshot, not an auto-waiting assertion**, and on a SPA `networkidle` settles before React commits the grid. The predicate therefore read `0` for a reason that was never true, and the tests had been dead for as long as the guard had existed. Nothing surfaced it because a skip is reported as a non-failure.
+
+**Fix.** Preconditions are now created rather than detected - see 10B.5. Where a readiness wait is still wanted, it is `await expect(locator).toBeVisible()`, which auto-waits.
+
+**Why the fix works.** It removes the predicate entirely instead of tuning it. There is no timing window left to lose.
+
+**Prevention.** Standing rule added to CHANGELOG and the fixture module's header: **`.count()` is never a valid readiness signal in a guard.** Any conditional skip whose predicate depends on ambient environment data is a dead test waiting to happen.
+
+### 10B.2 I-32 - "the first endpoint" is a shared mutable resource (High)
+
+**Symptom.** During a full parallel run, `credential-secret-visibility.spec.ts` timed out at 30s and two `discovery-explorer.spec.ts` tests failed with `discovery-spc-section` / `discovery-resourcetypes-section` not found. Each passed in isolation.
+
+**Root cause.** The admin endpoint list is ordered **`createdAt DESC`**. Several specs create a fixture endpoint, so a fixture becomes **"the first endpoint"** the instant it is created - and is deleted at that spec's cleanup. Any concurrently-running spec that bound to "the first card" was pointing at a resource with a foreign, short lifetime. This was **latent before this change** (specs creating endpoints already existed); increasing fixture usage raised the collision rate enough to make it visible.
+
+**Fix.** No spec binds to "the first endpoint" any more. Each creates its own and addresses it by id - including `discovery-explorer`, which now selects `discovery-primary-option-<its own id>` rather than `.first()`.
+
+**Why the fix works.** It removes the shared resource. Two specs can no longer name the same endpoint.
+
+**Prevention.** The shared fixture module is the sanctioned way to obtain an endpoint, and its header documents the ordering hazard so the pattern is not reintroduced.
+
+### 10B.3 I-33 - conditionally-vacuous assertions (Medium)
+
+**Symptom.** None - that is the point. `credential-reveal.spec.ts` reported PASS.
+
+**Root cause.** Its body was `if ((await moreButtons.count()) > 0) { ...assert... }`. On an endpoint with no per-endpoint credential the test asserted nothing and still passed. This is functionally a skip that does not even produce a skip line, so it is invisible in the summary.
+
+**Fix.** Fixture seeds a bearer credential; the conditionals became `await expect(...)`. A `toBeGreaterThan(0)` non-vacuity check was added where the original compared two counts (`0 === 0` used to pass).
+
+**Prevention.** Reinforces R10: an assertion guarded by a data-dependent condition is not coverage. Count-vs-count assertions need an accompanying non-zero check.
+
+### 10B.4 I-34 - hunting ambient data for a test subject (Medium)
+
+**Symptom.** `copy-and-truncate.spec.ts` skipped with "User ... has none of [name, emails, externalId, enterprise]".
+
+**Root cause.** The spec listed the tenant's endpoints, probed the first 25 for a user with a `userName` >= 40 chars, then required that user to also carry enrichment attributes. Two independent ambient-data lotteries; the second lost on every dev run, so the R1 truncation and drawer assertions never executed there.
+
+**Fix.** The fixture seeds exactly the user required - Entra-shaped, >= 40 chars, with `name`/`emails`/`externalId`/enterprise - and the spec asserts `userName.length >= 40` so a future shortening cannot silently disarm the truncation check.
+
+**Prevention.** Same rule as I-31: construct the precondition. Also removes 25 endpoint probes per test run.
+
+### 10B.5 The shared fix
+
+[web/e2e/endpoint-fixture.ts](../../web/e2e/endpoint-fixture.ts) - `createFixtureEndpoint`, `createFixtureEndpointWithUsers`, `deleteFixtureEndpoint`, `openCredentialsTab`. A spec that needs an endpoint in a particular shape creates one in that shape and deletes it afterwards.
+
+One non-obvious detail worth recording: **credential cards are filtered by the ACTIVE method sub-tab**, and each tab is gated by its own flag (`WifCredentialsEnabled`, `SecretTokenBearerAuthEnabled`, `OAuthClientCredentialsAuthEnabled`, `SharedSecretBearerAuthEnabled`, per `enabledMethodTabs()` in `CredentialsTab.tsx`). Enabling the flag alone is insufficient - the fixture must also select the tab, or the seeded credential is filtered out of view. The default tab is the first non-`shared_secret` method, so a WIF-enabled fixture lands on `wif` and a bearer credential is invisible until `bearer` is clicked.
+
+### 10B.6 A rejected "fix"
+
+`router-behavior.spec.ts` carried an unconditional `test.skip(true, ...)` with a suggested rewrite: assert no loading skeleton appears between click and page render. On inspection this would be **vacuous** - N2's `OnboardingWizard` calls `useEndpoints()` on every route mount, so the data is cached whether or not hover-prefetch works, and the assertion would pass either way. It was rejected and the reasoning written into the spec so it is not attempted again. The skip stays, with its real coverage (`router-loaders.test.ts` asserting a loader per route, `defaultPreload: 'intent'`, `defaultPreloadStaleTime: 30_000`) named in the skip message.
+
+**A test that cannot fail for the reason it claims to test is worse than no test**, because it consumes the budget that would otherwise fund real coverage.
+
+### 10B.7 Escape analysis
+
+| Issue | Caught by | Earliest gate that could have | Escape delta | Note |
+|---|---|---|---|---|
+| I-31 | Manual skip audit | Stage 5.3, any run | **months** | No gate reads skip *reasons*. A skip is scored as a non-failure, so 8 dead tests sat inside a green suite indefinitely. |
+| I-32 | Stage 5.3 full parallel run | Stage 5.3, any parallel run | **latent, intermittent** | Failed only under concurrency and passed in isolation, so it read as flake. Attribution required noticing the `createdAt DESC` ordering. |
+| I-33 | Manual audit of the same specs | Stage 5.3 | **months** | Produced neither a failure nor a skip line. Strictly invisible to any summary. |
+| I-34 | Stage 5.3 skip audit | Stage 5.3, any run | **months** | Same blind spot as I-31. |
+
+**Headline.** All four escaped for one shared reason: **the gate scored the suite, not the coverage.** 13 skips and an unknown number of vacuous conditionals were compatible with "0 failed" and were therefore reported as success. This is R10 ("presence is not correctness") applied to the test suite itself - the suite's own green is a presence signal, and the outcome that matters is whether each test can actually fail. Dispositions: **(a) applied** for all four in this commit chain; the skip-reason audit is now a standing step whenever the Playwright suite is run against dev.
+
+---
+
 ## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)

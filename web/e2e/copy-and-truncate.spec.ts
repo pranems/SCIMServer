@@ -31,6 +31,14 @@
  *   has zero endpoints or zero users on the chosen endpoint.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { createFixtureEndpointWithUsers, deleteFixtureEndpoint } from './endpoint-fixture';
+
+/** Tracked at module scope so the fixture is removed even when a test throws. */
+let fixtureEndpointId: string | null = null;
+
+test.afterEach(async ({ page }) => {
+  fixtureEndpointId = await deleteFixtureEndpoint(page, fixtureEndpointId);
+});
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
@@ -71,67 +79,40 @@ test.beforeEach(async ({ page, context }) => {
 async function openEndpointWithLongUserName(
   page: Page,
 ): Promise<{ endpointId: string; userId: string; fullValue: string }> {
-  const token = process.env.E2E_TOKEN || 'changeme-scim';
+  // DETERMINISM (2026-08-05). This helper used to LIST the tenant's endpoints
+  // and hunt the first 25 of them for a user whose userName happened to be
+  // >= 40 chars, skipping when it found none. Three problems: the probe cost a
+  // request per endpoint, the result depended entirely on ambient tenant data,
+  // and a downstream test skipped whenever the user it found carried none of
+  // name/emails/externalId/enterprise. On dev that last skip fired every run,
+  // so the "Additional attributes" assertions never executed.
+  //
+  // It now seeds exactly the user it needs. The fixture's userName is
+  // deliberately Entra-shaped and well over 40 chars, and carries the
+  // enrichment attributes, so R1 truncation and the drawer section are ALWAYS
+  // exercisable and no skip is reachable.
+  test.setTimeout(120_000);
 
-  // Navigate to the app first so subsequent page.evaluate() fetch
-  // calls run with a real origin (relative URLs work, and CORS is a
-  // non-issue since we hit our own backend).
-  await page.goto('/endpoints');
-  await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
+  const { endpointId, users } = await createFixtureEndpointWithUsers(page, {
+    namePrefix: 'e2e-trunc',
+    users: 1,
+  });
+  fixtureEndpointId = endpointId;
+  const target = users[0];
 
-  // Step 1: list all endpoints via admin API. Bearer = SCIM shared secret.
-  const epList = await page.evaluate(
-    async (token: string) => {
-      const r = await fetch('/scim/admin/endpoints', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!r.ok) throw new Error(`endpoints list failed: ${r.status} ${await r.text()}`);
-      const data = await r.json();
-      return (data.endpoints ?? []) as Array<{ id: string; name: string }>;
-    },
-    token,
-  );
-  test.skip(epList.length === 0, 'Tenant has zero endpoints; cannot exercise P1 primitives.');
+  // Non-vacuous guard: if the seeded name were ever shortened, the truncation
+  // assertions below would silently stop testing truncation.
+  expect(
+    target.userName.length,
+    'fixture userName must exceed the truncation threshold',
+  ).toBeGreaterThanOrEqual(40);
 
-  // Step 2: probe each endpoint's first 5 users for a long userName.
-  // Typical dev/prod tenant has 1-2 endpoints with Entra-shaped users;
-  // checking 25 covers low-density tenants too.
-  const target = await page.evaluate(
-    async ({ token, endpoints }: { token: string; endpoints: Array<{ id: string; name: string }> }) => {
-      for (const ep of endpoints.slice(0, 25)) {
-        try {
-          const r = await fetch(`/scim/endpoints/${ep.id}/Users?count=5`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!r.ok) continue;
-          const data = await r.json();
-          for (const user of data.Resources ?? []) {
-            if (typeof user.userName === 'string' && user.userName.length >= 40) {
-              return { endpointId: ep.id, userId: user.id, userName: user.userName as string };
-            }
-          }
-        } catch {
-          // try next endpoint
-        }
-      }
-      return null;
-    },
-    { token, endpoints: epList },
-  );
-
-  test.skip(
-    target === null,
-    'No endpoint among the first 25 has a userName >= 40 chars; ' +
-      'cannot exercise P1 truncation. Add an endpoint with Entra-shaped userNames to dev.',
-  );
-
-  // Step 3: navigate directly to the target endpoint's Users tab.
-  await page.goto(`/endpoints/${target!.endpointId}/users`);
+  await page.goto(`/endpoints/${endpointId}/users`);
   await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('users-tab')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId(`user-row-${target!.userId}`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId(`user-row-${target.id}`)).toBeVisible({ timeout: 20_000 });
 
-  return { endpointId: target!.endpointId, userId: target!.userId, fullValue: target!.userName };
+  return { endpointId, userId: target.id, fullValue: target.userName };
 }
 
 test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
@@ -335,11 +316,13 @@ test.describe('Phase P1 - CopyableField + TruncatedText on Users table', () => {
 
     const enrichmentKeys = ['name', 'emails', 'externalId', 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'];
     const present = enrichmentKeys.filter((k) => scimUser[k] !== undefined && scimUser[k] !== null);
-    test.skip(
-      present.length === 0,
+    // The fixture seeds all four enrichment attributes, so an empty result here
+    // is a real regression rather than a reason to skip.
+    expect(
+      present.length,
       `User ${fullValue} (${userId}) has none of [${enrichmentKeys.join(', ')}]; ` +
-        `cannot exercise the Additional-attributes section.`,
-    );
+        `the Additional-attributes section cannot be exercised.`,
+    ).toBeGreaterThan(0);
 
     // Section heading anchors the read-only block.
     await expect(page.getByText('Additional attributes', { exact: false })).toBeVisible();

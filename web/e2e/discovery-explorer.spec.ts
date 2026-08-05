@@ -14,6 +14,7 @@
  *   tenant has zero endpoints.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { createFixtureEndpoint, deleteFixtureEndpoint } from './endpoint-fixture';
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
@@ -27,31 +28,42 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-async function openDiscovery(page: Page): Promise<boolean> {
+/**
+ * DETERMINISM (2026-08-05). `openDiscovery` used to click the FIRST option in
+ * the primary picker. The admin list is ordered `createdAt DESC`, so that
+ * option was whichever endpoint a parallel spec had just created - and when
+ * that spec deleted its fixture, the discovery fetch for it failed and the
+ * section never mounted. Observed as `discovery-spc-section` not found.
+ *
+ * It now creates its own endpoint and selects that specific option by id.
+ */
+let fixtureEndpointId: string | null = null;
+
+test.afterEach(async ({ page }) => {
+  fixtureEndpointId = await deleteFixtureEndpoint(page, fixtureEndpointId);
+});
+
+async function openDiscovery(page: Page): Promise<void> {
+  test.setTimeout(120_000);
+  fixtureEndpointId = await createFixtureEndpoint(page, { namePrefix: 'e2e-discovery' });
+
   await page.goto('/discovery');
   await expect(page.getByTestId('discovery-page')).toBeVisible({ timeout: 30_000 });
-  // Empty-tenant guard: the page renders a no-endpoints notice instead of the picker.
-  const noEndpoints = page.getByTestId('discovery-no-endpoints');
-  if (await noEndpoints.count()) {
-    return false;
-  }
   await expect(page.getByTestId('discovery-primary-picker')).toBeVisible({ timeout: 30_000 });
-  // The discovery surfaces only render once a PRIMARY endpoint is picked
-  // (otherwise the page shows a "Pick an endpoint to begin" empty state).
-  // The picker does NOT auto-select, so click the first option to make the
-  // ServiceProviderConfig / ResourceTypes / Schemas sections mount.
-  const firstOption = page.locator('[data-testid^="discovery-primary-option-"]').first();
-  if ((await firstOption.count()) === 0) {
-    return false;
-  }
-  await firstOption.click();
-  return true;
+
+  // The discovery surfaces only render once a PRIMARY endpoint is picked (the
+  // picker does NOT auto-select). Select OUR endpoint by id so no other spec's
+  // lifecycle can affect this one.
+  const option = page.getByTestId(`discovery-primary-option-${fixtureEndpointId}`);
+  await expect(option, 'the fixture endpoint must appear in the discovery picker').toBeVisible({
+    timeout: 30_000,
+  });
+  await option.click();
 }
 
 test.describe('Discovery Explorer (/discovery)', () => {
   test('the page renders the primary picker + the three sub-tabs', async ({ page }) => {
-    const ready = await openDiscovery(page);
-    test.skip(!ready, 'Tenant has zero endpoints; discovery has nothing to show.');
+    await openDiscovery(page);
     await expect(page.getByTestId('discovery-subtabs')).toBeVisible();
     await expect(page.getByTestId('discovery-tab-serviceProviderConfig')).toBeVisible();
     await expect(page.getByTestId('discovery-tab-resourceTypes')).toBeVisible();
@@ -59,8 +71,7 @@ test.describe('Discovery Explorer (/discovery)', () => {
   });
 
   test('the ServiceProviderConfig tab renders its section + copy affordances', async ({ page }) => {
-    const ready = await openDiscovery(page);
-    test.skip(!ready, 'Tenant has zero endpoints.');
+    await openDiscovery(page);
     await page.getByTestId('discovery-tab-serviceProviderConfig').click();
     await expect(page.getByTestId('discovery-spc-section')).toBeVisible({ timeout: 20_000 });
     // The copy-as-JSON + refetch controls are present for the current surface.
@@ -69,15 +80,13 @@ test.describe('Discovery Explorer (/discovery)', () => {
   });
 
   test('switching to the Resource types tab renders its section', async ({ page }) => {
-    const ready = await openDiscovery(page);
-    test.skip(!ready, 'Tenant has zero endpoints.');
+    await openDiscovery(page);
     await page.getByTestId('discovery-tab-resourceTypes').click();
     await expect(page.getByTestId('discovery-resourcetypes-section')).toBeVisible({ timeout: 20_000 });
   });
 
   test('the compare toggle reveals the secondary endpoint picker', async ({ page }) => {
-    const ready = await openDiscovery(page);
-    test.skip(!ready, 'Tenant has zero endpoints.');
+    await openDiscovery(page);
     const toggle = page.getByTestId('discovery-toggle-compare');
     await expect(toggle).toBeVisible();
     await toggle.click();
