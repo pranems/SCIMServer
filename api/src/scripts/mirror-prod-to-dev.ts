@@ -81,6 +81,9 @@ interface Stats {
   members:   { read: number; inserted: number; updated: number; skippedOrphan: number };
   creds:     { read: number; inserted: number; updated: number; skippedOrphan: number };
   logs:      { read: number; inserted: number; updated: number; rebound: number };
+  jwksHosts: { read: number; inserted: number; updated: number };
+  deks:      { read: number; inserted: number; updated: number };
+  settings:  { read: number; inserted: number; updated: number };
 }
 const stats: Stats = {
   endpoints: { read: 0, inserted: 0, updated: 0 },
@@ -88,6 +91,9 @@ const stats: Stats = {
   members:   { read: 0, inserted: 0, updated: 0, skippedOrphan: 0 },
   creds:     { read: 0, inserted: 0, updated: 0, skippedOrphan: 0 },
   logs:      { read: 0, inserted: 0, updated: 0, rebound: 0 },
+  jwksHosts: { read: 0, inserted: 0, updated: 0 },
+  deks:      { read: 0, inserted: 0, updated: 0 },
+  settings:  { read: 0, inserted: 0, updated: 0 },
 };
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -133,6 +139,25 @@ async function main(): Promise<void> {
 
     // 4) EndpointCredential (depends on Endpoint)
     await mirrorCredentials(src, dst, liveEndpointIds);
+
+    // 4b) CredentialDek - MUST accompany EndpointCredential.
+    //
+    // EndpointCredential.secretEnvelope is encrypted under a DEK that lives, wrapped,
+    // in this table. Copy the credentials without the DEK and the target mints a fresh
+    // one, leaving every copied envelope undecryptable. Nothing looks broken, because
+    // authentication compares the bcrypt credentialHash (never encrypted) - only the
+    // admin "reveal secret" path fails, and only when somebody asks for it. Carrying
+    // the DEK is only correct when both deployments share the same CREDENTIAL_KEK;
+    // mirrorDeks warns when the target already holds a different active DEK.
+    await mirrorDeks(src, dst);
+
+    // 4c) JwksHostAllowlistEntry - server-level allow-list. Without it the target
+    // silently falls back to the seeded hosts and any trust pointing at a
+    // non-seeded JWKS host starts failing.
+    await mirrorJwksHosts(src, dst);
+
+    // 4d) ServerSetting - server-level configuration keyed by name.
+    await mirrorServerSettings(src, dst);
 
     // 5) RequestLog (last N days, capped). endpointId is rebinned to null if orphaned.
     await mirrorLogs(src, dst, liveEndpointIds);
@@ -337,6 +362,9 @@ async function mirrorCredentials(
           credentialHash: c.credentialHash,
           label: c.label,
           metadata: c.metadata as Prisma.InputJsonValue,
+          // WI-7 retained secret. Only decryptable on the target when the DEK is
+          // carried too (mirrorDeks) AND both sides share the same CREDENTIAL_KEK.
+          secretEnvelope: c.secretEnvelope,
           active: c.active,
           expiresAt: c.expiresAt,
         },
@@ -351,6 +379,7 @@ async function mirrorCredentials(
           credentialHash: c.credentialHash,
           label: c.label,
           metadata: c.metadata as Prisma.InputJsonValue,
+          secretEnvelope: c.secretEnvelope,
           active: c.active,
           createdAt: c.createdAt,
           expiresAt: c.expiresAt,
@@ -360,6 +389,105 @@ async function mirrorCredentials(
     }
   }
   log(`[credentials] inserted=${stats.creds.inserted} updated=${stats.creds.updated} skippedOrphan=${stats.creds.skippedOrphan}`);
+}
+
+// ─── Mirror: CredentialDek ─────────────────────────────────────────────────
+//
+// The wrapped data-encryption key that opens EndpointCredential.secretEnvelope.
+// It MUST travel with the credentials. See the note at the call site.
+
+async function mirrorDeks(src: PrismaClient, dst: PrismaClient): Promise<void> {
+  const rows = await src.credentialDek.findMany();
+  stats.deks.read = rows.length;
+  log(`[deks] source rows: ${rows.length}`);
+
+  const dstActive = await dst.credentialDek.findMany({ where: { active: true } });
+  const srcActive = rows.filter(r => r.active);
+  const foreignActive = dstActive.filter(d => !srcActive.some(s => s.id === d.id));
+  if (foreignActive.length > 0) {
+    log(
+      `[deks] WARNING: target already has ${foreignActive.length} active DEK(s) not present in the source. ` +
+      `That means the target minted its own key. Carried envelopes will only open if both ` +
+      `deployments share the same CREDENTIAL_KEK.`,
+    );
+  }
+
+  for (const d of rows) {
+    if (DRY_RUN) continue;
+    const existing = await dst.credentialDek.findUnique({ where: { id: d.id } });
+    if (existing) {
+      await dst.credentialDek.update({
+        where: { id: d.id },
+        data: { wrappedDek: d.wrappedDek, kekSalt: d.kekSalt, active: d.active },
+      });
+      stats.deks.updated++;
+    } else {
+      await dst.credentialDek.create({
+        data: {
+          id: d.id,
+          wrappedDek: d.wrappedDek,
+          kekSalt: d.kekSalt,
+          active: d.active,
+          createdAt: d.createdAt,
+        },
+      });
+      stats.deks.inserted++;
+    }
+  }
+  log(`[deks] inserted=${stats.deks.inserted} updated=${stats.deks.updated}`);
+}
+
+// ─── Mirror: JwksHostAllowlistEntry ────────────────────────────────────────
+//
+// Server-level JWKS host allow-list. `host` is unique, so an entry that already
+// exists on the target under a different id is matched by host rather than
+// inserted, which would violate the unique constraint.
+
+async function mirrorJwksHosts(src: PrismaClient, dst: PrismaClient): Promise<void> {
+  const rows = await src.jwksHostAllowlistEntry.findMany();
+  stats.jwksHosts.read = rows.length;
+  log(`[jwks-hosts] source rows: ${rows.length}`);
+
+  for (const h of rows) {
+    if (DRY_RUN) continue;
+    const byHost = await dst.jwksHostAllowlistEntry.findUnique({ where: { host: h.host } });
+    if (byHost) {
+      await dst.jwksHostAllowlistEntry.update({
+        where: { host: h.host },
+        data: { label: h.label },
+      });
+      stats.jwksHosts.updated++;
+    } else {
+      await dst.jwksHostAllowlistEntry.create({
+        data: { id: h.id, host: h.host, label: h.label, createdAt: h.createdAt },
+      });
+      stats.jwksHosts.inserted++;
+    }
+  }
+  log(`[jwks-hosts] inserted=${stats.jwksHosts.inserted} updated=${stats.jwksHosts.updated}`);
+}
+
+// ─── Mirror: ServerSetting ─────────────────────────────────────────────────
+//
+// Keyed by `key` (the primary key is the setting name, not a uuid).
+
+async function mirrorServerSettings(src: PrismaClient, dst: PrismaClient): Promise<void> {
+  const rows = await src.serverSetting.findMany();
+  stats.settings.read = rows.length;
+  log(`[settings] source rows: ${rows.length}`);
+
+  for (const s of rows) {
+    if (DRY_RUN) continue;
+    const existing = await dst.serverSetting.findUnique({ where: { key: s.key } });
+    if (existing) {
+      await dst.serverSetting.update({ where: { key: s.key }, data: { value: s.value } });
+      stats.settings.updated++;
+    } else {
+      await dst.serverSetting.create({ data: { key: s.key, value: s.value } });
+      stats.settings.inserted++;
+    }
+  }
+  log(`[settings] inserted=${stats.settings.inserted} updated=${stats.settings.updated}`);
 }
 
 // ─── Mirror: RequestLog (capped, batched) ──────────────────────────────────
@@ -495,6 +623,9 @@ function summary(): void {
   log(`   resources   : read=${stats.resources.read} inserted=${stats.resources.inserted} updated=${stats.resources.updated} skippedOrphan=${stats.resources.skippedOrphan}`);
   log(`   members     : read=${stats.members.read} inserted=${stats.members.inserted} updated=${stats.members.updated} skippedOrphan=${stats.members.skippedOrphan}`);
   log(`   credentials : read=${stats.creds.read} inserted=${stats.creds.inserted} updated=${stats.creds.updated} skippedOrphan=${stats.creds.skippedOrphan}`);
+  log(`   dek         : read=${stats.deks.read} inserted=${stats.deks.inserted} updated=${stats.deks.updated}`);
+  log(`   jwks hosts  : read=${stats.jwksHosts.read} inserted=${stats.jwksHosts.inserted} updated=${stats.jwksHosts.updated}`);
+  log(`   settings    : read=${stats.settings.read} inserted=${stats.settings.inserted} updated=${stats.settings.updated}`);
   log(`   logs        : read=${stats.logs.read} inserted=${stats.logs.inserted} updated=${stats.logs.updated} reboundOrphan=${stats.logs.rebound}`);
   log('-----------------------------------------------------------------');
 }
