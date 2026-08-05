@@ -14,13 +14,15 @@
     committed. (.gitignore also defensively excludes SP cred files just in case.)
 
     What gets created per tenant:
+      proviam09 -> SP 'scimserver-deploy-proviam09', Contributor on RGs
+                   scimserver-dev + scimserver-prod  (ProvIAM_Subscription, tenant 09)
       proviam -> SP 'scimserver-deploy-proviam', Contributor on RGs
-                 scimserver-dev + scimserver-prod  (ProvIAM_Subscription)
+                 scimserver-dev + scimserver-prod  (ProvIAM_Subscription, tenant 08, retiring)
       anandsa -> SP 'scimserver-deploy-anandsa', Contributor on RG
                  scimserver-rg-prod                (AnandSa-Test-150)
 
 .PARAMETER Name
-    Which tenant(s) to bootstrap: proviam, anandsa, or all (default).
+    Which tenant(s) to bootstrap: proviam09, proviam, anandsa, or all (default).
 
 .PARAMETER Years
     Lifetime of the SP secret in years (default 1). Re-run with -Rotate before it
@@ -68,7 +70,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('proviam', 'anandsa', 'all')]
+    [ValidateSet('proviam09', 'proviam', 'anandsa', 'all')]
     [string]$Name = 'all',
     [int]$Years = 1,
     [string]$Role = 'Contributor',

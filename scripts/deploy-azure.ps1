@@ -20,7 +20,14 @@ param(
     [string]$ImageRepository,
     # Override PG server name (PG server names are globally unique on Azure; if the default '<appname>-pg' is taken,
     # supply a custom one like 'scimserver-pg-new1'). Default: '<appname>-pg' truncated to 63 chars.
-    [string]$PgServerName
+    [string]$PgServerName,
+
+    # Full resource ID of an EXISTING Container Apps managed environment that lives in a
+    # DIFFERENT resource group. A subscription is capped at a small number of environments
+    # (MaxNumberOfGlobalEnvironmentsInSub), so the dev app shares the environment created in
+    # the prod resource group. `--environment <name>` cannot express a cross-resource-group
+    # reference and fails with a not-found error, so the full resource ID is required.
+    [string]$EnvironmentResourceId
 )
 
 if (-not $Location -or $Location -eq '') { $Location = 'eastus' }
@@ -692,6 +699,19 @@ Write-Host "🌐 Step 4/5: Container App Environment" -ForegroundColor Cyan
 
 # Check if environment exists
 $skipEnvDeployment = $false
+
+if ($EnvironmentResourceId) {
+    # Sharing an environment that lives in another resource group. Nothing to create here.
+    Write-Host "   ✅ Using existing environment by resource ID (cross-resource-group)" -ForegroundColor Green
+    Write-Host "      $EnvironmentResourceId" -ForegroundColor Gray
+    $sharedEnv = az containerapp env show --ids $EnvironmentResourceId --output json 2>$null | ConvertFrom-Json
+    if (-not $sharedEnv) {
+        Stop-Deployment -Message "EnvironmentResourceId '$EnvironmentResourceId' could not be read." -Hint "Check the ID and that the signed-in principal has access to that resource group."
+    }
+    Write-Host ("      name={0}  rg={1}  defaultDomain={2}" -f $sharedEnv.name, $sharedEnv.resourceGroup, $sharedEnv.properties.defaultDomain) -ForegroundColor Gray
+    $envName = $sharedEnv.name
+    $skipEnvDeployment = $true
+} else {
 $envCheck = az containerapp env show --name $envName --resource-group $ResourceGroup --query "name" --output tsv 2>$null
 $envExists = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrEmpty($envCheck)
 
@@ -706,6 +726,7 @@ if ($envExists) {
         Write-Host "      Desired subnet:`n      $infrastructureSubnetId" -ForegroundColor Yellow
     }
     $skipEnvDeployment = $true
+}
 }
 
 if (-not $skipEnvDeployment) {
@@ -836,6 +857,10 @@ if (-not $skipAppDeployment) {
         oauthClientSecret = $OauthClientSecret
         databaseUrl = $DatabaseUrl
     }
+
+    # Cross-resource-group environment: pass the full resource ID so the template does not
+    # try to resolve the environment name inside this app's resource group.
+    if ($EnvironmentResourceId) { $containerParams.environmentResourceId = $EnvironmentResourceId }
 
     # Pass GHCR credentials if provided (for private packages)
     if ($GhcrUsername) { $containerParams.ghcrUsername = $GhcrUsername }

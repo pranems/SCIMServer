@@ -49,15 +49,20 @@ param ghcrPassword string = ''
 // Use registry username+password whenever both are supplied. Falls back to managed identity for non-GHCR registries when no creds are passed.
 var useGhcrCredentials = ghcrUsername != '' && ghcrPassword != ''
 
-resource env 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
+@description('Full resource ID of an EXISTING managed environment, when it lives in a DIFFERENT resource group than this app. Leave empty to resolve environmentName inside this resource group. A subscription is capped at a small number of Container Apps environments, so the dev app deliberately shares the environment that lives in the prod resource group; a bare name cannot express that and fails with a not-found error.')
+param environmentResourceId string = ''
+
+resource env 'Microsoft.App/managedEnvironments@2024-03-01' existing = if (environmentResourceId == '') {
   name: environmentName
 }
+
+var resolvedEnvironmentId = environmentResourceId == '' ? env.id : environmentResourceId
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
   location: location
   properties: {
-    environmentId: env.id
+    environmentId: resolvedEnvironmentId
     // workloadProfileName omitted - uses default consumption model
     configuration: {
       // OPS-5: Multiple revisions mode enables blue/green deployment with
