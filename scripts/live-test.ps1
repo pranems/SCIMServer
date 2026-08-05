@@ -280,6 +280,48 @@ function Get-HttpErrorStatus {
         return [int]$resp.StatusCode
     } catch { return $null }
 }
+
+<#
+.SYNOPSIS
+    Idempotently ensure a host is on the JWKS SSRF allowlist before a section
+    depends on it.
+
+.DESCRIPTION
+    TEST ISOLATION (2026-08-05). Several sections verify a WIF trust against a
+    real Entra tenant using the LEGACY `login.windows.net` JWKS host. That host
+    is deliberately NOT in the well-known seed list (the seed carries
+    `login.microsoftonline.com` and friends), so those assertions only passed on
+    an environment where some earlier run had already persisted it.
+
+    Measured: on Azure dev the suite reported 1401/1401 because
+    `login.windows.net` was sitting in the persisted allowlist from a previous
+    run; against a FRESH Docker database the same suite failed 9 assertions
+    (9z-AV.T7/T8, 9z-BK.T2-T4, 9z-BE.T1-T4). Confirmed pre-existing, not a
+    regression, by running the identical suite against the previous published
+    image (0.55.3) on a fresh volume - the failure sets were identical.
+
+    This is the same defect class as a Playwright spec binding to "the first
+    endpoint": a test that passes only because of ambient state left behind by
+    something else. The fix is the same - make the precondition true by
+    construction instead of hoping the environment provides it.
+#>
+function Ensure-JwksHostAllowed {
+    param(
+        [Parameter(Mandatory = $true)][string]$HostName,
+        [string]$Label = 'live-test precondition'
+    )
+    try {
+        $current = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method GET -Headers $headers
+        if ($current.effective -contains $HostName) { return $true }
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/jwks-hosts" -Method POST -Headers $headers -Body (@{
+            host = $HostName; label = $Label
+        } | ConvertTo-Json) | Out-Null
+        return $true
+    } catch {
+        Write-Host "  ! could not ensure JWKS host '$HostName' is allowlisted: $($_.Exception.Message)" -ForegroundColor Yellow
+        return $false
+    }
+}
 function Get-HttpErrorBody {
     param($ErrorRecord)
     # PS 7.x: the response body is captured on ErrorDetails.Message.
@@ -12334,6 +12376,11 @@ try {
     # verify path (below) can actually resolve discovery + JWKS.
     $avIssuer = "https://login.microsoftonline.com/f08e6aff-ca0f-4f11-81fa-1ffd43323373/v2.0"
     $avJwks   = "https://login.windows.net/f08e6aff-ca0f-4f11-81fa-1ffd43323373/discovery/v2.0/keys"
+    # `login.windows.net` is the LEGACY Entra host and is deliberately not in the
+    # well-known seed allowlist, so make the precondition true by construction
+    # rather than depending on a previous run having persisted it. See
+    # Ensure-JwksHostAllowed for the measurement that motivated this.
+    Ensure-JwksHostAllowed -HostName 'login.windows.net' -Label '9z-AV precondition (legacy Entra JWKS host)' | Out-Null
     $avWif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials" -Method POST -Headers $headers -Body (@{
         credentialType = "wif"; label = "edit-me"
         wif = @{
@@ -13337,6 +13384,8 @@ try {
     $bkTenant = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
     $bkIssuer = "https://login.microsoftonline.com/$bkTenant/v2.0"
     $bkJwks   = "https://login.windows.net/$bkTenant/discovery/v2.0/keys"
+    # Legacy Entra host - not in the seed allowlist. Same precondition as 9z-AV.
+    Ensure-JwksHostAllowed -HostName 'login.windows.net' -Label '9z-BK precondition (legacy Entra JWKS host)' | Out-Null
     $bkEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
         name = "live-test-wifverify-$(Get-Random)"; profilePreset = "rfc-standard"
     } | ConvertTo-Json)

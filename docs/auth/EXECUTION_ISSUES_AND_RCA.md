@@ -693,6 +693,14 @@ Scope: the cache redesign (24 h TTL + background refresh + rate-limited unknown-
 | I-35 | Test correctness (method success) | Medium | A live assertion looked like feature evidence but passed against a build without the feature |
 | I-36 | Framework surprise | Low | Two pre-existing tests failed because W1.4 deliberately changed the behaviour they encoded |
 | I-37 | Test harness | Low | Widening a shared interface broke unrelated spec fixtures at compile time |
+| I-38 | Test isolation | Medium | Nine live assertions passed on dev and local only because each environment carried leftover state |
+
+```mermaid
+pie showData
+    title 10C issues by severity
+    "Medium" : 2
+    "Low" : 2
+```
 
 ### 10C.1 I-35 - the negative control worked, and reclassified an assertion (Medium)
 
@@ -737,15 +745,40 @@ Scope: the cache redesign (24 h TTL + background refresh + rate-limited unknown-
 
 **Prevention.** Keep the exhaustive assertion. Note for future policy additions: expect exactly three edits - the two fixtures and the env-var test - and treat a fourth failure as a real finding.
 
-### 10C.4 Escape analysis
+### 10C.4 I-38 - nine live assertions passed only on environments carrying leftover state (Medium)
+
+**Symptom.** The suite reported **1401/1401 on Azure dev** and **1401/1401 on a local node**, then **1396/1401 on Docker** against a fresh database. Failures: `9z-AV.T7/T8`, `9z-BK.T2-T4`, `9z-BE.T1-T4` - all WIF-verify assertions against a real Entra tenant.
+
+**First hypothesis, wrong.** Container egress. Disproved directly: `docker exec ... wget https://login.microsoftonline.com/common/discovery/v2.0/keys` returned a key set. The container's network was fine.
+
+**Root cause.** The affected sections verify against the **legacy** Entra JWKS host `https://login.windows.net/...`, which is deliberately **not** in the well-known seed allowlist (the seed carries `login.microsoftonline.com` and five siblings). Each environment satisfied the precondition by accident, differently:
+
+| Form factor | Why it passed / failed |
+|---|---|
+| Azure dev | `login.windows.net` was sitting in the **persisted** allowlist, left by an earlier run |
+| Local node | The runner had been started with `JWKS_HOST_ALLOWLIST='login.microsoftonline.com,login.windows.net'` - the env satisfied it |
+| Docker, fresh volume | Neither. Seed only. **SSRF rejection, as designed.** |
+
+So the assertions were not testing what they appeared to test on two of three form factors: they depended on ambient state rather than creating their precondition.
+
+**Confirmed pre-existing, not a W1.4 regression.** The identical suite was run against the **previous published image (0.55.3)** on a fresh volume and produced the **same failure set**; a set-difference of the two runs reported `none - every 0.55.5 failure also fails on 0.55.3`. This is the same negative-control technique as I-30/I-35, pointed at a regression question instead of a coverage question.
+
+**Fix.** New `Ensure-JwksHostAllowed` helper in [live-test.ps1](../../scripts/live-test.ps1), called by `9z-AV` and `9z-BK` before they use the legacy host. It is idempotent - it reads the effective allowlist first and only POSTs when the host is missing - so it is a no-op on an environment that already has it.
+
+**Why the fix works.** It makes the precondition true **by construction** instead of hoping the environment provides it. Proven non-vacuously: the local node was restarted with `JWKS_HOST_ALLOWLIST='login.microsoftonline.com'` **only**, verified via the API that `login.windows.net` was absent at start, and the suite then passed **1401/1401**. All three form factors are now green from a cold state.
+
+**Prevention.** This is the live-test analogue of the Playwright defect fixed in the same session (10B): **a test that depends on ambient environment state is a test that will pass or fail for reasons unrelated to the code.** The general rule now applies at both layers - construct the precondition, or assert loudly that it is missing; never let the environment silently supply it. Corollary learned here: **three green form factors are not three independent confirmations if each is green for a different accidental reason.** A fresh-volume run is the only one that tests the cold path.
+
+### 10C.5 Escape analysis
 
 | Issue | Caught by | Earliest gate that could have | Escape delta | Note |
 |---|---|---|---|---|
 | I-35 | Stage 4 negative control (deliberate) | same | **none** | The rule from I-30 fired as intended, pre-deploy, and improved the suite rather than catching a defect. This is what a self-improving gate looks like when it is working. |
 | I-36 | Stage 2 (API unit) | same | none | Immediate and unambiguous. |
 | I-37 | Stage 1 (tsc build) | same | none | Compile-time, by construction. |
+| I-38 | Stage 4.2 (Docker, fresh volume) | Stage 4.2, any run on a clean DB | **long-standing** | Invisible on dev and on the local node because each satisfied the precondition accidentally. Only a cold, stateless form factor could expose it - which is precisely the argument for keeping all three in the matrix rather than treating dev as representative. |
 
-**Headline.** Zero escapes. The notable entry is I-35, where a rule added in response to an earlier escape (I-30) paid for itself on the very next item - it found a mislabelled assertion **before** it entered the suite as folklore. Dispositions: **(a) applied** for all three in this commit chain.
+**Headline.** Zero regressions from W1.4 itself. The two notable entries are process wins: **I-35**, where a rule added after an earlier escape (I-30) paid for itself on the very next item by reclassifying a mislabelled assertion before it became folklore; and **I-38**, where running the *same* suite against the *previous image* answered "is this mine?" definitively in about two minutes instead of by argument. Dispositions: **(a) applied** for all four in this commit chain.
 
 ---
 
