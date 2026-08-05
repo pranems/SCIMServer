@@ -14673,6 +14673,32 @@ try {
         } | ConvertTo-Json -Depth 5)
         Test-Result -Success ($cdMax.profile.settings.JwksMaxKeys -eq 1000) `
             -Message "9z-CD.T7: JwksMaxKeys accepts the documented maximum of 1000"
+
+        # (4) NEGATIVE CONTROL - why T1-T4 alone prove nothing.
+        # Discovered while deploying 0.55.3: an UNREGISTERED settings key is stored
+        # and echoed back without validation. So "the setting round-trips" is NOT
+        # evidence that the feature exists - it was true on 0.55.1, which has no
+        # W1.5 at all. The load-bearing assertions are the BOUNDS REJECTIONS in
+        # T5, because rejecting an out-of-range value requires a registry entry.
+        # This control keeps that reasoning visible in the suite instead of in a
+        # commit message nobody re-reads.
+        $cdInvented = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ TotallyUnregisteredSettingXyz = 12345 } }
+        } | ConvertTo-Json -Depth 5)
+        Test-Result -Success ($cdInvented.profile.settings.TotallyUnregisteredSettingXyz -eq 12345) `
+            -Message "9z-CD.T8 (control): an UNREGISTERED key also round-trips, so T1-T4 are persistence checks, not proof of the feature"
+
+        # The discriminator, stated as its own assertion: an unregistered key is
+        # NOT bounds-checked, a registered one IS. That difference is the feature.
+        $cdInventedBoundsEnforced = $true
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ settings = @{ TotallyUnregisteredSettingXyz = 999999999 } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+            $cdInventedBoundsEnforced = $false   # accepted -> no bounds, as expected
+        } catch { $cdInventedBoundsEnforced = $true }
+        Test-Result -Success (-not $cdInventedBoundsEnforced) `
+            -Message "9z-CD.T9 (control): the unregistered key has NO bounds, while JwksTotalDeadlineMs does (T5) - that gap IS the registry entry"
     } finally {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cdId" -Method DELETE -Headers $headers | Out-Null
     }

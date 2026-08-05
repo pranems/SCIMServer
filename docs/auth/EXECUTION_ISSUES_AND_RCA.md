@@ -516,11 +516,12 @@ while closing the revocation window. That is the recommended resolution.
 | I-27 | Lint ratchet appeared breached (511 vs remembered 504); the baseline had moved AND the change added one | T3 | Low | W1.5 | Stage 1 (lint) | Fixed | 85bd9aa4 |
 | I-28 | Two documentation gates blocked the push (F1 version coupling; C3/C5 doc-claims-vs-source) | T7 | Low | W1.5 | Stage 1 (pre-push) | Fixed | ba8435dd, ad214675 |
 | I-29 | A fresh `git worktree` could not run tests - `node_modules` is not shared and the npm registry is TLS-blocked on this machine | T7 | Low | W1.5 | Stage 0 (setup) | Worked around | n/a |
+| I-30 | 4 of 12 live assertions for W1.5 could not fail - an UNREGISTERED settings key round-trips unvalidated, so "the setting persists" was never evidence the feature existed | T3 | **High** | W1.5 dev deploy | Stage 4.4 (pre-deploy negative control) | Fixed | (this change) |
 
 ```mermaid
 pie showData
-    title W1.5 issues by severity (5 total)
-    "High (false signal)" : 2
+    title W1.5 issues by severity (6 total)
+    "High (false signal / vacuous test)" : 3
     "Low (friction / gates working)" : 3
 ```
 
@@ -568,7 +569,16 @@ Both High-severity entries are **false signals rather than product defects**: a 
 - **Why the fix works.** It sidesteps a constraint that cannot be resolved locally rather than fighting it.
 - **Prevention.** **While the registry block persists, create feature branches inside an existing provisioned worktree.** A new worktree is only viable if `node_modules` is copied from a provisioned one. Recorded in the repo-scoped environment notes alongside the registry-block entry.
 
-### 10A.7 Escape analysis (addendum II)
+### 10A.7 I-30 (High, T3) - four live assertions that could not fail
+
+- **Symptom.** While capturing the pre-deploy state of dev (then on 0.55.1, which contains no W1.5 code at all), a negative control asked "is `JwksTotalDeadlineMs` accepted here?" and the answer was **True**. The setting round-tripped perfectly on a build where the feature did not exist.
+- **Root-cause analysis.** The endpoint settings validator validates **registered** keys and stores **unregistered** ones untouched. Proven directly: an invented key, `TotallyUnregisteredSettingXyz = 12345`, round-trips identically. So live assertions `9z-CD.T1` to `T4` - which assert the four caps persist via PATCH and re-read on GET - were **persistence checks, not feature checks**. All four would have passed against a build with no W1.5 in it. Four of the section's twelve assertions could not fail for the reason they appeared to test.
+- **Why the section still had value.** `T5` (six bounds rejections), `T6` (the non-vacuous guard) and `T7` (the documented 1,000-key maximum) *are* discriminating: rejecting an out-of-range value requires a registry entry with `min`/`max`, which only the feature provides. The section was never worthless - it was **partly** load-bearing, and nothing distinguished the two kinds of assertion for a reader.
+- **Fix.** Two control assertions added to `9z-CD`, and the reasoning written into the suite rather than left in a commit message: **T8** proves an unregistered key round-trips (so T1-T4 are persistence checks), and **T9** proves that same unregistered key has **no bounds**, while a registered one does. That difference *is* the registry entry, stated as an assertion.
+- **Why the fix works.** The pair makes the discriminator explicit and self-documenting. A future reader who assumes "it round-trips, so it works" is contradicted by T8 sitting immediately below. If the settings validator ever changes to reject unknown keys, T8 goes red and forces the reasoning to be revisited.
+- **Prevention.** This is **R10** ("presence is not correctness") arriving from a new direction: not a testid-presence check, but a *round-trip* check - which feels like an outcome assertion and is not one, because persistence is provided by a layer beneath the feature. Generalizable rule now recorded: **when a feature adds configuration, the round-trip is provided by the config store, not by the feature. Assert the thing only the feature can do - validation, enforcement, or an observable behaviour change.** The cheap, general way to find this class: **run the new assertions against the previous build before deploying.** Anything that still passes is not testing the change.
+
+### 10A.8 Escape analysis (addendum II)
 
 | ID | Caught at | Earliest gate that COULD have caught it | Escape delta | Why it escaped earlier |
 |---|---|---|---|---|
@@ -577,8 +587,9 @@ Both High-severity entries are **false signals rather than product defects**: a 
 | I-27 | Stage 1 (lint) | Stage 1 (lint) | none | Working as designed. |
 | I-28 | Stage 1 (pre-push) | Stage 1 (pre-push) | none | Working as designed, and by construction: the coupling check fires on the version bump. |
 | I-29 | Stage 0 (setup) | Stage 0 (setup) | none | Immediate and unmissable. |
+| I-30 | Stage 4.4 (deploy negative control) | Stage 0 (when `9z-CD` was authored) | **one full item** | The section was written, reviewed, run green locally and run green on dev before anyone asked what would happen if the feature were absent. Only building a deliberate pre-deploy negative control - running the assertions against the OLD build - exposed that four of them passed there too. |
 
-**Headline.** Zero escapes: every issue was caught by the earliest gate capable of catching it. The two High-severity entries are notable not for *when* they were caught but for *how nearly they were missed* - both would have passed a summary-level reading (a suite total; a printed version line). The self-improvement disposition is **(a) applied** for I-26 (the live runner now asserts the served version, matching the pipeline's Stage 4.6b) and **(c) accepted, existing rules sufficient** for the rest: R10 ("presence is not correctness") and Stage 0 per-test RED inspection already encode I-25's lesson, and the lint and documentation gates behaved exactly as designed.
+**Headline.** Five of six issues were caught by the earliest gate capable of catching them. The exception, **I-30, escaped a full item** - it was found only when a deliberate pre-deploy negative control ran the new assertions against the OLD build. That technique is the cheap, general detector for vacuous tests and is now the recommended step before any deploy that claims to add a feature: **run the new assertions against the previous build; anything that still passes is not testing the change.** The three High-severity entries share one shape - all would have survived a summary-level reading (a suite total, a printed version line, a green section). Dispositions: **(a) applied** for I-26 (the live runner asserts the served version) and I-30 (controls T8/T9 added); **(c) accepted** for the rest, where existing rules and gates behaved as designed.
 
 ---
 

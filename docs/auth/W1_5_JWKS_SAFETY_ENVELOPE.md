@@ -128,7 +128,7 @@ flowchart TD
 |---|---|---|
 | Unit (policy) | [egress-policy.spec.ts](../../api/src/oauth/egress-policy.spec.ts) | defaults for all 4 caps; the generous `maxKeys` default; env reads; clamping at both ends; non-numeric fallback; fractional truncation; endpoint-override precedence |
 | Unit (behaviour) | [external-jwks-validator.service.spec.ts](../../api/src/oauth/external-jwks-validator.service.spec.ts) | the ladder is cut short by the deadline; the deadline is *named* in the error; oversized body rejected; in-range body accepted; too many keys rejected; **exactly `maxKeys` accepted** (off-by-one guard); cache evicts oldest and retains the newest |
-| Live | `scripts/live-test.ps1` section **`9z-CD`** | all 4 caps round-trip via PATCH + GET; 6 bounds cases rejected with 400; a non-vacuous guard asserting all 6 cases actually ran; the documented 1,000-key maximum is accepted |
+| Live | `scripts/live-test.ps1` section **`9z-CD`** | all 4 caps round-trip via PATCH + GET; 6 bounds cases rejected with 400; a non-vacuous guard asserting all 6 cases actually ran; the documented 1,000-key maximum is accepted; **plus two controls (T8, T9)** proving that an unregistered key round-trips *and* has no bounds - which is why the bounds rejections, not the round-trips, are the assertions that discriminate the feature (see I-30) |
 
 **Measured:** API unit **158 suites / 4,720**; API E2E **87 / 1,440 on both backends** (parity held); live **1,385 / 1,385**; ESLint **0 errors / 510 warnings**, exactly the master baseline.
 
@@ -143,8 +143,9 @@ Each of these is also recorded in the standing ledger, [EXECUTION_ISSUES_AND_RCA
 | I-27 | Lint ratchet assumed rather than measured | T3 | Low |
 | I-28 | Two documentation gates blocked the push, correctly | T7 process | Low |
 | I-29 | A fresh worktree could not be provisioned | T7 process | Low |
+| I-30 | **4 of 12 live assertions could not fail** - an unregistered settings key round-trips unvalidated | T3 test-correctness | **High** |
 
-Both High-severity entries are **false signals rather than product defects**, and neither would have been visible in a summary-level reading.
+All three High-severity entries are **false signals rather than product defects**, and none would have been visible in a summary-level reading. I-30 is the sharpest: `9z-CD` was authored, reviewed, run green locally **and** run green on dev before anyone asked what it would do if the feature were absent. Running the assertions against the previous build answered that in one command - four of them passed there too.
 
 ### 8.1 A test that passed before the feature existed (T3, High)
 
