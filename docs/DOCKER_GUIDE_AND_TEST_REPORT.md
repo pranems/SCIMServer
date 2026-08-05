@@ -1,8 +1,8 @@
 # Docker Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.2`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.3`
 
-> **Version:** 0.55.2 - **Updated:** June 3, 2026  
+> **Version:** 0.55.3 - **Updated:** June 3, 2026  
 > **Source of truth:** [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml)
 
 ---
