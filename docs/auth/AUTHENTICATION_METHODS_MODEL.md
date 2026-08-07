@@ -1,6 +1,31 @@
-# Authentication Methods Model (A0 - inert backbone)
+# Authentication Methods Model (A0 - now PARTIALLY ACTIVE)
 
-> Step **A0** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)). Establishes the generalized `authenticationMethods[]` backbone (architecture sections 1.3 + 5.2 + 6.2) as an **inert** model: stored and round-tripped, but not yet consulted by any auth resolver.
+> Step **A0** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)). Establishes the generalized `authenticationMethods[]` backbone (architecture sections 1.3 + 5.2 + 6.2).
+
+> **Status correction, 2026-07-31 (v0.55.1).** This document previously described the model as
+> **inert** - "stored and round-tripped, but not yet consulted by any auth resolver". That was true at
+> A0 and is **no longer true**. The model is consulted at six runtime call sites, all of them through
+> the helper `resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods)`, which
+> resolves per-method enablement by preferring an explicit `methods[]` entry over the flat endpoint
+> config flags:
+>
+> | Consumer | Location | What it decides |
+> |---|---|---|
+> | `EndpointCredentialAuthenticator` | [endpoint-credential.authenticator.ts:69](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts) | whether a per-endpoint bearer or oauth-client credential may authenticate a data-plane request |
+> | `GlobalSharedSecretAuthenticator` | [global-shared-secret.authenticator.ts:93](../../api/src/modules/auth/authenticators/global-shared-secret.authenticator.ts) | whether the endpoint accepts the global shared secret (WI-11 reject-stop) |
+> | `AdminCredentialController` | [admin-credential.controller.ts:456](../../api/src/modules/scim/controllers/admin-credential.controller.ts) | whether a credential of a given type may be **created** on the endpoint |
+> | `EndpointOAuthController` | [endpoint-oauth.controller.ts:201](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) | whether the endpoint token endpoint will mint for the requested method |
+> | `authenticationSchemes` discovery | [discovery/authentication-schemes.ts:81](../../api/src/modules/scim/discovery/authentication-schemes.ts) | which schemes appear in `ServiceProviderConfig` |
+> | `ConnectionInfoService` | [connection-info.service.ts:155](../../api/src/modules/scim/services/connection-info.service.ts) | which methods the Connect surface shows as enabled |
+>
+> **Why the stale wording survived so long.** Nothing in the codebase is named after this document.
+> A search for a resolver whose identifier contains "authentication method" finds nothing, because the
+> consulting helper is called `resolveEndpointAuthEnablement`. Verify by the **mechanism**
+> (`profile?.authentication?.methods` reaching a decision), never by the **label**.
+>
+> **Still inert:** the `credentialRef` linkage and `defaultMethodId` are persisted and round-tripped but
+> do not yet select a credential at mint time; and six of the ten registry `type` values have no runtime
+> provider at all. Those remain genuine gaps.
 
 ## What changed
 
@@ -9,6 +34,7 @@ An endpoint can hold several authentication methods at once (legacy bearer, per-
 The model rides the existing `Endpoint.profile` JSONB - **no new column or table** - as `profile.authentication`:
 
 ```jsonc
+// Schematic shape. Placeholders in angle brackets are not literal JSON values.
 "profile": {
   "schemas": [ /* ... */ ],
   "resourceTypes": [ /* ... */ ],

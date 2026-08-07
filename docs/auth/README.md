@@ -2,7 +2,11 @@
 
 > **Start here.** This folder holds the complete authentication analysis + design for SCIMServer. The docs are a **hub-and-spoke set**, not four overlapping essays. This README is the navigational index and the single answer to "where is the plan?".
 
-> **Status of the cluster.** Everything past the shipped G11 baseline is **analysis + design only - no code has been implemented** for the `authenticationMethods[]` model, WIF, or the Phase Q sub-phases. The factual shipped baseline (3-tier guard chain, global HS256 OAuth issuer, per-endpoint bcrypt bearer) is described in [AUTHENTICATION_ARCHITECTURE.md section 4](AUTHENTICATION_ARCHITECTURE.md#4-current-scimserver-state-source-grounded) and [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md).
+> **Status of the cluster (corrected 2026-07-31, v0.55.1).** The WIF critical path has **shipped**. RFC 7523 workload identity federation, per-endpoint OAuth clients, the external JWKS validator, the admin authentication-methods CRUD, computed `authenticationSchemes`, the token-endpoint routing cascade, and capability-derived RFC 8414 metadata are all live in `api/src/`. See [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md) for the end-to-end proof and the per-step implementation reports (`WAVE2_*`, `WAVE3_*`) for what each step delivered.
+>
+> **What has NOT shipped:** RFC 8693 token exchange (deliberately, Wave 4 - and correctly *not* advertised in metadata), mTLS, DPoP, authorization-code/PKCE, and token introspection. The admin registry accepts ten method `type` values but only **four** have a runtime provider; see the note under [Coverage at a glance](#coverage-at-a-glance).
+>
+> This banner previously read "analysis + design only - no code has been implemented". That was true when the cluster was written and became false as the Phase Q and Wave work landed. It is corrected here because a status banner that under-reports shipped capability sends an implementer to rebuild something that already exists.
 
 ---
 
@@ -77,19 +81,53 @@ The ~5-6 day delta buys the generalized `methods[]` backbone that turns 1P / rol
 
 ## Coverage at a glance
 
-| Pattern | SCIMServer status | Closes in |
+> Re-verified against `release/0.55.0` (`6e6ad8ff`, v0.55.1) on 2026-07-31. "Shipped" means a runtime
+> provider exists and is exercised by unit, E2E, and live tests - not that a `type` value is accepted
+> by the admin registry.
+
+| Pattern | SCIMServer status | Evidence / closes in |
 |---|---|---|
-| 1 - Long-lived global bearer (legacy shared secret) | **SHIPPED** | - |
-| 2 - OAuth 2.0 client_credentials (issuer mode, single global pair) | **SHIPPED** | - |
-| 3 - Per-endpoint bcrypt bearer (multi-tenant) | **SHIPPED** (G11) | - |
-| 5 - Per-endpoint client_id/secret pairs (Entra Gallery mandate) | GAP | Q1 |
-| 4 - External JWKS-validated JWT | GAP | Q2 |
-| 8 - Workload Identity Federation (RFC 7523 + RFC 8693) | GAP | Q6 |
+| 1 - Long-lived global bearer (legacy shared secret) | **SHIPPED** | `authenticators/global-shared-secret.authenticator.ts` |
+| 2 - OAuth 2.0 client_credentials (issuer mode, single global pair) | **SHIPPED** | `api/src/oauth/oauth.controller.ts` |
+| 3 - Per-endpoint bcrypt bearer (multi-tenant) | **SHIPPED** (G11) | `authenticators/endpoint-credential.authenticator.ts` |
+| 4 - External JWKS-validated JWT | **SHIPPED** (Q2) | `api/src/oauth/external-jwks-validator.service.ts` |
+| 5 - Per-endpoint client_id/secret pairs (Entra Gallery mandate) | **SHIPPED** (Q1) | `controllers/client-secret-token-provider.ts` |
+| 8a - Workload Identity Federation, **RFC 7523** JWT-bearer client assertion | **SHIPPED** (Q6) | `controllers/wif-assertion-token.provider.ts`, `oauth/wif-assertion-validator.service.ts` |
+| 8b - Workload Identity Federation, **RFC 8693** token exchange | **GAP - deliberately** | Wave 4. Correctly **not** advertised: `endpoint-oauth-metadata.controller.ts` hardcodes `syncFabricRfc8693: false` |
 | 6 - Authorization-Code + refresh | GAP | Q4 (on demand) |
 | 7 - mTLS / DPoP | GAP | Q5 (deferred) |
-| HTTP Basic (`httpbasic`) | provably absent; deliberately not designed | one-provider add if ever needed |
+| HTTP Basic (`httpbasic`) | registry `type` only, no provider | one-provider add if ever needed |
+
+> **Registry breadth is not capability.** `KNOWN_METHOD_TYPES` in
+> [admin-authentication-method.controller.ts](../../api/src/modules/scim/controllers/admin-authentication-method.controller.ts)
+> accepts ten values - `shared-secret`, `bearer`, `oauth-client`, `external-jwt`, `wif-7523`,
+> `wif-8693`, `oauth-authcode`, `mtls`, `dpop`, `httpbasic` - while only four have a runtime provider.
+> Any surface that enumerates registry types without intersecting them against implemented providers
+> will over-state what the server can actually authenticate.
 
 Full 10-ISV matrix + per-pattern detail: [ISV sections 2-4](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md#2-industry-pattern-matrix-10-isvs).
+
+---
+
+## SyncFabric interoperability artifacts (mirrored, not authored here)
+
+Three files in this folder are **mirrors** of artifacts owned outside the repository. They are vendored
+so the design travels with the code, and they must be refreshed from their canonical source rather than
+edited here. Editing a mirror in place creates two drifting definitions.
+
+| Mirror in this folder | Canonical source | What it is |
+|---|---|---|
+| [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md) | `OneDrive - Microsoft\Documents\SCIMServer\auth\` | The cross-repository architecture and implementation guide for SyncFabric-to-SCIMServer workload identity federation. **SCIMServer implements from it**: roughly 100 references across 37 source files cite its wave and section labels (`W2.2`, `W3.4`, `W3.7`, `WI-11`..`WI-17`). Section 9.8 is the implementation status ledger; section 3.4.6 is the documentation-drift ledger this README's own corrections came from. |
+| [syncfabricScimserverAuthEvolution.prompt.md](syncfabricScimserverAuthEvolution.prompt.md) | `%APPDATA%\Code\User\prompts\` | The self-improving workflow that regenerates the guide from current source in both repositories. |
+| [syncfabricScimserverAuthEvolution.memory.md](syncfabricScimserverAuthEvolution.memory.md) | `%APPDATA%\Code\User\prompts\.memory\` | That workflow's persistent memory: verified invariants, superseded conclusions, and open empirical gates. |
+
+> **Do not trust a `(1)` or `(2)` filename suffix on any copy of the guide.** Those are browser-download
+> artifacts and do not indicate recency; the highest-numbered copy has historically been the **oldest**.
+> Verify by the `SHA-256` and revision number recorded in the guide's own header. A stale numbered
+> duplicate was removed from this folder on 2026-07-31 for exactly this reason.
+
+**Current mirror state:** guide revision 4, verified against SCIMServer `release/0.55.0` (`6e6ad8ff`,
+v0.55.1) and SyncFabric `origin/master` (`c6f63afc`), 2026-07-31.
 
 ---
 

@@ -1,10 +1,11 @@
 ---
-name: syncfabricScimserverAuthEvolution
 description: Refresh and critically re-evaluate SyncFabric-to-SCIMServer authentication, WIF, 1P, IdP/ISV emulation, performance, environments, and implementation guidance from the latest sources, with persistent self-improvement.
-argument-hint: Optional flags - --scope=delta|full, --auth=all|wif|1p|<method>, --syncfabric=<path>, --scimserver=<path>, --guide=<path>, --write=guide-only|repo-docs
+mode: agent
 ---
 
 # SyncFabric and SCIMServer Authentication Evolution
+
+**Argument hint:** `--scope=delta|full`, `--auth=all|wif|1p|<method>`, `--syncfabric=<path>`, `--scimserver=<path>`, `--guide=<path>`, `--write=guide-only|repo-docs`
 
 ## Intent
 
@@ -33,17 +34,37 @@ Use:
 /syncfabricScimserverAuthEvolution --guide=C:\path\to\guide.md
 ```
 
+### Availability
+
+This workflow is `/`-invokable from two surfaces, which name it differently:
+
+| Surface | Slash command | Registration |
+|---|---|---|
+| VS Code chat | `/syncfabricScimserverAuthEvolution` | This file, in `%APPDATA%\Code\User\prompts\`. The command name is the filename minus `.prompt.md`. |
+| Copilot CLI | `/syncfabric-scimserver-auth-evolution` | `%USERPROFILE%\.copilot\skills\syncfabric-scimserver-auth-evolution\SKILL.md`, which only loads this file. |
+
+**This file is the single source of behavior.** The CLI skill is a launcher and must never carry its own
+copy of the phases, defaults, or guardrails; if it drifts, delete the duplication rather than
+maintaining two definitions. Frontmatter here must stay limited to the VS Code prompt-file schema keys
+(`description`, `mode`, and optionally `tools` / `model`) - CLI-style keys such as `name` and
+`argument-hint` belong in the skill launcher, not here.
+
 ### Defaults
 
 ```text
 syncfabricRepo = C:\one\AD-IAM-Services-SyncFabric
-scimserverRepo = C:\Users\v-prasrane\source\repos\SCIMServer
+scimserverRepo = C:\Users\v-prasrane\source\repos\SCIMServer-master
 syncfabricReference = origin/master
-scimserverReference = origin/feat/wif, otherwise the current tracked upstream
+scimserverReference = origin/master
 scope = delta
 auth = all
 write = guide-only
 ```
+
+> **Worktree caution (verified 2026-07-31).** SCIMServer has multiple worktrees. `...\SCIMServer` is
+> on a release branch (`release/0.55.0`), `...\SCIMServer-tls-policy` is on a feature branch, and only
+> `...\SCIMServer-master` tracks `master`. Always resolve the worktree that actually has `master`
+> checked out before reading source; do not assume the shortest path is the right one.
 
 If `--guide` is absent, locate the newest existing file named:
 
@@ -240,10 +261,69 @@ SyncFabric:
 
 SCIMServer:
 
-- prefer `origin/feat/wif` while that branch exists;
-- otherwise use the branch's tracked upstream;
+- default to `origin/master`; `feat/wif` was merged into `master` and is now historical only;
+- if a named feature branch is explicitly requested, compare it against `origin/master` rather than treating it as the baseline;
+- resolve the worktree that actually has the target branch checked out (see the worktree caution under Defaults);
 - compare local branch and upstream;
 - record merge-base and ancestry.
+
+### 1.3.1 Range completeness rule
+
+**The analysed range must terminate at the reference you report.** In the 2026-07-31 run the delta
+analysis covered `f8fa96f4..f1362f37` while `origin/master` had advanced to `6bd2ac8e`, leaving an
+unanalysed tail. Re-resolve the reference SHA immediately before writing conclusions, and if it moved:
+
+- analyse the tail range separately;
+- state explicitly in the guide which range each conclusion covers;
+- never report a head SHA you did not actually analyse.
+
+### 1.3.2 Large-delta strategy
+
+When either side exceeds ~50 commits since the previous snapshot, do not attempt a linear read.
+
+1. Filter the range by auth vocabulary (Phase 2.1) to a candidate commit set.
+2. Bucket candidates into *wire-contract*, *rollout/enablement*, *first-hop identity*, and *internal refactor*.
+3. Analyse wire-contract commits in full; sample the rest for false negatives.
+4. State the bucket counts in the guide so a reader can judge coverage.
+5. Prefer delegating each side's classification to a separate bounded agent, but bank each result to a
+   durable file the moment it returns - a completed analysis must survive an interrupted session.
+
+### 1.3.3 Small-delta strategy: let the file list settle it
+
+The mirror image of 1.3.2, added 2026-07-31 after a one-commit SyncFabric delta.
+
+When a delta is small, compute the **union of changed paths first** and compare it against the
+authentication surface before reading any diff hunk. If the two sets are disjoint, every file in the
+surface is byte-identical to the previous snapshot **by construction**, and that is a stronger
+statement than any blob-by-blob sample. Record it as a proof, not as an impression.
+
+```powershell
+git diff --stat <previousSnapshot>..<currentReference>
+```
+
+Rules:
+
+- State the complete changed-path list in the guide when it is short enough to print. A reader can then
+  re-derive the verdict without trusting the analysis.
+- Still inspect any newly added configuration file for auth-relevant settings (authority, application
+  ID, audience, scope, certificate, federation). A new file is not covered by "unchanged blobs".
+- Do not use this shortcut to skip Phase 2 classification of the commits themselves; it establishes
+  invariance of the *runtime surface*, not irrelevance of the *commit*.
+
+### 1.3.4 Release branches and other non-`master` references
+
+Added 2026-07-31, when the requested reference was `release/0.55.0` rather than `master`.
+
+When the analysed reference is not the repository's mainline:
+
+- record `merge-base`, commits ahead, and commits behind, and state whether mainline is a strict
+  ancestor;
+- if it is a strict ancestor, say so explicitly, because it lets every conclusion be reported as
+  holding at both references;
+- if it has diverged, analyse the divergence separately and never present a release-branch conclusion
+  as a mainline conclusion;
+- read the version from `package.json` on the analysed reference rather than assuming it matches the
+  branch name. A branch called `release/0.55.0` can legitimately carry version `0.55.1`.
 
 ### 1.4 Determine previous snapshots
 
@@ -464,6 +544,58 @@ Map:
 - live-test and workflow support.
 
 Do not assume the number or names of methods from docs. Derive them from routes, guards, providers, DTOs, persistence, and tests.
+
+### 4.1.1 Registry breadth is not capability
+
+Verified 2026-07-31: the SCIMServer admin registry accepts **ten** method types while only **four**
+have a runtime provider, and SCIM discovery maps all ten to scheme names. Every run must:
+
+- enumerate the declared method-type registry (`admin-authentication-method.controller.ts`);
+- enumerate the actually-wired providers;
+- report the intersection **and** the difference;
+- flag any surface (metadata, discovery, connection info, UI) that publishes a registry type without
+  a provider as a truthfulness defect, not a cosmetic one.
+
+Never report "supports N methods" from a registry constant alone.
+
+### 4.1.2 The canonical guide is an implementation contract
+
+Verified 2026-07-31: SCIMServer source contains **22** citations of this workflow's guide section and
+wave labels (`W2.2`, `W3.4`, `W3.7`, `guide 7.1`, "the SyncFabric guide Section 17"). The guide is no
+longer an external proposal - the team implements from it. Therefore every run must:
+
+1. grep SCIMServer source for guide citations and count them;
+2. for each guide *proposal*, determine whether it shipped, partially shipped, or is untouched;
+3. maintain an explicit **implementation status ledger** in the guide rather than leaving proposals
+   ambiguous;
+4. reconcile proposed file paths against where the code actually landed, and treat the shipped
+   location as canonical;
+5. never restate a shipped item as an outstanding recommendation - that destroys the guide's
+   credibility as a work list.
+
+### 4.1.3 Verify a delegated negative claim by mechanism, not by label
+
+Added 2026-07-31 after two delegated exploration results were wrong in the same direction.
+
+A sub-agent reported that the SCIMServer authentication-methods model was inert and that its JWKS
+client failed closed. Both were false. The first failed because nothing in the codebase is named after
+the design document: the model is consulted through a helper called `resolveEndpointAuthEnablement`,
+so a search for a resolver named after "authentication method" finds nothing and concludes absence.
+
+This is operating principle 3 - no name-based conclusions - reappearing inside a tool rather than
+inside a person, and it is more dangerous there because the output reads as a completed search.
+
+Therefore:
+
+1. **Delegation is for breadth. Verification is not delegable.** Every load-bearing claim taken from a
+   sub-agent must be re-read at the cited `path:line` before it enters the guide.
+2. **Treat a delegated *negative* claim as unverified by default.** "X is not implemented", "nothing
+   consults Y", and "there is no cap on Z" are the highest-risk outputs, because absence of a search
+   hit is indistinguishable from absence of the feature.
+3. **Search for the mechanism, not the label.** To test whether a persisted structure is inert, follow
+   the *data path* (`profile?.authentication?.methods` reaching a decision), not the vocabulary.
+4. **Record every correction in the guide.** A validation report that lists which delegated findings
+   were wrong, and why, is worth more than one that only lists checks that passed.
 
 ### 4.2 Trace each method end to end
 
@@ -920,6 +1052,20 @@ Include a compact complexity budget and simplification delta.
 
 Revise the guide rather than appending a second report.
 
+**A guide must not contradict itself.** Added 2026-07-31: revision 3 corrected two conclusions in its
+body ("advertises RFC 8693", "returns HTTP 201") while leaving both standing in its executive summary.
+Operating principle 14 - one canonical guide, no appended contradictions - governs a document's
+internal consistency, not only its relationship to older documents. Every run must therefore:
+
+- grep the guide for each newly superseded claim and fix **every** occurrence, summary included;
+- prefer deleting a disproved bullet over annotating it, and record the deletion with its evidence in
+  a short note, so a reader of an older revision can see the requirement was met rather than dropped;
+- treat a contradiction between a summary and a body as a defect of the same severity as a wrong fact.
+
+**Filename suffixes are not recency.** When multiple copies of the guide exist, the header must carry a
+revision number and an identity table for the sibling copies. A file cannot state its own hash, so
+record authoritative hashes in the memory run log and reference them from the header.
+
 Mandatory updates:
 
 - source snapshots;
@@ -997,7 +1143,12 @@ Validate:
 - no raw tokens/secrets/private keys;
 - no fabricated production domain or app ID presented as real;
 - ASCII requirement;
-- guide hash, line count, diagram count, and example count.
+- guide hash, line count, diagram count, and example count;
+- **every backtick-quoted repository path resolves in one of the two repos, or is explicitly labelled
+  as a proposed/not-yet-created file** - an unresolved path that is *not* labelled is a defect;
+- **fenced code must not be nested inside a blockquote** when it needs to be machine-validated; put
+  the prose in the blockquote and the fenced block immediately after it, otherwise the `> ` prefix
+  makes JSON and PowerShell validation fail spuriously.
 
 ### 11.3 Repository verification
 
@@ -1179,17 +1330,48 @@ End with:
 ## Prompt metadata
 
 ```yaml
-promptVersion: 1.0.1
+promptVersion: 1.3.0
 created: 2026-07-23
-lastExecution: 2026-07-23
-executionCount: 1
+lastExecution: 2026-07-31
+executionCount: 3
 canonicalMemory: .memory/syncfabricScimserverAuthEvolution.memory.md
+lastSyncFabricSnapshot: c6f63afc37edde087bb6f8be9fbabb5929da736c
+lastScimServerSnapshot: edcb330fd47ef69e8a96e2cbdf60fd7013677907
+lastScimServerReference: release/0.55.0
+lastGuideSha256: see the 2026-07-31 revision-4 run-log entry in the memory file
 ```
+
+> **Standing requirement - self-improvement is mandatory, not optional.**
+> Every execution of this prompt **must** end by updating this metadata block, appending a changelog
+> entry, and appending a run entry to the memory file - even when the run finds no source change.
+> A run that does not improve the prompt is an incomplete run. If a run genuinely produced no new
+> lesson, record that explicitly as `no-new-lessons` in the changelog with the reason, rather than
+> silently skipping the step.
 
 ## Prompt changelog
 
 - 2026-07-23, v1.0.0: Initial cross-repository prompt. Added delta-first source refresh, complete 1P analysis, endpoint-persona modeling, standards and performance critique, multi-environment workflows, canonical guide updates, artifact verification, persistent memory, and controlled prompt evolution.
 - 2026-07-23, v1.0.1: First-run improvement. Added mandatory total-deadline/cardinality checks for JWKS work and route-level pre-persistence redaction proof for bearer-credential paths.
+- 2026-07-31, v1.2.0: Second-run improvement, driven by a ~86/~90 commit double-sided delta.
+  - Corrected the SCIMServer defaults: `feat/wif` is merged, so the reference is now `origin/master`, and the repo path is the `SCIMServer-master` worktree.
+  - Added a worktree-resolution caution after reading source from the wrong worktree was identified as a live risk.
+  - Added section 1.3.1 **range completeness rule** after the run analysed `f8fa96f4..f1362f37` while master had advanced to `6bd2ac8e`, leaving an unanalysed tail.
+  - Added section 1.3.2 **large-delta strategy** with auth-vocabulary filtering, four-way bucketing, and a requirement to bank delegated analysis results immediately so they survive interruption.
+  - Added section 4.1.1 **registry breadth is not capability** after confirming ten registry method types against four real providers.
+  - Added section 4.1.2 **the canonical guide is an implementation contract** after finding 22 guide citations in SCIMServer source; runs must now maintain an explicit implementation status ledger and reconcile proposed paths against shipped locations.
+  - Added two artifact-verification rules: all backticked repo paths must resolve or be labelled proposed, and machine-validated fenced blocks must not be nested in blockquotes.
+  - Recorded the last analysed snapshots and guide hash in metadata so the next run cannot silently reuse a stale baseline.
+- 2026-07-31, v1.2.1: Availability and schema hardening.
+  - Replaced the non-schema frontmatter keys `name` and `argument-hint` with the VS Code prompt-file schema keys `description` and `mode: agent`; the argument hint now lives in the body so it renders instead of warning.
+  - Registered a Copilot CLI launcher skill at `~/.copilot/skills/syncfabric-scimserver-auth-evolution/SKILL.md` that loads this file rather than duplicating its rules, so the workflow is `/`-invokable on both surfaces from one source of truth.
+  - Added the **Availability** subsection recording that surface-specific naming differs and that only this file may hold behavior.
+- 2026-07-31, v1.3.0: Third-run improvement, driven by a deliberately small double-sided delta (1 SyncFabric commit, 9 SCIMServer commits) analysed against a **release branch** rather than mainline.
+  - Added section 1.3.3 **small-delta strategy**. The mirror of the large-delta rule: compute the union of changed paths first, and when it is disjoint from the authentication surface, report invariance as a proof by construction rather than as a blob sample. Motivated by `6bd2ac8e..c6f63afc`, whose entire content was two Delos gateway configuration files.
+  - Added section 1.3.4 **release branches and other non-mainline references**, after the run was asked to analyse `release/0.55.0`. Requires recording merge-base, ahead/behind, and strict-ancestry, and requires reading the version from `package.json` rather than inferring it from the branch name - the branch named `release/0.55.0` carried version `0.55.1`.
+  - Added section 4.1.3 **verify a delegated negative claim by mechanism, not by label**, after two sub-agent findings were wrong in the same direction. The instructive one reported the authentication-methods model as inert because the consuming helper is named `resolveEndpointAuthEnablement` and does not contain the searched vocabulary. Delegated negatives are now unverified by default, and corrections must be published in the guide's validation report.
+  - Extended section 10.1 with an **internal-consistency** requirement, after revision 3 of the guide corrected two claims in its body while leaving both standing in its executive summary. A summary that contradicts its own body is a defect of the same severity as a wrong fact.
+  - Extended section 10.1 with a **filename suffixes are not recency** requirement plus a header identity table, after the highest-numbered copy of the guide turned out to be the oldest.
+  - Recorded `lastScimServerReference` in metadata so a future run cannot mistake a release-branch snapshot for a mainline one.
 
 ---
 

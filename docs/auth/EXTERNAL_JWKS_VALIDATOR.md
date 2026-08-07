@@ -31,10 +31,38 @@ flowchart TD
 | # | Guarantee | How |
 |---|---|---|
 | 1 | **Algorithm pinning** | `jwtVerify(..., { algorithms: ['RS256','ES256'] })`. `alg:none` and any HMAC (the public-key-as-HMAC-secret confusion) are rejected. |
-| 2 | **SSRF host allowlist** | the `jwksUri` host MUST be on `JWKS_HOST_ALLOWLIST` and the scheme MUST be https. A disallowed host is rejected **before any network call** - the critical anti-SSRF choke point ([architecture section 5.1](AUTHENTICATION_ARCHITECTURE.md#51-placement-table)). |
+| 2 | **SSRF host allowlist** | the `jwksUri` host MUST be on the **effective** allowlist and the scheme MUST be https. A disallowed host is rejected **before any network call** - the critical anti-SSRF choke point ([architecture section 5.1](AUTHENTICATION_ARCHITECTURE.md#51-placement-table)). See the note below: the effective allowlist is a union of three layers, not just the environment variable. |
 | 3 | **Cache by URI** with bounded max-age (`JWKS_CACHE_MAX_AGE_MS`, default 10 min) | a `Map` cache; a fresh entry skips the fetch. |
 | 4 | **Refetch on unknown `kid`** | the header `kid` is peeked; if the cached set lacks it (key rotation), the JWKS is refetched once. |
 | 5 | **Fail closed** | a fetch failure with no usable cached key REJECTS. It never falls back to skipping the signature check. A stale-but-present cache is used as a degraded fallback (logged), never "no check". |
+
+### The effective allowlist is three layers, not one (clarified 2026-07-31)
+
+Guarantee 2 says the host must be on "the allowlist". That allowlist is a **union**, and an operator
+who reads only `JWKS_HOST_ALLOWLIST` will not be able to explain why an unlisted host was accepted:
+
+```mermaid
+flowchart LR
+    S["layer 1 - compiled seed<br/>well-known IdP hosts<br/>Entra commercial, USGov, China, Google"] --> U{{"effective allowlist<br/>union"}}
+    E["layer 2 - JWKS_HOST_ALLOWLIST<br/>server environment variable"] --> U
+    P["layer 3 - JwksHostAllowlistEntry rows<br/>persisted, admin-editable at runtime, WI-15"] --> U
+    U --> C["assertJwksUriAllowed<br/>https + exact host match<br/>checked BEFORE any network call"]
+```
+
+| Layer | Where it lives | Who changes it | Takes effect |
+|---|---|---|---|
+| Compiled seed | [jwks-host-allowlist.service.ts](../../api/src/oauth/jwks-host-allowlist.service.ts) | code change | on deploy |
+| Environment | `JWKS_HOST_ALLOWLIST` | deployment configuration | on restart |
+| Persisted | `JwksHostAllowlistEntry` (Prisma model), managed through [admin-jwks-host.controller.ts](../../api/src/modules/scim/controllers/admin-jwks-host.controller.ts) | an admin, at runtime | immediately |
+
+Host matching is exact and lowercased; there is no wildcard or suffix match. Every redirect hop is
+re-checked against the same union, so a redirect cannot walk a request off the allowlist.
+
+**Bounds that exist, and bounds that do not.** Timeout, retry count, retry backoff, redirect hop count
+(max 3), and cache max-age are all bounded and configurable. There is **no** cap on JWKS response
+size, on the number of keys in a response, on the number of distinct URIs the cache may hold, and no
+maximum age past which a stale entry stops being served after a fetch failure. Those four are open
+items, tracked in the canonical guide's section 20.
 
 ## Runtime egress hardening (configurable)
 
