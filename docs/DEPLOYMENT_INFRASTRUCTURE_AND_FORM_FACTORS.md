@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-08-04 - **Repo version at capture:** `api/package.json` = `0.55.2`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-08-07 - **Repo version at capture:** `api/package.json` = `0.55.2`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -388,6 +388,8 @@ flowchart TB
 Two structural facts stand out in that graph and are easy to miss:
 
 - **The dev app does not have its own environment.** `scimserver-dev` lives in resource group `scimserver-dev` but its `environmentId` points at `scimserver-env` in resource group `scimserver-prod`. Dev and canary prod therefore share one managed environment, one Log Analytics workspace, one VNet, and one static egress IP.
+
+  **This sharing is now expressible in the tooling, not just an accident of history.** A subscription is capped on Container Apps environments (`MaxNumberOfGlobalEnvironmentsInSub`), so sharing is a hard requirement rather than a convenience. [infra/containerapp.bicep](../infra/containerapp.bicep) takes an optional `environmentResourceId` and [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1) an optional `-EnvironmentResourceId`; when set, the template skips resolving `environmentName` inside the app's own resource group and binds `environmentId` to the supplied full resource ID. **A bare environment NAME cannot express a cross-resource-group reference** - `az containerapp env show -n <name> -g <this-rg>` looks only in that resource group and fails with a not-found error, which is precisely the failure this parameter removes. When the parameter is supplied the script also skips environment creation entirely, reads the environment back with `az containerapp env show --ids`, and aborts if it cannot be read - so a typo fails loudly instead of silently provisioning a second environment against the subscription cap.
 - **`scimserver-dev-vnet` (East US 2) is orphaned.** It has the same address space and the same three delegated subnets as the prod VNet, but no environment references it.
 
 ---
@@ -547,8 +549,8 @@ flowchart TB
     P1["Step 1/5 Resource Group<br/>az group show, else az group create"]
     P2["Step 2/5 Network<br/>vnet exists: ensure 3 subnets individually<br/>vnet missing: deploy infra/networking.bicep"]
     P3["Step 3/5 PostgreSQL (only with -ProvisionPostgres)<br/>deploy infra/postgres.bicep<br/>set azure.extensions then restart server"]
-    P4["Step 4/5 Managed Environment<br/>skip if it already exists<br/>else deploy infra/containerapp-env.bicep --no-wait<br/>poll up to 900s then up to 600s"]
-    P5["Step 5/5 Container App<br/>skip if current image already equals desired<br/>else deploy infra/containerapp.bicep with a temp params file<br/>poll up to 300s"]
+    P4["Step 4/5 Managed Environment<br/>-EnvironmentResourceId set: skip creation,<br/>read it back with az containerapp env show --ids<br/>else skip if it already exists<br/>else deploy infra/containerapp-env.bicep --no-wait<br/>poll up to 900s then up to 600s"]
+    P5["Step 5/5 Container App<br/>skip if current image already equals desired<br/>else deploy infra/containerapp.bicep with a temp params file<br/>pass environmentResourceId when cross-resource-group<br/>poll up to 300s"]
     P6["Verify<br/>GET /scim/admin/version with Bearer SCIM secret<br/>18 attempts x 10s"]
     P7["Print URL, SCIM base path, secrets, log commands, cost estimate"]
 
