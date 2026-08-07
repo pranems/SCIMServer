@@ -1,6 +1,6 @@
 # SCIMServer - Sovereign & Government Cloud Deployment Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.3`
+> **Status:** User-facing reference - **Last verified:** 2026-08-07 - **Product version:** `0.55.3`
 
 > **Version:** 0.55.3 - **Updated:** April 28, 2026  
 > Covers: Azure Government (US), Azure China (21Vianet), Azure BLEU (France), Azure Germany, and custom sovereign environments
@@ -549,6 +549,8 @@ az deployment group create `
     oauthClientSecret=<oauth> `
     databaseUrl=<pg-url>
 ```
+
+> **If the environment lives in another resource group**, replace `environmentName=...` with `environmentResourceId=/subscriptions/<sub-id>/resourceGroups/<env-rg>/providers/Microsoft.App/managedEnvironments/<env-name>`. A bare name is only resolvable inside the deployment's own resource group, and a subscription is capped on how many Container Apps environments it may hold - so sharing one across resource groups is common rather than exotic. The equivalent script parameter is `-EnvironmentResourceId` on `scripts/deploy-azure.ps1`.
 
 ---
 

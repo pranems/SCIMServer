@@ -1,6 +1,6 @@
 # Azure Deployment & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.3`
+> **Status:** User-facing reference - **Last verified:** 2026-08-07 - **Product version:** `0.55.3`
 
 > **Version:** 0.55.3 - **Updated:** June 3, 2026  
 > **Source of truth:** [deploy.ps1](../deploy.ps1), [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), [infra/](../infra/)
@@ -264,6 +264,22 @@ Set as Container App secrets/environment variables:
 | `infra/postgres.bicep` | PostgreSQL Flexible Server |
 | `infra/acr.bicep` | Azure Container Registry (optional) |
 | `infra/networking.bicep` | VNet + subnets (optional) |
+
+#### Sharing one environment across resource groups
+
+An Azure subscription is capped on the number of Container Apps managed environments, so apps frequently have to share one - in this estate, `scimserver-dev` (resource group `scimserver-dev`) runs inside `scimserver-env`, which lives in resource group `scimserver-prod`.
+
+An environment **name** cannot express that: `az containerapp env show -n <name> -g <this-rg>` searches only the app's own resource group and returns not-found. Pass the **full resource ID** instead, via `-EnvironmentResourceId` on [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1) or the `environmentResourceId` parameter on `infra/containerapp.bicep`:
+
+```powershell
+.\scripts\deploy-azure.ps1 `
+  -ResourceGroup "scimserver-dev" `
+  -AppName "scimserver-dev" `
+  -ScimSecret "<secret>" `
+  -EnvironmentResourceId "/subscriptions/<sub-id>/resourceGroups/scimserver-prod/providers/Microsoft.App/managedEnvironments/scimserver-env"
+```
+
+When set, the template binds `environmentId` directly to that ID rather than resolving `environmentName` locally, and the script skips environment creation. It also reads the environment back first and aborts if it cannot - so a wrong ID fails loudly instead of provisioning a **second** environment against the very cap you were working around.
 
 ### Container App Configuration
 

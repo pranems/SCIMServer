@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.3`
+> **Status:** User-facing reference - **Last verified:** 2026-08-07 - **Product version:** `0.55.3`
 
 > Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
 
@@ -52,7 +52,19 @@ Same result - interactive prompts for all configuration. If run from within a cl
   -ScimSecret "your-secure-secret"
 ```
 
-Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-DatabaseUrl` (BYO PostgreSQL connection string), `-ProvisionPostgres` (auto-provision Azure PostgreSQL Flexible Server).
+Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-DatabaseUrl` (BYO PostgreSQL connection string), `-ProvisionPostgres` (auto-provision Azure PostgreSQL Flexible Server), `-EnvironmentResourceId` (reuse a Container Apps environment that lives in a **different resource group**).
+
+> **Reusing an environment across resource groups:** an Azure subscription is capped on the number of Container Apps managed environments, so several apps often have to share one. `--environment <name>` only ever looks inside the app's *own* resource group and fails with a not-found error when the environment lives elsewhere. Pass the **full resource ID** instead:
+>
+> ```powershell
+> .\scripts\deploy-azure.ps1 `
+>   -ResourceGroup "scimserver-dev" `
+>   -AppName "scimserver-dev" `
+>   -ScimSecret "your-secure-secret" `
+>   -EnvironmentResourceId "/subscriptions/<sub-id>/resourceGroups/scimserver-prod/providers/Microsoft.App/managedEnvironments/scimserver-env"
+> ```
+>
+> When set, the script skips environment creation entirely and reads the environment back to confirm it is reachable, so a mistyped ID **fails immediately** rather than quietly provisioning a second environment against the subscription cap.
 
 > **PostgreSQL required (Phase 3):** SCIMServer uses PostgreSQL as its persistence backend. Provide either `-DatabaseUrl "postgresql://..."` (existing server) or `-ProvisionPostgres` (the script will deploy an Azure Database for PostgreSQL Flexible Server via `infra/postgres.bicep`, ~$15-25/mo additional).
 
