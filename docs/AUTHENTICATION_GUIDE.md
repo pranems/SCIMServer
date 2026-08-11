@@ -387,7 +387,7 @@ Only **RS256** and **ES256** are accepted (`assertion_alg_not_allowed` otherwise
 
 Signing keys are only fetched from allowlisted hosts. Seeded set:
 
-`accounts.google.com`, `login.chinacloudapi.cn`, `login.microsoftonline.com`, `login.microsoftonline.us`, `login.partner.microsoftonline.cn`, `www.googleapis.com`
+`accounts.google.com`, `login.chinacloudapi.cn`, `login.microsoftonline.com`, `login.microsoftonline.us`, `login.partner.microsoftonline.cn`, `login.windows.net`, `www.googleapis.com`
 
 Legacy Entra v1 (`login.windows.net`) is **not** seeded and must be added:
 

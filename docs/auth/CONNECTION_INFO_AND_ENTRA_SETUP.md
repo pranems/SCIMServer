@@ -919,6 +919,7 @@ The **seed** (aligned with the [5C.2](#5c2-the-config-time-discovery-resolver-tw
 ```json
 [
   "login.microsoftonline.com",
+  "login.windows.net",
   "login.microsoftonline.us",
   "login.chinacloudapi.cn",
   "login.partner.microsoftonline.cn",
@@ -942,10 +943,10 @@ Authorization: Bearer <admin-scim-token>
 {
   "credentialSecretVisibility": "always",
   "jwksHostAllowlist": {
-    "seed": ["login.microsoftonline.com", "login.microsoftonline.us", "login.chinacloudapi.cn", "login.partner.microsoftonline.cn", "accounts.google.com", "www.googleapis.com"],
+    "seed": ["login.microsoftonline.com", "login.windows.net", "login.microsoftonline.us", "login.chinacloudapi.cn", "login.partner.microsoftonline.cn", "accounts.google.com", "www.googleapis.com"],
     "env": [],
     "stored": ["idp.contoso-okta.com"],
-    "effective": ["login.microsoftonline.com", "login.microsoftonline.us", "login.chinacloudapi.cn", "login.partner.microsoftonline.cn", "accounts.google.com", "www.googleapis.com", "idp.contoso-okta.com"]
+    "effective": ["login.microsoftonline.com", "login.windows.net", "login.microsoftonline.us", "login.chinacloudapi.cn", "login.partner.microsoftonline.cn", "accounts.google.com", "www.googleapis.com", "idp.contoso-okta.com"]
   }
 }
 ```

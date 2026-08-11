@@ -28,13 +28,34 @@ import type { IJwksHostAllowlistRepository } from '../domain/repositories/jwks-h
 
 /** Compiled seed of well-known IdP JWKS hosts (lowercased, exact-match). */
 export const WELL_KNOWN_JWKS_HOST_SEED: ReadonlyArray<string> = [
-  'login.microsoftonline.com', // Entra commercial
+  'login.microsoftonline.com', // Entra commercial (v2)
+  'login.windows.net', // Entra commercial (v1) - see note below
   'login.microsoftonline.us', // Entra US Gov
   'login.chinacloudapi.cn', // Entra China (21Vianet)
   'login.partner.microsoftonline.cn', // Entra China alt
   'www.googleapis.com', // Google
   'accounts.google.com', // Google OIDC
 ];
+
+// Why login.windows.net is seeded (added 2026-08-11)
+//
+// It is the v1 Entra JWKS host. Entra still serves v1 metadata there, tokens
+// minted through v1 endpoints carry it, and this repo's own live tests use it
+// (scripts/live-test.ps1 section 9z-AV builds a trust whose jwksUri is
+// https://login.windows.net/<tenant>/discovery/v2.0/keys). It belongs beside
+// login.microsoftonline.com as a well-known Microsoft host.
+//
+// It was previously absent from the seed and had been added BY HAND to the
+// persisted layer on every long-lived estate - dev, the canary prod and the
+// customer-facing prod all carried it with label=null rather than the seed
+// label. That made it invisible operator state: the 2026-08 cross-tenant
+// migration carried every endpoint, user, group and credential correctly, yet
+// the new estates came up without this host and no count-based check noticed.
+// Only a v1-issuer WIF trust would have failed, later, far from the cause.
+//
+// Seeding it removes that whole class of silent regression: the compiled seed is
+// a permanent floor, so it can no longer be lost by a migration, an accidental
+// admin deletion, or a fresh deployment.
 
 export interface JwksAllowlistPersistedEntry {
   id: string;

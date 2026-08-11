@@ -58,6 +58,37 @@ describe('JwksHostAllowlistService (WI-15)', () => {
     }
   });
 
+  // The loop above iterates whatever the constant happens to contain, so it can
+  // never notice a host being DROPPED from the seed. These name the Microsoft and
+  // Google hosts explicitly, so removing one is a failing test rather than a
+  // silent behaviour change.
+  //
+  // login.windows.net earned its own case: it is the v1 Entra JWKS host, it was
+  // NOT seeded originally, and it had been added by hand to the persisted layer
+  // on every long-lived estate. The 2026-08 cross-tenant migration carried every
+  // endpoint, user, group and credential faithfully and still lost this host,
+  // because no count-based check can see a missing allow-list entry. Seeding it
+  // makes it a permanent floor; this test keeps it there.
+  it.each([
+    'login.microsoftonline.com',
+    'login.windows.net',
+    'login.microsoftonline.us',
+    'login.chinacloudapi.cn',
+    'login.partner.microsoftonline.cn',
+    'www.googleapis.com',
+    'accounts.google.com',
+  ])('the seed permanently contains the well-known host %s', (host) => {
+    expect(WELL_KNOWN_JWKS_HOST_SEED).toContain(host);
+    expect(service.isAllowed(host)).toBe(true);
+  });
+
+  it('a v1 Entra JWKS URI is allowed without any admin configuration', () => {
+    // The shape live-test.ps1 section 9z-AV builds, and the shape a token minted
+    // through a v1 Entra endpoint carries.
+    const v1JwksHost = new URL('https://login.windows.net/9751e42f-78f3-42f4-8b8a-6e73845aceae/discovery/v2.0/keys').hostname;
+    expect(service.isAllowed(v1JwksHost)).toBe(true);
+  });
+
   it('the effective union contains the env-configured host', () => {
     expect(service.isAllowed('custom-env.example.com')).toBe(true);
   });

@@ -740,6 +740,7 @@ Server-wide allowlist governing which hosts a WIF trust may fetch signing keys f
     "login.microsoftonline.com",
     "login.microsoftonline.us",
     "login.partner.microsoftonline.cn",
+    "login.windows.net",
     "www.googleapis.com"
   ],
   "env": [],

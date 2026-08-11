@@ -115,7 +115,8 @@ Between the original report and this revision, the **connection-info epic (WI-1.
 
 ```ts
 export const WELL_KNOWN_JWKS_HOST_SEED: ReadonlyArray<string> = [
-  'login.microsoftonline.com', // Entra commercial
+  'login.microsoftonline.com', // Entra commercial (v2)
+  'login.windows.net',         // Entra commercial (v1) - seeded 2026-08-11
   'login.microsoftonline.us',  // Entra US Gov
   'login.chinacloudapi.cn',    // Entra China (21Vianet)
   'login.partner.microsoftonline.cn', // Entra China alt
@@ -126,14 +127,14 @@ export const WELL_KNOWN_JWKS_HOST_SEED: ReadonlyArray<string> = [
 
 The validator now consults `allowlistService.isAllowed(host)` (the seed union) when the service is wired ([external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts#L124-L138)). Consequences for the original failure:
 
-| Aspect | Before the epic | On `b9d615b` |
-|---|---|---|
-| `login.microsoftonline.com` JWKS | rejected unless env-set | **allowed out of the box** (seeded) |
-| `login.windows.net` JWKS (this trust) | rejected | **still rejected** - it is NOT in the seed |
-| How to fix without redeploy | not possible (env-only, restart) | **`POST /admin/settings/jwks-hosts`** adds it, hot-reloaded ([admin-jwks-host.controller.ts](../../api/src/modules/scim/controllers/admin-jwks-host.controller.ts)) |
-| Reason surfaced to the caller | no | **still no** - the response is still a bare `invalid_client` |
+| Aspect | Before the epic | On `b9d615b` | Since 2026-08-11 |
+|---|---|---|---|
+| `login.microsoftonline.com` JWKS | rejected unless env-set | **allowed out of the box** (seeded) | unchanged |
+| `login.windows.net` JWKS (this trust) | rejected | **still rejected** - not in the seed | **allowed out of the box (now seeded)** |
+| How to fix without redeploy | not possible (env-only, restart) | **`POST /admin/settings/jwks-hosts`** adds it, hot-reloaded ([admin-jwks-host.controller.ts](../../api/src/modules/scim/controllers/admin-jwks-host.controller.ts)) | no fix needed |
+| Reason surfaced to the caller | no | **still no** - bare `invalid_client` | addressed separately by the reason catalog |
 
-So this exact trust (JWKS host `login.windows.net`) **still fails on the latest code**. The fixes are now easier: either point `jwksUri` at the seeded `login.microsoftonline.com` (Entra publishes the same v2.0 keys there), or add `login.windows.net` via the new admin allowlist API. Critically, **the error is still opaque** - the operator still cannot tell from the response that the JWKS host was the problem.
+**Update, 2026-08-11: this exact trust now passes the host check.** `login.windows.net` was added to the compiled seed. The trigger was a cross-tenant migration: the host had been added BY HAND to the persisted layer on every long-lived estate (dev, canary prod and the customer-facing prod all carried it with `label: null` rather than the seed label), so it was invisible operator state. The migration carried every endpoint, user, group and credential faithfully and still lost it, and no count-based check noticed - only a v1-issuer trust would have failed, later, far from the cause. Seeding it makes it a permanent floor that a migration, an accidental admin deletion, or a fresh deployment cannot drop. Locked by explicit per-host cases in [jwks-host-allowlist.service.spec.ts](../../api/src/oauth/jwks-host-allowlist.service.spec.ts) - the pre-existing test looped over the constant and so could never detect a host being removed from it.
 
 **WI-14 would have sidestepped it entirely.** The new discovery resolver ([wif-discovery-resolver.service.ts](../../api/src/oauth/wif-discovery-resolver.service.ts)) lets an admin pass a preset + tenant id (or a discovery URL); it fetches the IdP's `openid-configuration` and stores the canonical `jwks_uri` - which for the `entra-commercial` preset is on the seeded `login.microsoftonline.com` host. Had the trust been built via the resolver, it would never have carried the un-seeded `login.windows.net` host.
 

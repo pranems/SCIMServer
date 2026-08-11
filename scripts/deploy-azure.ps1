@@ -655,7 +655,16 @@ if ($ProvisionPostgres -and -not $DatabaseUrl) {
     # listed in the `azure.extensions` server parameter (static, requires server restart).
     # Without this, the baseline migration silently fails with P3009 and the app crash-loops.
     # See: api/prisma/migrations/20260223000000_postgresql_baseline/migration.sql
-    $requiredExtensions = "CITEXT,PG_TRGM,PGCRYPTO"
+    #
+    # UUID-OSSP added 2026-08-11. The baseline migration does not need it, but an EXISTING
+    # estate may have it installed, and `pg_dump` of such a database emits
+    # CREATE EXTENSION "uuid-ossp". Restoring that dump into a server whose allow-list omits
+    # it fails with `extension "uuid-ossp" is not allow-listed` - which is exactly what broke
+    # the tenant-08 to tenant-09 canary-prod carry. The dev pair copied cleanly because the
+    # dev source had three extensions while the prod source had four, so the failure looked
+    # environment-specific rather than data-specific. Provisioning the SUPERSET means a new
+    # server can receive a dump from any existing estate.
+    $requiredExtensions = "CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP"
     Write-Host "   🔧 Allow-listing required PG extensions: $requiredExtensions" -ForegroundColor Cyan
     $currentExtValue = az postgres flexible-server parameter show `
         --resource-group $ResourceGroup `
