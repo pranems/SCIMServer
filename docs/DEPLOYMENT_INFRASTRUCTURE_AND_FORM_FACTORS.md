@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-08-12 - **Repo version at capture:** `api/package.json` = `0.55.2`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-08-12 - **Repo version at capture:** `api/package.json` = `0.55.3`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -13,13 +13,13 @@ Nothing in this document is inferred from memory. Every Azure value was read fro
 
 | Fact class | Source | Capture command |
 |---|---|---|
-| Azure resource inventory | ARM control plane, subscription `ProvIAM_Subscription` (`5738ea6a-533b-4c0d-a18a-d322f2094475`), tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373` | `az resource list --query "[].{rg:resourceGroup,name:name,type:type,location:location,sku:sku.name}" -o table` |
+| Azure resource inventory | ARM control plane, subscription `ProvIAM_Subscription` (`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`), tenant `9751e42f-78f3-42f4-8b8a-6e73845aceae` (Provisioning IAM Team 09) | `az resource list --query "[].{rg:resourceGroup,name:name,type:type,location:location,sku:sku.name}" -o table` |
 | Container App config | ARM | `az containerapp show -n <app> -g <rg> -o json` |
 | Revisions and traffic | ARM | `az containerapp revision list -n <app> -g <rg> --query "[].[name,properties.active,properties.replicas,properties.runningState,properties.trafficWeight]" -o tsv` |
 | Managed environment | ARM | `az containerapp env show -n scimserver-env -g scimserver-prod -o json` |
 | PostgreSQL | ARM | `az postgres flexible-server list -o json`, `... parameter show --name max_connections`, `... firewall-rule list` |
 | Networking | ARM | `az network vnet list -o json` |
-| Registry | ARM + data plane | `az acr show -n acrscimserver20622`, `az acr repository show-tags -n acrscimserver20622 --repository scimserver --orderby time_desc --top 10` |
+| Registry | ARM + data plane | `az acr show -n acrscimsrv09`, `az acr repository show-tags -n acrscimsrv09 --repository scimserver --orderby time_desc --top 10` |
 | Running app state (all 3 estates, incl. the cross-tenant one) | Data plane `GET /scim/admin/version` after OAuth `client_credentials` | see [Section 12](#12-verification-recipes) |
 | Node.js support status | [endoflife.date/nodejs](https://endoflife.date/nodejs) (last updated 2026-07-14) and [nodejs.org previous releases](https://nodejs.org/en/about/previous-releases) | web fetch |
 | Azure Container Apps rate card | [Azure Container Apps pricing](https://azure.microsoft.com/en-us/pricing/details/container-apps/) | web fetch |
@@ -316,47 +316,55 @@ Registry-auth selection logic in the template, in order:
 
 ## 4. Live estates - measured configuration
 
-Three estates are live. Names, regions, and resource groups differ in ways that matter operationally, so they are listed exactly as measured.
+Four estates are live. Dev and the canary prod moved to a **new Azure AD tenant on 2026-08-12** (see [Section 15](#15-change-log)); the two estates in the previous tenant were deliberately **left running and intact** rather than deleted, so they remain live and are listed here.
 
-| Attribute | **Dev** | **Canary prod** (proudbush) | **Customer prod** (calmsand) |
+Names, regions, and resource groups differ in ways that matter operationally, so they are listed exactly as measured.
+
+| Attribute | **Dev** | **Canary prod** (purplecliff) | **Customer prod** (calmsand) |
 |---|---|---|---|
 | Container App | `scimserver-dev` | `scimserver` | `scimserver-prod` |
 | Resource group | `scimserver-dev` | `scimserver-prod` | `scimserver-rg-prod` |
-| Subscription | `ProvIAM_Subscription` | `ProvIAM_Subscription` | `AnandSa-Test-150` |
-| Tenant | `f08e6aff-...` | `f08e6aff-...` | `9de357c6-...` |
+| Subscription | `ProvIAM_Subscription` (`8cb58fd6-...`) | `ProvIAM_Subscription` (`8cb58fd6-...`) | `AnandSa-Test-150` (`e299a87a-...`) |
+| Tenant | `9751e42f-...` (Provisioning IAM Team 09) | `9751e42f-...` (Provisioning IAM Team 09) | `9de357c6-...` (AnandSa-Test-150) |
 | Region | East US | East US | Central US |
-| Managed environment | `scimserver-env` (**in RG `scimserver-prod`**) | `scimserver-env` | not enumerable (cross-tenant) |
-| FQDN | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` |
-| Revision mode | **Single** (`latestRevision: true`, 100 %) | **Multiple** (`green-0714-1458` at 100 %) | Multiple (revision `scimserver-prod--green-0714-1516` observed serving) |
-| Image reference | `acrscimserver20622.azurecr.io/scimserver:0.54.86` (tag) | `ghcr.io/pranems/scimserver@sha256:599ee80d...c49e` (**digest-pinned**) | `ghcr.io` per self-report |
-| Managed identity | **None** | SystemAssigned, principal `52c90266-649c-4511-9472-4872b5c9738e` | not enumerable |
-| Registry auth | ACR admin user via secret `acrscimserver20622azurecrio-acrscimserver20622` | secret `ghcr-password` bound to server `acrscimserver20622.azurecr.io` | anonymous GHCR pull |
+| Managed environment | `scimserver-env` (**in RG `scimserver-prod`** - cross-RG) | `scimserver-env` | not enumerable (cross-tenant) |
+| FQDN | `scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` |
+| Revision mode | **Multiple** (`scimserver-dev--v0555fix` at 100 %, 2 active) | **Multiple** (`scimserver--0000002` at 100 %, 1 active) | Multiple |
+| Image reference | `ghcr.io/pranems/scimserver:0.55.5` (tag) | `ghcr.io/pranems/scimserver:0.55.1` (tag) | `ghcr.io` per self-report |
+| Managed identity | SystemAssigned | SystemAssigned | not enumerable |
+| Registry auth | **anonymous GHCR pull** (no `registries[]` entry) | **anonymous GHCR pull** (no `registries[]` entry) | anonymous GHCR pull |
+| Ingress | external, port 8080, transport Auto, `allowInsecure: false` | external, port 8080, transport Auto, `allowInsecure: false` | not enumerable |
+| App secrets | `database-url`, `jwt-secret`, `oauth-client-secret`, `scim-shared-secret` | same four | not enumerable |
 | CPU / memory | 0.5 vCPU / 1 GiB | 0.5 vCPU / 1 GiB | not enumerable |
 | Replicas | min 1 / max 1 | min 1 / max 1 | not enumerable |
 | Workload profile | Consumption | Consumption | not enumerable |
-| PostgreSQL host | `scimserver-pg-dev-new2.postgres.database.azure.com` | `scimserver-pg-new2.postgres.database.azure.com` | `scimserver-prod-pg.postgres.database.azure.com` |
+| PostgreSQL host | `scimserver-pg-dev-09.postgres.database.azure.com` (**East US 2**) | `scimserver-pg-09.postgres.database.azure.com` (**East US 2**) | `scimserver-prod-pg.postgres.database.azure.com` |
+| PostgreSQL SKU | `Standard_B1ms` Burstable, 32 GB, 7-day backup, geo-redundant off | `Standard_B1ms` Burstable, 32 GB, 7-day backup, geo-redundant off | not enumerable |
 | Database | `scimdb`, PostgreSQL 17 | `scimdb`, PostgreSQL 17 | `scimdb`, PostgreSQL 17 |
-| Running app version | **0.55.0** (2026-07-31) | **0.55.0** (2026-07-31) | 0.54.0-alpha.11 |
-| Node.js runtime in container | **v24.18.1** (Active LTS) | **v24.18.1** (Active LTS) | **v25.9.0** (EOL 2026-06-01) |
+| Running app version | **0.55.5** | **0.55.1** | **0.55.1** |
+| Node.js runtime in container | **v24.19.0** (Active LTS) | **v24.18.1** (Active LTS) | **v24.18.1** (Active LTS) |
+
+**The retiring tenant-08 estates are still live.** The 2026-08-12 migration copied everything to tenant 09 and changed nothing in tenant 08, by explicit instruction. Both old estates keep serving on `proudbush-ae90986e.eastus.azurecontainerapps.io` (`scimserver-dev` and `scimserver`, subscription `5738ea6a-...`, tenant `f08e6aff-...`). Their **ARM control plane expired on 2026-08-11**, so they can no longer be managed, scaled, redeployed or deleted - but the running containers and their PostgreSQL data plane are unaffected and still reachable. They are **not** deployment targets: every pipeline, gate and script now points at `purplecliff-91e4026d`. Treat them as read-only historical estates that will disappear on their own when the subscription is reclaimed.
+
 | Process uptime at capture | 1,135 s | n/a | 746,807 s (~8.6 days) |
 
 ```mermaid
 flowchart TB
     INET(["Internet / Entra ID provisioning service"])
 
-    subgraph T1["Tenant f08e6aff - subscription ProvIAM_Subscription"]
+    subgraph T1["Tenant 9751e42f (ProvIAM Team 09) - subscription ProvIAM_Subscription 8cb58fd6"]
       subgraph RGP["RG scimserver-prod (East US)"]
-        ENVP["managedEnvironment scimserver-env<br/>defaultDomain proudbush-ae90986e.eastus...<br/>staticIp 40.76.166.228<br/>Consumption, zoneRedundant false"]
-        APPP["containerApp scimserver<br/>Multiple revisions, digest-pinned GHCR image"]
+        ENVP["managedEnvironment scimserver-env<br/>defaultDomain purplecliff-91e4026d.eastus...<br/>staticIp 20.237.113.238<br/>Consumption, zoneRedundant false"]
+        APPP["containerApp scimserver<br/>Multiple revisions, GHCR tag 0.55.1"]
         VNETP["vnet scimserver-vnet 10.40.0.0/16"]
         LAW["logAnalytics scimserver-logs<br/>PerGB2018, 30 days"]
-        ACR["ACR acrscimserver20622<br/>Basic, adminUser enabled"]
-        PGP["PG flexibleServer scimserver-pg-new2<br/>East US 2, B1ms, PG17"]
+        ACR["ACR acrscimsrv09<br/>Basic, adminUser DISABLED, unused"]
+        PGP["PG flexibleServer scimserver-pg-09<br/>East US 2, B1ms, PG17"]
       end
       subgraph RGD["RG scimserver-dev"]
-        APPD["containerApp scimserver-dev<br/>Single revision, ACR tag image"]
-        PGD["PG flexibleServer scimserver-pg-dev-new2<br/>East US 2, B1ms, PG17"]
-        VNETD["vnet scimserver-dev-vnet (East US 2)<br/>UNUSED - see Gap G2"]
+        APPD["containerApp scimserver-dev<br/>Multiple revisions, GHCR tag 0.55.5"]
+        PGD["PG flexibleServer scimserver-pg-dev-09<br/>East US 2, B1ms, PG17"]
+        VNETD["vnet scimserver-dev-vnet (East US)<br/>UNUSED - see Gap G2"]
       end
     end
 
@@ -415,7 +423,7 @@ Measured facts:
 
 - All three subnets set `privateEndpointNetworkPolicies: Disabled` and `privateLinkServiceNetworkPolicies: Disabled`.
 - The environment binds **only** `aca-infra`. `aca-runtime` is delegated and reserved but currently unreferenced.
-- `internal: false` and `zoneRedundant: false`. The environment's static IP is `40.76.166.228`.
+- `internal: false` and `zoneRedundant: false`. The environment's static IP is `20.237.113.238`.
 - The database path is **public-network**, not private endpoint. Reachability is granted by the firewall rule `AllowAllAzureServices` (`0.0.0.0` to `0.0.0.0`, which is the Azure-specific "allow Azure services" sentinel, not a literal 0.0.0.0/0 internet allow).
 - Both PostgreSQL servers are in **East US 2** while both Container Apps are in **East US**. Every query therefore crosses a region boundary.
 
@@ -423,17 +431,16 @@ Live firewall rules:
 
 | Server | Rule | Range |
 |---|---|---|
-| `scimserver-pg-new2` (canary prod) | `AllowMyIP-temp` | `40.117.66.214` - `40.117.66.214` |
-| `scimserver-pg-new2` | `AllowAllAzureServices` | `0.0.0.0` - `0.0.0.0` |
-| `scimserver-pg-dev-new2` (dev) | `AllowMyIP-temp` | `40.117.66.210` - `40.117.66.210` |
-| `scimserver-pg-dev-new2` | `AllowAzureServices` | `0.0.0.0` - `0.0.0.0` |
-| `scimserver-pg-dev-new2` | `AllowAllAzureServices` | `0.0.0.0` - `0.0.0.0` |
+| `scimserver-pg-09` (canary prod) | `AllowAllAzureServices` | `0.0.0.0` - `0.0.0.0` |
+| `scimserver-pg-dev-09` (dev) | `AllowAllAzureServices` | `0.0.0.0` - `0.0.0.0` |
+
+The tenant-09 servers carry **only** the Azure-services sentinel rule. The previous estate had accumulated `AllowMyIP-temp` rules pinning individual developer IP addresses - rules whose name announced they were temporary and which then outlived the machine that needed them. They were not recreated. If a rule like that is added for a debugging session, delete it in the same session.
 
 ---
 
 ## 6. Data plane - PostgreSQL Flexible Server
 
-| Property | Dev `scimserver-pg-dev-new2` | Canary prod `scimserver-pg-new2` | Declared default in Bicep |
+| Property | Dev `scimserver-pg-dev-09` | Canary prod `scimserver-pg-09` | Declared default in Bicep |
 |---|---|---|---|
 | Region | East US 2 | East US 2 | `resourceGroup().location` |
 | Tier / SKU | Burstable / `Standard_B1ms` | Burstable / `Standard_B1ms` | `Burstable` / `Standard_B1ms` |
@@ -449,7 +456,7 @@ Live firewall rules:
 | Admin login | `scimadmin` | `scimadmin` | `scimadmin` |
 | Database | `scimdb` (UTF8, `en_US.utf8`) | `scimdb` | `scimdb` |
 | `max_connections` | 50 | **50** | n/a (tier default) |
-| `azure.extensions` | `CITEXT,PG_TRGM,PGCRYPTO` | `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` | set by deploy script to `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` (**superset since 2026-08-11**, see G9) |
+| `azure.extensions` | `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` | `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` | set by deploy script to `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` (**all four since 2026-08-11**, see G9) |
 | Storage declared | n/a | n/a | `storageSizeMB = 32768` -> 32 GB |
 
 `azure.extensions` is a **static** server parameter, so [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1) sets it and then issues `az postgres flexible-server restart`. The extensions are not optional: the baseline migration `api/prisma/migrations/20260223000000_postgresql_baseline/migration.sql` depends on them, and a missing extension surfaces as a Prisma **P3009** failure that crash-loops the container through the startup probe.
@@ -475,24 +482,26 @@ flowchart LR
       TRV["Trivy scan<br/>HIGH,CRITICAL - exit-code 1"]
     end
     GHCR[("ghcr.io/pranems/scimserver<br/>tags: version, sha-, latest, test-branch")]
-    ACR[("acrscimserver20622.azurecr.io/scimserver<br/>Basic SKU")]
+    ACR[("acrscimsrv09.azurecr.io/scimserver<br/>Basic SKU - provisioned but UNUSED")]
     DEV["Container App scimserver-dev"]
     CAN["Container App scimserver (canary prod)"]
     CUS["Container App scimserver-prod (calmsand)"]
 
     GIT --> VAL --> BLD --> GHCR
     BLD --> TRV
-    GHCR -->|"az acr import --force"| ACR
-    ACR -->|"az containerapp update --image acr/scimserver:VERSION"| DEV
+    GHCR -.->|"az acr import - optional mirror, not on the serving path"| ACR
+    GHCR -->|"anonymous pull"| DEV
     GHCR -->|"digest-pinned by promote-to-prod.ps1"| CAN
     GHCR -->|"anonymous pull, digest-pinned"| CUS
 ```
 
 **Why GHCR is the source of truth.** The calmsand tenant cannot pull from the ProvIAM-tenant ACR (cross-tenant ACR pull would require cross-tenant credentials), so calmsand pulls anonymously from GHCR. Consequently the CI-built GHCR artifact is the single deployable, and ACR is a **mirror** populated by `az acr import`, not an independent build. The dev pipeline enforces this ordering explicitly: stage 4.3 dispatches `publish-ghcr.yml`, 4.4 proves anonymous pull works (`docker logout ghcr.io` then `docker pull`), 4.5 imports into ACR, and 4.5b refuses to continue if the tag is not visible in ACR.
 
-**Digest pinning.** [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) resolves `docker buildx imagetools inspect ghcr.io/pranems/scimserver:<tag>`, parses `^Digest:\s+(sha256:[0-9a-f]+)`, and deploys `ghcr.io/pranems/scimserver@<digest>`. It refuses to promote if the digest cannot be parsed. The canary prod app's live image reference confirms this is in force: `ghcr.io/pranems/scimserver@sha256:599ee80d...`.
+**Digest pinning.** [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) resolves `docker buildx imagetools inspect ghcr.io/pranems/scimserver:<tag>`, parses `^Digest:\s+(sha256:[0-9a-f]+)`, and deploys `ghcr.io/pranems/scimserver@<digest>`. It refuses to promote if the digest cannot be parsed. Note that the tenant-09 estates were provisioned by direct image-tag deployment during the migration rather than through a blue/green promotion, so both currently reference a **tag** rather than a digest; the next promotion through `promote-to-prod.ps1` restores digest pinning on the canary.
 
-**Registry inventory at capture.** ACR `acrscimserver20622` holds exactly one repository, `scimserver`, with the 10 most recent tags `0.54.86, 0.54.85, 0.54.84, 0.54.81, 0.54.80, 0.54.79, 0.54.78, 0.54.77, a3084258, f2dfe89f` (the last two are short-SHA tags from the older tagging convention). SKU `Basic`, `adminUserEnabled: true`, `publicNetworkAccess: Enabled`, retention policy present at 7 days but with `status: disabled`.
+**Registry inventory at capture.** ACR `acrscimsrv09` (RG `scimserver-prod`) exists with SKU `Basic`, `adminUserEnabled: **false**`, `publicNetworkAccess: Enabled`, and holds the `scimserver` repository with tags `0.55.1`, `0.55.3`, `0.55.5`. **It is not on the serving path.** Both tenant-09 apps pull anonymously from GHCR and carry **no `registries[]` entry at all**, which is the same pattern customer prod has always used.
+
+This was a deliberate simplification made during the 2026-08-12 tenant migration. Wiring ACR back up requires an `AcrPull` role assignment for each app's managed identity, and the deployment service principal is scoped as **Contributor**, which does not include `Microsoft.Authorization/roleAssignments/write`. Rather than widen the deployment principal to Owner or User Access Administrator - a permanent privilege increase to solve a one-time setup problem - the estate uses the public registry that the customer-facing estate already depends on. That also removes the ACR admin-user credential that gap **G6** used to describe, and the misleading `registries[]` mapping that gap **G7** used to describe. The cost is a dependency on GHCR availability and public-image exposure, both of which were already true for calmsand.
 
 ### Image composition
 
@@ -620,7 +629,7 @@ Without `-BlueGreen` the script falls back to a legacy auto-flip: update the ima
 | 4 | 4.1 full-validation pipeline, 4.2 optional ACR mirror, 4.3 dispatch `publish-ghcr.yml` pinned to the current branch, 4.4 anonymous-pull proof, 4.5 `az acr import`, 4.5b tag-visible check, 4.6 `az containerapp update`, 4.6b version-echo poll, 4.7 `live-test.ps1` **gated on 4.6b** |
 | 5 | 5.3 Playwright against the dev FQDN with `E2E_TOKEN=changeme-scim` |
 | 6 | Post-deploy state diff vs the before-snapshot; fails on endpoint count delta or any missing ID |
-| 6.5 | Auto-canary to proudbush, blocked by any FAIL, any SKIPPED, the freeze file `scripts/.deploy-freeze`, or `SCIMSERVER_AUTOCANARY_DISABLE` |
+| 6.5 | Auto-canary to the `purplecliff` canary prod, blocked by any FAIL, any SKIPPED, the freeze file `scripts/.deploy-freeze`, or `SCIMSERVER_AUTOCANARY_DISABLE` |
 | 7 | Writes `test-results/dev-deploy-<timestamp>.md` including the exact cross-tenant calmsand promote commands |
 
 `--ref` pinning on the workflow dispatch (stage 4.3) exists because an unpinned dispatch once published from `master` instead of the working branch.
@@ -665,21 +674,24 @@ Every item below is a **measured** condition on the capture date, not a hypothet
 
 | ID | Severity | Finding | Evidence | Impact | Suggested action |
 |---|---|---|---|---|---|
-| **G1** | **High** | Canary prod has **11 active revisions, each running 1 replica**, while only `green-0714-1458` carries traffic | `az containerapp revision list` shows all 11 `active=True`, `replicas=1`, `runningState=RunningAtMaxScale`, weights `0,0,0,0,0,0,0,0,0,0,100` | 11 x 0.5 vCPU + 11 x 1 GiB billed continuously for 1 revision's worth of service. Worse: each replica opens a Prisma pool of 5 connections against a server whose `max_connections` is **50**, so 11 x 5 = **55 > 50** - the estate is over-subscribed on database connections | Deactivate all non-serving revisions (`az containerapp revision deactivate --revision <name>`), keeping at most the immediate previous one for rollback. Consider adding a post-flip deactivation step to `promote-to-prod.ps1` |
-| **G2** | Medium | `scimserver-dev-vnet` (East US 2) is provisioned with 3 delegated subnets but referenced by nothing | `az network vnet list` plus the dev app's `environmentId` pointing at `scimserver-env` in `scimserver-prod` | Dead resource; also means dev has **no** network isolation from canary prod | Either delete it, or give dev its own environment bound to it |
-| **G3** | ~~Medium~~ **Partly resolved 2026-07-31** | ~~Both production estates run **Node.js v25.9.0**~~ - dev and the **proudbush canary** are now on **v24.18.1** (Active LTS) after the v0.55.0 promotion. **calmsand (customer prod) is still on v25.9.0** and remains exposed | `/scim/admin/version` -> `runtime.node`: dev and canary report `v24.18.1`; calmsand still reports `v25.9.0`. [endoflife.date/nodejs](https://endoflife.date/nodejs) | Two of three estates are off the EOL runtime after ~2 months on it. calmsand still runs an unpatched runtime | Promote v0.55.0 to calmsand. It needs a separate `az login` into the AnandSa tenant and an explicit operator go-ahead, so it is deliberately not bundled with the canary promotion |
-| **G3a** | Medium | The **proudbush canary's JWKS host allowlist is missing `login.windows.net`** (6 hosts; dev has 7) | `GET /scim/admin/settings/jwks-hosts` on dev vs the canary. 5 live assertions (`9z-AV.T7/T8`, `9z-BK.T2/T3/T4`) fail on the canary for this reason alone. **Pre-existing, not a v0.55.0 regression**: blue and green share one database (`scimserver-pg-new2`) so both read the same rows, and blue returns `404` for that endpoint because it did not exist in `0.54.0-alpha.12` - which is exactly why the gap was never observable there | WIF trusts whose issuer serves keys from `login.windows.net` will fail verification on the canary | Decide explicitly. Adding a host **widens a trust boundary on a production system**, so it is a security decision in its own right and must not ride along inside a version promotion |
-| **G4** | Medium | Application and database are in **different regions** (apps East US, databases East US 2) | `az containerapp show` location vs `az postgres flexible-server list` location | Adds cross-region latency to every query and a cross-region egress charge | Accept and document, or co-locate on the next database rebuild |
-| **G5** | Medium | Temporary personal-IP firewall rules persist on both databases (`AllowMyIP-temp` for `40.117.66.214` and `40.117.66.210`) | `az postgres flexible-server firewall-rule list` | Long-lived exceptions named "temp"; widen the reachable surface beyond Azure services | Remove when not actively debugging; add to the promotion checklist |
-| **G6** | Medium | ACR `acrscimserver20622` has `adminUserEnabled: true` and dev authenticates with that admin credential rather than a managed identity | `az acr show`; dev app secret `acrscimserver20622azurecrio-acrscimserver20622`; dev app `identity: None` | Shared long-lived registry credential; no per-app revocation | Enable SystemAssigned identity on the dev app and grant `AcrPull`, matching the canary prod pattern |
-| **G7** | Low | Canary prod's `registries[]` entry names `acrscimserver20622.azurecr.io` with a `ghcr-password` secret, but the running image is `ghcr.io/pranems/scimserver@sha256:...` | `az containerapp show` registries vs image | Stale/misleading registry credential mapping. Harmless while GHCR is anonymous, confusing during incident response | Clean up the registry block to match the image source |
-| **G8** | Low | ACR retention policy is configured at 7 days but with `status: disabled` | `az acr show --query policies.retentionPolicy` | Untagged manifests accumulate on a Basic SKU with a fixed storage allowance | Enable retention, or prune periodically |
-| **G9** | ~~Low~~ **CLOSED 2026-08-11** | `azure.extensions` drift: canary prod had `UUID-OSSP` in addition to the three the deploy script set; dev did not | `az postgres flexible-server parameter show --name azure.extensions` | **The predicted failure happened, in the opposite direction to the one written here.** This row warned that "a migration depending on `uuid-ossp` would pass prod and fail dev". What actually broke was a *restore*: `pg_dump` of the prod source emits `CREATE EXTENSION "uuid-ossp"`, and Azure rejects that against a target whose allow-list omits it, so the tenant-08 to tenant-09 **canary-prod carry failed while the dev carry succeeded** - the drift made the failure look environment-specific when it was data-specific | **Closed.** [deploy-azure.ps1](../scripts/deploy-azure.ps1) now provisions the **superset** `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP`, so a newly provisioned server can receive a dump from any existing estate. Applied to both live tenant-09 servers |
+| **G1** | ~~High~~ **CLOSED 2026-08-12** | ~~Canary prod has **11 active revisions, each running 1 replica**~~ - the tenant-09 estate was provisioned fresh and is pruned: canary prod has **1 active revision** at 100 %, dev has **2** (serving + rollback target), which is exactly the `-Keep 2` policy | `az containerapp revision list` on both apps | Connection demand is now 2 x 5 = 10 against `max_connections` 50 on dev and 1 x 5 = 5 on canary prod, comfortably inside budget | **Closed.** [prune-revisions.ps1](../scripts/prune-revisions.ps1) is wired into `promote-to-prod.ps1` and pipeline stage 6.2, so it runs by construction |
+| **G2** | Medium | `scimserver-dev-vnet` (East US) is provisioned but referenced by nothing; the dev app uses `scimserver-env`, which lives in RG `scimserver-prod` | `az resource list` plus the dev app's `environmentId` pointing at `scimserver-env` in `scimserver-prod` | Dead resource; also means dev has **no** network isolation from canary prod, and dev's lifecycle is coupled to the prod resource group | Either delete it, or give dev its own environment bound to it. Carried forward from the previous estate because the migration reproduced the topology deliberately |
+| **G3** | ~~Medium~~ **CLOSED 2026-08-12** | ~~Production estates run **Node.js v25.9.0**~~ - **all four live estates now run an Active LTS runtime**: dev `v24.19.0`, canary prod `v24.18.1`, calmsand `v24.18.1` | `/scim/admin/version` -> `runtime.node` on each estate. [endoflife.date/nodejs](https://endoflife.date/nodejs) | The EOL runtime exposure that ran for roughly two months is fully retired | **Closed.** Stage 1.10 gates the source Dockerfile and Stage 1.11 check C4 gates the deployed artifact, so a recurrence fails a gate rather than waiting for an operator to notice |
+| **G3a** | ~~Medium~~ **CLOSED 2026-08-12** | ~~The canary's JWKS host allowlist is missing `login.windows.net`~~ - both tenant-09 estates publish the full **7-host** allow-list including `login.windows.net` | `GET /scim/admin/settings/jwks-hosts` on dev and canary prod; live assertions `9z-AV.T7/T8` and `9z-BK.T2/T3/T4` pass on both | v1 Entra issuers (`login.windows.net`) verify correctly on every estate | **Closed at two layers.** The row was carried in the migrated data, *and* `login.windows.net` was added to `WELL_KNOWN_JWKS_HOST_SEED` in [jwks-host-allowlist.service.ts](../api/src/oauth/jwks-host-allowlist.service.ts) so a future greenfield estate seeds it too. See the note under G16 for why the seed layer mattered |
+| **G4** | Medium | Application and database are in **different regions** (apps East US, databases East US 2) | `az containerapp show` location vs `az postgres flexible-server list` location | Adds cross-region latency to every query and a cross-region egress charge | Accept and document, or co-locate on the next database rebuild. Reproduced deliberately in tenant 09 so behaviour matches the previous estate |
+| **G5** | ~~Medium~~ **CLOSED 2026-08-12** | ~~Temporary personal-IP firewall rules persist on both databases~~ - the tenant-09 servers carry **only** `AllowAllAzureServices` | `az postgres flexible-server firewall-rule list` on both servers | No standing developer-IP exceptions | **Closed** by not recreating them. If one is added for a debugging session, delete it in the same session |
+| **G6** | ~~Medium~~ **CLOSED 2026-08-12** | ~~ACR has `adminUserEnabled: true` and dev authenticates with that admin credential~~ - `acrscimsrv09` has `adminUserEnabled: **false**`, and **no app references it**; both apps pull anonymously from GHCR and both carry `identity: SystemAssigned` | `az acr show -n acrscimsrv09`; both apps' `registries[]` are empty | No shared long-lived registry credential exists | **Closed.** See [Section 7](#7-image-supply-chain) for why ACR was left off the serving path rather than wired up with an `AcrPull` assignment |
+| **G7** | ~~Low~~ **CLOSED 2026-08-12** | ~~Canary prod's `registries[]` entry names an ACR server with a `ghcr-password` secret while the running image is GHCR~~ - neither tenant-09 app has any `registries[]` entry | `az containerapp show` registries vs image on both apps | The misleading credential mapping is gone; the image source is unambiguous during incident response | **Closed** |
+| **G8** | Low | ACR `acrscimsrv09` holds three tags but is on no deployment path, and its retention policy is unconfigured | `az acr show`; no app references it | A Basic-SKU registry accruing storage for no consumer | Delete it, or wire it in properly with an `AcrPull` role assignment. Note it is also named after a tenant generation (see G15) |
+| **G9** | ~~Low~~ **CLOSED 2026-08-11** | `azure.extensions` drift: canary prod had `UUID-OSSP` in addition to the three the deploy script set; dev did not | `az postgres flexible-server parameter show --name azure.extensions` | **The predicted failure happened, in the opposite direction to the one written here.** This row warned that "a migration depending on `uuid-ossp` would pass prod and fail dev". What actually broke was a *restore*: `pg_dump` of the prod source emits `CREATE EXTENSION "uuid-ossp"`, and Azure rejects that against a target whose allow-list omits it, so the tenant-08 to tenant-09 **canary-prod carry failed while the dev carry succeeded** - the drift made the failure look environment-specific when it was data-specific | **Closed.** [deploy-azure.ps1](../scripts/deploy-azure.ps1) now provisions all four - `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` - so a newly provisioned server can receive a dump from any existing estate. Both live tenant-09 servers verified at all four |
 | **G10** | Low | `Dockerfile.optimized` and `Dockerfile.ultra` are unreferenced and still declare `DATABASE_URL="file:./data.db"` with `prisma db push` | grep of all workflows, compose files, and deploy scripts | A reader or future script could pick a dead SQLite-era Dockerfile. This is exactly the failure mode behind the 2026-07-29 Node-25 EOL escape, where a spot-check hit the wrong Dockerfile | Delete both, or move them under an `archive/` path with a header stating they are not shipped |
-| **G11** | Low | [infra/acr.bicep](../infra/acr.bicep) is declared but deployed by no script; the live ACR was created out-of-band and its settings do not match the template (template defaults to `enableAdminUser: false`, live is `true`) | grep for `acr.bicep`; `az acr show` | Infrastructure-as-code does not describe a live resource | Either wire it into `deploy-azure.ps1` and reconcile, or delete it |
+| **G11** | Low | [infra/acr.bicep](../infra/acr.bicep) is declared but deployed by no script; the live ACR was created out-of-band | grep for `acr.bicep`; `az acr show` | Infrastructure-as-code does not describe a live resource | Either wire it into `deploy-azure.ps1` and reconcile, or delete it alongside G8 |
 | **G12** | Low | `CREDENTIAL_KEK` is not set by [infra/containerapp.bicep](../infra/containerapp.bicep), so all Azure estates run on the default `changeme-credential-kek` | Bicep env list; [credential-kek.ts](../api/src/security/credential-kek.ts) | Re-viewable credential secrets are wrapped with a publicly known KEK. Not on the auth path (token verification uses the bcrypt hash), so this is confidentiality-at-rest only | Add a `credential-kek` secret + env mapping to the template and set a private, deploy-stable value |
-| **G13** | Info | Dev runs `activeRevisionsMode: Single` while both prods run `Multiple` | `az containerapp show` | Dev cannot exercise the blue/green path that prod depends on | Accept (dev deploys are intentionally simple), but note that stage 6.5 auto-canary is the first place the blue/green code path runs |
-| **G14** | Info | Dev is at **0.54.86** while both prods are at **0.54.0-alpha.11** | `/scim/admin/version` on all three | Expected during a dev cycle; both prods are in lockstep with each other, which is the invariant that matters | No action; confirms no unintentional single-prod promotion |
+| **G13** | ~~Info~~ **CLOSED 2026-08-12** | ~~Dev runs `activeRevisionsMode: Single` while both prods run `Multiple`~~ - dev is now `Multiple`, matching both prods | `az containerapp show --query properties.configuration.activeRevisionsMode` | Dev can now exercise the same revision model prod depends on | **Closed** as a side effect of fresh provisioning |
+| **G14** | Info | Dev is at **0.55.5**; canary prod and calmsand are both at **0.55.1** | `/scim/admin/version` on all four estates | Expected during a dev cycle. Both prods are in lockstep with each other, which is the invariant that matters | No action; confirms no unintentional single-prod promotion |
+| **G15** | **Medium** | **The active subscription is ephemeral and its resource names encode a tenant generation.** `acrscimsrv09`, `scimserver-pg-09` and `scimserver-pg-dev-09` all carry an `09` that becomes wrong at the next tenant rollover, and the subscription itself has a limited life (the previous one lasted roughly 80 days) | Resource names in [Section 4](#4-live-estates---measured-configuration); the 2026-08-11 expiry of the predecessor | This whole migration is a **recurring** operation, roughly 4 to 5 times a year, and generation-stamped names guarantee either a rename or a lie at each turn. A name that encodes a fact that expires is a scheduled defect | Adopt generation-free names on the next rebuild, and drive estate identity from a declarative registry keyed by role (`active` / `next` / `retiring` / `permanent`) rather than by hard-coded names or FQDNs. Tracked as the follow-on generalization work |
+| **G16** | **Medium** | **The retiring tenant-08 estates are still serving but can no longer be managed.** Their ARM control plane expired on 2026-08-11; the containers and PostgreSQL data plane are unaffected | `az` against subscription `5738ea6a-...` fails; the `proudbush-ae90986e` FQDNs still answer | They cannot be scaled, redeployed, patched or deleted, and they will keep answering on the public internet until Azure reclaims the subscription. Anything still pointed at those URLs will keep working and will therefore not notice it is on a dead estate | Confirm nothing points at them (done: every script, gate, prompt and doc now targets `purplecliff-91e4026d`), and let them lapse. **The transferable lesson: subscription expiry kills ARM but not the data plane** - capture database connection strings *before* the boundary and store them outside the tenant, which is exactly what made the 2026-08-12 recovery possible |
+
 
 ---
 
@@ -719,10 +731,12 @@ The repo's own estimate, printed by [scripts/deploy-azure.ps1](../scripts/deploy
 
 Everything below is copy-pasteable and re-derives the facts in this document.
 
-### Azure control plane (ProvIAM tenant: dev + canary prod)
+### Azure control plane (ProvIAM tenant 09: dev + canary prod)
+
+Two subscriptions are named `ProvIAM_Subscription` - the active tenant-09 one and the expired tenant-08 one - so **always select by subscription ID, never by name**. [scripts/az-tenant.ps1](../scripts/az-tenant.ps1) does this for you (`Use-ProvIAM09`), and `Show-ScimTenants` prints every tenant, subscription and service principal with both its name and its ID.
 
 ```powershell
-az account set --subscription ProvIAM_Subscription
+az account set --subscription 8cb58fd6-cf6f-4334-9fe0-3b12f93a6596
 
 # Full resource inventory
 az resource list --query "[?starts_with(resourceGroup,'scimserver')].{rg:resourceGroup,name:name,type:type,location:location,sku:sku.name}" -o table
@@ -735,21 +749,28 @@ az containerapp show -n scimserver-dev -g scimserver-dev  -o json
 az containerapp revision list -n scimserver -g scimserver-prod `
   --query "[].[name,properties.active,properties.replicas,properties.runningState,properties.trafficWeight]" -o tsv
 
-# Managed environment
+# Managed environment (note: it lives in RG scimserver-prod and is shared by BOTH apps)
 az containerapp env show -n scimserver-env -g scimserver-prod -o json
 
 # PostgreSQL
 az postgres flexible-server list -o table
-az postgres flexible-server parameter show -g scimserver-prod -s scimserver-pg-new2 --name max_connections   -o tsv
-az postgres flexible-server parameter show -g scimserver-prod -s scimserver-pg-new2 --name azure.extensions  --query value -o tsv
-az postgres flexible-server firewall-rule list -g scimserver-prod -n scimserver-pg-new2 -o table
+az postgres flexible-server parameter show -g scimserver-prod -s scimserver-pg-09 --name max_connections   -o tsv
+az postgres flexible-server parameter show -g scimserver-prod -s scimserver-pg-09 --name azure.extensions  --query value -o tsv
+az postgres flexible-server firewall-rule list -g scimserver-prod -n scimserver-pg-09 -o table
 
 # Networking
 az network vnet list --query "[?starts_with(name,'scimserver')]" -o json
 
-# Registry
-az acr show -n acrscimserver20622 -o json
-az acr repository show-tags -n acrscimserver20622 --repository scimserver --orderby time_desc --top 10 -o tsv
+# Registry (provisioned but NOT on the serving path - see G8)
+az acr show -n acrscimsrv09 -o json
+az acr repository show-tags -n acrscimsrv09 --repository scimserver --orderby time_desc --top 10 -o tsv
+```
+
+**If `az containerapp` reports `'environment' is misspelled or not recognized by the system`, you are missing the extension, not the resource.** `az` stores extensions under `$AZURE_CONFIG_DIR/cliextensions`, so the per-tenant profile directories this repo uses for simultaneous multi-tenant login each start with an empty extension set. The error text never mentions extensions and reads like a typo or a deleted resource; during the 2026-08-12 migration it produced an empty inventory for a fully healthy estate. `az-tenant.ps1` now points `AZURE_EXTENSION_DIR` at one shared directory whenever it switches profiles. To reproduce by hand:
+
+```powershell
+$env:AZURE_CONFIG_DIR    = "$HOME\.azure-proviam09"
+$env:AZURE_EXTENSION_DIR = "$HOME\.azure\cliextensions"
 ```
 
 ### Azure control plane (AnandSa tenant: customer prod)
@@ -763,7 +784,7 @@ az containerapp show -n scimserver-prod -g scimserver-rg-prod -o json
 ### Data plane (works for all three, no Azure credentials needed)
 
 ```powershell
-$base = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+$base = 'https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
 
 Invoke-RestMethod -Uri "$base/scim/health"
 
@@ -833,7 +854,7 @@ Invoke-RestMethod -Uri "$base/scim/admin/version" `
 ```powershell
 az containerapp logs show -n scimserver -g scimserver-prod --type console --tail 50
 az containerapp logs show -n scimserver -g scimserver-prod --type system  --tail 30
-pwsh scripts/remote-logs.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+pwsh scripts/remote-logs.ps1 -BaseUrl https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 ```
 
 ---
@@ -878,7 +899,8 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
-| 2026-08-12 (latest) | **Gap G9 closed - and it closed by failing, not by being noticed.** `azure.extensions` is now provisioned as the superset `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` by [deploy-azure.ps1](../scripts/deploy-azure.ps1). G9 had sat as a **Low**-severity row since 2026-07-29 predicting that "a migration depending on `uuid-ossp` would pass prod and fail dev". The real failure came from the other direction: the tenant-08 to tenant-09 **canary-prod data carry** failed because `pg_dump` of a source that HAS the extension emits `CREATE EXTENSION "uuid-ossp"`, which Azure rejects against a target that does not allow-list it. The dev carry succeeded on the same code because the dev source had three extensions and the prod source four - so a **data**-specific fault presented as an **environment**-specific one, which is the most expensive kind of misdirection. Two lessons recorded rather than just the fix: a Low-severity drift row is still a live fault, and provisioning the SUPERSET is the only setting under which a dump from any estate restores into any other. Also in this change: `rotate-tenant-data.ps1` now quiesces the target app for the duration of a restore, because restoring underneath a live replica races the application re-seeding tables between the DROP and the COPY - with the restart in a `finally` block so a failed copy cannot strand an estate at zero replicas |
+| 2026-08-12 (latest) | **Dev and canary prod moved to a new Azure AD tenant, carrying everything.** The ephemeral subscription hosting both estates was expiring, so the full estate was rebuilt in tenant `9751e42f` (Provisioning IAM Team 09, subscription `8cb58fd6-...`, environment domain `purplecliff-91e4026d`) and every table was carried across: **58 endpoints, 728 users and 347 groups to canary prod; 58 endpoints, 734 users and 347 groups to dev**, with primary keys preserved so existing SCIM client configurations keep resolving. Verification actually run: a per-surface deep verify of **all 58 endpoints x 6 surfaces** (profile, schemas, resource types, ServiceProviderConfig, settings, config flags) plus the global surfaces on both estates - **OVERALL PASS** on each, with 296 and 319 attribute definitions confirmed RFC-valid; live SCIM **1387/1387** against tenant-09 dev; Playwright **207 passed / 0 failed** in real Chromium. **Customer prod (calmsand) was never contacted**, and the two tenant-08 estates were deliberately left running and untouched (see **G16**). Four findings worth carrying forward. (1) **The old tenant's ARM control plane expired mid-migration, on 2026-08-11.** Recovery was possible only because the PostgreSQL connection strings had been captured *before* the boundary and stored outside the tenant - **subscription expiry kills the control plane, not the data plane**, and that asymmetry is the single most useful thing to know when a tenant is on a clock. (2) **A migration can carry every row and still lose server-level state.** Endpoint, user, group and credential counts all matched, every per-endpoint surface passed, and yet the JWKS host allow-list had silently reverted to its seeded default - a security-relevant control that no count-based or per-endpoint check looks at. It is fixed at both layers: the row is carried, *and* `login.windows.net` was added to `WELL_KNOWN_JWKS_HOST_SEED` with explicit per-host regression assertions, because the previous test only iterated the constant and so could not detect a removal. (3) **`az` extensions live under `AZURE_CONFIG_DIR`**, so the per-tenant profile isolation this repo relies on for simultaneous multi-tenant login also gives each tenant an empty extension set - reported as `'environment' is misspelled or not recognized by the system`, which reads like a typo and produced an empty resource inventory for a completely healthy estate. `az-tenant.ps1` now pins `AZURE_EXTENSION_DIR` to one shared directory on every profile switch. (4) **Two subscriptions share the name `ProvIAM_Subscription`**, so tenant resolution now keys on subscription **ID** and refuses an ambiguous name rather than silently selecting the wrong tenant. Gaps **G1, G3, G3a, G5, G6, G7, G13 closed**; new **G15** (resource names encode a tenant generation that expires) and **G16** (the old estates still serve but can no longer be managed) opened |
+| 2026-08-12 | **Gap G9 closed - and it closed by failing, not by being noticed.** `azure.extensions` is now provisioned as the superset `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP` by [deploy-azure.ps1](../scripts/deploy-azure.ps1). G9 had sat as a **Low**-severity row since 2026-07-29 predicting that "a migration depending on `uuid-ossp` would pass prod and fail dev". The real failure came from the other direction: the tenant-08 to tenant-09 **canary-prod data carry** failed because `pg_dump` of a source that HAS the extension emits `CREATE EXTENSION "uuid-ossp"`, which Azure rejects against a target that does not allow-list it. The dev carry succeeded on the same code because the dev source had three extensions and the prod source four - so a **data**-specific fault presented as an **environment**-specific one, which is the most expensive kind of misdirection. Two lessons recorded rather than just the fix: a Low-severity drift row is still a live fault, and provisioning the SUPERSET is the only setting under which a dump from any estate restores into any other. Also in this change: `rotate-tenant-data.ps1` now quiesces the target app for the duration of a restore, because restoring underneath a live replica races the application re-seeding tables between the DROP and the COPY - with the restart in a `finally` block so a failed copy cannot strand an estate at zero replicas |
 | 2026-08-04 | **Two supply-chain gates added, and the second found six problems the image scan structurally cannot see.** A HIGH advisory against `fast-uri` blocked a push and exposed a conflict that is designed-in rather than unlucky: **Trivy fires the moment a fix is published** (`ignore-unfixed: true`, so every failure already has one) while **corporate policy forbids consuming any version younger than 7 days** - leaving a guaranteed window in which no compliant action makes the gate green. (a) `.trivyignore` entries now declare a `Class`: a `judgment` call is open-ended at 90 days, a `quarantine-window` is a **timing** hold capped at 14 days that must name its `Fixed-version:` and `Fix-available-from:`, and is flagged the moment the fix ages in **independent of `Re-check-by`**. Conflating the two is what let a 90-day default swallow a one-week wait - a 13x error. [trivyignore-review.yml](../.github/workflows/trivyignore-review.yml) accordingly moved **weekly -> daily**, because a weekly cron cannot police a seven-day deadline. (b) New [dependency-pins-review.yml](../.github/workflows/dependency-pins-review.yml) + [check-dependency-pins.ts](../api/src/scripts/check-dependency-pins.ts) watch the 8 packages pinned in `api/package.json` `overrides`. **An override freezes the version and Dependabot does not manage that block**, so a pin added to FIX one advisory becomes the VULNERABLE version of the next - which is exactly what `fast-uri@3.1.4` did. **Its first real run flagged 7 of the 8 pins, and 6 were medium and therefore invisible to Trivy**, which gates HIGH+CRITICAL only: `hono@4.12.25` (4), `@hono/node-server@1.19.10` (2), `fast-uri@3.1.4` (1 high). It carries **no semver dependency on purpose** - `semver` is transitive with no types, so importing it would be a phantom dependency and adding it would demand the lockfile regeneration this policy forbids locally. Neither gate blocks a push: both need the Advisory API, and a flaky blocking gate trades a real signal for an unreliable one. Also new: [validate-workflows.mjs](../scripts/validate-workflows.mjs), because a malformed workflow **fails no build - it simply never runs**; proven with a negative control before its green was believed. **This entry was demanded by C1**, which blocked the push the moment `.github/workflows/**` changed. Full procedure + decision diagram: [NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md) section 11. Repo version `0.55.1` -> `0.55.2` |
 | 2026-07-31 (latest) | **Documentation currency became a gate, and [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) gained Stage 1.12 to run it.** This document had been the *only* documentation this repo gated, and generalising that turned out to be overdue: **12 of 18 user-facing documents still advertised v0.53.0** while 0.55.1 shipped, one still said 0.40.0, and only 2 carried any provenance date - with every test and deployment green throughout. New [audit-doc-freshness.ps1](../scripts/audit-doc-freshness.ps1) applies the same shape as C1-C3 here to the whole user-facing set declared in [.doc-manifest.json](.doc-manifest.json): F1 version currency, F2 provenance age, F3 link integrity, F4 source coupling, F5 manifest integrity. **F5 is the one worth noting for anyone extending this pattern:** the first draft of the manifest carried four source prefixes that do not exist, and a prefix matching nothing makes the coupling check silently dead - green because it can never fire, the same failure shape as a script with no exit statement. A gate that validates other things must also validate its own inputs. Runs at pre-push (coupled), on PR + weekly via [docs-freshness.yml](../.github/workflows/docs-freshness.yml), and as Stage 1.12 here; weekly matters because a stamp ageing past its budget is not reachable from any code change. **This very entry was demanded by C1**, which blocked the push because the pipeline script changed |
 | 2026-07-31 | **Stage 1.13 added: documentation must be TRUE, not merely fresh.** Stage 1.12 gates currency MARKERS - version header, provenance date, links - and none of that reads the prose, so a doc can pass every check while telling the reader something false. Measured on the same corpus that had just passed 1.12: [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) advertised a route-handler count of **86** across **20** controller files when the source had **117** across **31**, and 22 handlers were genuinely undocumented - the entire JWKS host allowlist API, the WIF resolve and assertion-debugger tools, credential rotate/reveal/activate, connection-info, and the per-endpoint OAuth token endpoint with its RFC 8414 metadata. The settings guide documented a control (`CustomResourceTypesEnabled`) that exists **nowhere in `api/src`**, which is the more dangerous direction of that bug: a missing setting means a reader cannot find something, a phantom one means they configure it and silently get nothing. And [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) offered the **retired** `scimserver2.yellowsmoke-af7a3fff...` estate as "Azure (live production)" in eight places - invisible to every link checker because a dead host inside a code fence is not a markdown link. New [audit-doc-content.mjs](../scripts/audit-doc-content.mjs) compares doc CLAIMS against source: route/controller/settings/preset counts, settings and reason-code coverage, phantom settings, API-reference route coverage, retired-infrastructure references, and json-block parseability. Its self-test carries **positive** controls as well as negative ones, because two first drafts were wrong in the false-positive direction (`acrscimserver20622` contains the retired string `scimserver2`; `**Version:** 4.1` is a document revision, not a product version). A twelfth check was built and deliberately discarded for an unacceptable false-positive rate - a gate that cries wolf gets switched off, taking the useful checks with it |

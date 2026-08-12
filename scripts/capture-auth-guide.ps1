@@ -28,7 +28,7 @@
 
 .EXAMPLE
     pwsh scripts/capture-auth-guide.ps1 `
-      -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io `
+      -BaseUrl https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io `
       -EndpointId e8edd907-0dfb-415d-b834-abf0d20eb0e0 -Apply
 
 .NOTES

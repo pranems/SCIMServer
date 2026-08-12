@@ -35,7 +35,7 @@
     for explicit confirmation (use -ConfirmTag for unattended runs).
 
 .PARAMETER RegistryAcr
-    ACR login server (default: acrscimserver20622.azurecr.io).
+    ACR login server (default: acrscimsrv09.azurecr.io).
 
 .PARAMETER RegistryGhcr
     GHCR image base (default: ghcr.io/pranems/scimserver).
@@ -119,7 +119,7 @@
 [CmdletBinding()]
 param(
     [string]$ImageTag,
-    [string]$RegistryAcr = 'acrscimserver20622.azurecr.io',
+    [string]$RegistryAcr = 'acrscimsrv09.azurecr.io',
     [string]$RegistryGhcr = 'ghcr.io/pranems/scimserver',
     [string]$DevResourceGroup = 'scimserver-dev',
     [string]$DevAppName = 'scimserver-dev',
@@ -272,7 +272,7 @@ if ($ImageTag -ne $gitSha -and -not $ConfirmTag) {
 
 if (-not $DevFqdn) {
     if ($DryRun) {
-        $DevFqdn = 'scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+        $DevFqdn = 'scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
     } else {
         $DevFqdn = az containerapp show -n $DevAppName -g $DevResourceGroup --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
     }

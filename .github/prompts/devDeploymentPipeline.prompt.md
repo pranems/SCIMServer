@@ -30,7 +30,7 @@ Whenever the agent observes a UI behavior - including a bug, a new feature, a fi
 The spec MUST be runnable via `npx playwright test --reporter=line` against:
 1. Local dev server (`http://localhost:4000`)
 2. Local Docker compose (`http://localhost:8080`)
-3. Azure dev (`E2E_BASE_URL=https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`)
+3. Azure dev (`E2E_BASE_URL=https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`)
 
 A change that ships without its Playwright spec is incomplete. Stage 5.3 below fails the gate if any new behavior in the commit lacks Playwright coverage.
 
@@ -95,7 +95,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 ### Stage 4 - Build, publish, deploy
 
 4.1. **Docker compose build + live tests** (`pwsh scripts/full-validation-pipeline.ps1 -SkipLocal`) - clean rebuild, compose up, `scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret <docker-oauth>`. Must be ≥ baseline (currently 1,027 passing).
-4.2. **Tag + push to ACR** - `docker tag scimserver-api acrscimserver20622.azurecr.io/scimserver:<SHA>` and `:latest`; `az acr login --name acrscimserver20622`; `docker push <SHA>` and `docker push latest`.
+4.2. **Tag + push to ACR** - `docker tag scimserver-api acrscimsrv09.azurecr.io/scimserver:<SHA>` and `:latest`; `az acr login --name acrscimsrv09`; `docker push <SHA>` and `docker push latest`.
 4.3. **Tag + push to GHCR (public path)** - `gh workflow run publish-ghcr.yml -f version=<version-from-package-json> -f pushLatest=true`. Wait for green via `gh run watch`.
 4.4. **Verify anonymous GHCR pull** - `docker logout ghcr.io && docker pull ghcr.io/pranems/scimserver:latest` (proves the public local-run path).
 4.5. **Live test the public local-run path** - `docker run -d --name scim-public-verify -p 3000:8080 -e PERSISTENCE_BACKEND=inmemory ... ghcr.io/pranems/scimserver:latest` + `scripts/live-test.ps1 -BaseUrl http://localhost:3000 -ClientSecret <test-oauth>`. Cleanup after.
@@ -106,7 +106,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 
 5.1. `uiTestAndValidation` - full vitest + a11y + visual sanity pass.
 5.2. `playwrightSpecHygieneAudit` - delete stale specs (specs targeting deleted Phase I components: `raw-logs`, `manual-provision`, `database-browser`, `app-shell`, `activity-feed`, `live-data-verification`, `new-ui`). Run BEFORE 5.3 so the signal is trustworthy.
-5.3. **Playwright vs dev** - `cd web; $env:E2E_BASE_URL='https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'; $env:E2E_TOKEN='changeme-scim'; npx playwright test --reporter=line`. **All currently-shipped UI flows must pass.** Failures fall into:
+5.3. **Playwright vs dev** - `cd web; $env:E2E_BASE_URL='https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'; $env:E2E_TOKEN='changeme-scim'; npx playwright test --reporter=line`. **All currently-shipped UI flows must pass.** Failures fall into:
    - **Stale spec** → delete it (cite as Stage 5.2 finding)
    - **Real UI regression** → fix code, re-loop entire pipeline
    - **Flaky test** → not allowed; either stabilize the test or delete it

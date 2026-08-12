@@ -257,7 +257,7 @@ Whenever the agent observes a UI behavior - including a bug, a new feature, a fi
 - Behavioral changes to existing flows (update the existing spec)
 - Combination flows (multi-step user journeys spanning >= 2 pages)
 
-The spec MUST be runnable via `npx playwright test --reporter=line` against all three deployment form factors: local dev server (`http://localhost:4000`), local Docker compose (`http://localhost:8080`), and Azure dev (`E2E_BASE_URL=https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). A change that ships without its Playwright spec is incomplete. The Stage 5.3 + 5.4 gates fail when any new web/ behavior in the diff lacks Playwright coverage.
+The spec MUST be runnable via `npx playwright test --reporter=line` against all three deployment form factors: local dev server (`http://localhost:4000`), local Docker compose (`http://localhost:8080`), and Azure dev (`E2E_BASE_URL=https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). A change that ships without its Playwright spec is incomplete. The Stage 5.3 + 5.4 gates fail when any new web/ behavior in the diff lacks Playwright coverage.
 
 ## Visual Layout + Self-Improvement Discipline (CRITICAL - added 2026-05-29 after Finding-D)
 
@@ -442,7 +442,7 @@ Every feature or significant change commit MUST include ALL of the following bef
 1. **Unit Tests** - Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
 2. **E2E Tests** - End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
 3. **Live Integration Tests** - New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` (Docker)
-3a. **Playwright Spec** (when the change touches `web/src/`) - End-to-end browser spec under `web/e2e/*.spec.ts` exercising the new/changed UI surface, runnable against local dev (`http://localhost:4000`), Docker compose (`http://localhost:8080`), AND Azure dev (`https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). For a bug fix, the spec MUST reproduce the bug as a regression test before the fix lands. See "Always Add Playwright Coverage Rule" above.
+3a. **Playwright Spec** (when the change touches `web/src/`) - End-to-end browser spec under `web/e2e/*.spec.ts` exercising the new/changed UI surface, runnable against local dev (`http://localhost:4000`), Docker compose (`http://localhost:8080`), AND Azure dev (`https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). For a bug fix, the spec MUST reproduce the bug as a regression test before the fix lands. See "Always Add Playwright Coverage Rule" above.
 4. **Feature Documentation** - Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
 5. **INDEX.md Update** - Add the new feature doc reference to `docs/INDEX.md`
 6. **CHANGELOG.md Update** - Version bump entry with full test counts and feature summary
@@ -524,7 +524,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 4.1. **`fullValidationPipeline` prompt** - End-to-end local build + Docker build + container smoke. Must pass cleanly before any deployment.
 4.2. **Docker compose live tests** - `docker compose up -d api`, then `pwsh scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 984+ assertions). Confirms the Prisma backend behaves identically to the inmemory mode AND identical to dev.
 4.3. **Local node live tests** - `node api/dist/main.js` (inmemory backend, port 6000), then `pwsh scripts/live-test.ps1` -> all current-baseline tests pass. Confirms inmemory parity. **A live-test failure on local that passes on Docker/dev is a parity bug; fix it at the source (usually `api/src/infrastructure/repositories/inmemory/` or in the service-layer `isInMemoryBackend` branch), don't suppress.**
-4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 1,027 assertions). **This is the sub-phase gate the commit message names.**
+4.4. **Dev Azure deploy + live tests** - Publish image with current commit SHA tag, deploy to `scimserver-dev` Azure Container App, run `pwsh scripts/live-test.ps1 -BaseUrl https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io -ClientSecret "changeme-oauth"` -> all current-baseline tests pass (current: 1,027 assertions). **This is the sub-phase gate the commit message names.**
 
 ### Stage 5 - UI-Specific Gates (when the change touches `web/`)
 5.1. **`uiTestAndValidation` prompt** - Full React/vitest test suite + a11y + visual regression sanity check.
@@ -633,8 +633,8 @@ There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update i
 | Environment | App Name | Resource Group | Subscription | OAuth Secret | SCIM Shared Secret (E2E_TOKEN) | FQDN | Container Registry |
 |---|---|---|---|---|---|---|---|
 | **Prod (CUSTOMER-FACING)** | `scimserver-prod` | `scimserver-rg-prod` | `AnandSa-Test-150` | `changeme-oauth` | `changeme-scim` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | `ghcr.io/pranems/scimserver` (anonymous pull) |
-| **Prod (parallel, eastus)** | `scimserver` | `scimserver-prod` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
-| **Dev** | `scimserver-dev` | `scimserver-dev` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `acrscimserver20622.azurecr.io` + `ghcr.io/pranems/scimserver` |
+| **Prod (parallel, eastus)** | `scimserver` | `scimserver-prod` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `acrscimsrv09.azurecr.io` + `ghcr.io/pranems/scimserver` |
+| **Dev** | `scimserver-dev` | `scimserver-dev` | `ProvIAM_Subscription` | `changeme-oauth` | `changeme-scim` | `scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `acrscimsrv09.azurecr.io` + `ghcr.io/pranems/scimserver` |
 
 **Customer-facing prod (calmsand, centralus, AnandSa-Test-150 sub):**
 - App `scimserver-prod` / RG `scimserver-rg-prod` / FQDN `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io`
@@ -645,16 +645,16 @@ There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update i
 - Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version> -Subscription AnandSa-Test-150` (requires `az login` into the AnandSa tenant then `az account set --subscription AnandSa-Test-150` first; pass `-ImageTag` explicitly - dev app is in the other tenant)
 
 **Parallel prod (proudbush, eastus, ProvIAM_Subscription):**
-- App `scimserver` / RG `scimserver-prod` (different from calmsand's `scimserver-rg-prod`) / FQDN `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io`
-- Uses ACR image (`acrscimserver20622.azurecr.io/scimserver:<sha>`) with Managed Identity pull; lower cold-start latency
+- App `scimserver` / RG `scimserver-prod` (different from calmsand's `scimserver-rg-prod`) / FQDN `scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io`
+- Uses ACR image (`acrscimsrv09.azurecr.io/scimserver:<sha>`) with Managed Identity pull; lower cold-start latency
 - Same SCIM contract surface; both are kept in lockstep version-wise
 - Promotion target: `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag <version>` (in `ProvIAM_Subscription`)
 
 **Important when promoting prod:** ALWAYS canary-first - promote proudbush (same-tenant parallel prod) FIRST with `-BlueGreen -RunVerification -VerifyPlaywright`, prove it green, and ONLY THEN promote calmsand (after explicit operator go-ahead). If the operator says "promote to prod" without naming which one, promote proudbush as the canary and ask for confirmation before calmsand. Both deserve the same image. An UNINTENTIONAL single-prod promotion that leaves the other behind is the v0.52.3 mistake of 2026-05-29 (proudbush got v0.52.3 first; calmsand left on v0.52.2 until the operator surfaced it). Note: an auto-canary run intentionally leaves proudbush ahead until the calmsand go-ahead - that drift is expected, not the v0.52.3 mistake.
 
-**CRITICAL - the two prods live in DIFFERENT Azure AD tenants.** Dev + parallel prod (proudbush) are in `ProvIAM_Subscription`, tenant `f08e6aff-ca0f-4f11-81fa-1ffd43323373`. Customer-facing prod (calmsand) is in `AnandSa-Test-150`, a **separate tenant** `9de357c6-4488-4a8d-bd2f-14696f1af950` (distinct from the ProvIAM tenant). Consequences for promotion:
+**CRITICAL - the two prods live in DIFFERENT Azure AD tenants.** Dev + parallel prod (proudbush) are in `ProvIAM_Subscription`, tenant `9751e42f-78f3-42f4-8b8a-6e73845aceae`. Customer-facing prod (calmsand) is in `AnandSa-Test-150`, a **separate tenant** `9de357c6-4488-4a8d-bd2f-14696f1af950` (distinct from the ProvIAM tenant). Consequences for promotion:
 - You **cannot** promote both prods in a single `az` session. You must re-auth / switch context between them. Promote proudbush + dev work under the ProvIAM tenant; promoting calmsand requires `az login` into the AnandSa tenant first, then `az account set --subscription AnandSa-Test-150`.
-- The calmsand tenant **cannot pull from the ProvIAM-tenant ACR** (`acrscimserver20622.azurecr.io`) - cross-tenant ACR pull would need cross-tenant credentials. That is WHY calmsand pulls the image anonymously from **GHCR** (`ghcr.io/pranems/scimserver`). The publish step MUST push to GHCR (`publish-ghcr.yml`) before a calmsand promotion, not only ACR.
+- The calmsand tenant **cannot pull from the ProvIAM-tenant ACR** (`acrscimsrv09.azurecr.io`) - cross-tenant ACR pull would need cross-tenant credentials. That is WHY calmsand pulls the image anonymously from **GHCR** (`ghcr.io/pranems/scimserver`). The publish step MUST push to GHCR (`publish-ghcr.yml`) before a calmsand promotion, not only ACR.
 - For the calmsand promotion always pass `-ImageTag <version>` explicitly. Do NOT let `promote-to-prod.ps1` auto-read the tag from the dev app - the dev app is in the OTHER tenant and would not be reachable in the active (AnandSa) `az` context.
 - Promotion commands (run in the matching tenant context for each):
   ```powershell
@@ -677,7 +677,7 @@ These deployments are retired and not live. Any tooling, doc, or script referenc
 | Tenant-migration era (pre-2026-05-19) | `scimserver2` | `scimserver-rg` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | RETIRED (mgmt-plane expired during 2026-05-19 cross-tenant migration; data-plane was read-only during the migration window) |
 | Pre-tenant-migration dev | `scimserver-dev` | `scimserver-rg-dev` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | RETIRED (same tenant-migration cutover) |
 
-**Image registry note:** the runtime registry for the parallel proudbush prod + dev is Azure Container Registry (`acrscimserver20622.azurecr.io`); the customer-facing calmsand prod pulls from GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
+**Image registry note:** the runtime registry for the parallel proudbush prod + dev is Azure Container Registry (`acrscimsrv09.azurecr.io`); the customer-facing calmsand prod pulls from GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)

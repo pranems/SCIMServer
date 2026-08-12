@@ -32,7 +32,7 @@
  *
  * Run vs dev WITH mutations:
  *   $env:E2E_ALLOW_MUTATIONS = '1'
- *   $env:E2E_BASE_URL = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+ *   $env:E2E_BASE_URL = 'https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
  *   $env:E2E_TOKEN    = 'changeme-scim'
  *   cd web
  *   npx playwright test e2e/endpoint-crud.spec.ts --reporter=line

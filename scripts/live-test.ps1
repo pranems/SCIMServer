@@ -12332,8 +12332,8 @@ try {
 
     # Create a wif trust to edit. A real, reachable Entra tenant is used so the
     # verify path (below) can actually resolve discovery + JWKS.
-    $avIssuer = "https://login.microsoftonline.com/f08e6aff-ca0f-4f11-81fa-1ffd43323373/v2.0"
-    $avJwks   = "https://login.windows.net/f08e6aff-ca0f-4f11-81fa-1ffd43323373/discovery/v2.0/keys"
+    $avIssuer = "https://login.microsoftonline.com/9751e42f-78f3-42f4-8b8a-6e73845aceae/v2.0"
+    $avJwks   = "https://login.windows.net/9751e42f-78f3-42f4-8b8a-6e73845aceae/discovery/v2.0/keys"
     $avWif = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$avId/credentials" -Method POST -Headers $headers -Body (@{
         credentialType = "wif"; label = "edit-me"
         wif = @{
@@ -12341,7 +12341,7 @@ try {
             expectedSubject  = "sp-original"
             expectedAudience = "api://orig"
             jwksUri          = $avJwks
-            allowedTenantId  = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+            allowedTenantId  = "9751e42f-78f3-42f4-8b8a-6e73845aceae"
         }
     } | ConvertTo-Json -Depth 6)
     Test-Result -Success ($avWif.credentialType -eq "wif") -Message "9z-AV.T1: wif trust created for edit"
@@ -12354,7 +12354,7 @@ try {
             expectedSubject  = "sp-CHANGED"
             expectedAudience = "api://CHANGED"
             jwksUri          = $avJwks
-            allowedTenantId  = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+            allowedTenantId  = "9751e42f-78f3-42f4-8b8a-6e73845aceae"
         }
     } | ConvertTo-Json -Depth 6)
     Test-Result -Success ($avEdited.wif.expectedSubject -eq "sp-CHANGED" -and $avEdited.wif.expectedAudience -eq "api://CHANGED") -Message "9z-AV.T2: PUT replaced the trust's subject + audience"
@@ -13184,7 +13184,7 @@ Write-Host "TEST SECTION 9z-BH: WIF allowedTenantId gleaning from issuer/JWKS (U
 Write-Host "========================================" -ForegroundColor Yellow
 
 try {
-    $bhTenant = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+    $bhTenant = "9751e42f-78f3-42f4-8b8a-6e73845aceae"
     $bhEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
         name = "live-test-wifglean-$(Get-Random)"; profilePreset = "rfc-standard"
     } | ConvertTo-Json)
@@ -13334,7 +13334,7 @@ Write-Host "TEST SECTION 9z-BK: WIF verify with credentialId persists lastVerifi
 Write-Host "========================================" -ForegroundColor Yellow
 
 try {
-    $bkTenant = "f08e6aff-ca0f-4f11-81fa-1ffd43323373"
+    $bkTenant = "9751e42f-78f3-42f4-8b8a-6e73845aceae"
     $bkIssuer = "https://login.microsoftonline.com/$bkTenant/v2.0"
     $bkJwks   = "https://login.windows.net/$bkTenant/discovery/v2.0/keys"
     $bkEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{

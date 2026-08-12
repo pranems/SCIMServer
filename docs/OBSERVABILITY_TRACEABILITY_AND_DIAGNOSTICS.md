@@ -220,7 +220,7 @@ Resource-plane errors use the SCIM `Error` schema. The vendor extension `urn:sci
 
 ```http
 GET /scim/v2/endpoints/d915cf86-.../Users HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer bogus-token
 Accept: application/scim+json
 ```

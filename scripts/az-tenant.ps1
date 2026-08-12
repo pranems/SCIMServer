@@ -206,6 +206,38 @@ function Show-ScimTenants {
     Write-Host ""
 }
 
+function Set-ScimAzExtensionDir {
+    <#
+        Point AZURE_EXTENSION_DIR at the ONE shared extension directory.
+
+        This must be called every time AZURE_CONFIG_DIR changes. `az` stores its
+        installed extensions under `$AZURE_CONFIG_DIR/cliextensions`, so giving
+        each tenant its own profile directory - which is the whole point of this
+        module - also gives each tenant its own EMPTY extension set. The default
+        `~/.azure` profile has `containerapp`, `account`, `log-analytics`; a fresh
+        tenant profile has nothing.
+
+        The failure this prevents is nasty because the error does not mention
+        extensions at all. With the extension missing, `az containerapp
+        environment show` reports:
+
+            ERROR: 'environment' is misspelled or not recognized by the system.
+
+        which reads like a typo in the command, or like the resource is gone. It
+        cost a full misdiagnosis pass during the tenant-09 migration: every ARM
+        read came back empty while both apps were provably serving traffic, and
+        the obvious (wrong) conclusions were an expired token or a missing estate.
+
+        Sharing the directory is safe: extensions are tenant-agnostic code, not
+        credentials. Only the auth state under the profile directory must stay
+        isolated, and that is unaffected.
+    #>
+    [CmdletBinding()] param()
+    $shared = Join-Path $HOME '.azure\cliextensions'
+    if (-not (Test-Path $shared)) { New-Item -ItemType Directory -Force -Path $shared | Out-Null }
+    $env:AZURE_EXTENSION_DIR = $shared
+}
+
 function Resolve-ScimTenantEntry {
     [CmdletBinding()]
     param([string]$Name, [string]$Subscription)
@@ -246,6 +278,7 @@ function Connect-ScimTenant {
     }
 
     $env:AZURE_CONFIG_DIR = $entry.ConfigDir
+    Set-ScimAzExtensionDir
     if (-not (Test-Path $entry.ConfigDir)) {
         New-Item -ItemType Directory -Force -Path $entry.ConfigDir | Out-Null
     }
@@ -309,6 +342,7 @@ function Connect-ScimUser {
 
     $dir = if ($Entry.UserConfigDir) { $Entry.UserConfigDir } else { $Entry.ConfigDir }
     $env:AZURE_CONFIG_DIR = $dir
+    Set-ScimAzExtensionDir
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
@@ -378,6 +412,7 @@ function Show-ScimDeployStatus {
             Write-Host "  profile dir  : $($entry.ConfigDir)"
 
             $env:AZURE_CONFIG_DIR = $entry.ConfigDir
+            Set-ScimAzExtensionDir
             $acct = az account show -o json 2>$null | ConvertFrom-Json
             if ($acct) {
                 Write-Host "  logged in    : yes ($($acct.user.name), type=$($acct.user.type))" -ForegroundColor Green

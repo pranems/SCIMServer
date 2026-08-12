@@ -159,8 +159,8 @@ if ($missing.Count -gt 0) {
 if ($Live) {
     Write-Section '[C4] live estate truth'
     $estates = @(
-        @{ Name = 'dev';            Url = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io' }
-        @{ Name = 'prod (canary)';  Url = 'https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io' }
+        @{ Name = 'dev';            Url = 'https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io' }
+        @{ Name = 'prod (canary)';  Url = 'https://scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io' }
         @{ Name = 'prod (customer)';Url = 'https://scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io' }
     )
     $token = if ($env:E2E_TOKEN) { $env:E2E_TOKEN } else { 'changeme-scim' }

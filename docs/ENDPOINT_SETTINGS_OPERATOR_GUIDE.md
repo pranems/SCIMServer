@@ -205,7 +205,7 @@ Settings are nested under `profile.settings`. Send only the keys you want to cha
 
 ```http
 PATCH /scim/admin/endpoints/{endpointId} HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer <admin-token>
 Content-Type: application/json
 ```

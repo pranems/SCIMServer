@@ -954,7 +954,7 @@ curl -s -X PATCH \
 
 ```
 ==========================================================================
-  Server:   https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+  Server:   https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
   Endpoint: a4225b6d-d213-4183-ae78-ef11c14a5f54 (Himanshu-ISV-1)
 
   Changes:

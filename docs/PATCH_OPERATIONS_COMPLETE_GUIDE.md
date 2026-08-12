@@ -71,7 +71,7 @@ flowchart LR
 
 ### 2.1 URLs by resource type
 
-All PATCH routes are endpoint-scoped. `{baseUrl}` is the deployment origin (for example `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`), `{endpointId}` is the endpoint UUID.
+All PATCH routes are endpoint-scoped. `{baseUrl}` is the deployment origin (for example `https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io`), `{endpointId}` is the endpoint UUID.
 
 | Resource | Method + URL |
 |----------|--------------|
@@ -592,7 +592,7 @@ The following was executed live against the dev deployment (`rfc-standard` prese
 Request:
 ```http
 PATCH /scim/endpoints/{endpointId}/Users/{id} HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer <token>
 Content-Type: application/scim+json
 

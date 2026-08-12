@@ -20,8 +20,8 @@ There are TWO live prod instances (kept in lockstep, same image per promotion) +
 
 | Environment | Subscription / Tenant | Resource Group | Container App | FQDN | Registry |
 |-------------|----------------------|---------------|---------------|------|----------|
-| **Dev** | `ProvIAM_Subscription` (tenant `f08e6aff-...`) | `scimserver-dev` | `scimserver-dev` | `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | ACR `acrscimserver20622.azurecr.io` + GHCR |
-| **Prod (parallel, proudbush)** | `ProvIAM_Subscription` (tenant `f08e6aff-...`) | `scimserver-prod` | `scimserver` | `scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | ACR + GHCR |
+| **Dev** | `ProvIAM_Subscription` (tenant `f08e6aff-...`) | `scimserver-dev` | `scimserver-dev` | `scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io` | ACR `acrscimsrv09.azurecr.io` + GHCR |
+| **Prod (parallel, proudbush)** | `ProvIAM_Subscription` (tenant `f08e6aff-...`) | `scimserver-prod` | `scimserver` | `scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io` | ACR + GHCR |
 | **Prod (CUSTOMER-FACING, calmsand)** | `AnandSa-Test-150` (**separate tenant**) | `scimserver-rg-prod` | `scimserver-prod` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | GHCR `ghcr.io/pranems/scimserver` (anonymous pull) |
 
 **CROSS-TENANT WARNING:** The customer-facing prod (calmsand) is in a DIFFERENT Azure AD tenant than dev + parallel prod. You cannot promote both in one `az` session - re-auth between them. Calmsand cannot pull from the ProvIAM-tenant ACR, which is why it uses anonymous GHCR; the image MUST be on GHCR (`publish-ghcr.yml`) before a calmsand promotion.
@@ -79,11 +79,11 @@ There are TWO live prod instances (kept in lockstep, same image per promotion) +
 2. Wait 90s for startup probe to pass
 3. Health check:
    ```powershell
-   Invoke-RestMethod -Uri "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/health"
+   Invoke-RestMethod -Uri "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io/scim/health"
    ```
 4. Run full live tests:
    ```powershell
-   .\scripts\live-test.ps1 -BaseUrl "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io" -ClientSecret "changeme-oauth"
+   .\scripts\live-test.ps1 -BaseUrl "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io" -ClientSecret "changeme-oauth"
    ```
 5. **Gate**: If live tests have ANY failures, STOP. Do not proceed to prod.
 6. Report: "Dev deployment validated: X/Y tests passed"

@@ -183,7 +183,7 @@ The default. Every endpoint accepts it until you turn it off.
 
 ```http
 GET /scim/v2/endpoints/{endpointId}/Users?count=1 HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer changeme-scim
 ```
 

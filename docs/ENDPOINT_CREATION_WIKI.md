@@ -72,7 +72,7 @@ Set your server + secret once, then create an endpoint from the default preset.
 
 ```powershell
 # 1. Point at your server (pick one)
-$base = "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io"   # dev
+$base = "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io"   # dev
 # $base = "http://localhost:8080"                                                  # local Docker
 
 # 2. Get an OAuth token (admin credentials)

@@ -108,6 +108,72 @@ $envId = az containerapp env show -n $EnvironmentName -g $TargetResourceGroup --
 if (-not $envId) { throw "Container Apps environment '$EnvironmentName' not found in '$TargetResourceGroup'." }
 
 # --------------------------------------------------------------------------
+# Decompose the connection strings into discrete PG* variables.
+#
+# libpq parses a postgresql:// URI as PERCENT-ENCODED, so a password containing
+# a bare '%' fails with `invalid percent-encoded token` before it ever opens a
+# socket. That is exactly what broke the tenant-08 canary-prod carry: the
+# generated prod password contained '%s', the dev password happened not to, and
+# so the failure looked environment-specific through three wrong diagnoses.
+#
+# Passing PGHOST / PGUSER / PGPASSWORD / PGDATABASE / PGSSLMODE avoids URI
+# parsing altogether, so no character in the password can be reinterpreted.
+# --------------------------------------------------------------------------
+function Split-PgUri {
+    param([Parameter(Mandatory)][string]$Uri, [Parameter(Mandatory)][string]$Which)
+    # Anchor on the LAST '@' so a password containing '@' still splits correctly.
+    if ($Uri -notmatch '^postgres(?:ql)?://(.+)@([^@]+)$') { throw "$Which connection string is not a postgresql:// URI." }
+    $creds = $Matches[1]
+    $rest = $Matches[2]
+    # Split creds on the FIRST ':' so a password containing ':' survives.
+    $ci = $creds.IndexOf(':')
+    if ($ci -lt 0) { throw "$Which connection string has no password." }
+    $user = $creds.Substring(0, $ci)
+    $pass = $creds.Substring($ci + 1)
+    if ($rest -notmatch '^([^:/]+)(?::(\d+))?/([^?]+)(?:\?(.*))?$') { throw "$Which connection string has an unparseable host/database part." }
+    $h = $Matches[1]; $prt = $Matches[2]; $db = $Matches[3]; $qs = $Matches[4]
+    $ssl = 'require'
+    if ($qs -and $qs -match 'sslmode=([^&]+)') { $ssl = $Matches[1] }
+    [pscustomobject]@{
+        DbHost   = $h
+        Port     = if ($prt) { $prt } else { '5432' }
+        Database = $db
+        User     = $user
+        Password = $pass
+        SslMode  = $ssl
+    }
+}
+
+$src = Split-PgUri -Uri $SourceConnectionString -Which 'Source'
+$dst = Split-PgUri -Uri $TargetConnectionString -Which 'Target'
+Say ("source db : " + $src.Database + " as " + $src.User + " (sslmode=" + $src.SslMode + ")")
+Say ("target db : " + $dst.Database + " as " + $dst.User + " (sslmode=" + $dst.SslMode + ")")
+
+# --------------------------------------------------------------------------
+# A password taken from a postgresql:// URI is ambiguous, and the two SCIMServer
+# estates proved it by failing in OPPOSITE directions:
+#
+#   prod password contains '%s'  -> NOT a valid percent-escape, so libpq refuses
+#                                   the URI outright ("invalid percent-encoded
+#                                   token") and only the RAW password works.
+#   dev  password contains '%99' -> a VALID percent-escape, so libpq silently
+#                                   DECODES it, and only the DECODED password
+#                                   authenticates.
+#
+# Nothing in the connection string says which was intended, so guessing either
+# way breaks one estate. Supply both and let the container use whichever one
+# actually authenticates.
+# --------------------------------------------------------------------------
+function Get-DecodedOrSame {
+    param([string]$Value)
+    try { return [System.Uri]::UnescapeDataString($Value) } catch { return $Value }
+}
+$srcPwAlt = Get-DecodedOrSame $src.Password
+$dstPwAlt = Get-DecodedOrSame $dst.Password
+Say ("source password has an alternate percent-decoded form : " + ($srcPwAlt -ne $src.Password))
+Say ("target password has an alternate percent-decoded form : " + ($dstPwAlt -ne $dst.Password))
+
+# --------------------------------------------------------------------------
 # The transfer script that runs inside the container.
 #
 #   --no-owner --no-acl : role names differ between servers, so ownership and
@@ -123,13 +189,15 @@ if (-not $envId) { throw "Container Apps environment '$EnvironmentName' not foun
 # --------------------------------------------------------------------------
 $verifyOnly = @'
 set -eu
+S="host=$SRC_HOST port=$SRC_PORT dbname=$SRC_DB user=$SRC_USER sslmode=$SRC_SSL"
+D="host=$DST_HOST port=$DST_PORT dbname=$DST_DB user=$DST_USER sslmode=$DST_SSL"
 echo "=== source reachability ==="
-psql "$SRC" -Atc "select 'source ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
+PGPASSWORD="$SRC_PW" psql "$S" -Atc "select 'source ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
 echo "=== target reachability ==="
-psql "$DST" -Atc "select 'target ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
+PGPASSWORD="$DST_PW" psql "$D" -Atc "select 'target ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
 echo "=== source row counts ==="
-psql "$SRC" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
-  n=$(psql "$SRC" -Atc "select count(*) from \"$t\"")
+PGPASSWORD="$SRC_PW" psql "$S" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
+  n=$(PGPASSWORD="$SRC_PW" psql "$S" -Atc "select count(*) from \"$t\"")
   echo "  $t = $n"
 done
 echo "DRY RUN COMPLETE - nothing was written"
@@ -137,22 +205,53 @@ echo "DRY RUN COMPLETE - nothing was written"
 
 $fullCopy = @'
 set -eu
+S="host=$SRC_HOST port=$SRC_PORT dbname=$SRC_DB user=$SRC_USER sslmode=$SRC_SSL"
+D="host=$DST_HOST port=$DST_PORT dbname=$DST_DB user=$DST_USER sslmode=$DST_SSL"
+
+# Pick whichever password form authenticates. See the note in the PowerShell
+# caller: a password taken out of a postgresql:// URI may be the raw string or
+# the percent-decoded one, and the two estates need opposite answers.
+pick_pw() {
+  conn="$1"; a="$2"; b="$3"
+  if PGPASSWORD="$a" psql "$conn" -Atc 'select 1' >/dev/null 2>&1; then echo "$a"; return 0; fi
+  if PGPASSWORD="$b" psql "$conn" -Atc 'select 1' >/dev/null 2>&1; then echo "$b"; return 0; fi
+  return 1
+}
+
+if ! SRC_USE=$(pick_pw "$S" "$SRC_PW" "$SRC_PW_ALT"); then
+  echo "FATAL: neither password form authenticates against the SOURCE"; exit 91
+fi
+if ! DST_USE=$(pick_pw "$D" "$DST_PW" "$DST_PW_ALT"); then
+  echo "FATAL: neither password form authenticates against the TARGET"; exit 92
+fi
+echo "credentials resolved for both endpoints"
+
 echo "=== source row counts BEFORE ==="
-psql "$SRC" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
-  n=$(psql "$SRC" -Atc "select count(*) from \"$t\"")
+PGPASSWORD="$SRC_USE" psql "$S" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
+  n=$(PGPASSWORD="$SRC_USE" psql "$S" -Atc "select count(*) from \"$t\"")
   echo "  $t = $n"
 done
 
 echo "=== dumping ==="
-pg_dump --no-owner --no-acl --clean --if-exists --format=plain "$SRC" > /tmp/dump.sql
-echo "dump bytes: $(wc -c < /tmp/dump.sql)"
+PGPASSWORD="$SRC_USE" pg_dump --no-owner --no-acl --clean --if-exists --format=plain -d "$S" > /tmp/dump.sql
+BYTES=$(wc -c < /tmp/dump.sql)
+echo "dump bytes: $BYTES"
+
+# A failed pg_dump leaves an empty or truncated file, and restoring it then
+# reports success - a copy that looks clean and moved nothing, while --clean
+# empties the target. The tenant-08 prod carry did exactly that: 0-byte dump,
+# rc=0 restore, emptied target. Refuse anything implausibly small.
+if [ "$BYTES" -lt 10000 ]; then
+  echo "FATAL: dump is only $BYTES bytes - refusing to restore a truncated or empty dump"
+  exit 90
+fi
 
 echo "=== restoring ==="
-psql "$DST" -v ON_ERROR_STOP=1 -q -f /tmp/dump.sql
+PGPASSWORD="$DST_USE" psql "$D" -v ON_ERROR_STOP=1 -q -f /tmp/dump.sql
 
 echo "=== target row counts AFTER ==="
-psql "$DST" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
-  n=$(psql "$DST" -Atc "select count(*) from \"$t\"")
+PGPASSWORD="$DST_USE" psql "$D" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
+  n=$(PGPASSWORD="$DST_USE" psql "$D" -Atc "select count(*) from \"$t\"")
   echo "  $t = $n"
 done
 echo "COPY COMPLETE"
@@ -181,10 +280,14 @@ properties:
       parallelism: 1
       replicaCompletionCount: 1
     secrets:
-      - name: srcconn
-        value: "$SourceConnectionString"
-      - name: dstconn
-        value: "$TargetConnectionString"
+      - name: srcpw
+        value: "$($src.Password)"
+      - name: srcpwalt
+        value: "$srcPwAlt"
+      - name: dstpw
+        value: "$($dst.Password)"
+      - name: dstpwalt
+        value: "$dstPwAlt"
   template:
     containers:
       - name: pgcopy
@@ -196,10 +299,34 @@ properties:
           - |
 $indented
         env:
-          - name: SRC
-            secretRef: srcconn
-          - name: DST
-            secretRef: dstconn
+          - name: SRC_HOST
+            value: "$($src.DbHost)"
+          - name: SRC_PORT
+            value: "$($src.Port)"
+          - name: SRC_DB
+            value: "$($src.Database)"
+          - name: SRC_USER
+            value: "$($src.User)"
+          - name: SRC_SSL
+            value: "$($src.SslMode)"
+          - name: SRC_PW
+            secretRef: srcpw
+          - name: SRC_PW_ALT
+            secretRef: srcpwalt
+          - name: DST_HOST
+            value: "$($dst.DbHost)"
+          - name: DST_PORT
+            value: "$($dst.Port)"
+          - name: DST_DB
+            value: "$($dst.Database)"
+          - name: DST_USER
+            value: "$($dst.User)"
+          - name: DST_SSL
+            value: "$($dst.SslMode)"
+          - name: DST_PW
+            secretRef: dstpw
+          - name: DST_PW_ALT
+            secretRef: dstpwalt
         resources:
           cpu: 1.0
           memory: 2Gi

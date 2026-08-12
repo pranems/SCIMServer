@@ -17,13 +17,13 @@
  *     parser the browser will use at runtime.
  *
  * Run vs dev (canonical):
- *   $env:E2E_BASE_URL = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+ *   $env:E2E_BASE_URL = 'https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
  *   $env:E2E_TOKEN    = 'changeme-scim'
  *   cd web
  *   npx playwright test e2e/security-headers.spec.ts --reporter=line
  *
  * Run vs prod (only with explicit operator intent):
- *   $env:E2E_BASE_URL = 'https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io'
+ *   $env:E2E_BASE_URL = 'https://scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io'
  *   $env:E2E_TOKEN    = 'changeme-scim'
  *   cd web
  *   npx playwright test e2e/security-headers.spec.ts --reporter=line

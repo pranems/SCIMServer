@@ -136,14 +136,14 @@ scimserver-prod         <- PROD, parallel canary (same tenant as dev)
 |-- VNet, subnets
 |-- Container Apps Env + Log Analytics
 |-- PostgreSQL Flexible Server (scimserver-pg-new2)
-`-- Container App: scimserver (acrscimserver20622.azurecr.io/scimserver:<sha>)
-    FQDN: scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io
+`-- Container App: scimserver (acrscimsrv09.azurecr.io/scimserver:<sha>)
+    FQDN: scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io
 
 scimserver-dev          <- DEV (your iteration) - fully isolated
 |-- VNet, subnets (shares scimserver-env Container Apps Environment across RGs)
 |-- PostgreSQL Flexible Server (scimserver-pg-dev-new2)
-`-- Container App: scimserver-dev (acrscimserver20622.azurecr.io/scimserver:<sha>)
-    FQDN: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+`-- Container App: scimserver-dev (acrscimsrv09.azurecr.io/scimserver:<sha>)
+    FQDN: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 ```
 
 > The customer-facing estate lives in a **different Azure AD tenant**, so it cannot pull from the dev-tenant ACR. That is why it pulls the identical image anonymously from GHCR instead. Promotion is canary-first: prove the parallel prod, then promote the customer-facing one on an explicit go-ahead.

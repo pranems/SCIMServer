@@ -65,11 +65,11 @@ An operator set up Workload Identity Federation from an Entra app against dev en
 ```json
 {
   "assertionProfile": "jwt-bearer",
-  "expectedIssuer": "https://login.microsoftonline.com/f08e6aff-ca0f-4f11-81fa-1ffd43323373/v2.0",
+  "expectedIssuer": "https://login.microsoftonline.com/9751e42f-78f3-42f4-8b8a-6e73845aceae/v2.0",
   "expectedSubject": "649001f8-563a-44ae-824d-472a5434a039",
   "expectedAudience": "102538c4-6640-47f0-8362-0dbc6440234f",
-  "jwksUri": "https://login.windows.net/f08e6aff-ca0f-4f11-81fa-1ffd43323373/discovery/v2.0/keys",
-  "allowedTenantId": "f08e6aff-ca0f-4f11-81fa-1ffd43323373",
+  "jwksUri": "https://login.windows.net/9751e42f-78f3-42f4-8b8a-6e73845aceae/discovery/v2.0/keys",
+  "allowedTenantId": "9751e42f-78f3-42f4-8b8a-6e73845aceae",
   "requiredRoles": ["Scim.Provision"],
   "scope": "scim.read scim.write"
 }
@@ -726,7 +726,7 @@ Using the `authHealth` block from [Part 9.6](#96-extend-the-connection-info-api-
   "reason_code": "jwks_host_not_allowlisted",
   "correlation_id": "12c42cf8-bc10-4d70-a672-2533ffe09640",
   "timestamp": "2026-07-07T12:34:56Z",
-  "error_uri": "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/docs/auth-errors#jwks_host_not_allowlisted"
+  "error_uri": "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io/scim/docs/auth-errors#jwks_host_not_allowlisted"
 }
 ```
 

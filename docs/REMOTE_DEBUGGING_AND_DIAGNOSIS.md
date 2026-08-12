@@ -52,8 +52,8 @@ All observability endpoints require a bearer token. Use the **shared secret** fo
 |------------|----------|------------------------------|
 | **Local** (InMemory, port 6000) | `http://localhost:6000` | whatever you export as `SCIM_SHARED_SECRET` (the repo convention is `changeme-scim`; if unset the server generates one and logs it at startup) |
 | **Docker** (PostgreSQL, port 8080) | `http://localhost:8080` | `devscimsharedsecret` (the `docker-compose.yml` default) |
-| **Azure dev** | `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `changeme-scim` |
-| **Azure prod** (canary, eastus) | `https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | `changeme-scim` |
+| **Azure dev** | `https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `changeme-scim` |
+| **Azure prod** (canary, eastus) | `https://scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `changeme-scim` |
 | **Azure prod** (customer-facing, centralus) | `https://scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | `changeme-scim` |
 
 > The live estates are enumerated in [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md), which is gate-enforced. Earlier revisions of this guide pointed at `scimserver2.yellowsmoke-af7a3fff...`, which was **retired in the 2026-05-19 tenant migration** and no longer resolves.
@@ -68,7 +68,7 @@ Authorization: Bearer <shared-secret>
 
 ```powershell
 # Azure dev:
-$base = "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io"
+$base = "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io"
 $h = @{ Authorization = "Bearer changeme-scim" }
 
 # Docker:
@@ -95,7 +95,7 @@ The server keeps the last 2,000 log entries in an in-memory ring buffer. This is
 
 ```http
 GET /scim/admin/log-config/recent?limit=3&level=INFO HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer changeme-scim
 ```
 
@@ -158,7 +158,7 @@ Invoke-RestMethod "$base/scim/admin/log-config/recent?category=auth" -Headers $h
 **curl:**
 
 ```bash
-curl -s "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/admin/log-config/recent?limit=25" \
+curl -s "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io/scim/admin/log-config/recent?limit=25" \
   -H "Authorization: Bearer changeme-scim" | jq
 ```
 
@@ -589,7 +589,7 @@ Stream log entries as they happen via Server-Sent Events. Use `curl` (not `Invok
 **Request:**
 
 ```bash
-curl -N "https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/scim/admin/log-config/stream?level=INFO" \
+curl -N "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io/scim/admin/log-config/stream?level=INFO" \
   -H "Authorization: Bearer changeme-scim"
 ```
 
@@ -703,7 +703,7 @@ SCIMServer includes a built-in React SPA served at `/admin` that provides a brow
 |------------|-------------------|
 | **Local** | `http://localhost:6000/admin` |
 | **Docker** | `http://localhost:8080/admin` |
-| **Azure** | `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/admin` |
+| **Azure** | `https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io/admin` |
 
 **Features:**
 
@@ -734,7 +734,7 @@ The health endpoint is public (no auth required) and used by Docker HEALTHCHECK 
 
 ```http
 GET /health HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 ```
 
 **Response: `200 OK`**
@@ -751,7 +751,7 @@ Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
 
 ```bash
 # No auth needed
-curl -s https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io/health | jq
+curl -s https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io/health | jq
 ```
 
 ---

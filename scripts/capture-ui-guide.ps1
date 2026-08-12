@@ -17,7 +17,7 @@
 
 .PARAMETER BaseUrl
     Live URL to capture against, e.g.
-      https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+      https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
       http://localhost:8080
       http://localhost:4000
 
@@ -37,7 +37,7 @@
     only (dry run), so you can review before overwriting committed images.
 
 .EXAMPLE
-    pwsh scripts/capture-ui-guide.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+    pwsh scripts/capture-ui-guide.ps1 -BaseUrl https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
     # dry run: capture to test-results/ui-screenshots/, print summary
 
 .EXAMPLE
