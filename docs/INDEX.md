@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.5`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
 
-> **Version:** 0.55.5 - **Updated:** 2026-07-31  
+> **Version:** 0.55.6 - **Updated:** 2026-07-31  
 > 6 presets - **35 endpoint settings controls** (21 boolean flags + 3 enums + 11 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
 
 ### Start here

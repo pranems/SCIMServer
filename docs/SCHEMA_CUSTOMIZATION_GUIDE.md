@@ -1,8 +1,8 @@
 # Schema Customization Guide - Operator Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.5`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
 
-> **Version**: 3.2 · **Date**: 2026-07-31 · **Status**: Complete (route and module structure re-verified against v0.55.5 on 2026-07-31; the full line-by-line source pass dates from v0.53.0)  
+> **Version**: 3.2 · **Date**: 2026-07-31 · **Status**: Complete (route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line source pass dates from v0.53.0)  
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types  
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
 
