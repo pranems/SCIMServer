@@ -530,6 +530,11 @@ if (-not $SkipDeploy -and -not $SkipPlaywright) {
     Invoke-Gate '5.3' 'Playwright vs dev' {
         $env:E2E_BASE_URL = "https://$DevFqdn"
         $env:E2E_TOKEN = 'changeme-scim'
+        # The create/delete wizard specs are gated behind this so they never run
+        # against a customer-facing estate. Dev is ours and every spec cleans up
+        # after itself, so enable them here - otherwise the primary
+        # endpoint-creation flow has no browser coverage at all.
+        $env:E2E_ALLOW_MUTATIONS = '1'
         npx playwright test --reporter=line
     } 'web' | Out-Null
 } elseif ($SkipPlaywright) {

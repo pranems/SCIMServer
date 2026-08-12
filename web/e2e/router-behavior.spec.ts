@@ -177,13 +177,25 @@ test.describe('Phase A4 router contract - hover-prefetch', () => {
     // sidebar link - so the hover-triggered prefetch is correctly suppressed
     // by Phase A4's defaultPreloadStaleTime: 30_000.
     //
-    // The hover-prefetch contract itself is still correct (and still locked
-    // by web/src/router-loaders.test.ts at the unit layer). It just cannot be
-    // observed at the network layer post-N2. The right rewrite is to test
-    // "no loading skeleton between click and page render" which observes the
-    // same outcome (data was pre-loaded). Deferred to a Phase O test-hygiene
-    // sprint.
-    test.skip(true, 'Hover-prefetch network observability suppressed by N2 OnboardingWizard mount-time useEndpoints(); unit test in router-loaders.test.ts still locks the contract.');
+    // The hover-prefetch contract itself is still correct, and is locked at the
+    // unit layer by web/src/router-loaders.test.ts, which asserts every route
+    // declares a `loader` function, `defaultPreload === 'intent'`, and
+    // `defaultPreloadStaleTime === 30_000`. It just cannot be observed at the
+    // network layer post-N2.
+    //
+    // REVIEWED 2026-08-05 during the skip-elimination sweep. The previously
+    // suggested rewrite - "assert no loading skeleton between click and page
+    // render" - was evaluated and REJECTED as vacuous: OnboardingWizard warms
+    // the endpoints query on EVERY route mount, so that assertion would pass
+    // whether or not hover-prefetch worked at all. It would be a test that
+    // cannot fail for the reason it claims to test, which is worse than no
+    // test (see copilot-instructions.md R10 "presence is not correctness").
+    //
+    // This is therefore a DELIBERATE, permanent skip with real coverage
+    // elsewhere, not a deferred TODO. To make it observable again the wizard's
+    // mount-time useEndpoints() would have to become lazy - a product change,
+    // not a test change.
+    test.skip(true, 'Hover-prefetch network observability suppressed by N2 OnboardingWizard mount-time useEndpoints(); contract locked by web/src/router-loaders.test.ts (loader per route + defaultPreload:intent + defaultPreloadStaleTime:30_000). A "no skeleton" rewrite would be vacuous - see comment.');
 
     // Capture every admin-endpoints request the page sends.
     const requests: string[] = [];

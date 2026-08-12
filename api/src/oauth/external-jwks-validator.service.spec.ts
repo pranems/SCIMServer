@@ -297,14 +297,24 @@ describe('ExternalJwksValidatorService - runtime egress robustness', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2); // 302 + follow (now remembered)
 
     // Revoke the canonical host. The REMEMBERED target must be re-checked, so
-    // NO request may go out to it. (The verify itself still succeeds: the
-    // pre-existing fail-to-stale path returns the keys already fetched while
-    // the host WAS allowed - allowlist revocation does not retroactively
-    // invalidate cached keys. That is existing behaviour, unchanged by W1.3.)
+    // NO request may go out to it.
+    //
+    // W1.4 CHANGED THE OUTCOME HERE (intended, not a regression). This test
+    // used to assert that `verify` still SUCCEEDED, because fail-to-stale
+    // returned the keys fetched while the host was allowed - recorded as the
+    // open question in EXECUTION_ISSUES_AND_RCA.md section 10.2. W1.4 resolves
+    // that question: an allowlist rejection is now explicitly NOT
+    // stale-eligible, while a network failure still is. Keeping the old
+    // behaviour alongside the 10-min -> 24 h TTL raise would have widened the
+    // post-revocation exposure window by 144x.
     await elapse();
     canonicalAllowed = false;
     fetchMock.mockClear();
-    await svc.verify(token, 'https://idp.example.com/keys', { retries: 0 });
+    await expect(
+      svc.verify(token, 'https://idp.example.com/keys', { retries: 0 }),
+    ).rejects.toThrow(/not permitted|allowlist/i);
+    // The property this test has always guarded is unchanged: the remembered
+    // redirect target is re-validated, so no request reaches the revoked host.
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

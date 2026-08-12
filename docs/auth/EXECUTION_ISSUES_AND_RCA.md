@@ -474,6 +474,8 @@ The lesson: when a clean rebuild does not change a failure, do not conclude "the
 
 ### 10.2 Observation (not a defect) - allowlist revocation does not invalidate cached JWKS
 
+> **RESOLVED 2026-08-05 in W1.4** (v0.55.5). The recommended middle option below was taken: an SSRF/allowlist rejection is now raised as a distinct `JwksHostNotPermittedError` and is explicitly **not stale-eligible**, while a network failure still is. Nothing is purged, so the availability property for real outages is unchanged, and the post-revocation window is closed. The pre-existing W1.3 test that asserted the opposite ("the verify itself still succeeds") was updated in the same commit with the reasoning recorded inline. See [W1_4_JWKS_CACHE_CADENCE.md](W1_4_JWKS_CACHE_CADENCE.md) section 4.2. The original text is kept below because the decision - and why it was deferred rather than fixed on the spot - is the useful part.
+
 While writing the W1.3 re-validation test, the harness surfaced this existing behaviour: if a host
 is removed from `JWKS_HOST_ALLOWLIST` **after** its keys were cached, `verify()` still succeeds
 until the cache entry ages out. The remembered redirect target IS re-validated - no request is
@@ -590,6 +592,193 @@ Both High-severity entries are **false signals rather than product defects**: a 
 | I-30 | Stage 4.4 (deploy negative control) | Stage 0 (when `9z-CD` was authored) | **one full item** | The section was written, reviewed, run green locally and run green on dev before anyone asked what would happen if the feature were absent. Only building a deliberate pre-deploy negative control - running the assertions against the OLD build - exposed that four of them passed there too. |
 
 **Headline.** Five of six issues were caught by the earliest gate capable of catching them. The exception, **I-30, escaped a full item** - it was found only when a deliberate pre-deploy negative control ran the new assertions against the OLD build. That technique is the cheap, general detector for vacuous tests and is now the recommended step before any deploy that claims to add a feature: **run the new assertions against the previous build; anything that still passes is not testing the change.** The three High-severity entries share one shape - all would have survived a summary-level reading (a suite total, a printed version line, a green section). Dispositions: **(a) applied** for I-26 (the live runner asserts the served version) and I-30 (controls T8/T9 added); **(c) accepted** for the rest, where existing rules and gates behaved as designed.
+
+---
+
+## 10B. Wave 1 addendum III - Playwright skip elimination (2026-08-05)
+
+Scope: no production code. A sweep to remove skipped browser tests before starting W1.4, which turned up two latent cross-spec races and one class of vacuous assertion that no gate could see.
+
+**Outcome: 207 passed / 13 skipped / 0 failed -> 218 passed / 2 skipped / 0 failed.**
+
+| # | Type | Severity | One-line symptom |
+|---|---|---|---|
+| I-31 | Test correctness | **High** | 8 specs skipped with "Tenant has zero endpoints" against a tenant serving 58 |
+| I-32 | Test harness / concurrency | **High** | Two specs failed intermittently because another spec's fixture became "the first endpoint" and was then deleted |
+| I-33 | Test correctness | Medium | Assertions wrapped in `if (count > 0)` passed having asserted nothing |
+| I-34 | Test correctness | Medium | A data-dependent skip meant the "Additional attributes" assertions never ran on dev |
+
+```mermaid
+pie showData
+    title 10B issues by severity
+    "High" : 2
+    "Medium" : 2
+```
+
+### 10B.1 I-31 - `.count()` is not a readiness signal (High)
+
+**Symptom.** `export.spec.ts` reported "No endpoints available on this environment"; seven `wif-credentials.spec.ts` tests and several others reported "Tenant has zero endpoints." Dev was serving 58 endpoints throughout.
+
+**Root cause.** The guard was `test.skip((await cards.count()) === 0, ...)` executed right after `waitForLoadState('networkidle')`. Playwright's `.count()` is a **snapshot, not an auto-waiting assertion**, and on a SPA `networkidle` settles before React commits the grid. The predicate therefore read `0` for a reason that was never true, and the tests had been dead for as long as the guard had existed. Nothing surfaced it because a skip is reported as a non-failure.
+
+**Fix.** Preconditions are now created rather than detected - see 10B.5. Where a readiness wait is still wanted, it is `await expect(locator).toBeVisible()`, which auto-waits.
+
+**Why the fix works.** It removes the predicate entirely instead of tuning it. There is no timing window left to lose.
+
+**Prevention.** Standing rule added to CHANGELOG and the fixture module's header: **`.count()` is never a valid readiness signal in a guard.** Any conditional skip whose predicate depends on ambient environment data is a dead test waiting to happen.
+
+### 10B.2 I-32 - "the first endpoint" is a shared mutable resource (High)
+
+**Symptom.** During a full parallel run, `credential-secret-visibility.spec.ts` timed out at 30s and two `discovery-explorer.spec.ts` tests failed with `discovery-spc-section` / `discovery-resourcetypes-section` not found. Each passed in isolation.
+
+**Root cause.** The admin endpoint list is ordered **`createdAt DESC`**. Several specs create a fixture endpoint, so a fixture becomes **"the first endpoint"** the instant it is created - and is deleted at that spec's cleanup. Any concurrently-running spec that bound to "the first card" was pointing at a resource with a foreign, short lifetime. This was **latent before this change** (specs creating endpoints already existed); increasing fixture usage raised the collision rate enough to make it visible.
+
+**Fix.** No spec binds to "the first endpoint" any more. Each creates its own and addresses it by id - including `discovery-explorer`, which now selects `discovery-primary-option-<its own id>` rather than `.first()`.
+
+**Why the fix works.** It removes the shared resource. Two specs can no longer name the same endpoint.
+
+**Prevention.** The shared fixture module is the sanctioned way to obtain an endpoint, and its header documents the ordering hazard so the pattern is not reintroduced.
+
+### 10B.3 I-33 - conditionally-vacuous assertions (Medium)
+
+**Symptom.** None - that is the point. `credential-reveal.spec.ts` reported PASS.
+
+**Root cause.** Its body was `if ((await moreButtons.count()) > 0) { ...assert... }`. On an endpoint with no per-endpoint credential the test asserted nothing and still passed. This is functionally a skip that does not even produce a skip line, so it is invisible in the summary.
+
+**Fix.** Fixture seeds a bearer credential; the conditionals became `await expect(...)`. A `toBeGreaterThan(0)` non-vacuity check was added where the original compared two counts (`0 === 0` used to pass).
+
+**Prevention.** Reinforces R10: an assertion guarded by a data-dependent condition is not coverage. Count-vs-count assertions need an accompanying non-zero check.
+
+### 10B.4 I-34 - hunting ambient data for a test subject (Medium)
+
+**Symptom.** `copy-and-truncate.spec.ts` skipped with "User ... has none of [name, emails, externalId, enterprise]".
+
+**Root cause.** The spec listed the tenant's endpoints, probed the first 25 for a user with a `userName` >= 40 chars, then required that user to also carry enrichment attributes. Two independent ambient-data lotteries; the second lost on every dev run, so the R1 truncation and drawer assertions never executed there.
+
+**Fix.** The fixture seeds exactly the user required - Entra-shaped, >= 40 chars, with `name`/`emails`/`externalId`/enterprise - and the spec asserts `userName.length >= 40` so a future shortening cannot silently disarm the truncation check.
+
+**Prevention.** Same rule as I-31: construct the precondition. Also removes 25 endpoint probes per test run.
+
+### 10B.5 The shared fix
+
+[web/e2e/endpoint-fixture.ts](../../web/e2e/endpoint-fixture.ts) - `createFixtureEndpoint`, `createFixtureEndpointWithUsers`, `deleteFixtureEndpoint`, `openCredentialsTab`. A spec that needs an endpoint in a particular shape creates one in that shape and deletes it afterwards.
+
+One non-obvious detail worth recording: **credential cards are filtered by the ACTIVE method sub-tab**, and each tab is gated by its own flag (`WifCredentialsEnabled`, `SecretTokenBearerAuthEnabled`, `OAuthClientCredentialsAuthEnabled`, `SharedSecretBearerAuthEnabled`, per `enabledMethodTabs()` in `CredentialsTab.tsx`). Enabling the flag alone is insufficient - the fixture must also select the tab, or the seeded credential is filtered out of view. The default tab is the first non-`shared_secret` method, so a WIF-enabled fixture lands on `wif` and a bearer credential is invisible until `bearer` is clicked.
+
+### 10B.6 A rejected "fix"
+
+`router-behavior.spec.ts` carried an unconditional `test.skip(true, ...)` with a suggested rewrite: assert no loading skeleton appears between click and page render. On inspection this would be **vacuous** - N2's `OnboardingWizard` calls `useEndpoints()` on every route mount, so the data is cached whether or not hover-prefetch works, and the assertion would pass either way. It was rejected and the reasoning written into the spec so it is not attempted again. The skip stays, with its real coverage (`router-loaders.test.ts` asserting a loader per route, `defaultPreload: 'intent'`, `defaultPreloadStaleTime: 30_000`) named in the skip message.
+
+**A test that cannot fail for the reason it claims to test is worse than no test**, because it consumes the budget that would otherwise fund real coverage.
+
+### 10B.7 Escape analysis
+
+| Issue | Caught by | Earliest gate that could have | Escape delta | Note |
+|---|---|---|---|---|
+| I-31 | Manual skip audit | Stage 5.3, any run | **months** | No gate reads skip *reasons*. A skip is scored as a non-failure, so 8 dead tests sat inside a green suite indefinitely. |
+| I-32 | Stage 5.3 full parallel run | Stage 5.3, any parallel run | **latent, intermittent** | Failed only under concurrency and passed in isolation, so it read as flake. Attribution required noticing the `createdAt DESC` ordering. |
+| I-33 | Manual audit of the same specs | Stage 5.3 | **months** | Produced neither a failure nor a skip line. Strictly invisible to any summary. |
+| I-34 | Stage 5.3 skip audit | Stage 5.3, any run | **months** | Same blind spot as I-31. |
+
+**Headline.** All four escaped for one shared reason: **the gate scored the suite, not the coverage.** 13 skips and an unknown number of vacuous conditionals were compatible with "0 failed" and were therefore reported as success. This is R10 ("presence is not correctness") applied to the test suite itself - the suite's own green is a presence signal, and the outcome that matters is whether each test can actually fail. Dispositions: **(a) applied** for all four in this commit chain; the skip-reason audit is now a standing step whenever the Playwright suite is run against dev.
+
+---
+
+## 10C. Wave 1 addendum IV - W1.4 JWKS cache cadence (2026-08-05)
+
+Scope: the cache redesign (24 h TTL + background refresh + rate-limited unknown-`kid` + hard stale ceiling + `Cache-Control`). Three issues, all Low-to-Medium, and one of them is a **method success** rather than a defect - it is recorded because the method is the reusable part.
+
+| # | Type | Severity | One-line symptom |
+|---|---|---|---|
+| I-35 | Test correctness (method success) | Medium | A live assertion looked like feature evidence but passed against a build without the feature |
+| I-36 | Framework surprise | Low | Two pre-existing tests failed because W1.4 deliberately changed the behaviour they encoded |
+| I-37 | Test harness | Low | Widening a shared interface broke unrelated spec fixtures at compile time |
+| I-38 | Test isolation | Medium | Nine live assertions passed on dev and local only because each environment carried leftover state |
+
+```mermaid
+pie showData
+    title 10C issues by severity
+    "Medium" : 2
+    "Low" : 2
+```
+
+### 10C.1 I-35 - the negative control worked, and reclassified an assertion (Medium)
+
+**Symptom.** Not a failure. Following the I-30 rule ("run the new assertions against the previous build before deploying; anything that still passes is not testing the change"), the `9z-CE` assertions were run against dev at 0.55.3, which contains no W1.4. Measured:
+
+| Assertion | Against a build WITHOUT W1.4 | Verdict |
+|---|---|---|
+| T1-T3 round-trip | PASS | not testing W1.4 |
+| T5 bounds rejections | **FAIL** (0 of 6) | load-bearing |
+| T7 24 h ceiling accepted | **PASS** | **reclassified** |
+| T8 unregistered round-trip | PASS | control, as designed |
+
+**Root cause of the finding.** `T7` asserts `JwksCacheMaxAgeMs` accepts `86400000`. That was already true before W1.4 - the key and its 24 h ceiling both predate this item; W1.4 raises the **default** to the ceiling, it does not create the ceiling. Written without the control, `T7` would sit in the suite looking like evidence the feature shipped.
+
+**Fix.** `T7` is relabelled in the suite itself as `(regression guard, not W1.4-discriminating)`, with the measurement and date in the comment above it. It is kept, because "the raise did not break the ceiling" is worth locking - it is just not proof of delivery.
+
+**Why this matters.** I-30 was found by accident. This time the control was run deliberately, cost about a minute, and reclassified an assertion **before** it could mislead a future reader. The technique generalises past config: **the cheapest way to find out what a test is testing is to run it against a build that lacks the feature.**
+
+**Prevention.** Already a standing rule from I-30. This run is the evidence that it pays for itself; the addition here is that the OUTCOME of the control belongs in the suite as a label, not just in a commit message.
+
+### 10C.2 I-36 - two pre-existing tests encoded the behaviour W1.4 changes (Low)
+
+**Symptom.** After implementing, `external-jwks-validator.service.spec.ts` failed with `JwksHostNotPermittedError` where it expected success, and the W1.3 test comment read: *"The verify itself still succeeds ... allowlist revocation does not retroactively invalidate cached keys. That is existing behaviour, unchanged by W1.3."*
+
+**Root cause.** Not a regression - the opposite. That test faithfully encoded the RCA 10.2 open question, and W1.4 exists partly to resolve it. The failure is the test doing its job: a deliberate behaviour change should break the test that pinned the old behaviour.
+
+**Fix.** Updated the assertion to expect rejection, and replaced the comment with an explanation of *why* the outcome changed, pointing at RCA 10.2. The property the test has always really guarded - that no request reaches the revoked host - is asserted unchanged.
+
+**Why the fix works.** It keeps the test's original purpose intact while re-pointing the outcome at the new, deliberate contract, and leaves a reader able to reconstruct the decision without archaeology.
+
+**Prevention.** Convention, stated: when a change makes an existing test fail *by design*, the update MUST record the intent inline. A silently "fixed" assertion is indistinguishable from a bug being papered over - the same reasoning as R3 for visual-regression baselines.
+
+### 10C.3 I-37 - widening a shared interface broke unrelated fixtures (Low)
+
+**Symptom.** `egress-policy.spec.ts` failed to compile: `Type '{...}' is missing the following properties from type 'EgressPolicy': refreshIntervalMs, unknownKidMinIntervalMs, staleIfErrorMs`. A `toEqual` on a fully-resolved policy also failed with three unexpected keys.
+
+**Root cause.** `EgressPolicy` is a fully-concrete interface (every field required, by design - it is the resolved policy). Adding a field is therefore a breaking change for every object literal typed as one, including test fixtures. Two fixtures plus one exhaustive `toEqual` were affected.
+
+**Fix.** Added the three fields to both fixtures and extended the `reads each env var` test to actually exercise the three new env vars rather than just satisfying the type.
+
+**Why the fix works.** The exhaustive `toEqual` is the feature, not the friction: it is what guarantees a new policy field cannot be added without a test acknowledging it. Loosening it to `toMatchObject` would remove the only thing that noticed.
+
+**Prevention.** Keep the exhaustive assertion. Note for future policy additions: expect exactly three edits - the two fixtures and the env-var test - and treat a fourth failure as a real finding.
+
+### 10C.4 I-38 - nine live assertions passed only on environments carrying leftover state (Medium)
+
+**Symptom.** The suite reported **1401/1401 on Azure dev** and **1401/1401 on a local node**, then **1396/1401 on Docker** against a fresh database. Failures: `9z-AV.T7/T8`, `9z-BK.T2-T4`, `9z-BE.T1-T4` - all WIF-verify assertions against a real Entra tenant.
+
+**First hypothesis, wrong.** Container egress. Disproved directly: `docker exec ... wget https://login.microsoftonline.com/common/discovery/v2.0/keys` returned a key set. The container's network was fine.
+
+**Root cause.** The affected sections verify against the **legacy** Entra JWKS host `https://login.windows.net/...`, which is deliberately **not** in the well-known seed allowlist (the seed carries `login.microsoftonline.com` and five siblings). Each environment satisfied the precondition by accident, differently:
+
+| Form factor | Why it passed / failed |
+|---|---|
+| Azure dev | `login.windows.net` was sitting in the **persisted** allowlist, left by an earlier run |
+| Local node | The runner had been started with `JWKS_HOST_ALLOWLIST='login.microsoftonline.com,login.windows.net'` - the env satisfied it |
+| Docker, fresh volume | Neither. Seed only. **SSRF rejection, as designed.** |
+
+So the assertions were not testing what they appeared to test on two of three form factors: they depended on ambient state rather than creating their precondition.
+
+**Confirmed pre-existing, not a W1.4 regression.** The identical suite was run against the **previous published image (0.55.3)** on a fresh volume and produced the **same failure set**; a set-difference of the two runs reported `none - every 0.55.5 failure also fails on 0.55.3`. This is the same negative-control technique as I-30/I-35, pointed at a regression question instead of a coverage question.
+
+**Fix.** New `Ensure-JwksHostAllowed` helper in [live-test.ps1](../../scripts/live-test.ps1), called by `9z-AV` and `9z-BK` before they use the legacy host. It is idempotent - it reads the effective allowlist first and only POSTs when the host is missing - so it is a no-op on an environment that already has it.
+
+**Why the fix works.** It makes the precondition true **by construction** instead of hoping the environment provides it. Proven non-vacuously: the local node was restarted with `JWKS_HOST_ALLOWLIST='login.microsoftonline.com'` **only**, verified via the API that `login.windows.net` was absent at start, and the suite then passed **1401/1401**. All three form factors are now green from a cold state.
+
+**Prevention.** This is the live-test analogue of the Playwright defect fixed in the same session (10B): **a test that depends on ambient environment state is a test that will pass or fail for reasons unrelated to the code.** The general rule now applies at both layers - construct the precondition, or assert loudly that it is missing; never let the environment silently supply it. Corollary learned here: **three green form factors are not three independent confirmations if each is green for a different accidental reason.** A fresh-volume run is the only one that tests the cold path.
+
+### 10C.5 Escape analysis
+
+| Issue | Caught by | Earliest gate that could have | Escape delta | Note |
+|---|---|---|---|---|
+| I-35 | Stage 4 negative control (deliberate) | same | **none** | The rule from I-30 fired as intended, pre-deploy, and improved the suite rather than catching a defect. This is what a self-improving gate looks like when it is working. |
+| I-36 | Stage 2 (API unit) | same | none | Immediate and unambiguous. |
+| I-37 | Stage 1 (tsc build) | same | none | Compile-time, by construction. |
+| I-38 | Stage 4.2 (Docker, fresh volume) | Stage 4.2, any run on a clean DB | **long-standing** | Invisible on dev and on the local node because each satisfied the precondition accidentally. Only a cold, stateless form factor could expose it - which is precisely the argument for keeping all three in the matrix rather than treating dev as representative. |
+
+**Headline.** Zero regressions from W1.4 itself. The two notable entries are process wins: **I-35**, where a rule added after an earlier escape (I-30) paid for itself on the very next item by reclassifying a mislabelled assertion before it became folklore; and **I-38**, where running the *same* suite against the *previous image* answered "is this mine?" definitively in about two minutes instead of by argument. Dispositions: **(a) applied** for all four in this commit chain.
 
 ---
 

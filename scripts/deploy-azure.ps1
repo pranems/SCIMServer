@@ -15,7 +15,7 @@ param(
     # Optional: deploy PostgreSQL to a different region (some subscriptions restrict PG in eastus)
     [string]$PgLocation,
     # Override container registry (default: ghcr.io with repository pranems/scimserver)
-    # Example: -AcrLoginServer 'acrscimserver20622.azurecr.io' -ImageRepository 'scimserver'
+    # Example: -AcrLoginServer 'acrscimsrv09.azurecr.io' -ImageRepository 'scimserver'
     [string]$AcrLoginServer,
     [string]$ImageRepository,
     # Override PG server name (PG server names are globally unique on Azure; if the default '<appname>-pg' is taken,
