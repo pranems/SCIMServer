@@ -423,6 +423,12 @@ The `SCIMServer-Calmsand-*` names are misleading. They live in **tenant 08** and
 
 Note that `SCIMServer-Calmsand-WIF` has **zero federated identity credentials**. The WIF proof works by acquiring a normal client-credentials token from tenant 08 and presenting it to SCIMServer as an assertion. That means recreating it requires an app registration **plus a client secret**, not a federated credential.
 
+**Recreation is scripted, not manual: [scripts/setup-auth-proof-apps.ps1](../scripts/setup-auth-proof-apps.ps1).** These identities live in the directory rather than in the database, so `rotate-tenant-data.ps1` cannot carry them and they must be rebuilt at every rollover - which makes this a recurring task worth automating. The script creates all three with client secrets, is idempotent (it reuses an app that already exists), and writes the results to `~/.scimserver-deploy/<tenant>-authproofs.json`, outside the repository because the file holds secrets.
+
+It requires an **interactive user sign-in** (`Connect-ScimUser -Name proviam09`) and refuses to run without one. The deployment service principal cannot do this job: it is scoped as an Azure RBAC Contributor with no Microsoft Graph application permissions, so `az ad app create` returns `Insufficient privileges to complete the operation`. Creating an app registration needs a user holding the Application Developer or Application Administrator directory role.
+
+The new names are **generation-free** - `SCIMServer-Proof-WIF`, `SCIMServer-Proof-OAuth2Creds`, `SCIMServer-Proof-SecretToken`. The old ones encoded `Calmsand`, an estate they never belonged to, and this is the same class of defect as gap **G15**: a name that encodes a fact which expires.
+
 **Subscription role assignments** (tenant 08, shows this is a shared team tenant):
 
 | Role | Principal | Scope |

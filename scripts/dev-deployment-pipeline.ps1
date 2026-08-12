@@ -77,10 +77,10 @@
     needs an explicit operator go-ahead after the canary is green.
 
 .PARAMETER CanaryResourceGroup
-    Resource group of the auto-canary prod (default: scimserver-prod / proudbush).
+    Resource group of the auto-canary prod (default: scimserver-prod / purplecliff).
 
 .PARAMETER CanaryAppName
-    Container App name of the auto-canary prod (default: scimserver / proudbush).
+    Container App name of the auto-canary prod (default: scimserver / purplecliff).
 
 .PARAMETER DryRun
     Print plan only; do not execute.
