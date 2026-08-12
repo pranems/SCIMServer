@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-07 - **Product version:** `0.55.3`
+> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.3`
 
 > Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
 
@@ -69,6 +69,10 @@ Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-Database
 > **PostgreSQL required (Phase 3):** SCIMServer uses PostgreSQL as its persistence backend. Provide either `-DatabaseUrl "postgresql://..."` (existing server) or `-ProvisionPostgres` (the script will deploy an Azure Database for PostgreSQL Flexible Server via `infra/postgres.bicep`, ~$15-25/mo additional).
 
 > The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). **Store each value securely** - they are not stored anywhere else.
+
+> **Required PostgreSQL extensions - matters most if you bring your own server.** SCIMServer's baseline migration needs `CITEXT`, `PG_TRGM` and `PGCRYPTO`. On Azure Database for PostgreSQL these must additionally be named in the **`azure.extensions`** server parameter, which is *static* and needs a server restart to take effect. `-ProvisionPostgres` handles this for you; with `-DatabaseUrl` pointing at your own server, **you must do it yourself** - otherwise the migration fails with Prisma **P3009** and the container crash-loops on its startup probe, which reads as an app fault rather than a database one.
+>
+> The script allow-lists a fourth, `UUID-OSSP`, which the migration does **not** need. It is there so a server can *receive* a `pg_dump` from an older estate that has it: such a dump emits `CREATE EXTENSION "uuid-ossp"`, and Azure rejects that statement outright if the extension is not allow-listed on the target. Provisioning the superset means any estate can restore into any other.
 
 ### Quick Log Access (after deploy)
 

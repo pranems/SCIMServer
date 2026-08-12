@@ -1,6 +1,6 @@
 # Azure Deployment & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-07 - **Product version:** `0.55.3`
+> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.3`
 
 > **Version:** 0.55.3 - **Updated:** June 3, 2026  
 > **Source of truth:** [deploy.ps1](../deploy.ps1), [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), [infra/](../infra/)
@@ -131,7 +131,7 @@ flowchart TD
     C --> D[Create Resource Group]
     D --> E{ProvisionPostgres?}
     E -->|Yes| F[Deploy PostgreSQL Flexible Server<br>via postgres.bicep]
-    F --> G[Create Database + Extensions]
+    F --> G["Create Database + allow-list azure.extensions<br>CITEXT, PG_TRGM, PGCRYPTO, UUID-OSSP<br>then restart the server"]
     E -->|No| H[Use Existing DATABASE_URL]
     G --> I[Deploy Container App Environment<br>via containerapp-env.bicep]
     H --> I
