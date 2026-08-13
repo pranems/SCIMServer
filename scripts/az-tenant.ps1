@@ -231,6 +231,13 @@ function Set-ScimAzExtensionDir {
         Sharing the directory is safe: extensions are tenant-agnostic code, not
         credentials. Only the auth state under the profile directory must stay
         isolated, and that is unaffected.
+
+        DO NOT call this for an INTERACTIVE (user) profile. `az login` loads the
+        FULL command table and reads every extension's metadata, which on this
+        machine fails with `[WinError 5] Access is denied` on azure-devops.
+        Lazily-loaded commands such as `containerapp` never read it, so the
+        shared directory helps the automation profile and breaks the user one.
+        Measured 2026-08-13.
     #>
     [CmdletBinding()] param()
     $shared = Join-Path $HOME '.azure\cliextensions'
@@ -342,7 +349,15 @@ function Connect-ScimUser {
 
     $dir = if ($Entry.UserConfigDir) { $Entry.UserConfigDir } else { $Entry.ConfigDir }
     $env:AZURE_CONFIG_DIR = $dir
-    Set-ScimAzExtensionDir
+    # Deliberately do NOT share the extension directory here - see
+    # Set-ScimAzExtensionDir. `az login` loads the FULL command table, which
+    # reads every installed extension's metadata, and on this machine that
+    # fails with `[WinError 5] Access is denied` on the azure-devops extension's
+    # dist-info. Lazily-loaded commands like `containerapp` never touch it, so
+    # the shared directory is safe for the automation profile and unsafe here.
+    # Nothing this profile does needs an extension: `az login` and `az ad` are
+    # both core commands.
+    $env:AZURE_EXTENSION_DIR = $null
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
@@ -355,6 +370,14 @@ function Connect-ScimUser {
 
     Write-Host "Signing into $($Entry.Name) as a user (tenant $($Entry.Tenant))..." -ForegroundColor Cyan
     if ($DeviceCode) {
+        # WARNING: device-code sign-in is BLOCKED by Conditional Access in the
+        # Microsoft corporate tenants this project uses. It fails with
+        # AADSTS530035 even for a Global Administrator on a Compliant device,
+        # because the policy blocks the FLOW, not the user - device code is a
+        # well-known phishing vector. Measured 2026-08-13. Prefer the default
+        # browser flow, which satisfies device-based CA precisely because the
+        # machine is compliant. Keep this switch only for a genuinely headless
+        # host, where it will need a CA exclusion to work at all.
         az login --tenant $Entry.Tenant --use-device-code --output none
     } else {
         az login --tenant $Entry.Tenant --output none
