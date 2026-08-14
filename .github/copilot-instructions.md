@@ -630,6 +630,16 @@ pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app> -Keep 2
 
 There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update incorrectly marked calmsand as RETIRED; it is in fact the customer-facing prod and was just promoted to v0.52.3 alongside the proudbush instance.
 
+**CANONICAL SOURCE (added 2026-08-13): [scripts/scim-estates.json](scripts/scim-estates.json).** The table below is a human-readable snapshot; the registry is what tooling reads, and it is keyed by **role** (`active` / `next` / `retiring` / `permanent` / `trial`) rather than by name. **Prefer resolving an estate over hardcoding one:**
+
+```powershell
+. ./scripts/scim-estates.ps1
+Show-ScimEstates                        # every tenant + estate, names AND ids, no Azure calls
+Get-ScimEstateBaseUrl -Purpose dev      # FQDN DERIVED from ARM, never stored
+```
+
+**Never add a new hardcoded FQDN, tenant id or subscription id to a script, gate, prompt or spec.** The dev + canary estates sit on an ephemeral tenant that expires roughly every 80 days; the 2026-08-12 rollover needed 97 replacements across 28 files and that bulk edit corrupted the tenant map itself (it rewrote the retiring tenant's ids to the new tenant's, which no gate could catch). Resolve from the registry instead. Azure assigns the environment domain at creation, so a stored FQDN is a value guaranteed to become false.
+
 | Environment | App Name | Resource Group | Subscription | OAuth Secret | SCIM Shared Secret (E2E_TOKEN) | FQDN | Container Registry |
 |---|---|---|---|---|---|---|---|
 | **Prod (CUSTOMER-FACING)** | `scimserver-prod` | `scimserver-rg-prod` | `AnandSa-Test-150` | `changeme-oauth` | `changeme-scim` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | `ghcr.io/pranems/scimserver` (anonymous pull) |
@@ -667,6 +677,20 @@ There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update i
   az account set --subscription AnandSa-Test-150
   pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag <version> -Subscription AnandSa-Test-150
   ```
+
+### Ephemeral Tenant Rollover Rule (CRITICAL - added 2026-08-13)
+
+Origin: two completed cross-tenant migrations, 2026-05-19 (07 -> 08) and 2026-08-12 (08 -> 09). The dev + canary-prod estates live on an **ephemeral** Azure AD tenant that expires roughly every 80 days, so this is a **scheduled recurring operation**, 4 to 5 times a year, not an incident. Full comparison and learnings: [docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md](docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md).
+
+1. **Capture the data-plane connection strings BEFORE anything else, and store them outside the tenant.** Subscription expiry kills the **ARM control plane** but NOT the **PostgreSQL data plane**. On 2026-08-11 the source tenant's ARM expired mid-migration; recovery was possible only because the connection strings had already been captured. Every other step can be retried; this one cannot be recovered.
+2. **Carry the DATABASE, not the SCIM API.** API replay (`migrate-old-prod.ps1`) re-creates rather than copies: the target mints new primary keys so every resource id changes, and it structurally cannot carry credential `secretEnvelope`s, DEKs, the JWKS host allow-list or server settings. Use [scripts/rotate-tenant-data.ps1](scripts/rotate-tenant-data.ps1) via [scripts/replicate-estate.ps1](scripts/replicate-estate.ps1).
+3. **Verify SERVER-LEVEL state explicitly.** Resource counts, id checks and per-endpoint surface walks are **resource-shaped** and cannot see a singleton. On 2026-08-12 all 58 endpoints x 6 surfaces passed while the JWKS host allow-list had silently reverted to its seed. Compare against the SOURCE when it is reachable; comparing a target's effective list to its own seed stops discriminating once the seed catches up.
+4. **Provision the extension SUPERSET** `CITEXT,PG_TRGM,PGCRYPTO,UUID-OSSP`. `pg_dump` of a source that has an extension emits `CREATE EXTENSION`, which Azure rejects against a target that omits it - and because two sources can differ, this presents as an environment-specific fault when it is data-specific.
+5. **A cutover is a ROLE REASSIGNMENT, never a find-and-replace.** `Set-ScimEstateRole -TenantKey <new> -Role active`. Bulk identity replaces are forbidden: the 2026-08-12 one corrupted [scripts/az-tenant.ps1](scripts/az-tenant.ps1) itself by rewriting the retiring tenant's ids to the new tenant's, and no gate could catch it.
+6. **Prove the tool on a THROWAWAY estate (`role: trial`) before pointing it at dev or prod.** A migration tool that has only ever run once, under pressure, on the estate that matters is not proven.
+7. **Rebuild the directory objects; they are not in the database.** [scripts/grant-deploy-sp-directory-access.ps1](scripts/grant-deploy-sp-directory-access.ps1) once per tenant (one privileged sign-in, browser flow - **device code is blocked by Conditional Access**, AADSTS530035, even for a Global Administrator on a compliant device), then [scripts/setup-auth-proof-apps.ps1](scripts/setup-auth-proof-apps.ps1) non-interactively.
+8. **Use generation-free names.** `acrscimsrv09` and `scimserver-pg-09` encode a tenant generation that expires; a name encoding a fact with a shelf life is a scheduled defect.
+9. **Write the RCA ledger as you go**, per the Execution Issue RCA Ledger rule, and compare the run against its predecessors in [docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md](docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md). Only 1 of run 1's 8 issues recurred, and it was the one fixed in prose rather than in a script - **a fix carries forward only if it is structural.**
 
 ### Deployment Topology (HISTORICAL - retired)
 
