@@ -87,6 +87,9 @@ function Test-ScimEstateRegistry {
           R6 customer-prod is on a 'permanent' tenant and is never 'active'
           R7 NO estate stores an FQDN or a bare environment domain - the whole
              point of the file
+          R8 every estate declares revisionKeep >= 1; anything BELOW the default
+             of 2 gives up its rollback target, so it must justify itself in a
+             revisionKeepRationale and may only be a customer-prod estate
     #>
     [CmdletBinding()] param([string]$Path, [switch]$Quiet)
 
@@ -128,6 +131,36 @@ function Test-ScimEstateRegistry {
         # Allowed only inside the $comment block, where the whole point is to
         # explain the rule using real examples.
         $failures += "R7 registry contains an FQDN '$($m.Value)'. FQDNs are DERIVED from ARM, never stored."
+    }
+
+    # R8 - revision retention. Keeping fewer than 2 active revisions halves an
+    # estate's always-on compute and REMOVES its instant-rollback target. That
+    # is a legitimate trade for a cost-constrained estate, but it must be a
+    # DECLARED one: an undocumented 1 is indistinguishable from a typo, and a
+    # typo here silently deletes the rollback path of whichever estate it lands
+    # on. So the exception has to name its reason and may only apply to
+    # customer-prod, the one estate that is never auto-promoted.
+    foreach ($e in $reg.estates) {
+        $keep = $e.revisionKeep
+        if ($null -eq $keep) {
+            $failures += "R8 estate '$($e.id)' does not declare revisionKeep"
+            continue
+        }
+        # ConvertFrom-Json yields Int64 for whole numbers, so a `-is [int]`
+        # (Int32) test rejects every valid value. Parse instead of type-test.
+        $keepInt = 0
+        if (-not [int]::TryParse([string]$keep, [ref]$keepInt) -or $keepInt -lt 1) {
+            $failures += "R8 estate '$($e.id)' has revisionKeep '$keep'; it must be an integer >= 1"
+            continue
+        }
+        if ($keepInt -lt 2) {
+            if ($e.purpose -ne 'customer-prod') {
+                $failures += "R8 estate '$($e.id)' (purpose '$($e.purpose)') sets revisionKeep $keepInt; only a customer-prod estate may drop below 2"
+            }
+            if ([string]::IsNullOrWhiteSpace($e.revisionKeepRationale)) {
+                $failures += "R8 estate '$($e.id)' sets revisionKeep $keepInt but carries no revisionKeepRationale; giving up the rollback target must be justified in the registry"
+            }
+        }
     }
 
     if ($failures.Count -gt 0) {
@@ -185,6 +218,67 @@ function Get-ScimEstate {
         throw "Purpose '$Purpose' with role '$wantRole' matched $($hit.Count) estates. Fix scripts/scim-estates.json."
     }
     return $hit[0]
+}
+
+function Get-ScimEstateRevisionKeep {
+    <#
+        How many ACTIVE Container Apps revisions this estate retains after a
+        deploy. Read from the registry so the policy lives in ONE place: a
+        number copied into each deployment flow is a number that drifts, and
+        the drift is invisible until an estate is quietly paying for revisions
+        nobody kept on purpose.
+
+        Resolve by -Purpose (preferred), by -Id, or by the -AppName /
+        -ResourceGroup pair that the deployment scripts already carry.
+
+        Falls back to the SAFE default of 2 when the estate cannot be resolved.
+        Failing safe here means keeping a rollback target we did not strictly
+        need; failing unsafe would mean deleting one we did.
+    #>
+    [CmdletBinding(DefaultParameterSetName = 'ByPurpose')]
+    param(
+        [Parameter(ParameterSetName = 'ByPurpose', Mandatory)]
+        [ValidateSet('dev', 'canary-prod', 'customer-prod')]
+        [string]$Purpose,
+
+        [Parameter(ParameterSetName = 'ById', Mandatory)]
+        [string]$Id,
+
+        [Parameter(ParameterSetName = 'ByApp', Mandatory)]
+        [string]$AppName,
+        [Parameter(ParameterSetName = 'ByApp', Mandatory)]
+        [string]$ResourceGroup,
+
+        [string]$Path
+    )
+
+    $default = 2
+    try {
+        $estate = switch ($PSCmdlet.ParameterSetName) {
+            'ByPurpose' { Get-ScimEstate -Purpose $Purpose -Path $Path }
+            'ById' { Get-ScimEstate -Id $Id -Path $Path }
+            'ByApp' {
+                $reg = Get-ScimEstateRegistry -Path $Path
+                $hit = @($reg.estates | Where-Object { $_.appName -eq $AppName -and $_.resourceGroup -eq $ResourceGroup })
+                # An app+rg pair is NOT unique: the retiring tenant reuses both
+                # names, so 'scimserver / scimserver-prod' matches two estates
+                # whose policies could differ. Prefer the one a deployment could
+                # actually target - a live tenant - and only give up if that is
+                # still ambiguous.
+                if ($hit.Count -gt 1) {
+                    $hit = @($hit | Where-Object { $_.Role -in @('active', 'permanent', 'next') })
+                }
+                if ($hit.Count -ne 1) { $null } else { $hit[0] }
+            }
+        }
+        if (-not $estate) { return $default }
+        # Same Int64-vs-Int32 trap as R8: parse rather than type-test.
+        $keepInt = 0
+        if ([int]::TryParse([string]$estate.revisionKeep, [ref]$keepInt) -and $keepInt -ge 1) { return $keepInt }
+        return $default
+    } catch {
+        return $default
+    }
 }
 
 function Get-ScimEstateFqdn {
@@ -262,6 +356,11 @@ function Show-ScimEstates {
 
         foreach ($e in ($reg.estates | Where-Object { $_.tenantKey -eq $t.key })) {
             Write-Host ("  estate '{0}' [{1}]: app '{2}' in rg '{3}', pg '{4}'" -f $e.id, $e.purpose, $e.appName, $e.resourceGroup, $e.pgServerName)
+            # Surface the retention policy here rather than only in the JSON:
+            # an estate keeping fewer than the default has no rollback target,
+            # and that is worth seeing every time the estates are listed.
+            $keepNote = if ($e.revisionKeep -lt 2) { ' <- NO rollback target (roll forward only)' } else { '' }
+            Write-Host ("      revisions kept: {0}{1}" -f $e.revisionKeep, $keepNote) -ForegroundColor $(if ($e.revisionKeep -lt 2) { 'Yellow' } else { 'DarkGray' })
         }
     }
     Write-Host ""

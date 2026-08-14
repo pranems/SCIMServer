@@ -106,6 +106,50 @@ Assert-Case -Name 'R7 fires: an FQDN stored in the registry' -ExpectValid $false
     param($r) ($r.estates | Where-Object { $_.id -eq 'dev' }) | Add-Member -NotePropertyName fqdn -NotePropertyValue 'scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io' -Force
 }
 
+# ─── R8 - revision retention ──────────────────────────────────────────
+# Dropping below 2 deletes an estate's rollback target. That is a legitimate
+# trade for a cost-constrained estate but a silent disaster as a typo, so the
+# validator insists the exception be declared, justified, and confined to the
+# one estate that is never auto-promoted.
+
+Assert-Case -Name 'R8 fires: estate does not declare revisionKeep at all' -ExpectValid $false -Mutate {
+    param($r) ($r.estates | Where-Object { $_.id -eq 'dev' }).PSObject.Properties.Remove('revisionKeep')
+}
+
+Assert-Case -Name 'R8 fires: revisionKeep below 1 (would prune the serving revision)' -ExpectValid $false -Mutate {
+    param($r) ($r.estates | Where-Object { $_.id -eq 'dev' }).revisionKeep = 0
+}
+
+Assert-Case -Name 'R8 fires: revisionKeep is not an integer' -ExpectValid $false -Mutate {
+    param($r) ($r.estates | Where-Object { $_.id -eq 'dev' }).revisionKeep = 'two'
+}
+
+# The typo case: 1 on an estate that IS auto-promoted, where losing the
+# rollback target is not a trade anyone chose.
+Assert-Case -Name 'R8 fires: keep=1 on a NON customer-prod estate' -ExpectValid $false -Mutate {
+    param($r)
+    $e = $r.estates | Where-Object { $_.id -eq 'canary-prod' }
+    $e.revisionKeep = 1
+    $e | Add-Member -NotePropertyName revisionKeepRationale -NotePropertyValue 'cost' -Force
+}
+
+# The undocumented case: right estate, no stated reason. An unexplained 1 is
+# indistinguishable from a mistake six months later.
+Assert-Case -Name 'R8 fires: keep=1 on customer-prod with NO rationale' -ExpectValid $false -Mutate {
+    param($r) ($r.estates | Where-Object { $_.id -eq 'customer-prod' }).PSObject.Properties.Remove('revisionKeepRationale')
+}
+
+# Positive control for R8: raising customer-prod back to the default must be
+# valid WITHOUT a rationale - the rule constrains the exception, not the norm.
+# Without this, a validator that simply rejected every customer-prod edit would
+# still pass every negative above.
+Assert-Case -Name 'R8 positive: customer-prod back at the default 2 needs no rationale' -ExpectValid $true -Mutate {
+    param($r)
+    $e = $r.estates | Where-Object { $_.id -eq 'customer-prod' }
+    $e.revisionKeep = 2
+    $e.PSObject.Properties.Remove('revisionKeepRationale')
+}
+
 Write-Host ""
 Write-Host ("passed {0}, failed {1}" -f $script:passCount, $script:failCount) -ForegroundColor $(if ($script:failCount) { 'Red' } else { 'Green' })
 if ($script:failCount -gt 0) { exit 1 }

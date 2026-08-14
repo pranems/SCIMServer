@@ -376,10 +376,21 @@ pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppN
 
 **What `-BlueGreen` does.** It pins the current revision (blue) at 100%, creates the new revision (green) at 0%, soaks and verifies green on its own `--green` label FQDN, and only then flips traffic. Any failure rolls back automatically. Customers stay on blue throughout, so a bad image never serves traffic.
 
-**Revision hygiene.** Promotion ends by pruning to the newest **2** revisions - the one serving traffic plus one rollback target. This is not cosmetic: a revision at 0% traffic still runs a replica, and each replica still holds a database connection pool. Left unpruned they exhaust `max_connections` long before anything else complains. A revision serving traffic is never deactivated.
+**Revision hygiene.** Promotion ends by pruning stale revisions. This is not cosmetic: a revision at 0% traffic still runs a replica, and each replica still holds a database connection pool. Left unpruned they exhaust `max_connections` long before anything else complains. A revision serving traffic is never deactivated.
+
+How many to keep is a **per-estate policy** held in `scripts/scim-estates.json`, so the number lives in one place rather than being copied into each caller:
+
+| Estate | Revisions kept | Rollback story |
+|---|---|---|
+| dev | 2 | instant rollback to the previous revision |
+| canary prod | 2 | instant rollback to the previous revision |
+| customer prod | 1 | **roll forward** - re-promote the previous image tag |
+
+Customer prod keeps 1 for cost: its subscription runs on a fixed monthly credit, and a second always-on replica was a significant share of the bill for a rollback path never used there. Because it keeps 1, `promote-to-prod.ps1` prints the roll-forward command rather than an instant-rollback command that would name a revision no longer present.
 
 ```powershell
-pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app> -Keep 2
+# -Keep is resolved from the estate registry when omitted
+pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app>
 ```
 
 Full estate detail, including which registry each environment pulls from and why, is in [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md).

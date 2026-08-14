@@ -40,7 +40,21 @@
     "",
     "SECRETS ARE NOT STORED HERE. Service principal credentials live in",
     "~/.scimserver-deploy/<tenant>.json and auth-proof identities in",
-    "~/.scimserver-deploy/<tenant>-authproofs.json, both outside the repository."
+    "~/.scimserver-deploy/<tenant>-authproofs.json, both outside the repository.",
+    "",
+    "REVISION RETENTION (revisionKeep).",
+    "How many ACTIVE Container Apps revisions each estate retains after a deploy.",
+    "An active revision at 0% traffic is not free: it still runs a replica holding a",
+    "Prisma connection pool. Measured on proudbush 2026-07-31: 13 active revisions,",
+    "12 idle, 65 connections of demand against a max_connections of 50.",
+    "",
+    "The DEFAULT is 2 - the revision serving traffic plus one previous revision as an",
+    "instant rollback target. Dropping to 1 halves the always-on compute for that",
+    "estate and REMOVES the rollback target, so recovery becomes roll-forward only.",
+    "That is a real trade, so any estate below 2 MUST carry a revisionKeepRationale",
+    "and the validator (R8) rejects the registry otherwise. Only a customer-prod",
+    "estate may go below 2, because it is the one estate never auto-promoted - every",
+    "deployment to it is a deliberate, supervised act."
   ],
 
   "version": 1,
@@ -114,6 +128,7 @@
       "location": "eastus",
       "registry": "ghcr.io/pranems/scimserver",
       "registryAuth": "anonymous",
+      "revisionKeep": 2,
       "notes": "The managed environment lives in the OTHER resource group (scimserver-prod) because Azure allows only one Container Apps environment per subscription per region. The app must therefore reference it by full resourceId - passing a bare name only searches the target resource group."
     },
     {
@@ -130,6 +145,7 @@
       "location": "eastus",
       "registry": "ghcr.io/pranems/scimserver",
       "registryAuth": "anonymous",
+      "revisionKeep": 2,
       "notes": "Same tenant as dev, so it can be auto-promoted as a true blue/green canary. Multiple-revision mode."
     },
     {
@@ -146,6 +162,8 @@
       "location": "centralus",
       "registry": "ghcr.io/pranems/scimserver",
       "registryAuth": "anonymous",
+      "revisionKeep": 1,
+      "revisionKeepRationale": "Cost. This estate runs on an MSDN offer with a USD 150/month credit and hit the spending limit on 2026-08-14, which disabled the subscription until the next billing period. An active revision at 0% traffic still runs an always-on replica (0.5 vCPU / 1 GiB), so the second revision was roughly a third of the estate's entire compute bill for a rollback path that has never been exercised here. Keeping 1 removes the instant-rollback target: recovery is ROLL FORWARD - re-run promote-to-prod.ps1 with the previous image tag, which is always available from GHCR. Acceptable specifically here because this estate is never auto-promoted, so every deployment to it is deliberate and supervised, and because the canary prod estate has already proven the same image before it ever reaches this one.",
       "notes": "NEVER auto-promoted. Requires an explicit operator go-ahead and its own az login into the AnandSa tenant."
     },
     {
@@ -162,6 +180,7 @@
       "location": "eastus",
       "registry": "acrscimserver20622.azurecr.io/scimserver",
       "registryAuth": "acr-admin",
+      "revisionKeep": 2,
       "notes": "Still serving on the expired tenant. Read-only in practice: ARM cannot reach it. Retained so its data plane stays addressable."
     },
     {
@@ -178,6 +197,7 @@
       "location": "eastus",
       "registry": "acrscimserver20622.azurecr.io/scimserver",
       "registryAuth": "acr-admin",
+      "revisionKeep": 2,
       "notes": "Still serving on the expired tenant. Same constraints as dev-retiring."
     }
   ]

@@ -614,17 +614,24 @@ When `securityBestPracticesIntake` (X.2) recommends moving any DEFERRED item to 
 
 Origin: 2026-07-31. A routine look at the proudbush canary found **13 ACTIVE revisions, 12 of them serving 0% traffic**, the oldest dating to 2026-05-18. An Azure Container Apps revision at 0% traffic is not free: it still runs a replica, and for this app that replica still holds a **5-connection Prisma pool**. Against a PostgreSQL `max_connections` of 50 that is 65 connections of demand for 50 available. Nothing in the deploy path ever reclaimed them, and no gate looked - the app was healthy, every test was green, and the database was quietly the resource that would run out first.
 
-**The rule.** After EVERY deployment or promotion, prune stale revisions so that only the **newest 2** remain active: the one serving traffic, plus one previous revision as the rollback target. Use [scripts/prune-revisions.ps1](scripts/prune-revisions.ps1).
+**The rule.** After EVERY deployment or promotion, prune stale revisions. **How many to keep is a per-estate policy declared in [scripts/scim-estates.json](scripts/scim-estates.json) as `revisionKeep`, not a number typed into a caller.** Use [scripts/prune-revisions.ps1](scripts/prune-revisions.ps1), which resolves the policy itself when `-Keep` is omitted:
 
 ```powershell
-pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app> -Keep 2
+pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app>   # keep resolved from the registry
 ```
 
-1. **Wired in, not remembered.** The prune runs automatically at the end of [scripts/promote-to-prod.ps1](scripts/promote-to-prod.ps1) (after the blue/green flip and its post-flip verification, so blue is still retained) and as Stage 6.2 of [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1). Do not rely on running it by hand.
+| Estate | `revisionKeep` | Consequence |
+|---|---|---|
+| dev | 2 | serving + rollback target |
+| canary prod (proudbush) | 2 | serving + rollback target |
+| **customer prod (calmsand)** | **1** | **no rollback target - recovery is roll-forward** |
+
+1. **Wired in, not remembered.** The prune runs automatically at the end of [scripts/promote-to-prod.ps1](scripts/promote-to-prod.ps1) (after the blue/green flip and its post-flip verification) and as Stage 6.2 of [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1). Both read `revisionKeep` from the registry, so a caller cannot disagree with the policy or with each other. Do not rely on running it by hand.
 2. **A revision serving traffic is NEVER deactivated**, even if it falls outside the newest N. The script aborts rather than leave an app with nothing serving, and re-reads the revision list afterwards to verify the outcome instead of trusting the exit code.
-3. **`-Keep 2` is the floor, not a preference.** `-Keep 1` removes the rollback target and warns; never use it on a prod estate.
-4. **Deactivating is reversible and stateless.** Revisions are compute only - the database is external - so pruning cannot lose data. Verified on proudbush: after 13 -> 2 the serving revision's uptime was unchanged (never restarted) and all 24 endpoints were intact.
-5. **Applies to every estate**: dev, the proudbush canary, and customer-facing calmsand.
+3. **2 is the DEFAULT, and going below it is a declared exception, not a preference.** Rule **R8** in `Test-ScimEstateRegistry` rejects the registry unless an estate below 2 (a) is a `customer-prod` estate and (b) carries a `revisionKeepRationale` saying why. An unexplained `1` is indistinguishable from a typo, and a typo here silently deletes the rollback path of whichever estate it lands on. Six negative controls plus a positive control cover R8 in [scripts/test-scim-estates.ps1](scripts/test-scim-estates.ps1).
+4. **calmsand is the one estate at 1, for cost (2026-08-14).** Its MSDN subscription hit the $150/month spending limit and was disabled until the next billing period. A second always-on replica (0.5 vCPU / 1 GiB) was roughly a third of that estate's compute bill for a rollback path never exercised there. The trade is acceptable **specifically** because calmsand is never auto-promoted - every deployment to it is deliberate and supervised - and because the canary has already proven the same image first. **Recovery on calmsand is ROLL FORWARD:** re-run `promote-to-prod.ps1` with the previous `-ImageTag`; every published tag stays available from GHCR. `promote-to-prod.ps1` prints the roll-forward command instead of the instant-rollback command when the estate keeps fewer than 2, because naming a revision that no longer exists is worse than saying nothing.
+5. **Deactivating is reversible and stateless.** Revisions are compute only - the database is external - so pruning cannot lose data. Verified on proudbush: after 13 -> 2 the serving revision's uptime was unchanged (never restarted) and all 24 endpoints were intact.
+6. **Applies to every estate**: dev, the proudbush canary, and customer-facing calmsand. **Do NOT hardcode a retention number anywhere.** If a new flow needs it, call `Get-ScimEstateRevisionKeep` (resolves by `-Purpose`, `-Id`, or `-AppName`/`-ResourceGroup`); it falls back to **2** when the estate cannot be resolved, because failing safe means keeping a rollback target we did not need rather than deleting one we did.
 
 
 

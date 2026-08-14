@@ -583,12 +583,17 @@ if (-not $SkipDeploy) {
     # active revisions, 12 idle, 65 connections of demand against a
     # max_connections of 50. Reclaim it on every deploy rather than waiting
     # for the database to be the thing that notices.
+    #
+    # Retention comes from scripts/scim-estates.json per estate, not from a
+    # literal here, so this stage cannot drift away from promote-to-prod.ps1.
     if (-not $DryRun) {
         try {
-            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep 2
-            Add-Result -Stage '6.2' -Gate 'Revision hygiene (keep newest 2 active)' -Status 'PASS' -Detail 'stale revisions deactivated'
+            . (Join-Path $PSScriptRoot 'scim-estates.ps1')
+            $devKeep = Get-ScimEstateRevisionKeep -AppName $DevAppName -ResourceGroup $DevResourceGroup
+            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep $devKeep
+            Add-Result -Stage '6.2' -Gate "Revision hygiene (keep newest $devKeep active)" -Status 'PASS' -Detail 'stale revisions deactivated'
         } catch {
-            Add-Result -Stage '6.2' -Gate 'Revision hygiene (keep newest 2 active)' -Status 'FAIL' -Detail $_.Exception.Message
+            Add-Result -Stage '6.2' -Gate 'Revision hygiene' -Status 'FAIL' -Detail $_.Exception.Message
         }
     }
 }
