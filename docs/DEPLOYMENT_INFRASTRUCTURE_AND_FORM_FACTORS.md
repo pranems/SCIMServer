@@ -677,6 +677,33 @@ Two nuances worth knowing before debugging a deployment:
 - **`JWT_SECRET` is plumbed everywhere but signs nothing.** [api/src/oauth/oauth.module.ts](../api/src/oauth/oauth.module.ts) builds its JWT options from `OAuthSigningKeyService` using an **asymmetric** key pair (`privateKeyPem`/`publicKeyPem`, `algorithm: keys.alg`, `keyid: keys.kid`) and pins `verifyOptions.algorithms = [keys.alg]` as the algorithm-confusion defense. `JWT_SECRET` survives only as a `jwtSecretConfigured` boolean on `/scim/admin/version`.
 - **`LOG_RETENTION_DAYS` has two different fallbacks** for the same variable (21 for the auto-prune path, 30 for the admin default). The Bicep sets it explicitly to 30, so Azure is unambiguous, but a local or standalone run is not.
 
+### 9.1 Secret durability - what survives losing the workstation
+
+Asked and measured on 2026-08-13. The useful question is not "what secrets are on this machine" but **"what could not be recovered if the machine were destroyed tonight"**. Almost everything can be.
+
+| Tier | Material | Where it lives | If the workstation is lost |
+|---|---|---|---|
+| **3** | `database-url`, `jwt-secret`, `oauth-client-secret`, `scim-shared-secret` for the live estates | Azure Container Apps secrets | **Safe.** Read them back with `az containerapp secret list -n <app> -g <rg>`. Azure is the backup; a local copy only widens exposure. |
+| **2** | Deployment service principal passwords; auth-proof client secrets | `~/.scimserver-deploy/*.json` | **Recoverable by REGENERATION.** `setup-deploy-sp.ps1` and `setup-auth-proof-apps.ps1` reissue them. A reset also revokes whatever leaked, so reissuing beats restoring. |
+| **1** | Connection strings for an estate whose tenant has **expired** (`db-urls.json` -> `T08_*`) | this machine only | **Cannot be re-read from Azure by any means**, because expiry kills the ARM control plane while PostgreSQL keeps serving. |
+
+**Tier 1 sounds worse than it is, and the reason matters.** Those connection strings are a rollback path to the tenant-08 databases, and that data has **already been carried into tenant 09 and verified** - 58 endpoints, 728 and 734 users, 347 groups, all 58 x 6 per-endpoint surfaces, live SCIM 1401/1401. So losing them costs a forensic comparison, not the data.
+
+**The real recovery dependency is not the secrets at all.** It is: the repository (on GitHub), the Azure CLI, and the ability to sign in as an administrator. With those three, a fresh workstation can rebuild every credential from scratch. Nothing in this estate is bootstrapped from a secret that exists in only one place.
+
+**Optional hardening** - [scripts/backup-deploy-secrets.ps1](../scripts/backup-deploy-secrets.ps1) writes the residue to a single encrypted, portable file (AES-256-CBC, encrypt-then-MAC with HMAC-SHA256, PBKDF2-HMAC-SHA256 at 600,000 iterations, random salt and IV per file). The MAC covers the header as well as the body, and is checked before any decryption is attempted. Its crypto is proven by [test-backup-deploy-secrets.ps1](../scripts/test-backup-deploy-secrets.ps1): round-trip fidelity, wrong-passphrase rejection, single-bit ciphertext tampering, KDF-salt tampering, and non-reuse of salt/IV across runs.
+
+```powershell
+pwsh -File scripts/backup-deploy-secrets.ps1 -Action backup    # prompts for a passphrase, then self-verifies
+pwsh -File scripts/backup-deploy-secrets.ps1 -Action verify    # prove it opens - do this BEFORE you need it
+pwsh -File scripts/backup-deploy-secrets.ps1 -Action inspect   # header only, no passphrase, no secrets
+```
+
+Two rules that make the difference between a backup and a comforting file:
+
+1. **The passphrase must be retrievable without the machine being backed up.** A passphrase stored only on that machine protects nothing.
+2. **Treat a restored credential as a leaked one and rotate it immediately.** The archive embeds its own recovery instructions so they cannot drift away from it.
+
 ---
 
 ## 10. Drift and gap register
