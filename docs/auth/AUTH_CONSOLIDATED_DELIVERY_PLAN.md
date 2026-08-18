@@ -8,7 +8,7 @@ analysis streams into one delivery backlog:
 
 1. **X11 - WIF token-mint latency** ([../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)) - the perf options (cold ~2,161 ms -> tens of ms).
 2. **X12 - auth-source refactoring** ([AUTH_SOURCE_REFACTORING_ANALYSIS.md](AUTH_SOURCE_REFACTORING_ANALYSIS.md)) - the `ResourceAuthenticator` / provider strategy seam.
-3. **SyncFabric roadmap** - the canonical guide, **revision 6 (2026-08-04)** - RFC 8693, RFC 7523 binding corrections, persona model, security + metadata truthfulness, migration (its Phases -1..6 and file-by-file Section 25). The in-repo mirror [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md) was refreshed to revision 6 on 2026-08-04 and is byte-identical to the canonical copy at `OneDrive - Microsoft\Documents\SCIMServer\auth\`. (Before that date it had been a revision-2 mirror, 4,318 lines against the canonical 5,470.)
+3. **SyncFabric roadmap** - the canonical guide, **revision 6 (2026-08-04)** - RFC 8693, RFC 7523 binding corrections, persona model, security + metadata truthfulness, migration (its Phases -1..6 and file-by-file Section 25). The in-repo mirror [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md) was refreshed to revision 6 on 2026-08-04 and is byte-identical to the canonical copy at `OneDrive - Microsoft\Documents\SCIMServer\auth\`. (Before that date it had been a revision-2 mirror, 4,318 lines against the canonical 5,470.)
 4. **X15 - runtime tuning + configuration** ([../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md), added 2026-07-28) - the configuration layer under the X11 options: the three-tier model, per-environment recommended values, and three findings that **redesign W1.4** and add **W1.7**.
 
 It is grounded in the **current** `feat/wif` source (state confirmed below), the
@@ -433,7 +433,7 @@ Per the standing DA-gate:
 - X15 runtime tuning + configuration: [../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](../perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md)
 - X12 refactor: [AUTH_SOURCE_REFACTORING_ANALYSIS.md](AUTH_SOURCE_REFACTORING_ANALYSIS.md)
 - X10 standards: [AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)
-- SyncFabric guide (Phases -1..6, file-by-file Section 25, test strategy Section 23): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md) - **revision 6**, refreshed 2026-08-04, byte-identical to the canonical copy.
+- SyncFabric guide (Phases -1..6, file-by-file Section 25, test strategy Section 23): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md) - **revision 6**, refreshed 2026-08-04, byte-identical to the canonical copy.
 - Pattern ledger + DA-gate: [../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md), [.github/copilot-instructions.md](../../.github/copilot-instructions.md)
 
 ## 10. Change log

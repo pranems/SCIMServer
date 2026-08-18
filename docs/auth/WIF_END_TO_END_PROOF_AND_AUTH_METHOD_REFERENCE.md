@@ -917,7 +917,7 @@ the client secret, and exits non-zero on any failed assertion so it can be used 
 
 - Harness: [scripts/wif-e2e-proof.ps1](../../scripts/wif-e2e-proof.ps1)
 - Delivery plan: [AUTH_CONSOLIDATED_DELIVERY_PLAN.md](AUTH_CONSOLIDATED_DELIVERY_PLAN.md)
-- SyncFabric guide: `SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md`
+- SyncFabric guide: `SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md`
 - Entra setup + connection recipe: [CONNECTION_INFO_AND_ENTRA_SETUP.md](CONNECTION_INFO_AND_ENTRA_SETUP.md)
 - Wave 3 reports: [W3.2](WAVE3_W3_2_IMPLEMENTATION_REPORT.md), [W3.4](WAVE3_W3_4_IMPLEMENTATION_REPORT.md)
 - Validator: [wif-assertion-validator.service.ts](../../api/src/oauth/wif-assertion-validator.service.ts)
