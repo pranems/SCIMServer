@@ -1116,6 +1116,18 @@ foreach ($e in $list.endpoints) {
 Scope: **108 endpoints, 666 schemas, 3,658 top-level attributes** across the dev
 estate (58 endpoints) and the customer-facing production estate (50 endpoints).
 
+> **Re-verified 2026-08-18 at v0.55.6, and the survey is only half re-confirmable.**
+> The **dev** estate still measures **58 endpoints**, so that half stands - and it
+> stands across a *tenant migration*, since dev has since moved from tenant 08 to
+> tenant 09 (`purplecliff`) and carried its data with it. The **customer-facing
+> production** estate was **unreachable** at the time of writing (TLS handshake
+> failure, then timeout), so its 50-endpoint contribution could not be re-counted.
+> That estate runs a single replica by deliberate cost policy, so unreachability is
+> plausibly a billing pause rather than a fault - but it is **not verified either
+> way here**, and the 108/666/3,658 totals should be read as *measured 2026-07-31*,
+> not as *currently true*. The per-rule violation counts below are unaffected in
+> the sense that they were real when taken; they are simply not re-measured.
+
 | Rule | Violations | Reading |
 |---|---|---|
 | D1 `type` keyword | **0** | no schema anywhere uses an unknown type |
