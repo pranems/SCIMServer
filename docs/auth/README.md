@@ -2,7 +2,9 @@
 
 > **Start here.** This folder holds the complete authentication analysis + design for SCIMServer. The docs are a **hub-and-spoke set**, not four overlapping essays. This README is the navigational index and the single answer to "where is the plan?".
 
-> **Status of the cluster.** Everything past the shipped G11 baseline is **analysis + design only - no code has been implemented** for the `authenticationMethods[]` model, WIF, or the Phase Q sub-phases. The factual shipped baseline (3-tier guard chain, global HS256 OAuth issuer, per-endpoint bcrypt bearer) is described in [AUTHENTICATION_ARCHITECTURE.md section 4](AUTHENTICATION_ARCHITECTURE.md#4-current-scimserver-state-source-grounded) and [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md).
+> **Status of the cluster (corrected 2026-08-18, verified against `master` at v0.55.6).** The WIF critical path has **SHIPPED**. RFC 7523 workload-identity client assertions, external-JWKS validation, and per-endpoint OAuth client credentials all have runtime providers exercised by unit, E2E and live tests. **What has NOT shipped:** RFC 8693 token exchange (Wave 4 - and correctly *not* advertised in metadata, `syncFabricRfc8693: false`), the authorization-code grant, mTLS and DPoP.
+>
+> This banner previously read "analysis + design only - no code has been implemented". That was true when the cluster was written and stayed on the page for months after it stopped being true, which is the failure mode this whole doc set exists to prevent. The factual shipped baseline is described in [AUTHENTICATION_ARCHITECTURE.md section 4](AUTHENTICATION_ARCHITECTURE.md#4-current-scimserver-state-source-grounded) and [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md).
 
 ---
 
@@ -77,16 +79,19 @@ The ~5-6 day delta buys the generalized `methods[]` backbone that turns 1P / rol
 
 ## Coverage at a glance
 
-| Pattern | SCIMServer status | Closes in |
+> Re-verified against `master` at **v0.55.6** on 2026-08-18 by locating the runtime provider for each pattern in the source tree. **"SHIPPED" means a runtime provider exists** - not that a `type` value is accepted by the admin registry.
+
+| Pattern | SCIMServer status | Evidence / closes in |
 |---|---|---|
-| 1 - Long-lived global bearer (legacy shared secret) | **SHIPPED** | - |
-| 2 - OAuth 2.0 client_credentials (issuer mode, single global pair) | **SHIPPED** | - |
-| 3 - Per-endpoint bcrypt bearer (multi-tenant) | **SHIPPED** (G11) | - |
-| 5 - Per-endpoint client_id/secret pairs (Entra Gallery mandate) | GAP | Q1 |
-| 4 - External JWKS-validated JWT | GAP | Q2 |
-| 8 - Workload Identity Federation (RFC 7523 + RFC 8693) | GAP | Q6 |
+| 1 - Long-lived global bearer (legacy shared secret) | **SHIPPED** | `modules/auth/authenticators/global-shared-secret.authenticator.ts` |
+| 2 - OAuth 2.0 client_credentials (issuer mode, single global pair) | **SHIPPED** | `oauth/oauth.controller.ts`; metadata advertises `grant_types_supported: ['client_credentials']` |
+| 3 - Per-endpoint bcrypt bearer (multi-tenant) | **SHIPPED** (G11) | `modules/auth/authenticators/endpoint-credential.authenticator.ts` |
+| 4 - External JWKS-validated JWT | **SHIPPED** (Q2) | `oauth/external-jwks-validator.service.ts`; resource side `authenticators/oauth-jwt.authenticator.ts` |
+| 5 - Per-endpoint client_id/secret pairs (Entra Gallery mandate) | **SHIPPED** (Q1) | `modules/scim/controllers/client-secret-token-provider.ts` |
+| 8a - Workload Identity Federation, **RFC 7523** JWT-bearer client assertion | **SHIPPED** (Q6) | `oauth/wif-assertion-validator.service.ts`, `wif-discovery-resolver.service.ts`, `controllers/assertion-token-provider.ts` |
+| 8b - Workload Identity Federation, **RFC 8693** token exchange | **GAP - deliberately** | Wave 4. No grant handler; `syncFabricRfc8693` is hard-`false` in `endpoint-oauth-metadata.controller.ts`, so it is **correctly not advertised** rather than advertised-and-broken |
 | 6 - Authorization-Code + refresh | GAP | Q4 (on demand) |
-| 7 - mTLS / DPoP | GAP | Q5 (deferred) |
+| 7 - mTLS / DPoP | GAP | Q5 (deferred). No `tls_client_auth`, no `x5t#S256`, no DPoP handler in the source tree |
 | HTTP Basic (`httpbasic`) | provably absent; deliberately not designed | one-provider add if ever needed |
 
 Full 10-ISV matrix + per-pattern detail: [ISV sections 2-4](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md#2-industry-pattern-matrix-10-isvs).
