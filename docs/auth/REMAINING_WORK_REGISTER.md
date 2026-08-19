@@ -1,466 +1,341 @@
-# Auth + WIF + SyncFabric work register (X16) - delivered and remaining
+# Auth work register (X16) - what works, what is left
 
-**This is the single consolidated ledger.** Section 2A is everything **delivered**; sections 2, 3, 4B
-and 5 are everything **remaining**. If the two disagree with any other document, this one was
-verified against source most recently and wins - but check its `Last verified` date first.
+**Last verified:** 2026-08-19 against `feat/wif` (api + web **0.55.9**), SyncFabric `origin/master`
+`38c429b511`, canonical WIF guide revision 7 (6,503 lines, mirror byte-identical).
 
-**Status:** STOCK-TAKE. Every row below was verified against real sources on **2026-08-19**, not
-carried forward from a previous document.
-
-**Last verified:** 2026-08-19
-
-| Source | Snapshot verified | How |
-|---|---|---|
-| SCIMServer | `origin/master` `09b4b78d`, api + web `package.json` both **0.55.6** | `git rev-parse`, `package.json` read |
-| SyncFabric | `origin/master` `38c429b511`, 2026-08-19, **0 commits ahead** of the guide's snapshot | `git fetch --prune` in `C:\one\AD-IAM-Services-SyncFabric` (read-only) |
-| Canonical WIF guide | revision 7, **6,503 lines** (OneDrive) | line count |
-| In-repo guide mirror | **5,642 lines** | line count |
-
-This register exists because the answer to "what is left?" was spread across the delivery plan,
-the canonical guide's action list, GitHub issues, and the deployment estate, and **each of those
-four sources disagreed with the others**. Section 1 records what the cross-check corrected, and
-**Section 4 is a flow-by-flow comparison of both codebases' authentication logic**.
-
-**Scope exclusion:** SyncFabric's *connector configurations* are out of scope by operator
-instruction; they are on an independent plan. Section 4 compares auth-flow logic only.
+**How to read this.** Section 1 answers *"which authentication methods actually work?"*. Section 2 is
+everything remaining, grouped by **what it is for**, with the component it affects. Section 3 is what
+shipped. Appendix B records how each status was verified, and the three findings this register got
+wrong and retracted - read it before trusting any single row.
 
 ---
 
-## 1. Corrections this stock-take made to its own sources
+## 1. At a glance: which authentication methods work today
 
-These are findings, not restatements. Each one means a document was saying something untrue.
+**Two planes.** The *token endpoint* mints a token; the *resource plane* accepts one on a SCIM call.
+A method can be supported on one and not the other, which is where most confusion comes from.
 
-| # | Source that was wrong | What it claimed | What is actually true | Evidence |
-|---|---|---|---|---|
-| **C1** | Delivery plan Section 1, JWKS row | "JWKS pre-warm / background refresh: **still none** (lazy fetch, 10-min TTL)" | W1.4 shipped in v0.55.5: a background refresh sweep exists (`refreshTimer`, `setInterval`, `unref`ed) and the TTL is 24 h | [external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts) L126-L174 |
-| **C2** | Delivery plan Section 1, mint row | "Mint `client_secret` path: **inlined** in the controller" | W2.3 shipped: the provider is its own class with its own spec | [client-secret-token-provider.ts](../../api/src/modules/scim/controllers/client-secret-token-provider.ts) |
-| **C3** | ~~Canonical guide, gap-matrix header~~ **RETRACTED 2026-08-19** | ~~`09b4b78d` is "v0.55.7"~~ | **The guide was RIGHT and this register was wrong.** v0.55.7 is real: commit `07db4088` "fix(validation): honour multiValued on sub-attributes in strict mode (v0.55.7)" (2026-08-18) sets it, it is an ancestor of master, and CHANGELOG line 11 carries its entry. See 1.2 for how this register got it wrong | `git log -S` on an up-to-date tree |
-| **C4** | Canonical guide, actions A8 / A9 / A12 | paths under `api/src/modules/endpoint/` | Those paths do not exist. Real paths are `api/src/modules/endpoint/**services**/endpoint.service.ts` and `api/src/modules/**scim/controllers**/admin-authentication-method.controller.ts` | `Get-ChildItem -Recurse` |
-| **C5** | Canonical guide, RFC 7523 flow description | treats the flow generically as "RFC 7523" | It is specifically **section 2.2 client authentication** (`grant_type=client_credentials` + `client_assertion`), **not** the section 2.1 `jwt-bearer` authorization grant. A handler built on the wrong one is incompatible | `WorkloadIdentityAuthenticationHelper` + SCIMServer parser, Section 4 |
+### 1.1 Token endpoint - how a client obtains a token
 
-**C3 and C4 matter beyond their own rows.** The guide is the document that drives this backlog, and
-a stale path in an action item means whoever picks that action up starts by failing to find the file.
-The guide was never wrong about *what* to do, only about *where*, but a wrong location is what turns
-a 20-minute fix into an investigation.
-
-### 1.1 The recurring failure: the plan understates its own progress
-
-C1 and C2 are the **second** occurrence of a documented failure mode. The plan's own v0.55.2
-change-log entry says:
-
-> "Section 1's state table had gone stale in the understating direction: Waves 1 and 2 shipped
-> without it being updated, so the plan described work as outstanding that was already delivered."
-
-It has now happened again, to different rows, for the same reason: an item's **status line** is
-updated when the item ships, but the **summary table at the top** is not, because nothing binds them.
-Two sightings of one pattern is this repo's own promotion threshold.
-
-**Disposition: scheduled** as item **N4** in Section 5. The structural fix is to stop maintaining
-the same fact twice: Section 1 should state the *question* each row answers and defer the answer to
-the item's status line, or a gate should assert that no Section 1 row says "none"/"inlined"/"still"
-while the owning item says DELIVERED. A third manual correction is not a fix.
-
-### 1.2 Retraction: three findings that were artifacts of a stale working tree
-
-**C3, N1 and N9 were wrong and are retracted.** All three descended from a single bad read.
-
-At the start of the 2026-08-19 stock-take the working tree sat on branch
-`feat/w1-5-jwks-deadline-caps`, which was **3 commits behind `origin/master`**. One of those three
-was `07db4088`, the commit that sets `api/package.json` to **0.55.7**. So on that tree:
-
-- `package.json` genuinely read `0.55.6`, and
-- `git log -S'"version": "0.55.7"'` genuinely returned nothing,
-
-because `git log -S` searches the **current branch's** history, not the remote's. Both readings were
-accurate about the tree and false about the product. From them this register concluded that v0.55.7
-was a "phantom version", that the canonical guide was wrong to cite it, and later that the Stage 1.12
-F1 gate must be blind because it passed a doc advertising `0.55.7`. **The guide was right, the gate
-was right, and the register was wrong three times over.**
-
-The compounding step is the instructive one: the tree was rebased onto `origin/master` mid-session to
-land a commit, which silently made the working files `0.55.7`, and **nothing re-verified the earlier
-conclusions against the new tree.** A finding was carried forward across the very event that
-invalidated it.
-
-**Standing correction, and it generalizes past this incident:** a claim of the form "X does not exist
-anywhere in the repo" is only as good as the tree it was run against. Before recording an
-absence-based finding, confirm the tree is current (`git fetch` + `git status -sb`, or search
-`origin/master` explicitly rather than `HEAD`), and **re-verify any absence-based finding after any
-rebase, merge or checkout.** Presence is self-evidencing; absence is not. This is the same lesson as
-C1/C2 and the doc-sweep over-report in 4A - status read from the wrong place is worse than no status,
-because it is asserted with confidence.
-
----
-
-## 2. Delivery-plan work items still open
-
-From [AUTH_CONSOLIDATED_DELIVERY_PLAN.md](AUTH_CONSOLIDATED_DELIVERY_PLAN.md). **11 open**, 2 settled
-(not open), 2 partially delivered.
-
-| ID | Item | Wave | Est | Blocked by | Notes |
-|---|---|---|---|---|---|
-| **W1.2** | Startup JWKS pre-warm | 1 | S | nothing (W1.4 landed) | **Last Wave 1 item.** DB-pool half already done. Now unblocked |
-| **W3.5** | Credential/trust cache + typed lookup + composite index | 3 | M | W3.1 | Needs a Prisma migration + in-memory parity |
-| **W4.1** | RFC 8693 provider strategy | 4 | L | W2, W3 | Wave 4 spine |
-| **W4.2** | Advertise 8693 only when active | 4 | S | W4.1 | Closes the W0.3 truth |
-| **W4.3** | Real-SyncFabric 8693 validation | 4 | M | W4.1 | Empirical gate |
-| **W5.1** | Finite auth-persona catalog | 5 | L | W2-W4 | YAGNI risk: presets only, no DSL |
-| **W5.2** | Claim strengthening + lifetime cap | 5 | M | W3 + capture | Shadow before enforce |
-| **W5.3** | `typ=at+jwt` | 5 | M | W2 | `jti` already shipped in W3.8; only the type header is left |
-| **W5.4** | Opaque tokens + introspection + revocation | 5 | XL | W5.3 | Optional track, split before starting |
-| **W6.1** | Remove legacy fallbacks | 6 | M | W3-W5 + telemetry | Gated on zero-use telemetry |
-| **W6.2** | `private_key_jwt` / mTLS / DPoP | 6 | XL | W2 | Future track, on demand |
-
-**Settled, not open (do not re-raise):**
-
-- **W0.1** token-route secret redaction: **DECLINED** twice by the operator. `PERSIST_REQUEST_SECRETS`
-  defaults `true` **by design**; `logging-redaction.spec.ts:80-87` asserting that default is correct.
-  Still in scope separately: retention and log-read access (see A3' / item S1).
-- **W3.3** endpoint-UUID audience default: **DEFERRED** pending operator confirmation. There is no
-  correctness hole to close unilaterally, since `buildTrust` already requires a non-empty
-  `expectedAudience` at mint time.
-
-**Partial:** W3.1 (per-variation profile routing shipped; the versioned aggregate and 7-state
-migration are deferred and may never be needed) and W2.5 (value-preserving core shipped; the
-legacy-umbrella retirement and enforcement flip are still scheduled).
-
----
-
-## 2A. Delivered (the other half of the ledger)
-
-This section exists because "what is left?" is only half a stock-take, and the delivered half was
-previously spread across the plan's per-item status lines, `EXECUTION_LEDGER.md`, the `README.md`
-reconciliation table and the CHANGELOG - four places, none of them complete.
-
-**Delivery-plan waves: 20 of 33 items delivered, 2 settled, 11 open.**
-
-| Wave | Delivered | Note |
-|---|---|---|
-| **0** | W0.2, W0.3 | Wave complete (W0.1 declined, not open) |
-| **1** | W1.1, W1.3, W1.4, W1.5, W1.6, W1.7a/b/c | **8 of 9. Only W1.2 remains**, and only its JWKS half |
-| **2** | W2.1, W2.2, W2.3, W2.4, W2.5 | **Wave complete.** W2.4 and W2.5 shipped their load-bearing core; provider relocation and the legacy-umbrella retirement are scheduled tails, not open items |
-| **3** | W3.2, W3.4, W3.6, W3.7, W3.8, W3.9, + W3.1 partial | W3.5 open, W3.3 deferred |
-| **4, 5, 6** | none | Not started |
-
-**Canonical guide actions: 5 of 15 closed.**
-
-| ID | Closed by |
-|---|---|
-| **A1/A13** | mirror re-synced to revision 7, byte-identical at 6,503 lines (2026-08-19) |
-| **A4** | largely by **W3.7** (v0.54.78) - a mismatched `client_id` is rejected. Residual: not *required* when the trust pins no `targetClientId` |
-| **A8** | v0.55.8 - `auth_method_add` / `auth_method_remove` with failure outcomes |
-| **A10** | v0.55.9 - partial `authentication` block refused |
-| **A12** | v0.55.8 - the mislabelled merge comment |
-
-**Whole tracks complete** (see 4A for how these were found, and for the statuses that needed
-source-verification because the doc-level sweep reported them wrong):
-
-| Track | Items | Shipped |
-|---|---|---|
-| **Pre-Q / Q / A unified steps** | Pre-Q.A, Pre-Q.B, Q0, Q1, Q2, Q6, A0, A1, A2, A3, A4 | Q3, Q4, Q5 remain **deferred** tracks |
-| **WI** connection-info | WI-1 .. WI-17 | all 17 |
-| **U** Connect + Logs UX | U1 .. U12 | all 12 (v0.54.32-37) |
-| **V** credential lifecycle | V1 .. V12 | all 12 (v0.54.38-40) |
-| **W** durable logs + Connect UX | W1 .. W12 | all 12 (v0.54.42-48). **Distinct from the delivery plan's W0.1-W6.2** - do not conflate |
-| **F** real-Entra proof findings | F1 .. F6 | F7 open by design (= W5.2), F8 open |
-
-**Performance (X11 A-H):** A, B, D, H delivered; G effectively satisfied; C partial; E and F open.
-Full breakdown with the verification method in **4B**.
-
-**What "delivered" means here.** Every row was confirmed against source or against a
-`**Status: DELIVERED**` line that was itself source-checked during this stock-take. Section 1
-records two rows where the plan claimed *outstanding* work that had in fact shipped, and 4A records
-five where a doc-level sweep claimed *open* work that had also shipped. **Both directions of error
-occur**, so a status is only trustworthy with its verification method attached.
-
----
-
-## 3. Canonical guide action list (A1-A15)
-
-Re-checked against source. Path corrections from C4 applied.
-
-| ID | Action | Sev | Verified state on 2026-08-19 |
+| Method | Wire shape | Status | Gap |
 |---|---|---|---|
-| **A1/A13** | Re-sync the in-repo guide mirror with the canonical copy | Blocking | **DELIVERED 2026-08-19.** Both are now byte-identical at **6,503 lines** (revision 7). The earlier 861-line bidirectional divergence is closed |
-| **A8** | Structured `auth_methods_changed` audit event | High | **DELIVERED v0.55.8** as `auth_method_add` / `auth_method_remove`, with failure outcomes as well as success. Doc: [A8_AUTH_METHOD_AUDIT_EVENT.md](A8_AUTH_METHOD_AUDIT_EVENT.md); RCA I-39/I-40. Surfaced **N12** (the pre-existing `credentialId` redaction) |
-| **A9** | Optimistic concurrency on profile writes | High | OPEN. No `ifMatch` / `rowVersion` guard in [endpoint.service.ts](../../api/src/modules/endpoint/services/endpoint.service.ts) |
-| **A10** | Reject a partial `authentication` block | High | **DELIVERED v0.55.9.** `mergeProfilePartial` now refuses a block without an explicit `methods` array. It was a real silent-data-loss path: wholesale replace + a normalizer that turns a missing `methods` into `[]` deleted every method on a `200 OK`. Doc: [A10_PARTIAL_AUTHENTICATION_BLOCK.md](A10_PARTIAL_AUTHENTICATION_BLOCK.md); RCA I-41 |
-| **A4** | Require `client_id` for RFC 7523 | High | Largely closed by **W3.7** (v0.54.78), which rejects a mismatch with `wif_client_id_mismatch`. Residual: `client_id` is still not *required* when the trust pins no `targetClientId`. Re-scope rather than re-implement |
-| **A3'** | Bound RequestLog retention + restrict read access | High | OPEN. This is the part of the W0.1 area that was **never** declined. The declined half was redaction; retention and access control remain in scope |
-| **A2** | Transport persona axis | Med | OPEN, folds into W5.1 |
-| **A5** | Key-replay denylist on `uti` not `jti` | Med | OPEN |
-| **A6** | Surface `azpacr` in the decision trace | Med | OPEN |
-| **A7** | Reject `api://<appId>` in `expectedAudience` | Med | OPEN |
-| **A11** | Document the 6 merge rules | Low | OPEN |
-| **A12** | Fix the `// Deep-merge settings (additive)` comment | Low | **DELIVERED v0.55.8.** Corrected to say it is a per-key merge in which a nested object replaces rather than merges |
-| **A14** | Document that the token-endpoint host is config-gated | Low | OPEN |
-| **A15** | Model fail-closed denial in test-ISV scenarios | Med | OPEN |
+| **`client_secret_post`** | `grant_type=client_credentials` + `client_secret` in body | **WORKS** | - |
+| **`client_secret_basic`** | same, credentials in `Authorization: Basic` | **WORKS** | - |
+| **WIF / RFC 7523 §2.2** (`private_key_jwt`) | `grant_type=client_credentials` + `client_assertion` + jwt-bearer type | **WORKS** - this is the SyncFabric production flow | - |
+| **RFC 8693 token exchange** | `grant_type=...:token-exchange` + `subject_token` | **NOT IMPLEMENTED** - returns a clean `400 unsupported_grant_type` | **W4.1** |
 
-### 3.1 Empirical gates still unmet
+### 1.2 Resource plane - how a caller authenticates a SCIM request
 
-1. First-party sovereign application ID.
-2. Real SyncFabric to SCIMServer end-to-end capture, both modes. **Section 4 raises the priority of
-   this**: the two acquisition modes emit different `aud` shapes and the selecting flag is on for
-   `slice:A` and `slice:B` only, so a capture from one slice does not characterize the other.
-3. **WIF token-mint latency measurement.** The guide has deferred this four times, but SCIMServer
-   commit `6504626e` "docs: WIF token-mint latency analysis (X11)" already exists and was never
-   consulted. **This gate may already be satisfied** - check before scheduling a fifth deferral.
-4. Fail-closed denial telemetry from SyncFabric.
+| Method | Status | Gap |
+|---|---|---|
+| **Global shared secret** (bearer) | **WORKS** | - |
+| **Per-endpoint bearer credential** | **WORKS** | - |
+| **OAuth JWT** (a token SCIMServer minted) | **WORKS** | - |
+| **HTTP Basic** | **NOT SUPPORTED.** Basic is accepted at the *token endpoint* only | no item; see F-F |
+| **mTLS** | **NOT ENFORCED** - the name is declarable and gets advertised in SCIM discovery, but no authenticator implements it | **N8** |
+| **DPoP** | **NOT ENFORCED** - same as mTLS | **N8** |
+
+> **N8 is the row to notice.** `mtls`, `dpop` and `oauth-authcode` can be declared on an endpoint and
+> will appear in `ServiceProviderConfig.authenticationSchemes`, but nothing enforces them. The server
+> advertises a capability it does not have.
+
+### 1.3 Token profile
+
+| Property | Status |
+|---|---|
+| `jti` on every issued token | **WORKS** (W3.8) |
+| Provenance claims (`auth_method`, `src_*`) | **WORKS** (W3.8) |
+| Lifetime capped at the assertion expiry | **WORKS** (W3.6) |
+| `typ=at+jwt` (RFC 9068 conformance) | **MISSING** - **W5.3** |
+| Introspection / revocation (RFC 7662 / 7009) | **NOT IMPLEMENTED** - **W5.4**, optional track |
 
 ---
 
-## 4. Auth-flow comparison: SyncFabric vs SCIMServer
+## 2. What is remaining, by purpose
 
-**Scope note.** SyncFabric's *connector configurations* are excluded by operator instruction: they
-are on an independent plan. This section compares only the **authentication flow logic** on both
-sides, from source at SyncFabric `38c429b511` and SCIMServer `09b4b78d`.
+Every row says what the item is **for** and what it **affects**. `Sev` is severity; `Blocked by` is
+empty when the item can start today.
 
-### 4.1 SyncFabric's authentication types
+### 2.1 Make more authentication methods work
 
-`src/dev/Controller/RunProfile/AuthenticationType.cs` declares six: `None`, `Basic`,
-`TokenBasedBearerToken`, `SyncPolicy`, `WorkloadIdentityClientAuthentication`,
-`WorkloadIdentityTokenExchange`. The last two are the WIF flows, each implemented as an
-`IWorkloadIdentityTargetTokenStrategy`.
+*Purpose: extend what a client can authenticate with.*
 
-### 4.2 The exact wire contracts SCIMServer receives
+| ID | What it is for | Affects | Sev | Blocked by |
+|---|---|---|---|---|
+| **W4.1** | Accept SyncFabric's RFC 8693 token-exchange flow | token endpoint | High | W2, W3 (both done) |
+| **W4.2** | Advertise token-exchange only once W4.1 is live | RFC 8414 metadata | Low | W4.1 |
+| **W4.3** | Prove W4.1 against a real SyncFabric request | empirical gate | Med | W4.1 |
+| **W5.3** | `typ=at+jwt` so RFC 9068 conformance is provable | issued token | Med | - |
+| **W5.4** | Opaque tokens + introspection + revocation | token lifecycle | Low | W5.3. Optional track, split before starting |
+| **W6.2** | `private_key_jwt` / mTLS / DPoP as first-class methods | both planes | Low | - . Future track, on demand |
+| **N8** | Stop advertising `mtls` / `dpop` the server cannot enforce | SCIM discovery | Med | - |
 
-Built by `WorkloadIdentityAuthenticationHelper`. These are the literal form bodies.
+**W4.1 is the spine.** It is the only item here that unblocks a flow SyncFabric can already be
+configured to use: `configurableConnectorWorkloadIdentityTokenExchangeEnabled` is `Enabled=True`
+globally, so a connector set to that type fails against SCIMServer today.
 
-**Flow A, `WorkloadIdentityClientAuthentication`** (`ClientAuthenticationTargetTokenStrategy`):
+### 2.2 Harden the methods that already work
+
+*Purpose: correctness and security of the live paths, not new capability.*
+
+| ID | What it is for | Affects | Sev | Blocked by |
+|---|---|---|---|---|
+| **N6** | The assertion `aud` shape is **slice-dependent**; one trust cannot match both SyncFabric acquisition modes | WIF trust config | **High** | - |
+| **A9** | Optimistic concurrency, so two concurrent profile writes cannot silently clobber | endpoint profile writes | **High** | - |
+| **A3'** | Bound RequestLog retention + restrict who can read it | request log | **High** | - |
+| **A5** | Replay denylist keyed on Entra's `uti` (not `jti`) | WIF assertion validation | Med | - |
+| **A7** | Reject a bare `api://<appId>` in `expectedAudience` as likely misconfiguration | WIF trust config | Med | - |
+| **A4** | Residual: `client_id` is still not *required* when the trust pins no `targetClientId` | RFC 7523 path | Med | re-scope, mostly closed by W3.7 |
+| **W5.2** | Enforce `oid` / `azp` claims once real shapes are observed | WIF assertion validation | Med | W3 + capture |
+| **N12** | Auth-admin events log `credentialId: [REDACTED]`, so the audit trail cannot say *which* credential changed | credential audit | Med | - |
+
+**N6 is the one with a live trigger.** `workloadIdentityFirstPartyApplicationIsDefault` is on for
+`slice:A` and `slice:B` and off globally, and the two modes emit `api://<appId>` versus
+`api://<appId>/<host>`. A slice rollout would present as an audience-mismatch `401` with **no
+SCIMServer change involved**. Needs an operator runbook at minimum.
+
+**Settled - do not re-raise:** **W0.1** (request-secret capture stays on by design, declined twice)
+and **W3.3** (endpoint-UUID audience default, deferred pending operator confirmation; no correctness
+hole exists to close unilaterally).
+
+### 2.3 Performance
+
+*Purpose: latency and cost of the auth hot paths.*
+
+| ID | What it is for | Affects | Sev | Blocked by |
+|---|---|---|---|---|
+| **W1.2** | Prefetch registered trust JWKS at boot, so the first mint is warm | token mint cold path | Med | - . **Closes Wave 1** |
+| **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - |
+| **P1** | Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint | resource plane | Med | - |
+| **P2** | Nothing caps or prunes credentials or request-log rows | resource plane + storage | Med | - . Solve **with A3'** |
+
+**P1 and P2 have no wave number** - they were inherited from the X9 latency RCA and never promoted
+into the plan, so a plan-driven review could not see them. bcrypt is deliberately slow, which makes
+P1 the most expensive O(N) loop in the resource plane.
+
+### 2.4 Structure and configuration
+
+*Purpose: how auth config is modelled, not what it does.*
+
+| ID | What it is for | Affects | Sev | Blocked by |
+|---|---|---|---|---|
+| **W5.1** | Finite auth-persona catalog, so parser + metadata + UI derive from one definition | cross-cutting | Med | W2-W4. YAGNI risk: presets only, no DSL |
+| **N10** | `GlobalAuthPolicy` - the runtime-tunable global ceiling | global policy | Med | - . Designed, **unbuilt**, and has no wave number |
+| **W6.1** | Remove legacy fallbacks once telemetry proves zero use | cross-cutting | Low | W3-W5 + telemetry |
+| **W2.5 tail** | Retire the `PerEndpointCredentialsEnabled` umbrella | enablement flags | Low | - . Core shipped |
+| **W3.1 tail** | Versioned `WifTrustV2` aggregate + migration state machine | trust storage | Low | - . May never be needed |
+
+### 2.5 Operability
+
+*Purpose: knowing the estate is healthy.*
+
+| ID | What it is for | Affects | Sev | Blocked by |
+|---|---|---|---|---|
+| **N2** | A scheduled liveness probe. All 5 scheduled workflows are static gates | all estates | **High** | - |
+
+Customer-facing prod being down was found by inspection, not by alert. `audit-deployment-doc.ps1
+-Live` C4 does catch it, but only runs post-deploy, so a dead estate between deploys is invisible.
+
+**Non-auth, tracked elsewhere:** issues **#144** (8 vulnerable pins in `overrides`) and **#142** (2
+stale `.trivyignore` entries); Dependabot **#146, #147, #143, #128**; customer prod reactivates
+automatically **2026-08-21**; `registry.npmjs.org` is TLS-blocked locally so lockfile regeneration
+must happen in CI.
+
+### 2.6 Documentation and process integrity
+
+*Purpose: keeping the record true. Cheap, and the reason several defects above were found late.*
+
+| ID | What it is for | Sev |
+|---|---|---|
+| **N4** | Bind the delivery plan's summary table to item status, or delete the duplication | Med |
+| **N3** | `[Unreleased]` has absorbed every version since `0.54.0-alpha.12` | Med |
+| **N11** | `CONTEXT_INSTRUCTIONS.md` still says `0.54.89`; it is outside the freshness manifest | Low |
+| **N5** | Guide action items cite paths that do not exist | Low |
+| **A2** | Transport persona axis (folds into W5.1) | Med |
+| **A6** | Surface `azpacr` in the decision trace | Med |
+| **A15** | Model a fail-closed denial in test-ISV scenarios | Med |
+| **A11** | Document the 6 profile merge rules | Low |
+| **A14** | Document that the token-endpoint host is config-gated | Low |
+
+### 2.7 Empirical gates still unmet
+
+| Gate | Blocks |
+|---|---|
+| First-party sovereign application ID | 1P enforcement |
+| Real SyncFabric capture, **both** acquisition modes | W3.2 / W5.2 enforcement, and **N6** - a capture from one slice does not characterize the other |
+| Real SyncFabric RFC 8693 request capture | W4 |
+| Fail-closed denial telemetry from SyncFabric | A15 |
+
+> **Check before deferring again:** the WIF token-mint latency gate has been deferred four times, but
+> commit `6504626e` "docs: WIF token-mint latency analysis (X11)" already exists and was never
+> consulted. It may already be satisfied.
+
+---
+
+## 3. What is delivered
+
+**Delivery-plan waves: 20 of 33 delivered, 2 settled, 11 open.**
+
+| Wave | State |
+|---|---|
+| **0** Correctness | **Complete** - W0.2, W0.3 (W0.1 declined) |
+| **1** Perf foundation | **8 of 9** - W1.1, W1.3, W1.4, W1.5, W1.6, W1.7a/b/c. Only W1.2's JWKS half remains |
+| **2** Structural seam | **Complete** - W2.1 .. W2.5 |
+| **3** RFC 7523 correctness | W3.2, W3.4, W3.6, W3.7, W3.8, W3.9 + W3.1 partial. W3.5 open, W3.3 deferred |
+| **4, 5, 6** | Not started |
+
+**Guide actions: 5 of 15 closed** - A1/A13 (mirror re-synced, byte-identical at 6,503 lines), A4
+(largely, via W3.7), A8 (v0.55.8), A10 (v0.55.9), A12 (v0.55.8).
+
+**Whole tracks complete:** WI-1..17 (connection-info), U1..12 (Connect + Logs UX), V1..12 (credential
+lifecycle), the durable-logs W1..12 (**a different W-series** from the delivery plan's W0.1-W6.2 -
+do not conflate), the Pre-Q / Q / A unified steps (Q3, Q4, Q5 remain deferred tracks), and F1..F6 of
+the real-Entra proof findings.
+
+**Performance:** X11 options A, B, D, H delivered; G effectively satisfied but never tracked; C
+partial (DB pool done, JWKS prefetch absent); E and F open. All three X15 findings closed via W1.7b.
+
+---
+
+## 4. Do next, in order
+
+Sequenced by value per unit of effort.
+
+```mermaid
+flowchart TD
+    N6["N6 slice-dependent audience<br/>runbook, BEFORE any slice rollout"] --> W12["W1.2 JWKS prefetch<br/>closes Wave 1"]
+    W12 --> A9["A9 optimistic concurrency<br/>High, profile writes"]
+    A9 --> N2["N2 liveness probe<br/>High, estate visibility"]
+    N2 --> A3["A3' + P2 log retention and pruning<br/>one problem, two framings"]
+    A3 --> N8["N8 stop advertising unenforced methods"]
+    N8 --> W35["W3.5 trust cache + index"]
+    W35 --> W41["Wave 4 RFC 8693<br/>carries N7: no client_id"]
+```
+
+**Why this order.** **N6** is first because it has an external trigger nobody controls - a SyncFabric
+slice rollout breaks trusts with no change on our side. **W1.2** closes an entire wave for one small
+item. **A9** and **N2** are the remaining High-severity items. **A3' and P2 are the same problem**
+(unbounded request-log growth) seen from the security and performance sides, so they should be solved
+once, not twice. **W3.5** is the last thing gating Wave 4.
+
+**Two constraints to carry into Wave 4:** **N7** - RFC 8693 omits `client_id` by design, so A4's
+"require `client_id`" must **not** be generalized to the 8693 handler or the integration breaks
+outright. And W4.1 must return HTTP 200 from day one.
+
+---
+
+## Appendix A: SyncFabric to SCIMServer flow comparison
+
+Verified from source on both sides. SyncFabric's *connector configurations* are out of scope by
+operator instruction; this compares auth-flow logic only.
+
+SyncFabric's `AuthenticationType` declares six values: `None`, `Basic`, `TokenBasedBearerToken`,
+`SyncPolicy`, `WorkloadIdentityClientAuthentication`, `WorkloadIdentityTokenExchange`. The last two
+are the WIF flows.
+
+**Flow A - `WorkloadIdentityClientAuthentication`** (the production flow):
 
 ```text
 grant_type            = client_credentials
-client_id             = <targetDirectoryClientIdentifier>   (required; RejectIfNullOrEmpty)
+client_id             = <targetDirectoryClientIdentifier>   (required)
 client_assertion      = <applicationToken>
 client_assertion_type = urn:ietf:params:oauth:client-assertion-type:jwt-bearer
-+ connector-supplied supplemental fields (audience / scope / resource)
 ```
 
 This is **RFC 7523 section 2.2 client authentication**, not the section 2.1 authorization grant. The
-`grant_type` is `client_credentials`, **not** `urn:ietf:params:oauth:grant-type:jwt-bearer`. Getting
-this backwards is the single easiest way to build an incompatible handler.
+`grant_type` is `client_credentials`, **not** `urn:ietf:params:oauth:grant-type:jwt-bearer`. Building
+a handler on the wrong one of those two is the easiest way to be silently incompatible. SCIMServer
+accepts exactly this pair and the assertion-type URN matches character for character.
 
-**Flow B, `WorkloadIdentityTokenExchange`** (`TokenExchangeTargetTokenStrategy`):
+**Flow B - `WorkloadIdentityTokenExchange`** (unimplemented here):
 
 ```text
 grant_type          = urn:ietf:params:oauth:grant-type:token-exchange
 subject_token       = <applicationToken>
 subject_token_type  = urn:ietf:params:oauth:token-type:jwt
 + optional: audience / scope / resource / requested_token_type
-            (requested_token_type value = urn:ietf:params:oauth:token-type:access_token)
 ```
 
-The builder's own doc comment says it **"deliberately omits `client_id`"**.
+The builder's own comment says it **"deliberately omits `client_id`"** - the basis for N7.
 
-Supplemental fields are merged by `MergeSupplementalRequestData`, which **cannot override a
-protocol-required base field**: a duplicate key is skipped and a warning emitted.
+**Findings not already captured as items above:**
 
-### 4.3 Flow-by-flow matrix
+- **F-D.** Flow A always sends `client_id`, so SCIMServer's `targetClientId` and SyncFabric's
+  `targetDirectoryClientIdentifier` are **one coupled setting configured in two places**. A mismatch
+  is a hard `401`.
+- **F-F.** SyncFabric can be configured for `Basic` against a SCIM target; SCIMServer accepts Basic
+  only at the token endpoint. Noted as an asymmetry, not proposed work.
+- **F-G.** Trust selection decodes the assertion `iss` **without verifying it**, purely to *order*
+  candidates so the common case does one JWKS verification instead of N. Every candidate is still
+  fully verified, so a spoofed `iss` gains nothing, and W1.4/W1.5 bound the fallback. **Lower
+  severity than the guide implies.**
 
-| SyncFabric flow | What it sends | SCIMServer today | Verdict |
+---
+
+## Appendix B: how these statuses were verified
+
+**Read this before trusting any single row.** Status in this codebase has been wrong in *both*
+directions, repeatedly, and always with confidence.
+
+### B.1 Three findings this register got wrong and retracted
+
+**C3, N1 and N9 are withdrawn.** All three descended from one bad read. The working tree sat on a
+branch **3 commits behind `origin/master`**, and one of those commits set `api/package.json` to
+`0.55.7`. So `package.json` genuinely read `0.55.6` and `git log -S` genuinely found nothing, because
+`-S` searches the *current branch*. Both readings were true about the tree and false about the
+product. From them this register concluded v0.55.7 was a phantom, that the canonical guide was wrong
+to cite it, and that the Stage 1.12 F1 gate was blind. **The guide was right, the gate was right, and
+this register was wrong three times.**
+
+The compounding step is the instructive one: the tree was rebased mid-session, which silently made
+the files `0.55.7`, and nothing re-verified the earlier conclusions. A finding survived the very
+event that invalidated it.
+
+> **Standing rule.** "X does not exist anywhere in the repo" is only as good as the tree it ran
+> against. Confirm the tree is current before recording an absence-based finding, and **re-verify any
+> absence-based finding after a rebase, merge or checkout.** Presence is self-evidencing; absence is
+> not.
+
+### B.2 Both directions of status error have occurred
+
+| Direction | Where | Cause |
+|---|---|---|
+| **Under-reported** (claimed open, had shipped) | Delivery plan Section 1 - twice, 2026-08-04 and 2026-08-19 | The summary table duplicates the per-item status lines and nothing binds them. Tracked as **N4** |
+| **Over-reported** (claimed open, had shipped) | The `docs/auth/` sweep - U1-U12, V1-V12, Pre-Q.A, DD1, DD3 | A doc-reading pass inferred status from each plan's *item table* instead of its *status header* |
+
+Same root cause both times: **status lives in two places.** Verify against source before believing
+either.
+
+### B.3 Corrections still standing
+
+| # | Source | What it claimed | What is true |
 |---|---|---|---|
-| `WorkloadIdentityClientAuthentication` | `client_credentials` + `client_assertion` + jwt-bearer assertion type | Parser requires exactly `grant_type === 'client_credentials'` and `client_assertion_type === JWT_BEARER_ASSERTION_TYPE`, whose value is byte-identical | **MATCH** |
-| `WorkloadIdentityTokenExchange` | `grant-type:token-exchange` + `subject_token` | Parser rejects any non-`client_credentials` grant with `unsupported_grant_type` / `grant_type_unsupported` | **GAP, fails cleanly** (W4.1) |
-| `Basic` | HTTP Basic to the SCIM resource | **No Basic on the resource plane.** Basic is accepted only at the *token* endpoint (`client_secret_basic`, RFC 6749 2.3.1) | **GAP** |
-| `TokenBasedBearerToken` | long-lived bearer | endpoint-credential authenticator | **MATCH** |
-| `None` / `SyncPolicy` | n/a to SCIMServer | n/a | n/a |
-| `resource` form param | `OptionalParameterResource` | W3.4 `resourceMode` (`ignore` / `optionalExact` / `requiredExact`) | **MATCH** |
-| `scope` form param | `OptionalParameterScope` | parsed on both variants | **MATCH** |
+| **C1** | Plan Section 1 | JWKS refresh "still none, 10-min TTL" | W1.4 shipped in v0.55.5: background sweep, 24 h TTL |
+| **C2** | Plan Section 1 | `client_secret` mint "inlined in the controller" | W2.3 shipped it as its own provider class |
+| **C4** | Guide A8/A9/A12 | paths under `api/src/modules/endpoint/` | Real paths are `.../endpoint/**services**/` and `.../**scim/controllers**/` |
+| **C5** | Guide | treats the flow generically as "RFC 7523" | It is specifically **section 2.2 client authentication** |
 
-### 4.4 Findings
+### B.4 Perf verification method
 
-**F-A. Flow A is a genuine match, including the subtle part.** SCIMServer accepts precisely the
-grant/assertion-type pair SyncFabric emits, and the assertion-type URN matches character for
-character. No action.
-
-**F-B. Flow B is unimplemented but fails safely.** A SyncFabric token-exchange request gets a clean
-`400 unsupported_grant_type`, not a confusing partial acceptance. This is W4.1, and it is now
-*motivated*: `[configurableConnectorWorkloadIdentityTokenExchangeEnabled] Enabled=True` globally, so
-any configurable connector set to that auth type against SCIMServer fails today.
-
-**F-C. The assertion audience is slice-dependent, and SCIMServer matches one exact string. HIGH.**
-The two acquisition modes compose different scopes, so Entra mints different `aud` values:
-
-| Mode | Composed scope | Resulting `aud` |
-|---|---|---|
-| `CustomerApplication` (legacy) | `api://<resourceAppId>/.default` | `api://<resourceAppId>` |
-| `FirstPartyApplication` (new) | `api://<resourceAppId>/<normalizedDnsHost>/.default` | `api://<resourceAppId>/<host>` |
-
-`[workloadIdentityFirstPartyApplicationIsDefault]` is `Enabled=True` on **`slice:A` and `slice:B`**
-and `Enabled=False` globally. So **the audience shape SCIMServer receives depends on which slice
-serves the job**, and a single trust carrying one `expectedAudience` string cannot satisfy both. A
-slice rollout would surface as an audience-mismatch rejection with no SCIMServer change involved.
-This is the concrete, verified form of the guide's A7. It also explains why the first-party
-host-qualified registration is still an unmet empirical gate.
-
-**F-D. `client_id` is always sent, so the trust must be configured to agree.** Flow A treats
-`targetDirectoryClientIdentifier` as required. SCIMServer's W3.7 binding rejects with
-`wif_client_id_mismatch` only when the trust has a `targetClientId` **and** the request sends a
-different one. Since SyncFabric always sends one, an operator who sets `targetClientId` to anything
-other than SyncFabric's configured value gets a hard 401. Worth stating explicitly in the setup doc:
-these two values are one coupled setting, not two independent ones.
-
-**F-E. A4 must not be generalized to Flow B.** The guide's A4 ("require `client_id` for RFC 7523") is
-safe for Flow A because SyncFabric always sends it. Applying the same rule to the future RFC 8693
-handler would break the integration outright, because Flow B omits `client_id` **by design**. Recorded
-here so W4.1 does not inherit the requirement by analogy.
-
-**F-F. Basic is a resource-plane gap, if anyone needs it.** SyncFabric can be configured for
-`Basic` against a SCIM target; SCIMServer accepts Basic only at the token endpoint. Whether this
-matters depends on whether any SCIMServer-targeting profile uses `Basic`, which is deployment state.
-Not proposing work: noting the asymmetry so it is not discovered during an incident.
-
-**F-G. Trust selection is ordered, not unbounded-by-accident.** SCIMServer decodes the assertion
-`iss` **without verifying it** purely to *order* candidate trusts (WI-17), so the common multi-IdP
-case does one JWKS verification instead of N. Every candidate is still fully verified, so a spoofed
-`iss` gains nothing. The residual cost is the fallback path when `iss` matches nothing, which still
-walks all N trusts. W1.4/W1.5 bound the damage (cache caps, rate-limited unknown-`kid`, total
-deadline), so this is bounded rather than open, and lower severity than the guide implies.
-
-
----
-
-## 4A. Full `docs/auth/` sweep (added 2026-08-19, second pass)
-
-The first pass of this register was built from the delivery plan and the canonical guide only. A
-subsequent sweep of **all 46 files in `docs/auth/`** found six further ID schemes. Every status
-below was **re-verified against source**, which mattered: the doc-level sweep reported four of them
-as open, and source proved otherwise.
-
-| Scheme | Where | Verified disposition |
-|---|---|---|
-| **U1-U12** Connect + Logs UX | [CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md](CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md) | **All 12 SHIPPED** (v0.54.32 to v0.54.37). Not open |
-| **V1-V12** credential lifecycle + auth-in-logs | [CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md](CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md) | **All 12 SHIPPED** (v0.54.38 to v0.54.40). Not open |
-| **W1-W12** durable logs + Connect UX | [AUTH_DURABLE_LOGS_AND_CONNECT_UX_PLAN.md](AUTH_DURABLE_LOGS_AND_CONNECT_UX_PLAN.md) | **All 12 SHIPPED** (v0.54.42 to v0.54.48). **Name collision:** this is a *different* W-series from the delivery plan's W0.1-W6.2. Do not conflate them |
-| **WI-1..WI-17** connection-info track | [CONNECTION_INFO_AND_ENTRA_SETUP.md](CONNECTION_INFO_AND_ENTRA_SETUP.md) | All SHIPPED (2026-07-06/07) |
-| **Pre-Q.A / Pre-Q.B, Q0-Q6, A0-A4** | [README.md](README.md) reconciliation table, [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) section 13 | Pre-Q.A **DONE** (`'structured'` is in the `FlagType` union and handled by the validator), Pre-Q.B/Q0/Q1/Q2/Q6/A0-A4 shipped. **Q3, Q4, Q5 remain DEFERRED** |
-| **F1-F8** real-Entra proof findings | [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md) | F1-F6 fixed (W3.6/3.7/3.8/3.9/3.1). **F7 open by design** (= W5.2). **F8 open** (`expectedAudience` easy to misconfigure - now much better motivated by N6) |
-| **DD1-DD6** doc drift | guide gap matrix | **DD1 and DD3 are RESOLVED** (README corrected 2026-08-18; the methods model now reads "LIVE and enforced"). DD5 partly remains as N11. DD6 is A1/A13 |
-
-**Genuinely new open items this sweep produced:** **N10** (`GlobalAuthPolicy` unbuilt and untracked),
-**N11** (CONTEXT_INSTRUCTIONS version), **F8**, and the confirmation that **Q3 / Q4 / Q5** are
-deferred tracks with no W-number. Everything else it surfaced was already shipped.
-
-**Method note worth keeping.** The sweep was done by a doc-reading pass that inferred status from
-item tables rather than from each document's status header, and it was wrong on U, V, Pre-Q.A, DD1
-and DD3 - all of which it called open and all of which had shipped. **Reading a plan's item list
-without reading its status header systematically over-reports open work**, which is the mirror image
-of the C1/C2 defect where a summary table under-reported it. Both are the same root cause: status
-lives in two places. Verify against source before believing either.
-
----
-
-## 4B. Performance: what is done, what is left (verified 2026-08-19)
-
-The perf work is the **X11** option set (A-H) plus the **X15** findings. Each row below was probed
-against source, not read from a status line. Two probes returned false results and were corrected,
-which is why the method matters: a `prefetch|prewarm` search "found" W1.2 but the hits were
+Every X11 option was probed against source rather than read from a status line, and **two of eight
+probes returned false results**: a `prefetch|prewarm` search "found" W1.2 but matched
 `X-DNS-Prefetch-Control` in the helmet config, and a `canonicalJwks` search "missed" W1.3 because the
-field is actually named `resolvedUri`.
-
-| X11 | Item | W item | Verified state |
-|---|---|---|---|
-| **A** | Background JWKS refresh-ahead + TTL + `Cache-Control` | W1.4 | **DONE** - `refreshTimer` sweep present |
-| **B** | Eager `jose` at boot | W1.1 | **DONE** - `josePromise` memoized |
-| **C** | Startup pre-warm (JWKS + DB pool) | **W1.2** | **PARTIAL.** DB pool warmed by `PrismaService.onModuleInit`; the **JWKS prefetch is genuinely absent** |
-| **D** | Canonical `jwks_uri`, drop the redirect | W1.3 | **DONE** - `resolvedUri` memo, L119 |
-| **E** | Per-endpoint credential/trust cache | **W3.5** | **OPEN** - no trust/credential cache exists |
-| **F** | `findActiveByEndpointAndType` + composite index | **W3.5** | **OPEN** - neither the typed lookup nor `@@index([endpointId, credentialType, active])` exists. `EndpointCredential` has `@@index([endpointId, active])` only |
-| **G** | Per-mint logging + decision trace off the hot path | **none** | **Effectively satisfied, never tracked.** Log writes are buffered (`flushInterval` / `flushMaxBuffer`, W1.7b) and the decision trace is **not awaited** on the mint path. No work needed, but it was never assigned an item |
-| **H** | Total deadline + cancellation | W1.5 | **DONE** - `totalDeadlineMs` + caps |
-
-X15's three findings are all closed: F1 (redesigned W1.4), F2 (all four Node server timeouts set
-explicitly), F3 (Prisma pool acquire timeout restored) - see W1.7b.
-
-**So the perf backlog is exactly two tracked items** - the JWKS half of **W1.2**, and all of
-**W3.5** - plus two untracked follow-ups inherited from the X9 latency RCA
-([../perf/DEV_LATENCY_REGRESSION_RCA.md](../perf/DEV_LATENCY_REGRESSION_RCA.md) section 10), which is
-marked RESOLVED but leaves these open:
-
-| ID | Follow-up | Why it still matters |
-|---|---|---|
-| **P1** | **Opaque per-endpoint secrets are still O(N).** A real `bearer` / `oauth_client` secret (neither a JWT nor the global secret) bcrypt-compares against **every** active credential on the endpoint. bcrypt is deliberately slow, so this is the most expensive O(N) loop in the resource plane | Needs a non-secret lookup key or prefix stored beside each credential so the guard selects one candidate instead of comparing all. One measured endpoint already carries 10 credentials |
-| **P2** | **Nothing caps or prunes accumulated credentials or request-log rows.** The same endpoint had 3,455 request-log rows from months of testing | Bounds the P1 loop and is the same concern as A3' (RequestLog retention), approached from the perf side rather than the security side. **P2 and A3' should be solved together** |
-
-Neither P1 nor P2 has a W-number, so both were invisible to the wave plan - the same gap class as
-**N10** (`GlobalAuthPolicy`) and **X11-G**.
+field is named `resolvedUri`. One false positive and one false negative in eight - which is the
+argument for recording the method next to the result.
 
 ---
 
-## 5. Newly identified items (found by this stock-take)
-
-| ID | Item | Sev | Why it matters |
-|---|---|---|---|
-| **N1** | ~~Resolve the phantom v0.55.7~~ **RETRACTED - never real** | - | v0.55.7 exists (commit `07db4088`, CHANGELOG line 11). This item was an artifact of reading a stale branch. See 1.2 |
-| **N2** | **No scheduled liveness probe on any estate.** All 5 scheduled workflows are static gates. `audit-deployment-doc.ps1 -Live` C4 *does* catch a dead estate (verified: exit 1) but only runs post-deploy | High | This is why customer-facing prod being down was found by inspection rather than by alert. A dead estate between deploys is currently invisible |
-| **N3** | **`[Unreleased]` has absorbed everything since `0.54.0-alpha.12`** | Med | The CHANGELOG has one heading covering many shipped versions, so it can no longer answer "what changed in 0.55.5?" without reading prose |
-| **N4** | **Bind the delivery plan's Section 1 table to item status** (see 1.1) | Med | Second occurrence of the same drift. Manual correction has now failed twice |
-| **N5** | **Guide action items cite paths that do not exist** (C4) | Low | Cheap to fix while re-syncing the mirror under A1/A13 |
-| **N6** | **Assertion `aud` is slice-dependent and `expectedAudience` is a single exact string** (Section 4, F-C) | High | `workloadIdentityFirstPartyApplicationIsDefault` is on for `slice:A` and `slice:B` and off globally, and the two acquisition modes emit `api://<appId>` vs `api://<appId>/<host>`. One trust cannot satisfy both, so a slice rollout presents as an audience-mismatch 401 with no SCIMServer change involved. Needs, at minimum, a documented operator runbook; possibly a trust that accepts a declared set of audiences |
-| **N7** | **Do not generalize A4 to RFC 8693** (Section 4, F-E) | Med | Flow B omits `client_id` by design. A W4.1 handler that inherits "require `client_id`" by analogy from A4 would break the integration outright |
-| **N8** | **`mtls` and `dpop` are declarable auth-method names with no enforcing authenticator** | Med | `admin-authentication-method.controller.ts` accepts `'mtls'` / `'dpop'` / `'oauth-authcode'` into the method set and [authentication-schemes.ts](../../api/src/modules/scim/discovery/authentication-schemes.ts) maps them into SCIM `ServiceProviderConfig.authenticationSchemes`, but **no `ResourceAuthenticator` implements any of them**. An operator can therefore declare a method the server will advertise and never enforce. This is the same capability-truthfulness class W0.3 fixed on the RFC 8414 surface, unfixed on the SCIM discovery surface. Either gate the declarable set to implemented methods, or derive the advertised schemes from the authenticator chain |
-| **N9** | ~~The Stage 1.12 F1 doc-freshness check is blind~~ **RETRACTED - the gate is correct** | - | Re-tested against the real header: `docs/INDEX.md` advertises `0.55.7`, `api/package.json` is `0.55.7`, the `Product version` marker pattern matches, and the values agree. The gate behaved exactly as specified. See 1.2 |
-| **N10** | **`GlobalAuthPolicy` is proposed but unbuilt, and nothing tracks it** | Med | [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) sections 5, 6.2 design it as the runtime-tunable global ceiling (allowed profiles/versions, scope catalog, trusted first-party app catalog, TTL bounds, role-enforcement policy). Verified **absent** from `api/prisma/schema.prisma` and all of `api/src`. It has **no W-number**, so it was invisible to the wave plan. Today those ceilings are env/compiled only, which is safe but not runtime-tunable |
-| **N11** | **CONTEXT_INSTRUCTIONS.md still states `Version: 0.54.89`** (DD5 remnant) | Low | Actual is 0.55.6. The doc is outside the freshness manifest, so nothing checks it |
-| **N12** | **Every pre-existing auth-admin event's `credentialId` is destroyed by the redactor** | Med | [`SENSITIVE_KEY_PATTERN`](../../api/src/security/redact-sensitive.ts) matches `/credential/`, so the three emit sites in [admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts) have **always** logged `credentialId: "[REDACTED]"`. The config-time audit trail therefore cannot say which credential was created, revealed or rotated. Found while implementing A8, which routed around it with a `methodId` field. **Do not fix by loosening the pattern** - it legitimately catches `credentialHash`. The fix is a correctly-named non-secret id field, mirroring A8, and it is a separate contract + test surface from A8 |
-
----
-
-## 6. Non-auth open items
-
-| Item | Detail |
-|---|---|
-| **Issue #144** (security) | 8 pins in `api/package.json` `overrides` are now themselves vulnerable, e.g. `@hono/node-server@1.19.10` should move to 2.0.5 |
-| **Issue #142** (security) | 2 stale `.trivyignore` entries, 14 days overdue, e.g. CVE-2026-4800 (lodash) |
-| **Dependabot #146, #147** | 18-package bumps |
-| **Dependabot #143, #128** | Older, still open |
-| **Customer-facing prod** | Subscription disabled on spending limit; **reactivates automatically 2026-08-21**. Canary prod carries all 58 endpoints meanwhile, so impact is bounded |
-| **npm registry TLS block** | `registry.npmjs.org` unreachable machine-wide, so `npm ci` cannot run locally and lockfile regeneration must happen in CI |
-
----
-
-## 7. What to do next, in order
-
-Sequenced by value per unit of effort, not by wave order.
-
-```mermaid
-flowchart TD
-    A["A8 audit event<br/>helper exists, 2 handlers, ~1h"] --> B["A12 comment fix<br/>1 line"]
-    B --> C["N1 phantom v0.55.7<br/>doc truthfulness"]
-    C --> N6["N6 slice-dependent audience<br/>runbook, before a slice rollout"]
-    N6 --> D["W1.2 startup JWKS pre-warm<br/>closes Wave 1"]
-    D --> E["A9 + A10 concurrency + partial block<br/>both High"]
-    E --> F["A1/A13 merge the guide mirror<br/>861-line gap, needs care"]
-    F --> G["N2 scheduled liveness probe"]
-    G --> H["W3.5 credential cache + index<br/>unblocks Wave 4"]
-    H --> I["Wave 4 RFC 8693<br/>carries N7: no client_id"]
-```
-
-**Rationale for the ordering.** A8 is first because the helper, the pattern, and three worked
-examples already exist, so it is close to pure gain on the most security-sensitive mutation surface
-in the product. A12 and N1 are near-free truthfulness fixes. W1.2 is the single item that closes a
-whole wave. A1/A13 sits mid-list rather than first despite being marked "blocking", because the
-861-line bidirectional divergence means it needs a careful merge, and doing it hastily would lose the
-section 0.1 decision record that stopped a declined proposal from being regenerated five times.
-
-**Explicitly not scheduled:** W0.1 and W3.3 are settled decisions, and W5.4 and W6.2 are on-demand
-tracks. Scheduling any of them without a new operator decision would be re-litigating a closed
-question.
-
----
-
-## 8. Design and architecture gate disposition
+## Appendix C: design and architecture gate
 
 | Check | Finding | Disposition |
 |---|---|---|
-| SRP | This register reports; it does not own status. Item status stays on the item | **Applied** |
+| SRP | This register reports state; item status stays on the item | **Applied** |
 | Coupling | C1/C2 exist because one fact is stored in two places | **Scheduled** as N4 |
-| Pattern fit | A8 extends an existing emitter used by three siblings; no new pattern | **Applied** |
-| Open/Closed | Section 4's exposure is a config-gated strategy, extended not edited | **Accepted** (SyncFabric-side) |
-| YAGNI | No new abstraction proposed. N4 asks to **remove** a duplicated fact, not add a framework | **Applied** |
+| Pattern fit | Grouping by purpose rather than by source document | **Applied** (2026-08-19 restructure) |
+| YAGNI | No new abstraction proposed; N4 asks to **remove** a duplicated fact | **Applied** |
 
-**R7 self-improvement.** This run revealed that the rule set has no gate binding a summary table to
-the detail it summarizes, which is exactly how C1 and C2 recurred after being fixed once. Closed as
-**scheduled** (N4) rather than applied, because the right fix is either deleting the duplicated
-column or asserting it in CI, and choosing between those needs the operator's view on whether the
-summary table earns its keep at all.
+**R7 self-improvement.** The first version of this document was organized by *provenance* - one
+section per source I had consulted - which mirrored the investigation rather than the reader's
+question, and made "which auth methods work?" unanswerable without reading all twelve sections. That
+is a documentation instance of the same defect the register keeps finding in code: **structure that
+records how something was built instead of what it does.** Restructured by purpose on 2026-08-19.
