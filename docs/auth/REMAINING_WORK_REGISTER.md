@@ -297,6 +297,43 @@ lives in two places. Verify against source before believing either.
 
 ---
 
+## 4B. Performance: what is done, what is left (verified 2026-08-19)
+
+The perf work is the **X11** option set (A-H) plus the **X15** findings. Each row below was probed
+against source, not read from a status line. Two probes returned false results and were corrected,
+which is why the method matters: a `prefetch|prewarm` search "found" W1.2 but the hits were
+`X-DNS-Prefetch-Control` in the helmet config, and a `canonicalJwks` search "missed" W1.3 because the
+field is actually named `resolvedUri`.
+
+| X11 | Item | W item | Verified state |
+|---|---|---|---|
+| **A** | Background JWKS refresh-ahead + TTL + `Cache-Control` | W1.4 | **DONE** - `refreshTimer` sweep present |
+| **B** | Eager `jose` at boot | W1.1 | **DONE** - `josePromise` memoized |
+| **C** | Startup pre-warm (JWKS + DB pool) | **W1.2** | **PARTIAL.** DB pool warmed by `PrismaService.onModuleInit`; the **JWKS prefetch is genuinely absent** |
+| **D** | Canonical `jwks_uri`, drop the redirect | W1.3 | **DONE** - `resolvedUri` memo, L119 |
+| **E** | Per-endpoint credential/trust cache | **W3.5** | **OPEN** - no trust/credential cache exists |
+| **F** | `findActiveByEndpointAndType` + composite index | **W3.5** | **OPEN** - neither the typed lookup nor `@@index([endpointId, credentialType, active])` exists. `EndpointCredential` has `@@index([endpointId, active])` only |
+| **G** | Per-mint logging + decision trace off the hot path | **none** | **Effectively satisfied, never tracked.** Log writes are buffered (`flushInterval` / `flushMaxBuffer`, W1.7b) and the decision trace is **not awaited** on the mint path. No work needed, but it was never assigned an item |
+| **H** | Total deadline + cancellation | W1.5 | **DONE** - `totalDeadlineMs` + caps |
+
+X15's three findings are all closed: F1 (redesigned W1.4), F2 (all four Node server timeouts set
+explicitly), F3 (Prisma pool acquire timeout restored) - see W1.7b.
+
+**So the perf backlog is exactly two tracked items** - the JWKS half of **W1.2**, and all of
+**W3.5** - plus two untracked follow-ups inherited from the X9 latency RCA
+([../perf/DEV_LATENCY_REGRESSION_RCA.md](../perf/DEV_LATENCY_REGRESSION_RCA.md) section 10), which is
+marked RESOLVED but leaves these open:
+
+| ID | Follow-up | Why it still matters |
+|---|---|---|
+| **P1** | **Opaque per-endpoint secrets are still O(N).** A real `bearer` / `oauth_client` secret (neither a JWT nor the global secret) bcrypt-compares against **every** active credential on the endpoint. bcrypt is deliberately slow, so this is the most expensive O(N) loop in the resource plane | Needs a non-secret lookup key or prefix stored beside each credential so the guard selects one candidate instead of comparing all. One measured endpoint already carries 10 credentials |
+| **P2** | **Nothing caps or prunes accumulated credentials or request-log rows.** The same endpoint had 3,455 request-log rows from months of testing | Bounds the P1 loop and is the same concern as A3' (RequestLog retention), approached from the perf side rather than the security side. **P2 and A3' should be solved together** |
+
+Neither P1 nor P2 has a W-number, so both were invisible to the wave plan - the same gap class as
+**N10** (`GlobalAuthPolicy`) and **X11-G**.
+
+---
+
 ## 5. Newly identified items (found by this stock-take)
 
 | ID | Item | Sev | Why it matters |
