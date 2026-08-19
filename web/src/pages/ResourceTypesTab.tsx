@@ -53,6 +53,9 @@ import { useEndpoint, useUpdateEndpointConfig } from '../api/queries';
 import { LoadingSkeleton } from '../components/primitives';
 import { FormDialog } from '../components/primitives/FormDialog';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
+import { ConflictDialog } from '../components/primitives/ConflictDialog';
+import { ScimApiError } from '../api/scim-error';
+import { getEndpointVersion, forgetEndpointVersion } from '../api/endpoint-version';
 
 const RESERVED_NAMES = new Set(['User', 'Group']);
 const RESERVED_ENDPOINTS = new Set([
@@ -133,7 +136,21 @@ export interface ResourceTypesTabProps {
 export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const ep = useEndpoint(endpointId);
-  const update = useUpdateEndpointConfig(endpointId);
+  const update = useUpdateEndpointConfig(endpointId, { concurrencyChecked: true });
+
+  // This tab sends the WHOLE resourceTypes + schemas arrays, merged from the
+  // profile it read on load, so a second editor's type would be erased silently.
+  const [conflict, setConflict] = useState<Record<string, unknown> | null>(null);
+
+  const saveProfile = async (payload: Record<string, unknown>, onDone: () => void): Promise<void> => {
+    try {
+      await update.mutateAsync({ profile: payload });
+      onDone();
+    } catch (e) {
+      if (e instanceof ScimApiError && e.status === 412) setConflict(payload);
+      else setSubmitError(e);
+    }
+  };
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
@@ -233,17 +250,7 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
       : [...existingSchemas, newSchema];
     const mergedRts = [...allRts, newRt as unknown as Record<string, unknown>] as unknown as ResourceType[];
 
-    try {
-      await update.mutateAsync({
-        profile: {
-          resourceTypes: mergedRts,
-          schemas: mergedSchemas,
-        },
-      });
-      setCreateOpen(false);
-    } catch (e) {
-      setSubmitError(e);
-    }
+    await saveProfile({ resourceTypes: mergedRts, schemas: mergedSchemas }, () => setCreateOpen(false));
   };
 
   const handleDeleteOpen = (rt: ResourceType): void => {
@@ -257,17 +264,10 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
     if (!deleteTarget || deleteConfirm !== deleteTarget.name) return;
     setSubmitError(null);
     const filtered = allRts.filter((r) => r.name !== deleteTarget.name);
-    try {
-      await update.mutateAsync({
-        profile: {
-          resourceTypes: filtered as unknown as Array<Record<string, unknown>>,
-        },
-      });
+    await saveProfile({ resourceTypes: filtered as unknown as Array<Record<string, unknown>> }, () => {
       setDeleteOpen(false);
       setDeleteTarget(null);
-    } catch (e) {
-      setSubmitError(e);
-    }
+    });
   };
 
   // ─── Render ────────────────────────────────────────────────────────
@@ -282,6 +282,28 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
 
   return (
     <div className={classes.page} data-testid="resource-types-tab">
+      <ConflictDialog
+        open={conflict !== null}
+        pendingDiff={conflict ?? {}}
+        serverResource={{ id: endpointId, meta: { version: getEndpointVersion(endpointId) } }}
+        onRefreshAndReapply={() => {
+          // The refetch re-records the current ETag, so the retry carries it.
+          void ep.refetch().then(() => {
+            const pending = conflict;
+            setConflict(null);
+            if (pending) void saveProfile(pending, () => undefined);
+          });
+        }}
+        onForceOverwrite={() => {
+          // Dropping the remembered version means the retry sends no If-Match,
+          // which the server treats as "no opinion" and applies.
+          forgetEndpointVersion(endpointId);
+          const pending = conflict;
+          setConflict(null);
+          if (pending) void saveProfile(pending, () => undefined);
+        }}
+        onCancel={() => setConflict(null)}
+      />
       <div className={classes.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <CubeTree24Regular />

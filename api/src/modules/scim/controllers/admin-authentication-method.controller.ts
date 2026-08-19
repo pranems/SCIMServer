@@ -19,6 +19,13 @@ import type {
 import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { emitAuthAdminEvent } from '../../../oauth/auth-admin-event';
+import { KeyedMutex } from '../../../common/keyed-mutex';
+
+/**
+ * Module-level so every controller instance shares it; a per-instance lock
+ * would protect nothing if the controller ever became request-scoped.
+ */
+const authBlockMutex = new KeyedMutex();
 
 /**
  * Registry of known authentication-method `type` values (architecture section
@@ -101,29 +108,37 @@ export class AdminAuthenticationMethodController {
       );
     }
 
-    const current = await this.loadAuthentication(endpointId);
-    const method: AuthenticationMethod = { id: `m-${randomUUID().slice(0, 8)}`, type: dto.type };
-    if (dto.displayName !== undefined) method.displayName = dto.displayName;
-    if (dto.description !== undefined) method.description = dto.description;
-    if (dto.specUri !== undefined) method.specUri = dto.specUri;
-    if (dto.plane !== undefined) method.plane = dto.plane;
-    if (dto.tokenEndpointAuthMethod !== undefined) method.tokenEndpointAuthMethod = dto.tokenEndpointAuthMethod;
-    if (dto.enabled !== undefined) method.enabled = dto.enabled;
-    if (dto.priority !== undefined) method.priority = dto.priority;
-    if (dto.lifecycleStatus !== undefined) method.lifecycleStatus = dto.lifecycleStatus;
-    if (dto.config !== undefined) method.config = dto.config;
-    if (dto.credentialRef !== undefined) method.credentialRef = dto.credentialRef;
+    // Captured here because the guard's narrowing does not survive into the closure.
+    const type = dto.type;
 
-    const nextBlock: ProfileAuthentication = {
-      schemaVersion: current.schemaVersion,
-      methods: [...current.methods, method],
-      ...(current.defaultMethodId ? { defaultMethodId: current.defaultMethodId } : {}),
-      ...(current.policy ? { policy: current.policy } : {}),
-    };
+    // Read-modify-write of the whole authentication block: without the lock two
+    // concurrent adds both read the same block and the later write erases the
+    // earlier method, with both callers receiving 201.
+    const savedMethod = await authBlockMutex.runExclusive(endpointId, async () => {
+      const current = await this.loadAuthentication(endpointId);
+      const method: AuthenticationMethod = { id: `m-${randomUUID().slice(0, 8)}`, type };
+      if (dto.displayName !== undefined) method.displayName = dto.displayName;
+      if (dto.description !== undefined) method.description = dto.description;
+      if (dto.specUri !== undefined) method.specUri = dto.specUri;
+      if (dto.plane !== undefined) method.plane = dto.plane;
+      if (dto.tokenEndpointAuthMethod !== undefined) method.tokenEndpointAuthMethod = dto.tokenEndpointAuthMethod;
+      if (dto.enabled !== undefined) method.enabled = dto.enabled;
+      if (dto.priority !== undefined) method.priority = dto.priority;
+      if (dto.lifecycleStatus !== undefined) method.lifecycleStatus = dto.lifecycleStatus;
+      if (dto.config !== undefined) method.config = dto.config;
+      if (dto.credentialRef !== undefined) method.credentialRef = dto.credentialRef;
 
-    // expandAuthentication strips secret-looking config keys (A0 invariant).
-    const saved = await this.persist(endpointId, nextBlock);
-    const savedMethod = saved.methods.find((m) => m.id === method.id);
+      const nextBlock: ProfileAuthentication = {
+        schemaVersion: current.schemaVersion,
+        methods: [...current.methods, method],
+        ...(current.defaultMethodId ? { defaultMethodId: current.defaultMethodId } : {}),
+        ...(current.policy ? { policy: current.policy } : {}),
+      };
+
+      // expandAuthentication strips secret-looking config keys (A0 invariant).
+      const saved = await this.persist(endpointId, nextBlock);
+      return saved.methods.find((m) => m.id === method.id);
+    });
     if (!savedMethod) {
       throw new BadRequestException('Failed to persist the authentication method.');
     }
@@ -150,32 +165,35 @@ export class AdminAuthenticationMethodController {
     @Param('endpointId') endpointId: string,
     @Param('methodId') methodId: string,
   ): Promise<void> {
-    const current = await this.loadAuthentication(endpointId);
-    const target = current.methods.find((m) => m.id === methodId);
-    if (!target) {
-      emitAuthAdminEvent(
-        this.logger,
-        {
-          action: 'auth_method_remove',
-          outcome: 'failure',
-          endpointId,
-          methodId,
-          correlationId: getCorrelationContext()?.requestId,
-          detail: 'authentication method not found',
-        },
-        LogCategory.AUTH,
-      );
-      throw new NotFoundException(`Authentication method "${methodId}" not found for endpoint "${endpointId}".`);
-    }
-    const nextBlock: ProfileAuthentication = {
-      schemaVersion: current.schemaVersion,
-      methods: current.methods.filter((m) => m.id !== methodId),
-      ...(current.defaultMethodId && current.defaultMethodId !== methodId
-        ? { defaultMethodId: current.defaultMethodId }
-        : {}),
-      ...(current.policy ? { policy: current.policy } : {}),
-    };
-    await this.persist(endpointId, nextBlock);
+    const target = await authBlockMutex.runExclusive(endpointId, async () => {
+      const current = await this.loadAuthentication(endpointId);
+      const found = current.methods.find((m) => m.id === methodId);
+      if (!found) {
+        emitAuthAdminEvent(
+          this.logger,
+          {
+            action: 'auth_method_remove',
+            outcome: 'failure',
+            endpointId,
+            methodId,
+            correlationId: getCorrelationContext()?.requestId,
+            detail: 'authentication method not found',
+          },
+          LogCategory.AUTH,
+        );
+        throw new NotFoundException(`Authentication method "${methodId}" not found for endpoint "${endpointId}".`);
+      }
+      const nextBlock: ProfileAuthentication = {
+        schemaVersion: current.schemaVersion,
+        methods: current.methods.filter((m) => m.id !== methodId),
+        ...(current.defaultMethodId && current.defaultMethodId !== methodId
+          ? { defaultMethodId: current.defaultMethodId }
+          : {}),
+        ...(current.policy ? { policy: current.policy } : {}),
+      };
+      await this.persist(endpointId, nextBlock);
+      return found;
+    });
     this.logger.info(LogCategory.AUTH, `Removed authentication method "${methodId}" from endpoint "${endpointId}"`);
     emitAuthAdminEvent(
       this.logger,

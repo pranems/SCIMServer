@@ -15101,6 +15101,104 @@ try {
 Write-Host "`n--- 9z-CH: Two-Audience WIF Trusts Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CI: endpoint write concurrency (B/C/D)
+$script:currentSection = "9z-CI: endpoint write concurrency (B/C/D)"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CI: Endpoint Write Concurrency (B/C/D) ===" -ForegroundColor Cyan
+
+# Endpoint config is edited rarely, so the risk here is not volume - it is that
+# a lost update is SILENT. Two admins editing resource types both saw 200 OK and
+# one of them lost their type. B publishes a version, C lets a caller say which
+# version it edited, D removes a server-side race no caller could have seen.
+try {
+    $ciEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-ci-concurrency-$(Get-Random)"
+        displayName = "concurrency original"
+    } | ConvertTo-Json)
+    $ciId = $ciEndpoint.id
+
+    # --- B: the server publishes a version ---
+    $ciGet = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method GET -Headers $headers
+    $ciEtag = $ciGet.Headers['ETag']
+    if ($ciEtag -is [array]) { $ciEtag = $ciEtag[0] }
+    Test-Result -Success ($ciEtag -match '^W/"[a-f0-9]+"$') -Message "9z-CI.T1: GET publishes a weak ETag (got '$ciEtag')"
+
+    # --- C: a write that names the current version is accepted ---
+    $ciHeadersMatch = $headers.Clone()
+    $ciHeadersMatch['If-Match'] = $ciEtag
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method PATCH -Headers $ciHeadersMatch -Body (@{
+        displayName = "first writer wins"
+    } | ConvertTo-Json)
+    $ciAfterFirst = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method GET -Headers $headers
+    Test-Result -Success ($ciAfterFirst.displayName -eq "first writer wins") -Message "9z-CI.T2: a write naming the current version is applied"
+
+    # --- C: the lost-update scenario, using the now-stale version ---
+    $ciStaleStatus = 0
+    $ciScimType = ""
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method PATCH -Headers $ciHeadersMatch -Body (@{
+            displayName = "second writer clobbers"
+        } | ConvertTo-Json)
+    } catch {
+        $ciStaleStatus = [int]$_.Exception.Response.StatusCode
+        $ciBody = $_.ErrorDetails.Message
+        if ($ciBody) { try { $ciScimType = ($ciBody | ConvertFrom-Json).scimType } catch { $ciScimType = "" } }
+    }
+    Test-Result -Success ($ciStaleStatus -eq 412) -Message "9z-CI.T3: a write naming a STALE version is refused with 412 (got $ciStaleStatus)"
+    Test-Result -Success ($ciScimType -eq "versionMismatch") -Message "9z-CI.T4: the refusal carries scimType=versionMismatch (got '$ciScimType')"
+
+    # The decisive assertion: a 412 that still applied the write would be worse
+    # than no check at all, because the caller is told their change was rejected.
+    $ciAfterStale = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method GET -Headers $headers
+    Test-Result -Success ($ciAfterStale.displayName -eq "first writer wins") -Message "9z-CI.T5: the refused write did NOT modify the endpoint"
+
+    # --- C: opt-in, so existing callers are untouched ---
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method PATCH -Headers $headers -Body (@{
+        displayName = "no if-match still works"
+    } | ConvertTo-Json)
+    $ciAfterNoMatch = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method GET -Headers $headers
+    Test-Result -Success ($ciAfterNoMatch.displayName -eq "no if-match still works") -Message "9z-CI.T6: a write with NO If-Match still succeeds (backward compatible)"
+
+    # --- D: concurrent authentication-method writes ---
+    # Fired in parallel on purpose: sequential adds passed even before the fix,
+    # so a sequential test here would have proved nothing.
+    $ciMethodsUrl = "$baseUrl/scim/admin/endpoints/$ciId/authentication/methods"
+    $ciTypes = @('bearer', 'shared-secret', 'oauth-client')
+    $ciAddResults = $ciTypes | ForEach-Object -Parallel {
+        try {
+            $null = Invoke-RestMethod -Uri $using:ciMethodsUrl -Method POST -Headers $using:headers -Body (@{
+                type = $_
+                displayName = "concurrent-$_"
+            } | ConvertTo-Json)
+            return 201
+        } catch {
+            return [int]$_.Exception.Response.StatusCode
+        }
+    } -ThrottleLimit 3
+    $ciAllAccepted = ($ciAddResults | Where-Object { $_ -eq 201 }).Count
+    Test-Result -Success ($ciAllAccepted -eq 3) -Message "9z-CI.T7: three simultaneous auth-method adds were all accepted ($ciAllAccepted/3)"
+
+    $ciListed = Invoke-RestMethod -Uri $ciMethodsUrl -Method GET -Headers $headers
+    $ciCount = $ciListed.methods.Count
+    Test-Result -Success ($ciCount -eq 3) -Message "9z-CI.T8: all three methods SURVIVED the concurrent writes (found $ciCount, pre-fix this was 1)"
+
+    # A failure path that did not release the lock would hang every later call.
+    $ciAfterFailure = 0
+    try {
+        $null = Invoke-RestMethod -Uri $ciMethodsUrl -Method POST -Headers $headers -Body (@{ type = 'not-a-real-type' } | ConvertTo-Json)
+    } catch { $ciAfterFailure = [int]$_.Exception.Response.StatusCode }
+    Test-Result -Success ($ciAfterFailure -eq 400) -Message "9z-CI.T9: an invalid add is rejected with 400 (got $ciAfterFailure)"
+    $ciRecovered = Invoke-RestMethod -Uri $ciMethodsUrl -Method POST -Headers $headers -Body (@{ type = 'bearer'; displayName = 'after-failure' } | ConvertTo-Json)
+    Test-Result -Success ($null -ne $ciRecovered.id) -Message "9z-CI.T10: the endpoint still accepts writes after a failed add (lock released)"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciId" -Method DELETE -Headers $headers
+} catch {
+    Test-Result -Success $false -Message "9z-CI: endpoint write concurrency section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CI: Endpoint Write Concurrency Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

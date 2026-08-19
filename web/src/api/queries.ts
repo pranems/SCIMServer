@@ -30,6 +30,7 @@ import type { ConnectionInfo } from '@scim/types/connection-info.types';
 import type { AuthDecisionsResponse } from '@scim/types/auth-decision.types';
 import { getStoredToken, notifyTokenInvalid, clearStoredToken } from '../auth/token';
 import { ScimApiError } from './scim-error';
+import { rememberEndpointVersion, getEndpointVersion } from './endpoint-version';
 
 // ─── Base fetch wrapper ──────────────────────────────────────────────
 
@@ -73,7 +74,11 @@ function handleUnauthorized(path: string): void {
 }
 
 /** Authenticated fetch wrapper with automatic 401 handling */
-export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promise<T> {
+export async function fetchWithAuth<T>(
+  path: string,
+  init?: RequestInit,
+  onResponseHeaders?: (headers: Headers) => void,
+): Promise<T> {
   const token = getStoredToken();
 
   // Short-circuit when there is no token at all. Do NOT fire
@@ -92,6 +97,8 @@ export async function fetchWithAuth<T>(path: string, init?: RequestInit): Promis
   };
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+
+  if (onResponseHeaders && res.headers) onResponseHeaders(res.headers);
 
   if (res.status === 401) {
     handleUnauthorized(path);
@@ -327,7 +334,10 @@ export const endpointsQueryOptions = () => ({
 
 export const endpointDetailQueryOptions = (id: string) => ({
   queryKey: queryKeys.endpoints.detail(id),
-  queryFn: () => fetchWithAuth<EndpointResponse>(`/scim/admin/endpoints/${id}`),
+  queryFn: () =>
+    fetchWithAuth<EndpointResponse>(`/scim/admin/endpoints/${id}`, undefined, (h) =>
+      rememberEndpointVersion(id, h.get('etag')),
+    ),
   staleTime: 30_000,
 });
 
@@ -1933,14 +1943,23 @@ export function useEditCredentialLabel(endpointId: string) {
  * we keep the shallow merge against the detail cache - that path was
  * tested in v0.44.0 and we don't want to regress it.
  */
-export function useUpdateEndpointConfig(endpointId: string) {
+export function useUpdateEndpointConfig(
+  endpointId: string,
+  options?: { concurrencyChecked?: boolean },
+) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      fetchWithAuth(`/scim/admin/endpoints/${endpointId}`, {
+    mutationFn: (body: Record<string, unknown>) => {
+      // Opt-in per call site. Settings writes merge per key server-side, so a
+      // 412 there would be friction guarding a case that cannot lose data;
+      // callers that replace a whole profile section ask for the check.
+      const version = options?.concurrencyChecked ? getEndpointVersion(endpointId) : undefined;
+      return fetchWithAuth(`/scim/admin/endpoints/${endpointId}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
-      }),
+        ...(version ? { headers: { 'If-Match': version } } : {}),
+      });
+    },
     onMutate: async (body: Record<string, unknown>) => {
       await qc.cancelQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
       await qc.cancelQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });

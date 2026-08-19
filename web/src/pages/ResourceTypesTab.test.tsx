@@ -26,6 +26,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { ResourceTypesTab } from './ResourceTypesTab';
+import { ScimApiError } from '../api/scim-error';
+import { rememberEndpointVersion } from '../api/endpoint-version';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -230,8 +232,78 @@ describe('ResourceTypesTab (Phase M3)', () => {
     expect(schemaIds).toContain(SCHEMA_USER);
   });
 
-  // ─── 8-9. Validation ──────────────────────────────────────────────
+  // ─── C. Concurrent-edit conflict ──────────────────────────────────
 
+  const openCreateAndSubmit = (): void => {
+    // A real page load records the ETag from the GET; without it the dialog
+    // correctly hides force-overwrite because it has no version to overwrite.
+    rememberEndpointVersion('ep-1', 'W/"abc123"');
+    fireEvent.click(screen.getByTestId('resource-types-create-button'));
+    fireEvent.change(screen.getByTestId('resource-types-create-name'), { target: { value: 'Device' } });
+    fireEvent.change(screen.getByTestId('resource-types-create-endpoint'), { target: { value: '/Devices' } });
+    fireEvent.change(screen.getByTestId('resource-types-create-schema'), { target: { value: SCHEMA_DEVICE } });
+    fireEvent.click(screen.getByTestId('resource-types-create-dialog-submit'));
+  };
+
+  it('C-W1: a 412 opens the conflict dialog instead of a generic error', async () => {
+    mockUpdateMutate.mockRejectedValueOnce(
+      new ScimApiError({ status: 412, scimType: 'versionMismatch', detail: 'stale' }),
+    );
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    openCreateAndSubmit();
+
+    // The recovery path here is refresh-or-overwrite, which the generic error
+    // message cannot offer, so the dialog is the outcome that matters.
+    await waitFor(() => expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument());
+    expect(screen.getByTestId('conflict-refresh')).toBeInTheDocument();
+    expect(screen.getByTestId('conflict-force-overwrite')).toBeInTheDocument();
+  });
+
+  it('C-W2: force-overwrite retries the SAME payload and it succeeds', async () => {
+    mockUpdateMutate.mockRejectedValueOnce(
+      new ScimApiError({ status: 412, scimType: 'versionMismatch', detail: 'stale' }),
+    );
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    openCreateAndSubmit();
+    await waitFor(() => expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('conflict-force-overwrite'));
+
+    await waitFor(() => expect(mockUpdateMutate).toHaveBeenCalledTimes(2));
+    const retry = mockUpdateMutate.mock.calls[1][0] as {
+      profile: { resourceTypes: Array<{ name: string }> };
+    };
+    // The operator's work must survive the conflict, not be silently dropped.
+    expect(retry.profile.resourceTypes.map((r) => r.name)).toContain('Device');
+    await waitFor(() => expect(screen.queryByTestId('conflict-dialog')).not.toBeInTheDocument());
+  });
+
+  it('C-W3: cancel closes the dialog and does NOT write', async () => {
+    mockUpdateMutate.mockRejectedValueOnce(
+      new ScimApiError({ status: 412, scimType: 'versionMismatch', detail: 'stale' }),
+    );
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    openCreateAndSubmit();
+    await waitFor(() => expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('conflict-cancel'));
+
+    await waitFor(() => expect(screen.queryByTestId('conflict-dialog')).not.toBeInTheDocument());
+    expect(mockUpdateMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('C-W4: a non-412 failure still uses the generic error surface', async () => {
+    mockUpdateMutate.mockRejectedValueOnce(
+      new ScimApiError({ status: 400, scimType: 'invalidValue', detail: 'bad' }),
+    );
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    openCreateAndSubmit();
+
+    await waitFor(() => expect(mockUpdateMutate).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('conflict-dialog')).not.toBeInTheDocument();
+  });
+
+  // ─── 8-9. Validation ──────────────────────────────────────────────
   it('reserved name (User) shows inline error and disables Create submit', () => {
     renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
     fireEvent.click(screen.getByTestId('resource-types-create-button'));
@@ -279,3 +351,5 @@ describe('ResourceTypesTab (Phase M3)', () => {
     expect(names).toEqual(['Group', 'User']);
   });
 });
+
+

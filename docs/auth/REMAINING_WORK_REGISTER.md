@@ -80,7 +80,7 @@ globally, so a connector set to that type fails against SCIMServer today.
 
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
-| **A9** | Optimistic concurrency, so two concurrent profile writes cannot silently clobber | endpoint profile writes | **High** | - |
+| ~~**A9**~~ | ~~Optimistic concurrency, so two concurrent profile writes cannot silently clobber~~ **DELIVERED v0.55.12, re-scoped** as B/C/D after measuring which writes can lose data - `settings` and `serviceProviderConfig` merge per key and were never at risk, so no precondition was added there. See [ENDPOINT_WRITE_CONCURRENCY.md](../ENDPOINT_WRITE_CONCURRENCY.md). The blanket "If-Match on profile writes" originally scoped here was **not** built. | endpoint profile writes | ~~High~~ | - |
 | **A3'** | Bound RequestLog retention + restrict who can read it | request log | **High** | - |
 | **A5** | Replay denylist keyed on Entra's `uti` (not `jti`) | WIF assertion validation | Med | - |
 | **A7** | Reject a bare `api://<appId>` in `expectedAudience` as likely misconfiguration | WIF trust config | Med | - |
@@ -209,14 +209,14 @@ Sequenced by value per unit of effort.
 
 ```mermaid
 flowchart TD
-    A9["A9 optimistic concurrency<br/>High, profile writes"] --> N2["N2 liveness probe<br/>High, estate visibility"]
-    N2 --> A3["A3' + P2 log retention and pruning<br/>one problem, two framings"]
+    N2["N2 liveness probe<br/>High, estate visibility"] --> A3["A3' + P2 log retention and pruning<br/>one problem, two framings"]
     A3 --> N8["N8 stop advertising unenforced methods"]
     N8 --> W35["W3.5 trust cache + index"]
     W35 --> W41["Wave 4 RFC 8693<br/>carries N7: no client_id"]
 ```
 
-**Why this order.** **A9** and **N2** are the remaining High-severity items. **A3' and P2 are the same problem**
+**Why this order.** **N2** is now the only remaining High-severity item (**A9** shipped in v0.55.12).
+**A3' and P2 are the same problem**
 (unbounded request-log growth) seen from the security and performance sides, so they should be solved
 once, not twice. **W3.5** is the last thing gating Wave 4.
 

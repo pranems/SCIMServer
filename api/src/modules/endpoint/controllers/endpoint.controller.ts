@@ -7,8 +7,11 @@ import {
   Body,
   Param,
   HttpCode,
-  Query
+  Query,
+  Headers,
+  Res
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   EndpointService,
   type EndpointResponse,
@@ -18,6 +21,7 @@ import {
 } from '../services/endpoint.service';
 import { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import { UpdateEndpointDto } from '../dto/update-endpoint.dto';
+import { endpointETag, assertEndpointIfMatch } from './endpoint-etag';
 
 /**
  * Endpoint Management API Controller
@@ -85,9 +89,13 @@ export class EndpointController {
   async getEndpoint(
     @Param('endpointId') endpointId: string,
     @Query('view') view?: string,
+    @Res({ passthrough: true }) res?: Response,
   ): Promise<EndpointResponse> {
     const resolvedView = (view === 'full' || view === 'summary') ? view : 'full';
-    return this.endpointService.getEndpoint(endpointId, resolvedView);
+    const endpoint = await this.endpointService.getEndpoint(endpointId, resolvedView);
+    // A9 - the token a caller echoes back in If-Match to detect a lost update.
+    res?.setHeader('ETag', endpointETag(endpoint));
+    return endpoint;
   }
 
   /**
@@ -107,13 +115,25 @@ export class EndpointController {
    * Update endpoint configuration
    * PATCH /admin/endpoints/{endpointId}
    * Body: { displayName?, description?, profile?, active? }
+   *
+   * A9 - send `If-Match` with the ETag from a prior GET to make the write
+   * conditional. Omitting it preserves the previous last-write-wins behavior.
    */
   @Patch(':endpointId')
   async updateEndpoint(
     @Param('endpointId') endpointId: string,
-    @Body() dto: UpdateEndpointDto
+    @Body() dto: UpdateEndpointDto,
+    @Headers('if-match') ifMatch?: string,
+    @Res({ passthrough: true }) res?: Response,
   ): Promise<EndpointResponse> {
-    return this.endpointService.updateEndpoint(endpointId, dto);
+    if (ifMatch) {
+      // Read-then-compare BEFORE the write, so a stale caller never mutates.
+      assertEndpointIfMatch(await this.endpointService.getEndpoint(endpointId, 'full'), ifMatch);
+    }
+    const updated = await this.endpointService.updateEndpoint(endpointId, dto);
+    // Hand back the new token so a client can chain edits without re-reading.
+    res?.setHeader('ETag', endpointETag(updated));
+    return updated;
   }
 
   /**
