@@ -14,7 +14,11 @@ carried forward from a previous document.
 
 This register exists because the answer to "what is left?" was spread across the delivery plan,
 the canonical guide's action list, GitHub issues, and the deployment estate, and **each of those
-four sources disagreed with the others**. Section 1 records what the cross-check corrected.
+four sources disagreed with the others**. Section 1 records what the cross-check corrected, and
+**Section 4 is a flow-by-flow comparison of both codebases' authentication logic**.
+
+**Scope exclusion:** SyncFabric's *connector configurations* are out of scope by operator
+instruction; they are on an independent plan. Section 4 compares auth-flow logic only.
 
 ---
 
@@ -28,8 +32,7 @@ These are findings, not restatements. Each one means a document was saying somet
 | **C2** | Delivery plan Section 1, mint row | "Mint `client_secret` path: **inlined** in the controller" | W2.3 shipped: the provider is its own class with its own spec | [client-secret-token-provider.ts](../../api/src/modules/scim/controllers/client-secret-token-provider.ts) |
 | **C3** | Canonical guide, gap-matrix header | `09b4b78d` is "**v0.55.7**" | **There is no v0.55.7.** No commit ever set `api/package.json` to `0.55.7`; there is no such CHANGELOG heading. The version is **0.55.6** | `git log -S'"version": "0.55.7"' -- api/package.json` returns nothing |
 | **C4** | Canonical guide, actions A8 / A9 / A12 | paths under `api/src/modules/endpoint/` | Those paths do not exist. Real paths are `api/src/modules/endpoint/**services**/endpoint.service.ts` and `api/src/modules/**scim/controllers**/admin-authentication-method.controller.ts` | `Get-ChildItem -Recurse` |
-| **C5** | Canonical guide, connector-impact finding | "two of three prod auth-code-grant connectors have no configured URI" | **Correct, and understated.** Three more connectors declare the setting **empty**, which the same fail-closed predicate also denies. See Section 4 | `DeploymentSettings.xml` scan |
-| **C6** | SyncFabric design doc `docs/oauth2-token-exchange-uri-validation/API.md` | "AmazonBusiness is the **only** PROD member" of configurable code-grant connectors | Three prod connector configs declare `OAuth2AuthorizationCodeGrant`, not one. The safety argument for a global `Enabled=True` rests on a premise the repo contradicts | `connector_configurations/prod` scan |
+| **C5** | Canonical guide, RFC 7523 flow description | treats the flow generically as "RFC 7523" | It is specifically **section 2.2 client authentication** (`grant_type=client_credentials` + `client_assertion`), **not** the section 2.1 `jwt-bearer` authorization grant. A handler built on the wrong one is incompatible | `WorkloadIdentityAuthenticationHelper` + SCIMServer parser, Section 4 |
 
 **C3 and C4 matter beyond their own rows.** The guide is the document that drives this backlog, and
 a stale path in an action item means whoever picks that action up starts by failing to find the file.
@@ -108,12 +111,14 @@ Re-checked against source. Path corrections from C4 applied.
 | **A11** | Document the 6 merge rules | Low | OPEN |
 | **A12** | Fix the `// Deep-merge settings (additive)` comment | Low | OPEN. Confirmed at [endpoint.service.ts](../../api/src/modules/endpoint/services/endpoint.service.ts) **L799** - line number right, directory wrong in the guide |
 | **A14** | Document that the token-endpoint host is config-gated | Low | OPEN |
-| **A15** | Model fail-closed denial in test-ISV scenarios | Med | OPEN, and now better motivated by Section 4 |
+| **A15** | Model fail-closed denial in test-ISV scenarios | Med | OPEN |
 
 ### 3.1 Empirical gates still unmet
 
 1. First-party sovereign application ID.
-2. Real SyncFabric to SCIMServer end-to-end capture, both modes.
+2. Real SyncFabric to SCIMServer end-to-end capture, both modes. **Section 4 raises the priority of
+   this**: the two acquisition modes emit different `aud` shapes and the selecting flag is on for
+   `slice:A` and `slice:B` only, so a capture from one slice does not characterize the other.
 3. **WIF token-mint latency measurement.** The guide has deferred this four times, but SCIMServer
    commit `6504626e` "docs: WIF token-mint latency analysis (X11)" already exists and was never
    consulted. **This gate may already be satisfied** - check before scheduling a fifth deferral.
@@ -121,43 +126,114 @@ Re-checked against source. Path corrections from C4 applied.
 
 ---
 
-## 4. SyncFabric fail-closed exposure (outbound, not ours to fix)
+## 4. Auth-flow comparison: SyncFabric vs SCIMServer
 
-The guide's headline SyncFabric finding is **verified and understated**. Facts, all from
-`origin/master` `38c429b511`:
+**Scope note.** SyncFabric's *connector configurations* are excluded by operator instruction: they
+are on an independent plan. This section compares only the **authentication flow logic** on both
+sides, from source at SyncFabric `38c429b511` and SCIMServer `09b4b78d`.
 
-- `features.ini` carries `[oAuth2TokenExchangeUriScim20FailClosedEnabled] Enabled=True`, **globally
-  and unscoped** (no `appEnvironment` or `slice` qualifier, unlike its neighbours).
-- `ConfigurableScim20ConnectorOAuthTokenExchangeClient.IsTokenExchangeUriAllowed` is, in its own
-  words, "**Always fail-closed on missing/malformed cscfg**", and is used by PutSecrets and the
-  refresh gates **unconditionally**, independent of the exchange-time kill switch.
-- Three prod connectors declare `OAuth2AuthorizationCodeGrant`: `amazonbusiness`, `contentstack`,
-  `puzzel`.
-- Of those, only `amazonbusiness` has a cscfg `oAuth2TokenExchangeUri`
-  (`https://api.amazon.com/auth/O2/token`). **`contentstack` and `puzzel` declare none.**
-- Additionally, **three connectors declare the setting but leave it empty**: `genetec`,
-  `serviceNowScim`, `zoho`. Empty is whitespace, and the predicate is explicitly fail-closed on
-  whitespace. The guide missed this class entirely because it only looked for *absent*, not
-  *present-but-empty*.
+### 4.1 SyncFabric's authentication types
 
-**The tension worth escalating:** SyncFabric's own design doc justifies the global `Enabled=True` with
-"AmazonBusiness is the only PROD member" of the configurable code-grant family. The prod connector
-configs show three members, plus three more with empty values. **Either the doc's premise is stale or
-the connector configs are, and the difference decides whether up to five ISV integrations break.**
+`src/dev/Controller/RunProfile/AuthenticationType.cs` declares six: `None`, `Basic`,
+`TokenBasedBearerToken`, `SyncPolicy`, `WorkloadIdentityClientAuthentication`,
+`WorkloadIdentityTokenExchange`. The last two are the WIF flows, each implemented as an
+`IWorkloadIdentityTargetTokenStrategy`.
 
-**What we cannot determine from static config, and must not assert:** whether `contentstack`,
-`puzzel`, `genetec`, `serviceNowScim` and `zoho` actually route through the ConfigurableSCIM20 client
-at runtime. That binding is by run-profile tag (`[OAuthExchangeFactory(Tag = ...RunProfileTag)]`), and
-which run profiles are live is deployment state, not repository state.
+### 4.2 The exact wire contracts SCIMServer receives
 
-**Action: ask, do not assume.** The precise question for the SyncFabric team is: *"the fail-closed
-flag is on globally; five prod connectors have absent or empty `oAuth2TokenExchangeUri`; do any of
-them reach `ValidateTokenExchangeUri`?"* This is a question with evidence attached, which is the
-useful form. It is **not** an assertion that an incident is in progress.
+Built by `WorkloadIdentityAuthenticationHelper`. These are the literal form bodies.
 
-**For SCIMServer this is inbound risk only**, and it maps to **A15**: our test-ISV scenarios should be
-able to model a fail-closed denial, so that when an ISV reports a token-exchange failure we can
-reproduce the shape rather than guess at it.
+**Flow A, `WorkloadIdentityClientAuthentication`** (`ClientAuthenticationTargetTokenStrategy`):
+
+```text
+grant_type            = client_credentials
+client_id             = <targetDirectoryClientIdentifier>   (required; RejectIfNullOrEmpty)
+client_assertion      = <applicationToken>
+client_assertion_type = urn:ietf:params:oauth:client-assertion-type:jwt-bearer
++ connector-supplied supplemental fields (audience / scope / resource)
+```
+
+This is **RFC 7523 section 2.2 client authentication**, not the section 2.1 authorization grant. The
+`grant_type` is `client_credentials`, **not** `urn:ietf:params:oauth:grant-type:jwt-bearer`. Getting
+this backwards is the single easiest way to build an incompatible handler.
+
+**Flow B, `WorkloadIdentityTokenExchange`** (`TokenExchangeTargetTokenStrategy`):
+
+```text
+grant_type          = urn:ietf:params:oauth:grant-type:token-exchange
+subject_token       = <applicationToken>
+subject_token_type  = urn:ietf:params:oauth:token-type:jwt
++ optional: audience / scope / resource / requested_token_type
+            (requested_token_type value = urn:ietf:params:oauth:token-type:access_token)
+```
+
+The builder's own doc comment says it **"deliberately omits `client_id`"**.
+
+Supplemental fields are merged by `MergeSupplementalRequestData`, which **cannot override a
+protocol-required base field**: a duplicate key is skipped and a warning emitted.
+
+### 4.3 Flow-by-flow matrix
+
+| SyncFabric flow | What it sends | SCIMServer today | Verdict |
+|---|---|---|---|
+| `WorkloadIdentityClientAuthentication` | `client_credentials` + `client_assertion` + jwt-bearer assertion type | Parser requires exactly `grant_type === 'client_credentials'` and `client_assertion_type === JWT_BEARER_ASSERTION_TYPE`, whose value is byte-identical | **MATCH** |
+| `WorkloadIdentityTokenExchange` | `grant-type:token-exchange` + `subject_token` | Parser rejects any non-`client_credentials` grant with `unsupported_grant_type` / `grant_type_unsupported` | **GAP, fails cleanly** (W4.1) |
+| `Basic` | HTTP Basic to the SCIM resource | **No Basic on the resource plane.** Basic is accepted only at the *token* endpoint (`client_secret_basic`, RFC 6749 2.3.1) | **GAP** |
+| `TokenBasedBearerToken` | long-lived bearer | endpoint-credential authenticator | **MATCH** |
+| `None` / `SyncPolicy` | n/a to SCIMServer | n/a | n/a |
+| `resource` form param | `OptionalParameterResource` | W3.4 `resourceMode` (`ignore` / `optionalExact` / `requiredExact`) | **MATCH** |
+| `scope` form param | `OptionalParameterScope` | parsed on both variants | **MATCH** |
+
+### 4.4 Findings
+
+**F-A. Flow A is a genuine match, including the subtle part.** SCIMServer accepts precisely the
+grant/assertion-type pair SyncFabric emits, and the assertion-type URN matches character for
+character. No action.
+
+**F-B. Flow B is unimplemented but fails safely.** A SyncFabric token-exchange request gets a clean
+`400 unsupported_grant_type`, not a confusing partial acceptance. This is W4.1, and it is now
+*motivated*: `[configurableConnectorWorkloadIdentityTokenExchangeEnabled] Enabled=True` globally, so
+any configurable connector set to that auth type against SCIMServer fails today.
+
+**F-C. The assertion audience is slice-dependent, and SCIMServer matches one exact string. HIGH.**
+The two acquisition modes compose different scopes, so Entra mints different `aud` values:
+
+| Mode | Composed scope | Resulting `aud` |
+|---|---|---|
+| `CustomerApplication` (legacy) | `api://<resourceAppId>/.default` | `api://<resourceAppId>` |
+| `FirstPartyApplication` (new) | `api://<resourceAppId>/<normalizedDnsHost>/.default` | `api://<resourceAppId>/<host>` |
+
+`[workloadIdentityFirstPartyApplicationIsDefault]` is `Enabled=True` on **`slice:A` and `slice:B`**
+and `Enabled=False` globally. So **the audience shape SCIMServer receives depends on which slice
+serves the job**, and a single trust carrying one `expectedAudience` string cannot satisfy both. A
+slice rollout would surface as an audience-mismatch rejection with no SCIMServer change involved.
+This is the concrete, verified form of the guide's A7. It also explains why the first-party
+host-qualified registration is still an unmet empirical gate.
+
+**F-D. `client_id` is always sent, so the trust must be configured to agree.** Flow A treats
+`targetDirectoryClientIdentifier` as required. SCIMServer's W3.7 binding rejects with
+`wif_client_id_mismatch` only when the trust has a `targetClientId` **and** the request sends a
+different one. Since SyncFabric always sends one, an operator who sets `targetClientId` to anything
+other than SyncFabric's configured value gets a hard 401. Worth stating explicitly in the setup doc:
+these two values are one coupled setting, not two independent ones.
+
+**F-E. A4 must not be generalized to Flow B.** The guide's A4 ("require `client_id` for RFC 7523") is
+safe for Flow A because SyncFabric always sends it. Applying the same rule to the future RFC 8693
+handler would break the integration outright, because Flow B omits `client_id` **by design**. Recorded
+here so W4.1 does not inherit the requirement by analogy.
+
+**F-F. Basic is a resource-plane gap, if anyone needs it.** SyncFabric can be configured for
+`Basic` against a SCIM target; SCIMServer accepts Basic only at the token endpoint. Whether this
+matters depends on whether any SCIMServer-targeting profile uses `Basic`, which is deployment state.
+Not proposing work: noting the asymmetry so it is not discovered during an incident.
+
+**F-G. Trust selection is ordered, not unbounded-by-accident.** SCIMServer decodes the assertion
+`iss` **without verifying it** purely to *order* candidate trusts (WI-17), so the common multi-IdP
+case does one JWKS verification instead of N. Every candidate is still fully verified, so a spoofed
+`iss` gains nothing. The residual cost is the fallback path when `iss` matches nothing, which still
+walks all N trusts. W1.4/W1.5 bound the damage (cache caps, rate-limited unknown-`kid`, total
+deadline), so this is bounded rather than open, and lower severity than the guide implies.
+
 
 ---
 
@@ -170,6 +246,8 @@ reproduce the shape rather than guess at it.
 | **N3** | **`[Unreleased]` has absorbed everything since `0.54.0-alpha.12`** | Med | The CHANGELOG has one heading covering many shipped versions, so it can no longer answer "what changed in 0.55.5?" without reading prose |
 | **N4** | **Bind the delivery plan's Section 1 table to item status** (see 1.1) | Med | Second occurrence of the same drift. Manual correction has now failed twice |
 | **N5** | **Guide action items cite paths that do not exist** (C4) | Low | Cheap to fix while re-syncing the mirror under A1/A13 |
+| **N6** | **Assertion `aud` is slice-dependent and `expectedAudience` is a single exact string** (Section 4, F-C) | High | `workloadIdentityFirstPartyApplicationIsDefault` is on for `slice:A` and `slice:B` and off globally, and the two acquisition modes emit `api://<appId>` vs `api://<appId>/<host>`. One trust cannot satisfy both, so a slice rollout presents as an audience-mismatch 401 with no SCIMServer change involved. Needs, at minimum, a documented operator runbook; possibly a trust that accepts a declared set of audiences |
+| **N7** | **Do not generalize A4 to RFC 8693** (Section 4, F-E) | Med | Flow B omits `client_id` by design. A W4.1 handler that inherits "require `client_id`" by analogy from A4 would break the integration outright |
 
 ---
 
@@ -194,12 +272,13 @@ Sequenced by value per unit of effort, not by wave order.
 flowchart TD
     A["A8 audit event<br/>helper exists, 2 handlers, ~1h"] --> B["A12 comment fix<br/>1 line"]
     B --> C["N1 phantom v0.55.7<br/>doc truthfulness"]
-    C --> D["W1.2 startup JWKS pre-warm<br/>closes Wave 1"]
+    C --> N6["N6 slice-dependent audience<br/>runbook, before a slice rollout"]
+    N6 --> D["W1.2 startup JWKS pre-warm<br/>closes Wave 1"]
     D --> E["A9 + A10 concurrency + partial block<br/>both High"]
     E --> F["A1/A13 merge the guide mirror<br/>861-line gap, needs care"]
     F --> G["N2 scheduled liveness probe"]
     G --> H["W3.5 credential cache + index<br/>unblocks Wave 4"]
-    H --> I["Wave 4 RFC 8693"]
+    H --> I["Wave 4 RFC 8693<br/>carries N7: no client_id"]
 ```
 
 **Rationale for the ordering.** A8 is first because the helper, the pattern, and three worked
