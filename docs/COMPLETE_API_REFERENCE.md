@@ -724,6 +724,32 @@ Declares a structured authentication method (id, type, plane, priority, config, 
 
 Removes a declared method.
 
+#### Both mutations are audited (v0.55.8)
+
+`POST` and `DELETE` change **how an endpoint authenticates**, so each emits one structured
+`Auth config change` audit event, readable at
+`GET /scim/admin/log-config/recent?category=auth`:
+
+| Operation | `data.action` | `data.outcome` |
+|---|---|---|
+| `POST` accepted | `auth_method_add` | `success` |
+| `POST` with an unknown `type` | `auth_method_add` | `failure` |
+| `DELETE` accepted | `auth_method_remove` | `success` |
+| `DELETE` of an unknown method | `auth_method_remove` | `failure` |
+
+Failure outcomes are emitted **before** the `400` / `404` is returned, so a probing or misconfigured
+caller is visible rather than silent. Per the shared emitter convention a `success` is logged at
+`INFO` and a `failure` at `WARN`.
+
+The event identifies the affected method through **`data.methodId`**, not `credentialId`. This is
+load-bearing: the log redactor blanks any field whose name contains `credential`, so an id emitted
+under that name arrives as `[REDACTED]` and the audit record cannot say which method changed.
+
+The event carries the method `id` and `type` only. A method's `config` is **never** included, because
+it may hold operator-supplied material.
+
+Details and rationale: [auth/A8_AUTH_METHOD_AUDIT_EVENT.md](auth/A8_AUTH_METHOD_AUDIT_EVENT.md).
+
 ---
 
 ## Admin - JWKS Host Allowlist
