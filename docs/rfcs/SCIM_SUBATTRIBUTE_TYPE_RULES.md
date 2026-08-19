@@ -1,10 +1,10 @@
 # SCIM Attribute and Sub-Attribute Type Rules
 
 > **Question this answers**: which attribute shapes are legal in SCIM - multi-valued, complex, complex-with-multi-valued, complex-inside-complex - and which are not, at every nesting level.
-> **Normative sources**: [RFC 7643](https://www.rfc-editor.org/info/rfc7643) (Core Schema), [RFC 7644](https://www.rfc-editor.org/info/rfc7644) (Protocol), as **updated by** [RFC 9865](https://www.rfc-editor.org/info/rfc9865) (Oct 2025) and [RFC 9967](https://www.rfc-editor.org/info/rfc9967) (May 2026), **plus the verified errata** - see [Errata that settle the ambiguities](#errata-that-settle-the-ambiguities).
+> **Normative sources**: [RFC 7643](https://www.rfc-editor.org/info/rfc7643) (Core Schema), [RFC 7644](https://www.rfc-editor.org/info/rfc7644) (Protocol), as **updated by** [RFC 9865](https://www.rfc-editor.org/info/rfc9865) (Oct 2025) and [RFC 9967](https://www.rfc-editor.org/info/rfc9967) (May 2026), **plus the verified errata** - see [Errata that settle the ambiguities](#9-errata-that-settle-the-ambiguities).
 > **Mirrors**: [rfc7643.txt](rfc7643.txt), [rfc7644.txt](rfc7644.txt), [rfc9865.txt](rfc9865.txt), [rfc9967.txt](rfc9967.txt). Currency enforced by [rfc-manifest.json](rfc-manifest.json) + [scripts/sync-rfcs.ps1](../../scripts/sync-rfcs.ps1).
-> **Status**: reference document. It describes the standard and records what SCIMServer does today. It **does not change server behavior**; the one divergence found is written up in [Where SCIMServer stands today](#where-scimserver-stands-today) as an observation, not a fix.
-> **Last verified against upstream**: 2026-07-29.
+> **Status**: reference document. It describes the standard, records what SCIMServer does today, and - new in the 2026-07-31 revision - restates the rules as a [machine-checkable catalogue](#12-the-machine-checkable-rule-catalogue) with stable IDs, reports what those rules [actually find in two live estates](#13-measured-what-these-rules-find-in-a-live-estate), and documents the deliberate [`referenceTypes` divergence](#14-referencetypes-advertised-not-enforced). It still **does not change server behavior**.
+> **Last verified against upstream**: 2026-07-31 (corpus + errata re-checked online: no text drift, no metadata drift, no newly verified errata).
 
 ---
 
@@ -738,6 +738,9 @@ Source: [Tutorial: develop a SCIM endpoint](https://learn.microsoft.com/en-us/en
 | **Deviation** | Docs show `"manager": "123456"` - a bare string where the RFC expects `{"value": ...}` | Non-conformant; servers must tolerate |
 | **Deviation** | PATCH `{"op":"Add","path":"manager","value":[{"$ref":...,"value":...}]}` wraps a **singular** complex in an array | Non-conformant; servers must tolerate |
 | **Deviation** | `op` values capitalised (`Add` / `Replace` / `Remove`) | [Section 3.5.2](https://www.rfc-editor.org/rfc/rfc7644#section-3.5.2) values are lowercase; must be matched case-insensitively |
+| **Keyword casing** | "Property values should be **camel cased** (for example, readWrite)." | Reinforces [D9](#12-the-machine-checkable-rule-catalogue): a characteristic keyword is a fixed token, not free text. Entra reads `/Schemas`, so a mis-cased `ReadWrite` is a real interop break, not a cosmetic one. |
+| **Null hygiene** | "If a value isn't present, **don't send null values**." (schema discovery) | Reinforces [D10](#12-the-machine-checkable-rule-catalogue): a characteristic is a boolean or absent, never `null`. |
+| **`$ref` is sent as `null`** | Group member PATCH bodies are `{"$ref": null, "value": "<id>"}` | **Decisive for `referenceTypes`.** Any server that validated reference targets would reject the single most common provisioning operation Entra performs. See [section 14](#14-referencetypes-advertised-not-enforced). |
 
 ### Okta
 
@@ -745,10 +748,28 @@ Source: [Okta and SCIM Version 2.0](https://developer.okta.com/docs/api/openapi/
 
 | Behavior | Detail |
 |---|---|
-| **No nested object type at all** | Okta app-user profiles support string, number, boolean, integer and arrays of those. A custom **complex** attribute cannot be authored in an Okta app schema. |
-| Consequence | Okta emits only the RFC-defined complex attributes (`name.*`, `emails[]`, `groups[]`, `members[]`). Every custom attribute is a flat scalar. |
-| Implicit-path PATCH | `{"op":"replace","value":{"active":false}}` with **no** `path`. Legal per [section 3.5.2](https://www.rfc-editor.org/rfc/rfc7644#section-3.5.2) but frequently mishandled by servers. |
+| **No nested object type at all** *(claim NOT re-verified in the 2026-07-31 pass)* | Okta app-user profiles are documented elsewhere as supporting string, number, boolean, integer and arrays of those, with no authorable **complex** type. This claim originates from Okta's profile-attribute documentation, **not** from the SCIM guide cited above, and a re-read of that guide on 2026-07-31 neither confirmed nor contradicted it. Treat it as probable but unconfirmed. |
+| Consequence (if the above holds) | Okta emits only the RFC-defined complex attributes (`name.*`, `emails[]`, `groups[]`, `members[]`). Every custom attribute is a flat scalar. |
+| Implicit-path PATCH **(re-verified 2026-07-31)** | `{"op":"replace","value":{"active":false}}` with **no** `path`. Legal per [section 3.5.2](https://www.rfc-editor.org/rfc/rfc7644#section-3.5.2) but frequently mishandled by servers. |
+| `members` returned as `null` **(re-verified)** | Group responses may carry `"members": null`; Okta explicitly does not require the member list back. |
 | Update verb | PUT for most updates; PATCH only for activate / deactivate / password sync on OIN integrations. |
+
+### Slack
+
+Source: [Using the Slack SCIM API](https://docs.slack.dev/admins/scim-api) (page updated 2025-12-05).
+
+| Behavior | Detail | Relative to RFC |
+|---|---|---|
+| **Silently drops a sub-attribute** | "Slack does not store `type` for `addresses`. The `type` field will be used to determine which address is the primary address if the request does not specify one, however the `type` is **not stored**." | A sub-attribute is accepted, used, then discarded. A client that round-trips `addresses[].type` will find it missing. |
+| **All-or-nothing custom profile** | "When creating a new user, if anything in custom profile is invalid, **all profile fields will be dropped**." | Silent partial data loss rather than a `400`. The opposite of what [section 3.3](https://www.rfc-editor.org/rfc/rfc7644#section-3.3) expects. |
+| Field cap | 50 custom profile fields maximum | Breadth ceiling, like Entra's |
+| Content type | Documents `Content-Type: application/json`, not `application/scim+json` | Servers must accept both |
+
+### Atlassian and AWS IAM Identity Center
+
+Sources: [Atlassian user provisioning REST API](https://developer.atlassian.com/cloud/admin/user-provisioning/rest/intro/), [AWS IAM Identity Center SCIM](https://docs.aws.amazon.com/singlesignon/latest/developerguide/supported-apis.html).
+
+Both publish **volume and lifecycle** limits (user caps per directory, group-size caps, no hard delete, restricted operation sets) and say **nothing** about attribute typing or nesting. That silence is itself the datapoint: the shape rules are so universally taken for granted that vendors do not think to document them. The interop surface everyone actually documents is *which attributes exist* and *which operations work*, never *how deep an attribute may nest*.
 
 ### Cross-vendor pattern summary
 
@@ -800,22 +821,28 @@ RFC 9865 also adds three `scimType` keywords to the RFC 7644 [section 3.12](http
 
 `securityEvents.eventUris` is worth dwelling on: a 2026-vintage Standards Track RFC placing a multi-valued simple sub-attribute inside a complex attribute is the freshest possible confirmation that row 6 of the [combination matrix](#3-the-exhaustive-combination-matrix) is correct.
 
+**Verified negative (2026-07-31).** Both mirrors were searched for every phrase that could carry a typing rule (`subAttributes`, `complex attribute`, `attribute characteristic`, `referenceTypes`, `2.3.8`). RFC 9865 returns **zero** matches; RFC 9967 returns **one**, and it is the prose defining `securityEvents` itself. So although both RFCs formally `Update: 7643, 7644`, **neither alters a single attribute-definition rule** - the rules in this document derive entirely from RFC 7643 plus its errata. This matters because "Updates:" in an RFC header is often read as "the old rules may have moved"; here, measurably, they have not.
+
 ---
 
 ## 11. Conformance checklist
 
-For anyone authoring or reviewing a schema, in either direction.
+For anyone authoring or reviewing a schema, in either direction. Each box cites
+the rule ID from the [catalogue](#12-the-machine-checkable-rule-catalogue).
 
 **Publishing a schema (`/Schemas`)**
 
 - [ ] Every attribute declares `name`, `type`, `multiValued`, `required`.
-- [ ] No attribute inside a `subAttributes` array has `type: "complex"`. ([2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8), [errata 8415](https://errata.rfc-editor.org/eid8415/))
-- [ ] No attribute inside a `subAttributes` array has its own `subAttributes`.
-- [ ] No attribute with a non-`complex` `type` carries `subAttributes`. ([1.2](https://www.rfc-editor.org/rfc/rfc7643#section-1.2))
-- [ ] Every `complex` attribute has a non-empty `subAttributes`. ([7](https://www.rfc-editor.org/rfc/rfc7643#section-7), SHOULD)
-- [ ] No `complex` attribute carries `uniqueness` or `caseExact`. ([2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8), [errata 6004](https://errata.rfc-editor.org/eid6004/))
-- [ ] `referenceTypes` appears only on `type: "reference"` attributes. ([7](https://www.rfc-editor.org/rfc/rfc7643#section-7))
-- [ ] `type` keyword is one of `string`, `boolean`, `decimal`, `integer`, `dateTime`, `binary`, `reference`, `complex`. ([errata 8435](https://errata.rfc-editor.org/eid8435/) adds `binary`.)
+- [ ] No attribute inside a `subAttributes` array has `type: "complex"`. **(D2)**
+- [ ] No attribute inside a `subAttributes` array has its own `subAttributes`. **(D3)**
+- [ ] No attribute with a non-`complex` `type` carries `subAttributes`. **(D4)**
+- [ ] Every `complex` attribute has a non-empty `subAttributes`. **(D5, SHOULD)**
+- [ ] No `complex` attribute carries a *meaningful* `uniqueness` or `caseExact`. **(D6 - read the nuance in the catalogue before enforcing this one.)**
+- [ ] `referenceTypes` appears only on `type: "reference"` attributes. **(D7)**
+- [ ] `type` keyword is one of the eight in [Table 1](https://www.rfc-editor.org/rfc/rfc7643#section-2.3). **(D1)**
+- [ ] `mutability` / `returned` / `uniqueness` use the exact keyword spellings. **(D9)**
+- [ ] `required` / `multiValued` / `caseExact` are booleans, never `null` or a string. **(D10)**
+- [ ] Every attribute name matches `ATTRNAME`. **(D11 - `$ref` is the known exception.)**
 - [ ] Multi-valued complex attributes define the sub-attributes they actually accept, including `primary` and `display` if clients may send them.
 - [ ] Omitted characteristics are read as the [section 2.2](https://www.rfc-editor.org/rfc/rfc7643#section-2.2) defaults, not as "unsupported".
 
@@ -825,10 +852,413 @@ For anyone authoring or reviewing a schema, in either direction.
 - [ ] Do not assume `emails` has `display` or `primary`; many ISVs trim them.
 - [ ] Do not assume canonical `type` values beyond what the schema publishes.
 - [ ] Expect at most one `.` in any PATCH path you construct.
+- [ ] Do not assume a sub-attribute you sent will come back. Slack accepts `addresses[].type`, uses it, and does not store it.
 
 ---
 
-## 12. Where SCIMServer stands today
+## 12. The machine-checkable rule catalogue
+
+Sections 1 to 7 state the rules in prose. This section restates them as discrete,
+testable predicates with stable IDs, so tests, gates and error messages can cite
+one identifier instead of re-deriving the rule.
+
+Two families, and the distinction is the important part:
+
+- **P-rules** are about a **payload**. They can only be evaluated when a resource
+  is created or modified, because they depend on what the client sent.
+- **D-rules** are about a **schema definition**. They can be evaluated the moment
+  a schema is written, with no payload in sight.
+
+Conflating the two is the most common design error here. A complex sub-attribute
+*declared* in a schema is a D-rule violation the instant it is registered; the
+same declaration only becomes a P-rule violation if some client eventually sends
+data for it. A server that only checks payloads will happily publish a schema
+that no compliant client can ever PATCH.
+
+### 12.1 P-rules (payload)
+
+| ID | Predicate | Source | Strength |
+|---|---|---|---|
+| **P1** | A payload MUST NOT populate a sub-attribute whose definition is complex. | [2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8), [8415](https://errata.rfc-editor.org/eid8415/) | MUST |
+| **P2** | A payload MAY populate a multi-valued **simple** sub-attribute with an array of primitives; each element is type-checked against the sub-attribute's `type`. | [1.2](https://www.rfc-editor.org/rfc/rfc7643#section-1.2), [5607](https://errata.rfc-editor.org/eid5607/) | permitted |
+
+### 12.2 D-rules (schema definition)
+
+| ID | Predicate | Source | Strength | Safe to enforce? |
+|---|---|---|---|---|
+| **D1** | `type` is one of `string`, `boolean`, `decimal`, `integer`, `dateTime`, `binary`, `reference`, `complex`. | [2.3 Table 1](https://www.rfc-editor.org/rfc/rfc7643#section-2.3); [8435](https://errata.rfc-editor.org/eid8435/) adds `binary` to the [section 7](https://www.rfc-editor.org/rfc/rfc7643#section-7) prose, which lists only seven | MUST | yes |
+| **D2** | An attribute inside `subAttributes` does not have `type: "complex"`. | [2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8), [8415](https://errata.rfc-editor.org/eid8415/) | MUST | yes |
+| **D3** | An attribute inside `subAttributes` does not carry its own `subAttributes`. | [2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8) | MUST | yes |
+| **D4** | Only a `complex` attribute carries `subAttributes`. | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7): *"When an attribute is of type complex, subAttributes defines a set of sub-attributes"* | MUST | yes |
+| **D5** | A `complex` attribute carries a non-empty `subAttributes`. | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7): *"there **SHOULD** be a corresponding schema attribute"* | SHOULD | **warn only** |
+| **D6** | A `complex` attribute does not carry a **meaningful** `uniqueness` or `caseExact`. | [2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8): *"A complex attribute has no uniqueness or case sensitivity"*; [6004](https://errata.rfc-editor.org/eid6004/) | MUST | **only in the "meaningful" form - see below** |
+| **D7** | `referenceTypes` appears only on `type: "reference"`. | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7): *"only applicable for attributes that are of type reference"* | MUST | **document only** - see [section 14](#14-referencetypes-advertised-not-enforced) |
+| **D8** | Each `referenceTypes` value is a resource-type name, `external`, or `uri`. | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7) | MUST | **document only** |
+| **D9** | `mutability` in {`readOnly`,`readWrite`,`immutable`,`writeOnly`}; `returned` in {`always`,`never`,`default`,`request`}; `uniqueness` in {`none`,`server`,`global`}. | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7) | MUST | yes |
+| **D10** | `required`, `multiValued`, `caseExact` are JSON booleans when present. | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7): *"A Boolean value"* | MUST | yes |
+| **D11** | `name` matches `ATTRNAME = ALPHA *(nameChar)`, `nameChar = "$" / "-" / "_" / DIGIT / ALPHA`. | [2.1](https://www.rfc-editor.org/rfc/rfc7643#section-2.1) | MUST | yes, **with a `$ref` carve-out** |
+
+### 12.3 The two traps in this table
+
+**D6 is not what a literal reading suggests.** Section 2.3.8 says a complex
+attribute *has* no uniqueness or case sensitivity, which reads as "the keys must
+be absent". Real schemas - including the ones in this repository and the sample
+in Entra's own documentation - routinely emit `uniqueness: "none"` and
+`caseExact: false` on complex attributes as harmless defaults. Enforcing absence
+would reject them. The enforceable form is therefore:
+
+```text
+violation  <=>  type == "complex"
+                AND ( (uniqueness is present AND uniqueness != "none")
+                      OR (caseExact is present AND caseExact == true) )
+```
+
+That is, a complex attribute may *mention* these characteristics at their default
+values, but must not assert a **meaningful** one. Section 13 shows what happens
+if you get this wrong: 228 false positives across two estates.
+
+**D11 would reject `$ref` if applied literally.** `ATTRNAME` requires a leading
+`ALPHA`, but `$ref` is a canonical SCIM sub-attribute name used throughout the
+RFC's own schemas and by every IdP. This is open erratum
+[8924](https://errata.rfc-editor.org/eid8924/) (*Reported*, not Verified). Any
+implementation of D11 must carve out `$ref` explicitly, or it will reject the
+specification's own examples.
+
+### 12.4 Where each family can be evaluated
+
+```mermaid
+flowchart TD
+    subgraph W["Schema write - admin plane"]
+        A["PUT / PATCH endpoint profile"] --> B["validate profile"]
+        B --> C{"D-rules<br/>D1 D2 D3 D4 D6 D9 D10 D11"}
+        C -->|"violation"| D["400 - schema refused<br/>no resource data touched"]
+        C -->|"D5 only"| E["warning - schema accepted"]
+        C -->|"clean"| F["schema stored"]
+    end
+
+    subgraph R["Resource write - data plane"]
+        G["POST / PUT / PATCH a User or Group"] --> H["resolve schema"]
+        H --> I{"P1<br/>complex sub-attribute populated?"}
+        I -->|"yes"| J["400 invalidValue"]
+        I -->|"no"| K{"P2<br/>multi-valued simple sub-attribute?"}
+        K -->|"yes"| L["type-check each element<br/>path attr.sub[index]"]
+        K -->|"no"| M["existing single-value checks"]
+    end
+
+    F -.->|"schema now available to"| H
+```
+
+The dotted edge is the whole argument for having both families: a schema that
+passes the admin plane is the contract the data plane then enforces. If the
+admin plane never checks, the data plane is enforcing a contract that was never
+validated.
+
+### 12.5 What a violation looks like on the wire
+
+A **D-rule** violation, refused at schema-write time:
+
+```http
+PATCH /scim/admin/endpoints/2f1c7b9e-0e5a-4a1b-9c33-6d2f0b8a4e77 HTTP/1.1
+Host: scimserver.example.com
+Authorization: Bearer <admin token>
+Content-Type: application/json
+```
+
+```json
+{
+  "profile": {
+    "schemas": [
+      {
+        "id": "urn:example:params:scim:schemas:extension:hr:2.0:User",
+        "name": "HrUser",
+        "attributes": [
+          {
+            "name": "address",
+            "type": "complex",
+            "multiValued": false,
+            "required": false,
+            "subAttributes": [
+              {
+                "name": "geo",
+                "type": "complex",
+                "multiValued": false,
+                "required": false,
+                "subAttributes": [
+                  {
+                    "name": "lat",
+                    "type": "decimal",
+                    "multiValued": false,
+                    "required": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+A **P-rule** violation, refused at resource-write time, for a schema that was
+registered before the rules were switched on:
+
+```http
+POST /scim/endpoints/2f1c7b9e-0e5a-4a1b-9c33-6d2f0b8a4e77/Users HTTP/1.1
+Host: scimserver.example.com
+Authorization: Bearer <token>
+Content-Type: application/scim+json
+Accept: application/scim+json
+```
+
+```json
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "ada@example.com",
+  "address": {
+    "street": "1 Main St",
+    "geo": {
+      "lat": 47.6,
+      "lon": -122.3
+    }
+  }
+}
+```
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/scim+json
+```
+
+```json
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "status": "400",
+  "scimType": "invalidValue",
+  "detail": "Schema validation failed: address.geo: Sub-attribute 'geo' of complex attribute 'address' is itself complex, which RFC 7643 2.3.8 forbids."
+}
+```
+
+### 12.6 Data transformation: the one shape whose *handling* changes
+
+Every other rule either accepts or rejects. P2 is the only rule that changes how
+a value is **interpreted**, so it is worth showing the transformation explicitly.
+
+Given this sub-attribute definition:
+
+```json
+{
+  "name": "skus",
+  "type": "string",
+  "multiValued": true,
+  "required": false
+}
+```
+
+```mermaid
+flowchart LR
+    A["client sends<br/>skus: ['SKU-A', 'SKU-B']"] --> B{"is the multi-valued<br/>simple sub-attribute honoured?"}
+    B -->|"no - every sub-attribute<br/>treated as singular"| C["typeof value is 'object'<br/>expected 'string'"]
+    C --> D["400 invalidValue<br/>'must be a string, got object'"]
+    B -->|"yes - RFC 1.2 honoured"| E["treat as array;<br/>clone the definition<br/>with multiValued false"]
+    E --> F["type-check element 0<br/>path licenses[0].skus[0]"]
+    E --> G["type-check element 1<br/>path licenses[0].skus[1]"]
+    F --> H["201 - stored and<br/>round-tripped as an array"]
+    G --> H
+```
+
+The failure message under the first branch (*"must be a string, got object"*) is
+worth memorising: it is what a server says when it has silently collapsed a legal
+multi-valued sub-attribute into a singular one. It names a type mismatch, which
+sends the reader hunting for a wrong value, when the real fault is a cardinality
+assumption one level up.
+
+---
+
+## 13. Measured: what these rules find in a live estate
+
+Rules derived from a specification are hypotheses until they meet real data. This
+section records what happened when the eleven D-rules were evaluated against
+every schema in two production estates on **2026-07-31**.
+
+### 13.1 Method
+
+For each endpoint, the full profile was fetched from the admin plane and every
+attribute and sub-attribute walked recursively. The `Schema` resource itself was
+excluded up front, per the [section 7.1 carve-out](#71-the-one-rfc-sanctioned-exception-the-schema-resource-itself).
+
+D6 was evaluated **twice**, deliberately: once in the literal "characteristic is
+present at all" form, and once in the "characteristic is present with a
+meaningful value" form. Measuring both is what exposed the difference between
+them.
+
+To reproduce:
+
+```powershell
+$h = @{ Authorization = "Bearer $token" }
+$list = Invoke-RestMethod -Uri "$base/scim/admin/endpoints" -Headers $h
+foreach ($e in $list.endpoints) {
+    # NOTE: the LIST response carries profileSummary only - the settings and
+    # schemas live on the DETAIL resource. Counting from the list view silently
+    # measures nothing.
+    $detail = Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$($e.id)" -Headers $h
+    $detail.profile.schemas | ForEach-Object { <# walk attributes, apply D1..D11 #> }
+}
+```
+
+### 13.2 Results
+
+Scope: **108 endpoints, 666 schemas, 3,658 top-level attributes** across the dev
+estate (58 endpoints) and the customer-facing production estate (50 endpoints).
+
+> **Re-verified 2026-08-18 at v0.55.6, and the survey is only half re-confirmable.**
+> The **dev** estate still measures **58 endpoints**, so that half stands - and it
+> stands across a *tenant migration*, since dev has since moved from tenant 08 to
+> tenant 09 (`purplecliff`) and carried its data with it. The **customer-facing
+> production** estate was **unreachable** at the time of writing (TLS handshake
+> failure, then timeout), so its 50-endpoint contribution could not be re-counted.
+> That estate runs a single replica by deliberate cost policy, so unreachability is
+> plausibly a billing pause rather than a fault - but it is **not verified either
+> way here**, and the 108/666/3,658 totals should be read as *measured 2026-07-31*,
+> not as *currently true*. The per-rule violation counts below are unaffected in
+> the sense that they were real when taken; they are simply not re-measured.
+
+| Rule | Violations | Reading |
+|---|---|---|
+| D1 `type` keyword | **0** | no schema anywhere uses an unknown type |
+| D2 complex sub-attribute | **0** | **nobody nests.** The rule the whole document is about is violated by no one |
+| D3 sub-attribute with `subAttributes` | **0** | same |
+| D4 `subAttributes` on a non-complex attribute | **0** | |
+| D5 `complex` with empty `subAttributes` | **0** | |
+| D9 characteristic keywords | **0** | |
+| D10 non-boolean characteristics | **0** | |
+| **D6 literal form** ("present at all") | **228** | **would fire on a brand-new endpoint** |
+| **D6 meaningful form** | **0** | safe |
+| **D11 attribute name ABNF** | **2** | a real, live defect |
+
+### 13.3 Finding 1 - the literal D6 would have rejected our own schemas
+
+All 228 hits carry `uniqueness: "none"`, the default. The built-in schema
+constants in this repository declare complex attributes with `uniqueness` on
+three of them and `caseExact` on one. A validator implementing section 2.3.8
+literally would therefore reject a **freshly created endpoint using the shipped
+default schema** - a rule that fires on the server's own output before any
+operator has done anything.
+
+This is the strongest possible argument for measuring a rule against real data
+before enforcing it. The rule is correct as written in the RFC; the enforceable
+predicate is narrower than the sentence.
+
+### 13.4 Finding 2 - D11 catches a genuine production defect
+
+Two attributes on a live endpoint present in **both** estates are named:
+
+```text
+emails[type eq "work"].primary
+phoneNumbers[type eq "work"].primary
+```
+
+Someone stored a **filter expression as an attribute name**. Neither name can
+match `ATTRNAME`, so neither attribute can appear in a PATCH path, a filter, or
+an `attributes=` projection - the very operations the names were written to
+describe. It is inert data that looks like configuration.
+
+Nothing else in the codebase would surface this. It is the clearest evidence that
+D11 earns its place despite being the rule most likely to be dismissed as
+pedantry.
+
+### 13.5 What the measurement implies
+
+- Enforcing D1 to D5, D9 and D10 is **zero-impact today**. They are purely
+  preventive: they stop a class of schema that no one has authored yet.
+- The **only** endpoint in either estate that would fail a strict pass is the one
+  carrying the two malformed names.
+- The distribution confirms the [cross-vendor pattern](#cross-vendor-pattern-summary):
+  the field's problem is never over-nesting. It is trimming, dropping and
+  mis-naming.
+
+---
+
+## 14. `referenceTypes`: advertised, not enforced
+
+SCIMServer publishes `referenceTypes` in its schemas and does **not** act on it.
+That is a deliberate, RFC-permitted divergence, and this section is the record of
+it.
+
+### 14.1 What the RFC says
+
+| Aspect | RFC 7643 |
+|---|---|
+| Purpose | [7](https://www.rfc-editor.org/rfc/rfc7643#section-7): *"A multi-valued array of JSON strings that indicate the SCIM resource types that may be referenced."* |
+| Legal values | a resource type name (e.g. `User`), `external`, or `uri` |
+| Applicability | *"only applicable for attributes that are of type reference"* |
+| Reference target | [2.3.7](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.7): *"A reference URI MUST be to an HTTP-addressable resource."* |
+| Integrity | [2.3.7](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.7): a provider **MAY** choose to enforce referential integrity |
+
+That last row is the licence: enforcement is optional, so declining to enforce is
+conformant.
+
+### 14.2 What SCIMServer does
+
+| Behavior | Status |
+|---|---|
+| Publishes `referenceTypes` in `/Schemas` | **yes** - seven declarations in the built-in schemas |
+| Checks the value is a string | yes - `reference` shares the string branch |
+| Checks the value is an HTTP-addressable URI | **no** |
+| Checks the target's resource type against `referenceTypes` | **no** |
+| Enforces referential integrity | **no** (explicitly permitted) |
+| Validates `referenceTypes` placement (D7) or values (D8) at schema-write time | **no** |
+
+### 14.3 Why it stays that way
+
+Because the dominant client sends `null`. Entra's documented group-membership
+PATCH is:
+
+```json
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "op": "Add",
+      "path": "members",
+      "value": [
+        {
+          "$ref": null,
+          "value": "f648f8d5ea4e4cd38e9c"
+        }
+      ]
+    }
+  ]
+}
+```
+
+A server enforcing "a `reference` must be an HTTP-addressable URI" would reject
+the single most common write Entra performs. Okta likewise returns `members`
+as `null`. The RFC's `MAY` exists precisely for this situation, and the cost of
+exercising it is one documented divergence instead of a broken integration.
+
+### 14.4 The divergence, stated plainly
+
+> SCIMServer treats `referenceTypes` as **documentation for the client**, not as a
+> constraint on the server. It is published so that a well-behaved client knows
+> what a reference points at; it is never used to reject anything. A client MUST
+> NOT infer from a successful write that the reference target exists, is of the
+> declared type, or is resolvable.
+
+Anyone who later wants enforcement should read this section first, then
+[section 13](#13-measured-what-these-rules-find-in-a-live-estate) for how to
+measure the blast radius before switching it on.
+
+---
+
+## 15. Where SCIMServer stands today
 
 **Status: the gap is now closable per endpoint, behind the `RfcCompliantSubAttributes` flag.**
 
@@ -843,6 +1273,41 @@ to the RFC behavior this document specifies.
 | complex sub-attribute (forbidden by [section 2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8)) | accepted | rejected `400 invalidValue` |
 | multi-valued SIMPLE sub-attribute (allowed by [section 1.2](https://www.rfc-editor.org/rfc/rfc7643#section-1.2)) | rejected | accepted, each element type-checked |
 
+### 15.1 Planned evolution (NOT yet implemented)
+
+> **Everything in this subsection is a design record, not shipped behavior.** As
+> of v0.55.1 the server behaves exactly as the table above describes. Do not cite
+> this subsection as documentation of a live feature.
+
+Two changes are planned, driven by the analysis in sections 12 to 14:
+
+**1. `OFF` becomes fully permissive.** Today `OFF` is a literal no-op, which
+means it inherits an inconsistency: it accepts unlimited nesting (permissive)
+while rejecting multi-valued simple sub-attributes (strict). The plan makes `OFF`
+uniformly permissive - accept both - so the flag has one comprehensible polarity:
+*off accepts anything, on conforms*. This is a **loosening**, so nothing that
+works today stops working, but a strict endpoint does lose one rejection it
+currently performs.
+
+**2. `ON` grows from two rules to the full catalogue.** P1 and P2 today; P1, P2
+and D1 to D11 (minus the document-only D7/D8, with D5 as a warning and D6 in its
+meaningful form) under the plan. Because the D-rules are schema rules, this adds
+a **second enforcement point** at schema-write time, as diagrammed in
+[section 12.4](#124-where-each-family-can-be-evaluated).
+
+The measured blast radius is in [section 13.5](#135-what-the-measurement-implies):
+across 108 live endpoints, exactly **one** would fail the stricter pass, and it
+would fail on D11 because two of its attributes are named after filter
+expressions.
+
+The flag is also expected to be **renamed**, because `RfcCompliantSubAttributes`
+describes only part of what it now governs - D1 and D4 to D11 are *attribute*
+rules, not sub-attribute rules. At the time of writing the flag is set on **zero**
+endpoints across all three live estates, so the rename costs nothing; it becomes
+a breaking configuration change the moment anyone sets it.
+
+### 15.2 How the shipped flag relates to this document
+
 See [RFC_COMPLIANT_SUBATTRIBUTES.md](../RFC_COMPLIANT_SUBATTRIBUTES.md) for the
 design, the 2x2 interaction with `StrictSchemaValidation`, and the test matrix.
 Two details differ from the follow-up originally proposed here, and both were
@@ -851,13 +1316,16 @@ deliberate:
 1. **It is enforced at payload-validation time, not schema-registration time.** A
    schema may still carry a legacy complex sub-attribute declaration; only a
    payload that populates it is refused. That keeps an existing endpoint's
-   schema loadable after the flag is turned on.
+   schema loadable after the flag is turned on. Note that
+   [section 15.1](#151-planned-evolution-not-yet-implemented) proposes *adding*
+   the schema-registration point rather than replacing this one, so both would
+   apply.
 2. **It is standalone, not gated on `StrictSchemaValidation`.** The two flags
    answer different questions - how carefully do I police this payload, versus
    is this schema shape legal at all - so a lenient endpoint must still be able
    to refuse a shape the RFC forbids.
 
-### The original observation
+### 15.3 The original observation
 
 `SchemaValidator.validateSingleValue` in [api/src/domain/validation/schema-validator.ts](../../api/src/domain/validation/schema-validator.ts) recurses into `subAttributes` with no depth cap:
 
@@ -885,7 +1353,7 @@ if (attrDef.subAttributes && attrDef.subAttributes.length > 0) {
 
 ---
 
-## 13. References
+## 16. References
 
 **Normative**
 

@@ -8,7 +8,7 @@
  * be asserted in Playwright, not by CSS property checks alone.
  *
  * Run vs dev:
- *   $env:E2E_BASE_URL = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+ *   $env:E2E_BASE_URL = 'https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
  *   $env:E2E_TOKEN    = 'changeme-scim'
  *   cd web
  *   npx playwright test e2e/workbench-layout.spec.ts --reporter=line

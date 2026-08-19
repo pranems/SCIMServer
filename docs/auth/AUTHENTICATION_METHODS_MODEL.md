@@ -1,31 +1,8 @@
-# Authentication Methods Model (A0 - now PARTIALLY ACTIVE)
+# Authentication Methods Model
 
-> Step **A0** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)). Establishes the generalized `authenticationMethods[]` backbone (architecture sections 1.3 + 5.2 + 6.2).
-
-> **Status correction, 2026-07-31 (v0.55.1).** This document previously described the model as
-> **inert** - "stored and round-tripped, but not yet consulted by any auth resolver". That was true at
-> A0 and is **no longer true**. The model is consulted at six runtime call sites, all of them through
-> the helper `resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods)`, which
-> resolves per-method enablement by preferring an explicit `methods[]` entry over the flat endpoint
-> config flags:
+> **Status: LIVE and enforced.** Originally shipped as step **A0** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)) as an *inert* backbone. **It is no longer inert.** Since A1/A3, `profile.authentication.methods[]` is consulted on the authentication hot path and decides whether a method is accepted. Verified against `origin/master` `21ca0a95` (v0.55.2) on 2026-08-04 - see [Enforcement](#enforcement-this-model-is-not-inert).
 >
-> | Consumer | Location | What it decides |
-> |---|---|---|
-> | `EndpointCredentialAuthenticator` | [endpoint-credential.authenticator.ts:69](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts) | whether a per-endpoint bearer or oauth-client credential may authenticate a data-plane request |
-> | `GlobalSharedSecretAuthenticator` | [global-shared-secret.authenticator.ts:93](../../api/src/modules/auth/authenticators/global-shared-secret.authenticator.ts) | whether the endpoint accepts the global shared secret (WI-11 reject-stop) |
-> | `AdminCredentialController` | [admin-credential.controller.ts:456](../../api/src/modules/scim/controllers/admin-credential.controller.ts) | whether a credential of a given type may be **created** on the endpoint |
-> | `EndpointOAuthController` | [endpoint-oauth.controller.ts:201](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) | whether the endpoint token endpoint will mint for the requested method |
-> | `authenticationSchemes` discovery | [discovery/authentication-schemes.ts:81](../../api/src/modules/scim/discovery/authentication-schemes.ts) | which schemes appear in `ServiceProviderConfig` |
-> | `ConnectionInfoService` | [connection-info.service.ts:155](../../api/src/modules/scim/services/connection-info.service.ts) | which methods the Connect surface shows as enabled |
->
-> **Why the stale wording survived so long.** Nothing in the codebase is named after this document.
-> A search for a resolver whose identifier contains "authentication method" finds nothing, because the
-> consulting helper is called `resolveEndpointAuthEnablement`. Verify by the **mechanism**
-> (`profile?.authentication?.methods` reaching a decision), never by the **label**.
->
-> **Still inert:** the `credentialRef` linkage and `defaultMethodId` are persisted and round-tripped but
-> do not yet select a credential at mint time; and six of the ten registry `type` values have no runtime
-> provider at all. Those remain genuine gaps.
+> This correction matters for security review: a reader who believed the "inert" framing would conclude that disabling a method here has no effect. The opposite is true - it is one of the controls that determines whether a credential is accepted.
 
 ## What changed
 
@@ -84,9 +61,25 @@ This is asserted by unit, E2E, and live tests that submit a secret in `config` a
 
 Persistence + read + admin controllers needed **zero** changes: both backends store the profile JSONB opaquely, and `POST` / `GET /admin/endpoints/:id` (full view) already return the whole `profile`.
 
-## Inert by design
+## Enforcement - this model is not inert
 
-A0 wires no resolver. The token-mint plane and the resource-plane guard do not read `profile.authentication` yet. An endpoint created without it is byte-for-byte unaffected (the field stays `undefined`). The block survives an unrelated `settings` PATCH (it rides `{...current}` in the profile merge).
+The original A0 step deliberately wired no resolver, and this document described that state for several releases after it stopped being true. Current runtime (`origin/master` `21ca0a95`, verified 2026-08-04) consults the model through a single helper, [`resolveEndpointAuthEnablement`](../../api/src/modules/endpoint/endpoint-config.interface.ts) (defined at line 930), at **five** call sites:
+
+| # | Call site | What the decision controls |
+|---|---|---|
+| 1 | [endpoint-credential.authenticator.ts:69](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts) | whether a per-endpoint credential is accepted on the resource plane |
+| 2 | [global-shared-secret.authenticator.ts:93](../../api/src/modules/auth/authenticators/global-shared-secret.authenticator.ts) | whether the global shared-secret bearer is accepted |
+| 3 | [admin-credential.controller.ts:456](../../api/src/modules/scim/controllers/admin-credential.controller.ts) | what the admin credential API reports as effective |
+| 4 | [endpoint-oauth.controller.ts:199](../../api/src/modules/scim/controllers/endpoint-oauth.controller.ts) | whether the token endpoint honours a method |
+| 5 | [connection-info.service.ts:155](../../api/src/modules/scim/services/connection-info.service.ts) | what connection information advertises |
+
+Two further consumers read the block directly rather than through the helper: [admin-authentication-method.controller.ts](../../api/src/modules/scim/controllers/admin-authentication-method.controller.ts) (A1 CRUD, lines 147-158) and [authentication-schemes.ts](../../api/src/modules/scim/discovery/authentication-schemes.ts) (line 84 derives `hasWifMethod` from the enabled set for RFC 7643 discovery).
+
+**Resolution order.** An explicit `profile.authentication.methods[]` entry wins; otherwise the flat per-endpoint config flags apply. The helper is *value-preserving*: it never auto-seeds `methods[]`, so an endpoint that has never used the admin methods API behaves exactly as it did before the model existed. That backward-compatibility property is what made the stale "inert" wording survive review for so long - the model is invisible until someone uses it, and then it is authoritative.
+
+## Lifecycle in a profile PATCH
+
+`authentication` is **replaced wholesale** when a partial profile PATCH includes it ([endpoint.service.ts:811-813](../../api/src/modules/endpoint/services/endpoint.service.ts)), because the admin authentication-methods API computes and submits the complete block. It is preserved untouched when the partial omits it (it rides `{...current}`). This is deliberately different from `settings` and `serviceProviderConfig`, which are **per-key merged**. A caller that PATCHes a partial `authentication` block therefore **deletes every method it does not resend** - use the admin methods API rather than hand-rolling a profile PATCH.
 
 ## Test coverage
 

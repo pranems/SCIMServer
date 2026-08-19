@@ -1,0 +1,179 @@
+{
+  "$comment": [
+    "The user-facing documentation contract. Read by scripts/audit-doc-freshness.ps1.",
+    "",
+    "Each entry binds ONE user-facing document to the source paths it describes.",
+    "That binding is what makes Google's 'Update Docs with Code' rule mechanical",
+    "instead of aspirational: if a coupled source changes in a push and the doc",
+    "does not, the gate fails.",
+    "",
+    "'sources' are path PREFIXES matched against the changed-file list.",
+    "'maxAgeDays' bounds how stale the '**Last verified:**' stamp may get.",
+    "Add a doc here the moment it becomes user-facing. Docs NOT listed here are",
+    "internal design/phase notes and are deliberately not gated."
+  ],
+  "docs": [
+    {
+      "path": "README.md",
+      "title": "Project overview and quick start",
+      "sources": ["api/src/main.ts", "docker-compose.yml", "Dockerfile"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "DEPLOYMENT.md",
+      "title": "Public deployment quick start",
+      "sources": ["bootstrap.ps1", "setup.ps1", "scripts/deploy-azure.ps1"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/INDEX.md",
+      "title": "Documentation index",
+      "sources": [],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/AUTHENTICATION_GUIDE.md",
+      "title": "Authentication and Entra ID",
+      "sources": [
+        "api/src/oauth/",
+        "api/src/modules/auth/",
+        "api/src/modules/scim/controllers/admin-credential.controller.ts",
+        "api/src/modules/scim/controllers/auth-decisions.controller.ts",
+        "web/src/pages/CredentialsTab.tsx",
+        "web/src/components/primitives/AuthDiagnosticsPanel.tsx"
+      ],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/ENDPOINT_SETTINGS_OPERATOR_GUIDE.md",
+      "title": "Every endpoint setting",
+      "sources": ["api/src/modules/scim/endpoint-profile/", "web/src/pages/SettingsTab.tsx"],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md",
+      "title": "Endpoint configuration flags reference",
+      "sources": ["api/src/modules/endpoint/endpoint-config.interface.ts"],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/CUSTOM_EXTENSIONS_RFC_GUIDE.md",
+      "title": "Custom schema extensions",
+      "sources": ["api/src/domain/validation/schema-validator.ts", "api/src/modules/scim/discovery/"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md",
+      "title": "Mirroring production data into dev",
+      "sources": ["scripts/replicate-endpoints.ps1"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/OBSERVABILITY_TRACEABILITY_AND_DIAGNOSTICS.md",
+      "title": "Correlation, logging, errors and diagnostics",
+      "sources": ["api/src/modules/logging/", "api/src/oauth/auth-decision-trace.ts"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/UI_GUIDE.md",
+      "title": "Admin UI tour",
+      "sources": ["web/src/pages/", "web/src/routes/"],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/COMPLETE_API_REFERENCE.md",
+      "title": "REST API reference",
+      "sources": ["api/src/modules/scim/controllers/", "api/src/oauth/oauth.controller.ts"],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/ENDPOINT_CREATION_WIKI.md",
+      "title": "Endpoint creation wiki",
+      "sources": ["api/src/modules/scim/endpoint-profile/"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/ENDPOINT_LIFECYCLE_AND_USAGE.md",
+      "title": "Endpoint lifecycle quick start",
+      "sources": ["api/src/modules/scim/controllers/admin.controller.ts"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md",
+      "title": "Azure deployment and usage",
+      "sources": ["infra/", "scripts/deploy-azure.ps1", "scripts/promote-to-prod.ps1"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/DOCKER_GUIDE_AND_TEST_REPORT.md",
+      "title": "Docker guide",
+      "sources": ["Dockerfile", "docker-compose.yml", "api/Dockerfile"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/SCHEMA_CUSTOMIZATION_GUIDE.md",
+      "title": "Schema customization",
+      "sources": [
+        "api/src/domain/validation/schema-validator.ts",
+        "api/src/modules/scim/discovery/",
+        "api/src/modules/scim/controllers/schemas.controller.ts"
+      ],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md",
+      "title": "Attribute characteristic customization",
+      "sources": [
+        "api/src/modules/scim/endpoint-profile/tighten-only-validator.ts",
+        "api/src/modules/endpoint/dto/update-endpoint.dto.ts"
+      ],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/ENDPOINT_PROFILE_ARCHITECTURE.md",
+      "title": "Endpoint profile system and PATCH merge semantics",
+      "sources": [
+        "api/src/modules/scim/endpoint-profile/",
+        "api/src/modules/endpoint/services/endpoint.service.ts",
+        "api/src/modules/endpoint/dto/update-endpoint.dto.ts"
+      ],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md",
+      "title": "PATCH behaviour",
+      "sources": ["api/src/domain/patch/", "api/src/modules/scim/utils/scim-patch-path.ts"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/MULTI_ENDPOINT_GUIDE.md",
+      "title": "Multi-endpoint architecture",
+      "sources": [],
+      "maxAgeDays": 180
+    },
+    {
+      "path": "docs/LOGGING_AND_OBSERVABILITY.md",
+      "title": "Logging and observability",
+      "sources": ["api/src/modules/logging/"],
+      "maxAgeDays": 120
+    },
+    {
+      "path": "docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md",
+      "title": "Remote debugging",
+      "sources": ["api/src/modules/logging/"],
+      "maxAgeDays": 180
+    },
+    {
+      "path": "docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md",
+      "title": "Sovereign and gov cloud",
+      "sources": ["infra/"],
+      "maxAgeDays": 180
+    },
+    {
+      "path": "docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md",
+      "title": "Canonical infrastructure reference",
+      "sources": [],
+      "maxAgeDays": 90
+    }
+  ]
+}

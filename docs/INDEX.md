@@ -1,7 +1,34 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.55.1 - **Updated:** July 31, 2026  
-> 86 API route handlers - 20 controllers - 6 presets - 16 config flags. Test counts move every release; the authoritative current figures live in [CHANGELOG.md](../CHANGELOG.md) and [Session_starter.md](../Session_starter.md) rather than being duplicated here, because a hardcoded total in an index is a guaranteed future lie. At v0.55.x the API unit suite alone is past 4,670 checks, which the previously-frozen "7,335 checks" line understated by more than 800 in one layer.
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
+> **Version:** 0.55.6 - **Updated:** 2026-07-31  
+> 6 presets - **35 endpoint settings controls** (21 boolean flags + 3 enums + 11 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
+
+### Start here
+
+| If you want to... | Read |
+|---|---|
+| Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+| Wire up authentication (4 methods), connect Entra ID, or diagnose an auth failure | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
+| Tour the admin UI screen by screen | [UI_GUIDE.md](UI_GUIDE.md) |
+| Look up a REST route | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
+| Deploy it anywhere | [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) |
+
+### The documentation contract
+
+The **user-facing** set listed in [.doc-manifest.json](.doc-manifest.json) is **enforced, not aspirational**. [scripts/audit-doc-freshness.ps1](../scripts/audit-doc-freshness.ps1) fails a push when a doc advertises a stale product version, loses its `**Last verified:**` stamp, carries a dead link, or when a source path the doc is bound to changes without the doc changing too. [scripts/audit-doc-content.mjs](../scripts/audit-doc-content.mjs) then checks what those docs **claim** against what the source **contains**: route and settings counts, coverage of every setting and auth reason code, phantom settings, API route coverage, retired infrastructure, and json-block parseability.
+
+```powershell
+npm run docs:freshness          # currency only
+npm run docs:freshness:coupled  # + the "Update Docs with Code" coupling check
+npm run docs:freshness:fix      # restamp versions and provenance dates
+npm run docs:content            # do the docs match the source?
+npm run docs:content:selftest   # prove every content check can still FAIL
+npm run docs:freshness:selftest # prove every currency check can still FAIL
+```
+
+Everything else under `docs/` is internal design and phase notes, deliberately not gated.
 
 ---
 
@@ -23,6 +50,10 @@
 | [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Government, BLEU (France), China - sovereign cloud deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker Compose build/run, 4-stage Dockerfile, healthcheck, testing |
 | [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) | Running instances, connection info, credentials, Azure costs |
+| [TENANT_09_MIGRATION_PLAN.md](TENANT_09_MIGRATION_PLAN.md) | **Ephemeral tenant cutover 08 -> 09** - measured tenant-08 inventory, coupling register, identity/RBAC bootstrap, data-carry strategy comparison, phased plan P0-P8, risks and effort estimates |
+| [TENANT_09_MIGRATION_EXECUTION_ISSUES_AND_RCA.md](TENANT_09_MIGRATION_EXECUTION_ISSUES_AND_RCA.md) | **Execution issues and RCA for the 08 -> 09 cutover** - 14 issues across 5 types with root cause, fix, why the fix works and prevention; detection-stage escape analysis; the two total escapes (server-level state invisible to resource-shaped verification, and registry corruption from a bulk identity replace); 10 standing conventions |
+| [TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md](TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md) | **The two tenant migrations compared (2026-05-19 vs 2026-08-12)** - why the mechanism changed from SCIM-API replay to database dump/restore and what that structurally cannot carry; which of run 1's 8 issues recurred (1, and it had been written down as a Low-severity gap); 9 issues with no analogue in run 1; what neither run covered until now; 9 learnings; the procedure for run 3 |
+| [NEW_TENANT_DEPLOY_RCA_2026-05-19.md](NEW_TENANT_DEPLOY_RCA_2026-05-19.md) | The prior 07 -> 08 cross-tenant deploy: 8 issues, root causes, and the preventatives shipped |
 | [PROD_TO_DEV_MIRRORING_AND_FIXTURES.md](PROD_TO_DEV_MIRRORING_AND_FIXTURES.md) | Mirror prod data into dev (IDs intact) + synthetic shape-coverage fixtures |
 | [README_VISUAL_STUDIO_DEBUG.md](README_VISUAL_STUDIO_DEBUG.md) | VS Code debugging - launch configs, remote attach |
 | [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | Zero-access diagnosis - SSE, ring buffer, per-endpoint isolation, 4 workflows |
@@ -31,13 +62,13 @@
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 86 route handlers, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 117 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
 | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) | Multi-endpoint architecture, data isolation, tenant provisioning |
-| [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | **Profile system** - creation flow, 6 presets, auto-expand, tighten-only validation, schema cache |
+| [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | **Profile system** - creation flow, 6 presets, auto-expand, tighten-only validation, schema cache, and the canonical **PATCH merge semantics** table (what is replaced vs merged vs preserved) |
 | [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md](ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md) | **Profile enforcement design** - the advertise-but-don't-enforce bug class (10 gaps; 9 enforced + Gap 5 documented non-enforced), shared resource-type + capability resolvers, Phase 1 fix shipped v0.53.3 + Phase 2 settings-only model, data flows, RFC status mapping, parity harness |
 | [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | Profile configuration design (Phase 13) - decisions, types, flows |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Operator guide - custom extensions, resource types, profile-based |
@@ -111,7 +142,7 @@
 | Document | Description |
 |----------|-------------|
 | [rfcs/README.md](rfcs/README.md) | **The mirrored RFC corpus and its currency gate.** Verbatim RFC 7642 / 7643 / 7644 / 9865 / 9967 text, the exact-section index, the errata-are-not-in-the-text warning, and how [scripts/sync-rfcs.ps1](../scripts/sync-rfcs.ps1) keeps the mirror provably current (8 checks; C3 is self-extending, so a newly published RFC that updates 7643 makes the gate demand it with no script edit). |
-| [rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) | **Which attribute / sub-attribute shapes are legal, and which are not.** Exhaustive level x cardinality x type matrix; 8 allowed cases and 6 forbidden cases with worked JSON; why RFC 7644's `*1subAttr` path ABNF independently caps depth at two; the `Schema`-resource carve-out; the extension-URN "looks like 3 levels" trap; 3 legal ways to model deeper data; the 12 errata that settle the ambiguities (incl. 8415, which struck `complex` from `subAttributes.type`); Entra ID + Okta deviation matrix. |
+| [rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) | **Which attribute / sub-attribute shapes are legal, and which are not.** Exhaustive level x cardinality x type matrix; 8 allowed cases and 6 forbidden cases with worked JSON; why RFC 7644's `*1subAttr` path ABNF independently caps depth at two; the `Schema`-resource carve-out; the extension-URN "looks like 3 levels" trap; 3 legal ways to model deeper data; the 12 errata that settle the ambiguities (incl. 8415, which struck `complex` from `subAttributes.type`). **Plus (2026-07-31):** a machine-checkable rule catalogue with stable IDs (P1-P2 payload rules, D1-D11 schema-definition rules) and where each can be evaluated; a **measured survey of 108 live endpoints / 666 schemas / 3,658 attributes** showing which rules actually fire (and why the literal reading of 2.3.8 would have rejected our own schemas); the deliberate `referenceTypes` advertised-but-unenforced divergence and why Entra's `"$ref": null` makes enforcement impossible; and an expanded Entra / Okta / Slack / Atlassian / AWS deviation matrix. |
 | [rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md) | Canonical JSON extracted from RFC 7643 S8.7.1 + S3.1 + S2.2-S2.4, for diffing against what the server publishes |
 | [SCIM_REFERENCE.md](SCIM_REFERENCE.md) | SCIM v2 protocol reference with example payloads |
 | [SCIM_COMPLIANCE.md](SCIM_COMPLIANCE.md) | RFC 7643/7644 compliance matrix + Entra compatibility |
@@ -157,6 +188,8 @@
 | [auth/AUTH_SOURCE_REFACTORING_ANALYSIS.md](auth/AUTH_SOURCE_REFACTORING_ANALYSIS.md) | **X12 design/architecture analysis - should the auth sources be refactored, and how.** Maps the current two-plane structure + the patterns already used (repository + DI token, `IAssertionTokenProvider` strategy seam, guard, small services); ranks 5 coupling/SRP findings (the 491-line `SharedSecretGuard` god-guard #1; the token-mint `client_secret` inline asymmetry #2); recommends ONE refactor = a resource-plane `ResourceAuthenticator` strategy chain mirroring the existing mint seam + symmetric `client_secret` extraction + centralized decision emitter, decoupling by auth method; records explicit YAGNI non-goals (no policy DSL, no `OAuthService` split); a 3-phase backward-compatible TDD plan; and defines the STANDING **Design & Architecture Self-Improvement Gate** (now a rule in copilot-instructions.md + pattern PF-1 in the lessons ledger). |
 | [auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md](auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md) | **X13 consolidated delivery plan - interlocks the X11 perf, X12 refactor, and SyncFabric roadmap streams into one sequenced release train.** Waves 0-6 (~25 consolidated work items, each with goal/tasks/acceptance/deps/estimate/risk); current-source state table; dependency + critical-path Mermaid; relative-complexity estimate rollup (~119 core points); empirical gates; per-item DoD contract; DA-gate disposition. Core rule: the X12 seam (Wave 2) precedes RFC 8693 (Wave 4) so new methods EXTEND not EDIT; security hotfix (Wave 0) ships first; perf foundation (Wave 1) de-risks all external-JWKS methods. |
 | [auth/W0_2_TOKEN_ENDPOINT_200_NO_STORE.md](auth/W0_2_TOKEN_ENDPOINT_200_NO_STORE.md) | **W0.2 feature doc - token endpoint HTTP 200 + no-store.** Moves every token-mint SUCCESS response (global `client_secret`, per-endpoint `client_secret`, per-endpoint WIF `client_assertion`) from 201 to the RFC 6749 section 5.1-mandated 200 with `Cache-Control: no-store` + `Pragma: no-cache`; error paths keep 400/401 (section 5.2). Carries the IdP-behavior analysis (Entra/SyncFabric documented-vs-observed, other IdPs, where 201 could bite), the options table (chosen: Option D - implement + measure), the decorator implementation, and the E2E + live `9z-BU` measured coverage. |
+| [auth/W1_4_JWKS_CACHE_CADENCE.md](auth/W1_4_JWKS_CACHE_CADENCE.md) | **W1.4 feature doc - JWKS cache cadence: 24 h TTL, background refresh, rate-limited unknown-`kid`, hard stale ceiling.** Replaces a 10-minute lazily-refreshed cache with [Microsoft's published algorithm for its own signing keys](https://learn.microsoft.com/en-us/entra/identity-platform/signing-key-rollover). Explains why the TTL raise was gated behind a hard constraint (144x blast-radius multiplier) and honors it: the raise ships with the background refresher, the rate-limited unknown-`kid` path and the **overlap-window rotation test** that asserts the RETIRING key still verifies after the new one forces a refetch. Closes three pre-existing gaps: fail-to-stale had **no age test at all**, `Cache-Control` was ignored, and the caller-controlled unknown-`kid` refetch had no floor. **Resolves the RCA 10.2 open question** by making an allowlist rejection non-stale-eligible while a network failure stays stale-eligible. Carries the today-vs-target diagrams, the four settings with bounds, the measured I-30 negative control (which reclassified one assertion from feature evidence to regression guard), and what it deliberately did NOT do (startup prefetch stays W1.2). |
+| [auth/W1_5_JWKS_SAFETY_ENVELOPE.md](auth/W1_5_JWKS_SAFETY_ENVELOPE.md) | **W1.5 feature doc - JWKS total deadline + response caps.** The safety envelope W1.4's cache redesign will run inside. Derives the worst case it removes (a fully documented, validator-accepted configuration could spend **3 h 3 m** on one fetch, of which 10,230,000 ms is sleeping), then bounds it: `JWKS_TOTAL_DEADLINE_MS` over the whole operation with the backoff sleep clamped to the remaining budget and the per-attempt timeout reduced to `min(perAttempt, remaining)`; plus `JWKS_MAX_RESPONSE_BYTES` (checked before parsing), `JWKS_MAX_KEYS` (100, deliberately generous - Microsoft states a key cache holds 10-1000 across issuers), and `JWKS_MAX_CACHE_ENTRIES` (a fourth cap the plan did not ask for, closing an unbounded `Map` keyed by a caller-influenced URI). Carries the five design decisions (why a cap breach is non-retryable; why deadline expiry still serves stale), the fetch-flow diagram, the unit/live coverage table, what it deliberately did NOT do (the stale-age ceiling stays W1.4's - **delivered there in v0.55.5**), and the I-25 to I-29 issue record. |
 | [auth/WAVE2_DESIGN_ANALYSIS.md](auth/WAVE2_DESIGN_ANALYSIS.md) | **Wave 2 deep design analysis - is the auth strategy seam good design, and how does configurability work after W2.5.** Grounds the seam in the Spring Security `ProviderManager` probe-chain (the direct analog of SCIMServer's existing implicit cascade) + the ASP.NET named-scheme contrast + GoF Chain-of-Responsibility/Strategy; establishes the load-bearing "not-mine vs mine-but-invalid" three-outcome invariant (downgrade-confusion defense); recommends a probe-chain + token-shape fast-path on the resource plane and a keyed Strategy-select on the mint plane; benefits + 7 pitfalls with mitigations; alternatives evaluated (helpers-only, Passport, named-scheme - and why each is or isn't a fit); W2.5 worked fully (enabled/has-cred/active 4-state model, both-planes-one-source-of-truth, Option A explicit per-method `enabled`, gaps + migration + operator UX); per-item recommendations + sequencing. |
 | [auth/WAVE2_W2_1_IMPLEMENTATION_REPORT.md](auth/WAVE2_W2_1_IMPLEMENTATION_REPORT.md) | **W2.1 implementation report - the resource-plane `ResourceAuthenticator` probe-chain (delivered v0.54.67).** The 491-line `SharedSecretGuard` god-guard is now a ~185-line thin orchestrator over 3 ordered single-purpose authenticators (endpoint-credential / OAuth-JWT / global-secret), each returning the 3-outcome `AuthAttempt`. Behavior-preserving (guard spec 39/39 + auth E2E 80/80 unchanged; +20 per-strategy specs; full unit 4479). Includes the validation matrix, the 2-issue RCA (JWT-shaped test fixture, stale eslint-disable), the DA-gate disposition, learnings, and the W2.2-W2.5 next steps. Section 8 records the dev-deploy + measured validation (live-test 1303/1313, Playwright 194/194) + the pipeline RCA. |
 | [auth/WAVE2_W2_5_IMPLEMENTATION_REPORT.md](auth/WAVE2_W2_5_IMPLEMENTATION_REPORT.md) | **W2.5 implementation report - per-method auth-enablement consolidation (delivered v0.54.68).** One `resolveEndpointAuthEnablement` co-locates enablement on `profile.authentication.methods[]` (value-preserving fallback to the flat flags); the resource guard + credential create-gate + connection-info all read it, and the token-mint plane consults it in SHADOW (non-blocking, design 7.4). +7 resolver unit + 2 mint-shadow unit + 3 co-location E2E + live-test `9z-BV`. Legacy-flag retirement + mint enforcement flip + metadata enablement-gating are a scheduled value-preserving follow-up (section 7). |
@@ -314,7 +347,7 @@ These are the definitive source files for key aspects of the system:
 | Profile types | [api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) |
 | Built-in presets | [api/src/modules/scim/endpoint-profile/presets/](../api/src/modules/scim/endpoint-profile/presets/) |
 | Schema validator | [api/src/domain/validation/schema-validator.ts](../api/src/domain/validation/schema-validator.ts) |
-| SCIM constants | [api/src/modules/scim/utils/scim-constants.ts](../api/src/modules/scim/utils/scim-constants.ts) |
+| SCIM constants | [api/src/modules/scim/common/scim-constants.ts](../api/src/modules/scim/common/scim-constants.ts) |
 | Filter parser | [api/src/modules/scim/filters/scim-filter-parser.ts](../api/src/modules/scim/filters/scim-filter-parser.ts) |
 | Patch engines | [api/src/domain/patch/](../api/src/domain/patch/) |
 | Live tests | [scripts/live-test.ps1](../scripts/live-test.ps1) |

@@ -18,9 +18,18 @@
   step after every deployment rather than an occasional cleanup.
 
 .PARAMETER Keep
-  How many active revisions to retain, newest first. Default 2: the one
-  serving traffic plus one previous revision to roll back to. Going below 2
-  removes the rollback target, so 1 is allowed but warned about.
+  How many active revisions to retain, newest first.
+
+  When omitted this is RESOLVED FROM scripts/scim-estates.json for the target
+  app, so a manual run gets the same policy the deployment flows use. A number
+  copied by hand into each caller is a number that drifts, and the drift is
+  invisible until an estate is quietly paying for revisions nobody kept on
+  purpose - or has silently lost the rollback target somebody assumed was there.
+
+  Default policy is 2: the revision serving traffic plus one previous revision
+  to roll back to. customer-prod (calmsand) is a DECLARED exception at 1 for
+  cost reasons - see revisionKeepRationale in the registry. Passing -Keep
+  explicitly always wins, for one-off operational need.
 
 .NOTES
   SAFETY: a revision currently serving traffic is NEVER deactivated, even if
@@ -31,19 +40,38 @@
 param(
     [Parameter(Mandatory)] [string]$ResourceGroup,
     [Parameter(Mandatory)] [string]$AppName,
-    [int]$Keep = 2,
+    [int]$Keep,
     [string]$Subscription
 )
 
 $ErrorActionPreference = 'Stop'
 
+# Resolve the retention policy from the registry unless the caller pinned it.
+$keepSource = 'explicit -Keep'
+if (-not $PSBoundParameters.ContainsKey('Keep')) {
+    $estatesModule = Join-Path $PSScriptRoot 'scim-estates.ps1'
+    if (Test-Path $estatesModule) {
+        . $estatesModule
+        $Keep = Get-ScimEstateRevisionKeep -AppName $AppName -ResourceGroup $ResourceGroup
+        $keepSource = 'estate registry'
+    } else {
+        $Keep = 2
+        $keepSource = 'built-in default (registry not found)'
+    }
+}
+
 if ($Keep -lt 1) { throw "-Keep must be at least 1 (got $Keep)." }
-if ($Keep -eq 1) { Write-Warning "-Keep 1 leaves no previous revision to roll back to." }
 
 if ($Subscription) { az account set --subscription $Subscription | Out-Null }
 
 Write-Host ""
 Write-Host "=== Revision hygiene: $AppName (rg: $ResourceGroup) ===" -ForegroundColor Cyan
+Write-Host ("  retention: keep {0} active revision(s)  [from {1}]" -f $Keep, $keepSource) -ForegroundColor DarkGray
+if ($Keep -eq 1) {
+    # Not a warning about a mistake - it is a statement of the consequence the
+    # operator signed up for, printed where the deploy log will keep it.
+    Write-Host "  keep=1: after this prune there is NO rollback target. Recovery is roll-forward: re-run the promotion with the previous image tag." -ForegroundColor Yellow
+}
 
 $raw = az containerapp revision list -n $AppName -g $ResourceGroup -o json 2>$null
 if (-not $raw) { throw "Could not list revisions for $AppName in $ResourceGroup." }
@@ -89,8 +117,21 @@ if ($toDeactivate.Count -eq 0) {
 $failed = @()
 foreach ($r in $toDeactivate) {
     if ($PSCmdlet.ShouldProcess($r.name, 'deactivate revision')) {
-        az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r.name 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { $failed += $r.name } else { Write-Host "  deactivated $($r.name)" -ForegroundColor DarkGray }
+        $out = az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r.name 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            # Azure's revision list is eventually consistent, so a revision another
+            # run just deactivated can still appear active here. Deactivating an
+            # already-inactive revision is a no-op, not a failure - treat it as
+            # such rather than aborting the whole prune. Seen on calmsand
+            # 2026-07-31 when the promotion script's own prune had already run.
+            if ("$out" -match 'already|not active|inactive|InvalidRevision') {
+                Write-Host "  already inactive: $($r.name)" -ForegroundColor DarkGray
+            } else {
+                $failed += $r.name
+            }
+        } else {
+            Write-Host "  deactivated $($r.name)" -ForegroundColor DarkGray
+        }
     }
 }
 

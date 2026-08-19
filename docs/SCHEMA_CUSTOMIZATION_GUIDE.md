@@ -1,6 +1,8 @@
 # Schema Customization Guide - Operator Reference
 
-> **Version**: 3.1 · **Date**: June 3, 2026 · **Status**: ✅ Complete (source-verified against v0.53.0)  
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
+> **Version**: 3.2 · **Date**: 2026-07-31 · **Status**: Complete (route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line source pass dates from v0.53.0)  
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types  
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
 
@@ -76,7 +78,7 @@ flowchart LR
 
 A profile has four sections:
 
-```json
+```jsonc
 {
   "profile": {
     "schemas": [],              // Schema definitions (core + extensions)
@@ -107,7 +109,7 @@ A profile has four sections:
 
 ### Minimal Example
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "hr-endpoint",
@@ -164,7 +166,7 @@ Every custom extension requires three things:
 
 Same three-part pattern, but the binding goes on the Group resource type:
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "group-ext",
@@ -260,7 +262,7 @@ You can bind multiple extensions to a single resource type. Each extension is a 
 
 **Usage** - Creating a user with all three extensions:
 
-```json
+```http
 POST /scim/endpoints/{endpointId}/Users
 {
   "schemas": [
@@ -283,7 +285,7 @@ POST /scim/endpoints/{endpointId}/Users
 
 ## 5. Extensions on Both User and Group
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "dual-ext",
@@ -435,7 +437,7 @@ With `StrictSchemaValidation: "True"`, a `POST /Users` that omits the required e
 
 Custom resource types let you manage resources beyond User and Group (e.g., `Device`, `Application`, `License`).
 
-```json
+```http
 POST /scim/admin/endpoints
 {
   "name": "with-devices",
@@ -513,7 +515,19 @@ Custom resource types can also have schema extensions:
 
 > **Important**: `schemas` and `resourceTypes` use **Replace** merge semantics. You must send the complete arrays - including all existing schemas/RTs plus the new extension.
 
-```json
+Two rules cover every PATCH against a profile, both guarded in `mergeProfilePartial()`
+([endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts) lines 768-815):
+
+| | Rule |
+|---|---|
+| **Omit a section** | It is preserved untouched. Leaving `schemas` out of the body can never wipe it, so a settings-only PATCH is safe. |
+| **Include a section** | For `schemas` and `resourceTypes` the whole array is swapped in. A one-element `schemas` array leaves the endpoint with exactly one schema. |
+
+So the working pattern is always **GET -> modify -> PATCH the full arrays back**. The full
+per-section table, including `serviceProviderConfig` and `authentication`, plus a decision
+diagram, is in [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md#profile-merging-on-patch).
+
+```http
 PATCH /scim/admin/endpoints/{id}
 {
   "profile": {
@@ -540,13 +554,27 @@ PATCH /scim/admin/endpoints/{id}
 }
 ```
 
-**Structural integrity rule**: If you replace `schemas` without also including all resource types that reference those schemas, you'll get:
+**Structural integrity rule**: validation runs on the **merged** profile, so every
+`resourceTypes[].schema` and `schemaExtensions[].schema` URN must be present in the merged
+`schemas[]`. Replace `schemas` without carrying the URNs your resource types depend on and
+you get:
 
-```
-400: ResourceType "Group" references schema "urn:...Group" not in schemas array.
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/scim+json
+
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "detail": "Profile validation failed: ResourceType \"Group\" references schema \"urn:ietf:params:scim:schemas:core:2.0:Group\" which is not in the schemas array.",
+  "status": "400"
+}
 ```
 
-> **Settings and SPC are preserved**: Only schemas/resourceTypes are replaced. `serviceProviderConfig` and `settings` from the existing endpoint are preserved if not included in the PATCH body.
+The literal message is emitted by [endpoint-profile.service.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.service.ts) line 131. A rejected PATCH is atomic - the merge throws before the database write, so the stored profile is unchanged.
+
+> **Settings and SPC are preserved**: Only schemas/resourceTypes are replaced. `serviceProviderConfig` and `settings` from the existing endpoint are preserved if not included in the PATCH body. If you *do* include `serviceProviderConfig`, only the top-level capability keys you send (`patch`, `bulk`, `filter`, `sort`, `etag`, `changePassword`) are overwritten - the rest survive.
 
 ### When Does It Take Effect?
 
@@ -642,7 +670,7 @@ curl -X POST "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Groups" \
 
 Extension data roundtrips through GET - both single-resource and list responses. `schemas[]` is built dynamically from visible extension URN keys:
 
-```json
+```http
 GET /scim/endpoints/{endpointId}/Users/{userId}
 
 {
@@ -666,7 +694,7 @@ GET /scim/endpoints/{endpointId}/Users/{userId}
 
 Merge an entire extension block without specifying paths:
 
-```json
+```http
 PATCH /scim/endpoints/{endpointId}/Users/{userId}
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],

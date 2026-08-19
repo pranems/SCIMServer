@@ -158,14 +158,32 @@ if ($missing.Count -gt 0) {
 # ---------------------------------------------------------------- C4
 if ($Live) {
     Write-Section '[C4] live estate truth'
-    $estates = @(
-        @{ Name = 'dev';            Url = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io' }
-        @{ Name = 'prod (canary)';  Url = 'https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io' }
-        @{ Name = 'prod (customer)';Url = 'https://scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io' }
-    )
-    $token = if ($env:E2E_TOKEN) { $env:E2E_TOKEN } else { 'changeme-scim' }
 
-    foreach ($e in $estates) {
+        # Estates come from the ROLE-KEYED registry and their FQDNs are DERIVED
+        # from ARM, so this gate follows a tenant rollover automatically instead
+        # of having to be edited. Before 2026-08-13 the three URLs were hardcoded
+        # here, which meant a migration silently pointed the gate at the OLD
+        # estate: it would have kept reporting PASS against a retired deployment
+        # while saying nothing about the one actually serving.
+        $estates = @()
+        $estatesModule = Join-Path $PSScriptRoot 'scim-estates.ps1'
+        if (Test-Path $estatesModule) {
+            try {
+                . $estatesModule
+                foreach ($p in @(@('dev', 'dev'), @('prod (canary)', 'canary-prod'), @('prod (customer)', 'customer-prod'))) {
+                    try { $estates += @{ Name = $p[0]; Url = (Get-ScimEstateBaseUrl -Purpose $p[1]) } }
+                    catch { $failures += "C4: could not resolve the FQDN for '$($p[1])': $($_.Exception.Message)" }
+                }
+            }
+            catch { $failures += "C4: estate registry unusable: $($_.Exception.Message)" }
+        }
+        if ($estates.Count -eq 0) {
+            $failures += "C4: no estates resolved from scripts/scim-estates.json; skipping the live check rather than guessing a URL."
+        }
+
+        $token = if ($env:E2E_TOKEN) { $env:E2E_TOKEN } else { 'changeme-scim' }
+
+        foreach ($e in $estates) {
         try {
             $r = Invoke-RestMethod -Uri "$($e.Url)/scim/admin/version" `
                                    -Headers @{ Authorization = "Bearer $token" } -TimeoutSec 20
@@ -183,7 +201,20 @@ if ($Live) {
                 $notes += "C4: estate '$($e.Name)' reports version $($r.version), which the doc does not mention - refresh Section 4."
             }
         } catch {
-            $notes += "C4: estate '$($e.Name)' not reachable ($($_.Exception.Message.Split([Environment]::NewLine)[0])) - skipped, not failed."
+            $first = $_.Exception.Message.Split([Environment]::NewLine)[0]
+            # A 401 is NOT "unreachable". The estate answered; we presented the
+            # wrong credential. Treating that as a skip silently DISABLES this
+            # check - which is exactly what happened on 2026-08-13 when a
+            # refactor dropped the $token assignment and all three estates were
+            # reported as merely unreachable while the gate still said PASS.
+            # An estate that cannot be evaluated must never look like one that
+            # passed.
+            if ($first -match '\b401\b|Unauthorized') {
+                $failures += "C4: estate '$($e.Name)' returned 401 - the admin token is wrong or unset, so this check did NOT run. Set E2E_TOKEN. This is a broken gate, not an unreachable estate."
+            }
+            else {
+                $notes += "C4: estate '$($e.Name)' not reachable ($first) - skipped, not failed."
+            }
         }
     }
 }

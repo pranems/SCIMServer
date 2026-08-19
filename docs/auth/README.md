@@ -2,11 +2,9 @@
 
 > **Start here.** This folder holds the complete authentication analysis + design for SCIMServer. The docs are a **hub-and-spoke set**, not four overlapping essays. This README is the navigational index and the single answer to "where is the plan?".
 
-> **Status of the cluster (corrected 2026-07-31, v0.55.1).** The WIF critical path has **shipped**. RFC 7523 workload identity federation, per-endpoint OAuth clients, the external JWKS validator, the admin authentication-methods CRUD, computed `authenticationSchemes`, the token-endpoint routing cascade, and capability-derived RFC 8414 metadata are all live in `api/src/`. See [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md) for the end-to-end proof and the per-step implementation reports (`WAVE2_*`, `WAVE3_*`) for what each step delivered.
+> **Status of the cluster (corrected 2026-08-18, verified against `master` at v0.55.6).** The WIF critical path has **SHIPPED**. RFC 7523 workload-identity client assertions, external-JWKS validation, and per-endpoint OAuth client credentials all have runtime providers exercised by unit, E2E and live tests. **What has NOT shipped:** RFC 8693 token exchange (Wave 4 - and correctly *not* advertised in metadata, `syncFabricRfc8693: false`), the authorization-code grant, mTLS and DPoP.
 >
-> **What has NOT shipped:** RFC 8693 token exchange (deliberately, Wave 4 - and correctly *not* advertised in metadata), mTLS, DPoP, authorization-code/PKCE, and token introspection. The admin registry accepts ten method `type` values but only **four** have a runtime provider; see the note under [Coverage at a glance](#coverage-at-a-glance).
->
-> This banner previously read "analysis + design only - no code has been implemented". That was true when the cluster was written and became false as the Phase Q and Wave work landed. It is corrected here because a status banner that under-reports shipped capability sends an implementer to rebuild something that already exists.
+> This banner previously read "analysis + design only - no code has been implemented". That was true when the cluster was written and stayed on the page for months after it stopped being true, which is the failure mode this whole doc set exists to prevent. The factual shipped baseline is described in [AUTHENTICATION_ARCHITECTURE.md section 4](AUTHENTICATION_ARCHITECTURE.md#4-current-scimserver-state-source-grounded) and [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md).
 
 ---
 
@@ -54,7 +52,7 @@ The three docs were written at different times and used three numbering schemes.
 | **Pre-Q.A** | §7.2 pre-work | Pre-Q.A | `structured` config flag-type + validator | enabling |
 | **Pre-Q.B** | §7.2 pre-work | Pre-Q.B | RS256/ES256 externalized signing key + published JWKS | enabling |
 | **Q0** | Q0 | folded into A2 + Q6.1 | enrich `WWW-Authenticate`, add `aud` claim, RFC 8414 metadata | enabling |
-| **A0** | - | - | `profile.authentication.methods[]` model (inert) | backbone |
+| **A0** | - | - | `profile.authentication.methods[]` model (**live** - enforced at 5 runtime call sites since A1/A3; shipped inert, no longer is) | backbone |
 | **Q1** | Q1 | Q1 (prereq) | per-endpoint `oauth-client` credential + per-endpoint issuer | critical path |
 | **Q2** | Q2 | Q2 (prereq) | `jose` external JWKS validator | critical path |
 | **A1** | - | Q6.2 D5 | admin `/authentication/methods` CRUD + orthogonal create gate | backbone |
@@ -81,29 +79,20 @@ The ~5-6 day delta buys the generalized `methods[]` backbone that turns 1P / rol
 
 ## Coverage at a glance
 
-> Re-verified against `release/0.55.0` (`6e6ad8ff`, v0.55.1) on 2026-07-31. "Shipped" means a runtime
-> provider exists and is exercised by unit, E2E, and live tests - not that a `type` value is accepted
-> by the admin registry.
+> Re-verified against `master` at **v0.55.6** on 2026-08-18 by locating the runtime provider for each pattern in the source tree. **"SHIPPED" means a runtime provider exists** - not that a `type` value is accepted by the admin registry.
 
 | Pattern | SCIMServer status | Evidence / closes in |
 |---|---|---|
-| 1 - Long-lived global bearer (legacy shared secret) | **SHIPPED** | `authenticators/global-shared-secret.authenticator.ts` |
-| 2 - OAuth 2.0 client_credentials (issuer mode, single global pair) | **SHIPPED** | `api/src/oauth/oauth.controller.ts` |
-| 3 - Per-endpoint bcrypt bearer (multi-tenant) | **SHIPPED** (G11) | `authenticators/endpoint-credential.authenticator.ts` |
-| 4 - External JWKS-validated JWT | **SHIPPED** (Q2) | `api/src/oauth/external-jwks-validator.service.ts` |
-| 5 - Per-endpoint client_id/secret pairs (Entra Gallery mandate) | **SHIPPED** (Q1) | `controllers/client-secret-token-provider.ts` |
-| 8a - Workload Identity Federation, **RFC 7523** JWT-bearer client assertion | **SHIPPED** (Q6) | `controllers/wif-assertion-token.provider.ts`, `oauth/wif-assertion-validator.service.ts` |
-| 8b - Workload Identity Federation, **RFC 8693** token exchange | **GAP - deliberately** | Wave 4. Correctly **not** advertised: `endpoint-oauth-metadata.controller.ts` hardcodes `syncFabricRfc8693: false` |
+| 1 - Long-lived global bearer (legacy shared secret) | **SHIPPED** | `modules/auth/authenticators/global-shared-secret.authenticator.ts` |
+| 2 - OAuth 2.0 client_credentials (issuer mode, single global pair) | **SHIPPED** | `oauth/oauth.controller.ts`; metadata advertises `grant_types_supported: ['client_credentials']` |
+| 3 - Per-endpoint bcrypt bearer (multi-tenant) | **SHIPPED** (G11) | `modules/auth/authenticators/endpoint-credential.authenticator.ts` |
+| 4 - External JWKS-validated JWT | **SHIPPED** (Q2) | `oauth/external-jwks-validator.service.ts`; resource side `authenticators/oauth-jwt.authenticator.ts` |
+| 5 - Per-endpoint client_id/secret pairs (Entra Gallery mandate) | **SHIPPED** (Q1) | `modules/scim/controllers/client-secret-token-provider.ts` |
+| 8a - Workload Identity Federation, **RFC 7523** JWT-bearer client assertion | **SHIPPED** (Q6) | `oauth/wif-assertion-validator.service.ts`, `wif-discovery-resolver.service.ts`, `controllers/assertion-token-provider.ts` |
+| 8b - Workload Identity Federation, **RFC 8693** token exchange | **GAP - deliberately** | Wave 4. No grant handler; `syncFabricRfc8693` is hard-`false` in `endpoint-oauth-metadata.controller.ts`, so it is **correctly not advertised** rather than advertised-and-broken |
 | 6 - Authorization-Code + refresh | GAP | Q4 (on demand) |
-| 7 - mTLS / DPoP | GAP | Q5 (deferred) |
-| HTTP Basic (`httpbasic`) | registry `type` only, no provider | one-provider add if ever needed |
-
-> **Registry breadth is not capability.** `KNOWN_METHOD_TYPES` in
-> [admin-authentication-method.controller.ts](../../api/src/modules/scim/controllers/admin-authentication-method.controller.ts)
-> accepts ten values - `shared-secret`, `bearer`, `oauth-client`, `external-jwt`, `wif-7523`,
-> `wif-8693`, `oauth-authcode`, `mtls`, `dpop`, `httpbasic` - while only four have a runtime provider.
-> Any surface that enumerates registry types without intersecting them against implemented providers
-> will over-state what the server can actually authenticate.
+| 7 - mTLS / DPoP | GAP | Q5 (deferred). No `tls_client_auth`, no `x5t#S256`, no DPoP handler in the source tree |
+| HTTP Basic (`httpbasic`) | provably absent; deliberately not designed | one-provider add if ever needed |
 
 Full 10-ISV matrix + per-pattern detail: [ISV sections 2-4](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md#2-industry-pattern-matrix-10-isvs).
 

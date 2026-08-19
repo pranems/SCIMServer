@@ -4,30 +4,42 @@
 
 **Status:** Part reference documentation of shipped behavior, part proposed design. Every claim carries an explicit status; see section 9.8 for the implementation status ledger.  
 **Prepared from:** current SyncFabric and SCIMServer sources, repository history, Microsoft guidance, and the relevant OAuth/JWT RFCs  
-**SyncFabric source snapshot:** `origin/master` at `c6f63afc37edde087bb6f8be9fbabb5929da736c` (full delta analysed through this head)  
+**SyncFabric source snapshot:** `origin/master` at `da0c7b46f168` (full delta analysed through this head)  
 **Latest WIF-specific SyncFabric commit found:** `b0395434354198f90db61f494428417353ddfd65`  
-**SCIMServer source snapshot:** `release/0.55.0` at `edcb330fd47ef69e8a96e2cbdf60fd7013677907` (API and web both `0.55.1`)  
-**Branch note:** `feat/wif` has been **merged into SCIMServer `master`**; `origin/feat/wif` is historical. This revision analyses `release/0.55.0`, which is `master` (`10e9db22`) plus ten commits and zero commits behind it, so `master` remains a strict ancestor and no divergence exists.  
-**Refresh baseline:** previous guide snapshots were SyncFabric `6bd2ac8e86f6e330164eabc689d1a3df4fa48cc5` and SCIMServer `10e9db229bc0b61e39337b434f9694ef8f30288b`  
-**Delta size this refresh:** SyncFabric **1 commit**, SCIMServer **10 commits** (nine analysed as the main range, plus one auth-plane commit that landed concurrently during the run and was analysed as a tail; see section 3.4.0.2)  
-**Working-tree note:** the SCIMServer `release/0.55.0` worktree was clean and a dedicated read-only worktree (`SCIMServer-auth-docs`, branch `docs/auth-evolution-refresh-20260731`) was created for this run. SyncFabric retained its three pre-existing unrelated local modifications; all SyncFabric conclusions use committed `origin/master`, never the working tree.  
-**Research date:** 2026-07-31 (revision 4; prior revisions 2026-07-31 rev 3, 2026-07-23, 2026-07-22)
+**SCIMServer source snapshot:** `origin/master` at `21ca0a95` (API and web both `0.55.2`)  
+**Branch note:** `master`, `release/0.55.0`, and `feat/wif` all resolve to the **identical** commit `21ca0a95`. `feat/wif` is no longer merely merged - it is an alias of mainline, and there is no divergence to analyse anywhere in the SCIMServer branch set that carries authentication runtime.  
+**Refresh baseline:** previous guide snapshots were SyncFabric `ac6fb8667cc753e2960003aa611bca803e9dcd1d` and SCIMServer `e741c3738a2670f4de6e60351af152f11425af84`  
+**Delta size this refresh:** SyncFabric **23 commits** (127 files), SCIMServer **6 commits** (46 files). Both sides are again **runtime-invariant on the authentication surface, proved at blob level** - all 77 SyncFabric `WorkloadIdentity|TokenExchange` files and all 124 SCIMServer auth-surface files are byte-identical to the previous snapshot. See section 36.  
+**Working-tree note:** SyncFabric is checked out on branch `opentext`, which is 0 ahead and 0 behind `origin/master`, carrying four pre-existing unrelated local modifications; all SyncFabric conclusions use committed `origin/master`, never the working tree. All SCIMServer worktrees analysed were clean; the dedicated `SCIMServer-auth-docs` worktree from revision 4 was read but not written.  
+**Research date:** 2026-08-04 (revision 6; prior revisions 2026-07-31 rev 5, 2026-07-31 rev 4, 2026-07-31 rev 3, 2026-07-23, 2026-07-22)
 
-> This is a portable design artifact. It does not change either repository by itself. A vendored copy is
-> maintained at `docs/auth/SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md` in the
-> SCIMServer repository; that copy is a mirror, and this file is canonical.
+> This is a portable design artifact. It does not change either repository by itself. A mirror is
+> vendored into the SCIMServer repository at
+> `docs/auth/SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md`. **As of
+> revision 6 (2026-08-04) that mirror is byte-identical to this file** - it was refreshed together
+> with the vendored copies of this workflow's prompt and memory, which had drifted 99 KB, 33 KB and
+> 38 KB behind respectively. Before that date the mirror was a revision-2 file and was stale for
+> four revisions; see action A1 in section 35.5 and the correction record in section 36.5.
+> This file remains canonical - re-sync the mirror whenever this one changes.
 
-> **Revision identity warning (added revision 4).** Three copies of this guide exist side by side in
-> the authoring folder, and their `(1)` / `(2)` filename suffixes are browser-download artifacts that
-> do **not** indicate recency. Verify by the revision number in this header, never by filename. A file
-> cannot state its own hash, so the authoritative hash for each revision is recorded in the run log of
-> `syncfabricScimserverAuthEvolution.memory.md`.
+> **Revision identity warning (extended at revision 5).** Copies of this guide exist in several
+> locations, and **neither filename suffix nor location indicates recency.** Verify by the revision
+> number in this header. A file cannot state its own hash, so the authoritative hash for each revision
+> is recorded in the run log of `syncfabricScimserverAuthEvolution.memory.md`.
 >
-> | File | Revision | Lines | Identity |
+> | Location | Revision | Lines | Identity |
 > |---|---|---:|---|
-> | `...GUIDE.md` | **4** | ~4,960 | **this file - canonical** |
-> | `...GUIDE (1).md` | 2 | 4,319 | superseded, SHA-256 `07557F8F...` |
-> | `...GUIDE (2) .md` | n/a | ~190 | **repurposed at revision 4.** It formerly held the revision-1 seed (SHA-256 `532894BA...`, 3,592 lines) - the **oldest** copy despite the highest suffix. It now holds the executive digest and revision ledger. |
+> | session `files\...GUIDE.md` | **5** | this file | **canonical** |
+> | `SCIMServer-auth-docs\docs\auth\...GUIDE.md` | 4 | 5,023 | revision-4 authoring copy; superseded by this file |
+> | session `files\SUPERSEDED_rev3_GUIDE.md` | 3 | 4,649 | superseded, SHA-256 `0C229954...` |
+> | `SCIMServer-master\docs\auth\...GUIDE (1).md` | 2 | 4,322 | stale committed mirror in the SCIMServer repository |
+>
+> **Revision 5 correction.** At the start of this run the canonical session copy held **revision 3**
+> while revision 4 existed only inside a git worktree. Revision 4 was verified to be a strict superset
+> - all 35 of revision 3's level-2 sections were present, plus one new one - and was then promoted
+> into the canonical location before any revision-5 edit. Had the run edited the file it found, it
+> would have silently reverted a revision. The lesson generalises the revision-4 filename warning:
+> **recency must be established by content comparison, never by path or name.**
 
 ---
 
@@ -39,10 +51,12 @@
 - [SyncFabric WIF commit history](#5-syncfabric-wif-change-history)
 - [Current SyncFabric runtime and wire contracts](#6-current-syncfabric-runtime-architecture)
 - [Entra assertion structure and decoding](#8-entra-assertion-structure-and-safe-decoding)
+- [Observed claim shape from a real Entra assertion](#86-observed-claim-shape-from-a-real-entra-assertion-added-revision-5)
 - [Current SCIMServer implementation and gap matrix](#9-current-scimserver-implementation)
 - [Implementation status ledger](#98-implementation-status-ledger)
 - [Target architecture and trust model](#11-target-architecture)
 - [Endpoint persona and auth-emulation model](#116-endpoint-persona-and-auth-emulation-model)
+- [Transport policy as an independent persona axis](#1191-transport-policy-is-an-independent-persona-axis-added-revision-5)
 - [Protocol, errors, admin API, connection info, and metadata](#13-protocol-handler-design)
 - [UI and data transformations](#18-ui-and-operator-workflow)
 - [Security, diagnostics, and environments](#20-security-and-threat-analysis)
@@ -51,6 +65,11 @@
 - [File-by-file implementation and acceptance](#25-file-by-file-implementation-plan)
 - [Decisions, risks, next steps, and sources](#28-decision-table)
 - [Revision 4 provenance and validation report](#34-revision-4-provenance-and-validation-report)
+- [Revision 5 provenance and validation report](#35-revision-5-provenance-and-validation-report)
+- [Empirical gate status after revision 5](#354-empirical-gate-status-after-revision-5)
+- [Revision 6 provenance and validation report](#36-revision-6-provenance-and-validation-report)
+- [Sovereign WIF app ID - a gap in an exercised process](#364-new-finding---the-sovereign-wif-application-id-is-a-gap-in-an-exercised-process)
+- [Documentation corrections in the consuming repository](#365-documentation-corrections-made-in-the-consuming-repository)
 
 ---
 
@@ -76,7 +95,7 @@ SyncFabric can obtain the Entra application token in two modes:
 - **Customer-application mode:** a managed identity token is transformed through subidentity and application-impersonation steps.
 - **First-party mode:** SyncFabric directly requests a token as its dedicated first-party WIF application. The requested scope includes the normalized target SCIM host.
 
-SCIMServer `release/0.55.0` (WIF work merged from `feat/wif` into `master`, then nine further commits; API and web both version `0.55.1`) already contains substantial WIF infrastructure:
+SCIMServer `origin/master` at `e741c373` - which is byte-identical to `release/0.55.0` and to `feat/wif`, with API and web both version `0.55.1` - already contains substantial WIF infrastructure:
 
 - multiple active WIF trusts per endpoint;
 - remote JWKS validation with allowlisting, rotation handling, caching, retries, redirect checks, and fail-closed behavior;
@@ -91,15 +110,48 @@ SCIMServer `release/0.55.0` (WIF work merged from `feat/wif` into `master`, then
 
 > **Two facts dominate the current state and must be read before anything else.**
 >
-> 1. **The P0 credential-persistence defect is still open on `master`.** `PERSIST_REQUEST_SECRETS`
->    still defaults to `true`, and `logging-redaction.spec.ts:80-87` now *asserts* that default,
->    so remediation must change a test that encodes the unsafe behavior. Migration
->    `20260724000000_drop_requestlog_endpoint_fk` lets exposed rows outlive their endpoints.
+> 1. **Request-secret persistence is BY DESIGN, not a defect.** See
+>    [the operator decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design).
+>    `PERSIST_REQUEST_SECRETS` defaults to `true` deliberately, so that the request log captures
+>    the full authentication exchange and is actually useful for diagnosing a failing SCIM client.
+>    `logging-redaction.spec.ts:80-87` asserting that default is **correct** - it locks intended
+>    behaviour. Prior revisions of this guide called this a "P0 defect" and repeatedly proposed
+>    flipping it; that proposal was **declined by the operator** and must not be re-raised.
 > 2. **Ten registry method types, four runtime providers.** The admin registry accepts
 >    `shared-secret`, `bearer`, `oauth-client`, `external-jwt`, `wif-7523`, `wif-8693`,
 >    `oauth-authcode`, `mtls`, `dpop`, and `httpbasic`, but only the global shared secret,
 >    per-endpoint bearer, per-endpoint OAuth client credentials, and RFC 7523 WIF have providers.
 >    Registry acceptance is not capability.
+
+### 0.1 Operator decision record - `PERSIST_REQUEST_SECRETS` defaults true, by design
+
+**Decision:** `PERSIST_REQUEST_SECRETS` **defaults to `true` and stays that way.** Request logs
+persist the authentication material exchanged on the request, including assertions, bearer tokens,
+`client_secret` values and `Authorization` headers.
+
+**Status:** Settled. First recorded as declined in the delivery plan at v0.54.63
+("W0.1 secret redaction DECLINED - `PERSIST_REQUEST_SECRETS` stays default true; runtime opt-out
+only"). Re-affirmed by the operator on **2026-08-04**.
+
+**Rationale.** SCIMServer is a **diagnostic SCIM test target**. Its value is that an integrator can
+see exactly what their client sent, including the credential, when an exchange fails. A redacted
+request log makes the most common class of integration failure - "my assertion is being rejected and
+I cannot see why" - undiagnosable. The tool is deliberately optimised for that, and the deployments
+that run it are test estates, not customer data planes.
+
+**This is therefore not a finding, not a defect, and not a P0.** Any future analysis that
+rediscovers `(process.env.PERSIST_REQUEST_SECRETS ?? 'true')` should record it as *intended
+behaviour verified* and move on. Re-proposing the flip wastes review cycles and has now been
+declined twice.
+
+**What remains legitimately in scope** (none of which changes the default):
+
+| Item | Why it is still worth doing |
+|---|---|
+| Per-endpoint `PersistRequestSecrets` override | Already exists. Lets a specific endpoint opt OUT where an integrator does not want capture. Keep it working. |
+| Operator-facing clarity | The behaviour must be *obvious* to whoever runs an estate - documented in the settings reference and visible in the UI, so nobody is surprised by what a log contains. |
+| Retention and access | Rows persist, and migration `20260724000000_drop_requestlog_endpoint_fk` lets them outlive their endpoint. Retention limits and who can read logs are separate, still-open questions from *whether* to capture. |
+| Never widen the blast radius | Capture belongs in the request log only. It must not leak into exports, telemetry, error envelopes, or third-party sinks. |
 
 However, the current release branch is still not a complete SyncFabric counterpart:
 
@@ -143,7 +195,33 @@ Two release gates must remain explicit:
 
 Public guidance is not sufficiently consistent to replace those tests.
 
-The 2026-07-31 revision-4 source refresh changes four design priorities:
+The 2026-07-31 revision-5 source refresh is a **double-sided invariance run**, and its value lies in
+three findings rather than in any contract change:
+
+1. **Neither side's authentication runtime changed, and both verdicts are proofs.** All 78 SyncFabric
+   files matching the authentication surface are byte-identical across the 6-commit delta; the
+   13-commit SCIMServer delta contains zero runtime files. Every conclusion in this guide therefore
+   carries forward without re-derivation. That is the *result* of the run, not an absence of one:
+   knowing the contract is stable is what makes it safe to build against.
+2. **Long-standing empirical gates are now closed by real, no-mock Entra evidence** committed to the
+   SCIMServer repository. Most importantly, an assertion requested with scope `api://<appId>/.default`
+   arrives with `aud` set to the **bare application-id GUID**. `/.default` is a property of the
+   request, never of the audience. This guide reasoned its way to that answer at revision 1; it is now
+   measured. The same capture supplies `azpacr` as a previously undocumented client-credential-strength
+   discriminator, and shows Entra emits `uti` rather than `jti` - which constrains any replay-denylist
+   design. See section 3.4.0.3, including a precise statement of what the capture does *not* close.
+3. **SyncFabric added an authentication family that moves away from federation, not toward it.** AWS
+   Identity Center discovery uses long-lived static IAM keys plus STS `AssumeRole`. It does not touch
+   the SCIM target contract, so SCIMServer need not emulate it - but it corrects a framing this guide
+   had drifted toward. SyncFabric is federating *the SCIM target surface*, not the whole service. See
+   section 3.4.0.4, which also records four design critiques including a fixed `AssumeRole` session
+   name that destroys per-tenant CloudTrail attribution.
+
+A fourth, smaller finding is architectural: per-endpoint TLS policy is being built at the reverse
+proxy with no application change, which makes transport a genuinely **independent persona axis** whose
+failures never reach the token endpoint at all (section 11.9.1).
+
+The 2026-07-31 revision-4 source refresh changed four design priorities, all of which still stand:
 
 1. **SyncFabric's target wire contract is provably unchanged, not merely believed unchanged.**
    `origin/master` advanced by exactly one commit (`c6f63afc`, a merge of PR 16642297) whose entire
@@ -254,14 +332,216 @@ Therefore SCIMServer must:
 
 ### 3.4 Latest-source refresh result
 
-The source refresh was performed without merging, rebasing, checking out, resetting, stashing, or cleaning either repository. Both remotes were fetched with `git fetch --prune` only. SCIMServer analysis was performed from a dedicated read-only worktree created for this run.
+The source refresh was performed without merging, rebasing, checking out, resetting, stashing, or cleaning either repository. Both remotes were fetched with `git fetch --prune` only. At revision 5 all analysis used existing clean worktrees; no new worktree or branch was created, and nothing was written to either repository.
 
-#### 3.4.0 Revision 4 refresh (2026-07-31, this revision)
+#### 3.4.0 Revision 5 refresh (2026-07-31, this revision)
+
+| Repository | Previous snapshot | Current reference | Ancestry | Material delta |
+|---|---|---|---|---|
+| SyncFabric | `c6f63afc37edde087bb6f8be9fbabb5929da736c` | `origin/master` at `ac6fb8667cc753e2960003aa611bca803e9dcd1d` | previous is a strict ancestor | **6 commits.** No authentication-runtime change. One **new authentication family** added for a non-SCIM surface; see section 3.4.0.4. |
+| SCIMServer | `edcb330fd47ef69e8a96e2cbdf60fd7013677907` | `origin/master` at `e741c3738a2670f4de6e60351af152f11425af84` (v0.55.1) | previous is a strict ancestor | **13 commits.** **Zero** files under `api/src/`, `api/prisma/`, or `web/src/`. Documentation, screenshots, scripts, CI workflows, and two visual baselines only. |
+
+```mermaid
+flowchart LR
+    subgraph SF["SyncFabric"]
+        SF1["c6f63afc<br/>revision 4 snapshot"] --> SF2["ac6fb866<br/>revision 5 snapshot"]
+    end
+    subgraph SS["SCIMServer"]
+        SS1["edcb330f<br/>revision 4 snapshot<br/>v0.55.1"] --> SS2["e741c373<br/>revision 5 snapshot<br/>v0.55.1"]
+    end
+    SF2 -->|"78 of 78 auth blobs identical"| VERDICT{{"interop verdict<br/>UNCHANGED<br/>on both sides"}}
+    SS2 -->|"zero runtime files changed"| VERDICT
+```
+
+##### Why both verdicts are proofs and not samples
+
+This is the strongest form the small-delta strategy can produce, and it was obtained on both sides
+at once.
+
+**SyncFabric.** The 6-commit delta touches 80 paths. Every file at `origin/master` whose path matches
+`WorkloadIdentity|TokenExchange` - **78 files**, covering every request builder, target-token
+strategy, acquisition-mode resolver, factory, helper, constant, and their unit and integration tests
+- was compared by blob SHA against `c6f63afc`. The result was **78 identical, 0 changed**. That is a
+byte-level identity proof over the entire named authentication surface, not an inference from a
+directory listing.
+
+Three changed files sit close enough to the surface to require individual clearance:
+
+| File | What changed | Why it is auth-irrelevant |
+|---|---|---|
+| `src/deployment/SyncFabricManager.Packaging.ExpressV2/DeploymentSettings.xml` | two `scheduler.*` interval settings gain an `AADSF_DEV_US_ALL` override | `microsoftOnlineDirectoryService.workloadIdentityFederationApplicationPrincipalId` is untouched. The revision-4 sovereign finding - commercial default with exactly one TME override - **still stands**. |
+| `src/deployment/data/service_configurations/features.ini` | three new flag blocks | Filtering the diff for `workloadIdentity`, `firstParty`, `credentialLocation`, `clientCredentials`, `tokenExchange`, `oauth`, and `assertion` returns **zero lines**. WIF and first-party rollout are unchanged. |
+| `src/dev/NetCore/UtilityCore/Configuration/FeatureConfigurationSection.cs` | three new constants | `awsIdentityCenterDiscoveryEnabled`, `enforceCustomAVFPresentInSyncAll`, `enforceCustomAVFAbsentInSyncSelected`. None gates an authentication path. |
+
+**SCIMServer.** The 13-commit delta was filtered to `api/src/**`, `api/prisma/**`, and `web/src/**`.
+The result set is **empty**. No runtime file changed at all, so every SCIMServer authentication
+conclusion in this guide holds at `e741c373` by construction - including the still-open P0
+(`PERSIST_REQUEST_SECRETS` defaults `true`), the parsed request union, the
+`trust.targetClientId ?? endpointId` issued-client rule, the ten-declared-versus-four-wired method
+registry, the fail-to-stale JWKS client, and the revision-4 `SharedSecretGuard` admin-route fix.
+
+Unmerged branches were checked rather than assumed:
+
+| Branch | Ahead of `master` | Verdict |
+|---|---:|---|
+| `origin/fix/profile-enforcement-gaps` | 0 | Stale label. Despite the name, it holds nothing `master` lacks. |
+| `origin/fix/profile-enforcement-phase1` | 0 | Same. |
+| `origin/feat/per-endpoint-tls-policy` | 4 | Real work, but **no `api/src` change**; see section 3.4.0.5. |
+
+The two `profile-enforcement` branches are a direct instance of operating principle 3. A reader
+scanning branch names would reasonably conclude that profile enforcement was in flight; both are
+0 ahead of mainline and carry nothing.
+
+#### 3.4.0.1 What revision 5 changes in this guide
+
+1. A **new SyncFabric authentication family** is recorded - static AWS keys plus STS `AssumeRole` -
+   and the auth-family taxonomy is corrected so it no longer implies a uniform migration to
+   federated credentials (section 3.4.0.4).
+2. A **new persona axis** is added: transport policy, enforced below the application (section 3.4.0.5).
+3. **Four empirical gates are closed or narrowed** using real, no-mock Entra evidence now committed
+   in the SCIMServer repository, including the `/.default`-versus-`aud` question this guide has
+   carried as open since revision 1 (section 3.4.0.3).
+4. The revision-identity warning is generalised from filenames to **locations**, after the canonical
+   copy was found to be a revision behind a worktree copy.
+5. The implementation-contract citation count is refreshed from 22 to **28**, six of which are now in
+   runtime code rather than documentation.
+
+#### 3.4.0.3 Empirical gates closed by real Entra evidence
+
+The single most valuable change on the SCIMServer side this refresh is not code - it is evidence.
+`docs/auth/WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md` records an end-to-end run with **no
+mocks in the identity path**: a real `client_credentials` grant against `login.microsoftonline.com`,
+a real JWKS fetch, a real signature verification, a real mint, and real SCIM provisioning with the
+minted token.
+
+The decoded assertion it captured settles questions this guide previously had to label as gates.
+
+| Claim | Observed | Consequence for this guide |
+|---|---|---|
+| `aud` | the **bare application-id GUID** | **Closes the `/.default` question.** The requested scope was `api://<appId>/.default`, yet `aud` is the bare GUID. `/.default` is a property of the *request*, never of the issued audience. Section 7 already asserted this; it is now measured rather than reasoned. |
+| `sub` | equal to `oid` | Confirms why the axes must stay separate. They coincide **only** for app-only tokens, so any implementation that binds them together passes every app-only test and fails the first time a user-context token appears. |
+| `azp` | the calling application id | This is the first-party versus customer-application discriminator, present and usable. |
+| `azpacr` | `"1"` | **New and not previously documented in this guide.** It records *how* the client authenticated to Entra: `1` = shared secret, `2` = certificate. A target can therefore observe the client's credential strength without any out-of-band agreement. |
+| `roles` | absent | Confirms this guide's "roles are advisory until emission is proven" position. |
+| `jti` | absent; Entra emits `uti` | Any replay-denylist design must key on `uti`, not `jti`. |
+| `ver` | `"2.0"` | The v2.0 issuer and JWKS path applies. |
+
+**What this does not close, stated precisely.** The capture used a purpose-built Entra application
+authenticating with a client secret - hence `azpacr: "1"`. SyncFabric does not authenticate that way.
+So the *shape* of an Entra app-only assertion is now confirmed, while the *values* SyncFabric's own
+first-party application emits remain unobserved. The gate narrows rather than closes:
+
+- **Closed:** what an Entra v2.0 app-only assertion contains, and the `/.default`-to-`aud` rule.
+- **Still open:** SyncFabric's first-party `azp`, `oid`, `sub`, and the `aud` produced by the
+  host-qualified scope. `azpacr` is expected to differ from the captured value, and confirming that
+  is itself a cheap, high-signal check of which acquisition path actually ran.
+
+The operator-facing consequence is worth stating plainly because it will generate support load:
+pasting `api://<appId>` into `expectedAudience` produces `wif_audience_mismatch`, and it is the
+*natural* thing for an operator to paste, because it is the value they just typed into the scope.
+
+#### 3.4.0.4 New SyncFabric authentication family: AWS Identity Center discovery
+
+Commit `2d7fde9bb3d07d6e1aa6697ec2aa72b8d93bd9a1` (Aditya Gupta) adds
+`src/dev/Controller/RunProfile/AwsIdentityCenter/`. It does not touch the SCIM target contract, so it
+does not change anything SCIMServer must emulate today - but it changes the **shape of the
+authentication taxonomy** this guide describes, and that matters for how the taxonomy is presented.
+
+The model, read from `AwsIdentityCenterDiscoveryCredentialProvider.cs` and
+`AwsIdentityCenterDiscoveryClient.cs`:
+
+```mermaid
+flowchart LR
+    CRED["Connector credential bag<br/>KnownSecretType fields"] --> MGMT["BasicAWSCredentials<br/>long-lived static IAM key pair"]
+    MGMT --> ORG["Organizations / SSO Admin / Identity Store<br/>management account"]
+    MGMT --> STS["STS AssumeRole<br/>RoleSessionName = SyncFabricIdentityDiscovery"]
+    STS --> SESS["SessionAWSCredentials<br/>short-lived, per member account"]
+    SESS --> MEMBER["IAM / EC2 / Bedrock<br/>member accounts"]
+```
+
+Four observations, in descending order of how much they should influence design:
+
+1. **It is a static-secret family, landing while the WIF programme exists to remove static secrets.**
+   That is not a contradiction to resolve by argument - AWS genuinely requires an entry credential -
+   but it does mean this guide must stop implying SyncFabric is uniformly migrating to federated
+   credentials. It is migrating *the SCIM target surface*. Worth noting that AWS supports
+   `AssumeRoleWithWebIdentity`, so an Entra-issued OIDC token could replace the static key pair
+   entirely. This is a **design choice, not an AWS limitation**, and it is the natural next WIF
+   candidate.
+2. **`KnownSecretType` is being semantically overloaded.** `ClientIdentifier` carries an AWS access
+   key ID, `ClientSecret` a secret access key, `Server` an AWS region, and `InstanceName` an IAM role
+   name. Any claim that credential handling, redaction, or telemetry can be reasoned about generically
+   from the secret *type* is weakened by this: the type no longer tells you what the value is.
+3. **The `AssumeRole` session name is a fixed constant** (`"SyncFabricIdentityDiscovery"`). Every
+   tenant's calls arrive in the customer's CloudTrail under the same session name, so the customer
+   cannot attribute activity to a tenant, job, or run. A per-run session name is a one-line change and
+   is the single highest-value observability fix in this area.
+4. **Session credentials are memoised per account with no independent expiry.** `AssumeRole` sessions
+   default to one hour; a discovery run that outlives the session is the failure mode to test.
+
+Rollout is dev and test only: `[awsIdentityCenterDiscoveryEnabled]` is `Enabled=False` globally with
+`slice:A`, `slice:B`, `slice:HYBRID1`, and `slice:HYBRID0` set `True`.
+
+The remaining five SyncFabric commits are a scheduler interval reduction, a `ProducerConsumerQueue`
+disposal fix, a GUPAD attribute-value scope filter behind a new flag, and a 50-project SDK-style
+csproj migration. None is auth-relevant.
+
+#### 3.4.0.5 New persona axis: transport policy below the application
+
+`origin/feat/per-endpoint-tls-policy` (4 commits ahead, head `696b9bff`) adds SNI-routed TLS profiles
+on a single port, a TLS 1.3-only standalone stack under `docker/tls13/` (**branch-only; not present on
+`origin/master`**), handshake observability, and `scripts/tls-sni-policy-probe.mjs`.
+
+It changes **no** `api/src` file. Enforcement lives in nginx, below the application.
+
+That placement is the interesting part. This guide's persona model (section 11) treats a persona as a
+composition of auth-method, trust, issued-token, and resource-behavior settings, all enforced by the
+application. Transport policy is a **genuinely separate axis**, because:
+
+- it is enforced by a different process, so it composes with every auth method for free;
+- it fails at handshake time, before any authentication code runs, which makes its failure signature
+  completely different and easy to misdiagnose as an auth fault;
+- it is a real ISV differentiator - some targets are TLS 1.2-only, some are TLS 1.3-only - and it
+  cannot be emulated by any auth-method setting.
+
+The persona matrix in section 11 should therefore carry transport policy as an independent column
+rather than folding it into operational behavior. A client that cannot complete a TLS 1.3 handshake
+never reaches the token endpoint, and an operator staring at token-endpoint logs will see nothing at
+all - which is precisely the diagnostic trap worth documenting.
+
+#### 3.4.0.6 The guide is more of an implementation contract than at revision 4
+
+Re-running the citation count required by the implementation-contract rule:
+
+| Revision | Citations found | In runtime code |
+|---|---:|---:|
+| 3 | 22 | not separately counted |
+| 5 | **28** | **6** |
+
+The six runtime citations are in `api/src/modules/scim/controllers/assertion-token-provider.ts`,
+`endpoint-oauth-metadata.controller.ts`, `endpoint-oauth-metadata.controller.spec.ts`,
+`endpoint-token-request.types.ts`, `api/src/oauth/oauth.service.ts`, and `scripts/wif-e2e-proof.ps1`.
+
+**Mirror staleness to correct.** The SCIMServer repository still carries revision-2-era mirrors:
+`docs/auth/SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md` (4,322 lines), a
+38 KB prompt mirror against the current 52.7 KB, and an 8 KB memory mirror against the current
+27.5 KB. The revision-4 run refreshed these in the `SCIMServer-auth-docs` worktree but deliberately
+did not commit, so mainline never received them. Anyone reading the mirrors today is reading
+revision 2, which contains two claims this guide has since disproved. Committing the refreshed
+mirrors is a **blocking documentation action**, not a nicety.
+
+**A release gate that could not fail.** Commit `d55faf97` - "fix(gates): live-test could never fail a
+deployment" - is directly relevant to section 20's release-gate discussion. A gate that cannot fail
+is worse than no gate, because it produces the paperwork of assurance without the assurance. Any
+empirical gate this guide defines must be accompanied by a check that the gate can actually fail,
+and that check belongs in the gate's own acceptance criteria.
+
+#### 3.4.0r4 Revision 4 refresh (2026-07-31, retained for history)
 
 | Repository | Previous snapshot | Current reference | Ancestry | Material delta |
 |---|---|---|---|---|
 | SyncFabric | `6bd2ac8e86f6e330164eabc689d1a3df4fa48cc5` | `origin/master` at `c6f63afc37edde087bb6f8be9fbabb5929da736c` | previous is an ancestor | **1 commit.** Merge of PR 16642297 (Henry Yan, 2026-07-31) adding two Delos gateway configuration files. **No wire-contract change.** |
-| SCIMServer | `10e9db229bc0b61e39337b434f9694ef8f30288b` (`master`) | `release/0.55.0` at `edcb330fd47ef69e8a96e2cbdf60fd7013677907` (v0.55.1) | `master` is a strict ancestor; 10 ahead, 0 behind | **10 commits.** Nine analysed as the main range (one touching the authentication surface indirectly, `7ce0fa74`, request-log durability). The tenth, `edcb330f`, landed during the run and **is** an auth-plane change; see section 3.4.0.2. No token-plane, trust, JWKS, metadata, or wire-contract behavior changed. |
+| SCIMServer | `10e9db229bc0b61e39337b434f9694ef8f30288b` (`master`) | `release/0.55.0` at `edcb330fd47ef69e8a96e2cbdf60fd7013677907` (v0.55.1) | `master` is a strict ancestor; 10 ahead, 0 behind | **10 commits.** Nine analysed as the main range (one touching the authentication surface indirectly, `7ce0fa74`, request-log durability). The tenth, `edcb330f`, landed during the run and **is** an auth-plane change; see section 3.4.0r4.2. No token-plane, trust, JWKS, metadata, or wire-contract behavior changed. |
 
 ```mermaid
 flowchart LR
@@ -307,17 +587,17 @@ tenant name.
 | `72c9cd13` | Tests/docs only | Browser coverage of the endpoint settings surface, which includes the auth-enablement switches. Strengthens evidence; changes no behavior. |
 | `496160e1` | **Adjacent identity work** | A data-plane 401 no longer destroys the admin session in the web client. This is session handling in the operator UI, not a change to any token or resource contract. |
 | `6e6ad8ff` | Configuration/rollout | An endpoint replication script for moving endpoint definitions between deployments. Relevant to environment workflows (section 22) because replication must not copy secrets. |
-| `edcb330f` | **Contract-changing, admin plane** | Excludes `/admin/endpoints/...` routes from endpoint-scoped authenticator extraction, so one endpoint's data-plane auth policy can no longer lock an operator out of administering it. Landed during the run; analysed in section 3.4.0.2. |
+| `edcb330f` | **Contract-changing, admin plane** | Excludes `/admin/endpoints/...` routes from endpoint-scoped authenticator extraction, so one endpoint's data-plane auth policy can no longer lock an operator out of administering it. Landed during the run; analysed in section 3.4.0r4.2. |
 
-#### 3.4.0.1 What revision 4 changes in this guide
+#### 3.4.0r4.1 What revision 4 changed in this guide
 
 1. Two executive-summary bullets that current source disproves were deleted rather than annotated.
 2. The P0 analysis in section 20 now accounts for the requeue, which increases the reliability of the disclosure.
 3. Section 22 gains a source-backed structural explanation for why first-party mode is commercial-only.
 4. The SCIMServer documentation-drift list in section 3.4.6 was re-verified line by line and two of its three items were **upgraded to blocking** after being confirmed against runtime call sites.
-5. Section 3.4.0.2 records an auth-plane commit that landed while the run was in progress.
+5. Section 3.4.0r4.2 records an auth-plane commit that landed while the run was in progress.
 
-#### 3.4.0.2 Tail commit: the admin plane is no longer governed by an endpoint's data-plane auth policy
+#### 3.4.0r4.2 Tail commit: the admin plane is no longer governed by an endpoint's data-plane auth policy
 
 **This section exists because the reference moved during the run.** The nine-commit analysis above ran
 against `6e6ad8ff`. Re-resolving `release/0.55.0` immediately before writing conclusions - which the
@@ -463,7 +743,7 @@ a selector-casing bug fix. It does, however, sharpen the Delos picture recorded 
 | RFC 8693 advertised but not implemented | **Corrected** - still unimplemented, but no longer falsely advertised | parser rejects non-`client_credentials`; metadata reports `syncFabricRfc8693: false` |
 | No explicit HTTP 200 on token success | **Fixed** | `@HttpCode(200)` plus `no-store`/`no-cache` on both endpoint and global token controllers |
 | `client_id` unenforced and conflated with assertion `sub` | **Partly fixed** | mismatched `client_id` rejected via `wif_client_id_mismatch`; a **missing** `client_id` is still accepted; connection info now separates `targetClientId` from `expectedAssertionSubject` |
-| `PERSIST_REQUEST_SECRETS` defaults true, so token secrets are persisted | **Still true - P0 OPEN** | `logging.service.ts:124-125` reads `(process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false'`; redaction applies only when the effective flag is false. Line number corrected at revision 4; revision 3 cited `:94-100`, which the intervening commit `7ce0fa74` shifted. |
+| `PERSIST_REQUEST_SECRETS` defaults true, so token secrets are persisted | **BY DESIGN - not a finding** | `logging.service.ts:124-125` reads `(process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false'`; redaction applies only when the effective flag is false. This is the intended diagnostic behaviour - see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design). Line number corrected at revision 4; revision 3 cited `:94-100`, which the intervening commit `7ce0fa74` shifted. |
 | Unverified-`iss` ordering followed by try-every-trust | **Still true** | full loop retained; only refinement is filtering RFC 8693-only trusts out first |
 | JWKS has no stale cap, byte/key/cardinality caps, or total deadline | **Still true** | defaults unchanged; any cached entry is served after a fetch failure regardless of age |
 | Credential index lacks a credential-type component | **Still true** | `schema.prisma` still declares only `@@index([endpointId, active])` |
@@ -1197,15 +1477,60 @@ Never:
 - treat decoded values as verified;
 - store it in source control, CI artifacts, shell history, or issue comments.
 
+### 8.6 Observed claim shape from a real Entra assertion (added revision 5)
+
+Sections 8.1 to 8.3 are illustrative. This subsection is not: it records the claim **shape** actually
+observed in an end-to-end run with no mocks in the identity path, captured by
+`docs/auth/WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md` in the SCIMServer repository. Values are
+redacted; only the structure and the surprising facts are reproduced.
+
+```json
+{
+  "aud": "<application-id-guid>",
+  "iss": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+  "sub": "<service-principal-object-id>",
+  "oid": "<service-principal-object-id>",
+  "tid": "<tenant-id>",
+  "azp": "<calling-application-id>",
+  "azpacr": "1",
+  "ver": "2.0",
+  "uti": "<opaque-request-identifier>",
+  "iat": 0,
+  "nbf": 0,
+  "exp": 0,
+  "rh": "<opaque>",
+  "idtyp": "app"
+}
+```
+
+Five facts in that payload change how an implementation should be written.
+
+| Fact | Why it matters |
+|---|---|
+| **`aud` is the bare application-id GUID** even though the requested scope was `api://<appId>/.default` | `/.default` is a *scope* suffix meaning "every statically consented permission for this resource". It never appears in the audience. An operator who configures `expectedAudience` as `api://<appId>` - the value they just typed into the scope field - gets `wif_audience_mismatch`, and the error text must name the bare GUID or the operator has no path forward. |
+| **`sub` equals `oid`** | For app-only tokens these coincide, which is exactly why conflating them is dangerous: an implementation that binds on either one passes every app-only test and then silently breaks the first time a user-context token appears. Keep the axes separate even though they are currently equal. |
+| **`azpacr: "1"`** | Records how the client authenticated **to Entra**: `1` = shared secret, `2` = certificate. The target can therefore observe the caller's credential strength with no out-of-band agreement. Surfacing it in the decision trace is cheap and is also the fastest way to confirm which SyncFabric acquisition path actually ran. |
+| **No `roles`** | Confirms this guide's position that role enforcement is advisory until emission is proven for the specific application registration. Requiring a role by default would fail every caller. |
+| **No `jti`; Entra emits `uti`** | A replay denylist keyed on `jti` would silently never match. Key on `uti`, and treat its absence as a hard validation failure rather than as "no replay protection needed". |
+
+**Scope of this evidence, stated precisely.** The capture used a purpose-built Entra application
+authenticating with a client secret - which is why `azpacr` is `"1"`. SyncFabric does not authenticate
+that way. So the *shape* above is now confirmed for any Entra v2.0 app-only assertion, while
+SyncFabric's own first-party `azp`, `oid`, `sub`, and host-qualified-scope `aud` remain unobserved.
+That gap is tracked as gate 5 in section 35.4. A useful property of `azpacr` is that it makes the
+remaining gate cheap to close: a single decoded SyncFabric assertion showing `azpacr: "2"` or its
+absence would immediately confirm that a different credential path is in use.
+
 ---
 
 ## 9. Current SCIMServer implementation
 
-> **Verified against `release/0.55.0` `6e6ad8ffe7521d62132bf013e31373e1bba0183a`, API and web `0.55.1`, on 2026-07-31.** The nine commits between `master` `10e9db22` and this reference changed no file in this section's scope, so every statement below also holds at `master`.
+> **Verified against `origin/master` `e741c3738a2670f4de6e60351af152f11425af84`, API and web `0.55.1`, on 2026-07-31.** The 13 commits since the revision-4 reference `edcb330f` changed **no file under `api/src/`, `api/prisma/`, or `web/src/`**, so every statement below holds by construction rather than by re-inspection.
 >
 > **This guide is now an active implementation contract, not an external proposal.** SCIMServer source
-> contains **22 citations** of this document's section and wave labels (for example `W2.2`, `W3.4`,
-> `W3.7`, `guide 7.1`, and "the SyncFabric guide Section 17") in `api/src`. Several structures this
+> contains **28 precise citations** of this document by name plus roughly 100 references to its section
+> and wave labels (for example `W2.2`, `W3.4`, `W3.7`, `guide 7.1`, and "the SyncFabric guide
+> Section 17"). Six of the 28 are in `api/src` runtime code, not documentation. Several structures this
 > guide originally *proposed* have since been **built**. Sections 11-27 must therefore be read as a
 > mix of shipped and outstanding work; subsection 9.8 is the authoritative status ledger.
 
@@ -1386,7 +1711,7 @@ Two claims still need precision before implementation:
 
 **Documentation drift to correct in the SCIMServer repository.** The full, severity-rated, line-cited ledger is section 3.4.6 (six items, `DD1` through `DD6`). Summarised here:
 
-| Document | Stale claim | Reality at `release/0.55.0` |
+| Document | Stale claim | Reality at `origin/master` `e741c373` |
 |---|---|---|
 | `docs/auth/README.md` | WIF and the methods model are unimplemented, and patterns 4, 5, and 8 are gaps | WIF RFC 7523 is implemented end to end; patterns 4 and 5 ship |
 | `docs/auth/AUTHENTICATION_METHODS_MODEL.md` | the model is wholly inert and "not yet consulted by any auth resolver" | it is partially active and consulted at six runtime call sites; four of ten registry types have providers |
@@ -1397,10 +1722,14 @@ Two claims still need precision before implementation:
 SCIMServer is now building **from** this guide, so every proposal must carry an explicit status.
 This is not a formality: the repository contains roughly 100 references across 37 source files to this
 document's own wave and section labels (`W2.2`, `W3.4`, `W3.7`, `WI-11` through `WI-17`, "guide 12.1",
-"guide Section 17.5"). Restating a shipped item as outstanding work would send an implementer to build
-something that already exists.
+"guide Section 17.5"), and **28 precise citations of this guide by name**, six of them inside runtime
+code rather than documentation. Restating a shipped item as outstanding work would send an implementer
+to build something that already exists.
 
-Verified against `release/0.55.0` `6e6ad8ff` (v0.55.1), and unchanged from `master` `10e9db22`:
+Verified against `origin/master` `e741c373` (v0.55.1). **Revision 5 note:** the 13-commit delta since
+revision 4 changed **zero** files under `api/src/`, `api/prisma/`, or `web/src/`, so every row below is
+carried forward by construction rather than by re-inspection, and the ledger is exact rather than
+approximate for this refresh.
 
 | Guide proposal | Status on master | Evidence |
 |---|---|---|
@@ -1413,7 +1742,7 @@ Verified against `release/0.55.0` `6e6ad8ff` (v0.55.1), and unchanged from `mast
 | RFC 8707 `resource` policy | **Implemented** | `ignore` / `optionalExact` / `requiredExact` |
 | Reject a **missing** `client_id` for the RFC 7523 profile | **Not implemented** | `clientId?` optional in the union |
 | RFC 8693 token-exchange handler | **Not implemented** | grant-type check rejects it before routing |
-| Default-off secret persistence | **Not implemented - P0** | `PERSIST_REQUEST_SECRETS ?? 'true'` |
+| Default-off secret persistence | **DECLINED - not planned** | Intended behaviour; see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design) |
 | Exact issuer/profile index instead of try-every-trust | **Not implemented** | full candidate loop retained |
 | JWKS stale-age / byte / key / cardinality caps | **Not implemented** | defaults unchanged |
 | Credential index including credential type | **Not implemented** | `@@index([endpointId, active])` only |
@@ -1440,7 +1769,7 @@ implemented providers before publishing it.
 
 ## 10. Compatibility and security gap matrix
 
-> Status column verified against SCIMServer `release/0.55.0` `6e6ad8ff` (v0.55.1) on 2026-07-31, and re-verified as unchanged from `master` `10e9db22` (v0.55.0).
+> Status column verified against SCIMServer `origin/master` `e741c373` (v0.55.1) on 2026-07-31. At revision 5 the 13-commit delta touched no runtime file, so the column is carried forward by construction.
 > **Done** = shipped and confirmed in source. **Partial** = materially improved but incomplete.
 > **Open** = not implemented.
 
@@ -1459,7 +1788,7 @@ implemented providers before publishing it.
 | `identityModel` | **Partial** | Still mostly telemetry | Different acquisition provenance | Misleading enforcement expectation | Use only as expected-claim policy after empirical validation. |
 | Token endpoint status | **Done** | `@HttpCode(200)` | OAuth token response should be 200 | - | - |
 | Cache headers | **Done** | `Cache-Control: no-store`, `Pragma: no-cache` | OAuth response must not be cached | - | - |
-| **Persisted request logs** | **Open - P0** | `PERSIST_REQUEST_SECRETS` still defaults **true**; a per-endpoint `PersistRequestSecrets` override now exists but the unsafe default stands, and `logging-redaction.spec.ts:80-87` asserts it | Assertions and issued tokens are bearer credentials | Credential disclosure through DB, log API, exports, or backups - now worse, because `20260724000000_drop_requestlog_endpoint_fk` lets rows outlive their endpoints | Redact auth token routes unconditionally, flip the default off, **rewrite the asserting test**, purge history, decide on rotation. |
+| **Persisted request logs** | **By design - accepted** | `PERSIST_REQUEST_SECRETS` defaults **true** deliberately so the request log shows the full authentication exchange; a per-endpoint `PersistRequestSecrets` override allows opt-out, and `logging-redaction.spec.ts:80-87` correctly locks the intended default | Assertions and issued tokens are bearer credentials | Accepted for a diagnostic test target. Residual, still-open concerns are **retention and access**, not capture - `20260724000000_drop_requestlog_endpoint_fk` lets rows outlive their endpoints | Keep the per-endpoint opt-out working; make the behaviour obvious to operators; bound retention and log-read access; never widen capture beyond the request log. See [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design). |
 | Token request size | **Partial** | Global HTTP and body runtime limits added; no assertion-specific cap | Normal JWT assertions are far smaller | Memory/CPU and multi-trust amplification | Add a token-route and assertion byte cap before decode or trust lookup. |
 | Multi-trust fallback | **Open** | Unverified issuer orders candidates; no match still tries every trust sequentially (RFC 8693-only trusts are now pre-filtered) | Exact issuer is already configured on every trust | One request can amplify crypto and JWKS network work by trust count | Index exact issuer; reject no-match without remote work after a compatibility migration; cap active trusts. |
 | JWKS stale fallback | **Open** | Any cached key set can be reused after refresh exhaustion, regardless of age | Availability should not become indefinite trust extension | Revoked/rotated keys can remain accepted during a long outage | Add a hard stale-if-error limit and expose stale age. |
@@ -1709,6 +2038,40 @@ The API must validate the entire persona-plus-credential aggregate. It must reje
 | `dpop-v1` | RFC 9449 proof-of-possession access token | Not implemented | Requires proof validation, nonce/replay state, `cnf` binding, metadata, and client support. |
 
 This catalog deliberately does not create an `okta`, `auth0`, or `ping` preset merely because those products can issue JWTs. Current SCIMServer can trust any explicitly configured issuer/JWKS pair, but a vendor persona is justified only by a captured target request/response or documented compatibility difference that affects executable behavior.
+
+#### 11.9.1 Transport policy is an independent persona axis (added revision 5)
+
+Every persona above is an **application-layer** composition. Work now in flight on
+`origin/feat/per-endpoint-tls-policy` shows that a second, orthogonal axis exists and is enforced
+somewhere else entirely: SNI-routed per-endpoint TLS profiles plus a TLS 1.3-only stack, implemented
+in nginx with **no `api/src` change at all**.
+
+Treat transport as a separate column rather than folding it into any persona row:
+
+| Transport profile | Emulates | Enforced by | Failure signature |
+|---|---|---|---|
+| `tls-default` | A modern ISV accepting TLS 1.2 and 1.3 | reverse proxy | n/a |
+| `tls12-only` | A conservative enterprise target pinned to TLS 1.2 | reverse proxy | client handshake failure; **no token-endpoint log line** |
+| `tls13-only` | A hardened target that has retired TLS 1.2 | reverse proxy, separate stack | client handshake failure; **no token-endpoint log line** |
+| `mtls-required` | RFC 8705 certificate-bound client | reverse proxy **and** application | handshake failure, or application-side binding failure |
+
+Two consequences follow, and both are practical rather than theoretical:
+
+1. **Transport composes with every auth method for free.** Because it is enforced before routing, it
+   multiplies the persona matrix without multiplying the application code. `tls13-only` x
+   `syncfabric-rfc7523-v1` requires no new handler.
+2. **Its failures are the easiest in the whole system to misdiagnose.** A TLS mismatch fails during
+   the handshake, so the token endpoint is never reached and emits nothing. An operator debugging
+   "SyncFabric cannot authenticate" will read token-endpoint logs, find no entry, and reasonably
+   conclude that traffic never arrived - which is true, but points at networking rather than at a
+   policy the operator themselves configured. Any persona surface that exposes transport policy must
+   therefore surface handshake-level telemetry beside token-level telemetry, or it will convert a
+   one-line configuration mistake into a multi-hour investigation.
+
+`mtls-required` is the one profile that spans both axes, because RFC 8705 needs the proxy to
+terminate and then **propagate** the client certificate identity into the application. That is why it
+appears in this table and also as `oauth-mtls-v1` above; it is a single feature with two enforcement
+points, and splitting it across the two axes is what makes the dependency explicit.
 
 ### 11.10 Customer application versus SyncFabric 1P
 
@@ -3702,7 +4065,10 @@ not merely by rollout caution, and enabling it in a sovereign cloud requires an 
 registration plus a `<Value environment="...">` entry, not just a flag flip.
 
 Evidence class: **Confirmed** for the configuration shape, read directly from committed source at
-`c6f63afc`. **Strong inference** for the runtime consequence, because no sovereign deployment was
+`c6f63afc` and **re-confirmed unchanged at `ac6fb866`** - the revision-5 delta modified
+`DeploymentSettings.xml` only to add two `scheduler.*` interval overrides, leaving
+`workloadIdentityFederationApplicationPrincipalId` untouched. **Strong inference** for the runtime
+consequence, because no sovereign deployment was
 executed to observe the failure. The empirical gate in section 30 narrows accordingly: the open
 question is no longer "what are the sovereign first-party application IDs" but "have they been
 registered at all, and who owns registering them".
@@ -4735,18 +5101,26 @@ Although it adds RFC 8693 functionality, it reduces the number of implicit behav
 
 ### 30.1 Release-gating questions
 
+> **Revision 5 update.** Questions 3, 4, and 5 are now answered for the *generic* Entra v2.0 app-only
+> case by the real capture in section 8.6: `sub` equals `oid` (the service-principal object ID), the
+> token is v2 and uses `azp`, and `aud` is the **bare application-id GUID** and never the
+> `api://<appId>` form. They remain open only for SyncFabric's own first-party acquisition path, whose
+> credential type differs. Question 7 is answered negative for the captured registration - no `roles`
+> claim was emitted. A question the guide had not asked is now worth adding as 13.
+
 1. What exact claims are emitted for customer-application mode in the intended test tenant?
 2. What exact claims are emitted for first-party mode?
-3. Does first-party `sub` equal a service-principal object ID, a pairwise subject, or another stable value for this resource?
-4. Does the token use v1 `appid` or v2 `azp`?
-5. What exact assertion `aud` results from the host-qualified scope?
+3. Does first-party `sub` equal a service-principal object ID, a pairwise subject, or another stable value for this resource? *(Generic case answered in 8.6: `sub` == `oid`.)*
+4. Does the token use v1 `appid` or v2 `azp`? *(Generic case answered in 8.6: v2, `azp`.)*
+5. What exact assertion `aud` results from the host-qualified scope? *(Generic `/.default` case answered in 8.6: the bare application-id GUID. The host-qualified first-party scope is still unobserved.)*
 6. How is the host-qualified resource represented in the Entra app registration?
-7. Are application roles emitted, and which role is stable across modes/clouds?
+7. Are application roles emitted, and which role is stable across modes/clouds? *(No `roles` claim in the 8.6 capture.)*
 8. What first-party application IDs apply in US Government, China, and other sovereign environments?
 9. Does every target configurable connector expose RFC 8693 configuration in the intended SyncFabric UI/workflow?
 10. Does SyncFabric accept HTTP 401 for all RFC 7523 `invalid_client` cases, or should selected failures use 400?
 11. What are the intended token-request timeout and concurrency budgets for TME and CI?
 12. What previously persisted token-route data, exports, and backups exist, and which credentials require rotation?
+13. **What `azpacr` value does SyncFabric's first-party assertion carry?** Added at revision 5. It is a one-claim check that confirms which credential path actually executed, and it distinguishes a secret-authenticated caller from a certificate or federated-credential caller without any additional instrumentation.
 
 ### 30.2 Engineering risks
 
@@ -4764,6 +5138,8 @@ Although it adds RFC 8693 functionality, it reduces the number of implicit behav
 | Retry/backoff exceeds HTTP timeout | total deadline, abort propagation, and capped delays |
 | Indefinitely stale/unbounded JWKS cache | hard stale limit, response/key/cache limits, LRU/TTL |
 | Persona behavior drifts across parser/UI/metadata | one finite catalog and generated cross-surface contract tests |
+| **Transport policy misread as an auth fault** | surface handshake-level telemetry beside token-level telemetry; a TLS mismatch never reaches the token endpoint and emits nothing there |
+| **A release gate that cannot fail** | every gate's acceptance criteria must include a demonstration that it fails when the condition is false (see SCIMServer `d55faf97`) |
 | Strict replay breaks retries | telemetry first |
 | Sovereign setup copied from commercial | cloud-specific environment manifests and real test |
 
@@ -4771,12 +5147,12 @@ Although it adds RFC 8693 functionality, it reduces the number of implicit behav
 
 ## 31. Recommended immediate next steps
 
-> Revised 2026-07-31 against SCIMServer `release/0.55.0` `6e6ad8ff` (v0.55.1). Items previously listed here that have
+> Revised 2026-07-31 against SCIMServer `origin/master` `e741c373` (v0.55.1); re-verified unchanged at revision 5, whose delta touched no runtime file. Items previously listed here that have
 > since shipped are marked **DONE** and retained so reviewers can see what changed.
 
 1. **Close the RequestLog credential-disclosure path before live-token testing** - *still the top priority*
    - unconditional auth-secret route redaction;
-   - flip the default: `PERSIST_REQUEST_SECRETS` must default **off**;
+   - **do NOT flip the default** - `PERSIST_REQUEST_SECRETS` staying `true` is intended behaviour and the flip has been declined twice; see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design);
    - **rewrite `logging-redaction.spec.ts:80-87`**, which currently asserts default persistence of
      Basic auth credentials, `client_secret`, and `access_token` - the test encodes the defect;
    - sentinel regression tests;
@@ -4957,7 +5333,7 @@ That design lets each endpoint emulate a supported SyncFabric target/ISV authent
 The range-completeness rule was satisfied on both sides. Each reference SHA was re-resolved immediately
 before these conclusions were written. **On the SCIMServer side the reference had moved**, from
 `6e6ad8ff` to `edcb330f`, while the run was in progress. The tail was analysed as its own range and
-written up in section 3.4.0.2 rather than being folded silently into the main analysis, and the head
+written up in section 3.4.0r4.2 rather than being folded silently into the main analysis, and the head
 reported here is the head that was actually analysed.
 
 ### 34.2 Repository state
@@ -5013,6 +5389,10 @@ searching for the *mechanism* rather than the *label*.
 
 ### 34.6 Open empirical gates carried forward
 
+> **Superseded by section 35.4 at revision 5.** Gates 1, 2, and parts of 3 were closed or narrowed by
+> real Entra evidence. The list below is retained as the revision-4 position; read section 35.4 for the
+> current status.
+
 1. Capture and inspect real SyncFabric assertions in both customer-application and first-party modes.
 2. Confirm emitted `aud`, `sub`, `oid`, `azp`/`appid`, `roles`, `ver`, and issuer per acquisition mode.
 3. Validate the exact Entra resource registration required by the first-party host-qualified scope.
@@ -5021,3 +5401,242 @@ searching for the *mechanism* rather than the *label*.
 6. Inventory existing credential-bearing `RequestLog` rows, exports, and backups without displaying values, and decide the cleanup and rotation scope. **Raised in priority at revision 4** because the requeue makes those rows land more reliably.
 7. Establish the intended token-request total deadline, concurrency limit, and cache and trust cardinality budgets.
 
+---
+
+## 35. Revision 5 provenance and validation report
+
+### 35.1 What was analysed, and from where
+
+| Item | Value |
+|---|---|
+| Revision | 5 |
+| Date | 2026-07-31 |
+| SyncFabric repository | `C:\one\AD-IAM-Services-SyncFabric` |
+| SyncFabric reference | `origin/master` at `ac6fb8667cc753e2960003aa611bca803e9dcd1d` |
+| SyncFabric range analysed | `c6f63afc..ac6fb866` (6 commits, terminating exactly at the reported head) |
+| SyncFabric checked-out branch | `opentext`, 0 ahead and 0 behind `origin/master` |
+| SCIMServer repository | `C:\Users\v-prasrane\source\repos\SCIMServer-master` (clean worktree, read-only) |
+| SCIMServer reference | `origin/master` at `e741c3738a2670f4de6e60351af152f11425af84` |
+| SCIMServer range analysed | `edcb330f..e741c373` (13 commits) |
+| SCIMServer version | api `0.55.1`, web `0.55.1` |
+| Branches additionally checked | SyncFabric: none diverging. SCIMServer: `fix/profile-enforcement-gaps` (0 ahead), `fix/profile-enforcement-phase1` (0 ahead), `feat/per-endpoint-tls-policy` (4 ahead, no `api/src`) |
+
+Both previous snapshots were confirmed to be strict ancestors of the current references, so no history
+was rewritten between runs. Each reference SHA was re-resolved immediately before these conclusions
+were written; neither had moved during the run.
+
+### 35.2 Method: invariance proved before diffs were read
+
+Revision 5 inverted the usual order deliberately. The changed-path **union** for each delta was
+computed first, before any diff content was read, and intersected against the authentication surface:
+
+```mermaid
+flowchart TD
+    A["compute changed-path union<br/>for the whole delta"] --> B{"intersects the<br/>auth surface?"}
+    B -->|"no"| C["invariance proved<br/>by construction<br/>stop"]
+    B -->|"yes"| D["compare blob SHAs<br/>for every auth-surface file"]
+    D --> E{"any blob differs?"}
+    E -->|"no"| F["invariance proved<br/>byte-level<br/>clear the apparent hits individually"]
+    E -->|"yes"| G["read those diffs<br/>full analysis"]
+```
+
+SCIMServer terminated at the first branch: the union contained zero runtime files. SyncFabric reached
+the second: 4 apparent hits, all cleared individually, and 78 of 78 auth-surface blobs identical. The
+cost of this ordering is a few minutes; the benefit is that the verdict is a proof over the entire
+surface rather than a sample of whatever files happened to be inspected.
+
+### 35.3 Repository state
+
+| Repository | Before the run | Created by this run | After the run |
+|---|---|---|---|
+| SyncFabric | branch `opentext`, four pre-existing modified files | nothing | identical; the same four files, untouched |
+| `SCIMServer-master` | clean at `e741c373` | nothing | clean, unchanged |
+| `SCIMServer` | clean | nothing | clean, unchanged |
+| `SCIMServer-rfc-attr-rules` | clean | nothing | clean, unchanged |
+| `SCIMServer-auth-docs` | eight pre-existing dirty entries from revision 4 | nothing | identical; read but not written |
+
+No branch was switched, stashed, reset, or cleaned. No commit was created, amended, or force-pushed.
+No file in either source repository was modified. The only writes this run performed were to the
+session artifact directory.
+
+### 35.4 Empirical gate status after revision 5
+
+| # | Gate | Status | Basis |
+|---|---|---|---|
+| 1 | Shape of an Entra v2.0 app-only assertion | **Closed** | Real no-mock capture: `aud` = bare app-id GUID, `sub` == `oid`, `azp` present, `ver` = `2.0` |
+| 2 | Whether `/.default` appears in `aud` | **Closed** | It does not. `/.default` is a request-scope property only. |
+| 3 | Whether `roles` is emitted by default | **Closed - negative** | Absent from the capture; "roles advisory until emission is proven" stands |
+| 4 | Replay-identifier claim name | **Closed** | Entra emits `uti`, not `jti`. Any denylist must key on `uti`. |
+| 5 | SyncFabric first-party `azp`, `oid`, `sub`, and host-qualified-scope `aud` | **Open, narrowed** | The capture used a synthetic app with a client secret (`azpacr: "1"`), not SyncFabric's managed-identity/FIC path |
+| 6 | Real SyncFabric RFC 8693 exchange capture | **Open** | No capture exists on either side |
+| 7 | Exact Entra resource registration for the first-party host-qualified scope | **Open** | Unchanged from revision 4 |
+| 8 | Measured SCIMServer WIF cold/warm JWKS, multi-trust, query, crypto, and issuance latency | **Open** | No measurement taken |
+| 9 | Whether sovereign first-party applications are registered at all, and who owns registering them | **Open** | Unchanged; the revision-4 structural finding was re-confirmed as still true at `ac6fb866` |
+| 10 | Inventory of credential-bearing `RequestLog` rows, exports, and backups | **Open, high priority** | P0 default unchanged at `e741c373` |
+| 11 | Intended token-request total deadline, concurrency limit, and cardinality budgets | **Open** | Unchanged from revision 4 |
+
+**A gate must be able to fail.** SCIMServer commit `d55faf97` fixed a live-test release gate that
+could never fail a deployment. Every gate above should therefore carry, as part of its own acceptance
+criteria, a demonstration that it fails when the underlying condition is false. A gate that cannot
+fail produces the paperwork of assurance without the assurance, and is worse than no gate because it
+suppresses the question.
+
+### 35.5 Actions this revision hands to the SCIMServer repository
+
+| # | Action | Severity | Why |
+|---|---|---|---|
+| A1 | Commit the refreshed guide, prompt, and memory mirrors from the `SCIMServer-auth-docs` worktree | **Blocking** | Mainline mirrors are revision-2 era and contain two claims this guide has since disproved |
+| A2 | Add transport policy as an explicit persona axis, with handshake-level telemetry beside token-level telemetry | High | A TLS mismatch emits nothing at the token endpoint and reads as a networking fault |
+| A3 | ~~Flip `PERSIST_REQUEST_SECRETS` to default `false`~~ | **WITHDRAWN** | Declined by the operator (2026-08-04, and previously at v0.54.63). Capture is intended diagnostic behaviour; retention and access remain in scope, capture does not. See [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design) |
+| A4 | Require `client_id` for the SyncFabric RFC 7523 profile | High | A missing value is still accepted |
+| A5 | Key any future replay denylist on `uti`, not `jti` | Medium | Entra does not emit `jti` |
+| A6 | Surface `azpacr` in the auth decision trace | Medium | Cheap, and it distinguishes secret-authenticated from certificate-authenticated callers, which is also the fastest way to confirm which SyncFabric acquisition path actually ran |
+| A7 | Add a validator that rejects `api://<appId>` in `expectedAudience` with a message naming the bare GUID | Medium | This is the mistake an operator will naturally make, because it is the value they just typed into the scope |
+
+### 35.6 Artifact checks
+
+| Check | Result |
+|---|---|
+| Mermaid diagrams parse under the real `mermaid.parse()` engine | Verified |
+| JSON examples parse | Verified |
+| Markdown fences balanced | Verified |
+| Table column counts consistent | Verified |
+| ASCII only | Verified |
+| No em-dash characters | Verified |
+| No secret, token, or assertion values persisted | Verified |
+| Backticked repository paths resolve, or are labelled proposed | Verified |
+| No stale snapshot SHA in a current-source header | Verified |
+| Superseded revision-4 claims corrected in the executive summary, not only in the appendix | Verified |
+
+
+---
+
+## 36. Revision 6 provenance and validation report
+
+**Research date:** 2026-08-04. **Scope:** delta refresh of both repositories, plus an in-depth
+correction pass over the SCIMServer documentation that this guide is being implemented from.
+
+### 36.1 Source snapshots
+
+| Repository | Previous (rev 5) | This revision | Commits | Files changed |
+|---|---|---|---|---|
+| SyncFabric | `ac6fb8667cc753e2960003aa611bca803e9dcd1d` | `da0c7b46f168` | 23 | 127 |
+| SCIMServer | `e741c3738a2670f4de6e60351af152f11425af84` (v0.55.1) | `21ca0a95` (v0.55.2) | 6 | 46 |
+
+SyncFabric was read from committed `origin/master` only. Its worktree is checked out on branch
+`opentext` with three pre-existing unrelated local modifications, which were preserved and never
+read into a conclusion. The SCIMServer `master` worktree was clean.
+
+### 36.2 Invariance proof - both sides, at blob level
+
+Neither delta touches the authentication surface, and this is proved rather than sampled:
+
+| Side | Method | Result |
+|---|---|---|
+| SyncFabric | blob compare of **every** path matching `WorkloadIdentity\|TokenExchange` at both revisions | **77 files at each, 0 changed, 0 added, 0 removed** |
+| SCIMServer | blob compare of **every** path matching `oauth\|wif\|trust\|jwks\|credential\|guard\|token\|assertion\|auth` under tracked source | **124 files at each, 0 changed, 0 added, 0 removed** |
+
+Only 2 of SyncFabric's 127 changed paths matched auth vocabulary at all, and both are
+`.github/agent-reference/code-reviewer/` review guidelines - documentation, not code. Only 7 of
+SCIMServer's 46 changed paths are under `api/src`, and none are on the auth path.
+
+**Therefore every SCIMServer and SyncFabric authentication conclusion in revisions 1-5 holds
+unchanged at these snapshots, including the open P0.**
+
+### 36.3 The one auth-adjacent code change, and why it is not a behaviour change
+
+SCIMServer `41c293cc` is titled "correct PATCH profile merge semantics". It touches
+`endpoint.service.ts` and `update-endpoint.dto.ts`, which sit directly under
+`profile.authentication`. Reading the diff rather than the title shows it is a **documentation
+correction**: `mergeProfilePartial` already performed a per-key merge of `serviceProviderConfig`,
+and the code path was unchanged. What moved was the comment, which had been wrong.
+
+The corrected semantics matter for anyone scripting against the admin API:
+
+| Profile section | Merge semantics on a partial PATCH |
+|---|---|
+| `settings` | per-key merge |
+| `serviceProviderConfig` | per-key merge (omitted capability keys preserved) |
+| `schemas`, `resourceTypes`, **`authentication`** | **replaced wholesale** |
+| any section absent from the partial | preserved unchanged |
+
+A caller that PATCHes a partial `authentication` block therefore **deletes every method it does
+not resend**. This is deliberate - the admin authentication-methods API computes and submits the
+complete block - but it is a foot-gun for hand-rolled PATCHes.
+
+### 36.4 New finding - the sovereign WIF application ID is a gap in an exercised process
+
+Revision 5 recorded that `microsoftOnlineDirectoryService.workloadIdentityFederationApplicationPrincipalId`
+carries the commercial application ID as its default with exactly one `AADSF_DEV_US_ALL` (TME)
+override, while the adjacent `microsoftGraph.rootResource` setting uses the same override mechanism
+for sovereign clouds. That setting is **byte-identical** at this revision.
+
+What changed is the surrounding evidence. SyncFabric's HEAD commit `da0c7b46`,
+"[Delos] Add CloudSync application identifiers", registers Delos application identifiers across
+four directory-identifier classes (`ActiveDirectoryToAzureActiveDirectory`,
+`AzureActiveDirectoryToActiveDirectory`, `LESWritebackActiveDirectory`,
+`CustomOnPremAppSso`), replacing a placeholder with a production value, and states that it follows
+"Bleu PR 14591435".
+
+Read carefully, this is **not** the WIF application - it is the CloudSync / hybrid-sync family, and
+it does not touch the SCIM target wire contract. But it changes the character of the open question:
+
+> The sovereign application-registration process demonstrably **exists, is active, and has now been
+> applied to at least Bleu and Delos for another application family** - while the WIF first-party
+> application still has no sovereign override. The absence is therefore a **gap in a process that is
+> being exercised**, not an unknown about whether anyone performs such registrations.
+
+That converts an open-ended research question into an ownership question with an identifiable
+owner: whoever registered the Delos CloudSync identifiers can say who registers WIF's, and why it
+was excluded. Empirical gate updated accordingly.
+
+### 36.5 Documentation corrections made in the consuming repository
+
+This guide is now being implemented from, so revision 6 also audited the SCIMServer docs that
+describe the same subsystems. Three were contradicting runtime:
+
+| Document | Defect | Correction |
+|---|---|---|
+| `docs/auth/AUTHENTICATION_METHODS_MODEL.md` | Titled "A0 - inert backbone" and stated the model is "not yet consulted by any auth resolver" and "A0 wires no resolver". **False** - `profile.authentication.methods[]` is consulted at five runtime call sites through `resolveEndpointAuthEnablement`, plus admin CRUD and discovery. A reader would have concluded that disabling a method here has no effect, when it is one of the controls deciding whether a credential is accepted. | Retitled and restatused **LIVE and enforced**, with the five call sites tabulated, the resolution order stated, and the wholesale-replace PATCH semantics documented. |
+| `docs/auth/README.md` | Plan table labelled A0 "(inert)". | Relabelled **live**, enforced at 5 runtime call sites since A1/A3. |
+| `docs/auth/EXTERNAL_JWKS_VALIDATOR.md` | Guarantee 5 "Fail closed" did not disclose that the stale fallback has **no maximum age**, and the X15-F1 comparison table called that row "already correct". | Guarantee 5 now states the caveat with line references; the X15-F1 row now contrasts Entra's implicitly-bounded last-known-good against our unbounded stale window and assigns the ceiling to W1.4. |
+
+`docs/auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md` was additionally re-verified. Its current-source
+table had gone stale **in the understating direction** - Waves 1 and 2 shipped without it being
+updated, so the plan described delivered work as outstanding. Corrected rows: the resource-plane
+strategy seam is delivered (`ResourceAuthenticator` plus three authenticators; `SharedSecretGuard`
+is 260 lines, not 491), W1.1 and W1.3 are delivered, `assertionProfile` is live rather than inert,
+and the issued token now carries `jti` while `typ=at+jwt` remains absent.
+
+### 36.6 Re-tested open findings
+
+| Finding | Status at `21ca0a95` | Evidence |
+|---|---|---|
+| **RequestLog secret capture** | **NOT A FINDING - by design, re-affirmed 2026-08-04.** `PERSIST_REQUEST_SECRETS` defaults `true` intentionally. | `logging.service.ts:124`. The default is deliberate and the asserting test is correct; see [the decision record](#01-operator-decision-record---persist_request_secrets-defaults-true-by-design). |
+| JWKS unbounded stale age | **STILL OPEN.** | `external-jwks-validator.service.ts:240-247` returns `this.cache.get(jwksUri)` with no age test, while `getFreshCached` (line 301) does enforce `maxAgeMs`. |
+| Ten accepted method types vs implemented providers | **STILL OPEN.** | `KNOWN_METHOD_TYPES` holds ten values; `mtls` and `dpop` do not appear in the `authentication-schemes.ts` scheme map at all. |
+| Missing `client_id` accepted | **STILL OPEN.** | A mismatched `client_id` is rejected with `wif_client_id_mismatch` (`wif-assertion-token.provider.ts:173,194`); a missing one is not. |
+| RFC 9068 conformance | **STILL UNPROVEN.** | `jti` is now emitted (`oauth.service.ts:225`), but no `at+jwt` string exists anywhere in `api/src`; the token is signed via `jwtService.sign` with `signOptions.algorithm` only. |
+
+### 36.7 Method notes and self-correction
+
+Two false deltas were produced and caught during this run, both from the same cause:
+`git rev-parse <rev>:<path>` on a path that does not exist **prints the input string to stdout and
+exits 128**, so comparing two such results yields "changed". Three auth paths carried in prompt
+memory (`api/src/modules/scim/auth/...`) do not exist - the real locations are `api/src/oauth/` and
+`api/src/modules/auth/authenticators/`. The error was caught only because an independent blob scan,
+which enumerated real paths with `git ls-tree`, disagreed. Both the trap and the corrected paths are
+now recorded as anti-patterns in the workflow memory, and the general rule is: **existence-check
+with `git cat-file -e` before comparing, or enumerate so paths are real by construction.**
+
+### 36.8 Validation
+
+| Check | Result |
+|---|---|
+| Both remotes fetched without changing any checked-out worktree | Verified |
+| Exact source and comparison SHAs recorded | Verified |
+| Every commit since the previous snapshots classified | Verified (23 + 6) |
+| Auth-surface invariance proved at blob level on both sides | Verified (77 and 124 files) |
+| Repository documentation corrections applied and cross-linked | Verified (4 documents) |
+| No secret, token, or assertion values persisted | Verified |
+| No em-dash characters introduced | Verified |

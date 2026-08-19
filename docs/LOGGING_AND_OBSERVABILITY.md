@@ -1,6 +1,9 @@
 # Logging & Observability Guide
 
-> **Version:** 4.1 - **Source-verified against:** v0.53.0 - **Updated:** June 3, 2026  
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
+> **Version:** 4.2 - **Source-verified against:** v0.55.6 - **Updated:** 2026-07-31  
+> Route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  
 > Every statement in this document references the actual source file and line - nothing is assumed.
 
 ---
@@ -315,7 +318,8 @@ DELETE /scim/admin/log-config/recent
 
 **Response format:**
 
-```json
+```jsonc
+// Schematic shape - "..." marks elided fields, not literal values.
 {
   "count": 25,
   "entries": [
@@ -939,7 +943,8 @@ Configurable via:
 
 The `GET /scim/admin/log-config/audit` endpoint returns audit trail entries - CONFIG, ENDPOINT, and AUTH category logs from the ring buffer:
 
-```json
+```jsonc
+// Schematic shape - "..." marks elided fields, not literal values.
 {
   "count": 12,
   "entries": [
@@ -1029,7 +1034,7 @@ Authorization: Bearer changeme-scim
     "platform": "linux",
     "arch": "x64",
     "pid": 1,
-    "hostname": "scimserver2-abc123",
+    "hostname": "scimserver-dev-abc123",
     "cpus": 2,
     "containerized": true,
     "memory": {
@@ -1052,17 +1057,17 @@ Authorization: Bearer changeme-scim
   },
   "container": {
     "app": {
-      "name": "scimserver2",
-      "image": "ghcr.io/pranems/scimserver:0.35.0",
+      "name": "scimserver-dev",
+      "image": "ghcr.io/pranems/scimserver:0.55.1",
       "runtime": "node",
       "platform": "linux/amd64"
     }
   },
   "deployment": {
-    "resourceGroup": "scimserver-rg",
-    "containerApp": "scimserver2",
+    "resourceGroup": "scimserver-dev",
+    "containerApp": "scimserver-dev",
     "registry": "ghcr.io/pranems",
-    "currentImage": "ghcr.io/pranems/scimserver:0.35.0"
+    "currentImage": "ghcr.io/pranems/scimserver:0.55.1"
   }
 }
 ```

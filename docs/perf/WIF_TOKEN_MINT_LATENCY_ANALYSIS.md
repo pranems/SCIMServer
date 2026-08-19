@@ -51,8 +51,8 @@ POST /scim/endpoints/e8edd907-0dfb-415d-b834-abf0d20eb0e0/oauth/token   201   21
   outcome       : accept
   checkCount    : 5      (jwks_signature, issuer, subject, audience, tenant)
   selectedTrust : b8ec795d-49e7-4379-8167-3f7ca65be48c
-  jwksUri       : https://login.windows.net/f08e6aff-ca0f-4f11-81fa-1ffd43323373/discovery/v2.0/keys
-  issuer        : https://login.microsoftonline.com/f08e6aff-ca0f-4f11-81fa-1ffd43323373/v2.0
+  jwksUri       : https://login.windows.net/9751e42f-78f3-42f4-8b8a-6e73845aceae/discovery/v2.0/keys
+  issuer        : https://login.microsoftonline.com/9751e42f-78f3-42f4-8b8a-6e73845aceae/v2.0
   alg / kid     : RS256 / aFkmKVFc-4WV6sXCBvNZkXI505Y
 ```
 

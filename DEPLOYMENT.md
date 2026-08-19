@@ -1,5 +1,7 @@
 # SCIMServer Deployment Options
 
+> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.6`
+
 > Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
@@ -50,11 +52,27 @@ Same result - interactive prompts for all configuration. If run from within a cl
   -ScimSecret "your-secure-secret"
 ```
 
-Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-DatabaseUrl` (BYO PostgreSQL connection string), `-ProvisionPostgres` (auto-provision Azure PostgreSQL Flexible Server).
+Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-DatabaseUrl` (BYO PostgreSQL connection string), `-ProvisionPostgres` (auto-provision Azure PostgreSQL Flexible Server), `-EnvironmentResourceId` (reuse a Container Apps environment that lives in a **different resource group**).
+
+> **Reusing an environment across resource groups:** an Azure subscription is capped on the number of Container Apps managed environments, so several apps often have to share one. `--environment <name>` only ever looks inside the app's *own* resource group and fails with a not-found error when the environment lives elsewhere. Pass the **full resource ID** instead:
+>
+> ```powershell
+> .\scripts\deploy-azure.ps1 `
+>   -ResourceGroup "scimserver-dev" `
+>   -AppName "scimserver-dev" `
+>   -ScimSecret "your-secure-secret" `
+>   -EnvironmentResourceId "/subscriptions/<sub-id>/resourceGroups/scimserver-prod/providers/Microsoft.App/managedEnvironments/scimserver-env"
+> ```
+>
+> When set, the script skips environment creation entirely and reads the environment back to confirm it is reachable, so a mistyped ID **fails immediately** rather than quietly provisioning a second environment against the subscription cap.
 
 > **PostgreSQL required (Phase 3):** SCIMServer uses PostgreSQL as its persistence backend. Provide either `-DatabaseUrl "postgresql://..."` (existing server) or `-ProvisionPostgres` (the script will deploy an Azure Database for PostgreSQL Flexible Server via `infra/postgres.bicep`, ~$15-25/mo additional).
 
 > The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). **Store each value securely** - they are not stored anywhere else.
+
+> **Required PostgreSQL extensions - matters most if you bring your own server.** SCIMServer's baseline migration needs `CITEXT`, `PG_TRGM` and `PGCRYPTO`. On Azure Database for PostgreSQL these must additionally be named in the **`azure.extensions`** server parameter, which is *static* and needs a server restart to take effect. `-ProvisionPostgres` handles this for you; with `-DatabaseUrl` pointing at your own server, **you must do it yourself** - otherwise the migration fails with Prisma **P3009** and the container crash-loops on its startup probe, which reads as an app fault rather than a database one.
+>
+> The script allow-lists a fourth, `UUID-OSSP`, which the migration does **not** need. It is there so a server can *receive* a `pg_dump` from an older estate that has it: such a dump emits `CREATE EXTENSION "uuid-ossp"`, and Azure rejects that statement outright if the extension is not allow-listed on the target. Provisioning the superset means any estate can restore into any other.
 
 ### Quick Log Access (after deploy)
 
@@ -105,22 +123,30 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 
 When the production instance has active users, deploy a **separate dev resource group** for development. This gives full blast-radius isolation - the production deployment is never touched during development.
 
-### Architecture (CURRENT - 2026-05-29)
+### Architecture (CURRENT - 2026-07-31)
+
+There are **three** live estates. The canonical, gate-enforced record is [docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md); this is the short version.
 
 ```
-scimserver-prod         <- PROD (users) - do not touch
+scimserver-rg-prod      <- PROD, CUSTOMER-FACING (separate Azure AD tenant)
+`-- Container App: scimserver-prod (ghcr.io/pranems/scimserver:<tag>, anonymous pull)
+    FQDN: scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io
+
+scimserver-prod         <- PROD, parallel canary (same tenant as dev)
 |-- VNet, subnets
 |-- Container Apps Env + Log Analytics
 |-- PostgreSQL Flexible Server (scimserver-pg-new2)
-`-- Container App: scimserver (acrscimserver20622.azurecr.io/scimserver:<sha>)
-    FQDN: scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io
+`-- Container App: scimserver (acrscimsrv09.azurecr.io/scimserver:<sha>)
+    FQDN: scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io
 
 scimserver-dev          <- DEV (your iteration) - fully isolated
 |-- VNet, subnets (shares scimserver-env Container Apps Environment across RGs)
 |-- PostgreSQL Flexible Server (scimserver-pg-dev-new2)
-`-- Container App: scimserver-dev (acrscimserver20622.azurecr.io/scimserver:<sha>)
-    FQDN: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+`-- Container App: scimserver-dev (acrscimsrv09.azurecr.io/scimserver:<sha>)
+    FQDN: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 ```
+
+> The customer-facing estate lives in a **different Azure AD tenant**, so it cannot pull from the dev-tenant ACR. That is why it pulls the identical image anonymously from GHCR instead. Promotion is canary-first: prove the parallel prod, then promote the customer-facing one on an explicit go-ahead.
 
 Both apps also accept `ghcr.io/pranems/scimserver:<sha>` and `ghcr.io/pranems/scimserver:latest` (public anonymous-pull image, identical bits, used by the public bootstrap path).
 

@@ -1,8 +1,16 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** Active | **Last Updated:** 2026-06-03 | **Version:** 0.53.0
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
+> **Status:** Active | **Last Updated:** 2026-07-31 | **Version:** 0.55.6
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
-> Screenshots below are from the **live customer-facing production** instance (`scimserver-prod.calmsand-...`), verified at v0.53.0.
+> **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
+>
+> ```powershell
+> pwsh scripts/capture-ui-guide.ps1 -BaseUrl '<dev fqdn>' -Token '<scim secret>' -Apply
+> ```
+>
+> They were previously shot from the customer-facing production instance at v0.53.0. Dev is now the capture target because it carries a richer, deliberately-seeded data set (58 endpoints) and does not put customer tenant names in public documentation.
 
 ---
 
@@ -70,8 +78,8 @@ flowchart TB
 | Environment | URL | Bearer token |
 |-------------|-----|--------------|
 | **Prod (customer-facing)** | `https://scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` | configured `SCIM_SHARED_SECRET` |
-| **Prod (parallel)** | `https://scimserver.proudbush-ae90986e.eastus.azurecontainerapps.io` | configured `SCIM_SHARED_SECRET` |
-| **Dev** | `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io` | `changeme-scim` |
+| **Prod (parallel)** | `https://scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io` | configured `SCIM_SHARED_SECRET` |
+| **Dev** | `https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `changeme-scim` |
 | **Local (Docker)** | `http://localhost:8080` | `changeme-scim` |
 | **Local (dev server)** | `http://localhost:4000` (Vite) / API on `6000` | `local-secret` |
 
@@ -136,14 +144,87 @@ A searchable card grid of every endpoint. The header shows the total count and a
 
 ![Endpoints](screenshots/prod-02-endpoints.png)
 
-Clicking a card opens the **Endpoint Detail** page with tabs for Users, Groups, Logs, Settings, and Credentials. Creating an endpoint launches a preset picker (the six built-in presets) plus a JSON profile editor.
+### 6.1 Creating an endpoint
+
+**Create endpoint** opens a four-step wizard at `/endpoints/new`: **Identity & Preset** (name, description, and one of the six built-in presets) -> **Preview** (the schemas, resource types, ServiceProviderConfig and settings that preset will apply) -> **Override** (a JSON profile editor for anything you want to change) -> **Confirm**.
+
+Presets only ever **tighten**: the wizard will not let you widen a profile beyond the RFC baseline. See [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md).
+
+`/endpoints/{id}/edit` is a separate, deliberately narrow page for renaming an endpoint and toggling `active`. Deleting requires typing the endpoint name to confirm.
+
+### 6.2 Endpoint detail
+
+Clicking a card opens the endpoint detail page.
+
+![Endpoint detail](screenshots/prod-10-endpoint-detail.png)
+
+The header carries the display name, an Active badge, the copyable endpoint id and SCIM base path, the creation date, and **Edit** / **Delete**. **Overview** shows Resource Statistics (users, groups, generic resources, credentials, config flags) and a Recent Activity list where every row carries an **auth outcome chip** such as `auth ok - OAuth JWT` or `JWT - WIF`.
+
+Ten tabs:
+
+| Tab | Route | What it is for |
+|---|---|---|
+| **Overview** | `/endpoints/{id}` | Resource statistics and recent activity |
+| **Users** | `/endpoints/{id}/users` | Browse, inspect and edit SCIM Users |
+| **Groups** | `/endpoints/{id}/groups` | Browse groups and their membership |
+| **Activity** | `/endpoints/{id}/activity` | Provisioning activity parsed into human events |
+| **Bulk** | `/endpoints/{id}/bulk` | Compose and send a SCIM Bulk envelope |
+| **Resource types** | `/endpoints/{id}/resource-types` | The `/ResourceTypes` this endpoint serves |
+| **Schemas** | `/endpoints/{id}/schemas` | The `/Schemas` this endpoint publishes |
+| **Connect** | `/endpoints/{id}/connect` | Authentication: set up, connect, and monitor. See [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
+| **Logs** | `/endpoints/{id}/logs` | This endpoint's request log, with auth decision detail |
+| **Settings** | `/endpoints/{id}/settings` | All 28 settings controls. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+
+Two details worth knowing:
+
+- **Users and Groups are conditional.** They render only when the endpoint's profile actually serves that resource type, so a user-only endpoint shows no Groups tab at all. The other eight always render.
+- **There is no Credentials tab.** It was merged into **Connect**; `/endpoints/{id}/credentials` still resolves but redirects there.
+
+### 6.3 What each tab does
+
+**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Selecting a row opens a detail drawer where you can edit the resource and save it back over SCIM, with ETag concurrency applied when `RequireIfMatch` is on. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
+
+**Activity** is the provisioning story rather than the raw request log: the server parses requests into human events, each with a severity badge. Filter by **type** (`user`, `group`, `system`), by **severity** (`info`, `success`, `warning`, `error`), or by free text. The filters live **in the URL**, so a filtered view is a shareable link - useful when handing an investigation to someone else. Use Activity to answer "what did this provisioning job actually do?"; use **Logs** when you need the wire detail behind one of those events.
+
+**Bulk** turns a CSV into a single SCIM Bulk request (RFC 7644 section 3.7).
+
+![Bulk operations](screenshots/prod-11-endpoint-bulk.png)
+
+| Control | What it does |
+|---|---|
+| **Mode** | `POST (create)`, `PATCH` or `DELETE` |
+| **Resource** | Users or Groups |
+| **CSV file** | one row per operation; the header row supplies the attribute names |
+| **ID column** | which CSV column carries the resource id. Only shown for PATCH and DELETE, which need an existing target |
+| **failOnErrors** | stop after this many failures; `0` processes every row regardless |
+
+The cap is **1000 operations and a 1 MB payload**. Before submitting you get a preview of the first ten operations and a **Copy full envelope as JSON** button, so you can inspect exactly what will be sent. Afterwards, **failure rows are downloadable as CSV** carrying the per-operation `scimType` and `detail` - fix that file and re-submit it rather than re-deriving which rows failed.
+
+**Resource types** lists what this endpoint serves, and creates custom ones beyond User and Group.
+
+![Resource types](screenshots/prod-12-endpoint-resource-types.png)
+
+Each row shows the type name, its endpoint path and its schema URN. **Create** asks for a name, an endpoint path (mounted under `/scim/endpoints/{id}`), a schema URN and an optional description. Delete asks for confirmation. The list renders whether or not custom types are currently enabled, so you can always see what a client would discover at `/ResourceTypes`.
+
+**Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`. One row per schema showing its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
+
+**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
+
+**Logs** is this endpoint's slice of the request log, including the per-row auth outcome chip and the decision trace behind it. See [section 12](#12-logs).
+
+**Settings** exposes all 28 controls for this endpoint. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md).
 
 | Action | Endpoint |
 |--------|----------|
 | List endpoints | `GET /scim/admin/endpoints` |
 | Create endpoint | `POST /scim/admin/endpoints` |
+| List presets | `GET /scim/admin/endpoints/presets` |
 | Endpoint detail/overview | `GET /scim/admin/endpoints/{id}/overview` |
+| Endpoint statistics | `GET /scim/admin/endpoints/{id}/stats` |
+| Rename / activate | `PATCH /scim/admin/endpoints/{id}` |
+| Delete | `DELETE /scim/admin/endpoints/{id}` |
 | Per-endpoint credentials | `GET/POST/DELETE /scim/admin/endpoints/{id}/credentials` |
+| Connection values per method | `GET /scim/admin/endpoints/{id}/connection-info` |
 
 ---
 
@@ -292,20 +373,31 @@ This is why nearly every value in the screenshots above carries a copy icon.
 
 ## 17. Screenshot Inventory
 
-| File | Page | Source |
-|------|------|--------|
-| `prod-token-dialog.png` | Token Gate | prod (calmsand) |
-| `prod-01-dashboard.png` | Dashboard | prod (calmsand) |
-| `prod-02-endpoints.png` | Endpoints | prod (calmsand) |
-| `prod-03-discovery.png` | Discovery Explorer | prod (calmsand) |
-| `prod-04-operations.png` | Operations | prod (calmsand) |
-| `prod-05-workbench.png` | Workbench | prod (calmsand) |
-| `prod-06-my-profile.png` | My profile (/Me) | prod (calmsand) |
-| `prod-07-manual-provision.png` | Manual Provisioning | prod (calmsand) |
-| `prod-08-logs.png` | Logs | prod (calmsand) |
-| `prod-09-settings.png` | Settings | prod (calmsand) |
+All images are captured from the live **dev** estate (see the provenance note at the top of this document), not from production.
 
-Historical screenshots (`01-`...`35-`) from earlier UI iterations remain in `docs/screenshots/` for reference.
+| File | Page |
+|------|------|
+| `prod-token-dialog.png` | Token Gate |
+| `prod-01-dashboard.png` | Dashboard |
+| `prod-02-endpoints.png` | Endpoints |
+| `prod-03-discovery.png` | Discovery Explorer |
+| `prod-04-operations.png` | Operations |
+| `prod-05-workbench.png` | Workbench |
+| `prod-06-my-profile.png` | My profile (/Me) |
+| `prod-07-manual-provision.png` | Manual Provisioning |
+| `prod-08-logs.png` | Logs |
+| `prod-09-settings.png` | Settings |
+| `prod-10-endpoint-detail.png` | Endpoint detail (all ten tabs) |
+
+Re-shoot any single surface without disturbing the others:
+
+```powershell
+pwsh scripts/capture-ui-guide.ps1 -BaseUrl '<dev fqdn>' -Only 'prod-10-*' -Apply
+```
+
+The twelve `prod-auth-*` images belong to [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) and are re-shot by `scripts/capture-auth-guide.ps1`.
+
+> Only `prod-*.png` files are committed. `docs/screenshots/` is git-ignored by default with a single re-include for that prefix, so ad-hoc captures can never be committed by accident and are **not** present in a fresh clone.
 
 ---
 

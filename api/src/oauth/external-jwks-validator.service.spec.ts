@@ -297,14 +297,24 @@ describe('ExternalJwksValidatorService - runtime egress robustness', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2); // 302 + follow (now remembered)
 
     // Revoke the canonical host. The REMEMBERED target must be re-checked, so
-    // NO request may go out to it. (The verify itself still succeeds: the
-    // pre-existing fail-to-stale path returns the keys already fetched while
-    // the host WAS allowed - allowlist revocation does not retroactively
-    // invalidate cached keys. That is existing behaviour, unchanged by W1.3.)
+    // NO request may go out to it.
+    //
+    // W1.4 CHANGED THE OUTCOME HERE (intended, not a regression). This test
+    // used to assert that `verify` still SUCCEEDED, because fail-to-stale
+    // returned the keys fetched while the host was allowed - recorded as the
+    // open question in EXECUTION_ISSUES_AND_RCA.md section 10.2. W1.4 resolves
+    // that question: an allowlist rejection is now explicitly NOT
+    // stale-eligible, while a network failure still is. Keeping the old
+    // behaviour alongside the 10-min -> 24 h TTL raise would have widened the
+    // post-revocation exposure window by 144x.
     await elapse();
     canonicalAllowed = false;
     fetchMock.mockClear();
-    await svc.verify(token, 'https://idp.example.com/keys', { retries: 0 });
+    await expect(
+      svc.verify(token, 'https://idp.example.com/keys', { retries: 0 }),
+    ).rejects.toThrow(/not permitted|allowlist/i);
+    // The property this test has always guarded is unchanged: the remembered
+    // redirect target is re-validated, so no request reaches the revoked host.
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -350,6 +360,161 @@ describe('ExternalJwksValidatorService - runtime egress robustness', () => {
     release!();
     await Promise.all([p1, p2]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * W1.5 - the safety envelope around the JWKS fetch.
+ *
+ * A per-attempt timeout does NOT bound the operation: with retries and
+ * exponential backoff the worst case is tens of seconds on the token-mint hot
+ * path. These tests pin the total deadline and the response caps, and every
+ * cap is driven by configuration rather than a hardcoded literal.
+ */
+describe('ExternalJwksValidatorService - W1.5 total deadline + response caps', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const URI = 'https://idp.example.com/keys';
+
+  /** A 200 response that also exposes text(), the way a real Response does. */
+  const okBody = (body: unknown) => {
+    const text = JSON.stringify(body);
+    return {
+      status: 200,
+      ok: true,
+      headers: { get: () => null },
+      text: async () => text,
+      json: async () => JSON.parse(text),
+    };
+  };
+
+  it('bounds the whole retry ladder by the total deadline instead of running it to completion', async () => {
+    // retries=5 with a 200 ms base backoff would sleep 200+400+800+1600+3200 =
+    // 6.2 s before failing. The 400 ms total deadline must cut that short.
+    const fetchMock = jest.fn(async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({
+        JWKS_TOTAL_DEADLINE_MS: '400',
+        JWKS_FETCH_RETRIES: '5',
+        JWKS_FETCH_RETRY_BACKOFF_MS: '200',
+      }),
+      logger,
+      fetchMock as any,
+    );
+    const fx = await makeRsaKey('kid-1');
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'x' });
+
+    const started = Date.now();
+    await expect(svc.verify(token, URI)).rejects.toThrow();
+    const elapsed = Date.now() - started;
+
+    // Generous slack for CI scheduling, but far below the ~6.2 s full ladder.
+    expect(elapsed).toBeLessThan(2000);
+    expect(fetchMock.mock.calls.length).toBeLessThan(6);
+  });
+
+  it('reports the deadline as the reason when it is what stopped the work', async () => {
+    const fetchMock = jest.fn(async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({
+        JWKS_TOTAL_DEADLINE_MS: '150',
+        JWKS_FETCH_RETRIES: '5',
+        JWKS_FETCH_RETRY_BACKOFF_MS: '200',
+      }),
+      logger,
+      fetchMock as any,
+    );
+    const fx = await makeRsaKey('kid-1');
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'x' });
+    await expect(svc.verify(token, URI)).rejects.toThrow(/deadline/i);
+  });
+
+  it('rejects a JWKS response larger than maxResponseBytes', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const bloated = { keys: fx.jwks.keys, padding: 'x'.repeat(5000) };
+    const fetchMock = jest.fn(async () => okBody(bloated));
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_MAX_RESPONSE_BYTES: '512', JWKS_FETCH_RETRIES: '0' }),
+      logger,
+      fetchMock as any,
+    );
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'x' });
+    await expect(svc.verify(token, URI)).rejects.toThrow(/bytes|size|too large/i);
+  });
+
+  it('accepts a JWKS response within maxResponseBytes', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest.fn(async () => okBody(fx.jwks));
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_MAX_RESPONSE_BYTES: '1048576' }),
+      logger,
+      fetchMock as any,
+    );
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'ok' });
+    await expect(svc.verify(token, URI)).resolves.toBeDefined();
+  });
+
+  it('rejects a key set with more keys than maxKeys', async () => {
+    // Distinct kids on purpose. An earlier draft of this test reused ONE key
+    // three times, which made `createLocalJWKSet` reject on duplicate `kid` -
+    // so the test passed before the cap existed, for the wrong reason. With
+    // distinct kids the key set is perfectly valid and kid-1 resolves, so the
+    // ONLY thing that can reject it is the cap under test.
+    const fx1 = await makeRsaKey('kid-1');
+    const fx2 = await makeRsaKey('kid-2');
+    const fx3 = await makeRsaKey('kid-3');
+    const many = { keys: [fx1.jwks.keys[0], fx2.jwks.keys[0], fx3.jwks.keys[0]] };
+    const fetchMock = jest.fn(async () => okBody(many));
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_MAX_KEYS: '2', JWKS_FETCH_RETRIES: '0' }),
+      logger,
+      fetchMock as any,
+    );
+    const token = await signRs256(fx1.privateKey, 'kid-1', { iss: 'x' });
+    await expect(svc.verify(token, URI)).rejects.toThrow(/too many keys|maxKeys|key count/i);
+  });
+
+  it('accepts a key set at exactly maxKeys (boundary, must not off-by-one)', async () => {
+    const fx1 = await makeRsaKey('kid-1');
+    const fx2 = await makeRsaKey('kid-2');
+    const exactly = { keys: [fx1.jwks.keys[0], fx2.jwks.keys[0]] };
+    const fetchMock = jest.fn(async () => okBody(exactly));
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_MAX_KEYS: '2' }),
+      logger,
+      fetchMock as any,
+    );
+    const token = await signRs256(fx1.privateKey, 'kid-1', { iss: 'x' });
+    await expect(svc.verify(token, URI)).resolves.toBeDefined();
+  });
+
+  it('bounds cache cardinality, evicting the oldest entry', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest.fn(async () => okBody(fx.jwks));
+    const svc = new ExternalJwksValidatorService(
+      makeConfig({ JWKS_MAX_CACHE_ENTRIES: '2' }),
+      logger,
+      fetchMock as any,
+    );
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'x' });
+
+    await svc.verify(token, 'https://idp.example.com/a');
+    await svc.verify(token, 'https://idp.example.com/b');
+    await svc.verify(token, 'https://idp.example.com/c');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    // /a was evicted when /c arrived, so it must be refetched rather than served
+    // from cache. If cardinality were unbounded this would be a cache hit.
+    await svc.verify(token, 'https://idp.example.com/a');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    // /c is still cached and must NOT refetch.
+    await svc.verify(token, 'https://idp.example.com/c');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
 

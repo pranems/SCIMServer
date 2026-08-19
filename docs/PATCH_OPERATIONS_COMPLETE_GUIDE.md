@@ -1,5 +1,7 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
 **Audience:** integrators wiring a SCIM client (Microsoft Entra ID, Okta, custom), operators configuring endpoint profiles, and contributors changing PATCH code.
@@ -69,7 +71,7 @@ flowchart LR
 
 ### 2.1 URLs by resource type
 
-All PATCH routes are endpoint-scoped. `{baseUrl}` is the deployment origin (for example `https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`), `{endpointId}` is the endpoint UUID.
+All PATCH routes are endpoint-scoped. `{baseUrl}` is the deployment origin (for example `https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io`), `{endpointId}` is the endpoint UUID.
 
 | Resource | Method + URL |
 |----------|--------------|
@@ -590,7 +592,7 @@ The following was executed live against the dev deployment (`rfc-standard` prese
 Request:
 ```http
 PATCH /scim/endpoints/{endpointId}/Users/{id} HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer <token>
 Content-Type: application/scim+json
 

@@ -654,7 +654,7 @@ export class EndpointService implements OnModuleInit {
     // Build profile update
     let profileUpdate: any = undefined;
 
-    // Partial profile update: settings deep-merged, schemas/RTs/SPC replaced
+    // Partial profile update: settings + SPC per-key merged, schemas/RTs/auth replaced
     if (dto.profile) {
       const currentProfile = (endpoint.profile as EndpointProfile | null) ?? undefined;
       profileUpdate = this.mergeProfilePartial(currentProfile, dto.profile);
@@ -760,8 +760,11 @@ export class EndpointService implements OnModuleInit {
 
   /**
    * Merge a partial profile update into the current endpoint profile.
-   * - `settings` - deep-merged (additive, individual keys can be overwritten)
-   * - `schemas`, `resourceTypes`, `serviceProviderConfig` - replaced wholesale
+   * - `settings` - per-key merge (additive, individual keys can be overwritten)
+   * - `serviceProviderConfig` - per-key merge (only the top-level capability keys
+   *   present in the partial are overwritten)
+   * - `schemas`, `resourceTypes`, `authentication` - replaced wholesale
+   * - any section absent from the partial is preserved unchanged
    *
    * If `schemas` or `resourceTypes` are provided they are validated & expanded.
    */
@@ -789,7 +792,7 @@ export class EndpointService implements OnModuleInit {
     if (partial.resourceTypes !== undefined) {
       merged.resourceTypes = partial.resourceTypes;
     }
-    // Replace SPC if provided
+    // Per-key merge of SPC if provided - omitted capability keys are preserved
     if (partial.serviceProviderConfig !== undefined) {
       merged.serviceProviderConfig = { ...current.serviceProviderConfig, ...partial.serviceProviderConfig };
     }

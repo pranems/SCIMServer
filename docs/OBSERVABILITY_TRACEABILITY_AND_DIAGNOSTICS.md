@@ -1,5 +1,7 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
 > **What this is.** The cross-cutting synthesis of how SCIMServer makes a request *observable*: the single correlation id and why it is not split into a trace/span family, the custom logging stack, the persistent request log, the SCIM/OAuth error envelopes with their diagnostics extension, and the Auth Decision Trace that renders one decision at three fidelities. It carries worked HTTP examples (headers + request/response bodies), Mermaid flows, endpoint tables, and an honest cross-domain comparison against W3C Trace Context, OpenTelemetry, Elastic Common Schema, and RFC 9457.
 
 > **Scope.** This is the *architecture + comparison* doc. For the logging-stack field reference (ring buffer, SSE, file rotation, env vars) see [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md); for the middleware that establishes correlation before guards see [auth/CORRELATION_MIDDLEWARE_AND_REQUEST_TRACEABILITY.md](auth/CORRELATION_MIDDLEWARE_AND_REQUEST_TRACEABILITY.md); for the auth-diagnostics design see [auth/AUTH_ERROR_DIAGNOSTICS_AND_OBSERVABILITY.md](auth/AUTH_ERROR_DIAGNOSTICS_AND_OBSERVABILITY.md); for the operator-facing usability layer see [USABILITY_GUIDE.md](USABILITY_GUIDE.md).
@@ -218,7 +220,7 @@ Resource-plane errors use the SCIM `Error` schema. The vendor extension `urn:sci
 
 ```http
 GET /scim/v2/endpoints/d915cf86-.../Users HTTP/1.1
-Host: scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+Host: scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
 Authorization: Bearer bogus-token
 Accept: application/scim+json
 ```

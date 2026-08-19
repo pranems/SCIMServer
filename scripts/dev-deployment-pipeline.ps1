@@ -35,7 +35,7 @@
     for explicit confirmation (use -ConfirmTag for unattended runs).
 
 .PARAMETER RegistryAcr
-    ACR login server (default: acrscimserver20622.azurecr.io).
+    ACR login server (default: acrscimsrv09.azurecr.io).
 
 .PARAMETER RegistryGhcr
     GHCR image base (default: ghcr.io/pranems/scimserver).
@@ -77,10 +77,10 @@
     needs an explicit operator go-ahead after the canary is green.
 
 .PARAMETER CanaryResourceGroup
-    Resource group of the auto-canary prod (default: scimserver-prod / proudbush).
+    Resource group of the auto-canary prod (default: scimserver-prod / purplecliff).
 
 .PARAMETER CanaryAppName
-    Container App name of the auto-canary prod (default: scimserver / proudbush).
+    Container App name of the auto-canary prod (default: scimserver / purplecliff).
 
 .PARAMETER DryRun
     Print plan only; do not execute.
@@ -119,7 +119,7 @@
 [CmdletBinding()]
 param(
     [string]$ImageTag,
-    [string]$RegistryAcr = 'acrscimserver20622.azurecr.io',
+    [string]$RegistryAcr = 'acrscimsrv09.azurecr.io',
     [string]$RegistryGhcr = 'ghcr.io/pranems/scimserver',
     [string]$DevResourceGroup = 'scimserver-dev',
     [string]$DevAppName = 'scimserver-dev',
@@ -272,7 +272,7 @@ if ($ImageTag -ne $gitSha -and -not $ConfirmTag) {
 
 if (-not $DevFqdn) {
     if ($DryRun) {
-        $DevFqdn = 'scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+        $DevFqdn = 'scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
     } else {
         $DevFqdn = az containerapp show -n $DevAppName -g $DevResourceGroup --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
     }
@@ -327,6 +327,19 @@ Invoke-Gate '1.3' 'Web tsc --noEmit (baseline-or-better)' {
 
 Invoke-Gate '1.5' 'Web prod build' { npm run build } 'web' | Out-Null
 Invoke-Gate '1.6' 'Web size-limit budgets' { npm run size } 'web' | Out-Null
+
+# 1.12 - the user-facing documentation must still describe what we are about to
+# deploy. Runs in currency-only mode here (no diff to couple against at deploy
+# time); the coupling half (F4) is enforced at pre-push and on pull requests.
+Invoke-Gate '1.12' 'Docs freshness (user-facing set)' {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'audit-doc-freshness.ps1') -SkipCoupling -Quiet
+} | Out-Null
+
+# 1.13 - the docs must not merely be fresh, they must be TRUE. Counts, settings,
+# routes and reason codes are compared against the source they describe.
+Invoke-Gate '1.13' 'Docs content matches source' {
+    node (Join-Path $PSScriptRoot 'audit-doc-content.mjs')
+} | Out-Null
 
 # =============================================================================
 # Stage 2 - Local test gates
@@ -517,6 +530,11 @@ if (-not $SkipDeploy -and -not $SkipPlaywright) {
     Invoke-Gate '5.3' 'Playwright vs dev' {
         $env:E2E_BASE_URL = "https://$DevFqdn"
         $env:E2E_TOKEN = 'changeme-scim'
+        # The create/delete wizard specs are gated behind this so they never run
+        # against a customer-facing estate. Dev is ours and every spec cleans up
+        # after itself, so enable them here - otherwise the primary
+        # endpoint-creation flow has no browser coverage at all.
+        $env:E2E_ALLOW_MUTATIONS = '1'
         npx playwright test --reporter=line
     } 'web' | Out-Null
 } elseif ($SkipPlaywright) {
@@ -565,12 +583,17 @@ if (-not $SkipDeploy) {
     # active revisions, 12 idle, 65 connections of demand against a
     # max_connections of 50. Reclaim it on every deploy rather than waiting
     # for the database to be the thing that notices.
+    #
+    # Retention comes from scripts/scim-estates.json per estate, not from a
+    # literal here, so this stage cannot drift away from promote-to-prod.ps1.
     if (-not $DryRun) {
         try {
-            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep 2
-            Add-Result -Stage '6.2' -Gate 'Revision hygiene (keep newest 2 active)' -Status 'PASS' -Detail 'stale revisions deactivated'
+            . (Join-Path $PSScriptRoot 'scim-estates.ps1')
+            $devKeep = Get-ScimEstateRevisionKeep -AppName $DevAppName -ResourceGroup $DevResourceGroup
+            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep $devKeep
+            Add-Result -Stage '6.2' -Gate "Revision hygiene (keep newest $devKeep active)" -Status 'PASS' -Detail 'stale revisions deactivated'
         } catch {
-            Add-Result -Stage '6.2' -Gate 'Revision hygiene (keep newest 2 active)' -Status 'FAIL' -Detail $_.Exception.Message
+            Add-Result -Stage '6.2' -Gate 'Revision hygiene' -Status 'FAIL' -Detail $_.Exception.Message
         }
     }
 }

@@ -4,6 +4,6 @@ export class UpdateEndpointDto {
   displayName?: string;
   description?: string;
   active?: boolean;
-  /** Partial profile update - settings deep-merged, schemas/RTs/SPC replaced. */
+  /** Partial profile update - settings + SPC per-key merged, schemas/RTs/auth replaced. */
   profile?: Partial<ShorthandProfileInput>;
 }

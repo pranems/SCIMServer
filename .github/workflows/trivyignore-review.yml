@@ -1,11 +1,19 @@
 # Periodic .trivyignore review automation - OPS-3 follow-up.
 #
-# Each Monday at 04:00 UTC (and on demand) parse repo-root .trivyignore via
+# Daily (and on demand) parse repo-root .trivyignore via
 # api/src/scripts/check-trivyignore.ts. If any entry is past its
-# Re-check-by date (or missing/malformed that field), open a GitHub Issue
-# with the rendered Markdown report. If an open issue with the canonical
-# title already exists, update its body in place instead of opening a new
-# one - prevents duplicate-issue noise.
+# Re-check-by date (or missing/malformed that field, or violates its entry
+# class rules), open a GitHub Issue with the rendered Markdown report. If an
+# open issue with the canonical title already exists, update its body in place
+# instead of opening a new one - prevents duplicate-issue noise.
+#
+# WHY DAILY, NOT WEEKLY (changed 2026-08-04)
+# Entries now carry a Class. A `judgment` entry runs on a 90-day cadence, where
+# a weekly cron is ample. A `quarantine-window` entry is a hold of at most 7
+# days while a published fix ages past the corporate minimum release age - and
+# a WEEKLY cron cannot police a SEVEN-DAY deadline. A hold expiring on a
+# Tuesday would go unnoticed until the following Monday, leaving a known-fixed
+# HIGH CVE suppressed for six extra days. The job costs a few seconds.
 #
 # Non-blocking by design: this workflow does NOT fail CI for stale entries
 # (urgent security fixes must always be able to land). The Issue is the
@@ -13,16 +21,18 @@
 #
 # References:
 #   docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md OPS-3
-#   .trivyignore (machine-readable header documents the required fields)
-#   api/src/scripts/check-trivyignore.ts (parser + reporter; 17 unit tests)
+#   .trivyignore (machine-readable header documents the fields and both classes)
+#   api/src/scripts/check-trivyignore.ts (parser + reporter)
+#   .github/workflows/dependency-pins-review.yml (the sibling that watches the
+#     npm `overrides` pins, which Dependabot cannot manage)
 
 name: Trivyignore review
 
 on:
   schedule:
-    # Every Monday 04:00 UTC. Weekly cadence catches a missed quarterly
-    # review within 7 days of its deadline.
-    - cron: "0 4 * * 1"
+    # Daily 04:00 UTC. Must be daily to police a 7-day quarantine window; see
+    # the note above.
+    - cron: "0 4 * * *"
   workflow_dispatch: {}
   # Also run when .trivyignore itself changes on master, so the next push
   # closing the issue fires the check immediately rather than waiting.

@@ -3,7 +3,7 @@
 Status: ANALYSIS + STANDING GATE (source at `feat/wif`, api v0.54.60). Companion to
 the X10 auth-methods comparison ([AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)),
 the X11 token-mint latency analysis ([../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)),
-and the SyncFabric WIF architecture guide ([SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)).
+and the SyncFabric WIF architecture guide ([SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md)).
 The refactor is sequenced for delivery in [AUTH_CONSOLIDATED_DELIVERY_PLAN.md](AUTH_CONSOLIDATED_DELIVERY_PLAN.md) (X13, Wave 2).
 
 ## 0. Verdict (TL;DR)
@@ -276,7 +276,7 @@ flowchart LR
 
 - Auth methods vs standards (X10): [AUTH_METHODS_STANDARDS_COMPARISON.md](AUTH_METHODS_STANDARDS_COMPARISON.md)
 - Token-mint latency (X11): [../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md)
-- SyncFabric WIF architecture guide (persona/profile model, roadmap methods): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE (1).md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE%20(1).md)
+- SyncFabric WIF architecture guide (persona/profile model, roadmap methods): [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md)
 - Central pattern ledger: [../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](../strategy/ENGINEERING_LESSONS_AND_PATTERNS.md)
 - Seam template: [assertion-token-provider.ts](../../api/src/modules/scim/controllers/assertion-token-provider.ts)
 - The god-guard: [shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts)

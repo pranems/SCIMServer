@@ -28,20 +28,95 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-async function openFirstEndpointCredentials(page: Page): Promise<void> {
+/**
+ * DETERMINISM (2026-08-05). These credential tests used to open "the first
+ * endpoint card" and then either skip ("No per-endpoint credential cards on the
+ * first endpoint") or wrap every assertion in `if (count > 0)`. Both forms are
+ * dead tests: they assert nothing whenever the first endpoint happens to carry
+ * no per-endpoint credential, which is not a property any environment
+ * guarantees. On dev this skipped every run.
+ *
+ * They now create a fixture endpoint with `SecretTokenBearerAuthEnabled` on and
+ * one bearer credential, so a retained-capable credential card exists by
+ * construction and the conditionals become real assertions.
+ */
+let fixtureEndpointId: string | null = null;
+
+async function createCredentialFixture(page: Page): Promise<string | null> {
   await page.goto('/endpoints');
-  await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
-  const cards = page.locator('[data-testid^="endpoint-"]').filter({
-    hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-  });
-  test.skip((await cards.count()) === 0, 'Tenant has zero endpoints.');
-  const first = cards.first();
-  const cardTestId = (await first.getAttribute('data-testid')) ?? '';
-  const endpointId = cardTestId.replace(/^endpoint-/, '');
-  await first.click();
-  await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
-  await page.goto(`/endpoints/${endpointId}/credentials`);
+  return page.evaluate(async (t: string) => {
+    const authed = (extra: Record<string, string> = {}) => ({
+      Authorization: `Bearer ${t}`,
+      'Content-Type': 'application/json',
+      ...extra,
+    });
+
+    const created = await fetch('/scim/admin/endpoints', {
+      method: 'POST',
+      headers: authed(),
+      body: JSON.stringify({
+        name: `e2e-cred-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+        profilePreset: 'rfc-standard',
+      }),
+    });
+    if (!created.ok) return null;
+    const ep = (await created.json()) as { id?: string };
+    if (!ep?.id) return null;
+
+    // The per-endpoint bearer method tab is gated behind this flag; without it
+    // the credential is filtered out of the list (credentials are scoped to the
+    // active method tab).
+    const patched = await fetch(`/scim/admin/endpoints/${ep.id}`, {
+      method: 'PATCH',
+      headers: authed(),
+      body: JSON.stringify({ profile: { settings: { SecretTokenBearerAuthEnabled: true } } }),
+    });
+    if (!patched.ok) return null;
+
+    const cred = await fetch(`/scim/admin/endpoints/${ep.id}/credentials`, {
+      method: 'POST',
+      headers: authed(),
+      body: JSON.stringify({ credentialType: 'bearer', label: 'e2e-reveal-fixture' }),
+    });
+    if (!cred.ok) return null;
+
+    return ep.id;
+  }, TOKEN);
+}
+
+test.afterEach(async ({ page }) => {
+  if (!fixtureEndpointId) return;
+  const id = fixtureEndpointId;
+  fixtureEndpointId = null;
+  await page
+    .evaluate(
+      async ({ t, epId }: { t: string; epId: string }) => {
+        await fetch(`/scim/admin/endpoints/${epId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${t}` },
+        });
+      },
+      { t: TOKEN, epId: id },
+    )
+    .catch(() => undefined);
+});
+
+async function openFirstEndpointCredentials(page: Page): Promise<void> {
+  fixtureEndpointId = await createCredentialFixture(page);
+  // An assertion, not a skip: if the fixture cannot be built that is a real
+  // failure, not a reason to pass silently.
+  expect(fixtureEndpointId, 'credential fixture endpoint must be creatable').toBeTruthy();
+
+  await page.goto(`/endpoints/${fixtureEndpointId}/credentials`);
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+
+  // Credentials are scoped to the active method tab - select `bearer` so the
+  // seeded credential's card is the one on screen.
+  const bearerTab = page.getByTestId('credentials-method-tab-bearer');
+  await expect(bearerTab, 'fixture enables SecretTokenBearerAuthEnabled').toBeVisible({
+    timeout: 15_000,
+  });
+  await bearerTab.click();
 }
 
 test.describe('WI-8 - credential reveal + server security settings', () => {
@@ -70,34 +145,44 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
   });
 
   test('the credentials tab renders (reveal is in the card overflow menu for retained credentials)', async ({ page }) => {
+    test.setTimeout(120_000);
     await openFirstEndpointCredentials(page);
     // The tab renders; W7 - Reveal now lives in each card's overflow menu, shown
-    // only for a retained-capable credential.
+    // only for a retained-capable credential. The fixture seeds exactly such a
+    // credential, so these are assertions rather than `if (count > 0)` guards.
     await expect(page.getByTestId('tab-credentials')).toBeVisible();
     const moreButtons = page.locator('[data-testid^="credential-more-"]');
-    if ((await moreButtons.count()) > 0) {
-      await moreButtons.first().click();
-      const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
-      if ((await revealButtons.count()) > 0) {
-        await expect(revealButtons.first()).toBeEnabled();
-      }
-    }
+    await expect(
+      moreButtons.first(),
+      'fixture bearer credential must render a card overflow menu',
+    ).toBeVisible({ timeout: 15_000 });
+    await moreButtons.first().click();
+    const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
+    await expect(
+      revealButtons.first(),
+      'a retained-capable bearer credential must offer Reveal',
+    ).toBeEnabled({ timeout: 15_000 });
   });
 
   test('a Rotate item accompanies each retained-capable credential in the overflow menu', async ({ page }) => {
+    test.setTimeout(120_000);
     await openFirstEndpointCredentials(page);
     await expect(page.getByTestId('tab-credentials')).toBeVisible();
     const moreButtons = page.locator('[data-testid^="credential-more-"]');
-    test.skip((await moreButtons.count()) === 0, 'No per-endpoint credential cards on the first endpoint.');
+    await expect(
+      moreButtons.first(),
+      'fixture bearer credential must render a card overflow menu',
+    ).toBeVisible({ timeout: 15_000 });
     await moreButtons.first().click();
     // W7 - Reveal + Rotate are shown together for the same credential (both
     // secret-bearing, active, non-wif), so their counts match in the open menu.
     const rotateButtons = page.locator('[data-testid^="credential-rotate-"]');
     const revealButtons = page.locator('[data-testid^="credential-reveal-"]');
+    await expect(rotateButtons.first()).toBeEnabled({ timeout: 15_000 });
     expect(await rotateButtons.count()).toBe(await revealButtons.count());
-    if ((await rotateButtons.count()) > 0) {
-      await expect(rotateButtons.first()).toBeEnabled();
-    }
+    // Non-vacuous: the fixture guarantees at least one such pair, so a count of
+    // 0 == 0 can no longer pass this test.
+    expect(await rotateButtons.count()).toBeGreaterThan(0);
   });
 });
 

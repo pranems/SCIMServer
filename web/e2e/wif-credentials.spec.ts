@@ -31,38 +31,103 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-async function openFirstEndpointCredentials(page: Page): Promise<void> {
+/**
+ * DETERMINISM (2026-08-05). These specs used to open "the first endpoint card"
+ * and then skip when that endpoint happened to have no WIF method enabled, no
+ * credential, or `WifCredentialsEnabled` off. On dev that meant 7 of them
+ * skipped every run - they were testing whichever endpoint sorted first, which
+ * is not a property any environment guarantees.
+ *
+ * They now create a fixture endpoint configured exactly as the tests require
+ * (WIF enabled + one bearer credential) and delete it afterwards, so the
+ * preconditions hold by construction and the tests cannot silently skip.
+ */
+let fixtureEndpointId: string | null = null;
+
+async function createWifFixture(page: Page): Promise<string | null> {
   await page.goto('/endpoints');
-  await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
+  return page.evaluate(async (t: string) => {
+    const post = async (url: string, body: unknown, ct = 'application/json') => {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${t}`, 'Content-Type': ct },
+        body: JSON.stringify(body),
+      });
+      return res.ok ? res.json() : null;
+    };
 
-  const cards = page.locator('[data-testid^="endpoint-"]').filter({
-    hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-  });
-  const count = await cards.count();
-  test.skip(count === 0, 'Tenant has zero endpoints; cannot exercise the WIF section.');
+    const ep = await post('/scim/admin/endpoints', {
+      name: `e2e-wif-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      profilePreset: 'rfc-standard',
+    });
+    if (!ep?.id) return null;
 
-  const first = cards.first();
-  const cardTestId = (await first.getAttribute('data-testid')) ?? '';
-  const endpointId = cardTestId.replace(/^endpoint-/, '');
-  await first.click();
-  await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
+    // Each method tab is gated behind its own flag (see `enabledMethodTabs`).
+    // Without WifCredentialsEnabled the wif tab is absent and every WIF
+    // assertion has nothing to bind to; without SecretTokenBearerAuthEnabled
+    // the bearer tab is absent and the seeded bearer credential is filtered
+    // out of the list (credentials are scoped to the ACTIVE method tab).
+    const patched = await fetch(`/scim/admin/endpoints/${ep.id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile: {
+          settings: {
+            WifCredentialsEnabled: true,
+            SecretTokenBearerAuthEnabled: true,
+          },
+        },
+      }),
+    });
+    if (!patched.ok) return null;
 
-  // Deep-link straight to the credentials tab. The EndpointDetailPage uses
-  // PATH-based child routes (`/endpoints/$id/credentials`), not a `?tab=`
-  // search param - matching the proven pattern in endpoint-detail-tabs.spec.ts.
-  await page.goto(`/endpoints/${endpointId}/credentials`);
+    // One bearer credential so the in-card Connect params panel has a subject.
+    await post(`/scim/admin/endpoints/${ep.id}/credentials`, {
+      credentialType: 'bearer',
+      label: 'e2e-wif-fixture',
+    });
+
+    return ep.id as string;
+  }, TOKEN);
+}
+
+test.afterEach(async ({ page }) => {
+  if (!fixtureEndpointId) return;
+  const id = fixtureEndpointId;
+  fixtureEndpointId = null;
+  await page
+    .evaluate(
+      async ({ t, epId }: { t: string; epId: string }) => {
+        await fetch(`/scim/admin/endpoints/${epId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${t}` },
+        });
+      },
+      { t: TOKEN, epId: id },
+    )
+    .catch(() => undefined);
+});
+
+async function openFirstEndpointCredentials(page: Page): Promise<void> {
+  fixtureEndpointId = await createWifFixture(page);
+  // An assertion, not a skip: if the admin API cannot create a WIF-enabled
+  // endpoint that is a real failure, not a reason to pass silently.
+  expect(fixtureEndpointId, 'WIF fixture endpoint must be creatable').toBeTruthy();
+
+  await page.goto(`/endpoints/${fixtureEndpointId}/credentials`);
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 }
 
 /**
  * W11 - the WIF section lives on the `wif` method sub-tab (there is no "All"
- * tab). Open the Connect tab and select WIF; skip when the endpoint has no WIF
- * method enabled (the tab is absent).
+ * tab). The fixture enables WIF, so the tab is present by construction.
  */
 async function openWifSection(page: Page): Promise<void> {
   await openFirstEndpointCredentials(page);
   const wifTab = page.getByTestId('credentials-method-tab-wif');
-  test.skip((await wifTab.count()) === 0, 'Endpoint has no WIF method enabled.');
+  await expect(wifTab, 'fixture has WifCredentialsEnabled, so the wif tab must render').toBeVisible({
+    timeout: 15_000,
+  });
   await wifTab.click();
   await expect(page.getByTestId('wif-section')).toBeVisible({ timeout: 15_000 });
 }
@@ -95,8 +160,8 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await openWifSection(page);
 
     const addBtn = page.getByTestId('wif-add-trust-button');
-    const formVisible = await addBtn.isVisible().catch(() => false);
-    test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    // Fixture has WifCredentialsEnabled on, so the form MUST render.
+    await expect(addBtn, 'WIF add-trust button must render on a WIF-enabled endpoint').toBeVisible({ timeout: 15_000 });
     await addBtn.click();
 
     // Save is gated until the required fields are present.
@@ -114,8 +179,8 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await openWifSection(page);
 
     const addBtn = page.getByTestId('wif-add-trust-button');
-    const formVisible = await addBtn.isVisible().catch(() => false);
-    test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    // Fixture has WifCredentialsEnabled on, so the form MUST render.
+    await expect(addBtn, 'WIF add-trust button must render on a WIF-enabled endpoint').toBeVisible({ timeout: 15_000 });
     await addBtn.click();
 
     const hint = page.getByTestId('wif-field-alias-hint');
@@ -128,8 +193,8 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     await openWifSection(page);
 
     const addBtn = page.getByTestId('wif-add-trust-button');
-    const formVisible = await addBtn.isVisible().catch(() => false);
-    test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    // Fixture has WifCredentialsEnabled on, so the form MUST render.
+    await expect(addBtn, 'WIF add-trust button must render on a WIF-enabled endpoint').toBeVisible({ timeout: 15_000 });
     await addBtn.click();
 
     await expect(page.getByTestId('wif-resolve-row')).toBeVisible();
@@ -142,9 +207,18 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   // credential.
   test('U2/W8: a credential exposes an in-card Connect params panel', async ({ page }) => {
     await openFirstEndpointCredentials(page);
+    // Credentials are filtered by the ACTIVE method tab, so select `bearer`
+    // explicitly - the default tab is the first non-shared_secret method,
+    // which for this fixture is `wif`.
+    const bearerTab = page.getByTestId('credentials-method-tab-bearer');
+    await expect(bearerTab, 'fixture enables SecretTokenBearerAuthEnabled').toBeVisible({
+      timeout: 15_000,
+    });
+    await bearerTab.click();
+
     const connectBtn = page.locator('button[data-testid^="credential-connect-"]').first();
-    const hasConn = await connectBtn.isVisible().catch(() => false);
-    test.skip(!hasConn, 'No bearer/oauth_client credential on the first endpoint.');
+    // Fixture seeds a bearer credential, so a Connect button MUST be present.
+    await expect(connectBtn, 'fixture bearer credential must expose a Connect button').toBeVisible({ timeout: 15_000 });
     const testId = (await connectBtn.getAttribute('data-testid')) ?? '';
     const credId = testId.replace(/^credential-connect-/, '');
     await connectBtn.click();
@@ -174,31 +248,12 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
   test('WI-1: the return-values SCIM URL uses the /scim/v2/endpoints/{id} spec form', async ({
     page,
   }) => {
-    await page.goto('/endpoints');
-    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
-
-    const cards = page.locator('[data-testid^="endpoint-"]').filter({
-      hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-    });
-    const count = await cards.count();
-    test.skip(count === 0, 'Tenant has zero endpoints; cannot exercise the WIF return box.');
-
-    const first = cards.first();
-    const cardTestId = (await first.getAttribute('data-testid')) ?? '';
-    const endpointId = cardTestId.replace(/^endpoint-/, '');
-    await first.click();
-    await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
-    await page.goto(`/endpoints/${endpointId}/credentials`);
-    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
-
-    // W11 - the WIF section is on the wif method tab.
-    const wifTab = page.getByTestId('credentials-method-tab-wif');
-    test.skip((await wifTab.count()) === 0, 'WifCredentialsEnabled is off on this endpoint.');
-    await wifTab.click();
+    await openWifSection(page);
+    const endpointId = fixtureEndpointId as string;
 
     const addBtn = page.getByTestId('wif-add-trust-button');
-    const formVisible = await addBtn.isVisible().catch(() => false);
-    test.skip(!formVisible, 'WifCredentialsEnabled is off on this endpoint; the form is not rendered.');
+    // Fixture has WifCredentialsEnabled on, so the form MUST render.
+    await expect(addBtn, 'WIF add-trust button must render on a WIF-enabled endpoint').toBeVisible({ timeout: 15_000 });
     await addBtn.click();
     const issuer = page.getByTestId('wif-field-issuer');
 

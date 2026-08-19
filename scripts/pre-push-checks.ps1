@@ -221,6 +221,34 @@ Invoke-Gate -Name 'infra: deployment doc current' -WorkingDir $repoRoot -Action 
     }
 }
 
+# Docs: the user-facing set must still describe what ships. Every other gate in
+# this repo checks whether the CODE is correct; none checked whether the DOCS
+# still match it, which is how 12 user-facing guides kept advertising v0.53.0
+# while the product shipped 0.55.1 with every test green. Generalizes the
+# single-doc deployment audit to the whole set via docs/.doc-manifest.json.
+# Compares against the upstream ref so the COMMITS BEING PUSHED are checked.
+Invoke-Gate -Name 'docs: user-facing docs current' -WorkingDir $repoRoot -Action {
+    $upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    $script = Join-Path $repoRoot 'scripts/audit-doc-freshness.ps1'
+    if ($LASTEXITCODE -eq 0 -and $upstream) {
+        pwsh -NoProfile -ExecutionPolicy Bypass -File $script -BaseRef $upstream -Quiet 2>&1 | Out-Host
+    } else {
+        pwsh -NoProfile -ExecutionPolicy Bypass -File $script -Quiet 2>&1 | Out-Host
+    }
+}
+
+# Docs: what the docs CLAIM must match what the source CONTAINS. The freshness
+# gate above checks currency MARKERS - version header, provenance date, links -
+# and none of that reads the prose. A doc can pass every one of those while
+# telling the reader there are 86 route handlers when there are 117, and a
+# freshly stamped document asserting a wrong number is worse than an obviously
+# stale one because the stamp invites trust. Measured 2026-07-31: 22 route
+# handlers undocumented, a phantom setting that exists nowhere in the source,
+# and a retired FQDN offered as "Azure (live production)".
+Invoke-Gate -Name 'docs: doc claims match source' -WorkingDir $repoRoot -Action {
+    node scripts/audit-doc-content.mjs 2>&1 | Out-Host
+}
+
 # Supply chain: no lockfile entry may carry corporate-feed-proxy provenance. A
 # Microsoft corp-managed device redirects npm to a feed proxy that serves only a
 # legacy shasum, so any entry npm rewrites there comes back with an internal

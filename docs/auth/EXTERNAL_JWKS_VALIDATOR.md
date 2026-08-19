@@ -34,7 +34,7 @@ flowchart TD
 | 2 | **SSRF host allowlist** | the `jwksUri` host MUST be on the **effective** allowlist and the scheme MUST be https. A disallowed host is rejected **before any network call** - the critical anti-SSRF choke point ([architecture section 5.1](AUTHENTICATION_ARCHITECTURE.md#51-placement-table)). See the note below: the effective allowlist is a union of three layers, not just the environment variable. |
 | 3 | **Cache by URI** with bounded max-age (`JWKS_CACHE_MAX_AGE_MS`, default 10 min) | a `Map` cache; a fresh entry skips the fetch. |
 | 4 | **Refetch on unknown `kid`** | the header `kid` is peeked; if the cached set lacks it (key rotation), the JWKS is refetched once. |
-| 5 | **Fail closed** | a fetch failure with no usable cached key REJECTS. It never falls back to skipping the signature check. A stale-but-present cache is used as a degraded fallback (logged), never "no check". |
+| 5 | **Fail closed, then fail to stale** | a fetch failure with **no** cached key REJECTS, and it never falls back to skipping the signature check. If a cached copy exists it is served as a degraded fallback (logged at WARN), never "no check". **Caveat - the stale fallback is unbounded:** [external-jwks-validator.service.ts:240-247](../../api/src/oauth/external-jwks-validator.service.ts) returns `this.cache.get(jwksUri)` with **no age test**, unlike `getFreshCached` (line 301) which does enforce `maxAgeMs`. A key set cached weeks ago is therefore still served while the IdP is unreachable. See the open finding below. |
 
 ### The effective allowlist is three layers, not one (clarified 2026-07-31)
 
@@ -79,8 +79,56 @@ merged from server-level env defaults and per-endpoint overrides
 | **G2 redirect re-validation** | redirects are followed manually (`redirect: 'manual'`); each 3xx `Location` is re-checked against the SSRF allowlist before it is followed (≤ 3 hops), so a trusted host cannot redirect the fetch to an internal address. | not configurable (always on) |
 | **G3 single-flight** | concurrent fetches for the same `jwksUri` are coalesced into one in-flight request. | not configurable (always on) |
 | **cache max-age** | how long a cached JWKS is served before a refetch. | `JWKS_CACHE_MAX_AGE_MS` / `JwksCacheMaxAgeMs` (600000, 0-86400000) |
+| **W1.5 total deadline** | one wall-clock budget for the WHOLE fetch - every attempt, every backoff sleep and every redirect hop combined. A per-attempt timeout is **not** a bound on the operation. | `JWKS_TOTAL_DEADLINE_MS` / `JwksTotalDeadlineMs` (10000, 100-120000) |
+| **W1.5 response byte cap** | a body larger than the cap is rejected **before it is parsed**. | `JWKS_MAX_RESPONSE_BYTES` / `JwksMaxResponseBytes` (1048576, 1024-10485760) |
+| **W1.5 key-count cap** | a key set with more keys than the cap is rejected. | `JWKS_MAX_KEYS` / `JwksMaxKeys` (100, 1-1000) |
+| **W1.5 cache cardinality cap** | past the cap the OLDEST cache entry is evicted, so the cache cannot grow without bound. | `JWKS_MAX_CACHE_ENTRIES` / `JwksMaxCacheEntries` (50, 1-1000) |
 
-The four numeric knobs are per-endpoint config flags (see
+### W1.5 - the safety envelope
+
+> Full feature doc: [W1_5_JWKS_SAFETY_ENVELOPE.md](W1_5_JWKS_SAFETY_ENVELOPE.md) - includes the worst-case derivation (a documented-maximum configuration could previously spend **3 h 3 m** on a single fetch), the five design decisions, and the issue/RCA record.
+
+`JwksFetchTimeoutMs` bounds **one attempt**. That is not a bound on the work: with
+`retries: 5` and a 200 ms base backoff the ladder alone sleeps
+`200 + 400 + 800 + 1600 + 3200 = 6.2 s` before the last attempt even starts, and every
+one of those seconds is on the token-mint hot path. W1.5 adds the budget that actually
+caps it, plus the caps that bound what a JWKS response may cost.
+
+```mermaid
+flowchart TD
+    S["fetch JWKS"] --> D{"budget left?"}
+    D -->|"no"| DL["reject - total deadline exceeded"]
+    D -->|"yes"| A["attempt, timeout = min(perAttempt, remaining)"]
+    A -->|"ok"| B{"body within maxResponseBytes?"}
+    B -->|"no"| V["reject - non-retryable cap breach"]
+    B -->|"yes"| K{"key count within maxKeys?"}
+    K -->|"no"| V
+    K -->|"yes"| C["cache, evicting oldest past maxCacheEntries"]
+    A -->|"transient failure"| W["backoff, clamped to remaining budget"]
+    W --> D
+    DL --> ST{"cached copy exists?"}
+    ST -->|"yes"| SV["serve stale, logged"]
+    ST -->|"no"| FC["fail closed"]
+```
+
+Three properties worth calling out:
+
+1. **The backoff sleep is clamped to the remaining budget.** An unbounded sleep was the
+   single largest contributor to the worst-case cold path.
+2. **A cap breach is non-retryable.** An oversized body or an over-long key set is
+   deterministic - the same IdP returns the same response on every attempt - so retrying
+   only burns the deadline and then reports the generic exhaustion message, hiding the
+   real cause. Cap breaches raise `JwksPolicyViolationError` and propagate immediately.
+3. **Fail-to-stale still applies when the budget runs out.** Exceeding the deadline is an
+   availability event, so a cached copy is still served (logged, with `deadlineExceeded`);
+   only the no-cache case fails closed. The message then names the deadline explicitly
+   rather than saying "JWKS unavailable".
+
+`maxKeys` defaults to **100, not 10**, deliberately: Microsoft states a signing-key cache
+should hold 10-1000 keys across issuers, so a tight cap would reject a legitimate
+multi-issuer key set.
+
+The eight numeric knobs are per-endpoint config flags (see
 [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](../ENDPOINT_CONFIG_FLAGS_REFERENCE.md#runtime-egress-wif-jwks-fetch));
 an endpoint value **overrides** the server env default. On retry exhaustion the
 fetch still fails to a usable stale cache if present, otherwise fails closed.
@@ -101,7 +149,7 @@ config-time discovery/verify paths.
 > | Refresh cadence | every 1 h | on expiry only (no proactive refresh) |
 > | Cache granularity | per `kid` | per `jwksUri` (whole key set) |
 > | Unknown-`kid` refetch | yes, **rate-limited to once per 5 min** | yes, **no rate limit** (guarantee 4 above) |
-> | On fetch failure | serve last-known-good | serve stale (guarantee 5 - already correct) |
+> | On fetch failure | serve last-known-good | serve stale, but with **no maximum stale age** - see guarantee 5. Entra's "last-known-good" is implicitly bounded by its 24 h refresh cycle; ours is bounded by nothing, so a revoked key stays acceptable for as long as the IdP is unreachable. W1.4 must add a hard stale ceiling alongside the TTL raise. |
 >
 > The 10-minute TTL is the direct cause of the periodic ~2,161 ms cold mint measured in
 > [../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](../perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md),

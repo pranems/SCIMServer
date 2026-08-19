@@ -1,6 +1,8 @@
 # Prod -> Dev mirroring + synthetic shape-coverage fixtures
 
-> **Version:** 0.41.0  -  **Date:** May 6, 2026
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
+> **Version:** 0.55.6  -  **Date:** May 6, 2026
 > **Scope:** dev-tooling, no API surface change
 > **Affects:** [api/src/scripts/mirror-prod-to-dev.ts](../api/src/scripts/mirror-prod-to-dev.ts), [api/src/scripts/seed-shape-coverage.ts](../api/src/scripts/seed-shape-coverage.ts), [scripts/mirror-prod-to-dev.ps1](../scripts/mirror-prod-to-dev.ps1)
 
@@ -44,7 +46,7 @@ combinatorial test fixture, in less than 36 SCIM resources of synthetic data.
 The script will:
 
 1. `az containerapp secret show ... --secret-name database-url` against
-   `scimserver2` (prod) and `scimserver-dev` (dev) to resolve the connection
+   `scimserver` (prod) and `scimserver-dev` (dev) to resolve the connection
    strings.
 2. Add a temporary PostgreSQL Flexible Server firewall rule for your current
    public IP on both servers (rule name `mirror-tmp-<8 hex>`).
@@ -96,7 +98,7 @@ its cache is rehydrated.
 When you pass `-RestartDevApp`, the orchestrator runs:
 
 ```
-az containerapp revision restart -n scimserver-dev -g scimserver-rg-dev --revision <active>
+az containerapp revision restart -n scimserver-dev -g scimserver-dev --revision <active>
 ```
 
 after both data stages succeed. On the next boot `onModuleInit()` re-reads the

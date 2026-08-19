@@ -332,3 +332,89 @@ Unanswered because the source pages are not readable from here. **Not guessed at
 | Open/Closed | A future control (CFS quarantine, a new registry) extends [Section 6](#6-impact-across-everything-scimserver-does) rather than rewriting the rules | **accepted** |
 | YAGNI counter-check | No gate script was written for this. The lockfile-URL check is a one-line command in the standing rules; automating it before a second sighting would be speculative. **Revisit if a contaminated lockfile is ever staged** | **applied** |
 | Self-improvement (R7) | The misdiagnosis in [Section 4](#4-finding-1-we-misdiagnosed-this-and-it-was-expensive) generalizes beyond npm and is promoted to the patterns ledger | **applied** |
+
+---
+
+## 11. The Trivy conflict: when a fix exists but you are not allowed to take it
+
+Added 2026-08-04, after CVE-2026-18446 (`fast-uri`) blocked a push to `master`.
+
+### The conflict is structural, not bad luck
+
+Two controls in this repo disagree by design:
+
+| Control | Fires when | Wants |
+|---|---|---|
+| Trivy image scan (`build-test.yml`, `build-and-push.yml`) | a HIGH/CRITICAL advisory exists **and a fix is published**. `ignore-unfixed: true`, so every failure we see already has a fix | take the fix now |
+| Corporate minimum release age | any version younger than 7 days | do not install it |
+
+For any fast-moving advisory there is therefore a window of **up to 7 days in which no compliant action makes the gate green.** That window is guaranteed, not exceptional.
+
+```mermaid
+flowchart LR
+    A["advisory published"] --> B["Trivy fires immediately<br/>ignore-unfixed does not help,<br/>a fix exists"]
+    A --> C["fix version is 0 days old<br/>policy forbids consuming it"]
+    B --> D["gate RED"]
+    C --> D
+    D --> E["up to 7 days where NO<br/>compliant action makes it green"]
+    E --> F["represent the wait explicitly<br/>Class: quarantine-window"]
+```
+
+### Correcting a common misreading
+
+**GitHub runners are not subject to the Intune control.** They resolve from `registry.npmjs.org` and could install a brand-new version today. The reason we still wait is that [regen-lockfile.yml](../../.github/workflows/regen-lockfile.yml) holds CI to the same 7-day bar deliberately, because a runner consuming a two-hour-old package is the same supply-chain risk as a laptop doing it.
+
+So the wait is **a policy we chose**, not a technical block. Anyone proposing to shorten it is arguing with the policy, which is the honest place to have that argument.
+
+Equally: **the laptop is never the blocker for a lockfile change.** Edit `package.json` on a branch, run the regen-lockfile workflow, commit the artifact.
+
+### The procedure
+
+| Situation | Action |
+|---|---|
+| Fixed version is **>= 7 days old** | Edit the version (in `overrides` if it is pinned), run [regen-lockfile.yml](../../.github/workflows/regen-lockfile.yml) on your branch, commit the artifact. Same day, no exception needed. |
+| Fixed version is **< 7 days old** | Add a `Class: quarantine-window` entry to [.trivyignore](../../.trivyignore) with `Fixed-version:` and `Fix-available-from:` = publish date + 7 days. Take the fix on that date and **delete the entry in the same commit**. |
+| Vulnerability is **genuinely reachable** in a request path | Do not wait. Escalate via Global Helpdesk per corporate policy. Never self-bypass. |
+
+Check the age first, before assuming you are blocked:
+
+```powershell
+npm view <pkg> time --json      # publish dates
+npm view <pkg> versions --json  # what the corp proxy will actually serve
+```
+
+A version missing from the second list but present upstream is inside the quarantine window. That is how `fast-uri` was diagnosed: the proxy topped out at `4.1.1` while the advisory named `4.1.2` as patched.
+
+### Two exception classes, because the cadences differ by 13x
+
+The danger is that a 7-day timing hold and an indefinite judgment call look identical in `.trivyignore`, so the 90-day default cadence silently swallows the former.
+
+| Class | Meaning | Cadence | Extra required fields |
+|---|---|---|---|
+| `judgment` | a standing decision the CVE is not worth acting on (e.g. upstream deprecated its own fix) | 90 days | none |
+| `quarantine-window` | a fix exists and we intend to take it, blocked only on the 7-day age | capped at **14 days** | `Fixed-version:`, `Fix-available-from:` |
+
+Enforced by [check-trivyignore.ts](../../api/src/scripts/check-trivyignore.ts). A quarantine entry is flagged the moment `Fix-available-from` passes, **independent of `Re-check-by`**, so a known-fixed HIGH CVE is never left suppressed while its review date is still in the future. [trivyignore-review.yml](../../.github/workflows/trivyignore-review.yml) now runs **daily**, because a weekly cron cannot police a seven-day deadline.
+
+### The other half: pinned versions rot silently
+
+`api/package.json` pins 8 transitive packages via `overrides`, each added to fix a HIGH CVE. Two properties make that list dangerous:
+
+1. An override **freezes** the version, so the tree can never float off it and the pin cannot self-heal.
+2. **Dependabot does not manage the `overrides` block**, so nothing ever proposes changing it.
+
+The version pinned as the *fix* for one advisory therefore becomes the *vulnerable* version of the next. `fast-uri` is exactly that: pinned at `3.1.4` to fix an earlier CVE, and `3.1.4` is vulnerable to CVE-2026-18446.
+
+[check-dependency-pins.ts](../../api/src/scripts/check-dependency-pins.ts) closes this, driven by [dependency-pins-review.yml](../../.github/workflows/dependency-pins-review.yml) on a schedule and on any change to `api/package.json`. It is **broader than Trivy**, which gates on HIGH+CRITICAL only. Its first real run flagged **7 vulnerable pins across the 8**, of which **6 were medium and invisible to the image scan**:
+
+| Package | Pinned | Advisories | Recommended |
+|---|---|---|---|
+| `fast-uri` | 3.1.4 | 1 high | 3.1.5 |
+| `hono` | 4.12.25 | 4 medium | 4.12.34 |
+| `@hono/node-server` | 1.19.10 | 2 medium | 1.19.13 |
+
+It has **no semver dependency on purpose**: `semver` is present only transitively with no types, so importing it would be a phantom dependency and adding it would require a lockfile regeneration, which is the very thing this policy says not to do locally. GHSA ranges are a tiny grammar, so the comparator is hand-written and unit-tested, including the cases a lexical compare gets wrong (`3.1.10` vs `3.1.9`, `10.0.0` vs `9.0.0`).
+
+### Day-to-day effect
+
+Nothing changes for ordinary work. `npm ci` is unaffected, and neither check blocks a push - both open an Issue, because both need the network and a flaky blocking gate is worse than a reliable nagging one. What changes is that a suppression now has to say **which kind** it is, a timing hold cannot quietly become a quarter, and a rotting pin gets noticed by a scheduled job instead of by a failed required status check after an image build.

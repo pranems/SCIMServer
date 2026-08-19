@@ -32,15 +32,20 @@
  *
  * Run vs dev WITH mutations:
  *   $env:E2E_ALLOW_MUTATIONS = '1'
- *   $env:E2E_BASE_URL = 'https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io'
+ *   $env:E2E_BASE_URL = 'https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'
  *   $env:E2E_TOKEN    = 'changeme-scim'
  *   cd web
  *   npx playwright test e2e/endpoint-crud.spec.ts --reporter=line
  */
 import { test, expect, type Page } from '@playwright/test';
+import { createFixtureEndpoint, deleteFixtureEndpoint } from './endpoint-fixture';
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
+// Kept as a deliberate safety valve for runs against a customer-facing estate.
+// The dev pipeline sets E2E_ALLOW_MUTATIONS=1 so these DO run there - every
+// other spec in this suite now creates and deletes its own fixture endpoint, so
+// the create-wizard flow was the only major surface left uncovered by default.
 const MUTATIONS_ENABLED = process.env.E2E_ALLOW_MUTATIONS === '1';
 
 test.beforeEach(async ({ page }) => {
@@ -184,46 +189,45 @@ test.describe('CreateEndpointWizard - happy path (mutation gated)', () => {
 
 test.describe('EditEndpointPage - read-only checks', () => {
   test('edit page renders form fields and cancel returns to detail', async ({ page }) => {
-    // Find first endpoint, navigate to its edit page directly.
-    await page.goto('/endpoints');
-    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
+    // Use a fixture endpoint rather than "the first card": the admin list is
+    // ordered `createdAt DESC`, so the first card may be another spec's fixture
+    // being deleted underneath us. Also removes a dead `count === 0` skip.
+    test.setTimeout(120_000);
+    const id = await createFixtureEndpoint(page, { namePrefix: 'e2e-edit' });
+    try {
+      await page.goto(`/endpoints/${id}/edit`);
 
-    const cards = page.locator('[data-testid^="endpoint-"]').filter({
-      hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-    });
-    const count = await cards.count();
-    test.skip(count === 0, 'No endpoints to edit.');
+      await expect(page.getByTestId('edit-endpoint-page')).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('edit-endpoint-displayname-input')).toBeVisible();
+      await expect(page.getByTestId('edit-endpoint-description-input')).toBeVisible();
+      await expect(page.getByTestId('edit-endpoint-active-switch')).toBeVisible();
+      await expect(page.getByTestId('edit-endpoint-cancel-button')).toBeVisible();
+      await expect(page.getByTestId('edit-endpoint-save-button')).toBeVisible();
 
-    const cardTestId = await cards.first().getAttribute('data-testid');
-    const id = (cardTestId ?? '').replace(/^endpoint-/, '');
-
-    await page.goto(`/endpoints/${id}/edit`);
-
-    await expect(page.getByTestId('edit-endpoint-page')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('edit-endpoint-displayname-input')).toBeVisible();
-    await expect(page.getByTestId('edit-endpoint-description-input')).toBeVisible();
-    await expect(page.getByTestId('edit-endpoint-active-switch')).toBeVisible();
-    await expect(page.getByTestId('edit-endpoint-cancel-button')).toBeVisible();
-    await expect(page.getByTestId('edit-endpoint-save-button')).toBeVisible();
-
-    // Cancel returns to the detail page without mutating.
-    await page.getByTestId('edit-endpoint-cancel-button').click();
-    await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 15_000 });
+      // Cancel returns to the detail page without mutating.
+      await page.getByTestId('edit-endpoint-cancel-button').click();
+      await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await deleteFixtureEndpoint(page, id);
+    }
   });
 });
 
 test.describe('DeleteEndpointDialog - confirmation gate (read-only)', () => {
+  // Tracked at describe scope so the fixture is removed even when an assertion
+  // throws part-way through the dialog walk.
+  let deleteDialogFixtureId: string | null = null;
+
+  test.afterEach(async ({ page }) => {
+    deleteDialogFixtureId = await deleteFixtureEndpoint(page, deleteDialogFixtureId);
+  });
   test('Delete button is disabled until the typed name matches', async ({ page }) => {
-    await page.goto('/endpoints');
-    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
-
-    const cards = page.locator('[data-testid^="endpoint-"]').filter({
-      hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-    });
-    const count = await cards.count();
-    test.skip(count === 0, 'No endpoints to test delete dialog against.');
-
-    await cards.first().click();
+    // Fixture endpoint: this test opens a DELETE dialog, so it must never be
+    // pointed at an endpoint it does not own.
+    test.setTimeout(120_000);
+    const epId = await createFixtureEndpoint(page, { namePrefix: 'e2e-deldlg' });
+    deleteDialogFixtureId = epId;
+    await page.goto(`/endpoints/${epId}`);
     await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
 
     // Open the delete dialog.

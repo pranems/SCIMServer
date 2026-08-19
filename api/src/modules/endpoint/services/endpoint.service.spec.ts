@@ -900,6 +900,65 @@ describe('EndpointService', () => {
       expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
 
+    // The test above sends ALL SIX capability keys, so it passes under either a
+    // wholesale replace or a per-key merge - it cannot tell the two apart. That
+    // blind spot let docs/ENDPOINT_PROFILE_ARCHITECTURE.md advertise SPC as
+    // "Replace" for months. This test sends exactly ONE key and asserts the rest
+    // survive, which is only true under the per-key spread merge the code does.
+    it('should PER-KEY merge SPC - capability keys absent from the partial survive', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: {
+          serviceProviderConfig: { sort: { supported: false } },
+        },
+      });
+
+      // The key that WAS sent is overwritten.
+      expect(result.profile?.serviceProviderConfig?.sort?.supported).toBe(false);
+      // Every key that was NOT sent is preserved from the current profile.
+      expect(result.profile?.serviceProviderConfig?.patch?.supported).toBe(true);
+      expect(result.profile?.serviceProviderConfig?.bulk?.supported).toBe(true);
+      expect(result.profile?.serviceProviderConfig?.bulk?.maxOperations).toBe(100);
+      expect(result.profile?.serviceProviderConfig?.filter?.maxResults).toBe(200);
+      expect(result.profile?.serviceProviderConfig?.etag?.supported).toBe(true);
+      expect(result.profile?.serviceProviderConfig?.changePassword?.supported).toBe(false);
+    });
+
+    // Companion to the SPC test: schemas and resourceTypes are genuinely REPLACED,
+    // so a short array must shrink the endpoint. Locks the asymmetry between the
+    // two merge strategies that the docs now describe.
+    it('should REPLACE schemas wholesale - entries absent from the partial are dropped', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: {
+          schemas: [
+            { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
+          ],
+          resourceTypes: [
+            {
+              id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+              schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [],
+            },
+          ],
+        },
+      });
+
+      expect(result.profile?.schemas).toHaveLength(1);
+      expect(result.profile?.schemas?.[0].id).toBe('urn:ietf:params:scim:schemas:core:2.0:User');
+      expect(result.profile?.resourceTypes).toHaveLength(1);
+      // Sections absent from the partial are untouched.
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
+      expect(result.profile?.serviceProviderConfig?.bulk?.supported).toBe(true);
+    });
+
     it('should replace schemas when provided in partial profile', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
       (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {

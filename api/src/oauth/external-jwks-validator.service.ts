@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, Optional, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
@@ -23,10 +23,51 @@ export interface ExternalJwksVerifyResult {
 /** Allowed signature algorithms - asymmetric only (no HMAC, no `none`). */
 const ALLOWED_ALGS = ['RS256', 'ES256'];
 
-/** Cached JWKS entry: the raw key set + the time it was fetched. */
+/**
+ * W1.5 - a response that breached a configured cap (byte size, key count).
+ *
+ * Deterministic: the same IdP returning the same oversized body will breach the
+ * cap on every attempt, so retrying wastes the total deadline and then reports
+ * the generic exhaustion message, hiding the real cause. These fail fast and
+ * propagate their own message.
+ */
+export class JwksPolicyViolationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JwksPolicyViolationError';
+  }
+}
+
+/**
+ * W1.4 - the JWKS host is not (or is no longer) permitted by the allowlist.
+ *
+ * Distinct from a network failure ON PURPOSE. Fail-to-stale exists so that a
+ * real IdP outage does not become an auth outage, and that reasoning does not
+ * transfer to a host the operator has deliberately REVOKED: serving cached keys
+ * there would turn a security action into a no-op for the whole cache lifetime.
+ * Raising the TTL from 10 minutes to 24 hours widened that window by 144x,
+ * which is why this class arrived in the same change (RCA 10.2).
+ */
+export class JwksHostNotPermittedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JwksHostNotPermittedError';
+  }
+}
+
+/**
+ * Cached JWKS entry.
+ *
+ * `kids` is a kid-addressable index over `keys`, so an unknown-kid check is a
+ * set lookup rather than a scan of the key array on every verify. `expiresAt`
+ * carries the effective freshness deadline after the IdP's `Cache-Control` has
+ * been folded in (W1.4); it is always <= fetchedAt + policy.cacheMaxAgeMs.
+ */
 interface JwksCacheEntry {
   keys: unknown;
   fetchedAt: number;
+  kids: Set<string>;
+  expiresAt: number;
 }
 
 /**
@@ -52,7 +93,7 @@ interface JwksCacheEntry {
  * a runtime `import()` rather than a `require()`.
  */
 @Injectable()
-export class ExternalJwksValidatorService implements OnModuleInit {
+export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestroy {
   private readonly hostAllowlist: Set<string>;
   /** SERVER-level egress defaults (env-driven); endpoint overrides layer on top. */
   private readonly serverEgress: EgressPolicy;
@@ -76,6 +117,14 @@ export class ExternalJwksValidatorService implements OnModuleInit {
    * never widen what the fetcher is allowed to reach.
    */
   private readonly resolvedUri = new Map<string, string>();
+  /**
+   * W1.4 - when each jwksUri last performed a SYNCHRONOUS refetch because a
+   * token carried an unknown `kid`. Rate-limits that path so a caller cannot
+   * drive our outbound request rate by presenting unrecognised kids.
+   */
+  private readonly lastUnknownKidFetchAt = new Map<string, number>();
+  /** W1.4 - handle for the background refresh sweep; cleared on destroy. */
+  private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(
     private readonly config: ConfigService,
@@ -103,6 +152,78 @@ export class ExternalJwksValidatorService implements OnModuleInit {
         reason: (err as Error)?.message,
       });
     }
+    this.startRefreshTimer();
+  }
+
+  /**
+   * W1.4 - stop the background sweep. Without this a leaked interval keeps the
+   * Jest worker alive ("a worker process has failed to exit gracefully") and,
+   * in production, keeps a torn-down module fetching.
+   */
+  onModuleDestroy(): void {
+    this.stopRefreshTimer();
+  }
+
+  /** W1.4 - true while the background refresh sweep is scheduled. */
+  hasRefreshTimer(): boolean {
+    return this.refreshTimer !== undefined;
+  }
+
+  private startRefreshTimer(): void {
+    if (this.refreshTimer) return;
+    // Sweep more often than the refresh interval so an entry is refreshed
+    // promptly after it crosses the threshold rather than up to a full
+    // interval later. The sweep itself is cheap - it only fetches entries that
+    // are actually due.
+    const sweepMs = Math.max(60_000, Math.floor(this.serverEgress.refreshIntervalMs / 4));
+    this.refreshTimer = setInterval(() => {
+      void this.refreshCachedJwksNow();
+    }, sweepMs);
+    // Never hold the event loop open for this. A refresh sweep is not work
+    // worth delaying a shutdown (or a test run) for.
+    this.refreshTimer.unref?.();
+  }
+
+  private stopRefreshTimer(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
+  }
+
+  /**
+   * W1.4 - refresh every cached entry that has aged past `refreshIntervalMs`,
+   * OFF the hot path. This is what makes the steady state always a cache hit:
+   * before W1.4 each TTL expiry put a synchronous outbound fetch on a user's
+   * token mint.
+   *
+   * Deliberately never rejects. A background sweep that threw would surface as
+   * an unhandled rejection; a failed refresh simply leaves the existing (still
+   * valid) entry in place to be retried on the next sweep.
+   */
+  async refreshCachedJwksNow(): Promise<void> {
+    const now = Date.now();
+    const due: string[] = [];
+    for (const [uri, entry] of this.cache.entries()) {
+      if (now - entry.fetchedAt >= this.serverEgress.refreshIntervalMs) due.push(uri);
+    }
+    if (due.length === 0) return;
+
+    await Promise.all(
+      due.map(async (uri) => {
+        try {
+          // Goes through fetchJwks so single-flight coalescing still applies and
+          // the cache swap stays atomic (cacheKeys replaces the entry wholesale).
+          await this.fetchJwks(uri, this.serverEgress);
+          this.logger.debug(LogCategory.AUTH, 'JWKS background refresh succeeded', { jwksUri: uri });
+        } catch (err) {
+          this.logger.warn(LogCategory.AUTH, 'JWKS background refresh failed (cached keys retained)', {
+            jwksUri: uri,
+            reason: (err as Error)?.message,
+          });
+        }
+      }),
+    );
   }
 
   /** True once the `jose` module has been successfully pre-loaded. */
@@ -138,13 +259,32 @@ export class ExternalJwksValidatorService implements OnModuleInit {
     const jose = await this.loadJose();
     const kid = this.peekKid(token);
 
-    // Try the cached key set first; refetch on a cache miss / unknown kid.
-    let keys = this.getFreshCached(jwksUri, policy.cacheMaxAgeMs);
+    // W1.4 - the cached set is fresh when it is inside BOTH the configured TTL
+    // and whatever shorter lifetime the IdP asked for via Cache-Control.
+    let keys = this.getFreshCached(jwksUri);
     let triedRefetch = false;
 
-    if (!keys || (kid && !this.cacheHasKid(keys, kid))) {
+    if (!keys) {
+      // Nothing usable cached - a fetch is unavoidable.
       keys = await this.fetchJwks(jwksUri, policy);
       triedRefetch = true;
+    } else if (kid && !this.cacheHasKid(jwksUri, keys, kid)) {
+      // W1.4 - the cached set is fresh but does not contain this kid. That is
+      // the key-rotation signal, so a refetch is warranted; it is also fully
+      // caller-controlled, so it is rate-limited. Inside the window we fall
+      // through with the cached keys and let verification fail normally rather
+      // than issuing an outbound request per inbound request.
+      if (this.mayRefetchForUnknownKid(jwksUri, policy)) {
+        keys = await this.fetchJwks(jwksUri, policy);
+        triedRefetch = true;
+      } else {
+        this.logger.debug(LogCategory.AUTH, 'unknown kid refetch suppressed by rate limit', {
+          jwksUri,
+          kid,
+          unknownKidMinIntervalMs: policy.unknownKidMinIntervalMs,
+        });
+        triedRefetch = true; // do not let the catch below bypass the limit
+      }
     }
 
     try {
@@ -198,7 +338,9 @@ export class ExternalJwksValidatorService implements OnModuleInit {
       this.logger.warn(LogCategory.AUTH, 'JWKS host not permitted by allowlist (SSRF guard)', {
         host,
       });
-      throw new Error(`JWKS host "${host}" is not permitted by the JWKS_HOST_ALLOWLIST.`);
+      throw new JwksHostNotPermittedError(
+        `JWKS host "${host}" is not permitted by the JWKS_HOST_ALLOWLIST.`,
+      );
     }
   }
 
@@ -221,29 +363,84 @@ export class ExternalJwksValidatorService implements OnModuleInit {
 
   private async fetchJwksWithRetry(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
     let lastErr: unknown;
+    // W1.5 - one budget for the WHOLE operation. `policy.timeoutMs` bounds a
+    // single attempt, which is not a bound on the work: retries + exponential
+    // backoff can run for tens of seconds on the token-mint hot path.
+    const deadlineAt = Date.now() + policy.totalDeadlineMs;
+    let deadlineExceeded = false;
     // total tries = retries + 1
     for (let attempt = 0; attempt <= policy.retries; attempt++) {
       if (attempt > 0 && policy.retryBackoffMs > 0) {
         const backoff = policy.retryBackoffMs * Math.pow(2, attempt - 1);
         const jitter = Math.floor(Math.random() * policy.retryBackoffMs);
-        await new Promise((r) => setTimeout(r, backoff + jitter));
+        // Never sleep past the deadline - an unbounded sleep is the single
+        // biggest contributor to the worst-case cold path.
+        const sleepFor = Math.min(backoff + jitter, Math.max(0, deadlineAt - Date.now()));
+        if (sleepFor > 0) await new Promise((r) => setTimeout(r, sleepFor));
+      }
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) {
+        deadlineExceeded = true;
+        break;
       }
       try {
-        const keys = await this.fetchJwksOnce(jwksUri, policy);
-        this.cache.set(jwksUri, { keys, fetchedAt: Date.now() });
-        return keys;
+        // The attempt may not outlive the total budget either.
+        const attemptTimeoutMs = Math.min(policy.timeoutMs, remaining);
+        const fetched = await this.fetchJwksOnce(jwksUri, policy, attemptTimeoutMs);
+        this.cacheKeys(jwksUri, fetched.keys, policy, fetched.cacheControlMaxAgeMs);
+        return fetched.keys;
       } catch (err) {
         lastErr = err;
+        // W1.5 - a cap breach is deterministic; retrying only burns the budget
+        // and then reports the generic exhaustion message instead of the cause.
+        if (err instanceof JwksPolicyViolationError) throw err;
+        // W1.4 - a revoked host is deterministic too, AND must not fall through
+        // to fail-to-stale below. Propagate it immediately.
+        if (err instanceof JwksHostNotPermittedError) throw err;
+        if (Date.now() >= deadlineAt) {
+          deadlineExceeded = true;
+          break;
+        }
       }
     }
-    // All attempts failed. Fail-to-stale if a cached copy exists; else fail closed.
+    // All attempts failed (or the budget ran out). Fail-to-stale if a cached
+    // copy exists AND is inside the hard stale ceiling; else fail closed.
+    //
+    // W1.4 - the ceiling is the whole point. Before it, this path returned the
+    // cached keys with NO age test, so a revoked or rotated-out key stayed
+    // acceptable for as long as the IdP was unreachable - unbounded, and made
+    // 144x worse by the 10-min -> 24h TTL raise that ships alongside this.
     const cached = this.cache.get(jwksUri);
     if (cached) {
-      this.logger.warn(LogCategory.AUTH, 'JWKS fetch failed; using cached keys', {
+      const age = Date.now() - cached.fetchedAt;
+      if (age <= policy.staleIfErrorMs) {
+        this.logger.warn(LogCategory.AUTH, 'JWKS fetch failed; using cached keys', {
+          jwksUri,
+          reason: (lastErr as Error)?.message,
+          deadlineExceeded,
+          ageMs: age,
+          staleIfErrorMs: policy.staleIfErrorMs,
+        });
+        return cached.keys;
+      }
+      this.logger.error(
+        LogCategory.AUTH,
+        'JWKS fetch failed and the cached keys are past the stale ceiling (fail closed)',
+        lastErr,
+        { jwksUri, ageMs: age, staleIfErrorMs: policy.staleIfErrorMs },
+      );
+      throw new Error(
+        `JWKS unavailable: cached keys are stale (${age} ms old, ceiling ${policy.staleIfErrorMs} ms); failing closed.`,
+      );
+    }
+    if (deadlineExceeded) {
+      this.logger.error(LogCategory.AUTH, 'JWKS fetch exceeded its total deadline (fail closed)', lastErr, {
         jwksUri,
-        reason: (lastErr as Error)?.message,
+        totalDeadlineMs: policy.totalDeadlineMs,
       });
-      return cached.keys;
+      throw new Error(
+        `JWKS unavailable: exceeded the ${policy.totalDeadlineMs} ms total deadline; failing closed.`,
+      );
     }
     this.logger.error(LogCategory.AUTH, 'JWKS fetch failed and no cached keys (fail closed)', lastErr, {
       jwksUri,
@@ -251,8 +448,131 @@ export class ExternalJwksValidatorService implements OnModuleInit {
     throw new Error('JWKS unavailable; failing closed.');
   }
 
+  /**
+   * W1.5 - cache write with a cardinality cap. Without it the cache is an
+   * unbounded map keyed by a caller-influenced URI, so a large trust set (or a
+   * hostile one) grows process memory without limit. Evicts the oldest entry.
+   */
+  private cacheKeys(
+    jwksUri: string,
+    keys: unknown,
+    policy: EgressPolicy,
+    cacheControlMaxAgeMs?: number,
+  ): void {
+    if (!this.cache.has(jwksUri) && this.cache.size >= policy.maxCacheEntries) {
+      let oldestUri: string | undefined;
+      let oldestAt = Number.POSITIVE_INFINITY;
+      for (const [uri, entry] of this.cache.entries()) {
+        if (entry.fetchedAt < oldestAt) {
+          oldestAt = entry.fetchedAt;
+          oldestUri = uri;
+        }
+      }
+      if (oldestUri !== undefined) {
+        this.cache.delete(oldestUri);
+        this.logger.debug(LogCategory.AUTH, 'JWKS cache at capacity; evicted oldest entry', {
+          evicted: oldestUri,
+          maxCacheEntries: policy.maxCacheEntries,
+        });
+      }
+    }
+    // W1.4 - the IdP may ask us to cache for LESS than our configured TTL, but
+    // never for more: an IdP must not be able to pin keys in our cache beyond
+    // the lifetime we chose to trust them for.
+    const now = Date.now();
+    const effectiveMaxAgeMs =
+      typeof cacheControlMaxAgeMs === 'number' && Number.isFinite(cacheControlMaxAgeMs)
+        ? Math.min(policy.cacheMaxAgeMs, Math.max(0, cacheControlMaxAgeMs))
+        : policy.cacheMaxAgeMs;
+
+    // Atomic swap: the entry is replaced wholesale, so a concurrent reader sees
+    // either the whole old set or the whole new one, never a half-updated one.
+    this.cache.set(jwksUri, {
+      keys,
+      fetchedAt: now,
+      kids: this.indexKids(keys),
+      expiresAt: now + effectiveMaxAgeMs,
+    });
+  }
+
+  /** W1.4 - kid-addressable index over a key set, built once per fetch. */
+  private indexKids(keys: unknown): Set<string> {
+    const arr = (keys as { keys?: Array<{ kid?: unknown }> })?.keys;
+    const out = new Set<string>();
+    if (Array.isArray(arr)) {
+      for (const k of arr) {
+        if (typeof k?.kid === 'string') out.add(k.kid);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * W1.4 - RFC 9111 `Cache-Control: max-age=<seconds>`, in ms. `no-store` /
+   * `no-cache` collapse to 0 so the entry is immediately re-validated.
+   */
+  private parseCacheControlMaxAgeMs(header: string | null | undefined): number | undefined {
+    if (!header) return undefined;
+    const value = header.toLowerCase();
+    if (/\bno-store\b/.test(value) || /\bno-cache\b/.test(value)) return 0;
+    const m = /\bmax-age\s*=\s*(\d+)/.exec(value);
+    if (!m) return undefined;
+    const seconds = Number(m[1]);
+    return Number.isFinite(seconds) ? seconds * 1000 : undefined;
+  }
+
+  /**
+   * W1.5 - read the response body under a byte cap, then bound the key count.
+   *
+   * Falls back to `res.json()` when the response object has no `text()` (some
+   * unit-test doubles), so the cap applies wherever the body can be measured
+   * without breaking those callers.
+   */
+  private async readKeySet(
+    res: { text?: () => Promise<string>; json: () => Promise<unknown> },
+    policy: EgressPolicy,
+    jwksUri: string,
+  ): Promise<unknown> {
+    let parsed: unknown;
+    if (typeof res?.text === 'function') {
+      const body: string = await res.text();
+      const bytes = Buffer.byteLength(body, 'utf-8');
+      if (bytes > policy.maxResponseBytes) {
+        this.logger.warn(LogCategory.AUTH, 'JWKS response exceeded the byte cap', {
+          jwksUri,
+          bytes,
+          maxResponseBytes: policy.maxResponseBytes,
+        });
+        throw new JwksPolicyViolationError(
+          `JWKS response too large: ${bytes} bytes exceeds the ${policy.maxResponseBytes}-byte cap.`,
+        );
+      }
+      parsed = JSON.parse(body);
+    } else {
+      parsed = await res.json();
+    }
+
+    const keyArray = (parsed as { keys?: unknown[] })?.keys;
+    if (Array.isArray(keyArray) && keyArray.length > policy.maxKeys) {
+      this.logger.warn(LogCategory.AUTH, 'JWKS key set exceeded the key-count cap', {
+        jwksUri,
+        keyCount: keyArray.length,
+        maxKeys: policy.maxKeys,
+      });
+      throw new JwksPolicyViolationError(
+        `JWKS contains too many keys: ${keyArray.length} exceeds the maxKeys cap of ${policy.maxKeys}.`,
+      );
+    }
+    return parsed;
+  }
+
   /** A single fetch attempt: timeout-bounded, redirects followed + re-validated. */
-  private async fetchJwksOnce(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
+  private async fetchJwksOnce(
+    jwksUri: string,
+    policy: EgressPolicy,
+    attemptTimeoutMs?: number,
+  ): Promise<{ keys: unknown; cacheControlMaxAgeMs?: number }> {
+    const timeoutMs = attemptTimeoutMs ?? policy.timeoutMs;
     const doFetch = this.fetchFn ?? globalThis.fetch;
     // W1.3 - start from the canonical target this URI previously resolved to,
     // so a legacy host's redirect hop is paid once per process instead of on
@@ -264,8 +584,9 @@ export class ExternalJwksValidatorService implements OnModuleInit {
     }
     for (let hop = 0; hop <= MAX_JWKS_REDIRECTS; hop++) {
       const res = await doFetch(current, {
-        // G1 - abort a hung IdP rather than blocking the token mint.
-        signal: AbortSignal.timeout(policy.timeoutMs),
+        // G1 - abort a hung IdP rather than blocking the token mint. W1.5 caps
+        // this at whatever remains of the TOTAL deadline.
+        signal: AbortSignal.timeout(timeoutMs),
         // G2 - do not blindly follow redirects; each hop is re-validated below.
         redirect: 'manual',
       });
@@ -292,19 +613,44 @@ export class ExternalJwksValidatorService implements OnModuleInit {
       if (current !== jwksUri) {
         this.resolvedUri.set(jwksUri, current);
       }
-      return await res.json();
+      // W1.5 - byte cap + key-count cap before the body is trusted.
+      const keys = await this.readKeySet(res, policy, jwksUri);
+      // W1.4 - honor a SHORTER cache lifetime if the IdP asked for one.
+      const cacheControl =
+        typeof res.headers?.get === 'function' ? res.headers.get('cache-control') : null;
+      return { keys, cacheControlMaxAgeMs: this.parseCacheControlMaxAgeMs(cacheControl) };
     }
     throw new Error('JWKS fetch exceeded the redirect limit.');
   }
 
-  private getFreshCached(jwksUri: string, maxAgeMs: number): unknown {
+  /**
+   * W1.4 - a cached entry is fresh until `expiresAt`, which already folds the
+   * configured TTL together with any shorter `Cache-Control` the IdP asked for.
+   */
+  private getFreshCached(jwksUri: string): unknown {
     const cached = this.cache.get(jwksUri);
     if (!cached) return undefined;
-    if (Date.now() - cached.fetchedAt > maxAgeMs) return undefined;
+    if (Date.now() > cached.expiresAt) return undefined;
     return cached.keys;
   }
 
-  private cacheHasKid(keys: unknown, kid: string): boolean {
+  /**
+   * W1.4 - may this URI issue a synchronous refetch for an unknown kid right
+   * now? Records the decision so the window starts at the allowed fetch.
+   */
+  private mayRefetchForUnknownKid(jwksUri: string, policy: EgressPolicy): boolean {
+    const now = Date.now();
+    const last = this.lastUnknownKidFetchAt.get(jwksUri);
+    if (last !== undefined && now - last < policy.unknownKidMinIntervalMs) return false;
+    this.lastUnknownKidFetchAt.set(jwksUri, now);
+    return true;
+  }
+
+  private cacheHasKid(jwksUri: string, keys: unknown, kid: string): boolean {
+    const entry = this.cache.get(jwksUri);
+    // Prefer the prebuilt index; fall back to a scan when the key set did not
+    // come from the cache (e.g. straight off a fetch).
+    if (entry && entry.keys === keys) return entry.kids.has(kid);
     const arr = (keys as { keys?: Array<{ kid?: string }> })?.keys;
     return Array.isArray(arr) && arr.some((k) => k.kid === kid);
   }

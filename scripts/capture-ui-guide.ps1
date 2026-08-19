@@ -17,7 +17,7 @@
 
 .PARAMETER BaseUrl
     Live URL to capture against, e.g.
-      https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+      https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
       http://localhost:8080
       http://localhost:4000
 
@@ -37,7 +37,7 @@
     only (dry run), so you can review before overwriting committed images.
 
 .EXAMPLE
-    pwsh scripts/capture-ui-guide.ps1 -BaseUrl https://scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io
+    pwsh scripts/capture-ui-guide.ps1 -BaseUrl https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io
     # dry run: capture to test-results/ui-screenshots/, print summary
 
 .EXAMPLE
@@ -59,7 +59,15 @@ param(
 
     [int]$ViewportHeight = 900,
 
-    [switch]$Apply
+    [switch]$Apply,
+
+    # Capture only the surfaces whose filename matches this wildcard. Re-shooting
+    # all 10 to add one produces 9 pointless binary diffs, and the hygiene rule
+    # says a re-shoot must be intentional rather than blind.
+    [string]$Only,
+
+    # Endpoint id used by surfaces that need a concrete endpoint (detail page).
+    [string]$EndpointId = 'e8edd907-0dfb-415d-b834-abf0d20eb0e0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -84,7 +92,15 @@ $surfaces = @(
     @{ File = 'prod-07-manual-provision.png'; Route = '/manual-provision'; Auth = $true }
     @{ File = 'prod-08-logs.png';            Route = '/logs';             Auth = $true }
     @{ File = 'prod-09-settings.png';        Route = '/settings';         Auth = $true }
+    @{ File = 'prod-10-endpoint-detail.png'; Route = "/endpoints/$EndpointId"; Auth = $true }
+    @{ File = 'prod-11-endpoint-bulk.png';   Route = "/endpoints/$EndpointId/bulk"; Auth = $true }
+    @{ File = 'prod-12-endpoint-resource-types.png'; Route = "/endpoints/$EndpointId/resource-types"; Auth = $true }
 )
+
+if ($Only) {
+    $surfaces = @($surfaces | Where-Object { $_.File -like $Only })
+    if ($surfaces.Count -eq 0) { throw "-Only '$Only' matched no curated surface." }
+}
 
 Write-Host "=== capture-ui-guide ===" -ForegroundColor Cyan
 Write-Host "BaseUrl : $BaseUrl"
@@ -104,7 +120,12 @@ $surfacesJson = ($surfaces | ForEach-Object {
 }) | ConvertTo-Json -Compress -Depth 4
 if ($surfaces.Count -eq 1) { $surfacesJson = "[$surfacesJson]" }
 
-$captureScript = Join-Path $stageDir '_capture.mjs'
+# The helper MUST live inside web/ - Node resolves bare imports relative to the
+# SCRIPT FILE's own directory, not the cwd, so a helper written under
+# test-results/ can never find `playwright` in web/node_modules no matter what
+# Push-Location does. That is why this script previously failed every run with
+# ERR_MODULE_NOT_FOUND. Output still goes to $stageDir.
+$captureScript = Join-Path $webDir '_ui-guide-capture.mjs'
 @"
 import { chromium } from 'playwright';
 
@@ -160,6 +181,7 @@ try {
 }
 finally {
     Pop-Location
+    Remove-Item $captureScript -Force -ErrorAction SilentlyContinue
     Remove-Item Env:CAP_BASE_URL, Env:CAP_TOKEN, Env:CAP_TOKEN_KEY, Env:CAP_OUT_DIR, Env:CAP_VW, Env:CAP_VH, Env:CAP_SURFACES -ErrorAction SilentlyContinue
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "scimserver-api",
-  "version": "0.55.1",
+  "version": "0.55.6",
   "description": "SCIMServer backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",
@@ -31,6 +31,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "check:trivyignore": "ts-node --transpile-only src/scripts/check-trivyignore.ts",
+    "check:pins": "ts-node --transpile-only src/scripts/check-dependency-pins.ts",
     "mirror:prod-to-dev": "ts-node --transpile-only src/scripts/mirror-prod-to-dev.ts",
     "seed:shape-coverage": "ts-node --transpile-only src/scripts/seed-shape-coverage.ts"
   },

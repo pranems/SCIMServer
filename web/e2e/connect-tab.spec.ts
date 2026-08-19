@@ -14,6 +14,7 @@
  *   never creates a credential and never reveals a secret.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { createFixtureEndpoint, deleteFixtureEndpoint } from './endpoint-fixture';
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
@@ -27,35 +28,32 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+/**
+ * DETERMINISM (2026-08-05). Replaced the "first endpoint card" lookup with a
+ * self-cleaning fixture endpoint. The old `test.skip(count === 0, ...)` guard
+ * could never fire correctly (`.count()` does not auto-wait, so it read 0
+ * before React painted) and the admin list is ordered `createdAt DESC`, so a
+ * fixture created by a parallel spec became "the first endpoint" and was
+ * deleted underneath this one. See web/e2e/endpoint-fixture.ts.
+ */
+let fixtureEndpointId: string | null = null;
+
+test.afterEach(async ({ page }) => {
+  fixtureEndpointId = await deleteFixtureEndpoint(page, fixtureEndpointId);
+});
+
 async function openFirstEndpointConnect(page: Page): Promise<void> {
-  await page.goto('/endpoints');
-  await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
-
-  const cards = page.locator('[data-testid^="endpoint-"]').filter({
-    hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-  });
-  const count = await cards.count();
-  test.skip(count === 0, 'Tenant has zero endpoints; cannot exercise the Connect tab.');
-
-  const first = cards.first();
-  const cardTestId = (await first.getAttribute('data-testid')) ?? '';
-  const endpointId = cardTestId.replace(/^endpoint-/, '');
-  await first.click();
-  await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
-
-  await page.goto(`/endpoints/${endpointId}/connect`);
+  test.setTimeout(120_000);
+  fixtureEndpointId = await createFixtureEndpoint(page, { namePrefix: 'e2e-connect' });
+  await page.goto(`/endpoints/${fixtureEndpointId}/connect`);
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('Endpoint detail - Connect tab (WI-5)', () => {
   test('the Connect tab is present on the endpoint detail', async ({ page }) => {
-    await page.goto('/endpoints');
-    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
-    const cards = page.locator('[data-testid^="endpoint-"]').filter({
-      hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-    });
-    test.skip((await cards.count()) === 0, 'No endpoints to exercise.');
-    await cards.first().click();
+    test.setTimeout(120_000);
+    fixtureEndpointId = await createFixtureEndpoint(page, { namePrefix: 'e2e-connect' });
+    await page.goto(`/endpoints/${fixtureEndpointId}`);
     await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('endpoint-tab-connect')).toBeVisible();
   });

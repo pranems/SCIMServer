@@ -26,6 +26,13 @@
  *   visible-and-enabled; the destructive dialogs are NOT confirmed.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { createFixtureEndpoint, deleteFixtureEndpoint } from './endpoint-fixture';
+
+/**
+ * DETERMINISM (2026-08-05). See web/e2e/endpoint-fixture.ts - these tests now
+ * create their own endpoint instead of binding to whichever one sorts first.
+ */
+let fixtureEndpointId: string | null = null;
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
@@ -39,30 +46,25 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+test.afterEach(async ({ page }) => {
+  fixtureEndpointId = await deleteFixtureEndpoint(page, fixtureEndpointId);
+});
+
 /**
  * Navigates to /endpoints, picks the first card, and returns the
- * resolved endpointId from the URL. Skips the test when the tenant
- * has zero endpoints (e.g. a clean Azure dev that just rebooted).
- */
+* resolved endpointId from the URL.
+     *
+     * DETERMINISM (2026-08-05). Was "open the first endpoint card" with a
+     * `test.skip(count === 0)` guard that could never fire correctly
+     * (`.count()` does not auto-wait) and that bound to whichever endpoint a
+     * parallel spec had just created. Now uses a self-cleaning fixture.
+     */
 async function openFirstEndpoint(page: Page): Promise<string> {
-  await page.goto('/endpoints');
-  await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
+  test.setTimeout(120_000);
+  fixtureEndpointId = await createFixtureEndpoint(page, { namePrefix: 'e2e-tabs' });
+  const endpointId = fixtureEndpointId;
 
-  const cards = page.locator('[data-testid^="endpoint-"]').filter({
-    hasNot: page.locator('[data-testid^="endpoint-detail"]'),
-  });
-
-  const count = await cards.count();
-  test.skip(count === 0, 'Tenant has zero endpoints; cannot exercise detail tabs.');
-
-  const first = cards.first();
-  const cardTestId = await first.getAttribute('data-testid');
-  // Card testid format: `endpoint-${ep.id}`. Strip the prefix.
-  const endpointId = (cardTestId ?? '').replace(/^endpoint-/, '');
-  expect(endpointId).not.toBe('');
-
-  await first.click();
-
+  await page.goto(`/endpoints/${endpointId}`);
   await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
   expect(page.url()).toContain(`/endpoints/${endpointId}`);
 

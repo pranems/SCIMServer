@@ -746,14 +746,26 @@ if ($RunVerification -and (Test-Path $verifyScript)) {
 # Every promotion creates a revision, and old ones stay ACTIVE at 0% traffic
 # while still running a replica that holds a Prisma connection pool. Measured
 # on proudbush 2026-07-31: 13 active revisions, 12 idle, 65 connections of
-# demand against a max_connections of 50. Keep 2 - green (serving) plus blue
-# (the rollback target this script just pinned).
+# demand against a max_connections of 50.
+#
+# How many to keep is NOT decided here - it is read from scripts/scim-estates.json
+# per estate, so this script cannot disagree with the pipeline or with a manual
+# run. Default 2 (green + blue rollback target); customer-prod is a declared
+# exception at 1 for cost reasons, which means the blue revision below is
+# deactivated and recovery becomes roll-forward.
+. (Join-Path $PSScriptRoot 'scim-estates.ps1')
+$revisionKeep = Get-ScimEstateRevisionKeep -AppName $ProdAppName -ResourceGroup $ProdResourceGroup
+$blueRetained = $revisionKeep -ge 2
+
 $pruneScript = Join-Path $PSScriptRoot 'prune-revisions.ps1'
 if (Test-Path $pruneScript) {
     try {
-        & $pruneScript -ResourceGroup $ProdResourceGroup -AppName $ProdAppName -Keep 2
+        & $pruneScript -ResourceGroup $ProdResourceGroup -AppName $ProdAppName -Keep $revisionKeep
     } catch {
         Write-Host "   ⚠️  Revision prune failed (promotion itself is unaffected): $_" -ForegroundColor Yellow
+        # The prune failing means the old revision is still there, so the
+        # rollback target survives regardless of policy. Say so accurately.
+        $blueRetained = $true
     }
 }
 
@@ -764,9 +776,22 @@ Write-Host "=============================================" -ForegroundColor Gree
 Write-Host "   Production: $ProdAppName ($ProdResourceGroup)" -ForegroundColor White
 Write-Host "   Image:      $desiredImage" -ForegroundColor White
 Write-Host "   Green rev:  $greenRevision (100% traffic)" -ForegroundColor White
-Write-Host "   Blue rev:   $blueRevision (0% - retained for instant rollback)" -ForegroundColor White
+if ($blueRetained) {
+    Write-Host "   Blue rev:   $blueRevision (0% - retained for instant rollback)" -ForegroundColor White
+} else {
+    Write-Host "   Blue rev:   $blueRevision (DEACTIVATED - this estate keeps $revisionKeep revision)" -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host "📋 Post-promotion:" -ForegroundColor Cyan
-Write-Host "   - Instant rollback: az containerapp ingress traffic set -n $ProdAppName -g $ProdResourceGroup --revision-weight $blueRevision=100 $greenRevision=0" -ForegroundColor Gray
+if ($blueRetained) {
+    Write-Host "   - Instant rollback: az containerapp ingress traffic set -n $ProdAppName -g $ProdResourceGroup --revision-weight $blueRevision=100 $greenRevision=0" -ForegroundColor Gray
+} else {
+    # Printing the instant-rollback command here would be worse than printing
+    # nothing: it names a revision that no longer exists, so an operator would
+    # discover that only while trying to recover.
+    Write-Host "   - NO instant rollback on this estate (revisionKeep=$revisionKeep). Recover by ROLLING FORWARD:" -ForegroundColor Yellow
+    Write-Host "       pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup $ProdResourceGroup -ProdAppName $ProdAppName -ImageTag <previous-version>" -ForegroundColor Gray
+    Write-Host "       (every previously published tag remains available from ghcr.io/pranems/scimserver)" -ForegroundColor Gray
+}
 Write-Host "   - Stream logs:      az containerapp logs show -n $ProdAppName -g $ProdResourceGroup --type console --follow" -ForegroundColor Gray
 Write-Host ""

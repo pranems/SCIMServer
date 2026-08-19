@@ -1,8 +1,10 @@
 # Endpoint Configuration Flags Reference
 
-> **Version:** 0.54.30 - **Updated:** July 20, 2026  
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
+> **Version:** 0.55.6 - **Updated:** July 20, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
-> 27 flags: 19 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`) + 4 numeric runtime-egress overrides + 1 request-log privacy boolean (`PersistRequestSecrets`).  
+> 30 flags: 19 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`) + 11 numeric runtime-egress overrides + 1 request-log privacy boolean (`PersistRequestSecrets`).  
 > 5 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
 
 ---
@@ -141,6 +143,13 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 24 | [`JwksFetchRetries`](#runtime-egress-wif-jwks-fetch) | number | (server: 2) | Runtime egress |
 | 25 | [`JwksFetchRetryBackoffMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 200) | Runtime egress |
 | 26 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 600000) | Runtime egress |
+| 27 | [`JwksTotalDeadlineMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 10000) | Runtime egress |
+| 28 | [`JwksMaxResponseBytes`](#runtime-egress-wif-jwks-fetch) | number | (server: 1048576) | Runtime egress |
+| 29 | [`JwksMaxKeys`](#runtime-egress-wif-jwks-fetch) | number | (server: 100) | Runtime egress |
+| 30 | [`JwksMaxCacheEntries`](#runtime-egress-wif-jwks-fetch) | number | (server: 50) | Runtime egress |
+| 31 | [`JwksRefreshIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 3600000) | Runtime egress |
+| 32 | [`JwksUnknownKidMinIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 300000) | Runtime egress |
+| 33 | [`JwksStaleIfErrorMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 172800000) | Runtime egress |
 | 27 | [`PersistRequestSecrets`](#persistrequestsecrets) | boolean | (server: `true`) | Logging & privacy |
 | 28 | [`RfcCompliantSubAttributes`](#rfccompliantsubattributes) | boolean | `false` | Validation |
 
@@ -300,7 +309,14 @@ time - an out-of-range or non-numeric value is rejected with `400`.
 | `JwksFetchTimeoutMs` | `JWKS_FETCH_TIMEOUT_MS` (5000) | 100 - 60000 | Per-attempt fetch timeout (ms). A hung IdP is aborted rather than blocking the mint (**G1**). |
 | `JwksFetchRetries` | `JWKS_FETCH_RETRIES` (2) | 0 - 10 | Retries for a failed fetch; total tries = `retries + 1` (**G5**). |
 | `JwksFetchRetryBackoffMs` | `JWKS_FETCH_RETRY_BACKOFF_MS` (200) | 0 - 10000 | Base retry backoff (ms); exponential `backoff * 2^(attempt-1)` + jitter. |
-| `JwksCacheMaxAgeMs` | `JWKS_CACHE_MAX_AGE_MS` (600000) | 0 - 86400000 | How long a cached JWKS is served before a refetch (`0` = always refetch). **Open finding X15-F1:** Microsoft's guidance for its own signing keys is a 24 h TTL with a 1 h background refresh, so `600000` is ~144x more aggressive than the IdP asks. Do NOT simply raise this on today's code - the long TTL is only safe once W1.4 lands the background refresher and the rate-limited unknown-`kid` path. See [perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md](perf/RUNTIME_TUNING_AND_CONFIGURATION_REFERENCE.md) section 4.1. |
+| `JwksCacheMaxAgeMs` | `JWKS_CACHE_MAX_AGE_MS` (86400000) | 0 - 86400000 | How long a cached JWKS is served before a refetch (`0` = always refetch). **X15-F1 RESOLVED in W1.4 (v0.55.5):** the default is now **24 h**, matching Microsoft's guidance for its own signing keys. The raise was only safe once W1.4 landed the background refresher, the rate-limited unknown-`kid` path and the hard stale ceiling - see [auth/W1_4_JWKS_CACHE_CADENCE.md](auth/W1_4_JWKS_CACHE_CADENCE.md). |
+| `JwksTotalDeadlineMs` | `JWKS_TOTAL_DEADLINE_MS` (10000) | 100 - 120000 | **W1.5.** TOTAL wall-clock budget for the whole fetch - every attempt, every backoff sleep and every redirect hop combined. `JwksFetchTimeoutMs` bounds ONE attempt, which is not a bound on the operation: with `retries: 5` and a 200 ms base backoff the ladder alone sleeps 6.2 s. The backoff sleep is clamped to whatever remains of this budget. |
+| `JwksMaxResponseBytes` | `JWKS_MAX_RESPONSE_BYTES` (1048576) | 1024 - 10485760 | **W1.5.** Maximum JWKS response body size; a larger body is rejected **before it is parsed**. A cap breach is non-retryable - it is deterministic, so retrying would only burn the deadline and then hide the cause behind the generic exhaustion message. |
+| `JwksMaxKeys` | `JWKS_MAX_KEYS` (100) | 1 - 1000 | **W1.5.** Maximum number of keys accepted in a key set. Deliberately generous - Microsoft states a signing-key cache should hold 10-1000 keys across issuers, so a tight cap (e.g. 10) would reject a legitimate multi-issuer key set. |
+| `JwksMaxCacheEntries` | `JWKS_MAX_CACHE_ENTRIES` (50) | 1 - 1000 | **W1.5.** Cardinality cap on the JWKS cache; past it the OLDEST entry is evicted. Without a cap the cache is an unbounded map keyed by a caller-influenced URI. |
+| `JwksRefreshIntervalMs` | `JWKS_REFRESH_INTERVAL_MS` (3600000) | 60000 - 86400000 | **W1.4.** How old a cached JWKS may get before the BACKGROUND sweep refreshes it. Set below `JwksCacheMaxAgeMs` so the refresh lands while the entry is still fresh - that is what keeps the steady-state hot path a cache hit instead of paying a synchronous fetch at every TTL expiry. Floor of 60 s so a misconfiguration cannot turn the sweep into a hot loop. |
+| `JwksUnknownKidMinIntervalMs` | `JWKS_UNKNOWN_KID_MIN_INTERVAL_MS` (300000) | 0 - 3600000 | **W1.4.** Floor between SYNCHRONOUS refetches triggered by a token bearing an unknown `kid`. That path is fully caller-controlled, so without a floor anyone able to present an unrecognised `kid` drives our outbound request rate to the IdP for free. `0` disables the limit (pre-W1.4 behaviour). |
+| `JwksStaleIfErrorMs` | `JWKS_STALE_IF_ERROR_MS` (172800000) | 0 - 604800000 | **W1.4.** HARD ceiling on the age of cached keys served when a refetch fails (fail-to-stale). Before W1.4 that path had **no age test at all**, so a rotated-out key stayed acceptable for as long as the IdP was unreachable. `0` disables fail-to-stale entirely (strictest posture). An allowlist revocation is never stale-eligible regardless of this value. |
 
 Alongside these knobs the runtime fetch also enforces **single-flight** (G3 -
 concurrent fetches for the same URI are coalesced into one) and **redirect

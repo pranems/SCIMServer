@@ -1,8 +1,10 @@
 # SCIMServer
 
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
-[![Version](https://img.shields.io/badge/version-0.53.0-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.6-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
@@ -62,7 +64,7 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 | **Observability** | Structured JSON logging, SSE live stream, ring buffer, per-endpoint log isolation, file rotation, auto-prune |
 | **Deployment** | Docker Compose (1 command), Azure Container Apps (1 script), local dev, pre-built GHCR image |
 | **Web UI** | React + Vite admin console - dashboard, endpoint CRUD, Workbench, Bulk UI, custom resource types, discovery diff, operations, logs, settings |
-| **Testing** | 3,816 API unit + 1,217 API E2E + 1,068 web vitest + 1,027 live SCIM + 134 Playwright + 15 PowerShell = 7,277 total checks |
+| **Testing** | 4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright = **8,973 checks**, all measured on 2026-07-31 against v0.55.1 |
 
 ---
 
@@ -685,7 +687,7 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 
 ## API Reference (Summary)
 
-**86 route handlers** across 20 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
+**117 route handlers** across 31 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
 
 ### Health & Version
 
@@ -1411,7 +1413,7 @@ SCIMServer/
 |   |   |   +-- app/              # Root module
 |   |   |   +-- auth/             # SharedSecretGuard (3-tier auth)
 |   |   |   +-- scim/             # SCIM protocol implementation
-|   |   |   |   +-- controllers/  # 12 controllers (admin, SCIM, discovery)
+|   |   |   |   +-- controllers/  # 20 controller files (admin, SCIM, discovery)
 |   |   |   |   +-- services/     # Users, Groups, Generic, Bulk services
 |   |   |   |   +-- discovery/    # Schema registry, discovery service
 |   |   |   |   +-- endpoint-profile/  # Profile engine (presets, expand, validate)
@@ -1470,7 +1472,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 86 route handlers, full request/response examples |
+| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 117 route handlers, full request/response examples |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Quick start - endpoint lifecycle recipes |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md) | Profile system - presets, expansion, validation |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | All 16 configuration flags |
@@ -1479,7 +1481,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 | [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | Azure Container Apps deployment |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](docs/DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker build, run, and test guide |
 | [SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md) | RFC compliance matrix |
-| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint authentication |
 | [TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md) | Architecture deep dive |
 
 ---
@@ -1502,4 +1504,4 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the MIT License, as declared in [api/package.json](api/package.json).
