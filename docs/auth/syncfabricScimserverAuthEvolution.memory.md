@@ -25,6 +25,31 @@
 - When runtime blobs are invariant, keep looking at the **configuration plane**: per-section merge semantics, concurrent-write safety, structured audit coverage, and doc-versus-implementation agreement. Run 6's most consequential finding came from there while both token runtimes were byte-identical.
 - Verify a merge/replace rule by reading the merge function, not by trusting the commit message that claims to document it. The message was right in run 6, but the three follow-on defects were only visible in the source.
 
+
+### Added 2026-08-19 (run 7)
+
+- **Compare blobs, not file sets.** Run 7's headline SyncFabric finding lived in 2 files out of an
+  identical 77-file surface, inside a 112-commit delta. Nothing about the file list hinted at it. The
+  phrase "the auth surface is unchanged" must always mean *blob-identical*, never *same membership*.
+- **Read a feature flag's `features.ini` section body, not just its name.** A section containing a
+  bare `Enabled=True` with no `appEnvironment:`/`slice:` qualifier is **globally on**. Neighbouring
+  sections in the same file that do carry qualifiers make the absence meaningful, not accidental.
+- **Follow a config-driven gate to the entity list.** Once a gate reads a configuration value, the
+  useful question is never "does the code deny?" but "which configured entities lack the value?".
+  For SyncFabric that meant: cscfg declares 27 connectors, `DeploymentSettings.xml` populates 24,
+  three are empty, and separately two auth-code-grant connectors have no entry at all.
+- **`IsRequired = false` on a ConfigurationProperty is a fail-closed hazard.** It converts "absent"
+  from a load-time error into a runtime empty string, which is precisely the input a newly
+  fail-closed predicate denies.
+- **A source comment explaining why a change was made is high-value evidence.** SCIMServer's
+  `JwksHostNotPermittedError` doc-comment states the security reasoning (revocation must not inherit
+  fail-to-stale, and a 144x TTL increase widened the window) far more precisely than the diff does.
+  Read the comments in changed files before reasoning about intent.
+- **Check the counterpart repository for work you are about to redo.** A WIF token-mint latency
+  analysis existed in SCIMServer while this workflow carried it as a deferred gate for four runs.
+- **When two copies of an artifact diverge, resolve per-region, not per-file.** Operator edits in the
+  mirror are authoritative; analysis content in the canonical copy is authoritative. Picking a single
+  winner destroys one of the two.
 ## Anti-Patterns
 
 - Carrying a repository count forward as prose instead of re-deriving it. Run 5's "78 of 78" was 77 at every commit; the verdict was right so nothing ever forced a re-check, and the wrong number survived a full revision.
@@ -114,25 +139,31 @@
 - **"SCIMServer returns HTTP 201 without cache headers" is FALSE as of 2026-07-31.** `@HttpCode(200)` plus `no-store`/`no-cache` shipped.
 - **`origin/feat/wif` is no longer a valid SCIMServer baseline** - it was merged into `master`.
 - **"The SCIMServer authentication-methods model is inert" is FALSE as of 2026-07-31.** It is consulted at six runtime call sites. The repository documentation that still said otherwise was corrected in the same run.
-- **"SCIMServer's JWKS client fails closed on fetch failure" is FALSE.** It fails to stale. The real defect is the absence of a maximum stale age, not the absence of a fallback.
+- **"SCIMServer's JWKS client fails closed on fetch failure" is FALSE.** It fails to stale. The real defect was the absence of a maximum stale age, not the absence of a fallback. **FIXED at 0.55.5/0.55.6 (verified run 7, 2026-08-19).** W1.4 added a hard stale ceiling `staleIfErrorMs` (default **48 h**, bounds 0 - 7 days, per-endpoint via `JwksStaleIfErrorMs`, `0` disables fail-to-stale entirely); W1.5 added `totalDeadlineMs` 10 s, `maxResponseBytes` 1 MiB, and `maxKeys` 100. TTL rose from 10 min to 24 h with a 1 h background refresh and a 5 min unknown-kid rate limit. Fail-to-stale never skipped the signature check, and still does not. **Revocation is now deliberately excluded from fail-to-stale** via `JwksHostNotPermittedError` - serving cached keys for a host the operator revoked would make a security action a no-op for the whole cache lifetime.
+
+- **"`PERSIST_REQUEST_SECRETS` is a P0" was recorded as superseded in THIS FILE during run 6, and run 6's guide still carried 14 P0 references anyway.** This is a distinct failure from the original one and is worth its own entry: *recording a supersession in memory does not discharge it.* The artifact must be swept for the superseded claim in the same run, and the sweep must be verified by a count, not by intention. Run 7 performed the sweep and reduced the count to zero live references, retaining only historical mentions that explicitly label themselves as withdrawn. **New gate 13 below.**
 - **"No sovereign WIF application-ID override exists, but values may come from an out-of-band deployment system" is SUPERSEDED.** The setting's own `<Values>` declaration was read: the default is the commercial ID and the only override is TME. The open question is now whether sovereign applications have been registered at all.
 
 ## Open Empirical Gates
 
-> Status refreshed 2026-07-31 (run 5). Gates closed by the real-Entra capture are listed as CLOSED and
-> retained so a future run does not reopen them; see guide section 35.4 for the authoritative table.
+> Status refreshed 2026-08-19 (run 7). Gates closed by real evidence are listed as CLOSED and
+> retained so a future run does not reopen them; see guide section 37.4 for the authoritative table.
 
 - **CLOSED** - shape of an Entra v2.0 app-only assertion: `aud` = bare app-id GUID, `sub` == `oid`, `azp` present, `ver` = `2.0`, no `roles`, `uti` not `jti`.
 - **CLOSED** - whether `/.default` appears in `aud`: it does not.
+- **CLOSED 2026-08-19** - SCIMServer JWKS maximum stale age. `staleIfErrorMs` default **48 h**, bounds 0 - 7 days, per-endpoint `JwksStaleIfErrorMs`, `0` disables fail-to-stale. Was open since revision 1.
+- **CLOSED 2026-08-19** - SCIMServer JWKS response byte/key caps and total deadline: 1 MiB, 100 keys, 10 s.
+- **OPEN, NEW 2026-08-19** - Whether SyncFabric's globally enabled fail-closed token-exchange gate is denying live traffic. Source shows `oAuth2TokenExchangeUriScim20FailClosedEnabled` is `Enabled=True` with no environment or slice qualifier, that `IsTokenExchangeUriAllowedCore` now returns `false` on missing cscfg, and that two of three prod auth-code-grant connectors (`contentstack`, `puzzel`) have **no** `oAuth2TokenExchangeUri` configured. Cheapest resolution: query telemetry for `WarningScim20ValidateTokenExchangeUriDenied` with reason `CscfgUriMismatchOrMissing`. Do **not** escalate this as an incident without that evidence - deployed cscfg may differ from the committed file and these connectors may carry no traffic.
 - **OPEN, NARROWED** - SyncFabric's own first-party `azp`, `oid`, `sub`, and the `aud` produced by the host-qualified scope. The capture used a synthetic app with a client secret (`azpacr: "1"`), not SyncFabric's MI/FIC path. Checking `azpacr` on a real SyncFabric assertion is the cheapest way to confirm which acquisition path ran.
 - Capture and verify a real SyncFabric RFC 8693 exchange; none exists on either side.
 - Validate the exact Entra resource registration needed by the first-party host-qualified scope.
-- Establish measured SCIMServer WIF cold/warm JWKS, multi-trust, database-query, crypto, and issuance latency. **Two runs overdue.**
+- Establish measured SCIMServer WIF cold/warm JWKS, multi-trust, database-query, crypto, and issuance latency. **Four runs overdue - but read `SCIMServer` commit `6504626e` ("docs: WIF token-mint latency analysis (X11)") FIRST; the measurement may already exist and simply was never absorbed.**
 - **OPEN, SHARPENED 2026-08-04** - Determine whether sovereign first-party WIF applications have been registered at all, and who owns registering them. The question is no longer "does anyone register sovereign app IDs": SyncFabric `da0c7b46` registered **Delos** CloudSync application identifiers across four directory-identifier classes, explicitly following "Bleu PR 14591435". The sovereign-registration process demonstrably exists, is active, and has now been applied to Bleu and Delos for the hybrid-sync family - while `workloadIdentityFederationApplicationPrincipalId` stays commercial-default with a single TME override. The missing sovereign WIF app ID is therefore a **gap in an otherwise-exercised process**, not an unknown. Ask the CloudSync identifier owners who performs the registration and why WIF was excluded.
 - Inventory existing credential-bearing RequestLog rows, exports, and backups without displaying values; decide cleanup and credential rotation scope.
 - Establish intended token-request total deadline, concurrency, and cache/trust cardinality budgets for CI and TME.
 - **OPEN, NEW 2026-08-04** - Determine whether any SCIMServer endpoint has already lost authentication methods to a partial `profile.authentication` PATCH or to two concurrent method adds. This gate is **self-obscuring**: wholesale replacement plus no optimistic concurrency plus no structured audit event means the loss leaves no record. The audit fix (guide action A8) is a prerequisite for answering it, not merely a hardening item.
 - Every gate above must be given a demonstration that it can FAIL before it is treated as satisfied. For merge/replace semantics specifically, the demonstrating test must use a **strict-subset** partial - a complete partial makes both candidate behaviours produce identical output.
+- **Gate 13, added 2026-08-19.** When this memory records a conclusion as superseded or a proposal as declined, the same run must **sweep the guide for live references to it and report the resulting count**. Run 6 wrote the `PERSIST_REQUEST_SECRETS` supersession into this file and left 14 P0 references standing in the guide. Recording a supersession does not discharge it; only a counted sweep does. Historical references are permitted **only** when they explicitly label themselves as withdrawn.
 
 ## Source and Search Expansion
 
@@ -392,3 +423,110 @@ tion 5/5; prompt and memory
     the dangerous case, because "fixing" the document would have corrupted it.
 - Deferred for a third consecutive run: no WIF token-mint latency measurement. Guide section 20.8 remains
   modelled, not measured.
+
+### Run 7 - 2026-08-19
+
+**Baselines.** SyncFabric `da0c7b46` -> `38c429b511f11ff07a787fb7b3ceb8e5358166b7` (112 commits, 774
+paths). SCIMServer `21ca0a95` -> `e3ab7270e6d0c88eb02ca680c39ed3b03beaaec6` (36 commits, 102 paths,
+v0.55.2 -> 0.55.6). Both prior snapshots verified as strict ancestors.
+
+**The first double-sided runtime change in the series.** Runs 4-6 each found at least one side
+invariant. This one found real authentication-behaviour changes on both.
+
+- SyncFabric auth surface: 77 -> 77 files, membership identical, **2 blobs changed**, both from
+  `09b2995e97` (PR 16713499, 2026-08-07): OAuth2 token-exchange URI validation flipped **fail-open to
+  fail-closed**. `IsTokenExchangeUriAllowedCore` now returns `false` on missing/malformed cscfg where
+  it previously returned `true`. Kill-switch `oAuth2TokenExchangeUriScim20FailClosedEnabled` is
+  `Enabled=True` **globally, with no environment or slice qualifier**. When on, the legacy
+  `oauthSettings.tokenExchangeAllowList` path is **unreachable**.
+- Blast radius from source: prod has exactly three `OAuth2AuthorizationCodeGrant` connectors -
+  `amazonbusiness` (URI configured, allowed), `contentstack` (**zero** cscfg settings), and `puzzel`
+  (only `oAuth2ClientSecret`). Two of three would be denied. Three further connectors - `genetec`,
+  `serviceNowScim`, `zoho` - ship `value=""` and are latent. Recorded as a source-derived risk with
+  the telemetry signal that would confirm it, **not** as an incident.
+- Also noted: the URI comparison is `Host | Scheme` only, so path/port/query are ignored. Fail-closed
+  tightened the missing case, not the matching case.
+- SCIMServer auth surface: 92 -> **93** (one added file), **7 changed**, from `85bd9aa4` (W1.5),
+  `83f134de` (W1.4), `f2e9952f`. Two long-standing guide findings are now **fixed**: the JWKS
+  maximum stale age (48 h ceiling) and the response caps/total deadline (1 MiB, 100 keys, 10 s).
+- `login.windows.net` is now a **seeded** well-known JWKS host (Entra v1), with a committed RCA: it
+  had been hand-added to the persisted layer on every long-lived estate with `label=null`, and a
+  cross-tenant migration silently dropped it because count-based checks matched.
+
+**The most consequential finding was about this workflow, not either codebase.** Revisions 2-6 of the
+guide each re-raised `PERSIST_REQUEST_SECRETS` as a P0 that the operator had declined twice. Worse,
+run 6 recorded the supersession *in this memory file* and still shipped a guide with 14 P0
+references. Two rules follow: write declines into the **analysis artifact** (prompt 12.6.1), and
+**sweep and count** after recording a supersession (gate 13). Run 7 swept the guide to zero live P0
+claims; six mentions remain and every one explicitly labels itself withdrawn.
+
+**A second self-correction:** revision 6 claimed the SCIMServer mirror of the guide was
+"byte-identical" without hashing it. It was not - the two copies had diverged **bidirectionally**
+(5,642 vs 5,987 lines), the mirror holding the operator's decision record and the canonical copy
+holding all run-6 analysis. Resolved by absorbing the mirror's section 0.1 into the canonical file
+rather than choosing a winner.
+
+**Process failure repeated and caught:** an edit anchored on `#### 3.4.0r6 Revision 6 refresh`
+consumed that heading, exactly the failure mode section 36 had documented one run earlier. Caught by
+re-listing headings immediately after the edit. Rule upgraded: re-list after **every** structural
+edit, not only at run end (prompt 12.6.3).
+
+**Artifacts.**
+
+- Guide **revision 7**: 6,455 lines, 335,885 bytes, SHA-256
+  `860011BFA3DC5BC9C5973E94607B19C09090B0FB6B737C97EF88D119FF93FBDB` (Get-FileHash, on-disk CRLF
+  bytes). New sections 0.1, 3.4.0 / 3.4.0.1-3.4.0.4, and 37; revision-6 content demoted to
+  `3.4.0r6.x`.
+- `files\RUN7_DELTA_BANK.md` written **early**, before analysis deepened, because runs 6 and 7 were
+  both compacted mid-analysis. This worked and should be standard.
+- Validation all green: **22/22** Mermaid under the real `mermaid.parse()` plus a passing negative
+  control; **25/25** JSON; 224 fence markers balanced across 112 blocks; 0 table column mismatches;
+  36 internal anchors resolve; level-2 sections **1-37** all present; ASCII-only; 2 JWT-shaped
+  strings decoded and confirmed placeholders.
+- `validate-guide-structure.js` section bound raised 36 -> 37, then **proved to fail** by demoting
+  section 37 in a scratch copy. A gate that was not re-armed would have silently stopped checking the
+  newest section.
+- Prompt self-improved to **v1.6.0**: new section 12.6 with five standing rules, eight new
+  anti-patterns, metadata and changelog updated.
+
+**Zero source-repository mutations.** Both repositories were read through `git show`/`git diff`
+against committed refs only; no branch was switched, stashed, reset, or cleaned.
+
+### Run 7a - 2026-08-19 (post-publication correction)
+
+Triggered by the user asking to list the remaining SCIMServer-side work. Answering it required
+reading sections a keyword sweep had skipped, which exposed three defects **in revision 7 itself**.
+
+- **A withdrawal is discharged only when the instruction is gone, not when the label is gone.** Run 7
+  swept the guide for the string "P0" and declared A3 discharged. Section 31 item 1 still said "flip
+  `PERSIST_REQUEST_SECRETS` to default off" and "rewrite `logging-redaction.spec.ts:80-87` - the
+  test encodes the defect". Neither line contains "P0", and section 31 is titled *Recommended
+  immediate next steps*, so the withdrawn instruction was sitting at **priority 1**. Sweep for
+  imperatives and the identifier, never for the severity tag.
+- **Never publish a total you did not compute from the rows.** The gap-matrix summary claimed two
+  JWKS rows had moved to Done while both rows still read **Open** eleven lines above it, and the
+  published totals matched neither. Recomputed from the body: 10 Done, 4 Partial, 11 Open, 1
+  by-design.
+- **"Carried forward by construction" is not verification.** The matrix header cited `e741c373`
+  (2026-07-31) and justified the status column by the delta touching no runtime file. Every row is
+  now re-checked by grepping its named symbol at `09b4b78d` (v0.55.7).
+
+**Substantive re-verification:** A8 is far cheaper than revision 7 implied. `emitAuthAdminEvent`
+already exists with its own spec and is already wired into `admin-credential.controller.ts`,
+`admin-jwks-host.controller.ts`, and `endpoint.service.ts`; only
+`admin-authentication-method.controller.ts` has zero emits. "Open - zero occurrences" was true but
+read as a missing subsystem when it is a missing call site. Lesson: when reporting an absence, also
+report whether the **mechanism** exists elsewhere - it changes the estimate by an order of magnitude.
+
+**Also confirmed still open at `09b4b78d`** by direct grep: A4 (missing `client_id` accepted),
+A5 (no replay denylist), A6 (no `azpacr` in trace), A7 (no `api://` audience validator), A9 (no
+`ifMatch`/`rowVersion`), A10 (no `mergeStrategy`), A12 (comment still present), assertion byte
+cap, mint-path total deadline, registry-vs-provider intersection, transport persona axis,
+`typ=at+jwt`, RequestLog retention, and the credential index still `@@index([endpointId, active])`.
+
+**SCIMServer moved during the session:** `e3ab7270` -> `09b4b78d` (3 commits: SCIM multiValued
+sub-attribute validation, Playwright alignment, docs). No auth-surface change; ancestry verified.
+
+Guide re-validated after the edits: structural ALL GREEN (224 markers / 112 blocks, 25/25 JSON, 37
+anchors, sections 1-37, ASCII-only, 2 placeholder JWTs) and Mermaid **22/22** with a passing negative
+control. New SHA-256: `4E47BF621481CDC75A7D79693471CCC5F863BEB424BF5C6915D57FBD4BD24B81`.

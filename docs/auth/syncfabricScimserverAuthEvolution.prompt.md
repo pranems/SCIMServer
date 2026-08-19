@@ -1595,8 +1595,107 @@ Preserve useful existing sections, but ensure the final guide covers:
 - Updating the guide by appending contradictions.
 - Modifying dirty source worktrees during a guide-only run.
 - Persisting raw tokens in logs, files, CI artifacts, or prompt memory.
+- **Re-raising a proposal the operator has declined.** Added v1.6.0 - see section 12.6.
+- **Asserting two files are identical without hashing both in the same run.** Added v1.6.0.
+- **Concluding "no runtime change" from an unchanged file set.** File-set membership and blob content
+  are different questions; a fail-open to fail-closed flip changes neither the set nor any interface.
+- **Reporting a feature flag as "gated" without reading its `features.ini` scope.** A flag section with
+  a bare `Enabled=True` and no `appEnvironment:`/`slice:` qualifier is globally on, not staged.
+- **Deriving blast radius from the flag alone.** Trace the value the flag's code path actually reads,
+  to the configuration file that populates it, and enumerate which entities have it populated.
+- **Re-deriving a measurement that may already exist in the other repository.** Search the counterpart
+  repo's docs before declaring a gate unmeasured.
 
 ---
+
+## 12.6 Standing rules earned by run 7
+
+These are promoted to binding rules because each one cost a real error.
+
+### 12.6.1 A declined proposal must be recorded in the analysis artifact
+
+When an operator declines a recommendation, write the decision **into the guide**, at the point where
+the analysis would otherwise re-derive it, with: the decision, its status, when and by whom it was
+declined, the rationale, and what remains legitimately in scope.
+
+The reason is mechanical. The analysis regenerates findings from source each run. If the source still
+looks the way the proposal described, the proposal reappears - the decline lived somewhere the
+regeneration never reads. Run 7 discovered that revisions 2 through 6 had each independently
+re-raised `PERSIST_REQUEST_SECRETS`, which the operator had declined twice.
+
+Corollary: a finding that has been considered and rejected must be recorded as **intended behaviour
+verified**, never silently dropped. A later run cannot otherwise distinguish "nobody has noticed
+this" from "this was decided".
+
+### 12.6.2 Hunt explicitly for fail-open to fail-closed flips
+
+Add this to the Phase 2 classification vocabulary as a first-class change class. Such a flip:
+
+- adds no files, so a file-set comparison misses it;
+- changes no interface, so a signature diff misses it;
+- alters behaviour **only on the failure path**, so a green test suite is consistent with it;
+- is frequently gated by a kill-switch whose default is the interesting part.
+
+The only cheap detector is **blob comparison across the whole auth surface**, which this workflow
+already performs - but the *verdict* must be phrased as "N files changed", never "the file set is
+unchanged, therefore the runtime is unchanged".
+
+When one is found, always establish four things: the flag name, its `features.ini` scope, the value
+the new code path reads, and which configured entities have that value populated.
+
+### 12.6.3 Re-list the heading inventory after every structural edit
+
+Not only at the end of the run. An insertion anchored on a heading can consume that heading; run 6
+lost `## 16.` this way and run 7 lost `#### 3.4.0r6` the same way. No fence, table, anchor, or JSON
+check detects it, because the document remains syntactically valid.
+
+### 12.6.4 A mirror is identical only if both copies were hashed this run
+
+Never claim byte-identity from a memory of having synced, from a commit message, or from matching
+line counts. Run 7 found the mirror and the canonical copy had diverged **in both directions** - each
+held content the other lacked - while revision 6 asserted they were byte-identical.
+
+When divergence is found, determine direction per-region rather than picking a winner: operator edits
+in the mirror are authoritative and must be absorbed; analysis content in the canonical copy is
+authoritative and must be preserved.
+
+### 12.6.5 Check the counterpart repository before declaring a gate unmeasured
+
+Run 7 found a committed WIF token-mint latency analysis in the SCIMServer repository while the guide
+had been carrying that measurement as "deferred" for four consecutive runs. Before recording a gate
+as open, search the other repository's `docs/` for it.
+
+---
+
+### 12.6.6 A withdrawal is discharged only when the instruction is gone
+
+Removing a severity label is not the same as removing the instruction. After recording that a
+proposal was declined, sweep the artifact for **what the reader is told to do** - imperatives
+("flip", "rewrite", "must", "change the default"), the identifier itself, and the names of any files
+the withdrawn action told the reader to modify. Never sweep for the severity tag. Revision 7 removed
+every live "P0" and still shipped, at **priority 1** of its own "recommended immediate next steps",
+an order to flip the declined default and to rewrite a test that is correct.
+
+### 12.6.7 Never publish a total you did not compute from the rows
+
+A count asserted in prose beside a table is unfalsifiable; a count derived from the table is a check.
+Recompute every "N Done, M Open" summary from the table body immediately before publishing, and if
+the two disagree, the body wins. Revision 7 published totals matching neither the body nor its own
+narrative, while two rows contradicted the summary eleven lines below them.
+
+### 12.6.8 "Carried forward by construction" is not verification
+
+A status column may only be carried forward if the carry itself is verified this run. "The delta
+touched no runtime file, so the column still holds" expires silently the moment the delta stops being
+empty. Re-grep the named symbol for each row and cite the commit the check ran against.
+
+### 12.6.9 When reporting an absence, report whether the mechanism exists
+
+"Zero occurrences of X" is true but misleading if X already exists and is wired up elsewhere. State
+whether the missing thing is a **subsystem** or a **call site** - the difference is an order of
+magnitude in effort and changes how the receiving team prioritises. A8 was reported as "zero
+emitAuthAdminEvent occurrences" when the emitter existed, had a spec, and was already wired into
+three other files.
 
 ## Final response format
 
@@ -1617,20 +1716,20 @@ End with:
 ## Prompt metadata
 
 ```yaml
-promptVersion: 1.5.0
+promptVersion: 1.6.1
 created: 2026-07-23
-lastExecution: 2026-08-04
-executionCount: 5
+lastExecution: 2026-08-19
+executionCount: 6
 canonicalMemory: .memory/syncfabricScimserverAuthEvolution.memory.md
-lastSyncFabricSnapshot: da0c7b46f16882b17d40a8e7386cce22e4fdb7ee
-lastScimServerSnapshot: 21ca0a95557be1cb643f1b7d9da4a05897843f36
-lastScimServerReference: origin/master
-lastScimServerVersion: 0.55.2
-lastGuideRevision: 6
+lastSyncFabricSnapshot: 38c429b511f11ff07a787fb7b3ceb8e5358166b7
+lastScimServerSnapshot: 09b4b78ddae1333503903f4a74968b3a9b228427
+lastScimServerReference: master
+lastScimServerVersion: 0.55.7
+lastGuideRevision: 7 (corrected 7a)
 lastGuideSha256: SEE_MEMORY_RUN_LOG
 lastGuideSha256Note: SHA-256 of the file BYTES on disk (CRLF), per Get-FileHash. Do not record a hash computed over newline-translated text. The authoritative value for each revision lives in the memory run log.
 lastSyncFabricAuthSurfaceCount: 77
-lastScimServerAuthSurfaceCount: 92
+lastScimServerAuthSurfaceCount: 93
 authSurfaceCountNote: These are MEASUREMENTS at the snapshots above, recorded only so a later run can detect drift. Per section 1.3.9 they must be re-derived every run and never reported without recomputing.
 ```
 
@@ -1685,9 +1784,25 @@ authSurfaceCountNote: These are MEASUREMENTS at the snapshots above, recorded on
   - Added an artifact-verification rule to section 11.2: **a structural edit must be followed by a section-inventory comparison.** An insertion performed against a level-2 heading silently consumed that heading; fences stayed balanced, tables stayed well-formed, and every surviving anchor still resolved, so nothing in the previous check set could catch it.
   - Added a validator-correctness rule to section 11.2: **the validator itself must have a demonstrated negative control**, after the table checker reported two false failures by splitting on Markdown-escaped `\|`. A checker that has never been shown to fail correctly is subject to 9.4 like any other gate.
   - Recorded the measured auth-surface cardinalities in metadata explicitly labelled as drift-detection measurements, not as reusable constants.
+- 2026-08-19, v1.6.0: Sixth-run improvement, driven by the **first double-sided runtime change** in the series (SyncFabric 112 commits / 2 auth files changed; SCIMServer 36 commits / 7 auth files changed).
+  - Added section 12.6, five standing rules, each earned by a real error in this run.
+  - **12.6.1** - a declined proposal must be written into the *analysis* artifact, not only the implementing repository's plan. Run 7 found that revisions 2-6 had each independently re-raised `PERSIST_REQUEST_SECRETS`, which the operator declined at v0.54.63 and again on 2026-08-04. The analysis regenerates from source; a decline recorded elsewhere is invisible to it.
+  - **12.6.2** - *fail-open to fail-closed flips* are now a named change class to hunt for. They add no files, change no interface, and alter behaviour only on the failure path, so file-set comparison, signature diffing, and a green test suite are all consistent with them. Four things must always be established: flag name, `features.ini` scope, the value the new path reads, and which entities have it populated.
+  - **12.6.3** - re-list the heading inventory after *every* structural edit, not only at the end. Run 6 lost `## 16.`; run 7 lost `#### 3.4.0r6` the same way, in a run that had already added the end-of-run check.
+  - **12.6.4** - a mirror is byte-identical only if both copies were hashed in the same run. Run 7 found bidirectional divergence while revision 6 asserted identity without checking.
+  - **12.6.5** - search the counterpart repository's docs before recording an empirical gate as unmeasured. A WIF token-mint latency analysis existed in SCIMServer while the guide carried it as deferred for four runs.
+  - Added eight anti-patterns matching the above, including "concluding no runtime change from an unchanged file set" and "reporting a feature flag as gated without reading its `features.ini` scope".
+  - Updated metadata to the new snapshots, guide revision 7, and the re-derived SCIMServer surface count of 93 (up from 92 - a file was added, which is exactly the drift the labelled measurement exists to catch).
 
 ---
 
+### v1.6.1 - 2026-08-19 (run 7a, same-day correction)
+
+Triggered by a request to list remaining SCIMServer work, which surfaced three defects in revision 7
+itself: a keyword sweep that left the withdrawn instruction at priority 1 of section 31, a gap-matrix
+summary contradicting its own rows with totals matching neither, and a status column carried forward
+"by construction" from a 19-day-old commit. Added rules 12.6.6-12.6.9. Guide gained section 37.9
+recording the correction in the open.
 ## Memory seed
 
 If the memory file does not exist, create:
