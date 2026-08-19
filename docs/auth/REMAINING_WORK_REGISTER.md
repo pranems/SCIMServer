@@ -80,7 +80,6 @@ globally, so a connector set to that type fails against SCIMServer today.
 
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
-| **N6** | The assertion `aud` shape is **slice-dependent**; one trust cannot match both SyncFabric acquisition modes | WIF trust config | **High** | - |
 | **A9** | Optimistic concurrency, so two concurrent profile writes cannot silently clobber | endpoint profile writes | **High** | - |
 | **A3'** | Bound RequestLog retention + restrict who can read it | request log | **High** | - |
 | **A5** | Replay denylist keyed on Entra's `uti` (not `jti`) | WIF assertion validation | Med | - |
@@ -93,6 +92,14 @@ globally, so a connector set to that type fails against SCIMServer today.
 `slice:A` and `slice:B` and off globally, and the two modes emit `api://<appId>` versus
 `api://<appId>/<host>`. A slice rollout would present as an audience-mismatch `401` with **no
 SCIMServer change involved**. Needs an operator runbook at minimum.
+
+**N6 is RESOLVED (v0.55.11) - by runbook, not by code.** The slice-dependent `aud` shape is real, but
+the remedy already existed: multi-trust iteration means registering **both** audience shapes as two
+trusts works, with each still matching exactly. Verified at three levels and documented in
+[N6_SLICE_DEPENDENT_AUDIENCE_RUNBOOK.md](N6_SLICE_DEPENDENT_AUDIENCE_RUNBOOK.md). The `wif_audience_mismatch`
+remediation text now names the cause, so an operator meets the answer at the error rather than in a
+doc. **No audience-matching code was changed** - prefix or wildcard matching was explicitly rejected
+as converting an exact check into a pattern check.
 
 **Settled - do not re-raise:** **W0.1** (request-secret capture stays on by design, declined twice)
 and **W3.3** (endpoint-UUID audience default, deferred pending operator confirmation; no correctness
@@ -202,17 +209,14 @@ Sequenced by value per unit of effort.
 
 ```mermaid
 flowchart TD
-    N6["N6 slice-dependent audience<br/>runbook, BEFORE any slice rollout"] --> A9["A9 optimistic concurrency<br/>High, profile writes"]
-    A9 --> N2["N2 liveness probe<br/>High, estate visibility"]
+    A9["A9 optimistic concurrency<br/>High, profile writes"] --> N2["N2 liveness probe<br/>High, estate visibility"]
     N2 --> A3["A3' + P2 log retention and pruning<br/>one problem, two framings"]
     A3 --> N8["N8 stop advertising unenforced methods"]
     N8 --> W35["W3.5 trust cache + index"]
     W35 --> W41["Wave 4 RFC 8693<br/>carries N7: no client_id"]
 ```
 
-**Why this order.** **N6** is first because it has an external trigger nobody controls - a SyncFabric
-slice rollout breaks trusts with no change on our side. **A9** and **N2** are the remaining
-High-severity items. **A3' and P2 are the same problem**
+**Why this order.** **A9** and **N2** are the remaining High-severity items. **A3' and P2 are the same problem**
 (unbounded request-log growth) seen from the security and performance sides, so they should be solved
 once, not twice. **W3.5** is the last thing gating Wave 4.
 

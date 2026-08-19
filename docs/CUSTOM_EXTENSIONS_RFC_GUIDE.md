@@ -1,6 +1,6 @@
 # Custom Resource Extensions - RFC-Compliant Authoring Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.10`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.11`
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026

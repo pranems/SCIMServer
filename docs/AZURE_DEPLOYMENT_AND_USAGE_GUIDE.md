@@ -1,8 +1,8 @@
 # Azure Deployment & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.10`
+> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.11`
 
-> **Version:** 0.55.10 - **Updated:** June 3, 2026  
+> **Version:** 0.55.11 - **Updated:** June 3, 2026  
 > **Source of truth:** [deploy.ps1](../deploy.ps1), [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), [infra/](../infra/)
 
 ---

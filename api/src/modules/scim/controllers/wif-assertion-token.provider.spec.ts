@@ -506,6 +506,80 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     expect(generateEndpointAccessToken).toHaveBeenCalledTimes(1);
   });
 
+  // ─── N6 - two trusts differing ONLY by audience, on the SAME issuer ──────────
+  //
+  // SyncFabric emits `api://<appId>` on the legacy CustomerApplication chain and
+  // `api://<appId>/<host>` on the FirstPartyApplication chain, selected by a
+  // slice-scoped flag we do not control. The documented remedy is to register
+  // BOTH forms as two trusts. These lock that remedy: without them the runbook
+  // is an unverified claim that a future refactor could silently falsify.
+  //
+  // Distinct from WI-16 above, which varies the ISSUER. Trusts are ordered by
+  // issuer, so when both carry the SAME issuer that ordering cannot discriminate
+  // between them - the fall-through is the only thing making this work.
+  describe('N6 - slice-dependent audience, two trusts on one issuer', () => {
+    const SHARED_ISSUER = 'https://login.microsoftonline.com/tenant-123/v2.0';
+    const AUD_CUSTOMER = 'api://11111111-2222-3333-4444-555555555555';
+    const AUD_FIRSTPARTY = 'api://11111111-2222-3333-4444-555555555555/scim.example.com';
+
+    const twoAudienceTrusts = () => {
+      const legacy = wifCredential();
+      legacy.id = 'cred-aud-customer';
+      legacy.metadata = { ...wifMetadata, expectedIssuer: SHARED_ISSUER, expectedAudience: AUD_CUSTOMER };
+      const firstParty = wifCredential();
+      firstParty.id = 'cred-aud-firstparty';
+      firstParty.metadata = { ...wifMetadata, expectedIssuer: SHARED_ISSUER, expectedAudience: AUD_FIRSTPARTY };
+      return { legacy, firstParty };
+    };
+
+    const acceptOnlyAudience = (accepted: string) =>
+      validate.mockImplementation((_assertion: string, trust: { expectedAudience: string }) =>
+        trust.expectedAudience === accepted
+          ? Promise.resolve({
+              iss: SHARED_ISSUER,
+              sub: wifMetadata.expectedSubject,
+              aud: accepted,
+              tid: 'tenant-123',
+              roles: ['Scim.Provision'],
+            })
+          : Promise.reject(new WifAssertionInvalidError('audience mismatch')),
+      );
+
+    it('N6-T1: a FirstPartyApplication assertion mints when its trust is registered SECOND', async () => {
+      const { legacy, firstParty } = twoAudienceTrusts();
+      findActiveByEndpoint.mockResolvedValue([legacy, firstParty]);
+      acceptOnlyAudience(AUD_FIRSTPARTY);
+      generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+      await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).resolves.toMatchObject({
+        accessToken: 'minted.jwt',
+      });
+      expect(validate).toHaveBeenCalledTimes(2);
+    });
+
+    it('N6-T2: a legacy CustomerApplication assertion mints when its trust is registered SECOND', async () => {
+      const { legacy, firstParty } = twoAudienceTrusts();
+      // Reversed registration order - the remedy must not depend on which was added first.
+      findActiveByEndpoint.mockResolvedValue([firstParty, legacy]);
+      acceptOnlyAudience(AUD_CUSTOMER);
+      generateEndpointAccessToken.mockResolvedValue({ accessToken: 'minted.jwt', expiresIn: 7200, scope: 'scim.read scim.write' });
+
+      await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).resolves.toMatchObject({
+        accessToken: 'minted.jwt',
+      });
+      expect(validate).toHaveBeenCalledTimes(2);
+    });
+
+    it('N6-T3: an audience matching NEITHER trust is still rejected', async () => {
+      const { legacy, firstParty } = twoAudienceTrusts();
+      findActiveByEndpoint.mockResolvedValue([legacy, firstParty]);
+      acceptOnlyAudience('api://some-other-app');
+
+      await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).rejects.toThrow();
+      expect(generateEndpointAccessToken).not.toHaveBeenCalled();
+    });
+  });
+
   it('WI-16: throws mine-but-invalid-stop when NO wif trust matches (multi-trust)', async () => {
     const first = wifCredential();
     first.id = 'cred-wif-1';

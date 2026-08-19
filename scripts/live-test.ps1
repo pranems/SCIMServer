@@ -15022,6 +15022,85 @@ try {
 Write-Host "`n--- 9z-CG: Partial Authentication Block Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CH: two WIF trusts differing only by audience (N6 runbook)
+$script:currentSection = "9z-CH: two-audience WIF trusts (N6)"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CH: Two-Audience WIF Trusts (N6 runbook) ===" -ForegroundColor Cyan
+
+# SyncFabric emits api://<appId> on the legacy chain and api://<appId>/<host> on
+# the first-party chain, selected by a slice-scoped flag outside our control. The
+# documented remedy is to register BOTH as separate trusts. The MINT half is
+# proven in E2E (it needs a signed assertion); what must hold on a live server is
+# the CONFIG half - that a second trust differing only by audience is accepted
+# and does not overwrite the first. If that failed, the runbook is impossible.
+try {
+    $chAppId = "11111111-2222-3333-4444-555555555555"
+    $chIssuer = "https://login.microsoftonline.com/tenant-n6-live/v2.0"
+    $chJwks = "https://login.microsoftonline.com/tenant-n6-live/discovery/v2.0/keys"
+    $chAudCustomer = "api://$chAppId"
+    $chAudFirstParty = "api://$chAppId/scim.example.com"
+
+    $chEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-n6-twoaud-$(Get-Random)"
+    } | ConvertTo-Json)
+    $chId = $chEndpoint.id
+
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$chId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ WifCredentialsEnabled = 'True' } }
+        } | ConvertTo-Json -Depth 5) | Out-Null
+
+        function New-ChTrust([string]$aud, [string]$label) {
+            return Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$chId/credentials" -Method POST -Headers $headers -Body (@{
+                credentialType = 'wif'
+                label          = $label
+                wif            = @{
+                    assertionProfile  = 'jwt-bearer'
+                    expectedIssuer    = $chIssuer
+                    expectedSubject   = 'sp-object-id-n6-live'
+                    expectedAudience  = $aud
+                    jwksUri           = $chJwks
+                    allowedTenantId   = 'tenant-n6-live'
+                    scope             = 'scim.read scim.write'
+                    issuedTokenTtlSec = 3600
+                }
+            } | ConvertTo-Json -Depth 6)
+        }
+
+        $chFirst = New-ChTrust $chAudCustomer 'N6 live (CustomerApplication chain)'
+        Test-Result -Success ($null -ne $chFirst.id) `
+            -Message "9z-CH.T1: the legacy-audience WIF trust is accepted"
+
+        # T2 is the one the runbook depends on: a SECOND trust on the same
+        # endpoint, same issuer/subject/tenant, differing ONLY by audience.
+        $chSecond = New-ChTrust $chAudFirstParty 'N6 live (FirstPartyApplication chain)'
+        Test-Result -Success ($null -ne $chSecond.id -and $chSecond.id -ne $chFirst.id) `
+            -Message "9z-CH.T2 (runbook lock): a second trust differing ONLY by audience is accepted as a distinct credential"
+
+        # T3 - the second must not have replaced the first.
+        $chCreds = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$chId/credentials" -Method GET -Headers $headers
+        $chWif = @($chCreds | Where-Object { $_.credentialType -eq 'wif' -and $_.active })
+        Test-Result -Success ($chWif.Count -eq 2) `
+            -Message "9z-CH.T3 (data lock): BOTH WIF trusts are active - the second did not overwrite the first"
+
+        # T4 - both audience values are retained VERBATIM, not normalized or
+        # coerced. Read from the CREATE responses: the credentials LIST is
+        # deliberately metadata-only (id/label/type/active) and returns no trust
+        # detail, which is also why the runbook tells operators to give the two
+        # trusts distinct labels - the list is the only place they see them.
+        $chAuds = @($chFirst.wif.expectedAudience, $chSecond.wif.expectedAudience)
+        Test-Result -Success ($chAuds -contains $chAudCustomer -and $chAuds -contains $chAudFirstParty) `
+            -Message "9z-CH.T4: both audience shapes are retained verbatim (api://<appId> and api://<appId>/<host>)"
+    } finally {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$chId" -Method DELETE -Headers $headers | Out-Null
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CH: two-audience WIF trust section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CH: Two-Audience WIF Trusts Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

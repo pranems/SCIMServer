@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.10`
+> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.11`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -377,6 +377,34 @@ Note `issuer_match` expects the **v2.0** issuer (`login.microsoftonline.com`) wh
 
 The reference endpoint has **six** trusts. On a token mint the server evaluates them in order and records a sub-trace per rejected trust, so `wif_no_trust_accepted` always tells you which trust came closest.
 
+#### Two trusts for one caller: the slice-dependent audience
+
+Multi-trust is not only for multiple identity providers. It is also the supported answer when **one**
+caller can legitimately present **two different `aud` values**.
+
+SyncFabric composes its requested scope differently depending on which acquisition chain is active,
+so Entra mints a different audience:
+
+| Acquisition chain | Resulting assertion `aud` |
+|---|---|
+| `CustomerApplication` (legacy) | `api://<appId>` |
+| `FirstPartyApplication` (newer) | `api://<appId>/<normalized-dns-host>` |
+
+The chain is chosen by a SyncFabric feature flag that is enabled on some slices and not others, so a
+job can change shape **with no change on this side**. The symptom is a sudden `401`
+`wif_audience_mismatch` after a period of working normally.
+
+**Register both shapes as two trusts on the same endpoint.** Everything else - issuer, subject,
+tenant, JWKS URI, scope - stays identical; only `expectedAudience` differs. Each trust still matches
+its audience **exactly**, so this is not a widening: the endpoint accepts two explicitly-declared
+audience strings instead of one. Give them distinct **labels**, since the credential list shows the
+label but not the trust detail.
+
+Do **not** ask for prefix or wildcard audience matching instead. That would turn an exact check into a
+pattern check on the claim that binds a token to this server.
+
+Full diagnosis and fix steps: [auth/N6_SLICE_DEPENDENT_AUDIENCE_RUNBOOK.md](auth/N6_SLICE_DEPENDENT_AUDIENCE_RUNBOOK.md).
+
 ### 6.4 Signing algorithms and TTL
 
 Only **RS256** and **ES256** are accepted (`assertion_alg_not_allowed` otherwise).
@@ -488,7 +516,6 @@ sequenceDiagram
 Assignment matters: the SCIM template's default scope is **"Sync only assigned users and groups"**, so an app with nothing assigned runs, reports success, and provisions nothing.
 
 ### 7.3 Two problems you will probably hit
-
 **Users fail with `emails: Required attribute 'emails' is missing`.** The `entra-id` preset requires `userName`, `displayName` and `emails`. Entra's default mapping sources `emails[type eq "work"].value` from `mail`, and cloud-only users have no `mail` unless Exchange-licensed. Verbatim from Entra's provisioning log:
 
 ```text
@@ -570,6 +597,24 @@ Unlike the in-memory diagnostics, this is **persisted with the request log**, so
 ![Assertion debugger](screenshots/prod-auth-07-wif-debug-assertion.png)
 
 This is the fastest way to answer "why is my assertion rejected?" when several trusts are configured, because it shows the per-trust verdict side by side rather than one aggregate failure.
+
+### 8.4 "It worked yesterday and now every WIF token is 401"
+
+If WIF mints start failing with `wif_audience_mismatch` and **nothing changed on this side** - no
+deploy, no config edit, no rotation - check the `audience_match` line in the decision trace:
+
+```text
+audience_match   FAIL   expected: api://<appId>   received: api://<appId>/scim.example.com
+```
+
+If `received` is `expected` plus a `/<host>` suffix (or the reverse), the caller has switched
+acquisition chain and Entra is minting a different audience. This is a known SyncFabric behaviour
+selected by a per-slice feature flag, not a fault on either side.
+
+**Fix:** register the other shape as a second WIF trust on the same endpoint (see
+[section 6.3](#63-multi-trust-behaviour)). No deploy is involved.
+
+Full runbook: [auth/N6_SLICE_DEPENDENT_AUDIENCE_RUNBOOK.md](auth/N6_SLICE_DEPENDENT_AUDIENCE_RUNBOOK.md).
 
 API: `POST /scim/admin/endpoints/{id}/wif/debug-assertion` with `{"assertion": "<jwt>"}`, returning `overallOutcome` plus a `results[]` entry per trust:
 

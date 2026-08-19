@@ -155,7 +155,11 @@ export const AUTH_REASON_CATALOG: readonly AuthReasonEntry[] = [
     plane: 'wif',
     tier: 'T1',
     actorDescription: 'The assertion audience did not match the configured expected audience.',
-    remediation: "Align expectedAudience; in Entra set the resource app's Application ID URI.",
+    remediation:
+      "Align expectedAudience; in Entra set the resource app's Application ID URI. " +
+      'If this started without a config change, the caller may have switched acquisition chain: ' +
+      'SyncFabric emits api://<appId> on one and api://<appId>/<host> on the other. ' +
+      'Register BOTH shapes as two WIF trusts on the endpoint - each still matches exactly.',
   },
   {
     reasonCode: 'wif_tenant_mismatch',
