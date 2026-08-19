@@ -240,10 +240,14 @@ test.describe('RfcCompliantSubAttributes flag - UI toggle drives real server beh
       const nested = await postUser(page, id!, nestedUser('off-nested'));
       expect(nested.status).toBe(201);
 
-      // OUTCOME 4: and the multi-valued simple sub-attribute is REJECTED,
-      // which is the pre-existing gap the flag exists to close.
+      // OUTCOME 4: and the multi-valued simple sub-attribute is ACCEPTED too.
+      // That is NOT this flag's doing - it is base StrictSchemaValidation
+      // behavior (RFC 7643 1.2). Asserted here at flag-OFF specifically so
+      // re-gating it on the flag would turn this red.
       const multi = await postUser(page, id!, multiValuedSubUser('off-multi'));
-      expect(multi.status).toBe(400);
+      expect(multi.status).toBe(201);
+      const offCreated = multi.body as { licenses?: { skus?: string[] }[] };
+      expect(offCreated.licenses?.[0]?.skus).toEqual(['SKU-A', 'SKU-B']);
     } finally {
       await deleteEndpoint(page, id!);
     }
@@ -277,8 +281,8 @@ test.describe('RfcCompliantSubAttributes flag - UI toggle drives real server beh
       expect(diag?.attributePaths ?? []).toContain('address.geo');
       expect(diag?.triggeredBy).toBe(FLAG);
 
-      // OUTCOME 3 (R2 of the flag): the multi-valued SIMPLE sub-attribute
-      // that was rejected a moment ago is now ACCEPTED and round-trips.
+      // OUTCOME 3: the multi-valued SIMPLE sub-attribute is accepted and
+      // round-trips. Unchanged by the toggle - it is base strict behavior.
       const multi = await postUser(page, id!, multiValuedSubUser('on-multi'));
       expect(multi.status).toBe(201);
       const created = multi.body as { licenses?: { skus?: string[] }[] };
@@ -298,9 +302,11 @@ test.describe('RfcCompliantSubAttributes flag - UI toggle drives real server beh
 
       await toggleFlag(page, id!, false);
 
-      // OUTCOME: the server is back to the legacy decision for BOTH rules.
+      // OUTCOME: the server is back to the legacy decision for the ONE rule
+      // this flag owns. The multi-valued case is deliberately asserted as 201
+      // on BOTH sides of the toggle: it must not move with the flag at all.
       expect((await postUser(page, id!, nestedUser('roundtrip-off'))).status).toBe(201);
-      expect((await postUser(page, id!, multiValuedSubUser('roundtrip-off'))).status).toBe(400);
+      expect((await postUser(page, id!, multiValuedSubUser('roundtrip-off'))).status).toBe(201);
 
       const persisted = await readFlagFromApi(page, id!);
       expect(persisted === false || persisted === 'False').toBe(true);

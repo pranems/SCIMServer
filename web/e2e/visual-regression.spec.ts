@@ -294,35 +294,40 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     });
   });
 
-  // Endpoint-detail tabs: scoped to first endpoint that exists. Skipped
-  // gracefully when no endpoints are seeded so a fresh dev environment
-  // does not red-fail the suite.
+  // Endpoint-detail tabs: use a PURPOSE-CREATED endpoint, not "whatever
+  // endpoint happens to be first". Origin: 2026-08-18 - this test snapshotted
+  // the first existing endpoint, so the baseline encoded that endpoint's
+  // Recent Activity row count. `mask` hides the card's CONTENT but not its
+  // HEIGHT, and with fullPage:true a collapse from ~15 rows to ~4 is a large
+  // unmasked geometry change that blew the 3 % tolerance for a reason having
+  // nothing to do with any UI change. A fresh endpoint has deterministic
+  // (empty) activity, which removes the drift at its source instead of
+  // widening the tolerance until the gate stops discriminating.
   test('Endpoint detail - Overview tab', async ({ page }) => {
-    await page.goto('/endpoints');
-    await page.waitForLoadState('networkidle');
-    const firstCard = page.locator('[data-testid^="endpoint-"]').first();
-    if (!(await firstCard.isVisible().catch(() => false))) {
-      test.skip(true, 'No endpoints seeded - skip endpoint-detail snapshot');
+    const id = await createSnapshotEndpoint(page);
+    test.skip(!id, 'Could not create the snapshot fixture endpoint');
+    try {
+      await page.goto(`/endpoints/${id}`);
+      await page.waitForLoadState('networkidle');
+      await expect(page).toHaveScreenshot('endpoint-detail-overview.png', {
+        ...SNAPSHOT_OPTIONS,
+        mask: locatorsFor(page, [
+          ...ENDPOINT_DETAIL_LIVE_SELECTORS,
+          '[data-testid="dashboard-chart"] svg',
+          // Overview tab live-data regions: KPI counts + Recent Activity
+          // (populated card AND empty state) both vary per dev-environment
+          // activity. Mask wholesale - same pattern as DASHBOARD_LIVE_SELECTORS.
+          '[data-testid="overview-kpi-row"]',
+          '[data-testid="overview-activity"]',
+          '[data-testid="overview-activity-empty"]',
+        ]),
+        fullPage: true,
+        // Live KPI counts still vary slightly even on a fresh endpoint.
+        maxDiffPixelRatio: 0.03,
+      });
+    } finally {
+      await deleteSnapshotEndpoint(page, id);
     }
-    await firstCard.click();
-    await page.waitForLoadState('networkidle');
-    await expect(page).toHaveScreenshot('endpoint-detail-overview.png', {
-      ...SNAPSHOT_OPTIONS,
-      mask: locatorsFor(page, [
-        ...ENDPOINT_DETAIL_LIVE_SELECTORS,
-        '[data-testid="dashboard-chart"] svg',
-        // Overview tab live-data regions: KPI counts + Recent Activity
-        // (populated card AND empty state) both vary per dev-environment
-        // activity. Mask wholesale - same pattern as DASHBOARD_LIVE_SELECTORS.
-        '[data-testid="overview-kpi-row"]',
-        '[data-testid="overview-activity"]',
-        '[data-testid="overview-activity-empty"]',
-      ]),
-      fullPage: true,
-      // Overview tab has live KPI counts + Recent Activity that update per
-      // dev-environment activity; 3 % tolerance accommodates that drift.
-      maxDiffPixelRatio: 0.03,
-    });
   });
 
   test('Endpoint detail - Users tab', async ({ page }) => {
