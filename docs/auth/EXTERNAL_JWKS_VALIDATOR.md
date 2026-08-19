@@ -58,11 +58,13 @@ flowchart LR
 Host matching is exact and lowercased; there is no wildcard or suffix match. Every redirect hop is
 re-checked against the same union, so a redirect cannot walk a request off the allowlist.
 
-**Bounds that exist, and bounds that do not.** Timeout, retry count, retry backoff, redirect hop count
-(max 3), and cache max-age are all bounded and configurable. There is **no** cap on JWKS response
-size, on the number of keys in a response, on the number of distinct URIs the cache may hold, and no
-maximum age past which a stale entry stops being served after a fetch failure. Those four are open
-items, tracked in the canonical guide's section 20.
+**Bounds that exist.** Timeout, retry count, retry backoff, redirect hop count
+(max 3), and cache max-age are all bounded and configurable - and since **W1.5**
+so are the four that used to be open: JWKS response size (`JWKS_MAX_RESPONSE_BYTES`),
+key count (`JWKS_MAX_KEYS`), cache cardinality (`JWKS_MAX_CACHE_ENTRIES`) and a
+single wall-clock budget for the whole fetch (`JWKS_TOTAL_DEADLINE_MS`). Each has a
+per-endpoint override. See the W1.5 rows in the egress table below; this paragraph
+previously said those four were unbounded, which stopped being true when W1.5 shipped.
 
 ## Runtime egress hardening (configurable)
 
