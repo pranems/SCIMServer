@@ -98,6 +98,28 @@ Full 10-ISV matrix + per-pattern detail: [ISV sections 2-4](ISV_AUTH_PATTERNS_AN
 
 ---
 
+## SyncFabric interoperability artifacts (mirrored, not authored here)
+
+Three files in this folder are **mirrors** of artifacts owned outside the repository. They are vendored
+so the design travels with the code, and they must be refreshed from their canonical source rather than
+edited here. Editing a mirror in place creates two drifting definitions.
+
+| Mirror in this folder | Canonical source | What it is |
+|---|---|---|
+| [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md) | `OneDrive - Microsoft\Documents\SCIMServer\auth\` | The cross-repository architecture and implementation guide for SyncFabric-to-SCIMServer workload identity federation. **SCIMServer implements from it**: roughly 100 references across 37 source files cite its wave and section labels (`W2.2`, `W3.4`, `W3.7`, `WI-11`..`WI-17`). Section 9.8 is the implementation status ledger; section 3.4.6 is the documentation-drift ledger this README's own corrections came from. |
+| [syncfabricScimserverAuthEvolution.prompt.md](syncfabricScimserverAuthEvolution.prompt.md) | `%APPDATA%\Code\User\prompts\` | The self-improving workflow that regenerates the guide from current source in both repositories. |
+| [syncfabricScimserverAuthEvolution.memory.md](syncfabricScimserverAuthEvolution.memory.md) | `%APPDATA%\Code\User\prompts\.memory\` | That workflow's persistent memory: verified invariants, superseded conclusions, and open empirical gates. |
+
+> **Do not trust a `(1)` or `(2)` filename suffix on any copy of the guide.** Those are browser-download
+> artifacts and do not indicate recency; the highest-numbered copy has historically been the **oldest**.
+> Verify by the `SHA-256` and revision number recorded in the guide's own header. A stale numbered
+> duplicate was removed from this folder on 2026-07-31 for exactly this reason.
+
+**Current mirror state:** guide revision 4, verified against SCIMServer `release/0.55.0` (`6e6ad8ff`,
+v0.55.1) and SyncFabric `origin/master` (`c6f63afc`), 2026-07-31.
+
+---
+
 ## RFC explainers and authoritative text
 
 Each load-bearing RFC has a plain-language explainer in this folder, and the normative text is mirrored under [rfcs/](rfcs/) so the source travels with the design. The master reference list (RFCs with the exact sections each phase relies on) is **[hub section 14](AUTHENTICATION_ARCHITECTURE.md#14-references-rfcs-with-sections--sources)**.

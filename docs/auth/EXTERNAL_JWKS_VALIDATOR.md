@@ -31,10 +31,40 @@ flowchart TD
 | # | Guarantee | How |
 |---|---|---|
 | 1 | **Algorithm pinning** | `jwtVerify(..., { algorithms: ['RS256','ES256'] })`. `alg:none` and any HMAC (the public-key-as-HMAC-secret confusion) are rejected. |
-| 2 | **SSRF host allowlist** | the `jwksUri` host MUST be on `JWKS_HOST_ALLOWLIST` and the scheme MUST be https. A disallowed host is rejected **before any network call** - the critical anti-SSRF choke point ([architecture section 5.1](AUTHENTICATION_ARCHITECTURE.md#51-placement-table)). |
+| 2 | **SSRF host allowlist** | the `jwksUri` host MUST be on the **effective** allowlist and the scheme MUST be https. A disallowed host is rejected **before any network call** - the critical anti-SSRF choke point ([architecture section 5.1](AUTHENTICATION_ARCHITECTURE.md#51-placement-table)). See the note below: the effective allowlist is a union of three layers, not just the environment variable. |
 | 3 | **Cache by URI** with bounded max-age (`JWKS_CACHE_MAX_AGE_MS`, default 10 min) | a `Map` cache; a fresh entry skips the fetch. |
 | 4 | **Refetch on unknown `kid`** | the header `kid` is peeked; if the cached set lacks it (key rotation), the JWKS is refetched once. |
 | 5 | **Fail closed, then fail to stale** | a fetch failure with **no** cached key REJECTS, and it never falls back to skipping the signature check. If a cached copy exists it is served as a degraded fallback (logged at WARN), never "no check". **Caveat - the stale fallback is unbounded:** [external-jwks-validator.service.ts:240-247](../../api/src/oauth/external-jwks-validator.service.ts) returns `this.cache.get(jwksUri)` with **no age test**, unlike `getFreshCached` (line 301) which does enforce `maxAgeMs`. A key set cached weeks ago is therefore still served while the IdP is unreachable. See the open finding below. |
+
+### The effective allowlist is three layers, not one (clarified 2026-07-31)
+
+Guarantee 2 says the host must be on "the allowlist". That allowlist is a **union**, and an operator
+who reads only `JWKS_HOST_ALLOWLIST` will not be able to explain why an unlisted host was accepted:
+
+```mermaid
+flowchart LR
+    S["layer 1 - compiled seed<br/>well-known IdP hosts<br/>Entra commercial, USGov, China, Google"] --> U{{"effective allowlist<br/>union"}}
+    E["layer 2 - JWKS_HOST_ALLOWLIST<br/>server environment variable"] --> U
+    P["layer 3 - JwksHostAllowlistEntry rows<br/>persisted, admin-editable at runtime, WI-15"] --> U
+    U --> C["assertJwksUriAllowed<br/>https + exact host match<br/>checked BEFORE any network call"]
+```
+
+| Layer | Where it lives | Who changes it | Takes effect |
+|---|---|---|---|
+| Compiled seed | [jwks-host-allowlist.service.ts](../../api/src/oauth/jwks-host-allowlist.service.ts) | code change | on deploy |
+| Environment | `JWKS_HOST_ALLOWLIST` | deployment configuration | on restart |
+| Persisted | `JwksHostAllowlistEntry` (Prisma model), managed through [admin-jwks-host.controller.ts](../../api/src/modules/scim/controllers/admin-jwks-host.controller.ts) | an admin, at runtime | immediately |
+
+Host matching is exact and lowercased; there is no wildcard or suffix match. Every redirect hop is
+re-checked against the same union, so a redirect cannot walk a request off the allowlist.
+
+**Bounds that exist.** Timeout, retry count, retry backoff, redirect hop count
+(max 3), and cache max-age are all bounded and configurable - and since **W1.5**
+so are the four that used to be open: JWKS response size (`JWKS_MAX_RESPONSE_BYTES`),
+key count (`JWKS_MAX_KEYS`), cache cardinality (`JWKS_MAX_CACHE_ENTRIES`) and a
+single wall-clock budget for the whole fetch (`JWKS_TOTAL_DEADLINE_MS`). Each has a
+per-endpoint override. See the W1.5 rows in the egress table below; this paragraph
+previously said those four were unbounded, which stopped being true when W1.5 shipped.
 
 ## Runtime egress hardening (configurable)
 

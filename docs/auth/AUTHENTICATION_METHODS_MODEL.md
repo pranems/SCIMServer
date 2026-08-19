@@ -11,6 +11,7 @@ An endpoint can hold several authentication methods at once (legacy bearer, per-
 The model rides the existing `Endpoint.profile` JSONB - **no new column or table** - as `profile.authentication`:
 
 ```jsonc
+// Schematic shape. Placeholders in angle brackets are not literal JSON values.
 "profile": {
   "schemas": [ /* ... */ ],
   "resourceTypes": [ /* ... */ ],
