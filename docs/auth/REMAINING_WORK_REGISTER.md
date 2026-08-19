@@ -237,6 +237,36 @@ deadline), so this is bounded rather than open, and lower severity than the guid
 
 ---
 
+## 4A. Full `docs/auth/` sweep (added 2026-08-19, second pass)
+
+The first pass of this register was built from the delivery plan and the canonical guide only. A
+subsequent sweep of **all 46 files in `docs/auth/`** found six further ID schemes. Every status
+below was **re-verified against source**, which mattered: the doc-level sweep reported four of them
+as open, and source proved otherwise.
+
+| Scheme | Where | Verified disposition |
+|---|---|---|
+| **U1-U12** Connect + Logs UX | [CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md](CONNECT_AND_LOGS_UX_OVERHAUL_PLAN.md) | **All 12 SHIPPED** (v0.54.32 to v0.54.37). Not open |
+| **V1-V12** credential lifecycle + auth-in-logs | [CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md](CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md) | **All 12 SHIPPED** (v0.54.38 to v0.54.40). Not open |
+| **W1-W12** durable logs + Connect UX | [AUTH_DURABLE_LOGS_AND_CONNECT_UX_PLAN.md](AUTH_DURABLE_LOGS_AND_CONNECT_UX_PLAN.md) | **All 12 SHIPPED** (v0.54.42 to v0.54.48). **Name collision:** this is a *different* W-series from the delivery plan's W0.1-W6.2. Do not conflate them |
+| **WI-1..WI-17** connection-info track | [CONNECTION_INFO_AND_ENTRA_SETUP.md](CONNECTION_INFO_AND_ENTRA_SETUP.md) | All SHIPPED (2026-07-06/07) |
+| **Pre-Q.A / Pre-Q.B, Q0-Q6, A0-A4** | [README.md](README.md) reconciliation table, [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) section 13 | Pre-Q.A **DONE** (`'structured'` is in the `FlagType` union and handled by the validator), Pre-Q.B/Q0/Q1/Q2/Q6/A0-A4 shipped. **Q3, Q4, Q5 remain DEFERRED** |
+| **F1-F8** real-Entra proof findings | [WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md) | F1-F6 fixed (W3.6/3.7/3.8/3.9/3.1). **F7 open by design** (= W5.2). **F8 open** (`expectedAudience` easy to misconfigure - now much better motivated by N6) |
+| **DD1-DD6** doc drift | guide gap matrix | **DD1 and DD3 are RESOLVED** (README corrected 2026-08-18; the methods model now reads "LIVE and enforced"). DD5 partly remains as N11. DD6 is A1/A13 |
+
+**Genuinely new open items this sweep produced:** **N10** (`GlobalAuthPolicy` unbuilt and untracked),
+**N11** (CONTEXT_INSTRUCTIONS version), **F8**, and the confirmation that **Q3 / Q4 / Q5** are
+deferred tracks with no W-number. Everything else it surfaced was already shipped.
+
+**Method note worth keeping.** The sweep was done by a doc-reading pass that inferred status from
+item tables rather than from each document's status header, and it was wrong on U, V, Pre-Q.A, DD1
+and DD3 - all of which it called open and all of which had shipped. **Reading a plan's item list
+without reading its status header systematically over-reports open work**, which is the mirror image
+of the C1/C2 defect where a summary table under-reported it. Both are the same root cause: status
+lives in two places. Verify against source before believing either.
+
+---
+
 ## 5. Newly identified items (found by this stock-take)
 
 | ID | Item | Sev | Why it matters |
@@ -249,6 +279,9 @@ deadline), so this is bounded rather than open, and lower severity than the guid
 | **N6** | **Assertion `aud` is slice-dependent and `expectedAudience` is a single exact string** (Section 4, F-C) | High | `workloadIdentityFirstPartyApplicationIsDefault` is on for `slice:A` and `slice:B` and off globally, and the two acquisition modes emit `api://<appId>` vs `api://<appId>/<host>`. One trust cannot satisfy both, so a slice rollout presents as an audience-mismatch 401 with no SCIMServer change involved. Needs, at minimum, a documented operator runbook; possibly a trust that accepts a declared set of audiences |
 | **N7** | **Do not generalize A4 to RFC 8693** (Section 4, F-E) | Med | Flow B omits `client_id` by design. A W4.1 handler that inherits "require `client_id`" by analogy from A4 would break the integration outright |
 | **N8** | **`mtls` and `dpop` are declarable auth-method names with no enforcing authenticator** | Med | `admin-authentication-method.controller.ts` accepts `'mtls'` / `'dpop'` / `'oauth-authcode'` into the method set and [authentication-schemes.ts](../../api/src/modules/scim/discovery/authentication-schemes.ts) maps them into SCIM `ServiceProviderConfig.authenticationSchemes`, but **no `ResourceAuthenticator` implements any of them**. An operator can therefore declare a method the server will advertise and never enforce. This is the same capability-truthfulness class W0.3 fixed on the RFC 8414 surface, unfixed on the SCIM discovery surface. Either gate the declarable set to implemented methods, or derive the advertised schemes from the authenticator chain |
+| **N9** | **The Stage 1.12 F1 doc-freshness check is blind to the exact drift it exists to catch** | High | [docs/INDEX.md](../INDEX.md) line 3 advertises **`Product version: 0.55.7`** while `api/package.json` is `0.55.6`, and `0.55.7` has never existed (N1). F1 is specified as "a doc header must not advertise a product version other than `api/package.json`", yet `audit-doc-freshness.ps1` reports `ok docs/INDEX.md` and exits **PASSED (24 docs)**. A gate that is green while its own trigger condition is present is worse than no gate, because it certifies the drift. Root cause not yet diagnosed |
+| **N10** | **`GlobalAuthPolicy` is proposed but unbuilt, and nothing tracks it** | Med | [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) sections 5, 6.2 design it as the runtime-tunable global ceiling (allowed profiles/versions, scope catalog, trusted first-party app catalog, TTL bounds, role-enforcement policy). Verified **absent** from `api/prisma/schema.prisma` and all of `api/src`. It has **no W-number**, so it was invisible to the wave plan. Today those ceilings are env/compiled only, which is safe but not runtime-tunable |
+| **N11** | **CONTEXT_INSTRUCTIONS.md still states `Version: 0.54.89`** (DD5 remnant) | Low | Actual is 0.55.6. The doc is outside the freshness manifest, so nothing checks it |
 
 ---
 
