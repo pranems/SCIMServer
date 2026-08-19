@@ -796,7 +796,7 @@ export class EndpointService implements OnModuleInit {
     if (partial.serviceProviderConfig !== undefined) {
       merged.serviceProviderConfig = { ...current.serviceProviderConfig, ...partial.serviceProviderConfig };
     }
-    // Deep-merge settings (additive)
+    // Per-key merge of settings - a nested object value REPLACES, it does not merge
     if (partial.settings !== undefined) {
       // Validate individual settings values before merging
       try {

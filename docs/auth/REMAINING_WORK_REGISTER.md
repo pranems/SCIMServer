@@ -30,7 +30,7 @@ These are findings, not restatements. Each one means a document was saying somet
 |---|---|---|---|---|
 | **C1** | Delivery plan Section 1, JWKS row | "JWKS pre-warm / background refresh: **still none** (lazy fetch, 10-min TTL)" | W1.4 shipped in v0.55.5: a background refresh sweep exists (`refreshTimer`, `setInterval`, `unref`ed) and the TTL is 24 h | [external-jwks-validator.service.ts](../../api/src/oauth/external-jwks-validator.service.ts) L126-L174 |
 | **C2** | Delivery plan Section 1, mint row | "Mint `client_secret` path: **inlined** in the controller" | W2.3 shipped: the provider is its own class with its own spec | [client-secret-token-provider.ts](../../api/src/modules/scim/controllers/client-secret-token-provider.ts) |
-| **C3** | Canonical guide, gap-matrix header | `09b4b78d` is "**v0.55.7**" | **There is no v0.55.7.** No commit ever set `api/package.json` to `0.55.7`; there is no such CHANGELOG heading. The version is **0.55.6** | `git log -S'"version": "0.55.7"' -- api/package.json` returns nothing |
+| **C3** | ~~Canonical guide, gap-matrix header~~ **RETRACTED 2026-08-19** | ~~`09b4b78d` is "v0.55.7"~~ | **The guide was RIGHT and this register was wrong.** v0.55.7 is real: commit `07db4088` "fix(validation): honour multiValued on sub-attributes in strict mode (v0.55.7)" (2026-08-18) sets it, it is an ancestor of master, and CHANGELOG line 11 carries its entry. See 1.2 for how this register got it wrong | `git log -S` on an up-to-date tree |
 | **C4** | Canonical guide, actions A8 / A9 / A12 | paths under `api/src/modules/endpoint/` | Those paths do not exist. Real paths are `api/src/modules/endpoint/**services**/endpoint.service.ts` and `api/src/modules/**scim/controllers**/admin-authentication-method.controller.ts` | `Get-ChildItem -Recurse` |
 | **C5** | Canonical guide, RFC 7523 flow description | treats the flow generically as "RFC 7523" | It is specifically **section 2.2 client authentication** (`grant_type=client_credentials` + `client_assertion`), **not** the section 2.1 `jwt-bearer` authorization grant. A handler built on the wrong one is incompatible | `WorkloadIdentityAuthenticationHelper` + SCIMServer parser, Section 4 |
 
@@ -55,6 +55,36 @@ Two sightings of one pattern is this repo's own promotion threshold.
 the same fact twice: Section 1 should state the *question* each row answers and defer the answer to
 the item's status line, or a gate should assert that no Section 1 row says "none"/"inlined"/"still"
 while the owning item says DELIVERED. A third manual correction is not a fix.
+
+### 1.2 Retraction: three findings that were artifacts of a stale working tree
+
+**C3, N1 and N9 were wrong and are retracted.** All three descended from a single bad read.
+
+At the start of the 2026-08-19 stock-take the working tree sat on branch
+`feat/w1-5-jwks-deadline-caps`, which was **3 commits behind `origin/master`**. One of those three
+was `07db4088`, the commit that sets `api/package.json` to **0.55.7**. So on that tree:
+
+- `package.json` genuinely read `0.55.6`, and
+- `git log -S'"version": "0.55.7"'` genuinely returned nothing,
+
+because `git log -S` searches the **current branch's** history, not the remote's. Both readings were
+accurate about the tree and false about the product. From them this register concluded that v0.55.7
+was a "phantom version", that the canonical guide was wrong to cite it, and later that the Stage 1.12
+F1 gate must be blind because it passed a doc advertising `0.55.7`. **The guide was right, the gate
+was right, and the register was wrong three times over.**
+
+The compounding step is the instructive one: the tree was rebased onto `origin/master` mid-session to
+land a commit, which silently made the working files `0.55.7`, and **nothing re-verified the earlier
+conclusions against the new tree.** A finding was carried forward across the very event that
+invalidated it.
+
+**Standing correction, and it generalizes past this incident:** a claim of the form "X does not exist
+anywhere in the repo" is only as good as the tree it was run against. Before recording an
+absence-based finding, confirm the tree is current (`git fetch` + `git status -sb`, or search
+`origin/master` explicitly rather than `HEAD`), and **re-verify any absence-based finding after any
+rebase, merge or checkout.** Presence is self-evidencing; absence is not. This is the same lesson as
+C1/C2 and the doc-sweep over-report in 4A - status read from the wrong place is worse than no status,
+because it is asserted with confidence.
 
 ---
 
@@ -267,11 +297,48 @@ lives in two places. Verify against source before believing either.
 
 ---
 
+## 4B. Performance: what is done, what is left (verified 2026-08-19)
+
+The perf work is the **X11** option set (A-H) plus the **X15** findings. Each row below was probed
+against source, not read from a status line. Two probes returned false results and were corrected,
+which is why the method matters: a `prefetch|prewarm` search "found" W1.2 but the hits were
+`X-DNS-Prefetch-Control` in the helmet config, and a `canonicalJwks` search "missed" W1.3 because the
+field is actually named `resolvedUri`.
+
+| X11 | Item | W item | Verified state |
+|---|---|---|---|
+| **A** | Background JWKS refresh-ahead + TTL + `Cache-Control` | W1.4 | **DONE** - `refreshTimer` sweep present |
+| **B** | Eager `jose` at boot | W1.1 | **DONE** - `josePromise` memoized |
+| **C** | Startup pre-warm (JWKS + DB pool) | **W1.2** | **PARTIAL.** DB pool warmed by `PrismaService.onModuleInit`; the **JWKS prefetch is genuinely absent** |
+| **D** | Canonical `jwks_uri`, drop the redirect | W1.3 | **DONE** - `resolvedUri` memo, L119 |
+| **E** | Per-endpoint credential/trust cache | **W3.5** | **OPEN** - no trust/credential cache exists |
+| **F** | `findActiveByEndpointAndType` + composite index | **W3.5** | **OPEN** - neither the typed lookup nor `@@index([endpointId, credentialType, active])` exists. `EndpointCredential` has `@@index([endpointId, active])` only |
+| **G** | Per-mint logging + decision trace off the hot path | **none** | **Effectively satisfied, never tracked.** Log writes are buffered (`flushInterval` / `flushMaxBuffer`, W1.7b) and the decision trace is **not awaited** on the mint path. No work needed, but it was never assigned an item |
+| **H** | Total deadline + cancellation | W1.5 | **DONE** - `totalDeadlineMs` + caps |
+
+X15's three findings are all closed: F1 (redesigned W1.4), F2 (all four Node server timeouts set
+explicitly), F3 (Prisma pool acquire timeout restored) - see W1.7b.
+
+**So the perf backlog is exactly two tracked items** - the JWKS half of **W1.2**, and all of
+**W3.5** - plus two untracked follow-ups inherited from the X9 latency RCA
+([../perf/DEV_LATENCY_REGRESSION_RCA.md](../perf/DEV_LATENCY_REGRESSION_RCA.md) section 10), which is
+marked RESOLVED but leaves these open:
+
+| ID | Follow-up | Why it still matters |
+|---|---|---|
+| **P1** | **Opaque per-endpoint secrets are still O(N).** A real `bearer` / `oauth_client` secret (neither a JWT nor the global secret) bcrypt-compares against **every** active credential on the endpoint. bcrypt is deliberately slow, so this is the most expensive O(N) loop in the resource plane | Needs a non-secret lookup key or prefix stored beside each credential so the guard selects one candidate instead of comparing all. One measured endpoint already carries 10 credentials |
+| **P2** | **Nothing caps or prunes accumulated credentials or request-log rows.** The same endpoint had 3,455 request-log rows from months of testing | Bounds the P1 loop and is the same concern as A3' (RequestLog retention), approached from the perf side rather than the security side. **P2 and A3' should be solved together** |
+
+Neither P1 nor P2 has a W-number, so both were invisible to the wave plan - the same gap class as
+**N10** (`GlobalAuthPolicy`) and **X11-G**.
+
+---
+
 ## 5. Newly identified items (found by this stock-take)
 
 | ID | Item | Sev | Why it matters |
 |---|---|---|---|
-| **N1** | **Resolve the phantom v0.55.7.** Docs state "as of v0.55.7 it is base behavior of `StrictSchemaValidation`", but no such version exists in `package.json` or the CHANGELOG | Med | A doc that cites a version that was never cut is unfalsifiable. Either cut 0.55.7 or reword to the version that actually carries the behavior |
+| **N1** | ~~Resolve the phantom v0.55.7~~ **RETRACTED - never real** | - | v0.55.7 exists (commit `07db4088`, CHANGELOG line 11). This item was an artifact of reading a stale branch. See 1.2 |
 | **N2** | **No scheduled liveness probe on any estate.** All 5 scheduled workflows are static gates. `audit-deployment-doc.ps1 -Live` C4 *does* catch a dead estate (verified: exit 1) but only runs post-deploy | High | This is why customer-facing prod being down was found by inspection rather than by alert. A dead estate between deploys is currently invisible |
 | **N3** | **`[Unreleased]` has absorbed everything since `0.54.0-alpha.12`** | Med | The CHANGELOG has one heading covering many shipped versions, so it can no longer answer "what changed in 0.55.5?" without reading prose |
 | **N4** | **Bind the delivery plan's Section 1 table to item status** (see 1.1) | Med | Second occurrence of the same drift. Manual correction has now failed twice |
@@ -279,7 +346,7 @@ lives in two places. Verify against source before believing either.
 | **N6** | **Assertion `aud` is slice-dependent and `expectedAudience` is a single exact string** (Section 4, F-C) | High | `workloadIdentityFirstPartyApplicationIsDefault` is on for `slice:A` and `slice:B` and off globally, and the two acquisition modes emit `api://<appId>` vs `api://<appId>/<host>`. One trust cannot satisfy both, so a slice rollout presents as an audience-mismatch 401 with no SCIMServer change involved. Needs, at minimum, a documented operator runbook; possibly a trust that accepts a declared set of audiences |
 | **N7** | **Do not generalize A4 to RFC 8693** (Section 4, F-E) | Med | Flow B omits `client_id` by design. A W4.1 handler that inherits "require `client_id`" by analogy from A4 would break the integration outright |
 | **N8** | **`mtls` and `dpop` are declarable auth-method names with no enforcing authenticator** | Med | `admin-authentication-method.controller.ts` accepts `'mtls'` / `'dpop'` / `'oauth-authcode'` into the method set and [authentication-schemes.ts](../../api/src/modules/scim/discovery/authentication-schemes.ts) maps them into SCIM `ServiceProviderConfig.authenticationSchemes`, but **no `ResourceAuthenticator` implements any of them**. An operator can therefore declare a method the server will advertise and never enforce. This is the same capability-truthfulness class W0.3 fixed on the RFC 8414 surface, unfixed on the SCIM discovery surface. Either gate the declarable set to implemented methods, or derive the advertised schemes from the authenticator chain |
-| **N9** | **The Stage 1.12 F1 doc-freshness check is blind to the exact drift it exists to catch** | High | [docs/INDEX.md](../INDEX.md) line 3 advertises **`Product version: 0.55.7`** while `api/package.json` is `0.55.6`, and `0.55.7` has never existed (N1). F1 is specified as "a doc header must not advertise a product version other than `api/package.json`", yet `audit-doc-freshness.ps1` reports `ok docs/INDEX.md` and exits **PASSED (24 docs)**. A gate that is green while its own trigger condition is present is worse than no gate, because it certifies the drift. Root cause not yet diagnosed |
+| **N9** | ~~The Stage 1.12 F1 doc-freshness check is blind~~ **RETRACTED - the gate is correct** | - | Re-tested against the real header: `docs/INDEX.md` advertises `0.55.7`, `api/package.json` is `0.55.7`, the `Product version` marker pattern matches, and the values agree. The gate behaved exactly as specified. See 1.2 |
 | **N10** | **`GlobalAuthPolicy` is proposed but unbuilt, and nothing tracks it** | Med | [AUTHENTICATION_ARCHITECTURE.md](AUTHENTICATION_ARCHITECTURE.md) sections 5, 6.2 design it as the runtime-tunable global ceiling (allowed profiles/versions, scope catalog, trusted first-party app catalog, TTL bounds, role-enforcement policy). Verified **absent** from `api/prisma/schema.prisma` and all of `api/src`. It has **no W-number**, so it was invisible to the wave plan. Today those ceilings are env/compiled only, which is safe but not runtime-tunable |
 | **N11** | **CONTEXT_INSTRUCTIONS.md still states `Version: 0.54.89`** (DD5 remnant) | Low | Actual is 0.55.6. The doc is outside the freshness manifest, so nothing checks it |
 

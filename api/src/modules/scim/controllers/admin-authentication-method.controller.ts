@@ -16,8 +16,9 @@ import type {
   AuthenticationMethod,
   ProfileAuthentication,
 } from '../endpoint-profile/endpoint-profile.types';
-import { ScimLogger } from '../../logging/scim-logger.service';
+import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { emitAuthAdminEvent } from '../../../oauth/auth-admin-event';
 
 /**
  * Registry of known authentication-method `type` values (architecture section
@@ -83,6 +84,17 @@ export class AdminAuthenticationMethodController {
     @Body() dto: CreateMethodDto,
   ): Promise<AuthenticationMethod> {
     if (!dto.type || typeof dto.type !== 'string' || !KNOWN_METHOD_TYPES.has(dto.type)) {
+      emitAuthAdminEvent(
+        this.logger,
+        {
+          action: 'auth_method_add',
+          outcome: 'failure',
+          endpointId,
+          correlationId: getCorrelationContext()?.requestId,
+          detail: 'unknown authentication method type',
+        },
+        LogCategory.AUTH,
+      );
       throw new BadRequestException(
         `Invalid authentication method type "${dto.type ?? ''}". ` +
         `Allowed: ${Array.from(KNOWN_METHOD_TYPES).join(', ')}.`,
@@ -116,6 +128,19 @@ export class AdminAuthenticationMethodController {
       throw new BadRequestException('Failed to persist the authentication method.');
     }
     this.logger.info(LogCategory.AUTH, `Added authentication method "${savedMethod.id}" (${savedMethod.type}) to endpoint "${endpointId}"`);
+    // A8 - only ids/type reach the event; never `config`, which may carry secrets.
+    emitAuthAdminEvent(
+      this.logger,
+      {
+        action: 'auth_method_add',
+        outcome: 'success',
+        endpointId,
+        credentialId: savedMethod.id,
+        method: savedMethod.type,
+        correlationId: getCorrelationContext()?.requestId,
+      },
+      LogCategory.AUTH,
+    );
     return savedMethod;
   }
 
@@ -126,7 +151,20 @@ export class AdminAuthenticationMethodController {
     @Param('methodId') methodId: string,
   ): Promise<void> {
     const current = await this.loadAuthentication(endpointId);
-    if (!current.methods.some((m) => m.id === methodId)) {
+    const target = current.methods.find((m) => m.id === methodId);
+    if (!target) {
+      emitAuthAdminEvent(
+        this.logger,
+        {
+          action: 'auth_method_remove',
+          outcome: 'failure',
+          endpointId,
+          credentialId: methodId,
+          correlationId: getCorrelationContext()?.requestId,
+          detail: 'authentication method not found',
+        },
+        LogCategory.AUTH,
+      );
       throw new NotFoundException(`Authentication method "${methodId}" not found for endpoint "${endpointId}".`);
     }
     const nextBlock: ProfileAuthentication = {
@@ -139,6 +177,18 @@ export class AdminAuthenticationMethodController {
     };
     await this.persist(endpointId, nextBlock);
     this.logger.info(LogCategory.AUTH, `Removed authentication method "${methodId}" from endpoint "${endpointId}"`);
+    emitAuthAdminEvent(
+      this.logger,
+      {
+        action: 'auth_method_remove',
+        outcome: 'success',
+        endpointId,
+        credentialId: methodId,
+        method: target.type,
+        correlationId: getCorrelationContext()?.requestId,
+      },
+      LogCategory.AUTH,
+    );
   }
 
   /** Load the endpoint's authentication block, defaulting to an empty one. */

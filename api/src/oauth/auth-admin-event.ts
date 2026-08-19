@@ -36,6 +36,8 @@ export type AuthAdminAction =
   | 'jwks_host_update'
   | 'jwks_host_patch'
   | 'jwks_host_remove'
+  | 'auth_method_add'
+  | 'auth_method_remove'
   | 'auth_flags_changed';
 
 /** The outcome of a config-time auth operation. */
