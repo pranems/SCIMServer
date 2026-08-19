@@ -58,6 +58,14 @@ export interface AuthAdminEvent {
   credentialId?: string;
   /** Auth method kind when relevant (e.g. 'wif'). */
   method?: string;
+  /**
+   * A8 - the `authentication.methods[]` entry id. Deliberately NOT named
+   * `credentialId`: `SENSITIVE_KEY_PATTERN` matches /credential/, so any such
+   * key is redacted to `[REDACTED]` and the audit trail loses the one field
+   * that says WHICH method changed. A method id is an opaque profile key, not
+   * a secret, so it is safe and necessary to keep in the clear.
+   */
+  methodId?: string;
   /** JWKS host (bare hostname) for single-host operations. */
   host?: string;
   /** JWKS hosts added by a bulk patch. */
@@ -94,6 +102,7 @@ export function emitAuthAdminEvent(
     outcome: event.outcome,
     endpointId: event.endpointId,
     credentialId: event.credentialId,
+    methodId: event.methodId,
     method: event.method,
     host: event.host,
     hostsAdded: event.hostsAdded,
