@@ -104,8 +104,7 @@ hole exists to close unilaterally).
 
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
-| **W1.2** | Prefetch registered trust JWKS at boot, so the first mint is warm | token mint cold path | Med | - . **Closes Wave 1** |
-| **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - |
+| **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - . `findAllActiveByType` landed with W1.2; the per-endpoint cache and the composite index remain |
 | **P1** | Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint | resource plane | Med | - |
 | **P2** | Nothing caps or prunes credentials or request-log rows | resource plane + storage | Med | - . Solve **with A3'** |
 
@@ -174,12 +173,12 @@ must happen in CI.
 
 ## 3. What is delivered
 
-**Delivery-plan waves: 20 of 33 delivered, 2 settled, 11 open.**
+**Delivery-plan waves: 21 of 33 delivered, 2 settled, 10 open.**
 
 | Wave | State |
 |---|---|
 | **0** Correctness | **Complete** - W0.2, W0.3 (W0.1 declined) |
-| **1** Perf foundation | **8 of 9** - W1.1, W1.3, W1.4, W1.5, W1.6, W1.7a/b/c. Only W1.2's JWKS half remains |
+| **1** Perf foundation | **Complete** - W1.1, W1.2, W1.3, W1.4, W1.5, W1.6, W1.7a/b/c (W1.2 closed it in v0.55.10) |
 | **2** Structural seam | **Complete** - W2.1 .. W2.5 |
 | **3** RFC 7523 correctness | W3.2, W3.4, W3.6, W3.7, W3.8, W3.9 + W3.1 partial. W3.5 open, W3.3 deferred |
 | **4, 5, 6** | Not started |
@@ -192,8 +191,8 @@ lifecycle), the durable-logs W1..12 (**a different W-series** from the delivery 
 do not conflate), the Pre-Q / Q / A unified steps (Q3, Q4, Q5 remain deferred tracks), and F1..F6 of
 the real-Entra proof findings.
 
-**Performance:** X11 options A, B, D, H delivered; G effectively satisfied but never tracked; C
-partial (DB pool done, JWKS prefetch absent); E and F open. All three X15 findings closed via W1.7b.
+**Performance:** X11 options A, B, C, D, H delivered (C closed by W1.2 in v0.55.10); G effectively
+satisfied but never tracked; E and F open. All three X15 findings closed via W1.7b.
 
 ---
 
@@ -203,8 +202,7 @@ Sequenced by value per unit of effort.
 
 ```mermaid
 flowchart TD
-    N6["N6 slice-dependent audience<br/>runbook, BEFORE any slice rollout"] --> W12["W1.2 JWKS prefetch<br/>closes Wave 1"]
-    W12 --> A9["A9 optimistic concurrency<br/>High, profile writes"]
+    N6["N6 slice-dependent audience<br/>runbook, BEFORE any slice rollout"] --> A9["A9 optimistic concurrency<br/>High, profile writes"]
     A9 --> N2["N2 liveness probe<br/>High, estate visibility"]
     N2 --> A3["A3' + P2 log retention and pruning<br/>one problem, two framings"]
     A3 --> N8["N8 stop advertising unenforced methods"]
@@ -213,8 +211,8 @@ flowchart TD
 ```
 
 **Why this order.** **N6** is first because it has an external trigger nobody controls - a SyncFabric
-slice rollout breaks trusts with no change on our side. **W1.2** closes an entire wave for one small
-item. **A9** and **N2** are the remaining High-severity items. **A3' and P2 are the same problem**
+slice rollout breaks trusts with no change on our side. **A9** and **N2** are the remaining
+High-severity items. **A3' and P2 are the same problem**
 (unbounded request-log growth) seen from the security and performance sides, so they should be solved
 once, not twice. **W3.5** is the last thing gating Wave 4.
 

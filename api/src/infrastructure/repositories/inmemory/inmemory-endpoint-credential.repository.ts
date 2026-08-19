@@ -42,6 +42,16 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     );
   }
 
+  async findAllActiveByType(credentialType: string): Promise<EndpointCredentialModel[]> {
+    const now = new Date();
+    return Array.from(this.store.values()).filter(
+      (c) =>
+        c.credentialType === credentialType &&
+        c.active &&
+        (c.expiresAt === null || c.expiresAt > now),
+    );
+  }
+
   async findById(id: string): Promise<EndpointCredentialModel | null> {
     return this.store.get(id) ?? null;
   }

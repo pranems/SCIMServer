@@ -39,6 +39,20 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     return rows.map((r) => this.toModel(r));
   }
 
+  async findAllActiveByType(credentialType: string): Promise<EndpointCredentialModel[]> {
+    const rows = await this.prisma.endpointCredential.findMany({
+      where: {
+        credentialType,
+        active: true,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
+      },
+    });
+    return rows.map((r) => this.toModel(r));
+  }
+
   async findById(id: string): Promise<EndpointCredentialModel | null> {
     try {
       const row = await this.prisma.endpointCredential.findUnique({ where: { id } });

@@ -226,6 +226,32 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
     );
   }
 
+  /**
+   * W1.2 - populate the cache for one `jwksUri` ahead of any request, so the
+   * first mint after a deploy is a cache hit rather than a cold outbound fetch.
+   *
+   * Goes through `fetchJwks`, so it shares single-flight coalescing and the
+   * atomic cache swap with every other path - a prewarm racing a real mint
+   * cannot produce two fetches or a half-updated entry.
+   *
+   * Never rejects, for the same reason the background sweep does not: this runs
+   * at boot, and an IdP that is unreachable at that moment must not prevent the
+   * process from starting. The URI is simply left cold and fetched on first use.
+   */
+  async prewarm(jwksUri: string): Promise<boolean> {
+    try {
+      await this.fetchJwks(jwksUri, this.serverEgress);
+      this.logger.debug(LogCategory.AUTH, 'JWKS prewarm succeeded', { jwksUri });
+      return true;
+    } catch (err) {
+      this.logger.warn(LogCategory.AUTH, 'JWKS prewarm failed (will fetch on first use)', {
+        jwksUri,
+        reason: (err as Error)?.message,
+      });
+      return false;
+    }
+  }
+
   /** True once the `jose` module has been successfully pre-loaded. */
   isJoseLoaded(): boolean {
     return this.josePromise !== undefined;

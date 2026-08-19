@@ -9,6 +9,8 @@ import { AuthErrorsCatalogController } from './auth-errors-catalog.controller';
 import { OAuthSigningKeyService } from './oauth-signing-key.service';
 import { OAuthSigningModule } from './oauth-signing.module';
 import { ExternalJwksValidatorService, JWKS_FETCH } from './external-jwks-validator.service';
+import { JwksPrewarmService } from './jwks-prewarm.service';
+import { RepositoryModule } from '../infrastructure/repositories/repository.module';
 import { WifAssertionValidatorService } from './wif-assertion-validator.service';
 import { WifDiscoveryResolverService } from './wif-discovery-resolver.service';
 import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
@@ -46,6 +48,10 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
   imports: [
     ConfigModule,
     OAuthSigningModule,
+    // W1.2 - the boot JWKS prewarm needs the credential repository to enumerate
+    // registered trusts. Without this import the optional token resolves to
+    // undefined and the prewarm silently never runs.
+    RepositoryModule.register(),
     JwtModule.registerAsync({
       imports: [OAuthSigningModule],
       inject: [OAuthSigningKeyService],
@@ -60,6 +66,7 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
     WifDiscoveryResolverService,
     JwksHostAllowlistService,
     AuthDecisionRecordStore,
+    JwksPrewarmService,
     // Register the JWKS fetch implementation as an injectable so it can be
     // overridden in tests. The default wraps the platform `fetch` (bound to
     // globalThis), preserving the production behavior of the `?? globalThis.fetch`
