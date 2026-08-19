@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.8`
+> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.9`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -697,6 +697,43 @@ Generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts)
 ---
 
 ## 9. Reference
+
+### Auditing who changed the authentication configuration
+
+The routes above answer *"who authenticated?"*. A separate stream answers *"who changed how
+authentication works?"*, which is what an auditor usually needs after an incident.
+
+Every config-time authentication change emits exactly one structured `Auth config change` event,
+readable at:
+
+```http
+GET /scim/admin/log-config/recent?category=auth&limit=300
+Authorization: Bearer <admin token>
+```
+
+Filter on `data.action`:
+
+| `data.action` | Emitted when |
+|---|---|
+| `auth_method_add` / `auth_method_remove` | an `authentication.methods[]` entry is added or removed (v0.55.8) |
+| `auth_flags_changed` | an auth-affecting endpoint flag is flipped (carries `changedFlags[]` with before/after) |
+| `jwks_host_add` / `jwks_host_update` / `jwks_host_patch` / `jwks_host_remove` | the JWKS host allowlist is edited |
+| `wif_verify` / `wif_debug_assertion` | a WIF trust is verified or an assertion is debugged (`dryRun: true`, never mints) |
+
+Every event carries `outcome` (`success` / `failure` / `denied`) and `correlationId`, which is the
+same `X-Request-Id` on the request log, so a config change can be tied back to the call that made it.
+**Failures are emitted too, not just successes** - a rejected change is exactly what an auditor wants
+to see - and a `success` is logged at `INFO` while a `failure` or `denied` is logged at `WARN`.
+
+Payloads are non-secret by construction: hostnames, flag names, ids, and reason codes only. A method's
+`config` is never included, since it can hold operator-supplied material.
+
+One field is worth knowing about when writing a query: an authentication-method event identifies the
+method through **`methodId`**, *not* `credentialId`. The log redactor blanks any field whose name
+contains `credential`, so anything emitted under that name arrives as `[REDACTED]`. Note the
+consequence for the credential events specifically: their `credentialId` **is** redacted today, so
+those records tell you a credential was created, revealed or rotated on an endpoint, but not which
+one.
 
 ### Routes
 

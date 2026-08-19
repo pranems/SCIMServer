@@ -782,6 +782,55 @@ So the assertions were not testing what they appeared to test on two of three fo
 
 ---
 
+## 10D. A8 auth-method audit event (2026-08-19, api v0.55.8)
+
+| # | Type | Sev | Symptom | Root cause | Fix | Why it works | Prevention |
+|---|---|---|---|---|---|---|---|
+| **I-39** | Observability / redaction | **High** | The A8 event was emitted and arrived useless: `"credentialId":"[REDACTED]"`, so the audit record could not say WHICH method changed. Unit tests were green. | The event reused the existing `credentialId` field. [`SENSITIVE_KEY_PATTERN`](../../api/src/security/redact-sensitive.ts) matches `/credential/`, so the shared redactor blanks any key containing "credential" - including an opaque id that is not a secret and is already returned in the `201` body. | Added a `methodId` field to `AuthAdminEvent` and emitted the id there. **The redaction pattern was deliberately NOT loosened** - it legitimately catches `credentialHash`. | The id now travels under a name outside the sensitive namespace, so it survives to the log surface while every genuinely secret-named key stays redacted. The security control is unchanged. | Live **`9z-CF.T3`** asserts `methodId` both equals the created id AND is not `[REDACTED]`, so a rename back into the `/credential/` namespace fails on the wire. |
+| **I-40** | Test correctness | **High** | Two of the five new unit tests could never fail: both `outcome: 'failure'` assertions passed against an empty event list. | The test helper collected events from `logger.info` only. The emitter logs `success` at INFO and `failure` at **WARN**, so failure events were never in the set the helper searched, and `expect(events).toHaveLength(1)` was being evaluated against a list that could only ever be empty for those cases. | Helper reads both `info` and `warn`; both channels cleared between phases. | The assertion now searches the channel the event is actually written to, so a missing failure emission fails the test. | This is R10 (presence is not correctness) occurring **inside the harness** rather than the product. Standing check when asserting on a mocked logger: enumerate every channel the emitter can write to before filtering. |
+
+**Detection-stage escape analysis.**
+
+| # | Caught at | Earliest possible | Escape delta | Note |
+|---|---|---|---|---|
+| I-39 | Stage 2.2 (API E2E) | Stage 2.2 | **none** | **Structurally unreachable earlier.** The unit test mocks `ScimLogger`, so redaction never executes; no unit test at any level of diligence could have caught it. This is the concrete argument for why the checklist requires the E2E and live layers rather than treating them as duplicate coverage of the unit layer. |
+| I-40 | Stage 0 (RED-first) | Stage 0 | **none** | Caught only because the RED step was actually run and the failure count read: 4 failed, 1 passed. Had the tests been written after the implementation, all 5 would have been green immediately and the two vacuous ones would have shipped as permanent false assurance. |
+
+**Headline.** Both issues are arguments for discipline that is easy to skip because it looks
+redundant. I-39 says the E2E layer is not a slower copy of the unit layer - it is the only layer that
+runs the real logger, and the defect lived exactly there. I-40 says the RED step is not ceremony -
+the *only* reason two dead tests were found is that someone looked at which tests failed and counted
+them. Dispositions: **(a) applied** for both in this commit chain; the same redaction defect in the
+three pre-existing emitters is **(b) scheduled** as N12 in
+[REMAINING_WORK_REGISTER.md](REMAINING_WORK_REGISTER.md), because changing what those events publish
+is a separate contract with its own test surface.
+
+---
+
+## 10E. A10 partial authentication block (2026-08-19, api v0.55.9)
+
+| # | Type | Sev | Symptom | Root cause | Fix | Why it works | Prevention |
+|---|---|---|---|---|---|---|---|
+| **I-41** | Data loss / security config | **High** | `PATCH` with `{ "authentication": { "defaultMethodId": "m-abc" } }` returned `200 OK` and deleted **every** configured authentication method on the endpoint. | **Two safe behaviours composing into an unsafe one.** `mergeProfilePartial` replaces `authentication` **wholesale** (correct: the admin methods API submits the whole block), and `expandAuthentication` normalizes a missing `methods` key to `[]` (correct: it normalizes). Neither is wrong alone; together a caller who omits `methods` while meaning "leave it alone" gets a silent wipe. | Refuse a block that does not carry an explicit `methods` **array**, in the shared merge helper. | The write path now distinguishes **absent** from **empty**, which is the only thing the normalizer could not do. A complete block, including a deliberate `methods: []`, is still accepted, so the guard blocks accidental omission rather than the operation. | Unit `A10-T1/T2` + E2E + live **`9z-CG.T2`**, which re-reads the method list after the rejected PATCH rather than asserting the `400` alone - a status-only assertion would pass against a server that returned `400` **and** wiped the data. Controls (`A10-T3`, `9z-CG.T4`) fail on over-tightening. |
+
+**Detection-stage escape analysis.**
+
+| # | Caught at | Earliest possible | Escape delta | Note |
+|---|---|---|---|---|
+| I-41 | Stage 0 (RED-first, from a source read) | Stage 0 | **none** | Found by reading the merge helper and the expander **together** while implementing A8 in the same area, not by a failing test. Neither component had a test that could see the other, so no existing gate could have surfaced it: each was individually correct. |
+
+**Headline and the generalizable lesson.** This is the **second** defect in two consecutive items
+where two individually-correct behaviours composed into an incorrect one - A8's was a correct emit
+plus a correct redactor yielding a useless audit record (I-39), and this is a correct wholesale
+replace plus a correct normalization yielding silent deletion. In both cases every component had
+tests and every test was green, because unit tests are scoped to one component by construction. The
+standing check now applied to any **normalize-then-persist** path: *ask what the normalizer does with
+an absent key, and whether a caller could plausibly omit that key while meaning "leave this
+unchanged".* Where the answer is "it becomes empty", the write path must distinguish absent from
+empty. Disposition: **(a) applied** in this commit chain.
+
+---
+
 ## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)

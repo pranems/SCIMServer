@@ -276,4 +276,47 @@ describe('Endpoint Profile (E2E)', () => {
         .expect(400);
     });
   });
+
+  /**
+   * A10 - `profile.authentication` is replaced WHOLESALE and a missing
+   * `methods` key expands to `[]`, so a partial block silently deletes every
+   * configured authentication method. It must be refused.
+   */
+  describe('A10 - partial authentication block is refused', () => {
+    it('rejects a block that omits methods, and leaves the existing methods intact', async () => {
+      const endpointId = await createEndpoint(app, token);
+
+      const created = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'bearer', displayName: 'A10 keep me' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { authentication: { defaultMethodId: created.body.id } } })
+        .expect(400);
+
+      // The decisive assertion: the method the partial PATCH would have wiped.
+      const after = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(after.body.methods).toHaveLength(1);
+      expect(after.body.methods[0].id).toBe(created.body.id);
+    });
+
+    it('accepts a complete block carrying an explicit methods array', async () => {
+      const endpointId = await createEndpoint(app, token);
+
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { authentication: { schemaVersion: 1, methods: [] } } })
+        .expect(200);
+    });
+  });
 });

@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.8`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.9`
 
-> **Version:** 0.55.8 - **Updated:** 2026-07-31  
+> **Version:** 0.55.9 - **Updated:** 2026-07-31  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
 > **117 route handlers** across 31 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 
@@ -723,6 +723,32 @@ Declares a structured authentication method (id, type, plane, priority, config, 
 ### DELETE /scim/admin/endpoints/:endpointId/authentication/methods/:methodId
 
 Removes a declared method.
+
+#### Both mutations are audited (v0.55.8)
+
+`POST` and `DELETE` change **how an endpoint authenticates**, so each emits one structured
+`Auth config change` audit event, readable at
+`GET /scim/admin/log-config/recent?category=auth`:
+
+| Operation | `data.action` | `data.outcome` |
+|---|---|---|
+| `POST` accepted | `auth_method_add` | `success` |
+| `POST` with an unknown `type` | `auth_method_add` | `failure` |
+| `DELETE` accepted | `auth_method_remove` | `success` |
+| `DELETE` of an unknown method | `auth_method_remove` | `failure` |
+
+Failure outcomes are emitted **before** the `400` / `404` is returned, so a probing or misconfigured
+caller is visible rather than silent. Per the shared emitter convention a `success` is logged at
+`INFO` and a `failure` at `WARN`.
+
+The event identifies the affected method through **`data.methodId`**, not `credentialId`. This is
+load-bearing: the log redactor blanks any field whose name contains `credential`, so an id emitted
+under that name arrives as `[REDACTED]` and the audit record cannot say which method changed.
+
+The event carries the method `id` and `type` only. A method's `config` is **never** included, because
+it may hold operator-supplied material.
+
+Details and rationale: [auth/A8_AUTH_METHOD_AUDIT_EVENT.md](auth/A8_AUTH_METHOD_AUDIT_EVENT.md).
 
 ---
 

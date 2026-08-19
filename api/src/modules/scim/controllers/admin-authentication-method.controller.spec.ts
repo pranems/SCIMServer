@@ -65,7 +65,7 @@ describe('AdminAuthenticationMethodController - A8 auth-admin audit events', () 
       outcome: 'success',
       endpointId: ENDPOINT_ID,
       method: 'wif-7523',
-      credentialId: created.id,
+      methodId: created.id,
     });
   });
 
@@ -82,7 +82,7 @@ describe('AdminAuthenticationMethodController - A8 auth-admin audit events', () 
       outcome: 'success',
       endpointId: ENDPOINT_ID,
       method: 'bearer',
-      credentialId: created.id,
+      methodId: created.id,
     });
   });
 
@@ -113,3 +113,4 @@ describe('AdminAuthenticationMethodController - A8 auth-admin audit events', () 
     expect(serialized).not.toContain('clientSecret');
   });
 });
+

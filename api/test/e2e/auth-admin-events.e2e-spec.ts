@@ -105,4 +105,80 @@ describe('Auth config change events (E2E) - Phase 4', () => {
     );
     expect(hit).toBeUndefined();
   });
+
+  /**
+   * A8 - adding or removing an authentication method is the most
+   * security-sensitive config-time mutation the product exposes. It previously
+   * emitted only free-text INFO, which cannot be alerted on or counted.
+   */
+  describe('A8 - authentication-method changes', () => {
+    it('an add emits auth_method_add, and a remove emits auth_method_remove', async () => {
+      const endpointId = await createEndpoint(app, adminToken);
+
+      const created = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ type: 'wif-7523', displayName: 'A8 e2e' })
+        .expect(201);
+      const methodId = created.body.id as string;
+
+      const added = (await recentAuthEvents()).find(
+        (e) => (e.data as Record<string, unknown>)?.action === 'auth_method_add' &&
+          (e.data as Record<string, unknown>)?.methodId === methodId,
+      );
+      expect(added).toBeDefined();
+      expect((added!.data as Record<string, unknown>).outcome).toBe('success');
+      expect((added!.data as Record<string, unknown>).endpointId).toBe(endpointId);
+      expect((added!.data as Record<string, unknown>).method).toBe('wif-7523');
+
+      await request(app.getHttpServer())
+        .delete(`/scim/admin/endpoints/${endpointId}/authentication/methods/${methodId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(204);
+
+      const removed = (await recentAuthEvents()).find(
+        (e) => (e.data as Record<string, unknown>)?.action === 'auth_method_remove' &&
+          (e.data as Record<string, unknown>)?.methodId === methodId,
+      );
+      expect(removed).toBeDefined();
+      expect((removed!.data as Record<string, unknown>).outcome).toBe('success');
+      expect((removed!.data as Record<string, unknown>).method).toBe('wif-7523');
+    });
+
+    it('a rejected method type emits a failure event rather than silence', async () => {
+      const endpointId = await createEndpoint(app, adminToken);
+
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ type: 'definitely-not-a-method' })
+        .expect(400);
+
+      const hit = (await recentAuthEvents()).find(
+        (e) => (e.data as Record<string, unknown>)?.action === 'auth_method_add' &&
+          (e.data as Record<string, unknown>)?.endpointId === endpointId &&
+          (e.data as Record<string, unknown>)?.outcome === 'failure',
+      );
+      expect(hit).toBeDefined();
+    });
+
+    it('the emitted event carries no secret-bearing config', async () => {
+      const endpointId = await createEndpoint(app, adminToken);
+
+      await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ type: 'oauth-client', config: { clientSecret: 'e2e-planted-secret', issuer: 'https://example.test' } })
+        .expect(201);
+
+      const mine = (await recentAuthEvents()).filter(
+        (e) => (e.data as Record<string, unknown>)?.endpointId === endpointId,
+      );
+      expect(mine.length).toBeGreaterThan(0);
+      expect(JSON.stringify(mine)).not.toContain('e2e-planted-secret');
+      expect(JSON.stringify(mine)).not.toContain('clientSecret');
+    });
+  });
 });
+
+

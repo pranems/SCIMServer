@@ -14885,6 +14885,143 @@ try {
 Write-Host "`n--- 9z-CE: JWKS Cache Cadence Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CF: auth-method change audit events (A8)
+$script:currentSection = "9z-CF: auth-method audit events (A8)"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CF: Auth-Method Change Audit Events (A8) ===" -ForegroundColor Cyan
+
+try {
+    function Get-CfAuthEvents {
+        try {
+            $recent = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=auth&limit=300" -Method GET -Headers $headers
+            if ($null -ne $recent -and $null -ne $recent.entries) {
+                return @($recent.entries | Where-Object { $_.message -eq 'Auth config change' })
+            }
+        } catch { }
+        return @()
+    }
+
+    $cfEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-a8-audit-$(Get-Random)"
+    } | ConvertTo-Json)
+    $cfId = $cfEndpoint.id
+
+    try {
+        # T1 - an add emits auth_method_add with the method id IN THE CLEAR.
+        $cfMethod = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cfId/authentication/methods" -Method POST -Headers $headers -Body (@{
+            type = 'wif-7523'; displayName = 'live A8'
+        } | ConvertTo-Json)
+        $cfMethodId = $cfMethod.id
+
+        $cfAdd = @(Get-CfAuthEvents | Where-Object { $_.data.action -eq 'auth_method_add' -and $_.data.methodId -eq $cfMethodId })
+        Test-Result -Success ($cfAdd.Count -ge 1) `
+            -Message "9z-CF.T1: adding an authentication method emits an auth_method_add audit event"
+
+        Test-Result -Success ($cfAdd.Count -ge 1 -and $cfAdd[0].data.outcome -eq 'success' -and $cfAdd[0].data.method -eq 'wif-7523') `
+            -Message "9z-CF.T2: the event carries outcome=success and the method type"
+
+        # T3 is the regression lock for the defect this section exists for: the
+        # shared redactor blanks any key matching /credential/, so an id emitted
+        # as `credentialId` arrives as [REDACTED] and the audit trail cannot say
+        # WHICH method changed. `methodId` must survive in the clear.
+        Test-Result -Success ($cfAdd.Count -ge 1 -and $cfAdd[0].data.methodId -eq $cfMethodId -and $cfAdd[0].data.methodId -ne '[REDACTED]') `
+            -Message "9z-CF.T3 (regression lock): methodId survives redaction and identifies the changed method"
+
+        # T4 - the event must never carry the method config.
+        $cfAddJson = $cfAdd | ConvertTo-Json -Depth 8
+        Test-Result -Success ($cfAddJson -notmatch 'clientSecret') `
+            -Message "9z-CF.T4: the audit event carries no method config keys"
+
+        # T5 - a rejected type emits a failure event rather than silence.
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cfId/authentication/methods" -Method POST -Headers $headers -Body (@{
+                type = 'definitely-not-a-method'
+            } | ConvertTo-Json) | Out-Null
+        } catch { }
+        $cfFail = @(Get-CfAuthEvents | Where-Object { $_.data.action -eq 'auth_method_add' -and $_.data.endpointId -eq $cfId -and $_.data.outcome -eq 'failure' })
+        Test-Result -Success ($cfFail.Count -ge 1) `
+            -Message "9z-CF.T5: a rejected method type emits an outcome=failure event, not silence"
+
+        # T6 - a remove emits auth_method_remove.
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cfId/authentication/methods/$cfMethodId" -Method DELETE -Headers $headers | Out-Null
+        $cfRemove = @(Get-CfAuthEvents | Where-Object { $_.data.action -eq 'auth_method_remove' -and $_.data.methodId -eq $cfMethodId })
+        Test-Result -Success ($cfRemove.Count -ge 1) `
+            -Message "9z-CF.T6: removing an authentication method emits an auth_method_remove audit event"
+    } finally {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cfId" -Method DELETE -Headers $headers | Out-Null
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CF: auth-method audit event section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CF: Auth-Method Audit Events Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-CG: partial authentication block is refused (A10)
+$script:currentSection = "9z-CG: partial authentication block (A10)"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CG: Partial Authentication Block Refused (A10) ===" -ForegroundColor Cyan
+
+try {
+    $cgEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-a10-partial-$(Get-Random)"
+    } | ConvertTo-Json)
+    $cgId = $cgEndpoint.id
+
+    try {
+        # Seed a method that a partial PATCH would silently delete.
+        $cgMethod = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cgId/authentication/methods" -Method POST -Headers $headers -Body (@{
+            type = 'bearer'; displayName = 'A10 keep me'
+        } | ConvertTo-Json)
+        $cgMethodId = $cgMethod.id
+
+        # T1 - a block WITHOUT `methods` must be rejected. `profile.authentication`
+        # is replaced wholesale and a missing `methods` expands to [], so accepting
+        # this would wipe every configured method.
+        $cgRejected = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cgId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ authentication = @{ defaultMethodId = $cgMethodId } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+        } catch { $cgRejected = $true }
+        Test-Result -Success $cgRejected `
+            -Message "9z-CG.T1: a partial authentication block (no methods) is rejected"
+
+        # T2 is the one that matters - the data must still be there.
+        $cgAfter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cgId/authentication/methods" -Method GET -Headers $headers
+        Test-Result -Success (@($cgAfter.methods).Count -eq 1 -and $cgAfter.methods[0].id -eq $cgMethodId) `
+            -Message "9z-CG.T2 (data-loss lock): the method the partial PATCH would have wiped is still present"
+
+        # T3 - a non-array methods value is rejected too.
+        $cgBadArray = $false
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cgId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ authentication = @{ methods = 'not-an-array' } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+        } catch { $cgBadArray = $true }
+        Test-Result -Success $cgBadArray `
+            -Message "9z-CG.T3: a non-array methods value is rejected"
+
+        # T4 - a COMPLETE block is still accepted, so the guard refuses partials
+        # rather than the section as a whole.
+        $cgComplete = $true
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cgId" -Method PATCH -Headers $headers -Body (@{
+                profile = @{ authentication = @{ schemaVersion = 1; methods = @() } }
+            } | ConvertTo-Json -Depth 5) | Out-Null
+        } catch { $cgComplete = $false }
+        Test-Result -Success $cgComplete `
+            -Message "9z-CG.T4 (control): a complete block with an explicit empty methods array is still accepted"
+    } finally {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cgId" -Method DELETE -Headers $headers | Out-Null
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CG: partial authentication block section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CG: Partial Authentication Block Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
