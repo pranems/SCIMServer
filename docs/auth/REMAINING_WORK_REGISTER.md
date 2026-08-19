@@ -1,4 +1,8 @@
-# Auth + WIF + SyncFabric remaining-work register (X16)
+# Auth + WIF + SyncFabric work register (X16) - delivered and remaining
+
+**This is the single consolidated ledger.** Section 2A is everything **delivered**; sections 2, 3, 4B
+and 5 are everything **remaining**. If the two disagree with any other document, this one was
+verified against source most recently and wins - but check its `Last verified` date first.
 
 **Status:** STOCK-TAKE. Every row below was verified against real sources on **2026-08-19**, not
 carried forward from a previous document.
@@ -122,13 +126,62 @@ legacy-umbrella retirement and enforcement flip are still scheduled).
 
 ---
 
+## 2A. Delivered (the other half of the ledger)
+
+This section exists because "what is left?" is only half a stock-take, and the delivered half was
+previously spread across the plan's per-item status lines, `EXECUTION_LEDGER.md`, the `README.md`
+reconciliation table and the CHANGELOG - four places, none of them complete.
+
+**Delivery-plan waves: 20 of 33 items delivered, 2 settled, 11 open.**
+
+| Wave | Delivered | Note |
+|---|---|---|
+| **0** | W0.2, W0.3 | Wave complete (W0.1 declined, not open) |
+| **1** | W1.1, W1.3, W1.4, W1.5, W1.6, W1.7a/b/c | **8 of 9. Only W1.2 remains**, and only its JWKS half |
+| **2** | W2.1, W2.2, W2.3, W2.4, W2.5 | **Wave complete.** W2.4 and W2.5 shipped their load-bearing core; provider relocation and the legacy-umbrella retirement are scheduled tails, not open items |
+| **3** | W3.2, W3.4, W3.6, W3.7, W3.8, W3.9, + W3.1 partial | W3.5 open, W3.3 deferred |
+| **4, 5, 6** | none | Not started |
+
+**Canonical guide actions: 5 of 15 closed.**
+
+| ID | Closed by |
+|---|---|
+| **A1/A13** | mirror re-synced to revision 7, byte-identical at 6,503 lines (2026-08-19) |
+| **A4** | largely by **W3.7** (v0.54.78) - a mismatched `client_id` is rejected. Residual: not *required* when the trust pins no `targetClientId` |
+| **A8** | v0.55.8 - `auth_method_add` / `auth_method_remove` with failure outcomes |
+| **A10** | v0.55.9 - partial `authentication` block refused |
+| **A12** | v0.55.8 - the mislabelled merge comment |
+
+**Whole tracks complete** (see 4A for how these were found, and for the statuses that needed
+source-verification because the doc-level sweep reported them wrong):
+
+| Track | Items | Shipped |
+|---|---|---|
+| **Pre-Q / Q / A unified steps** | Pre-Q.A, Pre-Q.B, Q0, Q1, Q2, Q6, A0, A1, A2, A3, A4 | Q3, Q4, Q5 remain **deferred** tracks |
+| **WI** connection-info | WI-1 .. WI-17 | all 17 |
+| **U** Connect + Logs UX | U1 .. U12 | all 12 (v0.54.32-37) |
+| **V** credential lifecycle | V1 .. V12 | all 12 (v0.54.38-40) |
+| **W** durable logs + Connect UX | W1 .. W12 | all 12 (v0.54.42-48). **Distinct from the delivery plan's W0.1-W6.2** - do not conflate |
+| **F** real-Entra proof findings | F1 .. F6 | F7 open by design (= W5.2), F8 open |
+
+**Performance (X11 A-H):** A, B, D, H delivered; G effectively satisfied; C partial; E and F open.
+Full breakdown with the verification method in **4B**.
+
+**What "delivered" means here.** Every row was confirmed against source or against a
+`**Status: DELIVERED**` line that was itself source-checked during this stock-take. Section 1
+records two rows where the plan claimed *outstanding* work that had in fact shipped, and 4A records
+five where a doc-level sweep claimed *open* work that had also shipped. **Both directions of error
+occur**, so a status is only trustworthy with its verification method attached.
+
+---
+
 ## 3. Canonical guide action list (A1-A15)
 
 Re-checked against source. Path corrections from C4 applied.
 
 | ID | Action | Sev | Verified state on 2026-08-19 |
 |---|---|---|---|
-| **A1/A13** | Re-sync the in-repo guide mirror with the canonical copy | Blocking | **OPEN and widening.** Canonical 6,503 lines vs mirror 5,642, a **861-line** gap. Neither is a superset: the mirror holds the authoritative section 0.1 decision record, the canonical holds revisions 6-7. A blind copy in either direction **destroys information** - this needs a merge, not an overwrite |
+| **A1/A13** | Re-sync the in-repo guide mirror with the canonical copy | Blocking | **DELIVERED 2026-08-19.** Both are now byte-identical at **6,503 lines** (revision 7). The earlier 861-line bidirectional divergence is closed |
 | **A8** | Structured `auth_methods_changed` audit event | High | **DELIVERED v0.55.8** as `auth_method_add` / `auth_method_remove`, with failure outcomes as well as success. Doc: [A8_AUTH_METHOD_AUDIT_EVENT.md](A8_AUTH_METHOD_AUDIT_EVENT.md); RCA I-39/I-40. Surfaced **N12** (the pre-existing `credentialId` redaction) |
 | **A9** | Optimistic concurrency on profile writes | High | OPEN. No `ifMatch` / `rowVersion` guard in [endpoint.service.ts](../../api/src/modules/endpoint/services/endpoint.service.ts) |
 | **A10** | Reject a partial `authentication` block | High | **DELIVERED v0.55.9.** `mergeProfilePartial` now refuses a block without an explicit `methods` array. It was a real silent-data-loss path: wholesale replace + a normalizer that turns a missing `methods` into `[]` deleted every method on a `200 OK`. Doc: [A10_PARTIAL_AUTHENTICATION_BLOCK.md](A10_PARTIAL_AUTHENTICATION_BLOCK.md); RCA I-41 |

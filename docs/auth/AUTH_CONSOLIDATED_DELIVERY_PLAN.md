@@ -1,10 +1,11 @@
 # Consolidated auth + WIF + performance delivery plan (X13)
 
 Status: PLAN (source re-verified against `origin/master` `09b4b78d`, api v0.55.7, on
-2026-08-19). **Remaining-work register:** the consolidated, cross-checked answer to "what is
-left?" - across this plan, the canonical guide's action list, GitHub issues and the estate -
-now lives in [REMAINING_WORK_REGISTER.md](REMAINING_WORK_REGISTER.md) (X16). Read that first;
-this document remains the authority on **how** each item is sequenced and what its DoD is.
+2026-08-19). **Single consolidated ledger:** the cross-checked answer to **both** "what shipped?"
+(register section 2A) and "what is left?" (sections 2, 3, 4B, 5) - across this plan, the canonical
+guide's action list, GitHub issues and the estate - lives in
+[REMAINING_WORK_REGISTER.md](REMAINING_WORK_REGISTER.md) (X16). **Read that first;** this document
+remains the authority on **how** each item is sequenced and what its DoD is.
 **Branch note:** `feat/wif` is no longer a feature branch - it, `master`,
 and `release/0.55.0` all resolve to the same commit, so "source at `feat/wif`" now just
 means mainline. This doc **consolidates and sequences** three previously separate
