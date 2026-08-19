@@ -1295,6 +1295,11 @@ works today.
 > **Everything in this subsection is a design record, not shipped behavior.** As
 > of v0.55.7 the server behaves exactly as the table above describes. Do not cite
 > this subsection as documentation of a live feature.
+>
+> **Tracking lives elsewhere.** The status of every rule, the remaining items with
+> their blocking conditions, and the sequencing are maintained in
+> [SCIM_ATTRIBUTE_VALIDATION_CONFORMANCE_ROADMAP.md](../SCIM_ATTRIBUTE_VALIDATION_CONFORMANCE_ROADMAP.md).
+> This section states the intent; that document tracks the work.
 
 One change is planned, driven by the analysis in sections 12 to 14:
 

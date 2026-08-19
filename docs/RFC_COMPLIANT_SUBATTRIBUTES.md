@@ -376,6 +376,8 @@ have meant the assertions could not detect the feature's absence.
 
 > **This section is a design record.** Item 1 **shipped in v0.55.7**; items 2 and
 > 3 are not live. Do not cite 2 or 3 as documentation of shipped behavior.
+> Live tracking, including blocking conditions and definitions of done, is in
+> [SCIM_ATTRIBUTE_VALIDATION_CONFORMANCE_ROADMAP.md](SCIM_ATTRIBUTE_VALIDATION_CONFORMANCE_ROADMAP.md).
 
 A deeper re-reading of RFC 7643, plus a measured survey of two live estates,
 produced three intended changes. The full analysis, including the evidence, is in
