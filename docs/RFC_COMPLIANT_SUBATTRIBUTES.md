@@ -385,7 +385,7 @@ sections 12 to 15.
 | # | Change | Status | Why |
 |---|---|---|---|
 | 1 | **R2 moved out of the flag into base strict validation**, so a multi-valued simple sub-attribute is accepted at either flag setting | **SHIPPED v0.55.7** | The flag was inconsistent: permissive about nesting, strict about cardinality, so it both loosened and tightened. R2 was a defect (strict honoured `multiValued` at level 1 and ignored it at level 2, rejecting schema-conformant payloads), not a policy. Measured blast radius was **0 of 2,826** declared sub-attributes, and the change only accepts more. |
-| 2 | **`ON` grows from 1 rule to the full catalogue** - adds schema-definition rules D1 to D11 alongside today's P1 and P2 | planned | The flag claims RFC conformance but only checks nesting, and only at payload time. A schema that no compliant client could PATCH is currently accepted and published. |
+| 2 | **`ON` grows from 1 rule to the full catalogue** - adds schema-definition rules D1 to D11 alongside today's P1 (not P2, which is no longer flag-gated) | planned | The flag claims RFC conformance but only checks nesting, and only at payload time. A schema that no compliant client could PATCH is currently accepted and published. |
 | 3 | **The flag is renamed** | planned | `RfcCompliantSubAttributes` names only part of what it would govern - most of the new rules are *attribute* rules, not sub-attribute rules. It is set on **zero** endpoints across all three estates today, so a rename is free now and breaking later. |
 
 Two results from the survey shaped the design and are worth carrying forward:

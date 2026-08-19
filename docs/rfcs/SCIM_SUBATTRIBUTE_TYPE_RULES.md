@@ -1298,10 +1298,12 @@ works today.
 
 One change is planned, driven by the analysis in sections 12 to 14:
 
-**`ON` grows from one rule to the full catalogue.** P1 today; P1, P2 and D1 to
-D11 (minus the document-only D7/D8, with D5 as a warning and D6 in its meaningful
-form) under the plan. Because the D-rules are schema rules, this adds a **second
-enforcement point** at schema-write time, as diagrammed in
+**`ON` grows from one rule to the full catalogue.** P1 today; P1 plus D1 to D11
+(minus the document-only D7/D8, with D5 as a warning and D6 in its meaningful
+form) under the plan. P2 is deliberately **not** in that list: as of v0.55.7 it
+is base behavior of `StrictSchemaValidation` and is not gated on this flag at
+all. Because the D-rules are schema rules, this adds a **second enforcement
+point** at schema-write time, as diagrammed in
 [section 12.4](#124-where-each-family-can-be-evaluated).
 
 The measured blast radius is in [section 13.5](#135-what-the-measurement-implies):
