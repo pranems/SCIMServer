@@ -748,12 +748,12 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     type: 'boolean',
     default: false,
     description:
-      'When true, sub-attributes are handled per RFC 7643: a complex attribute MUST NOT contain ' +
-      'complex sub-attributes (§2.3.8, erratum 8415) so a payload populating one is rejected 400 ' +
-      'invalidValue, AND a multi-valued SIMPLE sub-attribute is honoured (§1.2, erratum 5607) with ' +
-      'each element type-checked. When false (default), current behavior is preserved exactly: ' +
-      'nested complex sub-attributes are accepted and a multi-valued simple sub-attribute is ' +
-      'rejected as "must be a string, got object". Leave false unless you author custom schemas.',
+      'When true, enforces RFC 7643 §2.3.8 (erratum 8415): a complex attribute MUST NOT contain ' +
+      'complex sub-attributes, so a payload populating one is rejected 400 invalidValue. This ' +
+      'only ever tightens, and runs independently of StrictSchemaValidation. When false ' +
+      '(default), nested complex sub-attributes are accepted as before. Leave false unless you ' +
+      'author custom schemas. Note: multi-valued SIMPLE sub-attributes (§1.2, erratum 5607) are ' +
+      'honoured by StrictSchemaValidation itself and need no flag.',
   },
 };
 

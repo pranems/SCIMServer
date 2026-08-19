@@ -1,6 +1,6 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.7`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 

@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.7`
 
-> **Version:** 0.55.6 - **Updated:** July 20, 2026  
+> **Version:** 0.55.7 - **Updated:** July 20, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
 > 30 flags: 19 boolean + 1 log level + 1 tri-state string (`PrimaryEnforcement`) + 1 two-value enum (`CredentialSecretVisibility`) + 11 numeric runtime-egress overrides + 1 request-log privacy boolean (`PersistRequestSecrets`).  
 > 5 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
@@ -220,20 +220,30 @@ See [ENDPOINT_PROFILE_ENFORCEMENT_DESIGN.md §8.1a](ENDPOINT_PROFILE_ENFORCEMENT
 ### RfcCompliantSubAttributes
 
 When `false` (**default**) the current behavior is preserved exactly, so no
-existing endpoint changes when this flag ships. When `true`, sub-attribute
-shapes are handled per RFC 7643 instead. The flag governs exactly two rules:
+existing endpoint changes when this flag ships. When `true`, the server enforces
+one RFC 7643 shape rule that it is otherwise too permissive about.
 
 | Rule | RFC | Flag OFF (default) | Flag ON |
 |---|---|---|---|
 | **R1** complex sub-attribute | [RFC 7643 §2.3.8](rfcs/rfc7643.txt), erratum 8415 | a schema may declare one and a payload populating it is **accepted** | the payload is **rejected** `400 invalidValue` |
-| **R2** multi-valued SIMPLE sub-attribute | [RFC 7643 §1.2](rfcs/rfc7643.txt), erratum 5607 | **rejected** (`must be a string, got object`) | **accepted**, each element type-checked with an `[index]` path |
 
 RFC 7643 §2.3.8 states a complex attribute "MUST NOT contain sub-attributes that
-have sub-attributes (i.e., that are complex)", and §1.2 defines a simple
-attribute as "singular or multi-valued", which is why a multi-valued *simple*
-sub-attribute is legal while a *complex* one is not. See
-[SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md) for the
-full combination matrix and the ISV/IdP survey.
+have sub-attributes (i.e., that are complex)".
+
+**This flag only ever tightens.** Everything it does rejects something that
+would otherwise be accepted, which makes its blast radius easy to reason about:
+turning it on can only ever produce new `400`s, never new `201`s.
+
+> **A multi-valued SIMPLE sub-attribute is NOT governed by this flag.**
+> RFC 7643 §1.2 defines a simple attribute as "singular or multi-valued", so
+> `skus: ["A", "B"]` inside a complex attribute is legal, and
+> [`StrictSchemaValidation`](#strictschemavalidation) honours it on its own with
+> each element type-checked at an `[index]` path. This used to be bundled into
+> `RfcCompliantSubAttributes`, which was a design error: it was a **defect fix**
+> (strict mode honoured `multiValued` at level 1 and ignored it at level 2, so
+> it rejected payloads that conform to the declared schema) rather than a policy
+> choice, and bundling it made this flag simultaneously loosen and tighten. See
+> [SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md).
 
 **It is standalone.** It is deliberately NOT gated on
 [`StrictSchemaValidation`](#strictschemavalidation), because the two answer
@@ -271,12 +281,66 @@ diagnostics envelope, whatever the strict setting:
 ```
 
 **When to turn it on.** Only if you author custom schemas and want the server to
-hold you to the RFC's shape rules, or if you need multi-valued simple
-sub-attributes (R2). Leave it off otherwise - stock `User` and `Group` schemas
-declare no complex sub-attributes, so the flag is a no-op for them.
+hold you to the RFC's shape rules. Leave it off otherwise - stock `User` and
+`Group` schemas declare no complex sub-attributes, so the flag is a no-op for
+them. Measured across the live estate (2026-08-18): **0 of 2,826** declared
+sub-attributes are complex.
 
 Applies to `POST`, `PUT` and `PATCH`, to `/Users`, `/Groups` and custom resource
 types alike. Full design: [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md).
+
+#### StrictSchemaValidation vs RfcCompliantSubAttributes
+
+These two are the pair most often confused, because both mention "schema" and
+both can produce a `400`. They are not a hierarchy and neither implies the
+other.
+
+| Aspect | `StrictSchemaValidation` | `RfcCompliantSubAttributes` |
+|---|---|---|
+| Question it answers | *How carefully do I police this payload?* | *Is this schema shape legal at all?* |
+| Default | `true` | `false` |
+| Direction | master switch: ON polices, OFF barely looks | tightening only |
+| What it inspects | the **payload**, against the schema | the **schema shape** the payload reaches into |
+| Turning it OFF | skips type, unknown-attribute and canonical-value checks entirely | accepts the nested-complex shape again |
+| Gated checks | unknown schema URN, unknown attribute, unknown extension attribute, unknown sub-attribute, plus all type / canonical / immutable / readOnly-PATCH enforcement | complex sub-attribute rejection (R1) |
+| Runs when the other is off? | yes | yes, by design |
+| `triggeredBy` on rejection | `StrictSchemaValidation` | `RfcCompliantSubAttributes` |
+| RFC basis | §2.2 / §2.4 / §7 characteristics | §2.3.8 + erratum 8415 |
+| Typical reason to change | set **false** for Entra ID interop | set **true** only when authoring custom schemas |
+
+The most important practical consequence is that **lenient mode is not a weaker
+validator, it is largely no validator**: with `StrictSchemaValidation` off the
+server runs required-attribute checks and nothing else, so a genuinely wrong
+type is stored silently. That is a deliberate interop concession, not a
+correctness position.
+
+```mermaid
+flowchart TD
+    A["Inbound POST / PUT / PATCH"] --> B{"RfcCompliantSubAttributes ON?"}
+    B -->|"yes"| C["Standalone 2.3.8 pass"]
+    C -->|"complex sub-attribute populated"| X["400 invalidValue<br/>triggeredBy RfcCompliantSubAttributes"]
+    C -->|"clean"| D{"StrictSchemaValidation ON?"}
+    B -->|"no"| D
+    D -->|"no"| E["required-attribute checks only<br/>no type checking at all"]
+    D -->|"yes"| F["full schema validation"]
+    F --> G["unknown URN / attribute / sub-attribute -> 400"]
+    F --> H["types, canonical values, mutability"]
+    H --> I{"sub-attribute declared multiValued?"}
+    I -->|"yes"| J["type-check EACH element<br/>path attr.sub[index]"]
+    I -->|"no"| K["type-check as a single value<br/>an array here is a 400"]
+```
+
+Outcome matrix for the two shapes that distinguish them:
+
+| `StrictSchemaValidation` | `RfcCompliantSubAttributes` | complex sub-attribute populated | multi-valued simple sub-attribute |
+|---|---|---|---|
+| ON | OFF | accepted | **accepted** |
+| ON | ON | **400** (R1) | **accepted** |
+| OFF | OFF | accepted | accepted, untyped |
+| OFF | ON | **400** (R1, standalone) | accepted, untyped |
+
+Note the multi-valued column no longer varies with the flag. That is the point:
+it is base behavior.
 
 ---
 
@@ -429,6 +493,33 @@ flowchart TD
   "detail": "Extension URN 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User' found in body but not in schemas[] array"
 }
 ```
+
+**Full scope.** The URN check above is the most visible effect but not the only
+one. This flag is the master switch for payload validation as a whole, so
+turning it off disables considerably more than the URN check:
+
+| Check | Strict ON | Strict OFF |
+|---|---|---|
+| Extension URN listed in `schemas[]` | 400 | accepted |
+| Unknown top-level attribute | 400 | accepted |
+| Unknown extension attribute | 400 | accepted |
+| Unknown sub-attribute | 400 | accepted |
+| Attribute **type** (string / boolean / integer / decimal / dateTime / binary / reference / complex) | 400 | **not checked at all** |
+| Canonical values | 400 | not checked |
+| Cardinality (`multiValued`) at both attribute and sub-attribute level | enforced | not checked |
+| Immutable attribute changed on `PUT` | 400 | accepted |
+| `readOnly` attribute in a `PATCH` op | 400 | silently stripped |
+| Required attributes on create / replace | 400 | **400 (always enforced)** |
+
+The row that surprises people is the type row: **lenient mode is not a more
+forgiving validator, it is essentially no validator**, so a genuinely wrong type
+is stored without complaint. Required-attribute checks are the one thing that
+runs unconditionally, because RFC 7643 §2.4 states them as a "MUST".
+
+Set it to `false` for Entra ID interop, where the provisioning service sends
+undeclared attributes and trimmed sub-attribute sets. See
+[RfcCompliantSubAttributes](#rfccompliantsubattributes) for how this flag
+differs from the other schema-shaped flag, including the outcome matrix.
 
 ---
 

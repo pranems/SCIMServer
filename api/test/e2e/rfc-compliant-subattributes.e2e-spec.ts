@@ -253,16 +253,27 @@ describe('RfcCompliantSubAttributes (E2E)', () => {
     });
   });
 
-  // ─── Flag ON + R2: multi-valued SIMPLE sub-attributes honoured ────────────
+  // ─── R2: multi-valued SIMPLE sub-attributes honoured (BASE behavior) ──────
 
-  describe('flag ON - R2 honours multi-valued simple sub-attributes (section 1.2)', () => {
+  // R2 is a defect fix, not a tightening, so it is asserted at BOTH flag
+  // settings. Strict mode honours `multiValued` at level 1; ignoring it at
+  // level 2 rejected payloads that conform to the declared schema.
+  describe.each([
+    ['flag ON', true],
+    ['flag OFF', false],
+  ])('R2 honours multi-valued simple sub-attributes (section 1.2) [%s]', (label, flag) => {
+    const slug = label.replace(/\W+/g, '-').toLowerCase();
+
     it('strict ON: accepts an array of primitives and round-trips it (201)', async () => {
       const id = await createEndpoint(app, token);
-      await configure(app, token, id, { StrictSchemaValidation: true, RfcCompliantSubAttributes: true });
+      await configure(app, token, id, {
+        StrictSchemaValidation: true,
+        RfcCompliantSubAttributes: flag,
+      });
 
       const res = expectStatus(
         await scimPost(app, `${scimBasePath(id)}/Users`, token, {
-          ...baseUser('skus'),
+          ...baseUser(`skus-${slug}`),
           licenses: [{ value: 'E5', skus: ['EXCHANGE', 'TEAMS'] }],
         }),
         201,
@@ -271,28 +282,16 @@ describe('RfcCompliantSubAttributes (E2E)', () => {
       expect(res.body.licenses[0].skus).toEqual(['EXCHANGE', 'TEAMS']);
     });
 
-    it('strict ON with the flag OFF: the same payload is REJECTED (legacy behavior)', async () => {
-      const id = await createEndpoint(app, token);
-      await configure(app, token, id, { StrictSchemaValidation: true, RfcCompliantSubAttributes: false });
-
-      const res = expectStatus(
-        await scimPost(app, `${scimBasePath(id)}/Users`, token, {
-          ...baseUser('skus-legacy'),
-          licenses: [{ value: 'E5', skus: ['EXCHANGE', 'TEAMS'] }],
-        }),
-        400,
-      );
-
-      expect(res.body[DIAG]?.attributePaths).toContain('licenses[0].skus');
-    });
-
     it('still type-checks each element and names the offending index', async () => {
       const id = await createEndpoint(app, token);
-      await configure(app, token, id, { StrictSchemaValidation: true, RfcCompliantSubAttributes: true });
+      await configure(app, token, id, {
+        StrictSchemaValidation: true,
+        RfcCompliantSubAttributes: flag,
+      });
 
       const res = expectStatus(
         await scimPost(app, `${scimBasePath(id)}/Users`, token, {
-          ...baseUser('skus-bad'),
+          ...baseUser(`skus-bad-${slug}`),
           licenses: [{ value: 'E5', skus: ['EXCHANGE', 42] }],
         }),
         400,

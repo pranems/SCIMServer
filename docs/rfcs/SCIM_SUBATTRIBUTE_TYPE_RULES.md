@@ -1260,39 +1260,48 @@ measure the blast radius before switching it on.
 
 ## 15. Where SCIMServer stands today
 
-**Status: the gap is now closable per endpoint, behind the `RfcCompliantSubAttributes` flag.**
+**Status: P2 is now base behavior; the P1 gap is closable per endpoint, behind the `RfcCompliantSubAttributes` flag.**
 
-This section originally recorded the divergence below as an observation, with the
-correction listed as a proposed follow-up. That follow-up has since shipped. The
-flag defaults to `false`, so the behavior described in the observation table is
-still what an untouched endpoint does; turning the flag on switches that endpoint
-to the RFC behavior this document specifies.
+This section originally recorded both divergences below as observations, with the
+corrections listed as proposed follow-ups. Both have since shipped, but they
+shipped **differently**, and the difference is the point:
+
+- **P2 was a defect**, so it was fixed unconditionally. Strict validation
+  honoured the `multiValued` characteristic at the attribute level and ignored it
+  at the sub-attribute level, which meant it rejected payloads that conform to
+  the schema the server itself publishes, and misreported a cardinality mismatch
+  as a type error. A validator that misreads its own schema is not a policy
+  choice. Shipped in **v0.55.7**.
+- **P1 is a tightening**, so it stays behind the flag. An endpoint whose custom
+  schema already declares a nested complex sub-attribute would start failing the
+  moment it was enforced.
 
 | | Flag OFF (default) | Flag ON |
 |---|---|---|
 | complex sub-attribute (forbidden by [section 2.3.8](https://www.rfc-editor.org/rfc/rfc7643#section-2.3.8)) | accepted | rejected `400 invalidValue` |
-| multi-valued SIMPLE sub-attribute (allowed by [section 1.2](https://www.rfc-editor.org/rfc/rfc7643#section-1.2)) | rejected | accepted, each element type-checked |
+| multi-valued SIMPLE sub-attribute (allowed by [section 1.2](https://www.rfc-editor.org/rfc/rfc7643#section-1.2)) | **accepted, each element type-checked** | **accepted, each element type-checked** |
+
+The second row no longer varies, which is what makes the flag comprehensible:
+**everything it does rejects something.**
+
+Measured blast radius of the P2 fix at the time it shipped (2026-08-18, dev
+estate): **0** of **2,826** declared sub-attributes across 58 endpoints and 354
+schemas carry `multiValued: true`, so no existing endpoint could change
+behavior. The fix only widens what is accepted, so it cannot break a caller that
+works today.
 
 ### 15.1 Planned evolution (NOT yet implemented)
 
 > **Everything in this subsection is a design record, not shipped behavior.** As
-> of v0.55.1 the server behaves exactly as the table above describes. Do not cite
+> of v0.55.7 the server behaves exactly as the table above describes. Do not cite
 > this subsection as documentation of a live feature.
 
-Two changes are planned, driven by the analysis in sections 12 to 14:
+One change is planned, driven by the analysis in sections 12 to 14:
 
-**1. `OFF` becomes fully permissive.** Today `OFF` is a literal no-op, which
-means it inherits an inconsistency: it accepts unlimited nesting (permissive)
-while rejecting multi-valued simple sub-attributes (strict). The plan makes `OFF`
-uniformly permissive - accept both - so the flag has one comprehensible polarity:
-*off accepts anything, on conforms*. This is a **loosening**, so nothing that
-works today stops working, but a strict endpoint does lose one rejection it
-currently performs.
-
-**2. `ON` grows from two rules to the full catalogue.** P1 and P2 today; P1, P2
-and D1 to D11 (minus the document-only D7/D8, with D5 as a warning and D6 in its
-meaningful form) under the plan. Because the D-rules are schema rules, this adds
-a **second enforcement point** at schema-write time, as diagrammed in
+**`ON` grows from one rule to the full catalogue.** P1 today; P1, P2 and D1 to
+D11 (minus the document-only D7/D8, with D5 as a warning and D6 in its meaningful
+form) under the plan. Because the D-rules are schema rules, this adds a **second
+enforcement point** at schema-write time, as diagrammed in
 [section 12.4](#124-where-each-family-can-be-evaluated).
 
 The measured blast radius is in [section 13.5](#135-what-the-measurement-implies):
@@ -1301,7 +1310,7 @@ would fail on D11 because two of its attributes are named after filter
 expressions.
 
 The flag is also expected to be **renamed**, because `RfcCompliantSubAttributes`
-describes only part of what it now governs - D1 and D4 to D11 are *attribute*
+describes only part of what it would govern - D1 and D4 to D11 are *attribute*
 rules, not sub-attribute rules. At the time of writing the flag is set on **zero**
 endpoints across all three live estates, so the rename costs nothing; it becomes
 a breaking configuration change the moment anyone sets it.
@@ -1310,8 +1319,8 @@ a breaking configuration change the moment anyone sets it.
 
 See [RFC_COMPLIANT_SUBATTRIBUTES.md](../RFC_COMPLIANT_SUBATTRIBUTES.md) for the
 design, the 2x2 interaction with `StrictSchemaValidation`, and the test matrix.
-Two details differ from the follow-up originally proposed here, and both were
-deliberate:
+Three details differ from the follow-up originally proposed here, and all three
+were deliberate:
 
 1. **It is enforced at payload-validation time, not schema-registration time.** A
    schema may still carry a legacy complex sub-attribute declaration; only a
@@ -1324,6 +1333,11 @@ deliberate:
    answer different questions - how carefully do I police this payload, versus
    is this schema shape legal at all - so a lenient endpoint must still be able
    to refuse a shape the RFC forbids.
+3. **The flag governs P1 only.** P2 shipped as base behavior of
+   `StrictSchemaValidation` instead, because it corrects a validator defect
+   rather than expressing a policy. Bundling the two made the flag loosen and
+   tighten at the same time, which is the one property that made it hard to
+   describe in a sentence.
 
 ### 15.3 The original observation
 

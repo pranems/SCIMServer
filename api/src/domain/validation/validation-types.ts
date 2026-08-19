@@ -150,26 +150,20 @@ export interface ValidationOptions {
   /** Operation mode - 'create' | 'replace' enforce required attributes; 'patch' does not */
   mode: 'create' | 'replace' | 'patch';
   /**
-   * When true, handle sub-attributes per RFC 7643 instead of SCIMServer's
-   * historical behavior. Two distinct rules, both opt-in together:
+   * When true, refuse a schema shape RFC 7643 §2.3.8 forbids: "A complex
+   * attribute MUST NOT contain sub-attributes that have sub-attributes (i.e.,
+   * that are complex)." Reinforced by erratum 8415 (Verified 2025-10-28).
+   * SCIMServer has always recursed with no depth cap, so a schema declaring a
+   * complex sub-attribute is accepted when this is false.
    *
-   *  1. §2.3.8 - "A complex attribute MUST NOT contain sub-attributes that have
-   *     sub-attributes (i.e., that are complex)." Reinforced by erratum 8415
-   *     (Verified 2025-10-28). SCIMServer has always recursed with no depth
-   *     cap, so a schema declaring a complex sub-attribute is accepted today.
+   * This option only ever TIGHTENS. The companion §1.2 rule - a simple
+   * attribute is "singular OR multi-valued", so a multi-valued SIMPLE
+   * sub-attribute is legal - is NOT gated here: it was a defect in strict
+   * validation, not a policy, so it applies unconditionally. See
+   * `validateSubAttributes`.
    *
-   *  2. §1.2 - a simple attribute is "singular OR multi-valued", so a
-   *     multi-valued SIMPLE sub-attribute is legal (erratum 5607 confirms it
-   *     for `referenceTypes`). SCIMServer has always treated every
-   *     sub-attribute as singular, so `skus: ["A","B"]` is rejected today with
-   *     "must be a string, got object".
-   *
-   * Note rule 1 forbids COMPLEXITY at level 2 while rule 2 permits
-   * MULTI-VALUEDNESS at level 2. They are orthogonal, and conflating them is
-   * the most common way to get this wrong.
-   *
-   * False/omitted is the DEFAULT and preserves both legacy behaviors exactly.
-   * Enabled per endpoint via the `RfcCompliantSubAttributes` config flag.
+   * False/omitted is the DEFAULT. Enabled per endpoint via the
+   * `RfcCompliantSubAttributes` config flag.
    *
    * @see docs/rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md
    */

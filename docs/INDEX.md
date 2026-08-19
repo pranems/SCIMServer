@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.6`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.7`
 
-> **Version:** 0.55.6 - **Updated:** 2026-07-31  
+> **Version:** 0.55.7 - **Updated:** 2026-07-31  
 > 6 presets - **35 endpoint settings controls** (21 boolean flags + 3 enums + 11 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
 
 ### Start here
@@ -157,7 +157,7 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | Document | Description |
 |----------|-------------|
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** - 19 flags with Mermaid diagrams, preset defaults, deprecation notes |
-| [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md) | **`RfcCompliantSubAttributes` flag** (default `false`, standalone) - the two rules it governs (R1 complex sub-attributes forbidden per RFC 7643 2.3.8 + erratum 8415; R2 multi-valued simple sub-attributes allowed per 1.2 + erratum 5607), the 2x2 interaction with `StrictSchemaValidation`, worked request/response examples, and the 51-assertion test matrix across 5 levels. |
+| [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md) | **`RfcCompliantSubAttributes` flag** (default `false`, standalone, tightening-only) - the one rule it governs (R1 complex sub-attributes forbidden per RFC 7643 2.3.8 + erratum 8415), why R2 (multi-valued simple sub-attributes, 1.2 + erratum 5607) shipped as base behaviour of `StrictSchemaValidation` instead of as part of the flag, the full comparison of the two flags, the 2x2 interaction matrix, worked request/response examples, and the 66-assertion test matrix across 5 levels. |
 | [SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md](SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md) | Attribute customization guide - tighten-only rules, 12 scenarios, 4 templates |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH add/remove config |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema, custom extensions |

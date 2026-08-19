@@ -190,7 +190,7 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
   {
     key: 'RfcCompliantSubAttributes',
     label: 'RfcCompliantSubAttributes',
-    description: 'When OFF (default), current behavior: a schema may declare a complex sub-attribute and payloads for it are accepted, while a multi-valued simple sub-attribute is rejected. Turn ON to follow RFC 7643 instead - a complex sub-attribute is refused (2.3.8, erratum 8415) and a multi-valued simple sub-attribute is accepted with each element type-checked (1.2, erratum 5607). Independent of StrictSchemaValidation: it applies whether that flag is on or off, and turning it on does not enable strict validation.',
+    description: 'When OFF (default), current behavior: a schema may declare a complex sub-attribute and payloads populating it are accepted. Turn ON to follow RFC 7643 2.3.8 (erratum 8415) instead and refuse that shape with 400 invalidValue. This flag only ever tightens. Independent of StrictSchemaValidation: it applies whether that flag is on or off, and turning it on does not enable strict validation. Multi-valued simple sub-attributes (1.2, erratum 5607) are honoured by StrictSchemaValidation itself and need no flag.',
     defaultValue: false,
     category: 'Validation & schema',
   },

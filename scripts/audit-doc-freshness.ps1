@@ -131,7 +131,14 @@ foreach ($entry in $manifest.docs) {
     # and anything qualified by another product name is excluded.
     $headerLineCount = [Math]::Min(15, $lines.Count)
     $header = ($lines[0..($headerLineCount - 1)]) -join "`n"
-    $versionPatterns = @(
+
+    # Two classes of version token, because -Fix must treat them OPPOSITELY.
+    #
+    #   MARKER - "this doc documents product version X". Restamping is correct.
+    #   CLAIM  - "this doc was verified against X", usually next to a date. A
+    #            stale one is a real finding, but REWRITING the number launders
+    #            it: it asserts a verification that never happened. Report only.
+    $markerPatterns = @(
         # A 3-part number after a Version label is a product version; a 2-part
         # one ('**Version:** 3.1') is the DOC's own revision and is excluded
         # automatically because it cannot match a 3-part group.
@@ -139,40 +146,71 @@ foreach ($entry in $manifest.docs) {
         '(?im)^#[^\n]*?\bv(\d+\.\d+\.\d+)'
         '\bSCIMServer\s+v?(\d+\.\d+\.\d+)'
         '\bProduct version:?\*{0,2}[^\d\n]{0,8}`?v?(\d+\.\d+\.\d+)'
+    )
+    $claimPatterns = @(
         # 'Source-verified against: v0.53.0' is a product-version claim too, and
         # missing it was a real false negative: four guides kept asserting they
         # matched 0.53.0 long after 0.55.1 shipped.
         '(?i)source-verified against:?\**\s*v?(\d+\.\d+\.\d+)'
         '(?i)verified against:?\**\s*v(\d+\.\d+\.\d+)'
+        # Dated capture provenance, e.g. UI_GUIDE's screenshot attribution.
+        '(?i)captured on[^\n]{0,120}?\bv(\d+\.\d+\.\d+)'
     )
-    $headerVersions = @()
-    foreach ($vp in $versionPatterns) {
-        foreach ($m in [regex]::Matches($header, $vp)) {
-            $tok = $m.Groups[1].Value
-            # Exclude a triple qualified by another product (Node, Postgres, ...).
-            $ctxStart = [Math]::Max(0, $m.Index - 16)
-            $ctx = $header.Substring($ctxStart, $m.Index - $ctxStart)
-            if ($ctx -match '(?i)(node|postgres|prisma|playwright|mermaid|react|nest)\s*v?$') { continue }
-            $headerVersions += $tok
+
+    # Collect matches WITH their offsets so a fix can be applied surgically
+    # instead of string-replacing the token across the whole header.
+    $hits = New-Object System.Collections.Generic.List[object]
+    foreach ($set in @(
+            @{ Patterns = $markerPatterns; Kind = 'marker' },
+            @{ Patterns = $claimPatterns;  Kind = 'claim'  })) {
+        foreach ($vp in $set.Patterns) {
+            foreach ($m in [regex]::Matches($header, $vp)) {
+                $g = $m.Groups[1]
+                # Exclude a triple qualified by another product (Node, Postgres, ...).
+                $ctxStart = [Math]::Max(0, $g.Index - 16)
+                $ctx = $header.Substring($ctxStart, $g.Index - $ctxStart)
+                if ($ctx -match '(?i)(node|postgres|prisma|playwright|mermaid|react|nest)\s*v?$') { continue }
+                $hits.Add([pscustomobject]@{
+                        Kind  = $set.Kind
+                        Token = $g.Value
+                        Index = $g.Index
+                        Len   = $g.Length
+                    })
+            }
         }
     }
-    $headerVersions = $headerVersions | Sort-Object -Unique
-    $staleVersions = @($headerVersions | Where-Object { $_ -ne $version })
-    if ($staleVersions.Count -gt 0) {
-        if ($Fix) {
-            $newHeader = $header
-            foreach ($sv in $staleVersions) {
-                $newHeader = $newHeader -replace [regex]::Escape($sv), $version
-            }
-            $rest = if ($lines.Count -gt $headerLineCount) { ($lines[$headerLineCount..($lines.Count - 1)]) -join "`n" } else { '' }
-            Set-Content -Path $full -Value ($newHeader + "`n" + $rest) -NoNewline:$false -Encoding UTF8
-            $fixed.Add("[F1] $label - header version $($staleVersions -join ', ') -> $version")
-            $raw = Get-Content $full -Raw
-            $lines = Get-Content $full
+
+    $staleHits = @($hits | Where-Object { $_.Token -ne $version })
+    $staleMarkers = @($staleHits | Where-Object { $_.Kind -eq 'marker' })
+    $staleClaims = @($staleHits | Where-Object { $_.Kind -eq 'claim' })
+
+    if ($Fix -and $staleMarkers.Count -gt 0) {
+        $newHeader = $header
+        # Descending offset so earlier replacements cannot shift later indices.
+        foreach ($h in ($staleMarkers | Sort-Object Index -Descending)) {
+            $newHeader = $newHeader.Remove($h.Index, $h.Len).Insert($h.Index, $version)
         }
-        else {
-            $issues += "[F1] header advertises $($staleVersions -join ', ') but the product is $version"
-        }
+        $rest = if ($lines.Count -gt $headerLineCount) { ($lines[$headerLineCount..($lines.Count - 1)]) -join "`n" } else { '' }
+        Set-Content -Path $full -Value ($newHeader + "`n" + $rest) -NoNewline:$false -Encoding UTF8
+        $fixed.Add("[F1] $label - header version $(($staleMarkers.Token | Sort-Object -Unique) -join ', ') -> $version")
+        $raw = Get-Content $full -Raw
+        $lines = Get-Content $full
+    }
+    elseif ($staleMarkers.Count -gt 0) {
+        $issues += "[F1] header advertises $(($staleMarkers.Token | Sort-Object -Unique) -join ', ') but the product is $version"
+    }
+
+    # Never auto-fixed, at any switch: a human has to re-verify and restamp.
+    #
+    # And only a MINOR-level gap is a finding. "Verified against v0.55.6" is a
+    # true statement about the past; shipping 0.55.7 does not falsify it, and
+    # failing on it would make every patch bump a blocker - which would get the
+    # rule deleted rather than obeyed. A claim trailing by a whole minor is the
+    # case the rule was written for (four guides asserting 0.53.0 after 0.55.1).
+    $curMinor = ($version -split '\.')[0, 1] -join '.'
+    $farClaims = @($staleClaims | Where-Object { (($_.Token -split '\.')[0, 1] -join '.') -ne $curMinor })
+    if ($farClaims.Count -gt 0) {
+        $issues += "[F1] header CLAIMS verification against $(($farClaims.Token | Sort-Object -Unique) -join ', ') but the product is $version - re-verify the doc and update the claim by hand (-Fix will not rewrite a dated verification claim, because that would assert a check nobody performed)"
     }
 
     # --- F2 provenance stamp -------------------------------------------------

@@ -17,11 +17,14 @@
  *        `referenceTypes` inside `subAttributes`.
  *        => MULTI-VALUEDNESS at level 2 is PERMITTED.
  *
- * SCIMServer's historical behavior gets BOTH wrong in opposite directions: it
- * recurses into complex sub-attributes with no depth cap (too permissive for
- * R1) and treats every sub-attribute as singular (too strict for R2). That
- * legacy behavior is the DEFAULT and is locked by the "flag OFF" block below,
- * so enabling the flag is the only thing that changes anything.
+ * SCIMServer's historical behavior got BOTH wrong in opposite directions: it
+ * recursed into complex sub-attributes with no depth cap (too permissive for
+ * R1) and treated every sub-attribute as singular (too strict for R2).
+ *
+ * Only R1 is flag-gated, because only R1 TIGHTENS. R2 is a straight defect fix
+ * - strict mode was rejecting payloads that CONFORM to the declared schema,
+ * because it honoured `multiValued` at level 1 and ignored it at level 2 - so
+ * it applies whenever strict validation runs, flag or not.
  *
  * @see docs/rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md
  */
@@ -240,16 +243,8 @@ describe('RfcCompliantSubAttributes', () => {
       expect(result.errors).toEqual([]);
     });
 
-    it('R2 legacy: REJECTS a legal multi-valued simple sub-attribute', () => {
-      const result = SchemaValidator.validate(
-        multiValuedPayload,
-        schemaOf(multiValuedSimpleSubAttr),
-        { strictMode: true, mode: 'create' },
-      );
-
-      // Documents the historical defect this flag exists to correct.
-      expect(result.errors.some(e => e.path === 'licenses[0].skus')).toBe(true);
-    });
+    // R2 is deliberately NOT locked here: it is a defect fix, not a tightening,
+    // so it applies with the flag off. See the base-behavior block below.
   });
 
   describe('flag ON - R1: complex sub-attributes are refused (section 2.3.8)', () => {
@@ -335,46 +330,70 @@ describe('RfcCompliantSubAttributes', () => {
     });
   });
 
-  describe('flag ON - R2: multi-valued SIMPLE sub-attributes are honoured (section 1.2)', () => {
-    it('accepts an array of primitives in a multi-valued simple sub-attribute', () => {
-      const result = SchemaValidator.validate(
-        multiValuedPayload,
-        schemaOf(multiValuedSimpleSubAttr),
-        { strictMode: true, mode: 'create', rfcCompliantSubAttributes: true },
-      );
+  /**
+   * R2 is BASE strict behavior, not a flag. Every case is run at all three flag
+   * settings, so a future change cannot quietly re-gate it on the flag: the
+   * `undefined` and `false` rows would go red.
+   */
+  describe.each([
+    ['flag absent', undefined],
+    ['flag false', false],
+    ['flag true', true],
+  ])(
+    'base strict behavior - R2: multi-valued SIMPLE sub-attributes are honoured (section 1.2) [%s]',
+    (_label, flag) => {
+      const opts = { strictMode: true, mode: 'create' as const, rfcCompliantSubAttributes: flag };
 
-      expect(result.errors).toEqual([]);
-    });
+      it('accepts an array of primitives in a multi-valued simple sub-attribute', () => {
+        const result = SchemaValidator.validate(
+          multiValuedPayload,
+          schemaOf(multiValuedSimpleSubAttr),
+          opts,
+        );
 
-    it('still type-checks EACH element, and reports the offending index', () => {
-      const result = SchemaValidator.validate(
-        { licenses: [{ value: 'E5', skus: ['EXCHANGE', 42] }] },
-        schemaOf(multiValuedSimpleSubAttr),
-        { strictMode: true, mode: 'create', rfcCompliantSubAttributes: true },
-      );
+        expect(result.errors).toEqual([]);
+      });
 
-      // Honouring multiValued must not become "skip validation".
-      expect(result.errors.some(e => e.path === 'licenses[0].skus[1]')).toBe(true);
-    });
+      it('still type-checks EACH element, and reports the offending index', () => {
+        const result = SchemaValidator.validate(
+          { licenses: [{ value: 'E5', skus: ['EXCHANGE', 42] }] },
+          schemaOf(multiValuedSimpleSubAttr),
+          opts,
+        );
 
-    it('leaves a SINGULAR sub-attribute untouched when the flag is on', () => {
-      const result = SchemaValidator.validate(
-        { licenses: [{ value: 'E5' }] },
-        schemaOf(multiValuedSimpleSubAttr),
-        { strictMode: true, mode: 'create', rfcCompliantSubAttributes: true },
-      );
+        // Honouring multiValued must not become "skip validation".
+        expect(result.errors.some(e => e.path === 'licenses[0].skus[1]')).toBe(true);
+      });
 
-      expect(result.errors).toEqual([]);
-    });
+      it('leaves a SINGULAR sub-attribute untouched', () => {
+        const result = SchemaValidator.validate(
+          { licenses: [{ value: 'E5' }] },
+          schemaOf(multiValuedSimpleSubAttr),
+          opts,
+        );
 
-    it('does not treat null as an array (section 2.5 unassigned handling intact)', () => {
-      const result = SchemaValidator.validate(
-        { licenses: [{ value: 'E5', skus: null }] },
-        schemaOf(multiValuedSimpleSubAttr),
-        { strictMode: true, mode: 'create', rfcCompliantSubAttributes: true },
-      );
+        expect(result.errors).toEqual([]);
+      });
 
-      expect(result.errors).toEqual([]);
-    });
-  });
+      it('does not treat null as an array (section 2.5 unassigned handling intact)', () => {
+        const result = SchemaValidator.validate(
+          { licenses: [{ value: 'E5', skus: null }] },
+          schemaOf(multiValuedSimpleSubAttr),
+          opts,
+        );
+
+        expect(result.errors).toEqual([]);
+      });
+
+      it('still rejects an array in a SINGULAR sub-attribute (cardinality still enforced)', () => {
+        const result = SchemaValidator.validate(
+          { licenses: [{ value: ['E5', 'E3'] }] },
+          schemaOf(multiValuedSimpleSubAttr),
+          opts,
+        );
+
+        expect(result.errors.some(e => e.path === 'licenses[0].value')).toBe(true);
+      });
+    },
+  );
 });

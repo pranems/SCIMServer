@@ -2,7 +2,7 @@
 
 **Flag:** `RfcCompliantSubAttributes` (boolean, default `false`)
 **Scope:** per endpoint, via the admin API and the Settings tab
-**Behavior change when off:** none - the default preserves current behavior exactly
+**Behavior change when off:** none for the shape this flag governs - the default preserves the existing nested-complex behavior exactly
 
 ---
 
@@ -17,10 +17,27 @@ layer:
 2. It **rejected** a shape the RFC permits - a sub-attribute that is simple and
    multi-valued.
 
-Neither could be corrected silently: an endpoint whose custom schema already
-declares a nested complex sub-attribute would start failing provisioning the
-moment the rule was tightened. So the corrected behavior ships behind a flag
-that defaults to the existing behavior, and an operator opts in per endpoint.
+The two need opposite treatment, and conflating them was the original design
+error in this flag.
+
+**Divergence 1 is a policy tightening.** It cannot be corrected silently: an
+endpoint whose custom schema already declares a nested complex sub-attribute
+would start failing provisioning the moment the rule was enforced. So it ships
+behind this flag, defaulting to the existing behavior, and an operator opts in
+per endpoint.
+
+**Divergence 2 was a defect, not a policy.** Strict validation honours the
+`multiValued` characteristic at the attribute level and simply ignored it at the
+sub-attribute level, so it rejected payloads that **conform to the schema the
+server itself published** - and reported the cardinality mismatch as a type
+error (`must be a string, got object`). Fixing a validator that misreads its own
+schema is not something to put behind a flag, and the fix only ever accepts
+more, so nothing that worked before stops working. It is therefore **base
+behavior of `StrictSchemaValidation`** and is documented here only because the
+two rules are so often confused.
+
+The practical result is a flag with a contract you can state in one line:
+**everything `RfcCompliantSubAttributes` does rejects something.**
 
 The gap itself was found and documented during the sub-attribute RFC survey in
 [rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md);
@@ -30,7 +47,7 @@ that document is the normative reference and this one is the implementation.
 
 ## 2. The two rules
 
-### R1 - a complex sub-attribute is forbidden
+### R1 - a complex sub-attribute is forbidden (THIS FLAG)
 
 > A complex attribute MUST NOT contain sub-attributes that have sub-attributes
 > (i.e., that are complex).
@@ -43,7 +60,7 @@ RFC 7644's PATCH grammar agrees independently:
 sub-attribute level, so a protocol-addressable third level cannot exist
 ([RFC 7644 §3.5.2](rfcs/rfc7644.txt)).
 
-### R2 - a multi-valued SIMPLE sub-attribute is allowed
+### R2 - a multi-valued SIMPLE sub-attribute is allowed (BASE BEHAVIOR, not this flag)
 
 > ... a simple attribute, which may be singular or multi-valued ...
 >
@@ -52,16 +69,24 @@ sub-attribute level, so a protocol-addressable third level cannot exist
 "Simple" and "multi-valued" are orthogonal characteristics. Only *complexity* is
 capped at two levels; *cardinality* is not. A sub-attribute of type `string`
 with `multiValued: true` is therefore legal and its value is an array of
-primitives.
+primitives. RFC 9967 ships one in the wild (`securityEvents.eventUris`).
+
+This is honoured by `StrictSchemaValidation` whenever it runs, at any setting of
+`RfcCompliantSubAttributes`. Each element is type-checked individually and a bad
+element is reported at its index (`licenses[0].skus[1]`), so honouring
+cardinality never degrades into skipping validation.
 
 ### Combination matrix
 
 | Sub-attribute `type` | `multiValued` | RFC 7643 | Flag OFF (default) | Flag ON |
 |---|---|---|---|---|
 | simple (`string`, `boolean`, `decimal`, ...) | `false` | legal | accepted | accepted |
-| simple | `true` | **legal** (§1.2) | **rejected** | **accepted**, each element type-checked |
+| simple | `true` | **legal** (§1.2) | **accepted** (base behavior) | **accepted** (base behavior) |
 | `complex` | `false` | **illegal** (§2.3.8) | **accepted** | **rejected** `400 invalidValue` |
 | `complex` | `true` | **illegal** (§2.3.8) | accepted | **rejected** `400 invalidValue` |
+
+Only the `complex` rows vary with the flag. That is the intended shape: the flag
+is a tightening switch and nothing else.
 
 ---
 
@@ -70,7 +95,7 @@ primitives.
 ```mermaid
 flowchart TD
     A["POST / PUT / PATCH payload"] --> B{"RfcCompliantSubAttributes ON?"}
-    B -->|no| L["Legacy path<br/>(behavior unchanged)"]
+    B -->|no| L["Legacy path<br/>(nested complex accepted)"]
     B -->|yes| C["R1 pass:<br/>validateSubAttributeNesting"]
     C --> D{"any sub-attribute<br/>declared complex?"}
     D -->|yes| E["400 invalidValue<br/>triggeredBy = RfcCompliantSubAttributes"]
@@ -78,11 +103,13 @@ flowchart TD
     L --> F
     F -->|no| G["Required-attribute check only"]
     F -->|yes| H["Full strict validation"]
-    H --> I{"multi-valued SIMPLE<br/>sub-attribute present?"}
-    I -->|"yes, flag ON"| J["type-check each element<br/>path = attr.sub[index]"]
-    I -->|"yes, flag OFF"| K["400 must be a string, got object"]
-    I -->|no| M["existing single-value checks"]
+    H --> I{"sub-attribute declared<br/>multiValued?"}
+    I -->|yes| J["type-check each element<br/>path = attr.sub[index]"]
+    I -->|no| M["single-value check<br/>an array here is a 400"]
 ```
+
+Note that the `multiValued` branch does not consult the flag. R2 is base
+behavior of strict validation.
 
 The R1 pass runs **before** the strict branch on purpose. If it ran only inside
 the lenient branch, an endpoint with strict on would still be rejected, but the
@@ -109,15 +136,19 @@ The two flags are orthogonal, which yields four supported combinations:
 
 | Strict | Flag | Undeclared attribute | Nested complex sub-attribute | Multi-valued simple sub-attribute |
 |---|---|---|---|---|
-| ON | OFF | rejected | accepted | rejected |
+| ON | OFF | rejected | accepted | **accepted** |
 | ON | ON | rejected | **rejected** | **accepted** |
 | OFF | OFF | tolerated | accepted | tolerated (no type check) |
 | OFF | ON | tolerated | **rejected** | tolerated (no type check) |
 
-Two invariants fall out and are both asserted by tests:
+The last column is constant by design: it is not governed by either flag beyond
+whether strict validation runs at all.
 
-- turning the flag on does **not** enable strict validation, and
-- turning strict off does **not** lift an R1 rejection.
+Three invariants fall out and are all asserted by tests:
+
+- turning the flag on does **not** enable strict validation,
+- turning strict off does **not** lift an R1 rejection, and
+- a multi-valued simple sub-attribute is accepted at **both** flag settings.
 
 ---
 
@@ -222,7 +253,7 @@ Omitting the offending sub-attribute is accepted - the rule is about the
 **payload populating** the illegal shape, so a schema can carry a legacy
 declaration without every request failing.
 
-### R2 - accepted when the flag is on
+### R2 - accepted at either flag setting
 
 Given `licenses` (multi-valued complex) with a `skus` sub-attribute that is
 `string` + `multiValued: true`:
@@ -252,12 +283,16 @@ Given `licenses` (multi-valued complex) with a `skus` sub-attribute that is
 }
 ```
 
-With the flag ON this returns `201` and `skus` round-trips as
-`["SKU-A", "SKU-B"]`. With the flag OFF the same payload returns `400` with
-`licenses[0].skus: Attribute 'skus' must be a string, got object.`
+This returns `201` and `skus` round-trips as `["SKU-A", "SKU-B"]` regardless of
+the flag, because R2 is base behavior of `StrictSchemaValidation`. Before the
+fix, strict validation rejected it with
+`licenses[0].skus: Attribute 'skus' must be a string, got object.` - a
+cardinality mismatch misreported as a type error.
 
 Each element is still type-checked, and the failing element is named by index,
-for example `licenses[0].skus[1]`.
+for example `licenses[0].skus[1]`. Cardinality is still enforced in the other
+direction too: the schema declares `value` as singular, so
+`"value": ["E5", "E3"]` remains a `400`.
 
 ---
 
@@ -295,7 +330,7 @@ newly-created endpoint.
 |---|---|---|
 | Registry | [api/src/modules/endpoint/endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) | flag constant, `boolean` type, `default: false`, description |
 | Domain option | [api/src/domain/validation/validation-types.ts](../api/src/domain/validation/validation-types.ts) | `ValidationOptions.rfcCompliantSubAttributes` |
-| Domain rules | [api/src/domain/validation/schema-validator.ts](../api/src/domain/validation/schema-validator.ts) | `validateSubAttributeNesting` (R1 standalone pass), `isComplexSubAttribute`, `subAttributeNestingError`, and the R2 branch inside `validateSubAttributes` |
+| Domain rules | [api/src/domain/validation/schema-validator.ts](../api/src/domain/validation/schema-validator.ts) | `validateSubAttributeNesting` (R1 standalone pass), `isComplexSubAttribute`, `subAttributeNestingError`. The R2 branch also lives in `validateSubAttributes` but is NOT gated on the flag |
 | Users / Groups enforcement | [api/src/modules/scim/common/scim-service-helpers.ts](../api/src/modules/scim/common/scim-service-helpers.ts) | `enforceSubAttributeNesting` - the single R1 enforcement point |
 | Custom resource types | [api/src/modules/scim/services/endpoint-scim-generic.service.ts](../api/src/modules/scim/services/endpoint-scim-generic.service.ts) | dynamic-URN twin of the same helper |
 | UI | [web/src/pages/SettingsTab.tsx](../web/src/pages/SettingsTab.tsx) | Switch + description, `data-testid="settings-flag-RfcCompliantSubAttributes"` |
@@ -314,11 +349,16 @@ Two details are deliberate:
 
 | Level | File | Count |
 |---|---|---|
-| Unit (domain) | [api/src/domain/validation/rfc-compliant-subattributes.spec.ts](../api/src/domain/validation/rfc-compliant-subattributes.spec.ts) | 23 |
-| API E2E | [api/test/e2e/rfc-compliant-subattributes.e2e-spec.ts](../api/test/e2e/rfc-compliant-subattributes.e2e-spec.ts) | 9 |
+| Unit (domain) | [api/src/domain/validation/rfc-compliant-subattributes.spec.ts](../api/src/domain/validation/rfc-compliant-subattributes.spec.ts) | 33 |
+| API E2E | [api/test/e2e/rfc-compliant-subattributes.e2e-spec.ts](../api/test/e2e/rfc-compliant-subattributes.e2e-spec.ts) | 10 |
 | Web unit | [web/src/pages/SettingsTab.test.tsx](../web/src/pages/SettingsTab.test.tsx) | 3 (19 in file) |
 | Playwright | [web/e2e/rfc-compliant-subattributes-flag.spec.ts](../web/e2e/rfc-compliant-subattributes-flag.spec.ts) | 5 |
-| Live SCIM | [scripts/live-test.ps1](../scripts/live-test.ps1) section `9z-AT` | 11 |
+| Live SCIM | [scripts/live-test.ps1](../scripts/live-test.ps1) section `9z-CA` | 15 |
+
+The R2 cases are parameterised over **every** flag setting (`absent`, `false`,
+`true`) at the unit level and over both settings at the E2E and live levels, so
+re-gating R2 on the flag cannot pass unnoticed. This is deliberate: the original
+defect survived because each test exercised exactly one setting.
 
 The Playwright spec asserts **outcomes**, not presence: every test drives the
 real Switch and then measures either the value the server persisted or the
@@ -332,22 +372,21 @@ have meant the assertions could not detect the feature's absence.
 
 ---
 
-## 9. Planned evolution (NOT yet implemented)
+## 9. Planned evolution
 
-> **This section is a design record.** As of **v0.55.1** the flag behaves exactly
-> as sections 1 to 8 describe. Nothing below is live. Do not cite it as
-> documentation of shipped behavior.
+> **This section is a design record.** Item 1 **shipped in v0.55.7**; items 2 and
+> 3 are not live. Do not cite 2 or 3 as documentation of shipped behavior.
 
 A deeper re-reading of RFC 7643, plus a measured survey of two live estates,
 produced three intended changes. The full analysis, including the evidence, is in
 [rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md](rfcs/SCIM_SUBATTRIBUTE_TYPE_RULES.md)
 sections 12 to 15.
 
-| # | Change | Why |
-|---|---|---|
-| 1 | **`OFF` becomes fully permissive** - accepts a multi-valued simple sub-attribute as well as nesting | Today `OFF` is inconsistent: permissive about nesting, strict about cardinality. One polarity is easier to reason about: *off accepts anything, on conforms*. This is a loosening, so nothing that works stops working. |
-| 2 | **`ON` grows from 2 rules to the full catalogue** - adds schema-definition rules D1 to D11 alongside today's P1 and P2 | The flag claims RFC conformance but only checks two things, and both only at payload time. A schema that no compliant client could PATCH is currently accepted and published. |
-| 3 | **The flag is renamed** | `RfcCompliantSubAttributes` names only part of what it would govern - most of the new rules are *attribute* rules, not sub-attribute rules. It is set on **zero** endpoints across all three estates today, so a rename is free now and breaking later. |
+| # | Change | Status | Why |
+|---|---|---|---|
+| 1 | **R2 moved out of the flag into base strict validation**, so a multi-valued simple sub-attribute is accepted at either flag setting | **SHIPPED v0.55.7** | The flag was inconsistent: permissive about nesting, strict about cardinality, so it both loosened and tightened. R2 was a defect (strict honoured `multiValued` at level 1 and ignored it at level 2, rejecting schema-conformant payloads), not a policy. Measured blast radius was **0 of 2,826** declared sub-attributes, and the change only accepts more. |
+| 2 | **`ON` grows from 1 rule to the full catalogue** - adds schema-definition rules D1 to D11 alongside today's P1 and P2 | planned | The flag claims RFC conformance but only checks nesting, and only at payload time. A schema that no compliant client could PATCH is currently accepted and published. |
+| 3 | **The flag is renamed** | planned | `RfcCompliantSubAttributes` names only part of what it would govern - most of the new rules are *attribute* rules, not sub-attribute rules. It is set on **zero** endpoints across all three estates today, so a rename is free now and breaking later. |
 
 Two results from the survey shaped the design and are worth carrying forward:
 

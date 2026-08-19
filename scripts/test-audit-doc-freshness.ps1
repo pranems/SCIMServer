@@ -47,10 +47,11 @@ function Set-Manifest($dir, $entries) {
     return $p
 }
 
-function Invoke-Gate($dir, $manifest, [switch]$SkipCoupling) {
+function Invoke-Gate($dir, $manifest, [switch]$SkipCoupling, [switch]$Fix) {
     $args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $gate,
         '-RepoRoot', $dir, '-ManifestPath', $manifest, '-Quiet')
     if ($SkipCoupling) { $args += '-SkipCoupling' }
+    if ($Fix) { $args += '-Fix' }
     $out = & pwsh @args 2>&1 | Out-String
     return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = $out }
 }
@@ -115,6 +116,41 @@ Set-Doc $d 'F1d.md' ($goodHeader + "`n> **Version:** 4.1 - the document's own re
 $mf = Set-Manifest $d @(@{ path = 'docs/F1d.md'; title = 'f1d'; sources = @(); maxAgeDays = 90 })
 $r = Invoke-Gate $d $mf -SkipCoupling
 Assert 'doc revision 4.1 does not trip F1' ($r.ExitCode -eq 0) $r.Output
+Remove-Item $d -Recurse -Force
+
+# A dated verification claim is a statement about the PAST. Shipping a patch
+# does not falsify it, and failing on it would make every patch bump a blocker,
+# which gets a rule deleted rather than obeyed. Only a MINOR-level gap counts.
+Write-Host "`n=== F1: a claim one PATCH behind must NOT fail ===" -ForegroundColor Cyan
+$d = New-Scratch
+Set-Doc $d 'F1e.md' ($goodHeader + "`n> **Source-verified against:** v9.9.8 - **Updated:** 2026-07-31`n") | Out-Null
+$mf = Set-Manifest $d @(@{ path = 'docs/F1e.md'; title = 'f1e'; sources = @(); maxAgeDays = 90 })
+$r = Invoke-Gate $d $mf -SkipCoupling
+Assert 'patch-behind verification claim does not trip F1' ($r.ExitCode -eq 0) $r.Output
+Remove-Item $d -Recurse -Force
+
+# Origin: 2026-08-18. -Fix used to string-replace the stale token across the
+# WHOLE header, so it rewrote 'captured on 2026-07-31 running v0.55.6' into
+# 'v0.55.7' - converting a true historical record into a false one. The
+# detector was precise and the writer was blind.
+Write-Host "`n=== F1 -Fix: restamp the MARKER, never a dated CLAIM or capture provenance ===" -ForegroundColor Cyan
+$d = New-Scratch
+$stale = @"
+# Some Guide
+
+> **Status:** User-facing reference - **Last verified:** $((Get-Date).ToString('yyyy-MM-dd')) - **Product version:** ``9.9.8``
+> **Source-verified against:** v9.1.0 - **Updated:** 2026-07-31
+> every image was re-captured on **2026-07-31** running **v9.9.8 / Node v24.18.1**
+
+Body text.
+"@
+$p = Set-Doc $d 'F1f.md' $stale
+$mf = Set-Manifest $d @(@{ path = 'docs/F1f.md'; title = 'f1f'; sources = @(); maxAgeDays = 90 })
+Invoke-Gate $d $mf -SkipCoupling -Fix | Out-Null
+$after = Get-Content $p -Raw
+Assert 'the product-version marker WAS restamped' ($after -match 'Product version:\*\* `9\.9\.9`') $after
+Assert 'the dated verification claim was NOT rewritten' ($after -match 'Source-verified against:\*\* v9\.1\.0') $after
+Assert 'the capture provenance was NOT rewritten' ($after -match 'running \*\*v9\.9\.8 / Node') $after
 Remove-Item $d -Recurse -Force
 
 Write-Host "`n=== F2: a missing provenance stamp must FAIL ===" -ForegroundColor Cyan

@@ -239,8 +239,9 @@ export class SchemaValidator {
    * so would silently turn strict mode on for lenient endpoints, which is a far
    * bigger behavior change than the flag advertises.
    *
-   * The permissive half of the flag (§1.2 multi-valued SIMPLE sub-attributes) is
-   * not needed here: with strict mode off there is no rejection to relax.
+   * The §1.2 multi-valued SIMPLE sub-attribute rule is NOT part of this flag at
+   * all - it is base strict behavior (see validateSubAttributes) - and has
+   * nothing to relax here, because the non-strict path type-checks nothing.
    */
   static validateSubAttributeNesting(
     payload: Record<string, unknown>,
@@ -620,18 +621,18 @@ export class SchemaValidator {
 
       // RFC 7643 §1.2 defines a simple attribute as "singular or multi-valued",
       // so a multi-valued SIMPLE sub-attribute is legal - erratum 5607 confirms
-      // it for `referenceTypes` inside `subAttributes`. SCIMServer historically
-      // treated EVERY sub-attribute as singular (see the legacy comment below),
-      // so `skus: ["A","B"]` was rejected with "must be a string, got object".
+      // it for `referenceTypes` inside `subAttributes`, and RFC 9967 ships one
+      // in the wild (`securityEvents.eventUris`).
       //
-      // Only honour it when the flag is on, and only when the value really is
-      // an array: null/undefined keep falling through to the existing path so
-      // RFC 7643 §2.5 unassigned-value handling is untouched.
-      if (
-        options.rfcCompliantSubAttributes === true &&
-        subDef.multiValued === true &&
-        Array.isArray(value)
-      ) {
+      // NOT flag-gated: this is a defect fix, not a tightening. validateSingleValue
+      // honours `multiValued` at level 1 (see the elements[] fan-out there) and
+      // used to ignore it here, so strict mode rejected payloads that CONFORM to
+      // the declared schema, reporting a cardinality mismatch as a type error
+      // ("must be a string, got object").
+      //
+      // Only when the value really is an array: null/undefined keep falling
+      // through so RFC 7643 §2.5 unassigned-value handling is untouched.
+      if (subDef.multiValued === true && Array.isArray(value)) {
         const elementDef: SchemaAttributeDefinition = { ...subDef, multiValued: false };
         value.forEach((element, index) => {
           this.validateSingleValue(
@@ -645,7 +646,9 @@ export class SchemaValidator {
         continue;
       }
 
-      // Sub-attributes are always single-valued in SCIM (multi-valued applies at the parent level)
+      // Reached only for a sub-attribute the schema declares SINGULAR, so an
+      // array here is a genuine cardinality violation and validateSingleValue
+      // is right to reject it.
       this.validateSingleValue(`${parentPath}.${key}`, value, subDef, options, errors);
     }
   }

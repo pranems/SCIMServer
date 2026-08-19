@@ -14328,12 +14328,16 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 9z-CA: RfcCompliantSubAttributes" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# One flag, TWO opposite RFC 7643 rules, and it is STANDALONE (not gated on
-# StrictSchemaValidation), so the whole 2x2 of (flag x strict) is exercised:
+# The flag owns ONE rule and it is STANDALONE (not gated on StrictSchemaValidation),
+# so the whole 2x2 of (flag x strict) is exercised:
 #   R1  2.3.8 - a complex attribute MUST NOT contain complex sub-attributes.
-#               Erratum 8415. Server is too PERMISSIVE by default.
+#               Erratum 8415. Server is too PERMISSIVE by default, so the flag
+#               TIGHTENS. This is the only thing the flag controls.
+# Also covered here, deliberately at BOTH flag settings:
 #   R2  1.2   - a sub-attribute MAY be multi-valued while staying simple.
-#               Erratum 5607. Server is too STRICT by default.
+#               Erratum 5607. This is BASE strict behavior, not a flag: strict
+#               mode honours multiValued at level 1 and used to ignore it at
+#               level 2, rejecting payloads that conform to the declared schema.
 try {
     $atEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
         name = "live-test-subattr-$(Get-Random)"; profilePreset = "rfc-standard"
@@ -14459,7 +14463,9 @@ try {
     $r8 = Invoke-AtPost $u
     Test-Result -Success ($r8.status -eq 201) -Message "9z-CA.T8: payload omitting the complex sub-attribute is accepted"
 
-    # ── R2: multi-valued SIMPLE sub-attributes ─────────────────────────────
+    # -- R2: multi-valued SIMPLE sub-attributes (BASE behavior, both flag states) --
+    # Asserted at BOTH flag settings on purpose: R2 is a defect fix, not a
+    # tightening, so re-gating it on the flag must turn this section red.
     $u = New-AtUser 't9'; $u.licenses = @(@{ value = 'E5'; skus = @('EXCHANGE', 'TEAMS') })
     $r9 = Invoke-AtPost $u
     Test-Result -Success ($r9.status -eq 201) -Message "9z-CA.T9: flag ON accepts a multi-valued SIMPLE sub-attribute (RFC 7643 1.2)"
@@ -14468,7 +14474,20 @@ try {
     Set-AtFlags $false $true
     $u = New-AtUser 't11'; $u.licenses = @(@{ value = 'E5'; skus = @('EXCHANGE', 'TEAMS') })
     $r11 = Invoke-AtPost $u
-    Test-Result -Success ($r11.status -eq 400) -Message "9z-CA.T11: flag OFF rejects the same payload (legacy behavior preserved)"
+    Test-Result -Success ($r11.status -eq 201) -Message "9z-CA.T11: flag OFF accepts it too - R2 is base strict behavior, not flag-gated"
+    Test-Result -Success (@($r11.body.licenses[0].skus) -join ',' -eq 'EXCHANGE,TEAMS') -Message "9z-CA.T12: it round-trips intact with the flag OFF as well"
+
+    # Honouring multiValued must not degrade into skipping validation.
+    $u = New-AtUser 't13'; $u.licenses = @(@{ value = 'E5'; skus = @('EXCHANGE', 42) })
+    $r13 = Invoke-AtPost $u
+    Test-Result -Success ($r13.status -eq 400) -Message "9z-CA.T13: each element is still type-checked with the flag OFF"
+    Test-Result -Success ((Get-AtDiag $r13 'attributePaths') -contains 'licenses[0].skus[1]') -Message "9z-CA.T14: diagnostics name the offending ELEMENT index licenses[0].skus[1]"
+
+    # Cardinality is still enforced the other way: the schema declares `value`
+    # SINGULAR, so an array there remains a 400.
+    $u = New-AtUser 't15'; $u.licenses = @(@{ value = @('E5', 'E3') })
+    $r15 = Invoke-AtPost $u
+    Test-Result -Success ($r15.status -eq 400) -Message "9z-CA.T15: an array in a SINGULAR sub-attribute is still rejected"
 
     # Cleanup
     try { Invoke-RestMethod -Uri $atAdmin -Method DELETE -Headers $headers | Out-Null } catch {}
