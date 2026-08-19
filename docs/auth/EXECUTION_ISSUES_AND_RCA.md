@@ -807,6 +807,30 @@ is a separate contract with its own test surface.
 
 ---
 
+## 10E. A10 partial authentication block (2026-08-19, api v0.55.9)
+
+| # | Type | Sev | Symptom | Root cause | Fix | Why it works | Prevention |
+|---|---|---|---|---|---|---|---|
+| **I-41** | Data loss / security config | **High** | `PATCH` with `{ "authentication": { "defaultMethodId": "m-abc" } }` returned `200 OK` and deleted **every** configured authentication method on the endpoint. | **Two safe behaviours composing into an unsafe one.** `mergeProfilePartial` replaces `authentication` **wholesale** (correct: the admin methods API submits the whole block), and `expandAuthentication` normalizes a missing `methods` key to `[]` (correct: it normalizes). Neither is wrong alone; together a caller who omits `methods` while meaning "leave it alone" gets a silent wipe. | Refuse a block that does not carry an explicit `methods` **array**, in the shared merge helper. | The write path now distinguishes **absent** from **empty**, which is the only thing the normalizer could not do. A complete block, including a deliberate `methods: []`, is still accepted, so the guard blocks accidental omission rather than the operation. | Unit `A10-T1/T2` + E2E + live **`9z-CG.T2`**, which re-reads the method list after the rejected PATCH rather than asserting the `400` alone - a status-only assertion would pass against a server that returned `400` **and** wiped the data. Controls (`A10-T3`, `9z-CG.T4`) fail on over-tightening. |
+
+**Detection-stage escape analysis.**
+
+| # | Caught at | Earliest possible | Escape delta | Note |
+|---|---|---|---|---|
+| I-41 | Stage 0 (RED-first, from a source read) | Stage 0 | **none** | Found by reading the merge helper and the expander **together** while implementing A8 in the same area, not by a failing test. Neither component had a test that could see the other, so no existing gate could have surfaced it: each was individually correct. |
+
+**Headline and the generalizable lesson.** This is the **second** defect in two consecutive items
+where two individually-correct behaviours composed into an incorrect one - A8's was a correct emit
+plus a correct redactor yielding a useless audit record (I-39), and this is a correct wholesale
+replace plus a correct normalization yielding silent deletion. In both cases every component had
+tests and every test was green, because unit tests are scoped to one component by construction. The
+standing check now applied to any **normalize-then-persist** path: *ask what the normalizer does with
+an absent key, and whether a caller could plausibly omit that key while meaning "leave this
+unchanged".* Where the answer is "it becomes empty", the write path must distinguish absent from
+empty. Disposition: **(a) applied** in this commit chain.
+
+---
+
 ## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)

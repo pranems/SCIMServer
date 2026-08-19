@@ -808,7 +808,18 @@ export class EndpointService implements OnModuleInit {
     }
     // A1 - replace the authentication block wholesale when provided (the admin
     // authentication-methods API computes the full block and submits it).
+    // A10 - because the replace is wholesale AND expandAuthentication defaults a
+    // missing `methods` to [], a partial block silently deletes every configured
+    // method. Refuse it: the caller must send the whole block or omit the key.
     if (partial.authentication !== undefined) {
+      const block = partial.authentication as { methods?: unknown } | null;
+      if (!block || typeof block !== 'object' || !Array.isArray(block.methods)) {
+        throw new BadRequestException(
+          'profile.authentication is replaced wholesale, so it must carry a complete `methods` array. ' +
+          'Read the current block from GET /scim/admin/endpoints/{id}/authentication/methods and resend it, ' +
+          'or omit `authentication` entirely to leave it unchanged.',
+        );
+      }
       merged.authentication = partial.authentication;
     }
 

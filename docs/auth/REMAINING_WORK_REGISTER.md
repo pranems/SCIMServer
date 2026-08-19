@@ -129,9 +129,9 @@ Re-checked against source. Path corrections from C4 applied.
 | ID | Action | Sev | Verified state on 2026-08-19 |
 |---|---|---|---|
 | **A1/A13** | Re-sync the in-repo guide mirror with the canonical copy | Blocking | **OPEN and widening.** Canonical 6,503 lines vs mirror 5,642, a **861-line** gap. Neither is a superset: the mirror holds the authoritative section 0.1 decision record, the canonical holds revisions 6-7. A blind copy in either direction **destroys information** - this needs a merge, not an overwrite |
-| **A8** | Structured `auth_methods_changed` audit event | High | **CONFIRMED OPEN, and cheap.** `admin-authentication-method.controller.ts` has **2 mutating handlers** (`add` L81 `@Post()`, `remove` L124 `@Delete(':methodId')`) and **0** `emitAuthAdminEvent` calls, while `admin-credential.controller.ts`, `admin-jwks-host.controller.ts` and `endpoint.service.ts` all emit. The helper already exists in [auth-admin-event.ts](../../api/src/oauth/auth-admin-event.ts). This is the **highest value-per-effort item in the register** |
+| **A8** | Structured `auth_methods_changed` audit event | High | **DELIVERED v0.55.8** as `auth_method_add` / `auth_method_remove`, with failure outcomes as well as success. Doc: [A8_AUTH_METHOD_AUDIT_EVENT.md](A8_AUTH_METHOD_AUDIT_EVENT.md); RCA I-39/I-40. Surfaced **N12** (the pre-existing `credentialId` redaction) |
 | **A9** | Optimistic concurrency on profile writes | High | OPEN. No `ifMatch` / `rowVersion` guard in [endpoint.service.ts](../../api/src/modules/endpoint/services/endpoint.service.ts) |
-| **A10** | Reject a partial `authentication` block | High | OPEN |
+| **A10** | Reject a partial `authentication` block | High | **DELIVERED v0.55.9.** `mergeProfilePartial` now refuses a block without an explicit `methods` array. It was a real silent-data-loss path: wholesale replace + a normalizer that turns a missing `methods` into `[]` deleted every method on a `200 OK`. Doc: [A10_PARTIAL_AUTHENTICATION_BLOCK.md](A10_PARTIAL_AUTHENTICATION_BLOCK.md); RCA I-41 |
 | **A4** | Require `client_id` for RFC 7523 | High | Largely closed by **W3.7** (v0.54.78), which rejects a mismatch with `wif_client_id_mismatch`. Residual: `client_id` is still not *required* when the trust pins no `targetClientId`. Re-scope rather than re-implement |
 | **A3'** | Bound RequestLog retention + restrict read access | High | OPEN. This is the part of the W0.1 area that was **never** declined. The declined half was redaction; retention and access control remain in scope |
 | **A2** | Transport persona axis | Med | OPEN, folds into W5.1 |
@@ -139,7 +139,7 @@ Re-checked against source. Path corrections from C4 applied.
 | **A6** | Surface `azpacr` in the decision trace | Med | OPEN |
 | **A7** | Reject `api://<appId>` in `expectedAudience` | Med | OPEN |
 | **A11** | Document the 6 merge rules | Low | OPEN |
-| **A12** | Fix the `// Deep-merge settings (additive)` comment | Low | OPEN. Confirmed at [endpoint.service.ts](../../api/src/modules/endpoint/services/endpoint.service.ts) **L799** - line number right, directory wrong in the guide |
+| **A12** | Fix the `// Deep-merge settings (additive)` comment | Low | **DELIVERED v0.55.8.** Corrected to say it is a per-key merge in which a nested object replaces rather than merges |
 | **A14** | Document that the token-endpoint host is config-gated | Low | OPEN |
 | **A15** | Model fail-closed denial in test-ISV scenarios | Med | OPEN |
 

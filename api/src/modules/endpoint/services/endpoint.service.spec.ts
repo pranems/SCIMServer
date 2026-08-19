@@ -141,6 +141,84 @@ describe('EndpointService', () => {
     const p4MinSchema = { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' as const };
     const p4MinRT = { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] };
 
+    /**
+     * A10 - the `authentication` block is replaced WHOLESALE, and
+     * `expandAuthentication` turns a missing `methods` key into `[]`. Together
+     * those mean a PATCH that intends to set one sibling field silently deletes
+     * every configured authentication method. A partial block must be refused.
+     */
+    describe('A10 - partial authentication block', () => {
+      const a10Base = (methods: unknown[]) => ({
+        ...mockEndpoint,
+        profile: {
+          settings: {},
+          schemas: [p4MinSchema],
+          resourceTypes: [p4MinRT],
+          serviceProviderConfig: {},
+          authentication: { schemaVersion: 1, methods },
+        },
+      });
+
+      it('A10-T1: rejects a block that omits `methods` instead of wiping them', async () => {
+        const before = a10Base([{ id: 'm-keep', type: 'bearer' }]);
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+        // Wired so the call would SUCCEED without the guard - the RED then proves
+        // the silent-wipe path is open, not that a mock was missing.
+        (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) =>
+          Promise.resolve({ ...before, profile: args.data.profile }),
+        );
+
+        await expect(
+          service.updateEndpoint('test-endpoint-id', {
+            profile: { authentication: { defaultMethodId: 'm-keep' } as any },
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('A10-T2: rejects a non-array `methods`', async () => {
+        const before = a10Base([{ id: 'm-keep', type: 'bearer' }]);
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+        (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) =>
+          Promise.resolve({ ...before, profile: args.data.profile }),
+        );
+
+        await expect(
+          service.updateEndpoint('test-endpoint-id', {
+            profile: { authentication: { methods: 'not-an-array' } as any },
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('A10-T3: accepts a complete block, including an intentional empty methods array', async () => {
+        const before = a10Base([{ id: 'm-old', type: 'bearer' }]);
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+        (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) =>
+          Promise.resolve({ ...before, profile: args.data.profile }),
+        );
+
+        const result = await service.updateEndpoint('test-endpoint-id', {
+          profile: { authentication: { schemaVersion: 1, methods: [] } },
+        });
+
+        expect(result.profile?.authentication?.methods).toEqual([]);
+      });
+
+      it('A10-T4: a patch that does not mention authentication leaves methods untouched', async () => {
+        const before = a10Base([{ id: 'm-keep', type: 'bearer' }]);
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+        (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) =>
+          Promise.resolve({ ...before, profile: args.data.profile }),
+        );
+
+        const result = await service.updateEndpoint('test-endpoint-id', {
+          profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'True' } },
+        });
+
+        expect(result.profile?.authentication?.methods).toHaveLength(1);
+        expect(result.profile?.authentication?.methods?.[0].id).toBe('m-keep');
+      });
+    });
+
     it('emits an "Auth config change" event when an auth-affecting flag flips (Prisma branch)', async () => {
       const before = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: 'False' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} } };
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
