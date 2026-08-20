@@ -93,15 +93,28 @@ test.describe('endpoint write conflict (C)', () => {
 
     // The outcome, not the dialog: the operator's type must actually exist on
     // the server, or the conflict flow just lost their work more politely.
+    // Polled because the retry is asynchronous - a single read races it.
     await expect(page.getByText('Device', { exact: false }).first()).toBeVisible();
-    const after = await request.get(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    const names = (await after.json()).profile.resourceTypes.map((r: { name: string }) => r.name);
-    expect(names).toContain('Device');
+    await expect.poll(async () => {
+      const after = await request.get(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      return (await after.json()).profile.resourceTypes.map((r: { name: string }) => r.name);
+    }, { timeout: 15_000 }).toContain('Device');
   });
 
   test('C-P3: with no competing edit the save still succeeds', async ({ page, request, baseURL }) => {
+    // The UI applies an optimistic cache update, so the new type appears on
+    // screen before the server has answered. That made an earlier version of
+    // this test report "Printer missing" with no clue why; capture the real
+    // response so a failure names the status instead of implying it.
+    const writes: string[] = [];
+    page.on('response', async (r) => {
+      if (r.request().method() === 'PATCH' && r.url().includes('/admin/endpoints/')) {
+        writes.push(`${r.status()} ${await r.text().catch(() => '')}`.slice(0, 300));
+      }
+    });
+
     await page.goto(`/endpoints/${endpointId}/resource-types`);
     await expect(page.getByTestId('resource-types-tab')).toBeVisible();
 
@@ -111,18 +124,17 @@ test.describe('endpoint write conflict (C)', () => {
     await page.getByTestId('resource-types-create-schema').fill('urn:ietf:params:scim:schemas:custom:Printer');
     await page.getByTestId('resource-types-create-dialog-submit').click();
 
-    // Wait for the save to actually land. `toBeHidden` on a dialog that never
-    // rendered passes instantly, so asserting it first would race the request
-    // and read the server before the write arrived.
-    await expect(page.getByText('Printer', { exact: false }).first()).toBeVisible();
+    // Wait for the WRITE, not the optimistic paint.
+    await expect.poll(() => writes.length, { timeout: 15_000 }).toBeGreaterThan(0);
 
     // The check must be invisible in the normal case; a version guard that
     // trips on ordinary edits would be worse than the bug it prevents.
     await expect(page.getByTestId('conflict-dialog')).toBeHidden();
-    const after = await request.get(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    const names = (await after.json()).profile.resourceTypes.map((r: { name: string }) => r.name);
-    expect(names).toContain('Printer');
+    await expect.poll(async () => {
+      const after = await request.get(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      return (await after.json()).profile.resourceTypes.map((r: { name: string }) => r.name);
+    }, { timeout: 15_000, message: () => `PATCH responses seen: ${JSON.stringify(writes)}` }).toContain('Printer');
   });
 });
