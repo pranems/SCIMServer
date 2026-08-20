@@ -111,6 +111,11 @@ test.describe('endpoint write conflict (C)', () => {
     await page.getByTestId('resource-types-create-schema').fill('urn:ietf:params:scim:schemas:custom:Printer');
     await page.getByTestId('resource-types-create-dialog-submit').click();
 
+    // Wait for the save to actually land. `toBeHidden` on a dialog that never
+    // rendered passes instantly, so asserting it first would race the request
+    // and read the server before the write arrived.
+    await expect(page.getByText('Printer', { exact: false }).first()).toBeVisible();
+
     // The check must be invisible in the normal case; a version guard that
     // trips on ordinary edits would be worse than the bug it prevents.
     await expect(page.getByTestId('conflict-dialog')).toBeHidden();
