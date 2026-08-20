@@ -278,6 +278,17 @@ if (-not $DevFqdn) {
     }
 }
 
+# An EXPIRED tenant does not error - ARM just returns nothing, and the run then
+# builds "https:///scim/..." and fails somewhere unrelated. Fail here instead,
+# naming the actual cause.
+if (-not $DryRun -and -not $DevFqdn) {
+    $activeTenant = (az account show --query tenantId -o tsv 2>$null)
+    throw "Could not resolve the dev FQDN for $DevAppName/$DevResourceGroup. " +
+          "The az session reports tenant '$activeTenant'. If that is not the CURRENT ephemeral tenant, " +
+          "the subscription has expired and every ARM lookup returns empty. " +
+          "Run: . ./scripts/az-tenant.ps1; Use-ProvIAM09"
+}
+
 Add-Result -Stage '0.1' -Gate 'Prerequisites + git/az/docker auth' -Status 'PASS' -Detail "SHA=$gitSha branch=$gitBranch dirty=$dirty"
 
 # Capture before-deploy state of dev

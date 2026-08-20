@@ -16,19 +16,17 @@
  * profile. M3 reuses `useUpdateEndpointConfig` (the L1 mutation hook
  * that powers SettingsTab) to avoid a parallel hook surface.
  *
- * Gating: `CustomResourceTypesEnabled` config flag controls whether
- * the wildcard SCIM controller answers /:resourceType requests, i.e.
- * whether the operator can register CUSTOM types. The tab always shows
- * a read-only inventory of the endpoint's current resource types
- * (built-in User/Group and any custom ones) regardless of the flag, so
- * a user-only endpoint still shows its supported User type. When the
- * flag is off, the create/delete affordances are hidden and an info
- * panel points at SettingsTab to enable custom registration.
+ * Gating: none. settings-v8 retired `CustomResourceTypesEnabled`; the server
+ * derives availability from `profile.resourceTypes[]` (see the wildcard
+ * controller's D9 lookup), so this tab must not gate on a flag the server
+ * ignores - doing so hid a working capability. The tab shows the endpoint's
+ * current resource types (built-in User/Group plus any custom ones) and offers
+ * create/delete for the custom ones.
  *
  * @see docs/PHASE_M3_CUSTOM_RESOURCE_TYPES.md
  * @see docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md
  */
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   makeStyles,
   tokens,
@@ -106,10 +104,7 @@ const useStyles = makeStyles({
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
   },
-  disabledPanel: {
-    padding: '16px',
-  },
-});
+  });
 
 function isCustomRt(rt: { name?: string }): boolean {
   return !!rt.name && !RESERVED_NAMES.has(rt.name);
@@ -123,7 +118,7 @@ function isBuiltInRt(rt: { name?: string }): boolean {
 // still serves the built-in User + Group (mirrors the server resolver in
 // api/src/modules/scim/common/resource-type-resolver.ts). We surface those so
 // the tab always shows the endpoint's current valid resource types - even when
-// the CustomResourceTypesEnabled flag is off.
+// the profile declares none.
 const DEFAULT_BUILTIN_RTS: ResourceType[] = [
   { id: 'User', name: 'User', endpoint: '/Users', schema: 'urn:ietf:params:scim:schemas:core:2.0:User' },
   { id: 'Group', name: 'Group', endpoint: '/Groups', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group' },
@@ -170,13 +165,6 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
         resourceTypes?: ResourceType[];
       }
     | undefined;
-
-  const flagOn = useMemo<boolean>(() => {
-    const v = profile?.settings?.CustomResourceTypesEnabled;
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'string') return v.toLowerCase() === 'true';
-    return false;
-  }, [profile]);
 
   const allRts: ResourceType[] = profile?.resourceTypes ?? [];
   // The inventory shown to the operator: declared types when present, else the
@@ -309,16 +297,14 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
           <CubeTree24Regular />
           <Subtitle1>Resource types</Subtitle1>
         </div>
-        {flagOn && (
-          <Button
-            appearance="primary"
-            icon={<Add24Regular />}
-            onClick={handleCreateOpen}
-            data-testid="resource-types-create-button"
-          >
-            Create resource type
-          </Button>
-        )}
+        <Button
+          appearance="primary"
+          icon={<Add24Regular />}
+          onClick={handleCreateOpen}
+          data-testid="resource-types-create-button"
+        >
+          Create resource type
+        </Button>
       </div>
       <Caption1>
         The resource types this endpoint currently serves. Built-in User and Group are listed
@@ -354,7 +340,7 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
               </Badge>
               <Text className={classes.monoCell}>{rt.endpoint}</Text>
               <Text className={classes.monoCell}>{rt.schema}</Text>
-              {!builtIn && flagOn ? (
+              {!builtIn ? (
                 <Button
                   appearance="subtle"
                   icon={<Delete24Regular />}
@@ -370,25 +356,11 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
         })}
       </Card>
 
-      {flagOn && customRts.length === 0 && (
+      {customRts.length === 0 && (
         <Caption1 className={classes.flagHint} data-testid="resource-types-empty">
           No custom resource types registered yet. Use &quot;Create resource type&quot; to add one
           beyond the built-in User and Group.
         </Caption1>
-      )}
-
-      {!flagOn && (
-        <Card className={classes.disabledPanel} data-testid="resource-types-disabled-panel">
-          <MessageBar intent="info">
-            <MessageBarBody>
-              <MessageBarTitle>Custom resource types are disabled</MessageBarTitle>
-              The endpoint still serves the resource types listed above. The
-              {' '}
-              <code>CustomResourceTypesEnabled</code> config flag is off, so you cannot register
-              custom types beyond the built-in User and Group yet. Turn it on from the Settings tab.
-            </MessageBarBody>
-          </MessageBar>
-        </Card>
       )}
 
       {/* Create dialog */}

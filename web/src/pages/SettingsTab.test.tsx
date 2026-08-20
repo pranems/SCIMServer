@@ -138,7 +138,6 @@ describe('SettingsTab', () => {
     expect(screen.getByRole('switch', { name: /MultiMemberPatchOpForGroupEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /SchemaDiscoveryEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /EnforceResourceTypes/i })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /AllowAndCoerceBooleanStrings/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /VerbosePatchSupported/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /PatchOpAllowRemoveAllMembers/i })).toBeInTheDocument();
@@ -218,29 +217,30 @@ describe('SettingsTab', () => {
     });
   });
 
-  it('reflects CustomResourceTypesEnabled and toggles it via profile.settings', async () => {
+  it('reflects SchemaDiscoveryEnabled and toggles it via profile.settings', async () => {
     const user = userEvent.setup();
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ SchemaDiscoveryEnabled: 'True' }),
+      isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const sw = screen.getByRole('switch', { name: /SchemaDiscoveryEnabled/i }) as HTMLInputElement;
+    expect(sw.checked).toBe(true);
+    await user.click(sw);
+    expect(mutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { SchemaDiscoveryEnabled: false } },
+    });
+  });
+
+  it('does NOT offer a toggle for the retired CustomResourceTypesEnabled flag', () => {
+    // settings-v8 retired it and the server derives the capability from
+    // profile.resourceTypes. A toggle here wrote a setting nothing reads.
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({ CustomResourceTypesEnabled: 'True' }),
       isLoading: false, error: null,
     });
     wrap(<SettingsTab endpointId={EP_ID} />);
-    const sw = screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i }) as HTMLInputElement;
-    expect(sw.checked).toBe(true);
-    await user.click(sw);
-    expect(mutateAsync).toHaveBeenCalledWith({
-      profile: { settings: { CustomResourceTypesEnabled: false } },
-    });
-  });
-
-  it('defaults CustomResourceTypesEnabled to off when the flag is absent', () => {
-    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: overviewWith({}),
-      isLoading: false, error: null,
-    });
-    wrap(<SettingsTab endpointId={EP_ID} />);
-    const sw = screen.getByRole('switch', { name: /CustomResourceTypesEnabled/i }) as HTMLInputElement;
-    expect(sw.checked).toBe(false);
+    expect(screen.queryByRole('switch', { name: /CustomResourceTypesEnabled/i })).not.toBeInTheDocument();
   });
 
   // RfcCompliantSubAttributes - RFC 7643 sub-attribute handling.

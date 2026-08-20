@@ -1008,6 +1008,14 @@ export class EndpointService implements OnModuleInit {
       MultiOpPatchRequestAddMultipleMembersToGroup: 'MultiMemberPatchOpForGroupEnabled',
       MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'MultiMemberPatchOpForGroupEnabled',
     };
+    // Retired with NO successor because the capability is derived, so there is
+    // nothing to rename them to (settings-v8). Carrying a rename here would
+    // recreate the two-sources-of-truth problem the derivation removed.
+    const DROPPED_KEYS = [
+      'CustomResourceTypesEnabled', // derived from profile.resourceTypes
+      'BulkOperationsEnabled', // derived from serviceProviderConfig.bulk.supported
+      'ReprovisionOnConflictForSoftDeletedResource',
+    ];
     for (const [oldKey, newKey] of Object.entries(STALE_KEY_MAP)) {
       if (oldKey in s && !(newKey in s)) {
         s[newKey] = s[oldKey];
@@ -1015,6 +1023,9 @@ export class EndpointService implements OnModuleInit {
       if (oldKey in s) {
         delete s[oldKey];
       }
+    }
+    for (const key of DROPPED_KEYS) {
+      delete s[key];
     }
   }
 

@@ -126,7 +126,9 @@ describe('ResourceTypesTab (Phase M3)', () => {
     expect(screen.getByTestId('resource-types-create-button')).toBeInTheDocument();
   });
 
-  it('shows feature-disabled panel + no Create button when CustomResourceTypesEnabled=false', () => {
+  it('B-W1: the Create button is shown even with CustomResourceTypesEnabled absent/false', () => {
+    // The server retired this flag in settings-v8 and derives availability from
+    // profile.resourceTypes. The UI gating on it hid a capability that works.
     mockUseEndpoint.mockReturnValue({
       data: endpointWithFlag(false),
       isLoading: false,
@@ -134,15 +136,37 @@ describe('ResourceTypesTab (Phase M3)', () => {
       error: null,
     });
     renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
-    expect(screen.getByTestId('resource-types-disabled-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('resource-types-create-button')).not.toBeInTheDocument();
-    // The inventory is STILL shown so the operator sees the current valid types.
+    expect(screen.getByTestId('resource-types-create-button')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-inventory')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-row-User')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-row-Group')).toBeInTheDocument();
   });
 
-  it('flag OFF still shows the current resource types of a user-only endpoint (User only, no Group)', () => {
+  it('B-W2: the feature-disabled panel is gone entirely', () => {
+    mockUseEndpoint.mockReturnValue({
+      data: endpointWithFlag(false),
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('resource-types-disabled-panel')).not.toBeInTheDocument();
+  });
+
+  it('B-W3: a custom type can still be deleted with the flag off', () => {
+    mockUseEndpoint.mockReturnValue({
+      data: endpointWithFlag(false, [
+        { id: 'Device', name: 'Device', endpoint: '/Devices', schema: SCHEMA_DEVICE, schemaExtensions: [] },
+      ]),
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    expect(screen.getByTestId('resource-types-row-Device-delete')).toBeInTheDocument();
+  });
+
+  it('a user-only endpoint shows only its User type, and User is never deletable', () => {
     mockUseEndpoint.mockReturnValue({
       data: endpointUserOnly(false),
       isLoading: false,
@@ -150,12 +174,11 @@ describe('ResourceTypesTab (Phase M3)', () => {
       error: null,
     });
     renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
-    expect(screen.getByTestId('resource-types-disabled-panel')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-inventory')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-row-User')).toBeInTheDocument();
     expect(screen.getByTestId('resource-types-row-User-kind').textContent).toContain('built-in');
     expect(screen.queryByTestId('resource-types-row-Group')).not.toBeInTheDocument();
-    // No delete affordance while the flag is off.
+    // Built-ins are never deletable - that is about being built-in, not about a flag.
     expect(screen.queryByTestId('resource-types-row-User-delete')).not.toBeInTheDocument();
   });
 

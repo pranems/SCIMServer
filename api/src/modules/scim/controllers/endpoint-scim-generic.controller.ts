@@ -18,7 +18,8 @@
  *   DELETE /endpoints/:endpointId/:resourceType/:id
  *   POST   /endpoints/:endpointId/:resourceType/.search
  *
- * Gated behind the `CustomResourceTypesEnabled` per-endpoint config flag.
+ * Availability is DERIVED from `profile.resourceTypes[]` (D9). The old
+ * `CustomResourceTypesEnabled` flag was retired in settings-v8; nothing reads it.
  */
 import {
   Body,

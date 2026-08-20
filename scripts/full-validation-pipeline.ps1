@@ -182,6 +182,24 @@ if (-not $SkipDocker) {
 
     # Step 7: Build Docker image (no-cache)
     Write-Phase 2 2 "Build Docker Image (no-cache)"
+
+    # A container does not inherit ~/.npmrc, so on a network that blocks the
+    # public registry every `npm ci` stage hangs. Probe it, and if it is blocked
+    # fall back to whatever registry the HOST npm is already using - which is
+    # machine-agnostic and needs no hardcoded corporate URL.
+    if (-not $env:NPM_REGISTRY) {
+        docker run --rm node:24-alpine sh -c "wget -q -T 10 -O /dev/null https://registry.npmjs.org/" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            $hostRegistry = (npm config get registry 2>$null)
+            if ($hostRegistry -and $hostRegistry -notmatch 'registry\.npmjs\.org') {
+                $env:NPM_REGISTRY = $hostRegistry.Trim()
+                Write-Host "  public npm registry unreachable from containers; using host registry $($env:NPM_REGISTRY)" -ForegroundColor Yellow
+            } else {
+                Write-Host "  public npm registry unreachable and no host mirror configured - the build will likely fail (see docs/LOCAL_DOCKER_BUILD.md)" -ForegroundColor Red
+            }
+        }
+    }
+
     try {
         $buildStart = Get-Date
         docker compose build --no-cache 2>&1 | Tee-Object -Variable buildOutput

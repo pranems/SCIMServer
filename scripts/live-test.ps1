@@ -15199,6 +15199,63 @@ try {
 Write-Host "`n--- 9z-CI: Endpoint Write Concurrency Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CJ: retired settings keys are dropped (settings-v8 cleanup)
+$script:currentSection = "9z-CJ: retired settings keys"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CJ: Retired Settings Keys ===" -ForegroundColor Cyan
+
+# settings-v8 retired six flags. Three were RENAMED, three were DERIVED away.
+# CustomResourceTypesEnabled was the derived one that kept being written by the
+# UI long after the server stopped reading it, so it survived on live profiles.
+try {
+    $cjEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-cj-retired-keys-$(Get-Random)"
+    } | ConvertTo-Json)
+    $cjId = $cjEndpoint.id
+
+    # --- derived-away key is dropped, with no successor invented ---
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ CustomResourceTypesEnabled = "True" } }
+    } | ConvertTo-Json -Depth 5)
+    $cjAfter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId`?view=full" -Method GET -Headers $headers
+    $cjKeys = @($cjAfter.profile.settings.PSObject.Properties.Name)
+    Test-Result -Success ($cjKeys -notcontains "CustomResourceTypesEnabled") -Message "9z-CJ.T1: CustomResourceTypesEnabled is dropped from the profile"
+    Test-Result -Success (-not ($cjKeys | Where-Object { $_ -match "CustomResourceType" })) -Message "9z-CJ.T2: no successor key was invented (capability is derived from resourceTypes)"
+
+    # --- renamed key carries its value to the modern name ---
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SoftDeleteEnabled = $true } }
+    } | ConvertTo-Json -Depth 5)
+    $cjAfter2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId`?view=full" -Method GET -Headers $headers
+    $cjKeys2 = @($cjAfter2.profile.settings.PSObject.Properties.Name)
+    Test-Result -Success ($cjKeys2 -notcontains "SoftDeleteEnabled") -Message "9z-CJ.T3: the legacy SoftDeleteEnabled key does not survive"
+    Test-Result -Success ($cjAfter2.profile.settings.UserSoftDeleteEnabled -eq $true) -Message "9z-CJ.T4: its value was carried to UserSoftDeleteEnabled"
+
+    # A control: without this, T1-T4 could pass on a server that simply drops
+    # every setting it is given.
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ StrictSchemaValidation = $false } }
+    } | ConvertTo-Json -Depth 5)
+    $cjAfter3 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId`?view=full" -Method GET -Headers $headers
+    Test-Result -Success ($cjAfter3.profile.settings.StrictSchemaValidation -eq $false) -Message "9z-CJ.T5 (control): a live flag is still persisted normally"
+
+    # --- the capability itself is NOT gated by the retired flag ---
+    $cjRt = @{ id = 'Widget'; name = 'Widget'; endpoint = '/Widgets'; schema = 'urn:ietf:params:scim:schemas:custom:Widget'; schemaExtensions = @() }
+    $cjSchema = @{ id = 'urn:ietf:params:scim:schemas:custom:Widget'; name = 'Widget'; description = 'Widget schema'; attributes = @() }
+    $cjProfile = (Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId`?view=full" -Method GET -Headers $headers).profile
+    $cjBody = @{ profile = @{ resourceTypes = @($cjProfile.resourceTypes) + @($cjRt); schemas = @($cjProfile.schemas) + @($cjSchema) } } | ConvertTo-Json -Depth 20
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId" -Method PATCH -Headers $headers -Body $cjBody
+    $cjFinal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId`?view=full" -Method GET -Headers $headers
+    Test-Result -Success (@($cjFinal.profile.resourceTypes | Where-Object { $_.name -eq 'Widget' }).Count -eq 1) -Message "9z-CJ.T6: a custom resource type registers with the retired flag absent"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cjId" -Method DELETE -Headers $headers
+} catch {
+    Test-Result -Success $false -Message "9z-CJ: retired settings keys section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CJ: Retired Settings Keys Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
