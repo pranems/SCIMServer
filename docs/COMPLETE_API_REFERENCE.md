@@ -266,6 +266,20 @@ Authorization: Bearer changeme-scim
 
 Returns full endpoint object (same shape as POST response).
 
+**Response carries an `ETag` (v0.55.12+).** It is a weak validator over a content hash of
+`{displayName, description, active, profile}`, and it is what `If-Match` on the next PATCH
+should quote. `id` and `name` are deliberately excluded: `name` is immutable after create and
+`id` identifies the row, so neither can participate in a lost update.
+
+```http
+HTTP/1.1 200 OK
+ETag: W/"e9adceb0cbc7d89b3ac549485c210902"
+Content-Type: application/json
+```
+
+Because it is a content hash, re-saving identical content produces the same ETag, so an
+idempotent retry matches rather than conflicting.
+
 ---
 
 ### GET /scim/admin/endpoints/by-name/:name
@@ -284,6 +298,56 @@ Authorization: Bearer changeme-scim
 
 Update endpoint properties. The body is a **partial** document: any top-level field or
 `profile` section you omit is left untouched.
+
+**Optional optimistic concurrency (v0.55.12+).** Send `If-Match` with the `ETag` you read to
+refuse the write if someone else changed the endpoint in the meantime. This is **opt-in**: a
+request with no `If-Match` behaves exactly as it always has, so existing callers need no
+change.
+
+| `If-Match` | Behaviour |
+|---|---|
+| absent | write proceeds (no opinion about the current version) |
+| matches current | write proceeds; the response carries the NEW `ETag` |
+| `*` | matches any current state; used to force an overwrite |
+| stale | `412 Precondition Failed`, `scimType: versionMismatch`, and the write is **not** applied |
+
+It matters most when you replace a whole profile section. `settings` and
+`serviceProviderConfig` merge **per key** server-side, so two callers changing different keys
+already both survive and do not need this. `schemas`, `resourceTypes` and `authentication` are
+replaced **wholesale**, so a read-modify-write of those is where an edit can be silently lost.
+
+```http
+PATCH /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+If-Match: W/"e9adceb0cbc7d89b3ac549485c210902"
+Content-Type: application/json
+
+{
+  "profile": {
+    "resourceTypes": [ ]
+  }
+}
+```
+
+A stale write is refused, and the error names both versions so the caller can resolve it:
+
+```http
+HTTP/1.1 412 Precondition Failed
+Content-Type: application/json
+
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "status": "412",
+  "scimType": "versionMismatch",
+  "detail": "The endpoint was modified by someone else.",
+  "currentETag": "W/\"7b1f42c0d3e5a6b8c9d0e1f2a3b4c5d6\""
+}
+```
+
+See [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) for the full rationale.
 
 ```http
 PATCH /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
