@@ -25,6 +25,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Public by default. On a corporate device the registry is unreachable
+        # from inside the build, so set NPM_REGISTRY before `docker compose build`.
+        # See docs/LOCAL_DOCKER_BUILD.md.
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     container_name: scimserver-api
     ports:
       - "8080:8080"

@@ -184,6 +184,24 @@ Origin: 2026-07-27, **and again 2026-07-28**. The operator reported "I cannot se
 
     Implementation note learned the hard way: the id passed to `mermaid.render(id, src)` is used internally in a **CSS selector**, so it must be a plain selector-safe token. The first version of the exporter derived ids from filenames and reported 15 false failures purely because of spaces, dots and parentheses in doc names - a reminder that a new checking tool needs its own sanity check before its output is believed.
 
+## Local Docker Build Rule (CRITICAL - added 2026-08-20)
+
+**The public npm registry is unreachable from this device**, host and container alike, by corporate policy. The host works only because `~/.npmrc` redirects npm to `https://packagefeedproxy.microsoft.io/npm/`, and **a container does not inherit `~/.npmrc`**. Build locally with the registry passed in:
+
+```powershell
+docker build -f Dockerfile --build-arg NPM_REGISTRY=https://packagefeedproxy.microsoft.io/npm/ -t scimserver-local:<version> .
+```
+
+`Dockerfile` declares `ARG NPM_REGISTRY` defaulting to the **public** registry so CI is unaffected. This is safe and was verified, not assumed: `npm ci` never rewrites the lockfile (byte-compared identical), every `resolved` stays `registry.npmjs.org`, every `integrity` stays `sha512`, and no credential enters the build. A **registry override at fetch time** is NOT the same operation as **regenerating a lockfile against an internal feed**, which remains forbidden.
+
+**Why this went unnoticed for six weeks:** the block dates from 2026-07-09, but every local build reused the cached `RUN npm ci` layer. The 0.55.12 version bump edited `package.json`, invalidated `COPY api/package*.json`, and forced the first real install since. **A Docker layer cache can mask a hard environmental break indefinitely and will surface it at the worst moment.** Periodically build with `--no-cache`. When a build fails at `npm ci`, check reachability before debugging npm:
+
+```powershell
+docker run --rm node:24-alpine sh -c "wget -q -T 10 -O /dev/null https://registry.npmjs.org/ && echo OK || echo BLOCKED"
+```
+
+Full analysis, the four industry-standard approaches considered, and why the registry override was chosen over build secrets / vendoring / CI-only: [docs/LOCAL_DOCKER_BUILD.md](../docs/LOCAL_DOCKER_BUILD.md). CI remains the **authoritative** image builder; local builds are for iteration.
+
 ## Git Commit Rules (CRITICAL)
 - NEVER use `git commit --amend` unless explicitly specified by the user - always create new commits with `git commit -m "..."`
 - NEVER rewrite history on commits that have been pushed
@@ -471,7 +489,7 @@ After implementation AND before considering work complete, ALL of the following 
 1.7. **Web size-limit budgets** - `cd web; npm run size` -> all budgets pass. Reports 24+ per-route + entry + shared-primitives budgets that lock first-paint download.
 1.8. **`bundleBudgetAudit` prompt** - Enforces that every NEW lazy route added under `web/src/routes/` has a corresponding entry in `web/package.json` `"size-limit"` array. Catches the "ship a route with no ceiling" bug class.
 1.9. **`prismaMigrationAudit` prompt** - Verifies `api/prisma/schema.prisma`, `api/prisma/migrations/*`, and the runtime DB stay in lockstep. Run whenever `api/prisma/` is touched. Catches the "schema edited but migration not generated" CD blocker.
-1.10. **Base-image LTS audit** - `pwsh scripts/audit-base-images.ps1` -> exit 0. Fails when any `Dockerfile*` pins a Node major that is not an Active LTS or Maintenance LTS line. Run whenever a `Dockerfile*` changes. Origin: 2026-07-29 - the ROOT Dockerfile (the one that actually ships) sat on `node:25-alpine` from 2026-05-01; Node 25 went EOL 2026-06-01, so dev served an unpatched runtime (`v25.9.0`, frozen 2026-04-01) for ~2 months with every gate green. Two blind spots hid it: (a) Trivy scans for CVEs in the image, never for the SUPPORT STATUS of the base image, so an EOL runtime with no CVE filed yet is invisible to it; (b) every other surface (all 4 workflows, `api/package.json` engines, `api/Dockerfile`) was already on 24, so a spot-check against the WRONG Dockerfile concluded the repo was consistent - which is exactly what the 2026-05-17 Stage X.2 intake did when it "resolved" the drift by amending the instruction to 24 instead of fixing the shipped image. **When a base image changes, verify against the Dockerfile that CI actually builds (`.github/workflows/publish-ghcr.yml` -> `file: ./Dockerfile`), not a same-named sibling.**
+1.10. **Base-image LTS audit**- `pwsh scripts/audit-base-images.ps1` -> exit 0. Fails when any `Dockerfile*` pins a Node major that is not an Active LTS or Maintenance LTS line. Run whenever a `Dockerfile*` changes. Origin: 2026-07-29 - the ROOT Dockerfile (the one that actually ships) sat on `node:25-alpine` from 2026-05-01; Node 25 went EOL 2026-06-01, so dev served an unpatched runtime (`v25.9.0`, frozen 2026-04-01) for ~2 months with every gate green. Two blind spots hid it: (a) Trivy scans for CVEs in the image, never for the SUPPORT STATUS of the base image, so an EOL runtime with no CVE filed yet is invisible to it; (b) every other surface (all 4 workflows, `api/package.json` engines, `api/Dockerfile`) was already on 24, so a spot-check against the WRONG Dockerfile concluded the repo was consistent - which is exactly what the 2026-05-17 Stage X.2 intake did when it "resolved" the drift by amending the instruction to 24 instead of fixing the shipped image. **When a base image changes, verify against the Dockerfile that CI actually builds (`.github/workflows/publish-ghcr.yml` -> `file: ./Dockerfile`), not a same-named sibling.**
 1.11. **Deployment infra doc audit** - `pwsh scripts/audit-deployment-doc.ps1` -> exit 0. [docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) is the **canonical, living** record of every infra element, form factor and live estate, and it is **enforced, not aspirational**. **Any change to infrastructure MUST update that doc in the SAME commit.** "Infrastructure" is defined mechanically as `Dockerfile*`, `docker-compose*.yml`, `infra/**`, `.github/workflows/**`, `api/docker-entrypoint.sh`, `dev-containerapp.yaml`, `prod-app-template.json`, and `scripts/{deploy-azure,promote-to-prod,dev-deployment-pipeline,verify-deployment,build-standalone,audit-base-images}.ps1`. Four checks: **C1** infra changed => doc changed; **C2** the doc's `**Last verified:**` header is within 90 days; **C3** every `Dockerfile*` / `docker-compose*.yml` / `infra/*.bicep` on disk is named in the doc; **C4** (`-Live`) every reachable estate runs a supported Node LTS and reports a version the doc mentions. C3 makes the gate **self-extending** - a new Bicep template or Dockerfile starts demanding documentation on the next run with no edit to the gate. C4 is the **deployed-artifact** half of the Node-LTS rule (1.10 gates the source Dockerfile); both share one LTS table in [scripts/node-lts.ps1](scripts/node-lts.ps1) so they cannot disagree. Run `-Live` at Stage 4.4 after any deploy. Origin: 2026-07-29 - documentation had never been gated in this repo, and a confidently wrong infra doc is worse than none because it terminates an investigation in the wrong place (exactly how the 2026-05-17 intake "resolved" the Node drift against the wrong Dockerfile).
 
 1.12. **User-facing doc freshness audit** - `pwsh scripts/audit-doc-freshness.ps1` -> exit 0 (`npm run docs:freshness`, `npm run docs:freshness:fix`, self-test `npm run docs:freshness:selftest`). Generalizes 1.11 from ONE document to the whole **user-facing set**, declared in [docs/.doc-manifest.json](docs/.doc-manifest.json). Five checks: **F1** a doc header must not advertise a product version other than `api/package.json`; **F2** every doc carries `**Last verified:** YYYY-MM-DD` within its `maxAgeDays`; **F3** every relative link and image resolves; **F4** if a source path the doc is BOUND TO changed in this push, the doc must have changed too; **F5** every manifest source prefix must exist on disk. Three triggers: pre-push (blocking, coupled), `.github/workflows/docs-freshness.yml` on PR + weekly schedule + `workflow_dispatch`, and Stage 1.12 of the dev pipeline.
@@ -686,6 +704,19 @@ Get-ScimEstateBaseUrl -Purpose dev      # FQDN DERIVED from ARM, never stored
   ```
 
 ### Ephemeral Tenant Rollover Rule (CRITICAL - added 2026-08-13)
+
+**STANDING RULE (added 2026-08-20): dev and canary prod are ALWAYS deployed on the CURRENT ephemeral tenant, never the retiring one.** The migration to tenant **09** (`proviamtest09`, tenant id `9751e42f-78f3-42f4-8b8a-6e73845aceae`, subscription `8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`) is COMPLETE; tenant **08** is `retiring` and its subscription has **expired**. Before any deploy or promotion:
+
+```powershell
+. ./scripts/az-tenant.ps1; Use-ProvIAM09     # sets AZURE_CONFIG_DIR to the 09 automation profile
+az account show --query tenantId -o tsv      # MUST be 9751e42f-78f3-42f4-8b8a-6e73845aceae
+```
+
+**An expired tenant does not fail loudly - it returns EMPTY.** On 2026-08-19 `az account show` reported a perfectly healthy `ProvIAM_Subscription` while every ARM call silently returned nothing; `dev-deployment-pipeline.ps1` then built the URL `https:///scim/oauth/token` and failed Stage 0 with an unrelated-looking `Invalid URI` error. **When an ARM lookup returns empty, verify the tenant before debugging the caller.**
+
+**The subscription NAME is ambiguous across 08 and 09** (both are `ProvIAM_Subscription`), so `promote-to-prod.ps1` must be given the subscription **id**, not the name, or it aborts with `ambiguous across 2 tenants`.
+
+**Customer-facing prod (calmsand) budget:** the MSDN subscription hit its spending limit and was disabled; **it resets 2026-08-21**, after which customer-prod promotion is available again. Until the reset, calmsand cannot be deployed to. It remains `revisionKeep: 1` (roll-forward recovery, no rollback target) and is NEVER auto-promoted.
 
 Origin: two completed cross-tenant migrations, 2026-05-19 (07 -> 08) and 2026-08-12 (08 -> 09). The dev + canary-prod estates live on an **ephemeral** Azure AD tenant that expires roughly every 80 days, so this is a **scheduled recurring operation**, 4 to 5 times a year, not an incident. Full comparison and learnings: [docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md](docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md).
 

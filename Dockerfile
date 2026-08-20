@@ -9,13 +9,21 @@
 #   4. runtime     - Minimal Alpine with compiled output
 #############################
 
+# Where npm FETCHES from. The lockfile stays the source of truth - `npm ci`
+# never rewrites it, and integrity is still verified against its sha512 hashes,
+# so pointing this at a mirror changes the transport, not what gets installed.
+# Needed on corporate machines where the public registry is unreachable; CI
+# leaves it at the default. See docs/LOCAL_DOCKER_BUILD.md.
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+
 #############################
 # Stage 1: Build web frontend (React + Vite)
 #############################
 FROM node:24-alpine AS web-build
+ARG NPM_REGISTRY
 WORKDIR /web
 COPY web/package*.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund --registry="$NPM_REGISTRY"
 COPY web/ ./
 RUN npm run build && rm -rf node_modules
 
@@ -23,10 +31,11 @@ RUN npm run build && rm -rf node_modules
 # Stage 2: Build API (NestJS + Prisma generate)
 #############################
 FROM node:24-alpine AS api-build
+ARG NPM_REGISTRY
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY api/package*.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund --registry="$NPM_REGISTRY"
 COPY api/ ./
 COPY --from=web-build /web/dist ./public
 
@@ -49,10 +58,11 @@ RUN npx prisma generate && \
 #   (which would pull 100+ MB of transitive deps back in).
 #############################
 FROM node:24-alpine AS prod-deps
+ARG NPM_REGISTRY
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY api/package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund && \
+RUN npm ci --omit=dev --no-audit --no-fund --registry="$NPM_REGISTRY" && \
     npm cache clean --force
 
 # Graft prisma CLI + engines from the full build (avoids npm install pulling transitive deps)

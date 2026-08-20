@@ -271,6 +271,31 @@ docker run -d \
   scimserver:latest
 ```
 
+### Behind a corporate network (`NPM_REGISTRY`)
+
+The build runs `npm ci` in three stages. If your network blocks the public npm
+registry, those stages hang and npm reports the misleading
+`Exit handler never called!`. Check reachability first:
+
+```bash
+docker run --rm node:24-alpine sh -c "wget -q -T 10 -O /dev/null https://registry.npmjs.org/ && echo OK || echo BLOCKED"
+```
+
+If it prints `BLOCKED`, point the build at a mirror. A container does **not**
+inherit your host `~/.npmrc`, so the value has to be passed in:
+
+```bash
+docker build --build-arg NPM_REGISTRY=https://your-mirror.example/npm/ -t scimserver:latest .
+
+# docker compose reads it from the environment
+NPM_REGISTRY=https://your-mirror.example/npm/ docker compose build
+```
+
+The default is the public registry, so this changes nothing unless you set it.
+The lockfile still decides **what** is installed and its `sha512` integrity
+hashes are still verified, so the mirror only changes where bytes are fetched
+from. See [LOCAL_DOCKER_BUILD.md](LOCAL_DOCKER_BUILD.md).
+
 ---
 
 ## Pre-Built Image
