@@ -25,23 +25,18 @@ test.describe('endpoint write conflict (C)', () => {
       window.localStorage.setItem('scimserver.authToken', t);
     }, TOKEN);
 
+    // Endpoint names are unique server-side, and Date.now() alone collides
+    // when parallel workers start within the same millisecond.
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const created = await request.post(`${baseURL}/scim/admin/endpoints`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
       data: {
-        name: `pw-conflict-${Date.now()}`,
+        name: `pw-conflict-${unique}`,
         displayName: 'Conflict spec',
       },
     });
-    expect(created.ok()).toBeTruthy();
+    expect(created.ok(), `create failed: ${created.status()} ${await created.text()}`).toBeTruthy();
     endpointId = (await created.json()).id;
-
-    // A profile supplied at create must be complete, so the flag goes on after
-    // create, where settings merge per key and the defaults are preserved.
-    const enabled = await request.patch(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-      data: { profile: { settings: { CustomResourceTypesEnabled: 'True' } } },
-    });
-    expect(enabled.ok()).toBeTruthy();
   });
 
   test.afterEach(async ({ request, baseURL }) => {
@@ -53,6 +48,10 @@ test.describe('endpoint write conflict (C)', () => {
   test('C-P1: a save built on a stale view raises the conflict dialog', async ({ page, request, baseURL }) => {
     await page.goto(`/endpoints/${endpointId}/resource-types`);
     await expect(page.getByTestId('resource-types-tab')).toBeVisible();
+    // Let EVERY initial read settle first. The page records the endpoint's
+    // version on each GET, so a query still in flight would re-record the
+    // version AFTER the competing edit below and quietly erase the collision.
+    await page.waitForLoadState('networkidle');
 
     // The other operator. The UI still holds the version it loaded with, which
     // is what makes the next save a genuine mid-air collision.
@@ -75,6 +74,7 @@ test.describe('endpoint write conflict (C)', () => {
   test('C-P2: force-overwrite applies the operator edit and the type appears', async ({ page, request, baseURL }) => {
     await page.goto(`/endpoints/${endpointId}/resource-types`);
     await expect(page.getByTestId('resource-types-tab')).toBeVisible();
+    await page.waitForLoadState('networkidle');
 
     await request.patch(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
       headers: { Authorization: `Bearer ${TOKEN}` },

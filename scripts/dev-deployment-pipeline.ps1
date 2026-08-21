@@ -489,8 +489,18 @@ if (-not $SkipDeploy) {
     else {
         # 4.6 - Deploy to dev. Revision suffix carries the COMMIT so the running
         # revision traces back to source; the image carries the VERSION.
-        Invoke-Gate '4.6' "Deploy $RegistryAcr/scimserver:$version to $DevAppName" {
-            az containerapp update --name $DevAppName --resource-group $DevResourceGroup --image "$RegistryAcr/scimserver:$version" --revision-suffix "v$ImageTag" --output none
+        # Azure rejects a revision suffix containing '.', so a dotted semver has
+        # to be dashed. Anything else non-alphanumeric is dashed too, and
+        # repeated dashes collapse because '--' is also rejected.
+        $revisionSuffix = 'v' + (($ImageTag -replace '[^a-zA-Z0-9]', '-') -replace '-+', '-').Trim('-').ToLower()
+
+        # Deploy the GHCR image, not the ACR mirror. The dev app carries NO
+        # registry credentials (`properties.configuration.registries` is empty)
+        # and pulls GHCR anonymously; pointing it at ACR fails the pull with
+        # UNAUTHORIZED. ACR stays a mirror, not the deploy path.
+        $deployImage = "$RegistryGhcr`:$version"
+        Invoke-Gate '4.6' "Deploy $deployImage to $DevAppName" {
+            az containerapp update --name $DevAppName --resource-group $DevResourceGroup --image $deployImage --revision-suffix $revisionSuffix --output none
         } | Out-Null
 
         # 4.6b - Confirm dev is actually SERVING the new build.

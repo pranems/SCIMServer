@@ -1,23 +1,25 @@
 /**
- * resource-types-inventory.spec.ts - browser guard for the v0.53.5 UX fix.
+ * resource-types-inventory.spec.ts - browser guard for the Resource Types tab.
  *
- * THE GAP (reported on customer prod, 2026-06-24)
- *   The per-endpoint Resource Types tab rendered ONLY a "Custom resource
- *   types are disabled" info panel when the `CustomResourceTypesEnabled`
- *   flag was off - it never showed the endpoint's CURRENT valid resource
- *   types. On a user-only endpoint the operator saw a dead-end panel with
- *   no indication that User was still served. Separately, the Settings tab
- *   did not expose `CustomResourceTypesEnabled`, so the operator could not
- *   turn the feature on from the UI.
+ * THE ORIGINAL GAP (reported on customer prod, 2026-06-24)
+ *   The tab rendered ONLY a "Custom resource types are disabled" panel when
+ *   the `CustomResourceTypesEnabled` flag was off - it never showed the
+ *   endpoint's CURRENT valid resource types, so on a user-only endpoint the
+ *   operator saw a dead end with no sign that User was still served.
  *
- * THE FIX (asserted here)
- *   1. Resource Types tab ALWAYS renders an inventory of the endpoint's
- *      current resource types (built-in User/Group + any custom), tagged
- *      built-in / custom, regardless of the flag. A user-only endpoint
- *      shows the User row (and no Group row).
- *   2. When the flag is off, the inventory is still shown plus a contained
- *      info panel; the Create affordance is hidden.
- *   3. The Settings tab exposes a CustomResourceTypesEnabled toggle.
+ * WHAT CHANGED SINCE (v0.55.13)
+ *   That flag had already been retired in settings-v8; the server derives
+ *   availability from `profile.resourceTypes[]` and never read it. The UI
+ *   kept gating on it, which HID a capability that worked. Both the panel
+ *   and the Settings toggle are gone.
+ *
+ * THE BEHAVIOUR ASSERTED HERE
+ *   1. The tab ALWAYS renders an inventory of the endpoint's current
+ *      resource types, tagged built-in / custom. A user-only endpoint shows
+ *      the User row and no Group row.
+ *   2. Create is offered regardless of any flag; built-ins are never
+ *      deletable (that is about being built-in, not about a flag).
+ *   3. The Settings tab does NOT offer a toggle for the retired flag.
  *
  * STRATEGY
  *   Creates a throwaway user-only endpoint via the admin API, drives the
@@ -73,8 +75,8 @@ async function deleteEndpoint(page: Page, endpointId: string): Promise<void> {
   );
 }
 
-test.describe('v0.53.5 - Resource Types tab shows current types + Settings exposes the flag', () => {
-  test('user-only endpoint: Resource Types tab lists User even with the flag off', async ({ page }) => {
+test.describe('Resource Types tab shows the endpoint\'s current types and is not flag-gated', () => {
+  test('user-only endpoint: Resource Types tab lists User and offers Create', async ({ page }) => {
     const endpointId = await createUserOnlyEndpoint(page);
     test.skip(!endpointId, 'Could not create a user-only endpoint (no user-only preset / admin denied).');
 
@@ -92,10 +94,11 @@ test.describe('v0.53.5 - Resource Types tab shows current types + Settings expos
       // 3. A user-only endpoint does NOT list a Group row.
       await expect(page.getByTestId('resource-types-row-Group')).toHaveCount(0);
 
-      // 4. Flag is off (preset default) -> the disabled panel is shown, the
-      //    Create button is hidden, and no User delete affordance exists.
-      await expect(page.getByTestId('resource-types-disabled-panel')).toBeVisible();
-      await expect(page.getByTestId('resource-types-create-button')).toHaveCount(0);
+      // 4. Custom resource types are NOT flag-gated (settings-v8 retired the
+      //    flag; the server derives from profile.resourceTypes), so Create is
+      //    offered. A built-in type is still never deletable.
+      await expect(page.getByTestId('resource-types-disabled-panel')).toHaveCount(0);
+      await expect(page.getByTestId('resource-types-create-button')).toBeVisible();
       await expect(page.getByTestId('resource-types-row-User-delete')).toHaveCount(0);
 
       // 5. No fatal route boundary.
@@ -105,7 +108,7 @@ test.describe('v0.53.5 - Resource Types tab shows current types + Settings expos
     }
   });
 
-  test('Settings tab exposes the CustomResourceTypesEnabled toggle', async ({ page }) => {
+  test('Settings tab does NOT offer the retired CustomResourceTypesEnabled toggle', async ({ page }) => {
     const endpointId = await createUserOnlyEndpoint(page);
     test.skip(!endpointId, 'Could not create a user-only endpoint (no user-only preset / admin denied).');
 
@@ -114,9 +117,11 @@ test.describe('v0.53.5 - Resource Types tab shows current types + Settings expos
       await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId('settings-tab')).toBeVisible({ timeout: 15_000 });
 
-      // The CustomResourceTypesEnabled Switch is present and reachable.
-      const sw = page.getByRole('switch', { name: /CustomResourceTypesEnabled/i });
-      await expect(sw).toBeVisible();
+      // The server ignores this flag, so a toggle here would write a setting
+      // nothing reads. Assert a live flag renders too, or this would pass on a
+      // Settings tab that failed to render any switch at all.
+      await expect(page.getByRole('switch', { name: /StrictSchemaValidation/i })).toBeVisible();
+      await expect(page.getByRole('switch', { name: /CustomResourceTypesEnabled/i })).toHaveCount(0);
     } finally {
       await deleteEndpoint(page, endpointId!);
     }

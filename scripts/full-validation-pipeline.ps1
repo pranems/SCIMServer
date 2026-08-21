@@ -180,6 +180,25 @@ if (-not $SkipDocker) {
     docker compose down --remove-orphans 2>&1 | Out-Null
     Write-Result "Existing containers removed" $true
 
+    # `compose down` only reaches THIS project. The pipeline's own E2E database
+    # from Stage 2 is a different project and still owns 5432, so compose up
+    # fails much later with an opaque "Bind for 0.0.0.0:5432 failed". Retire the
+    # containers we own; refuse to touch anything else.
+    $ownedTestDbs = @('scim-dev-pipeline-pg')
+    foreach ($name in $ownedTestDbs) {
+        if (docker ps --filter "name=^/$name$" --format '{{.Names}}' 2>$null) {
+            docker stop $name 2>&1 | Out-Null
+            Write-Host "  stopped $name (pipeline-owned test database) to free its host port" -ForegroundColor Yellow
+        }
+    }
+
+    $portHogs = docker ps --format '{{.Names}} {{.Ports}}' 2>$null | Where-Object { $_ -match '0\.0\.0\.0:(5432|8080)->' }
+    if ($portHogs) {
+        Write-Host "  Ports needed by docker-compose are held by containers outside this project:" -ForegroundColor Red
+        $portHogs | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+        throw "Host port conflict: stop the listed container(s) before running the Docker phase."
+    }
+
     # Step 7: Build Docker image (no-cache)
     Write-Phase 2 2 "Build Docker Image (no-cache)"
 

@@ -11,6 +11,7 @@
 |---|---|
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
 | Wire up authentication (4 methods), connect Entra ID, or diagnose an auth failure | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
+| Know where every auth setting is persisted and which route or screen changes it | [AUTHENTICATION_CONFIGURATION_REFERENCE.md](AUTHENTICATION_CONFIGURATION_REFERENCE.md) |
 | Tour the admin UI screen by screen | [UI_GUIDE.md](UI_GUIDE.md) |
 | Look up a REST route | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
 | Deploy it anywhere | [DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) |
