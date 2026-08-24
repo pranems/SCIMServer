@@ -16,10 +16,20 @@
     "BLANK with no error. That was the root cause of the recurring 2026-07-27 and",
     "2026-07-28 'I cannot see the diagrams' reports.",
     "",
-    "If diagrams are missing, run: npm run docs:mermaid:doctor"
+    "If diagrams are missing, run: npm run docs:mermaid:doctor",
+    "",
+    "ms-sarifvscode.sarif-viewer is listed as UNWANTED. It activates on",
+    "'workspaceContains:.git' and attaches diagnostics to EVERY open text",
+    "document, including the 'chat-editing-text-model:' documents that Copilot",
+    "chat session restore creates. On 2026-08-21 that turned restoring a large",
+    "chat session into an extension-host stall: 1,210 updateDiags calls, 1,153 of",
+    "them against chat-editing models, with the host repeatedly unresponsive.",
+    "CodeQL results are already gated in CI (.github/workflows/codeql.yml); the",
+    "editor-side viewer is not required to ship or review them."
   ],
   "recommendations": [],
   "unwantedRecommendations": [
-    "bierner.markdown-mermaid"
+    "bierner.markdown-mermaid",
+    "ms-sarifvscode.sarif-viewer"
   ]
 }
