@@ -51,39 +51,41 @@
 #            on Prisma schema files at build time, never at request time).
 # Owner:       @pranems
 # Class:       judgment
-# Reviewed:    2026-04-30
-# Re-check-by: 2026-07-30
+# Reviewed:    2026-08-24
+# Re-check-by: 2026-11-22
 # Re-check action: when chevrotain or lodash publishes a real fix, drop the
 #                  override and remove this entry.
+# 2026-08-24 re-review: lodash 4.18.0 is STILL the deprecated "Bad release";
+#                  no newer lodash exists, and chevrotain has not moved off it.
+#                  Rationale unchanged, so the entry stands with fresh dates.
 CVE-2026-4800
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CVE-2026-18446 (GHSA-7p8r-x3mc-p8w7) - fast-uri 3.1.4, HIGH
-# Package: fast-uri, pinned by an explicit override in api/package.json.
-#          Reached via prisma -> @prisma/dev -> @prisma/streams-local -> ajv.
-# Advisory published 2026-08-03T19:16Z. "fast-uri vulnerable to host confusion
-#          via backslash authority introducer."
+# ──────────────────────────────────────────────────────────────────────────────────
+# CVE-2026-40345 - deepmerge-ts 7.1.5, HIGH ("stack exhaustion when merging
+#          recursive object graphs"). Fixed in 8.0.0.
+# Package: deepmerge-ts, reached ONLY via prisma -> @prisma/config.
 #
-# Why suppressed, and only until 2026-08-10:
-#   Fixed versions 2.4.4 / 3.1.5 / 4.1.2 were all published within the last
-#   7 days, so the corporate feed proxy does not serve them - measured:
-#   `npm view fast-uri versions` tops out at 4.1.1. Taking the fix today is
-#   impossible without violating the NPM Minimum Release control, and CI holds
-#   itself to the same bar (see .github/workflows/regen-lockfile.yml).
-#   This is a TIMING wait, not a judgement that the CVE is acceptable.
+# Why this is a judgment entry and NOT an override:
+#   @prisma/config pins deepmerge-ts at EXACTLY "7.1.5" - not a range - and the
+#   newest prisma (7.9.1, checked 2026-08-24) still pins the same exact version,
+#   so there is no upgrade path. The only way to take the fix is an npm override
+#   forcing a MAJOR bump (7 -> 8) onto a dependency Prisma has pinned exactly.
+#   That code runs in PRODUCTION at container start - api/docker-entrypoint.sh
+#   invokes `prisma migrate deploy` - so a behavioural break there does not fail
+#   a test, it prevents the container from starting. Trading a non-reachable DoS
+#   for a plausible start-up outage on customer prod is the wrong trade.
 #
-# Reachability while we wait: fast-uri parses JSON-Schema $ref URIs inside ajv,
-#   which this repo reaches only through Prisma's CLI/dev tooling. It is not on
-#   any request path, so the host-confusion vector is not exposed to callers.
+# Reachability: deepmerge-ts merges Prisma's own config objects (prisma.config.ts
+#   and Prisma's defaults) inside the CLI at start-up. The inputs are OUR files,
+#   committed to this repo. No attacker-controlled data reaches the merge, and
+#   the package is absent from every request path. The CVE needs a recursive
+#   object graph supplied by an attacker, which cannot occur here.
 #
-# Owner:              @pranems
-# Class:              quarantine-window
-# Fixed-version:      4.1.2
-# Fix-available-from: 2026-08-10
-# Reviewed:           2026-08-04
-# Re-check-by:        2026-08-10
-# Re-check action: bump the `fast-uri` override in api/package.json to 4.1.2,
-#                  regenerate the lockfile via the regen-lockfile workflow (NOT
-#                  locally - a corp device produces a contaminated lockfile),
-#                  and DELETE this entry in the same commit.
-CVE-2026-18446
+# Owner:       @pranems
+# Class:       judgment
+# Reviewed:    2026-08-24
+# Re-check-by: 2026-11-22
+# Re-check action: check whether @prisma/config has moved to deepmerge-ts >= 8
+#                  (`npm view @prisma/config dependencies`). The moment it does,
+#                  take it and DELETE this entry - no override needed.
+CVE-2026-40345
