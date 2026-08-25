@@ -268,8 +268,32 @@ if ($RunPlaywright) {
             # -IncludeVisualBaselines if the target shares the baseline fixture data.
             $pwArgs = @('playwright', 'test', '--reporter=line')
             if (-not $IncludeVisualBaselines) {
-                $pwArgs += @('--grep-invert', 'Visual regression|Visual Snapshots')
-                Write-Host "   (excluding data-coupled pixel-baseline specs; pass -IncludeVisualBaselines to include)" -ForegroundColor DarkGray
+                $grepVisual = 'Visual regression|Visual Snapshots'
+                $pwArgs += @('--grep-invert', $grepVisual)
+
+                # An EXCLUDED test is invisible: it appears in no pass/skip/fail
+                # count, so "196 passed" silently omitted a whole coverage class.
+                # Count what the filter removes and prove it removed only pixel
+                # specs, so an over-broad pattern cannot quietly drop real coverage.
+                function Get-PwTestCount([string[]]$ExtraArgs) {
+                    $out = npx playwright test --list --reporter=line @ExtraArgs 2>&1 | Out-String
+                    $m = [regex]::Match($out, 'Total:\s+(\d+)\s+test')
+                    if ($m.Success) { return [int]$m.Groups[1].Value }
+                    return -1
+                }
+                $countAll      = Get-PwTestCount @()
+                $countVisual   = Get-PwTestCount @('--grep', $grepVisual)
+                $countFiltered = Get-PwTestCount @('--grep-invert', $grepVisual)
+
+                Write-Host "   Playwright selection: $countAll collected, $countVisual excluded (pixel baselines), $countFiltered will run" -ForegroundColor DarkGray
+
+                if ($countFiltered -le 0) {
+                    Write-Host "   ❌ the exclusion filter left NO tests to run" -ForegroundColor Red
+                    $failures += "playwright selection empty (grep-invert removed everything)"
+                } elseif ($countAll -ge 0 -and $countVisual -ge 0 -and ($countVisual + $countFiltered) -ne $countAll) {
+                    Write-Host "   ❌ selection accounting does not balance: $countVisual + $countFiltered != $countAll" -ForegroundColor Red
+                    $failures += "playwright selection accounting mismatch"
+                }
             }
             npx @pwArgs
             if ($LASTEXITCODE -ne 0) {

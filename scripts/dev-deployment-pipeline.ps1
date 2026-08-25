@@ -339,6 +339,31 @@ Invoke-Gate '1.3' 'Web tsc --noEmit (baseline-or-better)' {
 Invoke-Gate '1.5' 'Web prod build' { npm run build } 'web' | Out-Null
 Invoke-Gate '1.6' 'Web size-limit budgets' { npm run size } 'web' | Out-Null
 
+# 1.9 - the schema and its migrations must move together. A schema.prisma edit
+# with no accompanying migration deploys code that expects columns the database
+# does not have, and the failure surfaces at container start, not here.
+Invoke-Gate '1.9' 'prismaMigrationAudit (schema/migration lockstep)' {
+    $base = (git rev-parse --abbrev-ref '@{upstream}' 2>$null)
+    if (-not $base) { $base = 'origin/master' }
+    $schemaChanged = @(git diff --name-only "$base..HEAD" -- api/prisma/schema.prisma).Count -gt 0
+    $migrationsChanged = @(git diff --name-only "$base..HEAD" -- api/prisma/migrations/).Count -gt 0
+    Write-Host "    schema changed=$schemaChanged  migrations changed=$migrationsChanged (vs $base)" -ForegroundColor DarkGray
+    if ($schemaChanged -and -not $migrationsChanged) {
+        throw 'schema.prisma changed with no migration added - generate one before deploying'
+    }
+} | Out-Null
+
+# 1.10 - a base image can be free of known CVEs and still be unsupported. Trivy
+# scans for vulnerabilities, never for end-of-life status.
+Invoke-Gate '1.10' 'Base images on an Active/Maintenance LTS line' {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'audit-base-images.ps1')
+} | Out-Null
+
+# 1.11 - the canonical infrastructure record must still match the infrastructure.
+Invoke-Gate '1.11' 'Deployment infra doc current' {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'audit-deployment-doc.ps1')
+} | Out-Null
+
 # 1.12 - the user-facing documentation must still describe what we are about to
 # deploy. Runs in currency-only mode here (no diff to couple against at deploy
 # time); the coupling half (F4) is enforced at pre-push and on pull requests.
@@ -375,24 +400,44 @@ Invoke-Gate '2.4' 'Web vitest coverage (lines:78 / branches:70 / functions:65 / 
 Invoke-Gate '2.6' 'test-all-modes.ps1 (6-mode matrix)' { pwsh -NoProfile -File scripts/test-all-modes.ps1 } | Out-Null
 
 # =============================================================================
-# Stage 3 - Audit prompts (recorded as PENDING for operator-driven walk)
+# Stage 3 - Audits. The mechanically-checkable ones RUN here; only the ones
+# that genuinely need an LLM reviewer stay PENDING. Recording an executable
+# check as PENDING is indistinguishable from having no check at all.
 # =============================================================================
-Write-Stage 3 'Audit prompts (operator-driven)'
+Write-Stage 3 'Audits (executable gates run; reviewer prompts recorded)'
+
+Invoke-Gate '3b.3' 'endpointConfigFlagAudit (registry vs Settings UI conformance)' {
+    npx jest --silent --testPathPatterns 'endpoint-config-conformance'
+} 'api' | Out-Null
+
+Invoke-Gate '3b.5' 'dependencyCveSweep (production deps + .trivyignore freshness)' {
+    Push-Location (Join-Path $PSScriptRoot '..' 'api')
+    try {
+        $audit = npm audit --omit=dev --json 2>$null | ConvertFrom-Json
+        $crit = [int]$audit.metadata.vulnerabilities.critical
+        $high = [int]$audit.metadata.vulnerabilities.high
+        Write-Host "    api production deps: critical=$crit high=$high" -ForegroundColor DarkGray
+        if ($crit -gt 0) { throw "$crit CRITICAL vulnerability(ies) in production dependencies" }
+        # HIGH findings are permitted ONLY while an audited .trivyignore entry
+        # covers them; the staleness checker is what keeps that honest.
+        npx ts-node src/scripts/check-trivyignore.ts | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'stale or malformed .trivyignore entry' }
+    } finally { Pop-Location }
+} | Out-Null
+
 $auditPrompts = @(
     @{ Stage = '3a.1'; Gate = 'addMissingTests prompt' },
     @{ Stage = '3a.2'; Gate = 'apiContractVerification prompt' },
     @{ Stage = '3a.3'; Gate = 'error-handling-verification prompt' },
     @{ Stage = '3b.1'; Gate = 'logging-verification prompt' },
     @{ Stage = '3b.2'; Gate = 'auditAgainstRFC prompt' },
-    @{ Stage = '3b.3'; Gate = 'endpointConfigFlagAudit prompt' },
     @{ Stage = '3b.4'; Gate = 'securityAudit prompt' },
-    @{ Stage = '3b.5'; Gate = 'dependencyCveSweep prompt' },
     @{ Stage = '3b.6'; Gate = 'performanceBenchmark prompt' },
     @{ Stage = '3c.1'; Gate = 'codeReviewSelfAudit prompt' },
-    @{ Stage = '3c.2'; Gate = 'auditAndUpdateDocs prompt' }
+    @{ Stage = '3c.2'; Gate = 'auditAndUpdateDocs prompt (narrative half; the mechanical half is 1.11-1.13)' }
 )
 foreach ($p in $auditPrompts) {
-    Add-Result -Stage $p.Stage -Gate $p.Gate -Status 'PENDING' -Detail 'invoke via Copilot Chat with #prompt:<name>; record outcome in report'
+    Add-Result -Stage $p.Stage -Gate $p.Gate -Status 'PENDING' -Detail 'reviewer-judgement gate; invoke via Copilot Chat with #prompt:<name> and record the outcome here'
 }
 
 if ($SkipDeploy) {
