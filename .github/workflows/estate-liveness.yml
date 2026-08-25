@@ -1,0 +1,64 @@
+# Estate liveness (register item N2).
+#
+# WHY THIS EXISTS
+# Customer-facing prod was once unreachable and it was found by INSPECTION,
+# not by an alert. Every other scheduled workflow in this repo is a STATIC
+# gate - CodeQL, Dependabot, the .trivyignore review, doc freshness - and
+# every one of them reads the repository rather than the running estates. So
+# nothing in CI could tell the difference between "prod is serving" and "prod
+# has been down for a week". `audit-deployment-doc.ps1 -Live` does check, but
+# only runs post-deploy, which is exactly when the estate is known to be alive.
+#
+# WHERE THE TARGETS COME FROM
+# scim-estates.json deliberately stores NO FQDN: the Container Apps
+# environment domain is assigned by Azure and changes at every tenant
+# rollover, so a committed FQDN is a value guaranteed to become false.
+# Resolving it properly needs ARM, and no workflow here holds Azure
+# credentials - granting CI standing access to two production subscriptions
+# just to run a health check would be a bad trade.
+#
+# So the targets live in the repository VARIABLE `SCIM_ESTATE_URLS`, which is
+# outside the repo, editable without a commit, and refreshed from ARM. It can
+# still go stale, which is why the probe treats "no targets" as its own
+# failure (exit 2) instead of success.
+name: Estate liveness
+
+on:
+  schedule:
+    # Every 6 hours, offset off the top of the hour because GitHub queues
+    # scheduled runs and :00 is the most contended slot. Frequent enough that
+    # an outage is noticed within a working day; infrequent enough to stay far
+    # inside free-tier minutes.
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe live estates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Probe
+        shell: pwsh
+        env:
+          SCIM_ESTATE_URLS: ${{ vars.SCIM_ESTATE_URLS }}
+        run: |
+          ./scripts/probe-estates.ps1
+          $code = $LASTEXITCODE
+          # Exit 2 means the probe resolved nothing to check. That is a
+          # failure of the ALERT, not of the estates, and it must be loud -
+          # a silent no-op here would recreate the exact blind spot this
+          # workflow was added to remove.
+          if ($code -eq 2) {
+            Write-Host '::error::No estate URLs resolved. Set the SCIM_ESTATE_URLS repository variable (comma-separated https base URLs).'
+            exit 1
+          }
+          if ($code -ne 0) {
+            Write-Host '::error::At least one live estate is not answering its health check.'
+            exit 1
+          }

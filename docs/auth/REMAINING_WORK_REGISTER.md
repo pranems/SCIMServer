@@ -137,7 +137,25 @@ P1 the most expensive O(N) loop in the resource plane.
 
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
-| **N2** | A scheduled liveness probe. All 5 scheduled workflows are static gates | all estates | **High** | - |
+| **N2** | ~~A scheduled liveness probe. All 5 scheduled workflows are static gates~~ **DONE 2026-08-25** | all estates | ~~High~~ | - |
+
+**N2 shipped** as [probe-estates.ps1](../../scripts/probe-estates.ps1) plus the
+[estate-liveness](../../.github/workflows/estate-liveness.yml) workflow, every 6 hours.
+
+The design turned on a constraint worth recording. `scim-estates.json` forbids storing an FQDN -
+the Container Apps environment domain is assigned by Azure and changes at every tenant rollover, so
+a committed FQDN is a value guaranteed to become false - and resolving one properly needs ARM. But
+**no workflow in this repo holds Azure credentials**, and granting CI standing access to two
+production subscriptions in order to run a health check is a poor trade. Targets therefore arrive as
+*derived* input (`-Target`, then the `SCIM_ESTATE_URLS` repository variable, then ARM where auth
+exists); none is committed, and all are refreshed from Azure rather than hand-maintained.
+
+**The exit code that matters is 2.** Resolving zero targets is its own outcome, never success,
+because a probe that checked nothing and a probe that found everything healthy must not look alike -
+that equivalence is exactly why the original outage went unnoticed. Seventeen controls cover it,
+weighted toward "can this be green without checking anything?" rather than HTTP mechanics, and the
+zero-target path is additionally proven end-to-end by running the script somewhere the registry
+helper cannot be found.
 
 Customer-facing prod being down was found by inspection, not by alert. `audit-deployment-doc.ps1
 -Live` C4 does catch it, but only runs post-deploy, so a dead estate between deploys is invisible.
