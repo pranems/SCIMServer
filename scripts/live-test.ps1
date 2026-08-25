@@ -9647,24 +9647,32 @@ try {
     }
 
     # ─── Test 9z-X.9: admin traffic does NOT inflate the series ────
-    $beforeAdmin = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
-    $beforeAdminCurrent = $beforeAdmin.requestsLast24hSeries[23]
-
-    # Make 3 admin calls.
+    # Assert the EXCLUSION CONTRACT directly instead of inferring it from a
+    # delta on the shared 24h counter. That counter is fed by the whole
+    # database, so on an estate with concurrent live traffic - customer prod,
+    # where blue serves real users off the SAME database the green revision
+    # reads - ambient requests land in the same hour bucket and the delta
+    # cannot be attributed to this test's own calls. That is what made the
+    # old `delta < 3` assertion abort a HEALTHY blue/green on 2026-08-25
+    # (delta=4, entirely ambient). A test must never measure a shared mutable
+    # counter and attribute the movement to itself.
     for ($i = 0; $i -lt 3; $i++) {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Method GET -Headers $headers | Out-Null
     }
     Start-Sleep -Seconds 4
 
-    $afterAdmin = Invoke-RestMethod -Uri "$baseUrl/scim/admin/dashboard" -Method GET -Headers $headers
-    $afterAdminCurrent = $afterAdmin.requestsLast24hSeries[23]
+    $defaultLogs  = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=200" -Method GET -Headers $headers
+    $adminInclLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?pageSize=200&includeAdmin=true" -Method GET -Headers $headers
 
-    # The 3 admin GETs themselves must NOT contribute. Other traffic from
-    # parallel test runs may, so we assert the delta is < 3 (weaker
-    # claim, but exactly the contract we care about).
-    $adminDelta = $afterAdminCurrent - $beforeAdminCurrent
-    Test-Result -Success ($adminDelta -lt 3) `
-        -Message "9z-X.9: admin/version GETs not counted in series (delta=$adminDelta < 3)"
+    $adminInDefault = @($defaultLogs.items  | Where-Object { $_.url -like '*/scim/admin/version*' }).Count
+    $adminInIncluded = @($adminInclLogs.items | Where-Object { $_.url -like '*/scim/admin/version*' }).Count
+
+    Test-Result -Success ($adminInDefault -eq 0) `
+        -Message "9z-X.9: admin/version is excluded from the default (series-feeding) log view (found=$adminInDefault, expected 0)"
+    # Positive control: without it, 9z-X.9 would also pass if the rows simply
+    # did not exist, which would prove nothing about the exclusion.
+    Test-Result -Success ($adminInIncluded -gt 0) `
+        -Message "9z-X.9b (control): those same admin/version rows ARE visible with includeAdmin=true (found=$adminInIncluded)"
 } catch {
     Test-Result -Success $false -Message "9z-X.error: $($_.Exception.Message)"
 }
