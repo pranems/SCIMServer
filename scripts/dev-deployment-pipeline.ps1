@@ -482,15 +482,30 @@ if (-not $SkipDeploy) {
     # 4.3 - GHCR push via CI workflow (uses GITHUB_TOKEN; no local PAT needed)
     $pkgJsonPath = Join-Path $repoRoot 'api/package.json'
     $version = (Get-Content $pkgJsonPath -Raw | ConvertFrom-Json).version
-    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $gitBranch)" {
-        # CRITICAL (2026-05-29 false-green lesson): pin the workflow to the
-        # CURRENT branch. Without --ref, `gh workflow run` dispatches on the
-        # repo default branch (master) and publishes the WRONG code, while the
-        # ACR/dev path ships the right code - a silent split that shipped a
-        # stale GHCR image (calmsand path) undetected until Playwright caught it.
-        gh workflow run publish-ghcr.yml --ref $gitBranch -f version=$version -f pushLatest=true
+
+    # A SHIPPING TAG IS ALWAYS BUILT FROM MASTER (operator rule, 2026-08-25).
+    # Merge first, build second: an image built from an unmerged ref can ship
+    # code that is not on master, and `:latest` would then point at it.
+    # The 2026-05-29 lesson was the mirror image of this - the workflow defaulted
+    # to master while the work sat on a feature branch, shipping a STALE image.
+    # Both failures are the same root cause: the built ref and the shipped ref
+    # disagreed. Asserting HEAD is contained in master removes the disagreement
+    # instead of trading one direction of it for the other.
+    $publishRef = 'master'
+    Invoke-Gate '4.3a' 'HEAD is merged into origin/master (shipping ref check)' {
+        git fetch origin master --quiet
+        $head = (git rev-parse HEAD).Trim()
+        git merge-base --is-ancestor $head origin/master
+        if ($LASTEXITCODE -ne 0) {
+            throw "HEAD ($($head.Substring(0,8))) is NOT contained in origin/master. Merge before publishing - a shipping image must be built from master."
+        }
+        Write-Host "    HEAD $($head.Substring(0,8)) is contained in origin/master" -ForegroundColor DarkGray
+    } | Out-Null
+
+    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $publishRef)" {
+        gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true
         Start-Sleep -Seconds 6
-        $runId = (gh run list --workflow=publish-ghcr.yml --branch $gitBranch --limit 1 --json databaseId --jq '.[0].databaseId')
+        $runId = (gh run list --workflow=publish-ghcr.yml --branch $publishRef --limit 1 --json databaseId --jq '.[0].databaseId')
         gh run watch $runId --exit-status
     } | Out-Null
 
