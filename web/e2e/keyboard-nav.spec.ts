@@ -128,7 +128,20 @@ test.describe('Global keyboard shortcuts', () => {
 
     // Focus the endpoints SearchBox.
     const search = page.getByTestId('endpoints-search');
+    await expect(search).toBeVisible({ timeout: 30_000 });
     await search.click();
+
+    // Prove focus actually landed BEFORE typing. `endpoints-page` being visible
+    // does not mean the search box is interactive - on a cold container the
+    // endpoint list resolves after first paint and the re-render can swallow the
+    // click. When that happens the keystrokes reach the document instead, the
+    // shortcut layer navigates, and the failure reads as a regression in the
+    // shortcut logic when it was really a lost click. Asserting focus makes the
+    // test fail for the reason it is actually testing, or not at all.
+    // (Flaked once during the 0.55.15 canary post-flip verification under 3
+    // parallel workers against a just-flipped revision; passed 5/5 in isolation
+    // on the same image, and 3/3 on the previous one.)
+    await expect(search).toBeFocused({ timeout: 10_000 });
 
     // Type `g e` - the shortcut layer must NOT navigate because
     // isEditableTarget() returns true for INPUT.
@@ -140,6 +153,6 @@ test.describe('Global keyboard shortcuts', () => {
     await expect(page).toHaveURL(/\/endpoints(\?|$)/);
     // The SearchBox absorbed the keystrokes (filter text is "ge").
     // The Fluent UI SearchBox propagates `q=ge` to the URL.
-    await expect(page).toHaveURL(/q=ge/);
+    await expect(page).toHaveURL(/q=ge/, { timeout: 10_000 });
   });
 });
