@@ -3,8 +3,10 @@
 # Pre-push hook that runs scripts/pre-push-checks.ps1 to mirror CI gates
 # before a push leaves the local machine.
 #
-# Default mode: Fast (~9-10 min) - api build + lint + web tsc + web build +
+# Default mode: Fast (~7-10 min) - api build + lint + web tsc + web build +
 # static doc/infra gates + api unit tests + api e2e tests (inmemory).
+# Measured on the first real push with the test gates live: unit 51.7s,
+# e2e 160.2s, whole push 416s.
 #
 # The two API test gates were promoted into Fast on 2026-08-27. Before that the
 # default mode ran NO tests at all, which is how a dead route (an orphaned

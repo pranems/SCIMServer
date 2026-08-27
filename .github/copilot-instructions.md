@@ -522,7 +522,7 @@ After implementation AND before considering work complete, ALL of the following 
 
 **Origin.** In v0.55.15 a change orphaned `@Post(':endpointId/credentials')` onto a private helper, so credential creation was completely dead **and answered `201 Created`**. It was committed and pushed with all gates green. The reason is the part worth remembering: **every gate in the default mode was STATIC** - tsc, eslint, builds, docs, infra, supply chain. *No test of any kind ran at push time.* The gates existed (`api: unit tests`, `api: e2e tests` were defined) but only in `Validate` mode, which the hook never selects. **A gate defined in a mode nothing invokes is indistinguishable from a gate that does not exist** - the same defect shape as the Stage 3 audits that were recorded `PENDING` and could never pass.
 
-**Cost, measured before deciding rather than estimated:** unit **93s** (4,824 tests), E2E **195s** (1,430 tests), taking a typical push from ~4 min to ~9-10 min. The operator accepted that latency explicitly in exchange for catching this defect class locally.
+**Cost, measured before deciding rather than estimated:** standalone runs were unit **93s** (4,824 tests) and E2E **195s** (1,430 tests). The first real push with the gates live measured **unit 51.7s, E2E 160.2s, whole push 416s (~7 min)** - faster than the standalone figures because the caches are warm by the time the test gates run. Budget **~7-10 min per push**. The operator accepted that latency explicitly in exchange for catching this defect class locally.
 
 **Why E2E is safe to run at push time:** it uses the **inmemory** backend exactly as CI does, so it needs no database, no Docker and no network - pre-push stays deterministic and works offline.
 
