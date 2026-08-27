@@ -238,6 +238,16 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     defaultValue: true,
     category: 'Logging & privacy',
   },
+  {
+    key: 'logFileEnabled',
+    label: 'logFileEnabled',
+    description:
+      'Write this endpoint log entries to the server log FILE in addition to the request log stored in ' +
+      'the database. Turn OFF for a high-volume endpoint whose file output is noise. Console and database ' +
+      'logging are unaffected.',
+    defaultValue: true,
+    category: 'Logging & privacy',
+  },
 ];
 
 // ─── Enumerated (multi-option) settings ───────────────────────────────
@@ -337,6 +347,111 @@ const NUMBER_SETTINGS: ReadonlyArray<NumberSetting> = [
     min: 0,
     max: 86400000,
     serverDefault: 600000,
+  },
+  // ── Credential caps (P2) ──────────────────────────────────────────
+  // These bound the O(N) bcrypt loop on the resource plane: a presented token
+  // is compared against EVERY active credential, measured at ~293 ms each, so
+  // three already exceed the 800 ms latency gate.
+  {
+    key: 'MaxActiveBearerCredentials',
+    label: 'MaxActiveBearerCredentials',
+    description:
+      'Maximum ACTIVE per-endpoint bearer credentials. Each one adds a bcrypt comparison to every ' +
+      'failed resource-plane auth attempt, so this bounds worst-case auth latency. Bounds 1 - 25.',
+    min: 1,
+    max: 25,
+    serverDefault: 5,
+  },
+  {
+    key: 'MaxActiveOAuthClientCredentials',
+    label: 'MaxActiveOAuthClientCredentials',
+    description:
+      'Maximum ACTIVE per-endpoint oauth_client credentials. Counted separately from bearer so one ' +
+      'type cannot exhaust the other type budget. Bounds 1 - 25.',
+    min: 1,
+    max: 25,
+    serverDefault: 5,
+  },
+  {
+    key: 'MaxActiveWifTrusts',
+    label: 'MaxActiveWifTrusts',
+    description:
+      'Maximum ACTIVE WIF trusts. More generous than the secret-based caps because WIF trusts are ' +
+      'JWKS-verified and never enter the bcrypt loop - this bounds config sprawl, not latency. Bounds 1 - 25.',
+    min: 1,
+    max: 25,
+    serverDefault: 10,
+  },
+  // ── JWKS safety envelope (W1.5) ───────────────────────────────────
+  {
+    key: 'JwksTotalDeadlineMs',
+    label: 'JwksTotalDeadlineMs',
+    description:
+      'Safety envelope: total wall-clock deadline for a JWKS fetch INCLUDING all retries. Bounds 100 - 120000.',
+    min: 100,
+    max: 120000,
+    serverDefault: 10000,
+  },
+  {
+    key: 'JwksMaxResponseBytes',
+    label: 'JwksMaxResponseBytes',
+    description:
+      'Safety envelope: maximum JWKS response body size in bytes; a larger body is rejected before it ' +
+      'is parsed. Bounds 1024 - 10485760.',
+    min: 1024,
+    max: 10485760,
+    serverDefault: 1048576,
+  },
+  {
+    key: 'JwksMaxKeys',
+    label: 'JwksMaxKeys',
+    description:
+      'Safety envelope: maximum number of keys accepted in a JWKS. Deliberately generous - Microsoft ' +
+      'states a key cache should hold 10-1000 keys across issuers. Bounds 1 - 1000.',
+    min: 1,
+    max: 1000,
+    serverDefault: 100,
+  },
+  {
+    key: 'JwksMaxCacheEntries',
+    label: 'JwksMaxCacheEntries',
+    description:
+      'Safety envelope: JWKS cache cardinality cap; past it the OLDEST entry is evicted. Without a cap ' +
+      'the cache is an unbounded map keyed by a caller-influenced URI. Bounds 1 - 1000.',
+    min: 1,
+    max: 1000,
+    serverDefault: 50,
+  },
+  // ── JWKS refresh cadence (W1.4) ───────────────────────────────────
+  {
+    key: 'JwksRefreshIntervalMs',
+    label: 'JwksRefreshIntervalMs',
+    description:
+      'Background refresh cadence for a cached key set. Mirrors Microsoft published algorithm for its ' +
+      'own signing keys (24 h TTL with a 1 h background refresh). Bounds 60000 - 86400000.',
+    min: 60000,
+    max: 86400000,
+    serverDefault: 3600000,
+  },
+  {
+    key: 'JwksUnknownKidMinIntervalMs',
+    label: 'JwksUnknownKidMinIntervalMs',
+    description:
+      'Minimum interval between refetches triggered by an UNKNOWN kid. Throttles a caller who can ' +
+      'otherwise force repeated outbound fetches by presenting unknown key ids. Bounds 0 - 3600000.',
+    min: 0,
+    max: 3600000,
+    serverDefault: 300000,
+  },
+  {
+    key: 'JwksStaleIfErrorMs',
+    label: 'JwksStaleIfErrorMs',
+    description:
+      'How long a STALE cached key set may still be served when the issuer is unreachable, so an ' +
+      'upstream outage does not immediately break token validation. Bounds 0 - 604800000.',
+    min: 0,
+    max: 604800000,
+    serverDefault: 172800000,
   },
 ];
 
