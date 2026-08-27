@@ -147,7 +147,13 @@ AWS) is a **keyed O(1) lookup plus a fast hash** (SHA-256/HMAC): the token carri
 exactly one constant-time comparison happens regardless of how many credentials exist.
 
 **P2's caps bound the amplification; they do not remove it.** P1 remains open and is now the
-highest-severity item in this section. Design doc still to be written.
+highest-severity item in this section. **Design written 2026-08-27:**
+[P1_KEYED_CREDENTIAL_LOOKUP_DESIGN.md](P1_KEYED_CREDENTIAL_LOOKUP_DESIGN.md) - token format
+`scim_<keyId>_<secret>`, one indexed lookup plus an HMAC-SHA256 comparison (**measured 0.00419 ms,
+about 68,000x faster than one bcrypt compare**, and no longer multiplied by N), a server-side pepper
+to preserve the database-dump resistance bcrypt gave for free, and a five-phase migration in which
+the **existing rotation flow is the upgrade path**. Retirement of the legacy scan is gated on a
+measured zero legacy count, not on elapsed time.
 
 ### 2.4 Structure and configuration
 
