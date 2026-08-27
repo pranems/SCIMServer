@@ -42,6 +42,25 @@
 
 ## 0. Quick Start - Fetching Logs & Audit Data
 
+> **If the logs you need are already gone, check the pruner before anything else.**
+>
+> ```bash
+> curl -s -H "Authorization: Bearer $TOKEN" \
+>   "$BASE/scim/admin/log-config" | jq .autoPrune
+> # { "enabled": true, "retentionDays": 30, "intervalMs": 3600000,
+> #   "lastRunAt": "2026-08-26T09:14:02.118Z", "lastPrunedCount": 412 }
+> ```
+>
+> `retentionDays` here is the value the process is **actually running**, which a runtime `PUT` can
+> change independently of the `LOG_RETENTION_DAYS` environment variable - so the env var alone is not
+> evidence. A real incident: every estate reported `retentionDays: 1` while the environment said
+> `30`, because a test had "restored" the setting to a hardcoded value, leaving production with a
+> single day of diagnostic history.
+>
+> `lastRunAt` and `lastPrunedCount` describe **execution**, not intent. A sweep that removed zero
+> rows still updates `lastRunAt`, so a stale timestamp means the pruner is not running at all rather
+> than that it had nothing to do.
+
 > **Audience:** Colleague who has never used SCIMServer. This section gets you from zero to reading logs in under 2 minutes.
 
 ### 0.1 Authentication
