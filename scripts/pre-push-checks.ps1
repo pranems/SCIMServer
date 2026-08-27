@@ -7,23 +7,31 @@
 .DESCRIPTION
     Three modes, from cheapest to most thorough:
 
-      Fast (default for the hook)         ~1-2 min
+      Fast (default for the hook)         ~9-10 min
         - api npm run build (TS compile)
         - api npm run lint
         - web npx tsc --noEmit
         - web npm run build
+        - docs/infra/supply-chain static gates (mermaid, LTS, doc
+          freshness, doc claims, lockfile provenance, RFC corpus)
+        - api npm test (unit)              ~93s / 4,824 tests
+        - api npm run test:e2e             ~195s / 1,430 tests
+          (inmemory backend, maxWorkers=2, same excludes as CI)
+
+        The two test gates were promoted here from Validate on
+        2026-08-27. Until then the default mode ran NO tests at all -
+        only static checks - which is how a completely dead route
+        (an orphaned @Post decorator that still answered 201) was
+        committed and pushed with every gate green.
 
       Validate (mirrors CI .github/workflows/build-test.yml validate job)
-                                          ~8-12 min
+                                          ~11-14 min
         - Everything in Fast, plus:
         - api npx prisma generate (required before lint + tests)
         - api migration linter (npx ts-node lint-migrations.ts)
-        - api npm test (unit)
-        - api npm run test:e2e (inmemory backend, maxWorkers=2, same
-          excludes as CI)
         - web npm test (vitest)
 
-      Full                                ~15-20 min
+      Full                                ~18-22 min
         - Everything in Validate, plus:
         - docker build (mirrors build-and-push.yml build step)
         - trivy image scan (mirrors HIGH+CRITICAL gating)
@@ -275,8 +283,49 @@ Invoke-Gate -Name 'docs: patterns pie matches catalog' -WorkingDir $repoRoot -Ac
 # here on purpose - pre-push must stay deterministic and work offline. They run
 # monthly in .github/workflows/rfc-currency.yml and on demand via
 # `npm run rfcs:check:online`.
-Invoke-Gate -Name 'docs: RFC corpus current + intact' -WorkingDir $repoRoot -Action {
-    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/sync-rfcs.ps1') -Quiet 2>&1 | Out-Host
+Invoke-Gate -Name 'docs: RFC corpus current + intact' -WorkingDir $repoRoot -Action {    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/sync-rfcs.ps1') -Quiet 2>&1 | Out-Host
+}
+
+# -------------------------------------------------------------------------
+# API test gates - ALWAYS RUN (promoted from Validate on 2026-08-27)
+# -------------------------------------------------------------------------
+# Origin: v0.55.15. A change orphaned `@Post(':endpointId/credentials')` onto a
+# private helper, so credential creation was completely dead - and it answered
+# `201 Created`. It was committed AND pushed with all 12 gates green, because
+# every gate in the default mode was STATIC. No test of any kind ran at push
+# time, so `credential-lifecycle.e2e-spec.ts` - which fails instantly on that
+# defect - never got the chance.
+#
+# Unit tests are included alongside E2E deliberately: running E2E while skipping
+# the faster, broader suite would be incoherent. Measured 2026-08-27 on the dev
+# machine: unit 93s (4,824 tests), e2e 195s (1,430 tests).
+#
+# E2E runs against the INMEMORY backend, exactly as CI does, so pre-push needs no
+# database, no Docker and no network - it stays deterministic and works offline.
+
+Invoke-Gate -Name 'api: unit tests (jest)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
+    npm test 2>&1 | Out-Host
+}
+
+Invoke-Gate -Name 'api: e2e tests (inmemory, maxWorkers=2)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
+    # Match CI exactly: same env vars, same excludes, same worker count. Verified
+    # byte-for-byte against .github/workflows build-test.yml rather than assumed.
+    #
+    # OPEN FINDING (2026-08-27, deliberately NOT acted on here): the two
+    # --testPathIgnorePatterns below are UNDOCUMENTED and run in no automated
+    # gate anywhere, so 55 tests are permanently dark. Measured this session:
+    # they pass in isolation (2 suites / 55 tests) AND in the full suite with
+    # nothing excluded (92 suites / 1,485 tests / 133s). The exclusion looks
+    # stale. It is left in place because two green runs are not enough evidence
+    # to re-enable a previously-quarantined pair - if they are intermittently
+    # flaky, enabling them here would make every push flaky, which is a worse
+    # failure than the gap. Re-enabling belongs in its own change, in CI and
+    # pre-push together, after several consecutive green runs.
+    $env:PERSISTENCE_BACKEND = 'inmemory'
+    $env:SCIM_SHARED_SECRET = 'ci-shared-secret-not-for-production'
+    $env:JWT_SECRET = 'ci-jwt-secret-not-for-production'
+    $env:OAUTH_CLIENT_SECRET = 'ci-oauth-secret-not-for-production'
+    npm run test:e2e -- --maxWorkers=2 --testPathIgnorePatterns 'endpoint-scoped-logs.e2e-spec.ts' --testPathIgnorePatterns 'log-config.e2e-spec.ts' 2>&1 | Out-Host
 }
 
 # -------------------------------------------------------------------------
@@ -291,19 +340,6 @@ if ($Mode -in @('Validate', 'Full')) {
 
     Invoke-Gate -Name 'api: migration linter (additive-only)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
         npx ts-node --transpile-only src/scripts/lint-migrations.ts 2>&1 | Out-Host
-    }
-
-    Invoke-Gate -Name 'api: unit tests (jest)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
-        npm test 2>&1 | Out-Host
-    }
-
-    Invoke-Gate -Name 'api: e2e tests (inmemory, maxWorkers=2)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
-        # Match CI exactly: same env vars, same excludes, same worker count.
-        $env:PERSISTENCE_BACKEND = 'inmemory'
-        $env:SCIM_SHARED_SECRET = 'ci-shared-secret-not-for-production'
-        $env:JWT_SECRET = 'ci-jwt-secret-not-for-production'
-        $env:OAUTH_CLIENT_SECRET = 'ci-oauth-secret-not-for-production'
-        npm run test:e2e -- --maxWorkers=2 --testPathIgnorePatterns 'endpoint-scoped-logs.e2e-spec.ts' --testPathIgnorePatterns 'log-config.e2e-spec.ts' 2>&1 | Out-Host
     }
 
     Invoke-Gate -Name 'web: vitest' -WorkingDir (Join-Path $repoRoot 'web') -Action {

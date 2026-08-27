@@ -518,6 +518,18 @@ After implementation AND before considering work complete, ALL of the following 
 2.5. **`crossBackendParityAudit` prompt** - For ANY change that touches a file with an `isInMemoryBackend` branch, walk through the parity matrix (Q1-Q4) and confirm both backends behave identically. This is the Finding-B preventer (May 2026 - InMemory endpoint-create was missing the duplicate-name guard Prisma had).
 2.6. **API + Web tests across persistence backends** - `pwsh scripts/test-all-modes.ps1` (Phase H5 orchestrator) covers 6 modes including api-unit-prisma + api-unit-inmemory + api-e2e-prisma + api-e2e-inmemory. Companion runner to 2.5; the prompt does the thinking, the orchestrator does the execution.
 
+2.7. **API unit + E2E run at PUSH time, not only on request** (added 2026-08-27, operator-approved). `scripts/pre-push-checks.ps1` **Fast** mode - the mode the `.githooks/pre-push` hook uses by default - now includes `api: unit tests (jest)` and `api: e2e tests (inmemory, maxWorkers=2)`.
+
+**Origin.** In v0.55.15 a change orphaned `@Post(':endpointId/credentials')` onto a private helper, so credential creation was completely dead **and answered `201 Created`**. It was committed and pushed with all gates green. The reason is the part worth remembering: **every gate in the default mode was STATIC** - tsc, eslint, builds, docs, infra, supply chain. *No test of any kind ran at push time.* The gates existed (`api: unit tests`, `api: e2e tests` were defined) but only in `Validate` mode, which the hook never selects. **A gate defined in a mode nothing invokes is indistinguishable from a gate that does not exist** - the same defect shape as the Stage 3 audits that were recorded `PENDING` and could never pass.
+
+**Cost, measured before deciding rather than estimated:** unit **93s** (4,824 tests), E2E **195s** (1,430 tests), taking a typical push from ~4 min to ~9-10 min. The operator accepted that latency explicitly in exchange for catching this defect class locally.
+
+**Why E2E is safe to run at push time:** it uses the **inmemory** backend exactly as CI does, so it needs no database, no Docker and no network - pre-push stays deterministic and works offline.
+
+**Unit is included alongside E2E deliberately.** Running the slower, narrower suite while skipping the faster, broader one would be incoherent.
+
+**Reverse-checked, not assumed:** with the orphaned decorator reintroduced, the unit gate fails 1 suite (the `route-decorator-binding` static check) and the E2E gate fails 8+ suites. Restored afterwards and confirmed byte-identical via `git diff`.
+
 ### Stage 3 - Self-Improving Audit Prompts (every feature/bug-fix commit)
 Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. Run them in this order; later sub-stages depend on earlier ones being green.
 

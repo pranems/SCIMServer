@@ -175,3 +175,7 @@ docs/screenshots/*
 docs/screenshots/scratch/
 docs/screenshots/tmp-*.png
 docs/screenshots/*.tmp.png
+
+# E2E run marker written by test/e2e/global-setup.ts (removed by teardown, but a
+# --forceExit or crashed run leaves it behind). Never a committable artifact.
+api/test/e2e/.test-db-path

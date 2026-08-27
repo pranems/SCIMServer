@@ -3,7 +3,14 @@
 # Pre-push hook that runs scripts/pre-push-checks.ps1 to mirror CI gates
 # before a push leaves the local machine.
 #
-# Default mode: Fast (~1-2 min) - api build + lint + web tsc + web build
+# Default mode: Fast (~9-10 min) - api build + lint + web tsc + web build +
+# static doc/infra gates + api unit tests + api e2e tests (inmemory).
+#
+# The two API test gates were promoted into Fast on 2026-08-27. Before that the
+# default mode ran NO tests at all, which is how a dead route (an orphaned
+# @Post decorator that still answered 201 Created) was pushed with every gate
+# green. Push latency was accepted deliberately in exchange for that class of
+# defect being caught before it leaves the machine.
 #
 # Escalation (per-push, without editing this file):
 #   $env:PREPUSH_MODE = 'Validate'; git push origin feat/ui
