@@ -31,11 +31,17 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     app = await createTestApp();
     await app.init();
     adminToken = await getAuthToken(app);
+    // This suite mints many oauth_client credentials against the SAME two
+    // fixture endpoints, which exceeds the P2 default cap of 5. Raising the cap
+    // here (rather than lowering the default) keeps the suite's premise intact
+    // and matches how the 9z-BQ latency gate opts in.
     endpointA = await createEndpointWithConfig(app, adminToken, {
       PerEndpointCredentialsEnabled: 'True',
+      MaxActiveOAuthClientCredentials: 25,
     });
     endpointB = await createEndpointWithConfig(app, adminToken, {
       PerEndpointCredentialsEnabled: 'True',
+      MaxActiveOAuthClientCredentials: 25,
     });
   });
 

@@ -126,4 +126,68 @@ describe('Active credential caps per type (P2) (E2E)', () => {
       })
       .expect(400);
   });
+
+  it('P2-E7: REACTIVATION cannot be used to exceed the cap', async () => {
+    // Found by the Stage 3b.4 security audit, not by the original spec. Because
+    // deactivating frees a slot, the reverse operation must consume one -
+    // otherwise: fill to the cap, deactivate all, fill again, then reactivate
+    // the first batch = twice the cap, repeatable without limit. A cap that can
+    // be walked around is decorative, and this one exists to bound an
+    // unauthenticated bcrypt amplification.
+    const endpointId = await createEndpointWithConfig(app, token, {
+      SecretTokenBearerAuthEnabled: true,
+      MaxActiveBearerCredentials: 2,
+    });
+
+    const a = await createCred(endpointId, 'bearer').expect(201);
+    const b = await createCred(endpointId, 'bearer').expect(201);
+
+    await deactivate(endpointId, a.body.id as string);
+    await deactivate(endpointId, b.body.id as string);
+
+    // Budget is free again, so two fresh credentials are legitimate.
+    await createCred(endpointId, 'bearer').expect(201);
+    await createCred(endpointId, 'bearer').expect(201);
+
+    // Reviving either of the originals would make four active against a cap of two.
+    const revived = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${a.body.id}/activate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+    expect(JSON.stringify(revived.body)).toContain('MaxActiveBearerCredentials');
+  });
+
+  it('P2-E8: NEGATIVE CONTROL - reactivation still works when there is room', async () => {
+    // Without this, E7 would also pass if reactivation were simply broken.
+    const endpointId = await createEndpointWithConfig(app, token, {
+      SecretTokenBearerAuthEnabled: true,
+      MaxActiveBearerCredentials: 2,
+    });
+
+    const a = await createCred(endpointId, 'bearer').expect(201);
+    await deactivate(endpointId, a.body.id as string);
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${a.body.id}/activate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+  });
+
+  it('P2-E9: ROTATION is exempt - a compromised secret can always be replaced at the cap', async () => {
+    // Rotation is net-neutral (new minted, old deactivated). Refusing it at the
+    // cap would block the one operation you most want available during an
+    // incident, so the exemption is deliberate rather than an oversight.
+    const endpointId = await createEndpointWithConfig(app, token, {
+      SecretTokenBearerAuthEnabled: true,
+      MaxActiveBearerCredentials: 1,
+    });
+
+    const a = await createCred(endpointId, 'bearer').expect(201);
+    await createCred(endpointId, 'bearer').expect(400); // cap is genuinely reached
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${a.body.id}/rotate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+  });
 });

@@ -94,6 +94,34 @@ describe('LogConfigController', () => {
       expect(prune).toHaveProperty('lastPrunedCount');
     });
 
+    // Stage 3a.2. Every assertion above is `toHaveProperty`, which only says a
+    // key is PRESENT - it can never fail on an EXTRA key. That is the direction
+    // that leaks: an internal field added to this shape later would ship
+    // unnoticed with every existing test green. The allowlist closes it.
+    it('returns ONLY documented keys - no internal field can join the shape unnoticed', () => {
+      const ALLOWED_TOP = [
+        'globalLevel', 'categoryLevels', 'endpointLevels',
+        'includePayloads', 'includeStackTraces', 'maxPayloadSizeBytes',
+        'format', 'availableLevels', 'availableCategories', 'autoPrune',
+      ];
+      const ALLOWED_PRUNE = [
+        'enabled', 'retentionDays', 'intervalMs', 'lastRunAt', 'lastPrunedCount',
+      ];
+
+      const result = controller.getConfig() as Record<string, unknown>;
+      const extraTop = Object.keys(result).filter(k => !ALLOWED_TOP.includes(k));
+      const extraPrune = Object.keys(result.autoPrune as Record<string, unknown>)
+        .filter(k => !ALLOWED_PRUNE.includes(k));
+
+      // Report the offending keys rather than a bare boolean - a failure here
+      // should name the field that appeared, not just say something changed.
+      expect(extraTop).toEqual([]);
+      expect(extraPrune).toEqual([]);
+      // Guard the guard: an allowlist checked against an empty object passes
+      // vacuously, so assert the shape is actually populated.
+      expect(Object.keys(result).length).toBe(ALLOWED_TOP.length);
+    });
+
     it('should return string level names (not numbers)', () => {
       const result = controller.getConfig();
       expect(typeof result.globalLevel).toBe('string');

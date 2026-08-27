@@ -9631,6 +9631,11 @@ try {
     # Capture baseline.
     $baseSum = ($series | Measure-Object -Sum).Sum
     $baseCurrent = $series[23]
+    # The LAST bucket is the CURRENT hour, and it resets to 0 at the top of every
+    # hour. Comparing it across a rollover is therefore guaranteed to fail - not
+    # a regression, just an assertion that outlived its premise. Record the hour
+    # so the comparison below can tell the two cases apart.
+    $baseHour = (Get-Date).Hour
 
     # Drive a SCIM call that will be counted (not admin/health/keepalive).
     # Use any pre-existing endpoint - we don't need to create one.
@@ -9652,8 +9657,18 @@ try {
 
         Test-Result -Success ($afterSum -ge $baseSum) `
             -Message "9z-X.7: total series sum is monotonically non-decreasing ($baseSum -> $afterSum)"
-        Test-Result -Success ($afterCurrent -ge $baseCurrent) `
-            -Message "9z-X.8: current-hour bucket monotonically non-decreasing ($baseCurrent -> $afterCurrent)"
+
+        if ((Get-Date).Hour -eq $baseHour) {
+            Test-Result -Success ($afterCurrent -ge $baseCurrent) `
+                -Message "9z-X.8: current-hour bucket monotonically non-decreasing ($baseCurrent -> $afterCurrent)"
+        } else {
+            # The hour rolled over mid-section. Monotonicity is meaningless now,
+            # but something still MUST be true: the two SCIM calls just made land
+            # in the new bucket. Asserting that keeps a real check here instead of
+            # degrading to an unconditional pass.
+            Test-Result -Success ($afterCurrent -ge 2) `
+                -Message "9z-X.8: hour rolled over mid-run; new bucket counted the 2 calls just made ($afterCurrent)"
+        }
     } else {
         # Skip the monotonicity check if there are no endpoints (fresh install).
         Test-Result -Success $true -Message "9z-X.7-8: skipped (no endpoints exist to drive traffic)"
@@ -15412,6 +15427,53 @@ try {
     }
     Test-Result -Success $ckBoundsRejected -Message "9z-CK.T11: a cap outside the published bounds (1-25) is rejected on write, not clamped on read"
 
+    # --- REACTIVATION must not walk around the cap ---
+    # Found by the Stage 3b.4 security audit, not by the original section.
+    # Deactivating frees a slot, so the reverse operation must consume one -
+    # otherwise: fill to the cap, deactivate all, fill again, reactivate the
+    # first batch = twice the cap, repeatable without limit.
+    $ckEndpoint3 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-ck-reactivate-$(Get-Random)"
+    } | ConvertTo-Json)
+    $ckId3 = $ckEndpoint3.id
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{
+            SecretTokenBearerAuthEnabled      = "True"
+            OAuthClientCredentialsAuthEnabled = "True"
+            MaxActiveBearerCredentials        = 1
+        } }
+    } | ConvertTo-Json -Depth 5)
+
+    $ckR1 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'bearer'; label = 'ck-react-1' } | ConvertTo-Json) -ContentType 'application/json'
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials/$($ckR1.id)" -Method DELETE -Headers $headers
+
+    # Slot is free, so a replacement is legitimate and fills the cap again.
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'bearer'; label = 'ck-react-2' } | ConvertTo-Json) -ContentType 'application/json'
+
+    $ckReactivateRefused = $false
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials/$($ckR1.id)/activate" -Method POST -Headers $headers
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 400) { $ckReactivateRefused = $true }
+    }
+    Test-Result -Success $ckReactivateRefused -Message "9z-CK.T12: reactivation cannot be used to exceed the cap (a cap that can be walked around is decorative)"
+
+    # NEGATIVE CONTROL: reactivation still works when there IS room.
+    $ckR3 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'oauth_client'; label = 'ck-react-3' } | ConvertTo-Json) -ContentType 'application/json' -ErrorAction SilentlyContinue
+    if ($ckR3) {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials/$($ckR3.id)" -Method DELETE -Headers $headers
+        $ckReactivateOk = $false
+        try {
+            $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3/credentials/$($ckR3.id)/activate" -Method POST -Headers $headers
+            $ckReactivateOk = $true
+        } catch { $ckReactivateOk = $false }
+        Test-Result -Success $ckReactivateOk -Message "9z-CK.T13: NEGATIVE CONTROL - reactivation still succeeds when the budget has room"
+    }
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId3" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId2" -Method DELETE -Headers $headers
 } catch {

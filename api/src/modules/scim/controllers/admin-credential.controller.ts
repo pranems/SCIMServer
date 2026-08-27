@@ -428,6 +428,14 @@ export class AdminCredentialController {
     return typeof def?.default === 'number' ? def.default : undefined;
   }
 
+  /** Bounds come from the registry too - a hardcoded range in the message goes stale silently. */
+  private registeredCapBounds(flag: string): string {
+    const def = Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS).find(d => d.key === flag);
+    return typeof def?.min === 'number' && typeof def?.max === 'number'
+      ? `${def.min} - ${def.max}`
+      : 'see the flag registry';
+  }
+
   /**
    * P2 - refuse a create once this TYPE has reached its active-credential cap.
    *
@@ -440,6 +448,8 @@ export class AdminCredentialController {
     endpointId: string,
     config: EndpointConfig,
     credentialType: 'bearer' | 'oauth_client' | 'wif',
+    /** Reactivation counts the credential being revived, which is not yet active. */
+    incoming = 1,
   ): Promise<void> {
     const flag = {
       bearer: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_BEARER_CREDENTIALS,
@@ -469,11 +479,18 @@ export class AdminCredentialController {
     const active = await this.credentialRepo.findActiveByEndpoint(endpointId);
     const sameType = active.filter(c => c.credentialType === credentialType).length;
 
-    if (sameType >= cap) {
+    if (sameType + incoming > cap) {
+      // Log it: hitting a cap is a security-relevant event (the cap bounds an
+      // unauthenticated bcrypt amplification), and a refusal that leaves no
+      // trace cannot be distinguished from one that never happened.
+      this.logger.warn(
+        LogCategory.AUTH,
+        `Refused ${credentialType} credential for endpoint "${endpointId}": ${sameType} active, limit ${cap} ("${flag}")`,
+      );
       throw new BadRequestException(
         `Endpoint "${endpointId}" already has ${sameType} active "${credentialType}" credential(s), ` +
         `which meets the configured limit of ${cap}. Deactivate an existing one, or raise "${flag}" ` +
-        `in the endpoint config (bounds: 1 - 25).`,
+        `in the endpoint config (bounds: ${this.registeredCapBounds(flag)}).`,
       );
     }
   }
@@ -727,11 +744,25 @@ export class AdminCredentialController {
     @Param('endpointId') endpointId: string,
     @Param('credentialId') credentialId: string,
   ): Promise<{ id: string; endpointId: string; credentialType: string; label: string | null; active: boolean }> {
-    await this.requireEndpoint(endpointId);
+    const endpoint = await this.requireEndpoint(endpointId);
 
     const credential = await this.credentialRepo.findById(credentialId);
     if (!credential || credential.endpointId !== endpointId) {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+
+    // Reactivation CONSUMES a slot, so it must be capped like a create. Without
+    // this the cap is bypassable and therefore decorative: create to the cap,
+    // deactivate all, create to the cap again, then reactivate the first batch -
+    // twice the cap active, repeatable without limit. Deactivating genuinely
+    // frees a slot (an inactive credential costs nothing in the bcrypt loop),
+    // which is exactly what makes the reverse operation need a check.
+    if (!credential.active) {
+      await this.assertTypeCapNotReached(
+        endpointId,
+        (endpoint.profile?.settings ?? {}) as EndpointConfig,
+        credential.credentialType as 'bearer' | 'oauth_client' | 'wif',
+      );
     }
 
     const updated = await this.credentialRepo.reactivate(credentialId);
@@ -987,6 +1018,10 @@ export class AdminCredentialController {
       throw new BadRequestException('A "wif" credential has no secret to rotate.');
     }
 
+    // Rotation is deliberately EXEMPT from the active-credential cap: it is
+    // net-neutral (the old credential is deactivated immediately below), and
+    // refusing it at the cap would block the one operation you most want an
+    // operator to be able to perform on a compromised secret.
     // Mint a fresh secret + bcrypt hash.
     const plaintext = crypto.randomBytes(32).toString('base64url');
     const hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);

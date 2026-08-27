@@ -87,6 +87,7 @@ globally, so a connector set to that type fails against SCIMServer today.
 | **A4** | Residual: `client_id` is still not *required* when the trust pins no `targetClientId` | RFC 7523 path | Med | re-scope, mostly closed by W3.7 |
 | **W5.2** | Enforce `oid` / `azp` claims once real shapes are observed | WIF assertion validation | Med | W3 + capture |
 | **N12** | Auth-admin events log `credentialId: [REDACTED]`, so the audit trail cannot say *which* credential changed | credential audit | Med | - |
+| **D1** | `admin-credential.controller.ts` is **1,221 lines** and carries credential CRUD, rotate, reveal, activate, the WIF resolve/verify/debug trio, and now the P2 caps - well past the ~400-line / ~5-responsibility god-class threshold | credential admin plane | Med | - . **Raised by the 2026-08-27 Stage 3c.1 / DA-gate pass; disposition (b) SCHEDULED, not applied.** Splitting it inside a deploy-bound change carries real regression risk in the exact file that just produced the orphaned-decorator defect (I-42). The natural seam is to lift the three `wif/*` diagnostic routes into their own controller, which is ~40% of the file and shares no state with credential CRUD. |
 
 **N6 is the one with a live trigger.** `workloadIdentityFirstPartyApplicationIsDefault` is on for
 `slice:A` and `slice:B` and off globally, and the two modes emit `api://<appId>` versus

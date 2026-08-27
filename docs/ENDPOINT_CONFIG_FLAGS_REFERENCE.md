@@ -445,6 +445,15 @@ endpoint, so raise deliberately.
 - **Only ACTIVE credentials count.** Deactivating one frees a slot immediately,
   because the bcrypt loop iterates active credentials only - an inactive
   credential costs nothing on the resource plane.
+- **Reactivation is capped too.** Because deactivating frees a slot, the reverse
+  operation consumes one. Without that, the cap would be trivially bypassable:
+  fill to the cap, deactivate all, fill again, then reactivate the first batch -
+  twice the cap active, repeatable without limit. `POST .../activate` returns
+  `400` when the budget is full.
+- **Rotation is deliberately EXEMPT.** `POST .../rotate` is net-neutral (a new
+  secret is minted and the old credential deactivated immediately), and refusing
+  it at the cap would block the one operation you most want available when a
+  secret is compromised.
 - **Absence resolves to the default, never to "unlimited."** An endpoint that
   never sets a cap still gets the registry default. An absent limit and an
   infinite limit must never be the same thing.
@@ -466,8 +475,8 @@ endpoint, so raise deliberately.
 ```
 
 Coverage: unit (`admin-credential.controller.spec.ts`), E2E
-(`credential-caps.e2e-spec.ts`, 6 cases incl. a negative control), live
-(`9z-CK`, 11 assertions).
+(`credential-caps.e2e-spec.ts`, 9 cases incl. two negative controls), live
+(`9z-CK`, 13 assertions).
 
 ---
 
