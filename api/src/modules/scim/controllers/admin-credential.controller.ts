@@ -422,7 +422,6 @@ export class AdminCredentialController {
         m.roleEnforcement === 'shadow' || m.roleEnforcement === 'enforce' ? m.roleEnforcement : 'off',
     };
   }
-  @Post(':endpointId/credentials')
   /** The registry is the single source of the default; never hardcode it here. */
   private registeredCapDefault(flag: string): number | undefined {
     const def = Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS).find(d => d.key === flag);
@@ -469,6 +468,7 @@ export class AdminCredentialController {
     }
   }
 
+  @Post(':endpointId/credentials')
   async createCredential(
     @Param('endpointId') endpointId: string,
     @Body() dto: CreateCredentialDto,

@@ -245,7 +245,11 @@ export async function createEndpoint(
 export async function createEndpointWithConfig(
   app: INestApplication,
   token: string,
-  config: Record<string, string | boolean>,
+  // `number` is not optional decoration: 14 of the 38 registered flags are
+  // numeric (the MaxActive* caps, the JWKS bounds). A `string | boolean` type
+  // here made every numeric flag unreachable from an E2E test, which is a
+  // coverage hole the type system was creating rather than catching.
+  config: Record<string, string | boolean | number>,
   name?: string,
 ): Promise<string> {
   const wk = process.env.JEST_WORKER_ID ?? '0';
