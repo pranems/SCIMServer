@@ -300,6 +300,30 @@ export const ENDPOINT_CONFIG_FLAGS = {
   JWKS_MAX_RESPONSE_BYTES: 'JwksMaxResponseBytes',
 
   /**
+   * P2. Maximum ACTIVE per-endpoint bearer credentials. Bounds the O(N) bcrypt
+   * loop in EndpointCredentialAuthenticator, which compares a presented token
+   * against every active credential. Measured at cost factor 12: ~293 ms per
+   * compare, so three active credentials already exceed the 800 ms X9 latency
+   * gate - and that loop is reachable by an unauthenticated caller sending any
+   * non-JWT token. Bounds: 1 - 25.
+   */
+  MAX_ACTIVE_BEARER_CREDENTIALS: 'MaxActiveBearerCredentials',
+
+  /**
+   * P2. Maximum ACTIVE per-endpoint oauth_client credentials. Same bcrypt loop,
+   * counted separately so one type cannot exhaust another's budget. Bounds: 1 - 25.
+   */
+  MAX_ACTIVE_OAUTH_CLIENT_CREDENTIALS: 'MaxActiveOAuthClientCredentials',
+
+  /**
+   * P2. Maximum ACTIVE WIF trusts. Deliberately separate and more generous: WIF
+   * trusts are JWKS-verified and never enter the bcrypt loop, so this is a
+   * storage and configuration-hygiene bound, not a latency one. Collapsing it
+   * into one shared cap would conflate two unrelated concerns. Bounds: 1 - 25.
+   */
+  MAX_ACTIVE_WIF_TRUSTS: 'MaxActiveWifTrusts',
+
+  /**
    * W1.5 safety envelope. Per-endpoint override of the maximum number of keys
    * accepted in a JWKS. Deliberately generous by default - Microsoft states a
    * signing-key cache should hold 10-1000 keys across issuers, so a tight cap
@@ -680,6 +704,38 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'W1.5 safety envelope: maximum number of keys accepted in a JWKS. Deliberately generous - Microsoft ' +
       'states a key cache should hold 10-1000 keys across issuers. ' +
       'Overrides the server default (env JWKS_MAX_KEYS, default 100) when set. Bounds: 1 - 1000.',
+  },
+  MAX_ACTIVE_BEARER_CREDENTIALS: {
+    key: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_BEARER_CREDENTIALS,
+    type: 'number',
+    default: 5,
+    min: 1,
+    max: 25,
+    description:
+      'P2: maximum ACTIVE per-endpoint bearer credentials. Bounds the O(N) bcrypt loop on the resource ' +
+      'plane (~293 ms per compare at cost 12, so 3 already exceed the 800 ms latency gate). Absence ' +
+      'resolves to the default, never to unenforced. Bounds: 1 - 25.',
+  },
+  MAX_ACTIVE_OAUTH_CLIENT_CREDENTIALS: {
+    key: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_OAUTH_CLIENT_CREDENTIALS,
+    type: 'number',
+    default: 5,
+    min: 1,
+    max: 25,
+    description:
+      'P2: maximum ACTIVE per-endpoint oauth_client credentials. Counted separately from bearer so one ' +
+      'type cannot exhaust another type budget. Bounds: 1 - 25.',
+  },
+  MAX_ACTIVE_WIF_TRUSTS: {
+    key: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_WIF_TRUSTS,
+    type: 'number',
+    default: 10,
+    min: 1,
+    max: 25,
+    description:
+      'P2: maximum ACTIVE WIF trusts. More generous than the secret-based caps because WIF trusts are ' +
+      'JWKS-verified and never enter the bcrypt loop - this bounds storage and config sprawl, not latency. ' +
+      'Bounds: 1 - 25.',
   },
   JWKS_MAX_CACHE_ENTRIES: {
     key: ENDPOINT_CONFIG_FLAGS.JWKS_MAX_CACHE_ENTRIES,

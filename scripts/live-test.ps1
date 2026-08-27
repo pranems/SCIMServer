@@ -7961,9 +7961,22 @@ Test-Result -Success ($updatedPrune.retentionDays -eq 14) -Message "9z-L.5: PUT 
 Test-Result -Success ($updatedPrune.enabled -eq $false) -Message "9z-L.6: PUT updates enabled to false"
 
 # --- Test 9z-L.7: Restore prune config ---
-$restoreBody = @{ retentionDays = 1; enabled = $true } | ConvertTo-Json
+# This block used to PUT a HARDCODED retentionDays=1 and then assert
+# `-Success $true`, a literal that cannot fail. Two consequences, both live:
+# the "restore" silently overrode the configured LOG_RETENTION_DAYS=30 down to
+# ONE DAY on every estate the suite touched - including customer production on
+# every promotion - and the assertion that was supposed to catch exactly that
+# asserted nothing. Restore the value CAPTURED at 9z-L.1, and then prove the
+# restore by reading it back.
+$originalRetention = $pruneConfig.retentionDays
+$originalEnabled = [bool]$pruneConfig.enabled
+$restoreBody = @{ retentionDays = $originalRetention; enabled = $originalEnabled } | ConvertTo-Json
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/prune" -Method PUT -Headers $headers -Body $restoreBody -ContentType "application/json" | Out-Null
-Test-Result -Success $true -Message "9z-L.7: Restored prune config"
+$afterRestore = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/prune" -Method GET -Headers $headers
+Test-Result -Success ($afterRestore.retentionDays -eq $originalRetention) `
+    -Message "9z-L.7: retention restored to the captured original ($originalRetention, read back $($afterRestore.retentionDays))"
+Test-Result -Success ([bool]$afterRestore.enabled -eq $originalEnabled) `
+    -Message "9z-L.7b: enabled restored to the captured original ($originalEnabled)"
 
 # --- Test 9z-L.8: Database statistics includes database.type ---
 Write-Host "`n--- Test 9z-L.8: Database statistics type field ---" -ForegroundColor Cyan

@@ -131,6 +131,34 @@ describe('LoggingService - Auto-Prune', () => {
         expect.stringContaining('Pruned 10 log entries'),
       );
     });
+
+    // A3'/P2 slice 1. A log line is not an observable state: it scrolls away,
+    // and nothing can query it. Recording the outcome makes "the prune ran and
+    // removed N rows" answerable at any later moment, which is what the
+    // operator needs in order to trust that retention is actually bounded.
+    it('records the run so execution is observable, not just logged', async () => {
+      prisma.requestLog.deleteMany.mockResolvedValue({ count: 10 });
+      const before = service.getAutoPruneConfig();
+      expect(before.lastRunAt).toBeNull();
+      expect(before.lastPrunedCount).toBeNull();
+
+      await service.pruneOldLogs(1);
+
+      const after = service.getAutoPruneConfig();
+      expect(after.lastRunAt).not.toBeNull();
+      expect(after.lastPrunedCount).toBe(10);
+    });
+
+    it('records a zero-row prune as a RUN, not as never-having-run', async () => {
+      // The common steady state is "nothing was old enough to delete". If that
+      // left lastRunAt null it would be indistinguishable from a prune that
+      // never fired at all - the exact conflation this slice removes.
+      prisma.requestLog.deleteMany.mockResolvedValue({ count: 0 });
+      await service.pruneOldLogs(1);
+      const after = service.getAutoPruneConfig();
+      expect(after.lastRunAt).not.toBeNull();
+      expect(after.lastPrunedCount).toBe(0);
+    });
   });
 
   describe('onModuleInit', () => {

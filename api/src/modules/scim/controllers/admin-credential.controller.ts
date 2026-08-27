@@ -51,7 +51,7 @@ import type {
   WifDebugAssertionResponse,
   WifDebugTrustResult,
 } from '../../../shared/types/wif-debug.types';
-import { getConfigBoolean, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, getConfigNumber, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, ENDPOINT_CONFIG_FLAGS_DEFINITIONS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
@@ -423,6 +423,52 @@ export class AdminCredentialController {
     };
   }
   @Post(':endpointId/credentials')
+  /** The registry is the single source of the default; never hardcode it here. */
+  private registeredCapDefault(flag: string): number | undefined {
+    const def = Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS).find(d => d.key === flag);
+    return typeof def?.default === 'number' ? def.default : undefined;
+  }
+
+  /**
+   * P2 - refuse a create once this TYPE has reached its active-credential cap.
+   *
+   * Counts only ACTIVE credentials of the SAME type, because that is exactly the
+   * set `findActiveByEndpoint` feeds into the bcrypt loop on the resource plane.
+   * An inactive credential costs nothing there and must not occupy the budget,
+   * and one type must not be able to exhaust another's.
+   */
+  private async assertTypeCapNotReached(
+    endpointId: string,
+    config: EndpointConfig,
+    credentialType: 'bearer' | 'oauth_client' | 'wif',
+  ): Promise<void> {
+    const flag = {
+      bearer: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_BEARER_CREDENTIALS,
+      oauth_client: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_OAUTH_CLIENT_CREDENTIALS,
+      wif: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_WIF_TRUSTS,
+    }[credentialType];
+
+    const cap = getConfigNumber(config, flag) ?? this.registeredCapDefault(flag);
+    // `getConfigNumber` returns undefined for an UNSET key by design (the egress
+    // overrides rely on that to fall through to a server default), so the
+    // registry default has to be resolved explicitly. Absence must never mean
+    // "unenforced" - an absent limit and an infinite limit would otherwise be
+    // indistinguishable, which is the defect this whole item exists to remove.
+    if (cap === undefined || cap === null) return;
+
+    if (!this.credentialRepo) return;
+    const active = await this.credentialRepo.findActiveByEndpoint(endpointId);
+    const sameType = active.filter(c => c.credentialType === credentialType).length;
+
+    if (sameType >= cap) {
+      throw new BadRequestException(
+        `Endpoint "${endpointId}" already has ${sameType} active "${credentialType}" credential(s), ` +
+        `which meets the configured limit of ${cap}. Deactivate an existing one, or raise "${flag}" ` +
+        `in the endpoint config (bounds: 1 - 25).`,
+      );
+    }
+  }
+
   async createCredential(
     @Param('endpointId') endpointId: string,
     @Body() dto: CreateCredentialDto,
@@ -446,6 +492,8 @@ export class AdminCredentialController {
           `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
         );
       }
+      // WIF returns early, so its cap cannot rely on the shared check below.
+      await this.assertTypeCapNotReached(endpointId, config, 'wif');
       return this.createWifCredential(endpointId, dto);
     }
 
@@ -468,6 +516,9 @@ export class AdminCredentialController {
         `(or the legacy "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}").`,
       );
     }
+
+    // Narrowed by the allow-list check above.
+    await this.assertTypeCapNotReached(endpointId, config, credentialType as 'bearer' | 'oauth_client');
 
     // Parse optional expiry
     let expiresAt: Date | null = null;

@@ -349,6 +349,85 @@ describe('AdminCredentialController', () => {
       await expect(controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' })).resolves.toBeDefined();
     });
 
+    // P2 - per-type active-credential caps.
+    //
+    // These bound the O(N) bcrypt loop in EndpointCredentialAuthenticator, which
+    // calls findActiveByEndpoint and compares the presented token against EVERY
+    // active credential. Measured on this hardware at cost factor 12: 293 ms per
+    // compare, so THREE active credentials already exceed the 800 ms X9 latency
+    // gate, and the loop is reachable by an unauthenticated caller presenting any
+    // non-JWT token. The cap bounds that amplification; it is not a fix. The fix
+    // is a keyed O(1) lookup, tracked separately.
+    //
+    // Caps are per TYPE, not global: bearer and oauth_client sit in the bcrypt
+    // loop, WIF trusts do not (they are JWKS-verified), so one shared number
+    // would conflate a latency control with a storage-hygiene one.
+    describe('P2 - per-type active credential caps', () => {
+      const settingsWith = (extra: Record<string, unknown>) => ({
+        ...mockEndpoint,
+        profile: { settings: { PerEndpointCredentialsEnabled: true, ...extra } },
+      });
+      const activeOfType = (type: string, n: number) =>
+        Array.from({ length: n }, (_, i) => ({ ...mockCredential, id: `c-${i}`, credentialType: type, active: true }));
+
+      it('refuses a bearer create once the bearer cap is reached', async () => {
+        mockEndpointService.getEndpoint.mockResolvedValue(settingsWith({ MaxActiveBearerCredentials: 2 }));
+        mockCredentialRepo.findActiveByEndpoint.mockResolvedValue(activeOfType('bearer', 2));
+        await expect(
+          controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+        ).rejects.toThrow(/MaxActiveBearerCredentials/);
+      });
+
+      it('NEGATIVE CONTROL: the same create succeeds when the cap is raised', async () => {
+        // Without this, the refusal above would also pass if creation were broken
+        // for an unrelated reason - it would prove nothing about the cap.
+        mockEndpointService.getEndpoint.mockResolvedValue(settingsWith({ MaxActiveBearerCredentials: 3 }));
+        mockCredentialRepo.findActiveByEndpoint.mockResolvedValue(activeOfType('bearer', 2));
+        mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+        await expect(
+          controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+        ).resolves.toBeDefined();
+      });
+
+      it('counts only the SAME type - oauth_client credentials do not consume the bearer cap', async () => {
+        mockEndpointService.getEndpoint.mockResolvedValue(settingsWith({ MaxActiveBearerCredentials: 2 }));
+        mockCredentialRepo.findActiveByEndpoint.mockResolvedValue(activeOfType('oauth_client', 5));
+        mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+        await expect(
+          controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+        ).resolves.toBeDefined();
+      });
+
+      it('applies its own cap to oauth_client', async () => {
+        mockEndpointService.getEndpoint.mockResolvedValue(settingsWith({ MaxActiveOAuthClientCredentials: 1 }));
+        mockCredentialRepo.findActiveByEndpoint.mockResolvedValue(activeOfType('oauth_client', 1));
+        await expect(
+          controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' }),
+        ).rejects.toThrow(/MaxActiveOAuthClientCredentials/);
+      });
+
+      it('counts only ACTIVE credentials - a deactivated one frees a slot', async () => {
+        // The bcrypt loop iterates findActiveByEndpoint, so an inactive
+        // credential costs nothing and must not occupy the budget.
+        mockEndpointService.getEndpoint.mockResolvedValue(settingsWith({ MaxActiveBearerCredentials: 2 }));
+        mockCredentialRepo.findActiveByEndpoint.mockResolvedValue(activeOfType('bearer', 1));
+        mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
+        await expect(
+          controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+        ).resolves.toBeDefined();
+      });
+
+      it('falls back to a bounded default when the endpoint sets no cap', async () => {
+        // Absence must resolve to a safe default, never to "unenforced" - an
+        // absent limit and an infinite limit must not be the same thing.
+        mockEndpointService.getEndpoint.mockResolvedValue(settingsWith({}));
+        mockCredentialRepo.findActiveByEndpoint.mockResolvedValue(activeOfType('bearer', 99));
+        await expect(
+          controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' }),
+        ).rejects.toThrow(/MaxActiveBearerCredentials/);
+      });
+    });
+
     it('WI-11: an explicit OAuthClientCredentialsAuthEnabled=false blocks oauth_client even if bearer is on', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,

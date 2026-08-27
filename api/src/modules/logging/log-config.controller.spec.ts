@@ -21,7 +21,16 @@ describe('LogConfigController', () => {
 
     scimLogger = new ScimLogger();
     const mockLoggingService = {
-      getAutoPruneConfig: jest.fn().mockReturnValue({ enabled: true, retentionDays: 1, intervalMs: 3600000 }),
+      // Mirrors the real getAutoPruneConfig contract. The controller's job here
+      // is pass-through; that the SERVICE actually records lastRunAt is proven
+      // against the real implementation in logging-auto-prune.spec.ts.
+      getAutoPruneConfig: jest.fn().mockReturnValue({
+        enabled: true,
+        retentionDays: 1,
+        intervalMs: 3600000,
+        lastRunAt: null,
+        lastPrunedCount: null,
+      }),
       setAutoPruneConfig: jest.fn(),
     } as any;
     controller = new LogConfigController(scimLogger, mockLoggingService);
@@ -57,6 +66,32 @@ describe('LogConfigController', () => {
       expect(result).toHaveProperty('format');
       expect(result).toHaveProperty('availableLevels');
       expect(result).toHaveProperty('availableCategories');
+    });
+
+    // A3'/P2 slice 1. Retention pruning has worked since it was written, but
+    // NOTHING reported it: this endpoint returned levels and payload settings
+    // only, and runtime-config's logging group publishes just the flush knobs.
+    // An operator therefore could not tell a running prune from an absent one,
+    // which is why the work register recorded retention as unbounded when it
+    // has been bounded at 21 days all along. Reporting the state is the fix;
+    // the mechanism did not need rebuilding.
+    it('reports the auto-prune state so a running prune is distinguishable from none', () => {
+      const result = controller.getConfig() as Record<string, unknown>;
+      expect(result).toHaveProperty('autoPrune');
+      const prune = result.autoPrune as Record<string, unknown>;
+      expect(prune).toHaveProperty('enabled');
+      expect(prune).toHaveProperty('retentionDays');
+      expect(prune).toHaveProperty('intervalMs');
+    });
+
+    it('reports WHEN the prune last ran, not merely that it is configured', () => {
+      // Configuration proves intent; lastRunAt proves execution. Without it a
+      // silently-failing prune looks identical to a healthy one - the same
+      // "configured but never fired" blind spot the gates hit elsewhere.
+      const result = controller.getConfig() as Record<string, unknown>;
+      const prune = result.autoPrune as Record<string, unknown>;
+      expect(prune).toHaveProperty('lastRunAt');
+      expect(prune).toHaveProperty('lastPrunedCount');
     });
 
     it('should return string level names (not numbers)', () => {
@@ -646,7 +681,7 @@ describe('LogConfigController', () => {
   describe('getAutoPruneConfig', () => {
     it('should delegate to loggingService.getAutoPruneConfig()', () => {
       const result = controller.getAutoPruneConfig();
-      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000 });
+      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000, lastRunAt: null, lastPrunedCount: null });
     });
   });
 
@@ -684,7 +719,7 @@ describe('LogConfigController', () => {
     it('should return updated config from getAutoPruneConfig', () => {
       const result = controller.updateAutoPruneConfig({ retentionDays: 14 });
       // Returns the mock's return value
-      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000 });
+      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000, lastRunAt: null, lastPrunedCount: null });
     });
   });
 });

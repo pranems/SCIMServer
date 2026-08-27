@@ -60,6 +60,7 @@ export class LogConfigController {
       format: config.format,
       availableLevels: Object.keys(LogLevel).filter(k => isNaN(Number(k))),
       availableCategories: Object.values(LogCategory),
+      autoPrune: this.loggingService.getAutoPruneConfig(),
     };
   }
 

@@ -47,6 +47,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   private initialPruneTimer: ReturnType<typeof setTimeout> | null = null;
   private autoPruneEnabled: boolean = (process.env.LOG_AUTO_PRUNE ?? 'true').toLowerCase() !== 'false';
 
+  // Execution state, not configuration. Retention has been enforced since it
+  // was written, but nothing REPORTED it, so a running prune and an absent one
+  // looked identical - which is why the work register recorded retention as
+  // unbounded when it had been bounded at 21 days throughout.
+  private lastPruneRunAt: Date | null = null;
+  private lastPrunedCount: number | null = null;
+
   /**
    * Set at the very start of `onModuleDestroy`, before anything is awaited.
    *
@@ -179,6 +186,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       enabled: this.autoPruneEnabled,
       retentionDays: this.autoPruneRetentionDays,
       intervalMs: this.autoPruneIntervalMs,
+      // A zero-row prune still counts as a RUN. Leaving these null on an empty
+      // sweep would make the steady state look like "never fired".
+      lastRunAt: this.lastPruneRunAt ? this.lastPruneRunAt.toISOString() : null,
+      lastPrunedCount: this.lastPrunedCount,
     };
   }
 
@@ -512,7 +523,9 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
       const before = this.inMemoryLogRows.length;
       this.inMemoryLogRows = this.inMemoryLogRows.filter(r => r.createdAt >= cutoff);
-      return before - this.inMemoryLogRows.length;
+      const removed = before - this.inMemoryLogRows.length;
+      this.recordPruneRun(removed);
+      return removed;
     }
 
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
@@ -520,7 +533,14 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       where: { createdAt: { lt: cutoff } },
     });
     this.logger.info(LogCategory.DATABASE, `Pruned ${result.count} log entries older than ${retentionDays} days`);
+    this.recordPruneRun(result.count);
     return result.count;
+  }
+
+  /** Both backends record, or the inmemory mode would report "never pruned" forever. */
+  private recordPruneRun(count: number): void {
+    this.lastPruneRunAt = new Date();
+    this.lastPrunedCount = count;
   }
 
   async listLogs(filters: {
