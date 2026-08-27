@@ -122,6 +122,16 @@ The auth switches themselves live on **Settings**:
 
 ## 4. How a request is actually authenticated
 
+> **Each endpoint has a limit on how many ACTIVE credentials of each type it may hold**, because
+> every additional one makes authentication measurably slower. When a per-endpoint opaque secret is
+> presented, the server compares it against **every** active credential using bcrypt - measured at
+> roughly **293 ms per comparison** - so three credentials already push a failed attempt past the
+> 800 ms latency budget. Defaults are `MaxActiveBearerCredentials` **5**,
+> `MaxActiveOAuthClientCredentials` **5**, `MaxActiveWifTrusts` **10** (bounds 1 - 25, editable per
+> endpoint on the Settings tab). WIF is more generous on purpose: WIF trusts are verified against a
+> JWKS and never enter that comparison loop. Exceeding a cap refuses the **create** with `400`; it
+> never affects credentials that already exist. Deactivating one frees a slot immediately.
+
 The server tries methods in order; the first that accepts wins. A disabled method is **skipped**, not tried and failed. Every attempt produces an **Auth Decision Trace**: an ordered list of checks, each with `expected` and `received`.
 
 ```mermaid

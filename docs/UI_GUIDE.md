@@ -125,6 +125,13 @@ The sidebar collapses to an icon rail via the chevron at its bottom, persisting 
 
 ## 5. Dashboard
 
+> **Every server-known endpoint setting is reachable on the Settings tab.** Eleven settings were
+> previously enforced by the server while having no control at all, so an operator could not see or
+> change them. They now appear in the existing category cards - the three active-credential caps, the
+> JWKS safety-envelope and refresh-cadence values, and `logFileEnabled` under Logging and privacy -
+> and a gate keeps it that way: adding a setting to the registry without giving it a control now
+> fails the build.
+
 The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Groups, Status). Below: a 24-hour request-volume sparkline, an **Activity analytics** block (Operations 24h / 7d, User ops 30d, Group ops 30d) with a Users-vs-Groups split bar, and a grid of endpoint summary cards.
 
 ![Dashboard](screenshots/prod-01-dashboard.png)

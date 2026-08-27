@@ -36,6 +36,13 @@
 
 ## 1. Architecture Overview
 
+> **Retention is bounded, and you can now confirm it ran.** Request logs are auto-pruned on a timer
+> (`LOG_AUTO_PRUNE`, default on; `LOG_RETENTION_DAYS`, default 21). That has always been true, but
+> nothing reported it, so a working prune and an absent one looked identical from outside.
+> `GET /scim/admin/log-config` now returns an `autoPrune` block carrying `enabled`, `retentionDays`,
+> `intervalMs`, **`lastRunAt`** and **`lastPrunedCount`**. A sweep that deleted **zero** rows still
+> updates `lastRunAt` - the common steady state must not be indistinguishable from "never fired".
+
 SCIMServer uses a **fully custom, zero-dependency logging stack** - no Winston, Pino, Bunyan, or Morgan. The entire stack is built on NestJS `Logger`, Node.js `AsyncLocalStorage`, and plain `fs`.
 
 ```

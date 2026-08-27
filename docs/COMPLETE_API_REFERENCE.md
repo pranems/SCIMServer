@@ -562,6 +562,20 @@ Authorization: Bearer changeme-scim
 
 ## Admin - Per-Endpoint Credentials
 
+> **Active-credential caps.** A create is refused with `400` once the endpoint already holds the
+> configured number of **active** credentials **of that type**. The caps are per type, so
+> `oauth_client` credentials never consume the `bearer` budget:
+>
+> | Setting | Default | Bounds |
+> |---|---|---|
+> | `MaxActiveBearerCredentials` | 5 | 1 - 25 |
+> | `MaxActiveOAuthClientCredentials` | 5 | 1 - 25 |
+> | `MaxActiveWifTrusts` | 10 | 1 - 25 |
+>
+> The error names the flag and the current count. **Only active credentials count** - deactivating
+> one (`DELETE`) frees a slot without deleting history. The caps bound the per-request bcrypt
+> comparison loop on the resource plane, which is why they are deliberately small.
+
 Requires `PerEndpointCredentialsEnabled: true` in endpoint settings.
 
 ### POST /scim/admin/endpoints/:endpointId/credentials

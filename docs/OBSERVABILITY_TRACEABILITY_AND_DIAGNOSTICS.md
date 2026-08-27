@@ -156,6 +156,14 @@ Every entry ([scim-logger.service.ts](../api/src/modules/logging/scim-logger.ser
 
 ## 5. Persistent request logging
 
+> **How long a request log survives, and how to check the pruner is alive.** Retention is enforced by
+> a timer (`LOG_RETENTION_DAYS`, default 21) and reported by
+> `GET /scim/admin/log-config` under `autoPrune`, which includes **`lastRunAt`** and
+> **`lastPrunedCount`** as well as the configuration. Configuration proves intent; `lastRunAt` proves
+> execution - a silently failing pruner is otherwise indistinguishable from a healthy one. Check this
+> first when diagnostic history is shorter than expected: the value that governs behaviour is the
+> **running** one, which a runtime `PUT` can change independently of the environment variable.
+
 Each request (except successful health probes) becomes a durable `RequestLog` row ([logging.service.ts](../api/src/modules/logging/logging.service.ts)), at parity across the Prisma and InMemory backends. Fields include `method`, `url`, `status`, `durationMs`, the request/response headers + bodies (redaction-gated), `errorMessage`, a derived reportable `identifier`, the `requestId`, and - since V10 - the persisted auth summary `authOutcome` / `authMethod` / `authReason` / `authCredentialId` (see [auth/CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md](auth/CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md)).
 
 A list item from `GET /scim/admin/logs`:
