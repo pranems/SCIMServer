@@ -119,6 +119,26 @@ Four numeric knobs controlling how the server fetches signing keys when verifyin
 | `JwksUnknownKidMinIntervalMs` | 0 - 3600000 | 300000 |
 | `JwksStaleIfErrorMs` | 0 - 604800000 | 172800000 |
 
+### Active-credential caps
+
+These bound how many ACTIVE credentials of each type an endpoint may hold. They exist for a
+performance reason, not a tidiness one: the resource plane compares a presented opaque token against
+**every** active credential with bcrypt, measured at ~293 ms per comparison, so three credentials
+already exceed the 800 ms auth-latency gate. Counting is per type, so one type cannot exhaust
+another's budget.
+
+`MaxActiveWifTrusts` is deliberately more generous because WIF trusts are JWKS-verified and never
+enter that comparison loop - it bounds configuration sprawl, not latency.
+
+When a cap is reached the create is refused with `400` naming the flag; deactivate an existing
+credential or raise the cap. Deactivated credentials do not count.
+
+| Setting | Bounds | Default |
+|---|---|---|
+| `MaxActiveBearerCredentials` | 1 - 25 | 5 |
+| `MaxActiveOAuthClientCredentials` | 1 - 25 | 5 |
+| `MaxActiveWifTrusts` | 1 - 25 | 10 |
+
 The last four are the **W1.5 safety envelope**. `JwksFetchTimeoutMs` bounds a single
 attempt; `JwksTotalDeadlineMs` bounds the whole fetch - every attempt, every backoff
 sleep and every redirect hop combined - which is the number that actually caps how long

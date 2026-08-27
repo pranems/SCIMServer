@@ -406,8 +406,13 @@ Invoke-Gate '2.6' 'test-all-modes.ps1 (6-mode matrix)' { pwsh -NoProfile -File s
 # =============================================================================
 Write-Stage 3 'Audits (executable gates run; reviewer prompts recorded)'
 
-Invoke-Gate '3b.3' 'endpointConfigFlagAudit (registry vs Settings UI conformance)' {
-    npx jest --silent --testPathPatterns 'endpoint-config-conformance'
+Invoke-Gate '3b.3' 'endpointConfigFlagAudit (registry vs Settings UI, both directions)' {
+    # Two gates, deliberately separate. Conformance asks "does the UI offer a key
+    # the server does not know?"; ui-coverage asks the reverse, "is every
+    # registered flag reachable by an operator?". Eleven flags had drifted into
+    # the second state - enforced by the server, invisible in the UI - because
+    # only the first direction was ever checked.
+    npx jest --silent --testPathPatterns 'endpoint-config-(conformance|ui-coverage)'
 } 'api' | Out-Null
 
 Invoke-Gate '3b.5' 'dependencyCveSweep (production deps + .trivyignore freshness)' {
