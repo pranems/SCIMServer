@@ -235,6 +235,20 @@ Content-Type: application/json
 
 > **The `token` is returned once.** It is stored as a bcrypt hash, so the server cannot show it to you again. `CredentialSecretVisibility` controls whether the UI keeps it on screen (`always`) or hides it after first reveal (`once`).
 
+> **There is a limit on how many can be ACTIVE at once.** Each credential type
+> has its own cap - `MaxActiveBearerCredentials` and
+> `MaxActiveOAuthClientCredentials` default to **5**, `MaxActiveWifTrusts` to
+> **10** - and a create or re-activate past the cap returns `400` naming the
+> flag. Deactivating a credential frees a slot immediately.
+>
+> This is not bookkeeping. An opaque bearer token carries nothing that says which
+> credential it is, so the server must bcrypt-compare a presented token against
+> **every** active secret credential on the endpoint - measured at ~293 ms each.
+> The cap bounds how much work an unauthenticated caller can force. Raise it
+> deliberately: a higher cap is a higher worst-case cost per request. Rotation is
+> exempt, so a compromised secret can always be replaced.
+> See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#active-credential-caps-p2).
+
 ### 5.3 OAuth 2.0 client credentials
 
 Two steps: mint a client, then exchange it for a short-lived access token.

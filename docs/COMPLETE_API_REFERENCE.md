@@ -778,6 +778,17 @@ Re-displays a credential secret when the endpoint's `CredentialSecretVisibility`
 
 Re-activates a deactivated credential (the inverse of `DELETE`, which deactivates rather than destroying).
 
+Returns **`400`** when the endpoint has already reached its active-credential cap
+for that credential type (`MaxActiveBearerCredentials`,
+`MaxActiveOAuthClientCredentials`, `MaxActiveWifTrusts` - defaults 5 / 5 / 10).
+Reactivation consumes a slot exactly as a create does, because deactivating one
+frees a slot; without that symmetry the cap could be walked around by
+deactivating and reviving in batches. `POST .../rotate` is deliberately exempt:
+it is net-neutral, and refusing a rotation at the cap would block the one
+operation you most want available when a secret is compromised.
+
+See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#active-credential-caps-p2).
+
 ---
 
 ## Admin - Authentication Methods

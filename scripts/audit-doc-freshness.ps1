@@ -99,7 +99,15 @@ if (-not $SkipCoupling) {
     }
     finally { Pop-Location }
     $changed = $changed | Where-Object { $_ } | Sort-Object -Unique
-    Say "changed  : $($changed.Count) file(s)$(if ($BaseRef) { " vs $BaseRef" })"
+    # Test files are excluded from coupling. A doc documents a CONTRACT, and a
+    # spec change cannot make prose stale - it is downstream of the same source
+    # the doc is already bound to. Left in, F4 fires on every test-only commit
+    # forever, and a gate that cries wolf trains people to rubber-stamp the
+    # verified date, which destroys the signal the gate exists to give.
+    $testFile = '\.(spec|e2e-spec|test)\.ts$|(^|/)test/|(^|/)e2e/|(^|/)__tests__/'
+    $couplingChanged = @($changed | Where-Object { $_ -notmatch $testFile })
+    Say "changed  : $($changed.Count) file(s)$(if ($BaseRef) { " vs $BaseRef" }); $($couplingChanged.Count) non-test for F4"
+    $changed = $couplingChanged
 }
 
 Say ""
