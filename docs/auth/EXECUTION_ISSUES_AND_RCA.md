@@ -831,6 +831,56 @@ empty. Disposition: **(a) applied** in this commit chain.
 
 ---
 
+## 10F. P2 per-type credential caps (2026-08-27, api v0.55.15)
+
+| # | Type | Sev | Symptom | Root cause | Fix | Why it works | Prevention |
+|---|---|---|---|---|---|---|---|
+| **I-42** | Framework surprise / routing | **High** | Every `POST /scim/admin/endpoints/:id/credentials` returned **`201 Created` with an empty body** and created nothing. Credential creation was completely dead on `feat/wif`, and it was **committed and pushed** (`7ce08edf`) in that state. | The P2 change inserted two `private` helpers **between** `@Post(':endpointId/credentials')` and `createCredential`. TypeScript binds a decorator to whatever declaration **follows** it, so the route bound to `registeredCapDefault(flag: string)`. That helper has no parameter decorators, so Nest invoked it with `undefined`; it returned `undefined`; Nest answered `201` (the POST default) with no body. | Reattach the decorator (`8748a67e`), and add a **static** binding gate. | The decorator is once again adjacent to the handler it was written for, and the gate now asserts that adjacency structurally so the next edit in that region cannot silently break it. | New spec `route-decorator-binding.spec.ts` - **B-T1** no HTTP decorator may land on a `private`/`protected` method; **B-T2** no method carrying parameter decorators may lack an HTTP decorator. Four negative controls plus **B-T0** (the scan must find controllers at all, so the gate cannot pass by scanning nothing). |
+| **I-43** | Test correctness | Medium | The P2 caps E2E reported 4 of 6 failing, and re-running the **pre-existing** credential E2E specs showed 3 of 4 failing with `404` on an id they had just "created". | Downstream symptom of I-42. Worth its own row because of what it says about signal: the failure surfaced as a **`404` on a later request**, never at the request that was actually broken - which answered `201`. | Fixed by I-42. | - | The E2E specs already existed and would have caught I-42 **on the same day it was written**. See the escape analysis - the gap was *when* they ran, not whether they existed. |
+| **I-44** | Test correctness (false green) | Medium | `9z-CK.T5` failed with `404` on `DELETE .../credentials/<id>` for a credential that had demonstrably just been created. | `Invoke-WebRequest` in PS7 returns `$r.Content` as a **`byte[]`** when the response is `application/scim+json` (not a recognized text type). `ConvertFrom-Json` on a byte array yields an object with no properties, so `$b.id` was silently **empty** and the DELETE hit `.../credentials/`. | Use `Invoke-RestMethod` (which parses correctly) plus the established `Get-HttpErrorStatus` helper for the failure path. | `Invoke-RestMethod` performs content negotiation properly; the helper is the section's only source of a failure status, so the two paths cannot disagree. | Added **`9z-CK.T5`**, which asserts the create response carries a **non-empty** id *before* anything depends on it. An empty id must fail where it is produced, not three requests later. |
+| **I-45** | Cross-feature interaction | Medium | With the caps live, `9z-BQ` (the X9 auth-latency regression gate) threw `400` and lost all of its assertions. | `9z-BQ` deliberately seeds **6** bearer credentials so a reintroduced bcrypt loop would be unmissable. The new **default** bearer cap is 5, so the sixth seed was refused. The cap was working exactly as designed; the perf gate's premise simply predated it. | `9z-BQ` now sets `MaxActiveBearerCredentials = $perfSeedCredCount` explicitly. | The perf gate keeps its premise (enough credentials to expose a regression) while demonstrating the cap is a **configurable bound**, not a hard ceiling. | Found by the standing **author-and-smoke-run-before-batch** rule. Nothing else would have found it before dev: it is an interaction between two features that are each individually correct and separately tested. |
+| **I-46** | Design (fail-open) | Medium | `assertTypeCapNotReached` began `if (!this.credentialRepo) return;` - silently **skipping** the cap when the repository was absent. | Reflex defensive coding. The repository is a **non-optional** `@Inject`, so the branch is unreachable in a wired app - but it encoded "absence means unenforced", which is the precise defect this whole item exists to remove. | Fail **closed**: throw rather than bypass. | A control that cannot be *evaluated* must never look like a control that *passed*. Refusing the create is the safe direction; silently allowing an unbounded number of credentials is not. | Caught by applying this item's own stated principle to its own implementation. Promoted below. |
+
+**Detection-stage escape analysis.**
+
+| # | Caught at | Earliest possible | Escape delta | Note |
+|---|---|---|---|---|
+| **I-42** | Stage 2.2 (API E2E), **after commit + push** | Stage 2.2, **before** push | **1 stage + a push** | The decisive fact: controller unit tests call `controller.createCredential(...)` as an ordinary method, so routing is never exercised and an orphaned decorator is invisible to them **by construction, not by omission**. No quantity of additional unit tests could have found this. API E2E *would* have - but E2E is **not in pre-push** (12 gates, unit only), so a broken route reached `origin`. |
+| I-43 | Stage 2.2 | Stage 2.2 | none | - |
+| I-44 | Stage 4.3 (local live smoke) | Stage 4.3 | none | Found by the smoke-run rule, in the same step the section was authored. |
+| I-45 | Stage 4.3 | Stage 4.3 | none | Only a full-suite run could find it; it is a cross-section interaction. |
+| I-46 | Stage 0 (source read) | Stage 0 | none | - |
+
+**Headline and the generalizable lesson.** I-42 is the highest-severity escape in this ledger to
+date, and the reason is worth stating plainly: **the failure mode was a success status.** A dead
+route answered `201 Created`. Nothing downstream of a status check could notice, and the only
+assertions that *could* notice were in a suite that pre-push does not run.
+
+Two durable conclusions:
+
+1. **Some defect classes are structurally invisible to the test type you are running.** Decorator-to-handler
+   binding is a property of the **source**, not of behaviour reachable from a unit test. When a
+   property cannot be observed by the gate that runs most often, move the *check* to where that gate
+   is - a static assertion in the unit suite - rather than hoping a slower gate runs in time. That is
+   what `route-decorator-binding.spec.ts` does, and why it is a source scan rather than a runtime test.
+2. **A gate you own but do not run is not a gate.** The API E2E suite already contained assertions
+   that would have failed instantly. The gap was *scheduling*, not coverage. **Open question for the
+   operator, deliberately not decided unilaterally:** should API E2E join pre-push (correctness at the
+   cost of push latency), or should branch pushes be gated some other way? Recorded here rather than
+   silently resolved, because it is a cost trade-off, not a technical one.
+
+I-46 generalizes as a standing check now applied to every enforcement point: **ask what happens when
+the thing you need in order to evaluate the control is missing.** If the answer is "we skip the
+control", that is fail-open, and it is indistinguishable from having no control. It is the same
+principle already recorded for forwarded-header trust ("a control that cannot be evaluated must never
+look like a control that passed") - now confirmed as a recurring pattern (>= 2 sightings) and
+therefore promoted from note to **pattern**.
+
+Disposition: **(a) applied** in this commit chain for I-42/I-44/I-45/I-46; the pre-push scheduling
+question in conclusion 2 is **(b) scheduled** for operator decision.
+
+---
+
 ## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)

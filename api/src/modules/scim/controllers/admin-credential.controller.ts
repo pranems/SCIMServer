@@ -455,7 +455,17 @@ export class AdminCredentialController {
     // indistinguishable, which is the defect this whole item exists to remove.
     if (cap === undefined || cap === null) return;
 
-    if (!this.credentialRepo) return;
+    if (!this.credentialRepo) {
+      // Fail CLOSED. The repository is a non-optional injection, so this is
+      // unreachable in a wired app - but if it ever became reachable, returning
+      // here would silently disable the cap, which is the same "absence means
+      // unenforced" defect this item exists to remove. A control that cannot be
+      // evaluated must never look like a control that passed.
+      throw new BadRequestException(
+        `Cannot verify the active-credential limit for endpoint "${endpointId}": the credential ` +
+        `repository is unavailable. Refusing the create rather than bypassing "${flag}".`,
+      );
+    }
     const active = await this.credentialRepo.findActiveByEndpoint(endpointId);
     const sameType = active.filter(c => c.credentialType === credentialType).length;
 

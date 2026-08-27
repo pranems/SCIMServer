@@ -13771,7 +13771,16 @@ try {
     $perfEpBody = @{ name = "perf-gate-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json -Depth 4
     $perfEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $perfEpBody
     $perfEpId = $perfEp.id
-    $perfPatch = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True"; SecretTokenBearerAuthEnabled = "True" } } } | ConvertTo-Json -Depth 5
+    # The seed count deliberately exceeds the DEFAULT bearer cap of 5 (P2), so
+    # this endpoint must raise its own cap to be allowed to seed them. Opting in
+    # explicitly is the point: it keeps this gate's premise intact (enough
+    # credentials that a reintroduced bcrypt loop would be obvious) while proving
+    # the cap is a configurable bound rather than a hard ceiling.
+    $perfPatch = @{ profile = @{ settings = @{
+        PerEndpointCredentialsEnabled = "True"
+        SecretTokenBearerAuthEnabled  = "True"
+        MaxActiveBearerCredentials    = $perfSeedCredCount
+    } } } | ConvertTo-Json -Depth 5
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$perfEpId" -Method PATCH -Headers $headers -Body $perfPatch -ContentType "application/json" | Out-Null
     $perfScimBase = "$baseUrl/scim/endpoints/$perfEpId"
 
@@ -15275,6 +15284,141 @@ try {
 }
 
 Write-Host "`n--- 9z-CJ: Retired Settings Keys Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-CK: per-type active-credential caps (P2)
+$script:currentSection = "9z-CK: credential caps"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CK: Per-Type Active Credential Caps ===" -ForegroundColor Cyan
+
+# The resource plane compares a presented opaque token against EVERY active
+# credential with bcrypt - measured at ~293 ms per comparison at cost factor 12.
+# Three credentials already exceed the 800 ms latency gate, and that loop is
+# reachable by an unauthenticated caller sending any non-JWT token. These caps
+# bound the amplification. They are a bound, not the fix.
+#
+# Run live because the enforcement point is an HTTP request handler, and this
+# whole item exists because of a defect (the orphaned @Post decorator, fixed in
+# 8748a67e) that unit tests could not see and that presented as 201 Created.
+try {
+    $ckEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-ck-cred-caps-$(Get-Random)"
+    } | ConvertTo-Json)
+    $ckId = $ckEndpoint.id
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{
+            SecretTokenBearerAuthEnabled = "True"
+            MaxActiveBearerCredentials   = 2
+        } }
+    } | ConvertTo-Json -Depth 5)
+
+    # Use Invoke-RestMethod for the success path rather than Invoke-WebRequest.
+    # MEASURED GOTCHA (2026-08-27): the admin credential response is served as
+    # `application/scim+json`, which PS7's Invoke-WebRequest does NOT treat as
+    # text - `$r.Content` comes back as a byte[], so `ConvertFrom-Json` yields an
+    # object with no properties and `$b.id` is silently EMPTY. The DELETE then
+    # 404s on an empty id. Invoke-RestMethod parses it correctly, and
+    # Get-HttpErrorStatus (the established helper) carries the failure status.
+    function New-CkCredential {
+        param([string]$Type)
+        try {
+            $b = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId/credentials" -Method POST -Headers $headers `
+                -Body (@{ credentialType = $Type; label = "ck-$Type-$(Get-Random)" } | ConvertTo-Json) -ContentType 'application/json'
+            return @{ Status = 201; Body = $b }
+        } catch {
+            return @{ Status = (Get-HttpErrorStatus $_); Body = $null }
+        }
+    }
+
+    # --- the cap is reached, and reaching it is refused ---
+    $ck1 = New-CkCredential -Type 'bearer'
+    $ck2 = New-CkCredential -Type 'bearer'
+    Test-Result -Success ($ck1.Status -eq 201 -and $ck2.Status -eq 201) -Message "9z-CK.T1: creates up to the configured cap of 2 succeed"
+
+    $ck3 = New-CkCredential -Type 'bearer'
+    Test-Result -Success ($ck3.Status -eq 400) -Message "9z-CK.T2: the create that would exceed the cap is refused with 400"
+
+    # --- NEGATIVE CONTROL: raise the cap, the SAME create now succeeds ---
+    # Without this, T2 would also pass if credential creation were broken for an
+    # unrelated reason - which is exactly the failure mode that produced this
+    # section, so the control is not optional here.
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ MaxActiveBearerCredentials = 3 } }
+    } | ConvertTo-Json -Depth 5)
+    $ck4 = New-CkCredential -Type 'bearer'
+    Test-Result -Success ($ck4.Status -eq 201) -Message "9z-CK.T3: NEGATIVE CONTROL - raising the cap lets the same create through (the cap is what refused, not a broken route)"
+
+    # --- only ACTIVE credentials count ---
+    # The bcrypt loop iterates active credentials only, so an inactive one costs
+    # nothing on the resource plane and must not occupy the budget.
+    $ck5 = New-CkCredential -Type 'bearer'
+    Test-Result -Success ($ck5.Status -eq 400) -Message "9z-CK.T4: the raised cap of 3 is itself enforced"
+
+    # Assert the id EXISTS before relying on it. The byte[] bug above produced an
+    # empty id that turned a real DELETE into a 404 - a downstream assertion
+    # failing for a reason that had nothing to do with what it was testing.
+    Test-Result -Success (-not [string]::IsNullOrWhiteSpace($ck1.Body.id)) -Message "9z-CK.T5: the create response carries a usable credential id"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId/credentials/$($ck1.Body.id)" -Method DELETE -Headers $headers
+    $ck6 = New-CkCredential -Type 'bearer'
+    Test-Result -Success ($ck6.Status -eq 201) -Message "9z-CK.T6: deactivating a credential frees a slot (only active credentials count)"
+
+    # --- the cap is per TYPE, not per endpoint ---
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{
+            OAuthClientCredentialsAuthEnabled = "True"
+            MaxActiveOAuthClientCredentials   = 1
+        } }
+    } | ConvertTo-Json -Depth 5)
+    $ckOa1 = New-CkCredential -Type 'oauth_client'
+    Test-Result -Success ($ckOa1.Status -eq 201) -Message "9z-CK.T7: oauth_client has its own budget and is not blocked by a full bearer budget"
+    $ckOa2 = New-CkCredential -Type 'oauth_client'
+    Test-Result -Success ($ckOa2.Status -eq 400) -Message "9z-CK.T8: the oauth_client cap is independently enforced"
+
+    # --- absence resolves to the registry default, never to "unlimited" ---
+    $ckEndpoint2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-ck-cred-caps-default-$(Get-Random)"
+    } | ConvertTo-Json)
+    $ckId2 = $ckEndpoint2.id
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId2" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 5)
+
+    $ckDefaultRefused = $false
+    $ckDefaultCreated = 0
+    for ($i = 0; $i -lt 6; $i++) {
+        try {
+            $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId2/credentials" -Method POST -Headers $headers `
+                -Body (@{ credentialType = 'bearer'; label = "ck-def-$i" } | ConvertTo-Json) -ContentType 'application/json'
+            $ckDefaultCreated++
+        } catch {
+            if ((Get-HttpErrorStatus $_) -eq 400 -and $i -eq 5) { $ckDefaultRefused = $true }
+        }
+    }
+    # Both halves matter: five must SUCCEED and the sixth must be REFUSED. Testing
+    # only the refusal would also pass if creation were broken outright.
+    Test-Result -Success ($ckDefaultCreated -eq 5) -Message "9z-CK.T9: an endpoint that sets no cap allows exactly the registry default of 5"
+    Test-Result -Success $ckDefaultRefused -Message "9z-CK.T10: the sixth is refused (absence resolves to the default, never to unlimited)"
+
+    # --- the published bound is enforced on write ---
+    $ckBoundsRejected = $false
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId2" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ MaxActiveBearerCredentials = 999 } }
+        } | ConvertTo-Json -Depth 5) -ContentType 'application/json'
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 400) { $ckBoundsRejected = $true }
+    }
+    Test-Result -Success $ckBoundsRejected -Message "9z-CK.T11: a cap outside the published bounds (1-25) is rejected on write, not clamped on read"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId" -Method DELETE -Headers $headers
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ckId2" -Method DELETE -Headers $headers
+} catch {
+    Test-Result -Success $false -Message "9z-CK: credential caps section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CK: Per-Type Active Credential Caps Complete ---" -ForegroundColor Green
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

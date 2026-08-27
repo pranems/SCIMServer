@@ -389,19 +389,52 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           .map((el) => (el.getAttribute('data-testid') || '').replace('settings-number-', '').replace(/-input$/, ''))
           .filter(Boolean),
       );
-      expect(nums.length, 'expected the four JWKS numeric knobs').toBeGreaterThanOrEqual(4);
+      // The numeric surface grew from 4 to 14 (v0.55.15: seven more JWKS bounds
+      // plus the three P2 active-credential caps), so a `>= 4` bound would now
+      // pass while ten controls went undriven. The floor tracks the real surface
+      // and the explicit check below names the caps, because those three are the
+      // ones with a security consequence if they silently stop persisting.
+      expect(nums.length, 'expected the full numeric settings surface').toBeGreaterThanOrEqual(14);
+      for (const cap of ['MaxActiveBearerCredentials', 'MaxActiveOAuthClientCredentials', 'MaxActiveWifTrusts']) {
+        expect(nums, `${cap} must be operator-reachable in the Settings tab`).toContain(cap);
+      }
 
       // In-bounds values chosen per the documented ranges.
+      //
+      // There is deliberately NO generic fallback. A `?? '1000'` default silently
+      // breaks for any flag whose range excludes 1000 - which is three of the ten
+      // added in v0.55.15 (the caps max out at 25, JwksRefreshIntervalMs starts at
+      // 60000). Worse, it fails as a "did not persist" message that points at the
+      // control rather than at the test's own bad input. Requiring an explicit
+      // value makes a newly-added flag a deliberate choice instead of a
+      // mysterious failure.
       const value: Record<string, string> = {
-        JwksFetchTimeoutMs: '7500',
-        JwksFetchRetries: '3',
-        JwksFetchRetryBackoffMs: '350',
-        JwksCacheMaxAgeMs: '900000',
+        JwksFetchTimeoutMs: '7500',           // 100 - 60000
+        JwksFetchRetries: '3',                // 0 - 10
+        JwksFetchRetryBackoffMs: '350',       // 0 - 10000
+        JwksCacheMaxAgeMs: '900000',          // 0 - 86400000
+        JwksTotalDeadlineMs: '30000',         // 100 - 120000
+        JwksMaxResponseBytes: '524288',       // 1024 - 10485760
+        JwksMaxKeys: '50',                    // 1 - 1000
+        JwksMaxCacheEntries: '100',           // 1 - 1000
+        JwksRefreshIntervalMs: '3600000',     // 60000 - 86400000
+        JwksUnknownKidMinIntervalMs: '60000', // 0 - 3600000
+        JwksStaleIfErrorMs: '86400000',       // 0 - 604800000
+        MaxActiveBearerCredentials: '7',      // 1 - 25
+        MaxActiveOAuthClientCredentials: '4', // 1 - 25
+        MaxActiveWifTrusts: '12',             // 1 - 25
       };
+
+      const unmapped = nums.filter((k) => value[k] === undefined);
+      expect(
+        unmapped,
+        `numeric settings with no in-bounds test value - add one to the map above ` +
+        `(check its min/max in ENDPOINT_CONFIG_FLAGS_DEFINITIONS):\n${unmapped.join('\n')}`,
+      ).toHaveLength(0);
 
       const failures: string[] = [];
       for (const key of nums) {
-        const v = value[key] ?? '1000';
+        const v = value[key];
         await openSettings(page, id!);
         // Unlike the Dropdown, this testid is on the <input> ITSELF, so it is
         // filled directly - descending into it finds nothing.

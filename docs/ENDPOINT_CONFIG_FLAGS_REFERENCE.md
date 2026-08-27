@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.14`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.15`
 
-> **Version:** 0.55.14 - **Updated:** July 20, 2026  
+> **Version:** 0.55.15 - **Updated:** July 20, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
 > 38 flags: 21 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 string-valued (`logLevel`, the tri-state `PrimaryEnforcement`, and the two-value `CredentialSecretVisibility`). Counted from `ENDPOINT_CONFIG_FLAGS_DEFINITIONS`, which is the single source of truth.  
 > 5 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
@@ -411,6 +411,63 @@ server default:
 **Scope note:** these tune the **runtime** token-mint JWKS fetch only. The
 config-time discovery/verify paths (admin "Verify WIF trust" / discovery
 resolver) are unaffected by these flags.
+
+---
+
+### Active-credential caps (P2)
+
+Three numeric flags bound how many **active** credentials of each type an
+endpoint may hold. Each is enforced at **create** time and each has independent
+budget - one type can never exhaust another's.
+
+| Flag | Default | Bounds | Caps |
+|---|---|---|---|
+| `MaxActiveBearerCredentials` | `5` | 1 - 25 | active `bearer` credentials |
+| `MaxActiveOAuthClientCredentials` | `5` | 1 - 25 | active `oauth_client` credentials |
+| `MaxActiveWifTrusts` | `10` | 1 - 25 | active `wif` trusts |
+
+**Why these exist.** On the resource plane, a presented **opaque** bearer token
+must be bcrypt-compared against every active secret credential on the endpoint,
+because an opaque token carries nothing that identifies which credential it is.
+Measured on this codebase at cost factor 12: **~293 ms per comparison**. Three
+active credentials therefore cost ~879 ms, already past the 800 ms latency gate
+(`9z-BQ`), and 25 would cost ~7.3 s. That loop is reachable by an
+**unauthenticated** caller sending any non-JWT token.
+
+**What they are and are not.** These caps **bound the amplification factor**.
+They are not the fix - the fix is a keyed O(1) credential lookup so the number of
+credentials stops multiplying the cost at all (tracked as **P1**). Until then,
+raising a cap raises the worst-case cost of an unauthenticated request on that
+endpoint, so raise deliberately.
+
+**Behaviour worth knowing:**
+
+- **Only ACTIVE credentials count.** Deactivating one frees a slot immediately,
+  because the bcrypt loop iterates active credentials only - an inactive
+  credential costs nothing on the resource plane.
+- **Absence resolves to the default, never to "unlimited."** An endpoint that
+  never sets a cap still gets the registry default. An absent limit and an
+  infinite limit must never be the same thing.
+- **The bound is enforced on write.** A value outside 1 - 25 is rejected with
+  `400` when the endpoint is configured, rather than silently clamped on read.
+- **Exceeding a cap returns `400`** naming the flag, the current count, and the
+  limit, so the operator is told exactly which knob to turn.
+
+```json
+{
+  "profile": {
+    "settings": {
+      "MaxActiveBearerCredentials": 10,
+      "MaxActiveOAuthClientCredentials": 3,
+      "MaxActiveWifTrusts": 15
+    }
+  }
+}
+```
+
+Coverage: unit (`admin-credential.controller.spec.ts`), E2E
+(`credential-caps.e2e-spec.ts`, 6 cases incl. a negative control), live
+(`9z-CK`, 11 assertions).
 
 ---
 

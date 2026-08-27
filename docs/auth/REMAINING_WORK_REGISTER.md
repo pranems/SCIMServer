@@ -81,7 +81,7 @@ globally, so a connector set to that type fails against SCIMServer today.
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
 | ~~**A9**~~ | ~~Optimistic concurrency, so two concurrent profile writes cannot silently clobber~~ **DELIVERED v0.55.12, re-scoped** as B/C/D after measuring which writes can lose data - `settings` and `serviceProviderConfig` merge per key and were never at risk, so no precondition was added there. See [ENDPOINT_WRITE_CONCURRENCY.md](../ENDPOINT_WRITE_CONCURRENCY.md). The blanket "If-Match on profile writes" originally scoped here was **not** built. | endpoint profile writes | ~~High~~ | - |
-| **A3'** | Bound RequestLog retention + restrict who can read it | request log | **High** | - |
+| **A3'** | Bound RequestLog retention + restrict who can read it | request log | **High** | - . **Retention half DONE (v0.55.15)** - auto-prune was already bounding rows (the register's premise was wrong); the missing piece was *observability*, now shipped as `lastRunAt` / `lastPrunedCount` on `/log-config`. The **read-restriction** half remains open. |
 | **A5** | Replay denylist keyed on Entra's `uti` (not `jti`) | WIF assertion validation | Med | - |
 | **A7** | Reject a bare `api://<appId>` in `expectedAudience` as likely misconfiguration | WIF trust config | Med | - |
 | **A4** | Residual: `client_id` is still not *required* when the trust pins no `targetClientId` | RFC 7523 path | Med | re-scope, mostly closed by W3.7 |
@@ -112,12 +112,41 @@ hole exists to close unilaterally).
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
 | **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - . `findAllActiveByType` landed with W1.2; the per-endpoint cache and the composite index remain |
-| **P1** | Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint | resource plane | Med | - |
-| **P2** | Nothing caps or prunes credentials or request-log rows | resource plane + storage | Med | - . Solve **with A3'** |
+| **P1** | Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint | resource plane | **High** (was Med - **re-rated on measurement**) | - . See the measurement note below |
+| **P2** | ~~Nothing caps or prunes credentials or request-log rows~~ | resource plane + storage | Med | **DONE** (v0.55.15) |
 
-**P1 and P2 have no wave number** - they were inherited from the X9 latency RCA and never promoted
-into the plan, so a plan-driven review could not see them. bcrypt is deliberately slow, which makes
-P1 the most expensive O(N) loop in the resource plane.
+**P2 is DONE (v0.55.15).** Delivered in two slices:
+
+- **Pruning observability.** The register's premise - *"nothing prunes request-log rows"* - **was
+  wrong**, and measuring it is what showed that: `LOG_AUTO_PRUNE` defaults on, `LOG_RETENTION_DAYS`
+  defaults to 21, and the prune is scheduled at init and on an interval. What was actually missing
+  was any way to see whether it had ever **run**. `/log-config` now reports `lastRunAt` and
+  `lastPrunedCount`. Measuring the premise also surfaced that the live suite had been **capping
+  production retention at 1 day** on all three estates (a hardcoded `retentionDays: 1` PUT asserted
+  against the literal `$true`); all three were restored to 30.
+- **Per-type active-credential caps.** `MaxActiveBearerCredentials` (5),
+  `MaxActiveOAuthClientCredentials` (5), `MaxActiveWifTrusts` (10), each bounded 1 - 25 and
+  enforced per type at create time. See
+  [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](../ENDPOINT_CONFIG_FLAGS_REFERENCE.md#active-credential-caps-p2).
+  Coverage: unit + E2E (`credential-caps.e2e-spec.ts`) + live (`9z-CK`, 11 assertions).
+
+**P1 re-rated Med -> High on measurement (2026-08-27).** The bcrypt cost was measured rather than
+assumed: **~293 ms per comparison** at cost factor 12. Consequences:
+
+- 3 active credentials = ~879 ms, which **already exceeds** the 800 ms `9z-BQ` latency gate.
+- 25 (the new cap ceiling) = **~7.3 s**.
+- The loop is reachable by an **unauthenticated** caller sending any non-JWT token, against a
+  0.5-vCPU single-replica estate with **no HTTP rate limiting** (still on the deferred backlog).
+
+That combination is a denial-of-service amplifier, not merely a latency concern. The decisive
+detail: per-endpoint credentials are `crypto.randomBytes(32)` - **256 bits of entropy** - so a slow
+KDF buys nothing. OWASP's slow-hash guidance exists to make *human-chosen passwords* expensive to
+brute-force; it does not apply to a full-entropy random secret. The industry answer (GitHub, Stripe,
+AWS) is a **keyed O(1) lookup plus a fast hash** (SHA-256/HMAC): the token carries an identifier, so
+exactly one constant-time comparison happens regardless of how many credentials exist.
+
+**P2's caps bound the amplification; they do not remove it.** P1 remains open and is now the
+highest-severity item in this section. Design doc still to be written.
 
 ### 2.4 Structure and configuration
 
