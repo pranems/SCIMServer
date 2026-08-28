@@ -17,6 +17,11 @@ import { looksLikeJwt } from '../../../oauth/jwt-decode.util';
 import { safeCompare } from '../../../security/safe-compare';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { resolveEndpointAuthEnablement, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import {
+  HASH_ALGO_HMAC_V1,
+  parseCredentialToken,
+  verifySecretHash,
+} from '../../../security/credential-token';
 import type { AuthCheck } from '../../../oauth/auth-decision-trace';
 import type { AuthAttempt, AuthContext, ResourceAuthenticator } from './resource-authenticator';
 
@@ -89,6 +94,25 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
         return na('token is the global shared secret (handled by the legacy acceptor)');
       }
 
+      // P1 - keyed fast path. A token minted after P1 names its own row, so this
+      // costs ONE indexed read plus ONE HMAC instead of a bcrypt compare against
+      // every active credential (287 ms each). It deliberately does NOT fall
+      // through to the scan on failure: doing so would restore the exact
+      // amplification this exists to remove, with a DB read on top.
+      const parsed = parseCredentialToken(token);
+      if (parsed) {
+        const cred = await this.credentialRepo.findActiveByLookupKey(parsed.lookupKey);
+        if (!cred) return na('keyed credential not found');
+        // lookupKey is globally unique, so the row must be re-checked against the
+        // endpoint being addressed - otherwise a token would authenticate anywhere.
+        if (cred.endpointId !== endpointId) return na('keyed credential belongs to another endpoint');
+        if (cred.hashAlgo !== HASH_ALGO_HMAC_V1 || !cred.secretHash) return na('keyed credential has no P1 hash');
+        if (cred.credentialType === 'bearer' && !effective.secretTokenBearer) return na('bearer method not enabled');
+        if (cred.credentialType === 'oauth_client' && !effective.oauthClientCredentials) return na('oauth_client method not enabled');
+        if (!verifySecretHash(parsed.secret, cred.secretHash)) return na('keyed credential secret mismatch', 'fail');
+        return this.acceptFor(cred, endpointId);
+      }
+
       const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
       if (credentials.length === 0) {
         this.logger.debug(LogCategory.AUTH, 'No active per-endpoint credentials found, falling back', { endpointId });
@@ -97,32 +121,14 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
 
       const compare = await loadBcryptCompare();
       for (const cred of credentials) {
+        // A migrated row can never match a legacy token, so bcrypting it is pure
+        // cost - and this is what makes the scan shrink as rotation progresses.
+        if (cred.hashAlgo === HASH_ALGO_HMAC_V1) continue;
         if (cred.credentialType === 'bearer' && !effective.secretTokenBearer) continue;
         if (cred.credentialType === 'oauth_client' && !effective.oauthClientCredentials) continue;
         const isMatch = cred.credentialHash ? await compare(token, cred.credentialHash) : false;
         if (isMatch) {
-          return {
-            outcome: 'accept',
-            method: 'endpoint_bearer',
-            checks: [
-              {
-                id: 'endpoint_bearer',
-                status: 'pass',
-                expected: 'a matching per-endpoint bearer credential',
-                received: `matched credential ${cred.id}`,
-              },
-            ],
-            apply: (req) => {
-              req.authType = 'endpoint_credential';
-              req.authCredentialId = cred.id;
-              this.logger.enrichContext({ authType: 'endpoint_credential', authCredentialId: cred.id });
-              this.logger.info(LogCategory.AUTH, 'Per-endpoint credential authentication successful', {
-                endpointId,
-                credentialId: cred.id,
-                label: cred.label,
-              });
-            },
-          };
+          return this.acceptFor(cred, endpointId);
         }
       }
 
@@ -135,5 +141,34 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
       });
       return na('per-endpoint credential lookup failed (fell back)');
     }
+  }
+
+  /** Shared accept result, so the keyed and legacy paths cannot drift apart. */
+  private acceptFor(
+    cred: { id: string; label?: string | null },
+    endpointId: string,
+  ): AuthAttempt {
+    return {
+      outcome: 'accept',
+      method: 'endpoint_bearer',
+      checks: [
+        {
+          id: 'endpoint_bearer',
+          status: 'pass',
+          expected: 'a matching per-endpoint bearer credential',
+          received: `matched credential ${cred.id}`,
+        },
+      ],
+      apply: (req) => {
+        req.authType = 'endpoint_credential';
+        req.authCredentialId = cred.id;
+        this.logger.enrichContext({ authType: 'endpoint_credential', authCredentialId: cred.id });
+        this.logger.info(LogCategory.AUTH, 'Per-endpoint credential authentication successful', {
+          endpointId,
+          credentialId: cred.id,
+          label: cred.label,
+        });
+      },
+    };
   }
 }

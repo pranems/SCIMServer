@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.15`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.16`
 
-> **Version:** 0.55.15 - **Updated:** July 20, 2026  
+> **Version:** 0.55.16 - **Updated:** July 20, 2026  
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)  
 > 38 flags: 21 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 string-valued (`logLevel`, the tri-state `PrimaryEnforcement`, and the two-value `CredentialSecretVisibility`). Counted from `ENDPOINT_CONFIG_FLAGS_DEFINITIONS`, which is the single source of truth.  
 > 5 value-types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).

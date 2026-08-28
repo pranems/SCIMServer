@@ -51,6 +51,7 @@ import type {
   WifDebugAssertionResponse,
   WifDebugTrustResult,
 } from '../../../shared/types/wif-debug.types';
+import { mintCredentialToken, P1_KEYED_HASH_PLACEHOLDER } from '../../../security/credential-token';
 import { getConfigBoolean, getConfigNumber, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, ENDPOINT_CONFIG_FLAGS_DEFINITIONS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
@@ -559,11 +560,20 @@ export class AdminCredentialController {
       }
     }
 
-    // Generate a cryptographically secure random token
-    const plaintext = crypto.randomBytes(32).toString('base64url');
+    // P1 - a BEARER credential is the one presented as a resource-plane bearer,
+    // so it is the one that drove the O(N) bcrypt scan. It is now minted in the
+    // keyed format `scim_<lookupKey>_<secret>` and verified with one indexed read
+    // plus one HMAC. `oauth_client` deliberately keeps its readable
+    // `client-secret-<uuid>` form (operator request) and its bcrypt hash: that
+    // secret is presented at the TOKEN endpoint, not as a resource bearer.
+    const minted = mintCredentialToken();
+    const plaintext = minted.token;
 
-    // Hash with bcrypt
-    const hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
+    // `credentialHash` is NOT NULL and is the LEGACY verifier's column. A keyed
+    // row is never verified through it (the scan skips hashAlgo='hmac-sha256-v1'),
+    // so it carries a self-describing placeholder rather than a second copy of
+    // the secret material.
+    const hash = P1_KEYED_HASH_PLACEHOLDER;
 
     // Q1: an `oauth_client` credential is a per-endpoint client_id / client_secret
     // pair used at the per-endpoint token endpoint to mint endpoint-scoped tokens.
@@ -640,6 +650,9 @@ export class AdminCredentialController {
       metadata: bearerDescription != null ? { description: bearerDescription } : undefined,
       secretEnvelope: await this.maybeRetainSecret(config, plaintext),
       expiresAt,
+      lookupKey: minted.lookupKey,
+      secretHash: minted.secretHash,
+      hashAlgo: minted.hashAlgo,
     });
 
     this.logger.info(LogCategory.AUTH, `Created per-endpoint credential "${credential.id}" for endpoint "${endpointId}"`);
@@ -1022,13 +1035,29 @@ export class AdminCredentialController {
     // net-neutral (the old credential is deactivated immediately below), and
     // refusing it at the cap would block the one operation you most want an
     // operator to be able to perform on a compromised secret.
-    // Mint a fresh secret + bcrypt hash.
-    const plaintext = crypto.randomBytes(32).toString('base64url');
-    const hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
+    //
+    // P1 - rotation IS the migration path. A legacy bcrypt bearer credential
+    // comes back in the keyed format, so the existing operator workflow upgrades
+    // rows with no new concept to learn. oauth_client keeps its readable
+    // `client-secret-<uuid>` form and bcrypt (it is a token-endpoint secret, not
+    // a resource-plane bearer).
+    const isOauth = old.credentialType === 'oauth_client';
+
+    let plaintext: string;
+    let hash: string;
+    let keyed: { lookupKey: string; secretHash: string; hashAlgo: string } | null = null;
+    if (isOauth) {
+      plaintext = `client-secret-${crypto.randomUUID()}`;
+      hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
+    } else {
+      const minted = mintCredentialToken();
+      plaintext = minted.token;
+      hash = P1_KEYED_HASH_PLACEHOLDER;
+      keyed = { lookupKey: minted.lookupKey, secretHash: minted.secretHash, hashAlgo: minted.hashAlgo };
+    }
     const secretEnvelope = await this.maybeRetainSecret(config, plaintext);
 
     // oauth_client keeps its public client_id so only the secret changes.
-    const isOauth = old.credentialType === 'oauth_client';
     const clientId = isOauth && typeof old.metadata?.clientId === 'string' ? old.metadata.clientId : null;
 
     const created = await this.credentialRepo.create({
@@ -1039,6 +1068,7 @@ export class AdminCredentialController {
       metadata: clientId ? { clientId } : old.metadata ?? null,
       secretEnvelope,
       expiresAt: old.expiresAt,
+      ...(keyed ?? {}),
     });
 
     // Deactivate the old credential AFTER the new one is persisted.

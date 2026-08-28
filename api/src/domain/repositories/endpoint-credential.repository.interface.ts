@@ -23,6 +23,16 @@ export interface IEndpointCredentialRepository {
   /** Find a credential by ID. */
   findById(id: string): Promise<EndpointCredentialModel | null>;
 
+  /**
+   * P1 - find the ONE active credential carrying this public lookup key.
+   *
+   * This is the method that removes the O(N) bcrypt scan: a P1-format token
+   * names its own row, so verification costs one indexed read and one HMAC
+   * instead of a bcrypt compare against every active credential (287 ms each).
+   * Returns null when the key is unknown or the row is inactive/expired.
+   */
+  findActiveByLookupKey(lookupKey: string): Promise<EndpointCredentialModel | null>;
+
   /** List all credentials for an endpoint (active and inactive). */
   findByEndpoint(endpointId: string): Promise<EndpointCredentialModel[]>;
 

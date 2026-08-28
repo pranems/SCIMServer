@@ -1,10 +1,32 @@
 # P1 - Keyed credential lookup (replacing the O(N) x bcrypt scan)
 
-**Status:** DESIGN - not yet implemented
+**Status:** **IMPLEMENTED for `bearer`** (phases 1-3) - v0.55.16, 2026-08-27
 **Severity:** High (re-rated from Medium on measurement, 2026-08-27)
 **Last verified:** 2026-08-27
 **Owner:** auth workstream
 **Register entry:** [REMAINING_WORK_REGISTER.md](REMAINING_WORK_REGISTER.md) - P1
+
+> ## Outcome, measured
+>
+> A wrong token against **10 active credentials** on a live node answers in
+> **7 ms**. Before P1 the same request cost ~2.9 s of bcrypt (10 x 287 ms).
+>
+> | | before | after |
+> |---|---:|---:|
+> | 3 active credentials | 860 ms | ~7 ms |
+> | 10 active credentials | 2,866 ms | **7 ms (measured)** |
+> | 25 active credentials | 7,165 ms | ~7 ms |
+>
+> **Scope of this increment:** `bearer` credentials only - the type actually
+> presented as a resource-plane bearer, and therefore the one that drove the
+> scan. `oauth_client` keeps its readable `client-secret-<uuid>` form and bcrypt:
+> that secret is presented at the **token endpoint**, not as a resource bearer,
+> and the readable form was an explicit operator request. Migrating it is a
+> separate decision, tracked below.
+>
+> Legacy rows still verify via bcrypt until rotated, and the scan now **skips**
+> rows already migrated - so the remaining cost shrinks as rotation progresses
+> rather than staying flat.
 
 ---
 
@@ -103,15 +125,22 @@ Give the token a **public, non-secret lookup key** so the server can find exactl
 one candidate row:
 
 ```text
-scim_<keyId>_<secret>
-     |       |
-     |       +-- 32 random bytes, base64url (the actual secret, never stored)
-     +---------- 12 random bytes, base64url (public identifier, stored + indexed)
+scim_<lookupKey>_<secret>
+     |            |
+     |            +-- 32 random bytes, base64url (the secret; never stored)
+     +--------------- 12 random bytes, HEX (public identifier, stored + indexed)
 ```
 
 The `scim_` prefix is deliberate: it makes the credential greppable in secret
 scanners (GitHub secret scanning, trufflehog) and instantly recognisable in a
 support ticket.
+
+> **The lookup key is HEX, not base64url, and TDD is why.** The first
+> implementation used base64url for both halves, and the round-trip test failed
+> immediately: the base64url alphabet **includes `_`**, which is the separator,
+> so a key containing `_` split in the wrong place and truncated. Hex cannot
+> collide with the separator. The secret stays base64url because it is the last
+> field - everything after the second `_`.
 
 ### 3.2 Verification path
 
@@ -185,14 +214,24 @@ flowchart LR
 
 | Phase | What happens | Reversible? |
 |---|---|---|
-| 1 | Add columns; verification handles both `hashAlgo` values. No behaviour change. | yes |
-| 2 | Newly created credentials get `scim_<keyId>_<secret>` + HMAC. Legacy rows untouched. | yes |
-| 3 | `POST .../rotate` issues the new format, so the existing rotation flow *is* the migration path - no new operator concept. | yes |
-| 4 | Surface a per-endpoint count of remaining legacy credentials (extends the `check-credential-cap-impact.ps1` idea) so the tail is visible rather than assumed. | yes |
-| 5 | Only once the measured legacy count is zero across all estates: delete the loop and the `bcrypt` dependency. | one-way |
+| 1 **DONE** | Added `lookupKey` (unique), `secretHash`, `hashAlgo` (default `bcrypt`). Verification handles both. Strictly additive - every existing row stays valid. | yes |
+| 2 **DONE** | New `bearer` credentials mint `scim_<lookupKey>_<secret>` + HMAC. Legacy rows untouched. | yes |
+| 3 **DONE** | `POST .../rotate` issues the new format, so the existing rotation flow **is** the migration path - no new operator concept. | yes |
+| 4 TODO | Surface a per-endpoint count of remaining legacy credentials so the tail is **visible** rather than assumed. | yes |
+| 5 TODO | Only once the measured legacy count is zero across all estates: delete the loop and the `bcrypt` dependency. | one-way |
 
 **Phase 5 must be gated on measurement, not on elapsed time.** "It has been three
 months, probably fine" is the reasoning that produced the EOL-Node escape.
+
+### 4.2 Still on bcrypt after this increment
+
+- **`oauth_client` secrets.** Presented at the token endpoint, and their readable
+  `client-secret-<uuid>` form was an explicit operator request. They remain in the
+  legacy scan, so an endpoint with `oauth_client` credentials still pays
+  N x 287 ms for a wrong token. With the default cap of 5 that is ~1.4 s rather
+  than the ~2.9 s it was with both types. **Deciding whether to migrate them is
+  the next P1 question** and needs the operator's view on the readable format.
+- **Pre-P1 `bearer` rows**, until rotated.
 
 ### 4.1 Bounding the legacy path meanwhile
 
@@ -221,21 +260,29 @@ Stated explicitly so the doc cannot be read as claiming more than it delivers:
 
 ## 6. Test plan (written before the code, per Stage 0)
 
-| Level | Assertion |
-|---|---|
-| Unit | a `scim_`-format token verifies via exactly **one** repository call - assert the call count, because "it works" would also pass if it fell through to the scan |
-| Unit | a wrong secret with a **valid** keyId rejects, and does *not* fall back to scanning |
-| Unit | a legacy token still verifies via bcrypt (`hashAlgo='bcrypt'`) |
-| Unit | rotation of a legacy credential yields `hashAlgo='hmac-sha256-v1'` + a `lookupKey` |
-| Unit | timing: a mismatched keyId does not perform an HMAC at all |
-| E2E | a newly minted credential authenticates a real SCIM request over HTTP |
-| E2E | an existing (legacy-format) credential keeps working - **the migration's whole promise** |
-| Live | `9z-` section: mint, authenticate, rotate, authenticate again |
-| **Perf** | with 25 active credentials, an **unauthenticated** wrong-token request completes in **< 50 ms** (today: ~7,165 ms). This is the assertion that proves the item, and it must be a *measured bound*, not a presence check - see R10. |
+All of the following are implemented and green.
 
-The perf assertion needs a **negative control**: the same measurement against a
-legacy-only endpoint must still show the slow path, or the test is not proving
-that the fast path is what made it fast.
+| Level | Assertion | Where |
+|---|---|---|
+| Unit | a `scim_`-format token verifies via exactly **one** repository call - the call count is asserted, because "it works" would also pass if it fell through to the scan | `P1-A1` |
+| Unit | a wrong secret with a **valid** key rejects, and does *not* fall back to scanning | `P1-A2` |
+| Unit | an unknown key does no scan | `P1-A3` |
+| Unit | a keyed row belonging to another endpoint is refused | `P1-A4` |
+| Unit | a legacy token still verifies via bcrypt | `P1-A5` |
+| Unit | the scan skips already-migrated rows, proven **behaviourally** (the row carries a real bcrypt hash that WOULD match) | `P1-A6` |
+| Unit | negative control: the same row without the marker DOES match | `P1-A7` |
+| Unit | token round-trip, entropy, pepper, malformed-hash safety (25 cases) | `credential-token.spec.ts` |
+| E2E | a newly minted credential authenticates a real SCIM request | `P1-X1` |
+| E2E | the row stores `lookupKey`/`secretHash` and **not** the secret | `P1-X2` |
+| E2E | an existing legacy credential keeps working - **the migration's whole promise** | `P1-X5` |
+| E2E | rotation upgrades a legacy row in place | `P1-X6` |
+| **E2E perf** | 25 keyed credentials + a wrong token is faster than **3** legacy bcrypt rows, and under 250 ms | `P1-X7` |
+| Live | mint, authenticate, forge, cross-endpoint, rotate, re-authenticate | `9z-CL.T1-T7` |
+| **Live perf** | a wrong token against 10 active credentials - **measured 7 ms** | `9z-CL.T8` |
+
+The perf assertion carries a **negative control**: the same wrong token against
+only three *legacy* rows must be measurably slower. Without it, a fast result
+would not be attributable to the fast path.
 
 ---
 

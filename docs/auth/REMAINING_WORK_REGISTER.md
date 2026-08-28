@@ -113,7 +113,7 @@ hole exists to close unilaterally).
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
 | **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - . `findAllActiveByType` landed with W1.2; the per-endpoint cache and the composite index remain |
-| **P1** | Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint | resource plane | **High** (was Med - **re-rated on measurement**) | - . See the measurement note below |
+| **P1** | ~~Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint~~ | resource plane | **High** | **DONE for `bearer` (v0.55.16)** - measured **7 ms** against 10 active credentials, was ~2.9 s. `oauth_client` + un-rotated legacy rows remain on bcrypt; see the design doc section 4.2 |
 | **P2** | ~~Nothing caps or prunes credentials or request-log rows~~ | resource plane + storage | Med | **DONE** (v0.55.15) |
 
 **P2 is DONE (v0.55.15).** Delivered in two slices:

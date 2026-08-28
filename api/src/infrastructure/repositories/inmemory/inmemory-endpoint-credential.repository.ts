@@ -27,6 +27,11 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
       active: true,
       createdAt: new Date(),
       expiresAt: input.expiresAt ?? null,
+      lookupKey: input.lookupKey ?? null,
+      secretHash: input.secretHash ?? null,
+      // Mirrors the column default, so an omitted value means the same thing in
+      // both backends rather than `undefined` here and 'bcrypt' there.
+      hashAlgo: input.hashAlgo ?? 'bcrypt',
     };
     this.store.set(model.id, model);
     return model;
@@ -39,6 +44,21 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
         c.endpointId === endpointId &&
         c.active &&
         (c.expiresAt === null || c.expiresAt > now),
+    );
+  }
+
+  // P1 - mirrors the Prisma implementation's active/expiry semantics exactly;
+  // a parity gap here would make the fast path behave differently per backend.
+  async findActiveByLookupKey(lookupKey: string): Promise<EndpointCredentialModel | null> {
+    if (!lookupKey) return null;
+    const now = new Date();
+    return (
+      Array.from(this.store.values()).find(
+        (c) =>
+          c.lookupKey === lookupKey &&
+          c.active &&
+          (c.expiresAt === null || c.expiresAt > now),
+      ) ?? null
     );
   }
 

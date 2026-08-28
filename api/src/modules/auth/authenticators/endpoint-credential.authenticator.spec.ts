@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcrypt';
 import { EndpointCredentialAuthenticator } from './endpoint-credential.authenticator';
+import { HASH_ALGO_HMAC_V1, mintCredentialToken } from '../../../security/credential-token';
 import type { AuthContext } from './resource-authenticator';
 
 /**
@@ -9,7 +10,7 @@ import type { AuthContext } from './resource-authenticator';
  * bcrypt match, and that a non-match is always not-applicable (never reject).
  */
 describe('EndpointCredentialAuthenticator (W2.1)', () => {
-  let credentialRepo: { findActiveByEndpoint: jest.Mock };
+  let credentialRepo: { findActiveByEndpoint: jest.Mock; findActiveByLookupKey: jest.Mock };
   let endpointService: { getEndpoint: jest.Mock };
   let logger: any;
   let auth: EndpointCredentialAuthenticator;
@@ -26,7 +27,10 @@ describe('EndpointCredentialAuthenticator (W2.1)', () => {
   const enabled = { profile: { settings: { SecretTokenBearerAuthEnabled: 'true' } } };
 
   beforeEach(() => {
-    credentialRepo = { findActiveByEndpoint: jest.fn().mockResolvedValue([]) };
+    credentialRepo = {
+      findActiveByEndpoint: jest.fn().mockResolvedValue([]),
+      findActiveByLookupKey: jest.fn().mockResolvedValue(null),
+    };
     endpointService = { getEndpoint: jest.fn().mockResolvedValue(enabled) };
     logger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), enrichContext: jest.fn() };
     auth = new EndpointCredentialAuthenticator(credentialRepo as any, endpointService as any, logger);
@@ -85,5 +89,114 @@ describe('EndpointCredentialAuthenticator (W2.1)', () => {
     ]);
     const r = await auth.tryAuthenticate(ctx());
     expect(r.outcome).toBe('not-applicable');
+  });
+
+  /**
+   * P1 - keyed lookup. See docs/auth/P1_KEYED_CREDENTIAL_LOOKUP_DESIGN.md.
+   *
+   * The assertions that matter are about WHICH repository method is called, not
+   * merely that authentication succeeds. "It works" would also pass if the fast
+   * path silently fell through to the O(N) bcrypt scan - which is the entire
+   * defect this item exists to remove. So every test here asserts the scan was
+   * NOT used.
+   */
+  describe('P1 - keyed lookup replaces the O(N) bcrypt scan', () => {
+    it('P1-A1: a keyed token verifies via ONE lookup and never scans', async () => {
+      const minted = mintCredentialToken();
+      credentialRepo.findActiveByLookupKey.mockResolvedValue({
+        id: 'cred-k', endpointId: 'ep-1', credentialType: 'bearer',
+        hashAlgo: HASH_ALGO_HMAC_V1, secretHash: minted.secretHash, lookupKey: minted.lookupKey,
+      });
+
+      const r = await auth.tryAuthenticate(ctx({ token: minted.token }));
+
+      expect(r.outcome).toBe('accept');
+      expect(credentialRepo.findActiveByLookupKey).toHaveBeenCalledTimes(1);
+      expect(credentialRepo.findActiveByLookupKey).toHaveBeenCalledWith(minted.lookupKey);
+      expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('P1-A2: a wrong secret under a VALID key rejects without falling back to the scan', async () => {
+      // The dangerous failure: verify fails, code "helpfully" retries the old
+      // path, and the amplification is back with an extra DB read on top.
+      const minted = mintCredentialToken();
+      const other = mintCredentialToken();
+      credentialRepo.findActiveByLookupKey.mockResolvedValue({
+        id: 'cred-k', endpointId: 'ep-1', credentialType: 'bearer',
+        hashAlgo: HASH_ALGO_HMAC_V1, secretHash: other.secretHash, lookupKey: minted.lookupKey,
+      });
+
+      const r = await auth.tryAuthenticate(ctx({ token: minted.token }));
+
+      expect(r.outcome).toBe('not-applicable');
+      expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('P1-A3: an UNKNOWN key does no HMAC and no scan', async () => {
+      const minted = mintCredentialToken();
+      credentialRepo.findActiveByLookupKey.mockResolvedValue(null);
+
+      const r = await auth.tryAuthenticate(ctx({ token: minted.token }));
+
+      expect(r.outcome).toBe('not-applicable');
+      expect(credentialRepo.findActiveByLookupKey).toHaveBeenCalledTimes(1);
+      expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('P1-A4: a keyed row belonging to ANOTHER endpoint is refused', async () => {
+      // lookupKey is globally unique, so a stolen token must not authenticate
+      // against a different endpoint just because the key resolves.
+      const minted = mintCredentialToken();
+      credentialRepo.findActiveByLookupKey.mockResolvedValue({
+        id: 'cred-k', endpointId: 'ep-OTHER', credentialType: 'bearer',
+        hashAlgo: HASH_ALGO_HMAC_V1, secretHash: minted.secretHash, lookupKey: minted.lookupKey,
+      });
+
+      const r = await auth.tryAuthenticate(ctx({ token: minted.token }));
+
+      expect(r.outcome).toBe('not-applicable');
+      expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('P1-A5: LEGACY tokens still verify via the bcrypt scan (the migration promise)', async () => {
+      // The whole migration rests on this: existing credentials keep working.
+      const hash = await bcrypt.hash(OPAQUE, 4);
+      credentialRepo.findActiveByEndpoint.mockResolvedValue([
+        { id: 'cred-1', credentialType: 'bearer', credentialHash: hash, hashAlgo: 'bcrypt' },
+      ]);
+
+      const r = await auth.tryAuthenticate(ctx({ token: OPAQUE }));
+
+      expect(r.outcome).toBe('accept');
+      expect(credentialRepo.findActiveByLookupKey).not.toHaveBeenCalled();
+    });
+
+    it('P1-A6: the legacy scan SKIPS rows already migrated to HMAC', async () => {
+      // Behavioural, not a spy: the row carries a REAL bcrypt hash of the
+      // presented token, so it WOULD match if the scan considered it. Requiring
+      // not-applicable proves the skip fired, without depending on bcrypt being
+      // mockable (it is lazy-loaded and cached, so a spy cannot bind).
+      const hash = await bcrypt.hash(OPAQUE, 4);
+      credentialRepo.findActiveByEndpoint.mockResolvedValue([
+        { id: 'cred-new', credentialType: 'bearer', credentialHash: hash, hashAlgo: HASH_ALGO_HMAC_V1 },
+      ]);
+
+      const r = await auth.tryAuthenticate(ctx({ token: OPAQUE }));
+
+      expect(r.outcome).toBe('not-applicable');
+    });
+
+    it('P1-A7: NEGATIVE CONTROL - the same row WITHOUT the migrated marker does match', async () => {
+      // Proves A6 passes because of the hashAlgo skip, not because the fixture
+      // was broken in some other way.
+      const hash = await bcrypt.hash(OPAQUE, 4);
+      credentialRepo.findActiveByEndpoint.mockResolvedValue([
+        { id: 'cred-old', credentialType: 'bearer', credentialHash: hash, hashAlgo: 'bcrypt' },
+      ]);
+
+      const r = await auth.tryAuthenticate(ctx({ token: OPAQUE }));
+
+      expect(r.outcome).toBe('accept');
+    });
   });
 });

@@ -158,6 +158,14 @@ model EndpointCredential {
   createdAt      DateTime  @default(now()) @db.Timestamptz
   expiresAt      DateTime?                   @db.Timestamptz
 
+  // P1 - keyed lookup. The token carries a PUBLIC lookupKey so verification is
+  // ONE indexed row + ONE HMAC, instead of a bcrypt compare against every active
+  // credential on the endpoint (287 ms each). Nullable because pre-P1 rows have
+  // no key and are verified with bcrypt until rotated.
+  lookupKey      String?   @unique @db.VarChar(64)
+  secretHash     String?   @db.VarChar(128)  // HMAC-SHA256(pepper, secret), hex
+  hashAlgo       String    @default("bcrypt") @db.VarChar(32) // "bcrypt" | "hmac-sha256-v1"
+
   endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 
   @@index([endpointId, active])

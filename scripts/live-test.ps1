@@ -15483,6 +15483,107 @@ try {
 Write-Host "`n--- 9z-CK: Per-Type Active Credential Caps Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CL: keyed credential lookup (P1)
+$script:currentSection = "9z-CL: keyed credential lookup"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CL: Keyed Credential Lookup (P1) ===" -ForegroundColor Cyan
+
+# Before P1 an opaque bearer was bcrypt-compared against EVERY active credential
+# on the endpoint - measured 287 ms each, so 25 credentials cost ~7.2 s on a path
+# reachable by an UNAUTHENTICATED caller. The token now carries a public lookup
+# key, so verification is one indexed read plus one HMAC.
+try {
+    $clEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-cl-keyed-$(Get-Random)"
+    } | ConvertTo-Json)
+    $clId = $clEndpoint.id
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 5)
+
+    $clCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'bearer'; label = 'cl-keyed' } | ConvertTo-Json) -ContentType 'application/json'
+    $clToken = $clCred.token
+
+    Test-Result -Success ($clToken -like 'scim_*') -Message "9z-CL.T1: a new bearer credential is issued in the keyed scim_<key>_<secret> format"
+
+    # The credential must actually authenticate a SCIM request.
+    $clScimHeaders = @{ Authorization = "Bearer $clToken" }
+    $clUsers = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clId/Users?count=1" -Method GET -Headers $clScimHeaders
+    Test-Result -Success ($null -ne $clUsers) -Message "9z-CL.T2: the keyed credential authenticates a real SCIM request"
+
+    # A forged secret under the REAL lookup key must be refused.
+    $clKey = ($clToken -split '_')[1]
+    $clForgedRefused = $false
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clId/Users?count=1" -Method GET -Headers @{ Authorization = "Bearer scim_${clKey}_forged-secret-value" }
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 401) { $clForgedRefused = $true }
+    }
+    Test-Result -Success $clForgedRefused -Message "9z-CL.T3: a forged secret under a REAL lookup key is refused with 401"
+
+    # The same credential must not work on a DIFFERENT endpoint (lookupKey is global).
+    $clEndpoint2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-cl-other-$(Get-Random)"
+    } | ConvertTo-Json)
+    $clId2 = $clEndpoint2.id
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId2" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 5)
+    $clCrossRefused = $false
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clId2/Users?count=1" -Method GET -Headers $clScimHeaders
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 401) { $clCrossRefused = $true }
+    }
+    Test-Result -Success $clCrossRefused -Message "9z-CL.T4: a credential does not authenticate against a different endpoint"
+
+    # Rotation is the migration path and must keep the keyed format.
+    $clRotated = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId/credentials/$($clCred.id)/rotate" -Method POST -Headers $headers
+    Test-Result -Success ($clRotated.token -like 'scim_*') -Message "9z-CL.T5: rotation issues a keyed credential (rotation is the migration path)"
+    $clRotHeaders = @{ Authorization = "Bearer $($clRotated.token)" }
+    $clRotUsers = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clId/Users?count=1" -Method GET -Headers $clRotHeaders
+    Test-Result -Success ($null -ne $clRotUsers) -Message "9z-CL.T6: the rotated keyed credential authenticates"
+
+    # The old credential must stop working after rotation.
+    $clOldRefused = $false
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clId/Users?count=1" -Method GET -Headers $clScimHeaders
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 401) { $clOldRefused = $true }
+    }
+    Test-Result -Success $clOldRefused -Message "9z-CL.T7: the rotated-away credential no longer authenticates"
+
+    # --- the amplification is measurably gone ---
+    # Seed the endpoint to its cap and time an UNAUTHENTICATED wrong token. Before
+    # P1 this was N x 287 ms; it should now be a single indexed miss.
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ MaxActiveBearerCredentials = 10 } }
+    } | ConvertTo-Json -Depth 5)
+    for ($i = 0; $i -lt 9; $i++) {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId/credentials" -Method POST -Headers $headers `
+            -Body (@{ credentialType = 'bearer'; label = "cl-perf-$i" } | ConvertTo-Json) -ContentType 'application/json'
+    }
+    $clSw = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clId/Users?count=1" -Method GET -Headers @{ Authorization = "Bearer not-a-real-credential-value" }
+    } catch { }
+    $clSw.Stop()
+    # Generous vs the pre-P1 cost (10 x 287 ms = ~2.9 s) so network variance on a
+    # remote estate cannot make this flaky, while still failing loudly if the
+    # bcrypt scan ever returns.
+    Test-Result -Success ($clSw.ElapsedMilliseconds -lt 1500) `
+        -Message "9z-CL.T8: a wrong token against 10 active credentials answers in $($clSw.ElapsedMilliseconds)ms (pre-P1 this was ~2.9s of bcrypt)"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId" -Method DELETE -Headers $headers
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId2" -Method DELETE -Headers $headers
+} catch {
+    Test-Result -Success $false -Message "9z-CL: keyed credential lookup section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CL: Keyed Credential Lookup Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

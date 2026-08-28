@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.15`
+> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.16`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -234,6 +234,18 @@ Content-Type: application/json
 ```
 
 > **The `token` is returned once.** It is stored as a bcrypt hash, so the server cannot show it to you again. `CredentialSecretVisibility` controls whether the UI keeps it on screen (`always`) or hides it after first reveal (`once`).
+
+> **Token format (v0.55.16).** A bearer credential is now issued as
+> `scim_<lookupKey>_<secret>`. The `lookupKey` half is a **public identifier** -
+> it names which credential the token is, so the server verifies it with one
+> indexed lookup and one constant-time comparison. Before this, a presented token
+> had to be bcrypt-compared against *every* active credential on the endpoint
+> (~287 ms each), which an unauthenticated caller could force; a wrong token
+> against 10 credentials now answers in **7 ms** instead of ~2.9 s.
+>
+> The `scim_` prefix is deliberate, so secret scanners can recognise a leaked
+> credential. **Credentials issued before v0.55.16 keep working unchanged** and
+> are upgraded when you rotate them.
 
 > **There is a limit on how many can be ACTIVE at once.** Each credential type
 > has its own cap - `MaxActiveBearerCredentials` and

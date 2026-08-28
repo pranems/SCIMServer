@@ -1,8 +1,8 @@
 # Endpoint Lifecycle & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.15`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.16`
 
-> **Version:** 0.55.15 - **Updated:** June 3, 2026  
+> **Version:** 0.55.16 - **Updated:** June 3, 2026  
 > Quick-start recipes for common SCIMServer operations
 
 ---

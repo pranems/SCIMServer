@@ -18,6 +18,12 @@ export interface EndpointCredentialModel {
   active: boolean;
   createdAt: Date;
   expiresAt: Date | null;
+  /** P1: public identifier carried in the token; null on pre-P1 rows. */
+  lookupKey?: string | null;
+  /** P1: HMAC-SHA256(pepper, secret), hex; null on pre-P1 rows. */
+  secretHash?: string | null;
+  /** P1: `bcrypt` (legacy) or `hmac-sha256-v1`. Selects the verifier. */
+  hashAlgo?: string;
 }
 
 export interface EndpointCredentialCreateInput {
@@ -29,4 +35,7 @@ export interface EndpointCredentialCreateInput {
   /** WI-7: retained (DEK-encrypted) secret envelope; omit/null when not retained. */
   secretEnvelope?: string | null;
   expiresAt?: Date | null;
+  lookupKey?: string | null;
+  secretHash?: string | null;
+  hashAlgo?: string;
 }

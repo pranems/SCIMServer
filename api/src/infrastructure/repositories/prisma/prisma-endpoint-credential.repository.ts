@@ -20,6 +20,9 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
         metadata: input.metadata ? (input.metadata as any) : undefined,
         secretEnvelope: input.secretEnvelope ?? null,
         expiresAt: input.expiresAt ?? null,
+        lookupKey: input.lookupKey ?? null,
+        secretHash: input.secretHash ?? null,
+        hashAlgo: input.hashAlgo ?? 'bcrypt',
       },
     });
     return this.toModel(row);
@@ -37,6 +40,24 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
       },
     });
     return rows.map((r) => this.toModel(r));
+  }
+
+  // P1 - the whole point of the keyed format: ONE indexed read. `lookupKey` is
+  // UNIQUE, so this can never fan out. Active/expiry filtering matches
+  // findActiveByEndpoint exactly, or a key would outlive the credential.
+  async findActiveByLookupKey(lookupKey: string): Promise<EndpointCredentialModel | null> {
+    if (!lookupKey) return null;
+    const row = await this.prisma.endpointCredential.findFirst({
+      where: {
+        lookupKey,
+        active: true,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
+      },
+    });
+    return row ? this.toModel(row) : null;
   }
 
   async findAllActiveByType(credentialType: string): Promise<EndpointCredentialModel[]> {
@@ -170,6 +191,9 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
       active: row.active,
       createdAt: row.createdAt,
       expiresAt: row.expiresAt ?? null,
+      lookupKey: row.lookupKey ?? null,
+      secretHash: row.secretHash ?? null,
+      hashAlgo: row.hashAlgo ?? 'bcrypt',
     };
   }
 }
