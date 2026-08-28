@@ -56,15 +56,61 @@ async function authenticatedPage(context: BrowserContext, path: string): Promise
 
 test.describe('Phase H3 - F3-deferred cross-tab SSE invalidation', () => {
   // This test depends on MSW running in the page (VITE_USE_MSW=true on a local
-  // vite dev server). Against a deployed Azure dev URL there is no MSW worker
-  // and the mock endpoint `ep-msw-1` does not exist - so skip in that case.
+  // vite dev server) because it drives the mock endpoint `ep-msw-1`.
+  //
+  // The guard probes for that endpoint rather than inspecting the URL. The
+  // previous version skipped when E2E_BASE_URL did not start with
+  // `http://localhost`, which conflates "localhost" with "vite dev server with
+  // MSW" - a local Docker container is on localhost and is a REAL backend with
+  // no MSW, so the test ran and failed with a 5 s combobox timeout that looked
+  // like an SSE regression. Probing the actual precondition is correct on any
+  // target: local vite, local container, or a deployed URL.
+  //
   // Replacement coverage for the F3 SSE contract against real backends is
-  // already provided by the live-test 9z-V section (PII boundary + SSE event
-  // emission) plus the api/test/e2e/scim-event-sse-bridge.e2e-spec.ts E2E.
-  test.skip(
-    !!process.env.E2E_BASE_URL && !process.env.E2E_BASE_URL.startsWith('http://localhost'),
-    'MSW-only test; requires local vite dev server with VITE_USE_MSW=true. F3 contract is also locked by api/test/e2e/scim-event-sse-bridge.e2e-spec.ts + live-test 9z-V.',
-  );
+  // api/test/e2e/scim-event-sse-bridge.e2e-spec.ts + live-test 9z-V.
+  test.beforeEach(async ({ browser }) => {
+    // MSW intercepts inside the BROWSER (service worker), so the probe has to
+    // run in a page - a Node-side request could never observe it. Two earlier
+    // guards got this wrong: keying off `http://localhost` (a local Docker
+    // container is localhost but is a real backend), and fetching a UI path
+    // (SPA routing returns 200 for anything via the index.html fallback).
+    const ctx = await browser.newContext();
+    let mswPresent = false;
+    try {
+      const probe = await ctx.newPage();
+      await probe.goto('/');
+      // main.tsx awaits worker.start() before createRoot, but the service worker
+      // still has to activate, so the probe waits for the app to settle and
+      // retries rather than sampling once too early.
+      await probe.waitForLoadState('networkidle').catch(() => {});
+      for (let attempt = 0; attempt < 5 && !mswPresent; attempt++) {
+        mswPresent = await probe.evaluate(async () => {
+          try {
+            const res = await fetch('/scim/admin/endpoints/ep-msw-1', {
+              headers: { Authorization: 'Bearer msw-test-bearer' },
+            });
+            if (!res.ok) return false;
+            const body = await res.json();
+            return body?.id === 'ep-msw-1';
+          } catch {
+            return false;
+          }
+        });
+        if (!mswPresent) await probe.waitForTimeout(500);
+      }
+    } catch {
+      mswPresent = false;
+    } finally {
+      await ctx.close();
+    }
+
+    test.skip(
+      !mswPresent,
+      'MSW-only test: the mock endpoint ep-msw-1 is not being served to the page. ' +
+        'Requires a local vite dev server with VITE_USE_MSW=true. The F3 contract is ' +
+        'also locked by scim-event-sse-bridge.e2e-spec.ts + live-test 9z-V.',
+    );
+  });
 
   test('Tab A creates user, Tab B refetches WITHOUT manual reload', async ({ browser }) => {
     // Two independent BrowserContexts so each tab gets its own
