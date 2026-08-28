@@ -35,6 +35,46 @@ const SCHEME_NAME_BY_TYPE: Record<string, string> = {
   httpbasic: 'HTTP Basic',
 };
 
+/**
+ * N8 - method types the server actually ENFORCES, and may therefore advertise.
+ *
+ * Discovery is a promise. `ServiceProviderConfig.authenticationSchemes` tells a
+ * client which ways of authenticating this server accepts, and a client is
+ * entitled to pick one and rely on it. Advertising a scheme nothing implements
+ * is worse than not offering it: an integrator configures `mtls`, sees it in
+ * discovery, and only finds out it was decorative when requests are silently
+ * accepted by some *other* acceptor - or rejected with no explanation.
+ *
+ * This is an ALLOWLIST rather than a denylist of the three unenforced types, and
+ * that choice is the point. A denylist defaults a NEWLY ADDED method type to
+ * "advertised", so the next type someone registers before implementing it
+ * silently recreates this exact bug. An allowlist defaults it to "not
+ * advertised" until a human adds it here, which is the safe direction.
+ * `authentication-schemes.spec.ts` fails if a type known to the admin API is
+ * absent from BOTH this set and UNENFORCEABLE_METHOD_TYPES, so adding a type
+ * forces the decision instead of letting it default.
+ */
+export const ENFORCEABLE_METHOD_TYPES: ReadonlySet<string> = new Set([
+  'shared-secret',   // legacy global bearer acceptor
+  'bearer',          // per-endpoint opaque credential
+  'oauth-client',    // client_credentials at the per-endpoint token endpoint
+  'external-jwt',    // externally-issued JWT validated against a trust
+  'wif-7523',        // RFC 7523 jwt-bearer assertion
+  'wif-8693',        // RFC 8693 token exchange
+  'httpbasic',       // accepted at the TOKEN endpoint (client_secret_basic)
+]);
+
+/**
+ * N8 - declarable, but NOT enforced by any authenticator, so never advertised.
+ * Kept declarable so existing endpoint profiles that already name them keep
+ * loading; the value is documentary until an authenticator exists.
+ */
+export const UNENFORCEABLE_METHOD_TYPES: ReadonlyMap<string, string> = new Map([
+  ['mtls', 'no authenticator verifies a client certificate; ingress terminates TLS and the forwarded-header trust issue makes a header-based check unsound'],
+  ['dpop', 'RFC 9449 proof validation is not implemented (backlog item)'],
+  ['oauth-authcode', 'no authorization-code flow exists; there is no user-facing consent surface'],
+]);
+
 /** The canonical name of the auto-advertised WIF scheme (Q6.6). */
 const WIF_SCHEME_NAME = 'Workload Identity Federation';
 
@@ -78,7 +118,12 @@ export function computeAuthenticationSchemes(
   // exactly one primary below.
   const baselineClones = baseline.map((s) => ({ ...s, primary: false }));
 
-  const enabled = (authentication?.methods ?? []).filter((m) => m.enabled !== false);
+  // N8 - an enabled method is only advertised if the server can actually enforce
+  // it. An unenforceable method stays declared on the profile (and visible in the
+  // admin API) but contributes no scheme, because discovery is a promise.
+  const enabled = (authentication?.methods ?? [])
+    .filter((m) => m.enabled !== false)
+    .filter((m) => ENFORCEABLE_METHOD_TYPES.has(m.type));
 
   // Q6.6 - whether an enabled method already contributes a WIF scheme.
   const hasWifMethod = enabled.some((m) => m.type === 'wif-7523' || m.type === 'wif-8693');

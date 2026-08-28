@@ -30,8 +30,12 @@ const authBlockMutex = new KeyedMutex();
 /**
  * Registry of known authentication-method `type` values (architecture section
  * 1.3). A method's `type` must be one of these. `id` is server-assigned.
+ *
+ * Exported so `authentication-schemes.spec.ts` can assert every type here is
+ * classified as enforceable or explicitly unenforceable - adding a type must
+ * force that decision rather than let it default to being advertised (N8).
  */
-const KNOWN_METHOD_TYPES = new Set([
+export const KNOWN_METHOD_TYPES = new Set([
   'shared-secret',
   'bearer',
   'oauth-client',
