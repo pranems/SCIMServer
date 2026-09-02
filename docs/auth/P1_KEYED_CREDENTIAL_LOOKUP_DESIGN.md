@@ -244,6 +244,184 @@ Both narrow the window without changing behaviour for anyone.
 
 ---
 
+## 4A. End-to-end walkthrough with real data
+
+Everything below was **captured live from the dev estate on 2026-09-02**, not
+composed by hand. The secret shown belongs to a throwaway endpoint that was
+deleted immediately afterwards.
+
+### 4A.1 Step 1 - the operator mints a credential
+
+```text
+POST /scim/admin/endpoints/a02406b2-2c07-4b6a-a401-4b2a65f68a6e/credentials
+Authorization: Bearer <admin OAuth JWT>
+Content-Type: application/json
+```
+
+```json
+{
+  "credentialType": "bearer",
+  "label": "trace-demo"
+}
+```
+
+Response - **`201 Created`**. The `token` field appears exactly once, ever:
+
+```json
+{
+  "id": "73755a2a-f105-4546-bfcd-8410953054e8",
+  "endpointId": "a02406b2-2c07-4b6a-a401-4b2a65f68a6e",
+  "credentialType": "bearer",
+  "label": "trace-demo",
+  "description": null,
+  "active": true,
+  "createdAt": "2026-09-02T20:39:38.755Z",
+  "expiresAt": null,
+  "token": "scim_fd5588f6a959fa323b2e5f8f_ba30aofsycHo4CRox_mv-O9_euGSF0jZhSP__QkgHzM"
+}
+```
+
+### 4A.2 Anatomy of that token - and why the key is hex
+
+```text
+scim_fd5588f6a959fa323b2e5f8f_ba30aofsycHo4CRox_mv-O9_euGSF0jZhSP__QkgHzM
+|--|  |----------------------|  |-----------------------------------------|
+ |              |                                  |
+ |              |                                  +-- secret: 43 chars base64url
+ |              |                                      (32 random bytes = 256 bits)
+ |              +-- lookupKey: 24 chars HEX (12 random bytes), PUBLIC, indexed
+ +-- prefix: greppable by secret scanners
+```
+
+**Look at the real secret above: it contains `_` three times**
+(`...Ho4CRox_mv-O9_euGSF0jZhSP__QkgHzM`). The base64url alphabet is
+`A-Z a-z 0-9 - _`, so the separator character occurs *inside* the secret for
+roughly half of all generated values.
+
+This is not hypothetical. Splitting that captured token naively on `_` yields a
+"secret" of **17 characters** instead of 43:
+
+| Parse method | Recovered secret length | Correct? |
+|---|---:|---|
+| `split('_')[2]` | 17 | **no - truncated** |
+| everything after the **second** `_` | **43** | yes |
+
+Had the lookup key also been base64url, the key itself could contain `_` and the
+boundary would be genuinely ambiguous - the token would fail to parse for a large
+fraction of issued credentials. **Hex shares no character with the separator**,
+which is why the key is hex while the secret stays base64url. The round-trip unit
+test (`P1-T1`) caught this on its very first run, before any integration existed.
+
+### 4A.3 What is persisted - the actual row
+
+`EndpointCredential` after the create above:
+
+| Column | Value | Note |
+|---|---|---|
+| `id` | `73755a2a-f105-4546-bfcd-8410953054e8` | |
+| `endpointId` | `a02406b2-2c07-4b6a-a401-4b2a65f68a6e` | re-checked at auth time |
+| `credentialType` | `bearer` | |
+| `lookupKey` | `fd5588f6a959fa323b2e5f8f` | **UNIQUE index** - this is what makes it O(1) |
+| `secretHash` | `<64 hex chars>` | `HMAC-SHA256(pepper, secret)` |
+| `hashAlgo` | `hmac-sha256-v1` | selects the verifier |
+| `credentialHash` | `p1-keyed-see-secretHash` | placeholder; the legacy column is NOT NULL |
+| `active` | `true` | |
+
+**The secret itself appears nowhere in that row** - only its HMAC. Because the
+HMAC is peppered with a server-side key held outside the database, a dump of this
+table alone is not sufficient to verify tokens offline. That is the one property
+bcrypt gave us for free, and that a bare SHA-256 would have lost.
+
+### 4A.4 Step 2 - an authenticated request, stage by stage
+
+```text
+GET /scim/endpoints/a02406b2-2c07-4b6a-a401-4b2a65f68a6e/Users?count=1
+Authorization: Bearer scim_fd5588f6a959fa323b2e5f8f_ba30aofsycHo4CRox_mv-O9_euGSF0jZhSP__QkgHzM
+```
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as SharedSecretGuard
+    participant A as EndpointCredentialAuthenticator
+    participant DB as EndpointCredential
+    participant R as "SCIM handler"
+
+    C->>G: "GET /Users with Bearer scim_fd55..."
+    G->>A: "probe, order 10"
+    A->>A: "endpointId present? yes"
+    A->>A: "endpoint enables bearer? yes"
+    A->>A: "looksLikeJwt? NO - so not the OAuth path"
+    A->>A: "equals global shared secret? NO"
+    A->>A: "parse prefix, split into key + secret"
+    A->>DB: "findActiveByLookupKey fd5588f6a959fa323b2e5f8f"
+    DB-->>A: "exactly ONE row - unique index"
+    A->>A: "row endpointId matches route? yes"
+    A->>A: "hashAlgo is hmac-sha256-v1? yes"
+    A->>A: "HMAC with pepper, then timingSafeEqual"
+    A-->>G: "accept, credentialId 73755a2a"
+    G->>R: "authenticated"
+    R-->>C: "200 OK"
+```
+
+Measured on dev: **588 ms** for that request cold, and **72 ms** for a rejected
+wrong token. The rejection is the number that matters - it is the path an
+unauthenticated attacker can drive, and pre-P1 it cost `N x 287 ms`.
+
+### 4A.5 The four ways it can fail, and why each is distinct
+
+All of these return `not-applicable` - the guard falls through to the next
+authenticator - **except** the secret mismatch, which records a `fail` for the
+decision trace.
+
+| # | Condition | Check | Why it is separate |
+|---|---|---|---|
+| 1 | token is not `scim_<hex>_<...>` | `parseCredentialToken` returns `null` | Legacy tokens must fall through to the bcrypt scan. A **throw** here would turn every pre-P1 credential into a 500 - which is why the parser returns null and never throws (9 unit cases cover exactly this) |
+| 2 | key unknown | `findActiveByLookupKey` returns `null` | No HMAC is computed at all; an unknown key costs one indexed miss |
+| 3 | **key resolves to another endpoint** | `row.endpointId !== endpointId` | `lookupKey` is **globally** unique, so without this a stolen token would authenticate against *any* endpoint |
+| 4 | secret mismatch | `timingSafeEqual` fails | Deliberately does **not** fall back to the scan - that would restore the amplification with a DB read on top |
+
+Case 3 deserves a second look: the uniqueness that makes the lookup O(1) is
+exactly what makes the endpoint re-check mandatory.
+
+### 4A.6 Side by side, same request
+
+```mermaid
+flowchart TB
+  subgraph BEFORE["BEFORE P1 - O(N) x bcrypt"]
+    B1["wrong token"] --> B2["load ALL active credentials"]
+    B2 --> B3["bcrypt compare 1 - 287 ms"]
+    B3 --> B4["bcrypt compare 2 - 287 ms"]
+    B4 --> B5["... every credential ..."]
+    B5 --> B6["reject after N x 287 ms<br/>10 credentials = 2,866 ms"]
+  end
+  subgraph AFTER["AFTER P1 - keyed"]
+    A1["wrong token"] --> A2{"parses as a keyed token?"}
+    A2 -->|no| A3["scan, skipping migrated rows"]
+    A2 -->|yes| A4["ONE indexed lookup"]
+    A4 --> A5["reject - 32 ms measured on dev"]
+  end
+  style B6 fill:#ffe6e6
+  style A5 fill:#e6ffe6
+```
+
+**A mismatch costs the maximum**, because every credential is tried before
+rejecting. That is what made it an amplifier rather than a latency nuisance.
+
+### 4A.7 A legacy credential, for contrast
+
+A credential issued before v0.55.16 has `lookupKey = NULL`,
+`hashAlgo = 'bcrypt'`, and a real bcrypt hash in `credentialHash`. Its token is a
+bare 43-character base64url string with no `scim_` prefix, so the parse returns
+`null` and it takes the legacy path - which now **skips** rows already migrated,
+so the scan shrinks as rotation progresses.
+
+Verified end to end during the upgrade rehearsal: a database at 18 migrations was
+seeded with a legacy row, the **container** applied migration 19 at start, and the
+row came out with `hashAlgo=bcrypt` / `lookupKey=<null>` and kept authenticating.
+
+---
+
 ## 5. What this does NOT solve
 
 Stated explicitly so the doc cannot be read as claiming more than it delivers:
