@@ -51,7 +51,7 @@ import type {
   WifDebugAssertionResponse,
   WifDebugTrustResult,
 } from '../../../shared/types/wif-debug.types';
-import { mintCredentialToken, mintOAuthClientSecret, P1_KEYED_HASH_PLACEHOLDER } from '../../../security/credential-token';
+import { mintCredentialToken, mintOAuthClientSecret, P1_KEYED_HASH_PLACEHOLDER, HASH_ALGO_BCRYPT } from '../../../security/credential-token';
 import { getConfigBoolean, getConfigNumber, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, ENDPOINT_CONFIG_FLAGS_DEFINITIONS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
@@ -709,6 +709,11 @@ export class AdminCredentialController {
       active: c.active,
       createdAt: c.createdAt,
       expiresAt: c.expiresAt,
+      // P1 phase 4: which verifier this row needs, so the migration report is
+      // actionable. It says how many are legacy; without this it cannot say
+      // WHICH, and rotating the wrong live credential is the expensive mistake.
+      // Public by nature - an algorithm name reveals nothing the token does not.
+      hashAlgo: c.hashAlgo ?? HASH_ALGO_BCRYPT,
       // Q1: expose the PUBLIC client_id for oauth_client credentials so the UI
       // can show it. The secret is never stored and never returned in a list.
       ...(c.credentialType === 'oauth_client' && c.metadata?.clientId

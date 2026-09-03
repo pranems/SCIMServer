@@ -1,6 +1,6 @@
 # Schema Attribute Customization Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.18`
+> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.19`
 
 > **Version**: 1.1 - **Date**: 2026-08-04 - **Status**: Complete (PATCH merge semantics re-verified against `mergeProfilePartial()` on 2026-08-04; the full line-by-line source pass dates from v0.40.0)  
 > **Audience**: Operators, ISV admins, Entra ID integration engineers  

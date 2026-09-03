@@ -882,6 +882,49 @@ describe('AdminCredentialController', () => {
       const result = await controller.listCredentials(mockEndpoint.id);
       expect(result).toEqual([]);
     });
+
+    it('P4-L1: reports hashAlgo so the migration report is ACTIONABLE, not just countable', async () => {
+      // The phase-4 status endpoint says how many legacy credentials remain; it
+      // cannot say WHICH. Without this field an operator reading "4 legacy" has
+      // to guess which rows to rotate, and guessing is how the wrong live
+      // credential gets rotated.
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([
+        { ...mockCredential, id: 'legacy-1', hashAlgo: 'bcrypt' },
+        { ...mockCredential, id: 'keyed-1', hashAlgo: 'hmac-sha256-v1' },
+      ]);
+
+      const result = await controller.listCredentials(mockEndpoint.id);
+
+      expect(result[0].hashAlgo).toBe('bcrypt');
+      expect(result[1].hashAlgo).toBe('hmac-sha256-v1');
+    });
+
+    it('P4-L2: a row with no hashAlgo reports bcrypt, mirroring the column default', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([
+        { ...mockCredential, id: 'pre-p1', hashAlgo: undefined },
+      ]);
+
+      const result = await controller.listCredentials(mockEndpoint.id);
+
+      expect(result[0].hashAlgo).toBe('bcrypt');
+    });
+
+    it('P4-L3: exposing hashAlgo must not leak the hash or the lookup key', async () => {
+      mockCredentialRepo.findByEndpoint.mockResolvedValue([
+        {
+          ...mockCredential,
+          hashAlgo: 'hmac-sha256-v1',
+          lookupKey: '700f9dedc3a004fc8f2f494e',
+          secretHash: 'deadbeef'.repeat(8),
+        },
+      ]);
+
+      const result = await controller.listCredentials(mockEndpoint.id);
+
+      expect(result[0]).not.toHaveProperty('credentialHash');
+      expect(result[0]).not.toHaveProperty('secretHash');
+      expect(result[0]).not.toHaveProperty('lookupKey');
+    });
   });
 
   describe('revokeCredential', () => {

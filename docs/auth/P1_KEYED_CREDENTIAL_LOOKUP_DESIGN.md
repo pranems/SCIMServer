@@ -333,6 +333,43 @@ existing and future rows without a data migration. `P4-S9`, `P4-S10` and
 `hmac-sha256-v1` and not a secretless type counts as legacy, so introducing a
 third algorithm cannot silently open the gate (`P4-S6`).
 
+**The credential list reports `hashAlgo`,** so the report is actionable rather
+than merely countable. Knowing "4 legacy remain" without knowing *which four* is
+how the wrong live credential gets rotated.
+
+### 4.5 Phase 5 as originally specified is UNREACHABLE - the gate needs changing
+
+Using the phase-4 report immediately falsified the phase-5 plan, which is what
+phase 4 was for.
+
+**`legacy.total === 0` can never become true through any exposed action:**
+
+| Action | Effect on a legacy row |
+|---|---|
+| `POST .../rotate` | deactivates it and creates a **new** keyed row - the legacy row remains, now inactive (`P4-X5` asserts `legacy.total` is unchanged) |
+| `DELETE .../credentials/:id` | soft-deactivate only - sets `active=false`, row remains |
+| *(nothing)* | there is **no hard-delete route**; `credentialRepo.delete()` is not exposed |
+
+So every migration path converts *active* legacy into *inactive* legacy, and
+§4.4 rule 1 deliberately counts inactive rows. **The gate is shut permanently by
+its own success criterion** - the second time this measurement corrected a
+belief that reasoning alone had not.
+
+**Recommended change to phase 5** (not yet applied - it is a one-way decision):
+
+1. **Gate on `legacy.active === 0`**, which rotation *can* achieve, and which is
+   also the honest security condition: the O(N) bcrypt scan only ever iterated
+   **active** credentials, so active-zero is when the amplification is actually
+   gone.
+2. **Make `activateCredential` refuse to reactivate a legacy row** once the
+   verifier is deleted, failing closed with a message telling the operator to
+   rotate instead. That removes the hazard rule 1 exists to prevent, without
+   requiring anything to be deleted.
+
+This is strictly safer than the original plan *and* achievable: it keeps the
+credential audit trail intact - hard-deleting rows to satisfy a gate would be
+destroying history to make a number look right.
+
 ---
 
 ## 4A. End-to-end walkthrough with real data

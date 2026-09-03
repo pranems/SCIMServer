@@ -206,6 +206,38 @@ reading "confirm the tail is empty" would have been discharged by a number that 
 in the safe direction, and nothing guarantees the next miscount is as harmless. Phase 5 stays gated
 on this report, and the report now has its own regression tests (`P4-S9`, `P4-S10`, `P4-X9`).
 
+**Then USING the report falsified phase 5 itself (2026-09-03).** `legacy.total === 0` is unreachable
+through any exposed action: rotation deactivates the old row and creates a new one, `DELETE` is a
+soft-deactivate, and no hard-delete route exists. Every path converts *active* legacy into *inactive*
+legacy, which the gate deliberately counts - **so the gate is shut permanently by its own success
+criterion.** The recommended change (gate on `legacy.active === 0`, and make `activate` refuse to
+reactivate a legacy row once the verifier is gone) is written up in
+[P1_KEYED_CREDENTIAL_LOOKUP_DESIGN.md](P1_KEYED_CREDENTIAL_LOOKUP_DESIGN.md) §4.5 and **not yet
+applied** - it is a one-way decision. This is the second belief the same report corrected in two
+days, both of which survived design review and died on contact with real data.
+
+**External-traffic audit (2026-09-03), before any credential is rotated.** Rotation invalidates the
+current secret, so "who is actually calling this endpoint" had to be answered from evidence rather
+than assumed. Source addresses were read from the retained request logs on both reachable estates:
+
+| Estate | Endpoint holding legacy rows | Requests | Source |
+|---|---|---|---|
+| dev | `PRTest-Auth-Methods-ISV-1` (4) | 0 | - |
+| dev | `shape-per-endpoint-creds` (1) | 0 | - |
+| canary | `PRTest-Auth-Methods-ISV-1` (4) | 4 | ours |
+| canary | `shape-per-endpoint-creds` (1) | 4 | ours |
+| **canary** | **`Test-AV_CustomExtension_ScalarMV` (1)** | **1,000** | **966 from `20.190.174.40` + `40.126.18.174` - live Microsoft Entra ID provisioning** |
+
+The Entra traffic is unmistakable: `userName eq "AzureAD..."` filters, `Groups?excludedAttributes=members`
+syncs, and `POST .../oauth/token` against the endpoint's own credential. **Rotating that one
+credential would break a live provisioning integration.** Every other legacy row sits behind an
+endpoint that only this machine has touched.
+
+Two caveats worth keeping: our own egress is a **NAT pool** (`40.117.66.208-215`, eight rotating
+addresses), so identifying "us" by a single IP under-counts badly; and request logs have ~30-day
+retention, so "no external traffic" means *none in the retained window* - a quarterly integration
+would not appear.
+
 ### 2.4 Structure and configuration
 
 *Purpose: how auth config is modelled, not what it does.*
