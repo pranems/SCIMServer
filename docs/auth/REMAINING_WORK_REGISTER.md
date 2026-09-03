@@ -89,6 +89,32 @@ globally, so a connector set to that type fails against SCIMServer today.
 | **N12** | Auth-admin events log `credentialId: [REDACTED]`, so the audit trail cannot say *which* credential changed | credential audit | Med | - |
 | **D1** | `admin-credential.controller.ts` is **1,221 lines** and carries credential CRUD, rotate, reveal, activate, the WIF resolve/verify/debug trio, and now the P2 caps - well past the ~400-line / ~5-responsibility god-class threshold | credential admin plane | Med | - . **Raised by the 2026-08-27 Stage 3c.1 / DA-gate pass; disposition (b) SCHEDULED, not applied.** Splitting it inside a deploy-bound change carries real regression risk in the exact file that just produced the orphaned-decorator defect (I-42). The natural seam is to lift the three `wif/*` diagnostic routes into their own controller, which is ~40% of the file and shares no state with credential CRUD. |
 | **D2** | `web/e2e/sse-cross-tab.spec.ts` **has never run anywhere** | Playwright | Med | - . Found 2026-08-27 while validating P1 against a local container. `web/public/mockServiceWorker.js` **was never committed** (0 commits; the `public/` directory does not exist), so `worker.start()` cannot succeed and the MSW mock endpoint `ep-msw-1` is never served - even on a local vite dev server. The old skip guard keyed off `!E2E_BASE_URL.startsWith('http://localhost')`, which **conflates "localhost" with "vite dev server with MSW"**, so it hid the problem on deployed targets and produced a *false failure* on a local Docker container (a 5 s combobox timeout that reads like an SSE regression). The guard now probes for MSW **in the page** and skips honestly. Generating the worker makes the spec RUN and then FAIL, so it is stale beyond the missing asset. **Decide: fix or retire.** The F3 SSE contract is already covered by `scim-event-sse-bridge.e2e-spec.ts` + live-test `9z-V`, so retiring loses nothing. |
+| **D3** | **Revision pruning can silently consume the rollback slot**, leaving a prod estate with no way back | deploy tooling | **High** | - . Found 2026-09-03 during the v0.55.18 canary promote; **repaired by hand on proudbush, not yet fixed in the tooling.** See below. |
+
+**D3 - the prune keeps the newest N, which is not the same as keeping a rollback target.**
+[prune-revisions.ps1](../../scripts/prune-revisions.ps1) retains the newest `revisionKeep` revisions
+by creation time. That is only equivalent to "serving + rollback target" while every retained
+revision runs a *different* image. On the v0.55.18 canary promote an interrupted first attempt left
+an orphan green revision at 0%, so the two newest revisions were **both v0.55.18** - the prune then
+deactivated `green-0902-2136`, the only v0.55.17 revision, and the estate was left with **no rollback
+target at all** while every check reported success. The `revisionKeep: 2` policy was satisfied to the
+letter (2 active) and defeated in purpose.
+
+Two distinct defects, both worth fixing:
+
+1. **The prune is image-blind.** It should keep the serving revision plus the newest revision running
+   a **different image digest** - that is what a rollback target *is*. Keeping two copies of the
+   version just deployed is never useful.
+2. **The promote summary is computed before the prune runs**, so it printed
+   `Instant rollback: ... --revision-weight scimserver--green-0902-2136=100` naming a revision the
+   prune had deactivated three lines earlier. **A rollback command that cannot work is worse than
+   none**, because it is consulted under pressure and reads authoritative. Compute the summary after
+   the prune, or have the promote pass the blue revision to the prune as protected.
+
+Repaired on proudbush by deactivating the duplicate orphan and reactivating the v0.55.17 revision;
+verified 0.55.18 still serving 100% with 0.55.17 retained at 0%. **Both fixes belong in the tooling
+with a negative control** (a prune run where the two newest revisions share a digest must retain an
+older, different one), in the style of the existing `Test-ScimEstateRegistry` R8 controls.
 
 **N6 is the one with a live trigger.** `workloadIdentityFirstPartyApplicationIsDefault` is on for
 `slice:A` and `slice:B` and off globally, and the two modes emit `api://<appId>` versus
