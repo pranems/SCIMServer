@@ -78,7 +78,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 17 boolean flags + logLevel + PrimaryEnforcement (19 flags) + helpers
+  endpoint-config.interface.ts                           # 21 boolean flags + 3 enum + 14 numeric (38 settings) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -360,7 +360,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 - Unified `Endpoint.profile` JSONB replaces fragmented `config` + `EndpointSchema` + `EndpointResourceType`
 - 6 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only, user-only-with-custom-ext)
 - RFC-native SCIM discovery format as configuration input with auto-expand + tighten-only validation
-- New API: `GET /admin/profile-presets` (read-only, 5 presets)
+- New API: `GET /admin/profile-presets` (read-only, 6 presets)
 - Prisma schema: 5 models (Endpoint, RequestLog, ScimResource, ResourceMember, EndpointCredential)
 - 28 files deleted (~4,800 lines removed), 13 new files created
 - Design doc: `SCHEMA_TEMPLATES_DESIGN.md` (2,349 lines, 47 code blocks, 19 Mermaid diagrams)
