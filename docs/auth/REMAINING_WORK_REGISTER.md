@@ -128,6 +128,30 @@ wired into pre-push as `deploy: revision retention selector` - deploy tooling ge
 the app's test suites, so an ungated selector is one nobody would notice breaking. `PR-T2` is the D3
 regression itself, built from the real revision names and timestamps of the incident.
 
+**Proven in production on the very next promote (v0.55.19, 2026-09-03).** The first promote attempt
+terminated mid-verification and left an orphan green revision carrying the **same image** as the one
+being deployed - reproducing the D3 setup exactly, by accident. The relaunched promote's prune then
+printed:
+
+```text
+rollback target: scimserver--green-0903-0320
+KEEP   scimserver--green-0903-1458   14:59  <- serving 100%   (0.55.19)
+PRUNE  scimserver--green-0903-1357   13:58                    (0.55.19 - same image, the orphan)
+KEEP   scimserver--green-0903-0320   03:21                    (0.55.18 - different image)
+PRUNE  scimserver--green-0902-2136   21:37                    (0.55.17)
+```
+
+The pre-D3 selector would have kept **1458 + 1357, both 0.55.19**, and pruned 0320 - destroying the
+rollback target exactly as it did the day before. The image-aware selector skipped the duplicate and
+retained a real one, and the summary's `Blue rev:` named `0903-0320` because it is now **read back
+from Azure** rather than inferred. Both halves of the fix demonstrated on a live estate rather than
+only in the self-test.
+
+**Also confirmed: an interrupted blue/green is safe by construction.** When the first attempt died
+mid-verification, the estate was left with blue (0.55.18) still serving 100% and the new green at 0%
+- the flip had not happened. A verification that never completes cannot promote, which is the
+property the design depends on.
+
 **N6 is the one with a live trigger.** `workloadIdentityFirstPartyApplicationIsDefault` is on for
 `slice:A` and `slice:B` and off globally, and the two modes emit `api://<appId>` versus
 `api://<appId>/<host>`. A slice rollout would present as an audience-mismatch `401` with **no
