@@ -45,6 +45,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'revision-selection.ps1')
 
 # Resolve the retention policy from the registry unless the caller pinned it.
 $keepSource = 'explicit -Keep'
@@ -79,7 +80,8 @@ if (-not $raw) { throw "Could not list revisions for $AppName in $ResourceGroup.
 $active = @($raw | ConvertFrom-Json | Where-Object { $_.properties.active } |
     Select-Object @{n = 'name'; e = { $_.name } },
                   @{n = 'traffic'; e = { [int]$_.properties.trafficWeight } },
-                  @{n = 'created'; e = { [datetime]$_.properties.createdTime } })
+                  @{n = 'created'; e = { [datetime]$_.properties.createdTime } },
+                  @{n = 'image'; e = { $_.properties.template.containers[0].image } })
 
 if ($active.Count -eq 0) { throw "$AppName has no active revisions - refusing to act." }
 
@@ -88,19 +90,28 @@ if ($serving.Count -eq 0) {
     throw "$AppName has no revision serving traffic - refusing to prune a broken app."
 }
 
-# Newest first. Anything serving traffic is retained regardless of age.
 $ordered = @($active | Sort-Object created -Descending)
-$keepNames = [System.Collections.Generic.HashSet[string]]::new()
-foreach ($r in $serving) { [void]$keepNames.Add($r.name) }
-foreach ($r in $ordered) {
-    if ($keepNames.Count -ge $Keep) { break }
-    [void]$keepNames.Add($r.name)
-}
+$keepNames = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]]@(Select-RevisionsToKeep -Revisions $active -Keep $Keep),
+    [StringComparer]::OrdinalIgnoreCase)
 
 $toDeactivate = @($ordered | Where-Object { -not $keepNames.Contains($_.name) })
 
 Write-Host ("  active: {0}   keeping: {1}   deactivating: {2}" -f `
         $active.Count, $keepNames.Count, $toDeactivate.Count)
+
+# Name the rollback target explicitly. Retaining N revisions is not the same as
+# retaining something to roll back TO, and conflating the two is what left the
+# canary with no way back on 2026-09-03 (D3).
+$servingImages = @($serving | ForEach-Object { $_.image })
+$rollback = @($ordered | Where-Object {
+        $keepNames.Contains($_.name) -and $_.traffic -eq 0 -and $servingImages -notcontains $_.image
+    })
+if ($rollback.Count -gt 0) {
+    Write-Host ("  rollback target: {0}" -f $rollback[0].name) -ForegroundColor DarkGray
+} elseif ($Keep -ge 2) {
+    Write-Host "  rollback target: NONE - every retained revision runs the serving image. Recovery is roll-forward." -ForegroundColor Yellow
+}
 
 foreach ($r in $ordered) {
     $mark = if ($keepNames.Contains($r.name)) { 'KEEP  ' } else { 'PRUNE ' }

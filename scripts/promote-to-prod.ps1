@@ -769,6 +769,20 @@ if (Test-Path $pruneScript) {
     }
 }
 
+# D3 (2026-09-03): ASK whether blue survived rather than inferring it from the
+# retention number. On the v0.55.18 canary promote `$revisionKeep -ge 2` was
+# true while the prune had just deactivated blue - so the summary printed an
+# instant-rollback command naming a revision that could not serve. A rollback
+# command that cannot work is worse than none: it is read under pressure and
+# looks authoritative.
+try {
+    $blueState = az containerapp revision show -n $ProdAppName -g $ProdResourceGroup `
+        --revision $blueRevision --query "properties.active" -o tsv 2>$null
+    $blueRetained = ("$blueState".Trim() -eq 'true')
+} catch {
+    $blueRetained = $false
+}
+
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host "  ✅ Promotion Complete (TRUE blue/green)" -ForegroundColor Green
@@ -779,7 +793,7 @@ Write-Host "   Green rev:  $greenRevision (100% traffic)" -ForegroundColor White
 if ($blueRetained) {
     Write-Host "   Blue rev:   $blueRevision (0% - retained for instant rollback)" -ForegroundColor White
 } else {
-    Write-Host "   Blue rev:   $blueRevision (DEACTIVATED - this estate keeps $revisionKeep revision)" -ForegroundColor Yellow
+    Write-Host "   Blue rev:   $blueRevision (NOT ACTIVE - verified after the prune; revisionKeep=$revisionKeep)" -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "📋 Post-promotion:" -ForegroundColor Cyan
@@ -787,9 +801,9 @@ if ($blueRetained) {
     Write-Host "   - Instant rollback: az containerapp ingress traffic set -n $ProdAppName -g $ProdResourceGroup --revision-weight $blueRevision=100 $greenRevision=0" -ForegroundColor Gray
 } else {
     # Printing the instant-rollback command here would be worse than printing
-    # nothing: it names a revision that no longer exists, so an operator would
+    # nothing: it names a revision that is not active, so an operator would
     # discover that only while trying to recover.
-    Write-Host "   - NO instant rollback on this estate (revisionKeep=$revisionKeep). Recover by ROLLING FORWARD:" -ForegroundColor Yellow
+    Write-Host "   - NO instant rollback: $blueRevision is not active. Recover by ROLLING FORWARD:" -ForegroundColor Yellow
     Write-Host "       pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup $ProdResourceGroup -ProdAppName $ProdAppName -ImageTag <previous-version>" -ForegroundColor Gray
     Write-Host "       (every previously published tag remains available from ghcr.io/pranems/scimserver)" -ForegroundColor Gray
 }

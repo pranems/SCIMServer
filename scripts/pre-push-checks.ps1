@@ -278,6 +278,16 @@ Invoke-Gate -Name 'docs: patterns pie matches catalog' -WorkingDir $repoRoot -Ac
     node scripts/check-patterns-pie.mjs 2>&1 | Out-Host
 }
 
+# D3 (2026-09-03): the prune retained the newest N revisions by creation time,
+# which only means "serving + rollback target" while those revisions run
+# DIFFERENT images. An interrupted promote left a same-image orphan, so the two
+# newest were both the new version and the prune deactivated the only revision
+# worth rolling back to - with every check green. Deploy tooling gets no
+# feedback from the app's own test suites, so its selector is gated here.
+Invoke-Gate -Name 'deploy: revision retention selector' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test-prune-revisions.ps1') 2>&1 | Out-Host
+}
+
 # Offline-only checks (C1-C5): coverage, SHA-256 integrity, update/obsolete
 # closure, freshness and README linkage. The network checks (O1-O3) are NOT run
 # here on purpose - pre-push must stay deterministic and work offline. They run
