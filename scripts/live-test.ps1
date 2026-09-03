@@ -15707,10 +15707,16 @@ try {
     # The credential list must report hashAlgo, or the report says how many are
     # legacy without saying WHICH - and guessing is how the wrong live
     # credential gets rotated.
+    #
+    # The served version is quoted in the failure because a stale binary on the
+    # target fails this assertion IDENTICALLY to a broken feature, and that
+    # ambiguity cost a debugging cycle on 2026-09-03 (a leftover node still held
+    # port 6000, so the suite validated the previous build).
+    $cmVer = try { (Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Headers $headers).version } catch { 'unknown' }
     $cmCreds = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId/credentials" -Headers $headers
     $cmKeyed = @($cmCreds | Where-Object { $_.hashAlgo -eq 'hmac-sha256-v1' })
     Test-Result -Success ($cmKeyed.Count -ge 1) `
-        -Message "9z-CM.T11: the credential list reports hashAlgo (the minted credential is hmac-sha256-v1)"
+        -Message "9z-CM.T11: the credential list reports hashAlgo (the minted credential is hmac-sha256-v1) [served version $cmVer]"
     $cmLeaked = @($cmCreds | Where-Object { $_.PSObject.Properties.Name -contains 'credentialHash' -or $_.PSObject.Properties.Name -contains 'secretHash' -or $_.PSObject.Properties.Name -contains 'lookupKey' })
     Test-Result -Success ($cmLeaked.Count -eq 0) `
         -Message "9z-CM.T12: exposing hashAlgo did not leak the hash, secretHash or lookupKey"

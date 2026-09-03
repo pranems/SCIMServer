@@ -19,6 +19,20 @@ web/dist
 coverage/
 .nyc_output
 
+# Test + run output. These are gitignored working directories that grow without
+# bound, and the build context is transferred to the daemon BEFORE any layer is
+# evaluated - so they are pure latency. Measured 2026-09-03: api/logs alone was
+# 1,294 MB and dominated a 1.42 GB context, which cost ~11 minutes per local
+# `docker compose build` before anything compiled.
+#
+# The `**/` prefix matters: a bare `logs/` matches only the ROOT logs directory,
+# which is why the first attempt at this fix changed nothing measurable.
+test-results/
+standalone/
+**/logs
+**/test-artifacts
+playwright-report/
+
 # Prisma-generated client (regenerated inside the image by `npx prisma generate`).
 # Must be excluded so that worktree junction/symlink at api/src/generated/
 # does not poison the build context.
