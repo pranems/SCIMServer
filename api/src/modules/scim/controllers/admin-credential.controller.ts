@@ -2,7 +2,8 @@
  * AdminCredentialController - Admin API for managing per-endpoint SCIM credentials.
  *
  * Phase 11: Provides CRUD endpoints to create, list, and revoke per-endpoint
- * bearer tokens. Tokens are bcrypt-hashed before storage; the plaintext is
+ * bearer tokens. Secrets are minted as keyed tokens and stored as a peppered
+ * HMAC; the plaintext is
  * returned only once at creation time.
  *
  * Gated behind the `PerEndpointCredentialsEnabled` per-endpoint config flag.
@@ -30,7 +31,6 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as crypto from 'node:crypto';
-import * as bcrypt from 'bcrypt';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
@@ -64,7 +64,9 @@ import {
   type ScimCredentialEventPayload,
 } from '../../stats/scim-events';
 
-const BCRYPT_SALT_ROUNDS = 12;
+// P1: this controller no longer hashes anything. Both credential types are
+// minted as keyed tokens with a peppered HMAC, so bcrypt survives only in the
+// VERIFIERS, for rows issued before the migration.
 
 interface CreateCredentialDto {
   label?: string;
@@ -1041,11 +1043,10 @@ export class AdminCredentialController {
     // refusing it at the cap would block the one operation you most want an
     // operator to be able to perform on a compromised secret.
     //
-    // P1 - rotation IS the migration path. A legacy bcrypt bearer credential
-    // comes back in the keyed format, so the existing operator workflow upgrades
-    // rows with no new concept to learn. oauth_client keeps its readable
-    // `client-secret-<uuid>` form and bcrypt (it is a token-endpoint secret, not
-    // a resource-plane bearer).
+    // P1 - rotation IS the migration path. A legacy bcrypt credential of either
+    // type comes back keyed, so the existing operator workflow upgrades rows
+    // with no new concept to learn. oauth_client keeps its readable
+    // `client-secret-` prefix (operator request) and gains a lookup key.
     const isOauth = old.credentialType === 'oauth_client';
 
     let plaintext: string;
