@@ -17,16 +17,19 @@
 > | 10 active credentials | 2,866 ms | **7 ms (measured)** |
 > | 25 active credentials | 7,165 ms | ~7 ms |
 >
-> **Scope of this increment:** `bearer` credentials only - the type actually
-> presented as a resource-plane bearer, and therefore the one that drove the
-> scan. `oauth_client` keeps its readable `client-secret-<uuid>` form and bcrypt:
-> that secret is presented at the **token endpoint**, not as a resource bearer,
-> and the readable form was an explicit operator request. Migrating it is a
-> separate decision, tracked below.
+> **Scope of this increment:** **both credential types are now keyed.** `bearer`
+> shipped in v0.55.16; `oauth_client` followed in **v0.55.17** using the **hybrid**
+> format, which keeps the readable `client-secret-` prefix the operator asked for
+> AND adds a lookup key:
 >
-> Legacy rows still verify via bcrypt until rotated, and the scan now **skips**
-> rows already migrated - so the remaining cost shrinks as rotation progresses
-> rather than staying flat.
+> | Type | Format | Shipped |
+> |---|---|---|
+> | `bearer` | `scim_<24 hex>_<43 base64url>` | v0.55.16 |
+> | `oauth_client` | `client-secret-<24 hex>-<43 base64url>` | **v0.55.17** |
+>
+> Legacy rows of **both** types still verify via bcrypt until rotated, and the
+> scan now **skips** rows already migrated - so the remaining cost shrinks as
+> rotation progresses rather than staying flat.
 
 ---
 
@@ -225,13 +228,48 @@ months, probably fine" is the reasoning that produced the EOL-Node escape.
 
 ### 4.2 Still on bcrypt after this increment
 
-- **`oauth_client` secrets.** Presented at the token endpoint, and their readable
-  `client-secret-<uuid>` form was an explicit operator request. They remain in the
-  legacy scan, so an endpoint with `oauth_client` credentials still pays
-  N x 287 ms for a wrong token. With the default cap of 5 that is ~1.4 s rather
-  than the ~2.9 s it was with both types. **Deciding whether to migrate them is
-  the next P1 question** and needs the operator's view on the readable format.
-- **Pre-P1 `bearer` rows**, until rotated.
+- **Pre-P1 rows of both types**, until rotated. `bearer` credentials issued before
+  v0.55.16 and `oauth_client` secrets issued before v0.55.17 keep their bcrypt
+  hash and keep working; rotation upgrades them in place.
+
+### 4.3 The hybrid `oauth_client` format (v0.55.17)
+
+The original P1 increment left `oauth_client` on bcrypt because its secret is
+presented at the **token endpoint** rather than as a resource bearer, and because
+the readable `client-secret-<uuid>` form was an explicit operator request. The
+operator chose the **hybrid**, which gives up neither property:
+
+```text
+client-secret-700f9dedc3a004fc8f2f494e-k-E2PBpYxc7hftEKX-Ru_vKFWQfmFFE2AjBrKAr-E94
+|------------| |----------------------| |-----------------------------------------|
+      |                    |                              |
+      |                    |                              +-- secret, 43 chars base64url
+      |                    +-- lookupKey, 24 chars HEX
+      +-- the readable prefix, preserved
+```
+
+**The hex key matters even more here than on the bearer format.** The separator
+is `-`, and the base64url alphabet **contains** `-` - the real captured secret
+above has four of them. A hex key cannot contain `-`, so the boundary is
+unambiguous and the secret is simply everything after it.
+
+Hex also gives the migration its safety property for free: **a legacy
+`client-secret-<uuid>` can never false-match**, because a UUID's longest run of
+hex is 12 characters (the final group) and the key needs 24. If it *could* match,
+a legacy secret would be looked up by a bogus key, miss, and stop authenticating
+- a silent customer outage. `P1-H7` asserts this over 500 real UUIDs rather than
+arguing it.
+
+**Where it is verified.** The token endpoint
+([client-secret-token-provider.ts](../../api/src/modules/scim/controllers/client-secret-token-provider.ts))
+still selects the candidate by `clientId` - that is the contract the caller
+presents - and then verifies with one HMAC when the row is keyed, or bcrypt when
+it is legacy. **Note that path was already O(1)**: it filtered by `clientId` and
+did a single compare. The win is on the **resource plane**, where `oauth_client`
+rows were part of the O(N) scan and are now skipped once migrated.
+
+**Rotation preserves the public `clientId`** - only the secret changes - so an
+integration re-reads one value, not two.
 
 ### 4.1 Bounding the legacy path meanwhile
 
@@ -455,8 +493,11 @@ All of the following are implemented and green.
 | E2E | an existing legacy credential keeps working - **the migration's whole promise** | `P1-X5` |
 | E2E | rotation upgrades a legacy row in place | `P1-X6` |
 | **E2E perf** | 25 keyed credentials + a wrong token is faster than **3** legacy bcrypt rows, and under 250 ms | `P1-X7` |
+| Unit (hybrid) | round-trip, entropy, separator-in-secret, and **500 real UUIDs never false-match** | `P1-H1..H9` |
+| E2E (hybrid) | readable prefix kept + keyed shape; mints a token; forged secret refused; **a legacy `client-secret-<uuid>` still mints**; rotation upgrades in place | `P1-X8a..X8e` |
 | Live | mint, authenticate, forge, cross-endpoint, rotate, re-authenticate | `9z-CL.T1-T7` |
 | **Live perf** | a wrong token against 10 active credentials - **measured 7 ms** | `9z-CL.T8` |
+| Live (hybrid) | prefix kept, keyed shape, mints, forged refused, rotation reissues hybrid and still mints | `9z-CL.T9-T14` |
 
 The perf assertion carries a **negative control**: the same wrong token against
 only three *legacy* rows must be measurably slower. Without it, a fast result

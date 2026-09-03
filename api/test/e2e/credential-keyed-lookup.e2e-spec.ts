@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
@@ -138,8 +139,7 @@ describe('P1 keyed credential lookup (E2E)', () => {
    * N x 287 ms of bcrypt - 25 credentials was ~7.2 s - and it is reachable by an
    * UNAUTHENTICATED caller.
    */
-  describe('P1-X7: the amplification is measurably gone', () => {
-    it('25 keyed credentials + a wrong token stays fast, and 3 LEGACY rows do not', async () => {
+  describe('P1-X7: the amplification is measurably gone', () => {    it('25 keyed credentials + a wrong token stays fast, and 3 LEGACY rows do not', async () => {
       const keyedEp = await createEndpointWithConfig(app, token, {
         SecretTokenBearerAuthEnabled: true,
         MaxActiveBearerCredentials: 25,
@@ -174,5 +174,116 @@ describe('P1 keyed credential lookup (E2E)', () => {
       expect(keyedMs).toBeLessThan(legacyMs);
       expect(keyedMs).toBeLessThan(250);
     }, 120_000);
+  });
+
+  /**
+   * P1 HYBRID - oauth_client keeps its readable prefix and gains a lookup key.
+   * The token endpoint must accept both the new and the legacy shape.
+   */
+  describe('P1-X8: hybrid oauth_client secret', () => {
+    const mintToken = (endpointId: string, clientId: string, clientSecret: string) =>
+      request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointId}/oauth/token`)
+        .set('Content-Type', 'application/x-www-form-urlencoded')
+        .send(`grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`);
+
+    it('P1-X8a: a new oauth_client secret keeps the readable prefix AND is keyed', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const created = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'oauth_client', label: 'hybrid' })
+        .expect(201);
+
+      const secret = created.body.clientSecret as string;
+      // Readable prefix preserved - this was an explicit operator requirement.
+      expect(secret.startsWith('client-secret-')).toBe(true);
+      // ...and now keyed: prefix + 24 hex + '-' + base64url secret.
+      expect(secret).toMatch(/^client-secret-[0-9a-f]{24}-[A-Za-z0-9_-]{20,}$/);
+
+      const row = await repo.findById(created.body.id as string);
+      expect(row!.hashAlgo).toBe(HASH_ALGO_HMAC_V1);
+      expect(row!.lookupKey).toBeTruthy();
+    });
+
+    it('P1-X8b: the hybrid secret mints a token at the token endpoint', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const created = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'oauth_client', label: 'hybrid-mint' })
+        .expect(201);
+
+      const res = await mintToken(endpointId, created.body.clientId as string, created.body.clientSecret as string);
+      expect(res.status).toBe(200);
+      expect(res.body.access_token).toBeTruthy();
+    });
+
+    it('P1-X8c: a wrong secret under a real clientId is refused', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const created = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ credentialType: 'oauth_client', label: 'hybrid-wrong' })
+        .expect(201);
+
+      const forged = `client-secret-${'a'.repeat(24)}-not-the-real-secret`;
+      const res = await mintToken(endpointId, created.body.clientId as string, forged);
+      expect(res.status).toBe(401);
+    });
+
+    it('P1-X8d: a LEGACY client-secret-<uuid> still mints - the migration promise', async () => {
+      // The whole hybrid rests on this: existing oauth_client secrets keep
+      // working until their owner chooses to rotate.
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const legacySecret = `client-secret-${randomUUID()}`;
+      const clientId = `legacy-client-${Date.now()}`;
+      await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: await bcrypt.hash(legacySecret, 10),
+        label: 'legacy-oauth',
+        metadata: { clientId },
+      });
+
+      const res = await mintToken(endpointId, clientId, legacySecret);
+      expect(res.status).toBe(200);
+      expect(res.body.access_token).toBeTruthy();
+    });
+
+    it('P1-X8e: rotating a LEGACY oauth_client yields the hybrid format', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const legacy = await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: await bcrypt.hash(`client-secret-${randomUUID()}`, 10),
+        label: 'legacy-rotate-oauth',
+        metadata: { clientId: `legacy-rot-${Date.now()}` },
+      });
+
+      const rotated = await request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${endpointId}/credentials/${legacy.id}/rotate`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      const secret = (rotated.body.clientSecret ?? rotated.body.token) as string;
+      expect(secret).toMatch(/^client-secret-[0-9a-f]{24}-/);
+      // The public clientId must survive rotation - only the secret changes.
+      const res = await mintToken(endpointId, rotated.body.clientId as string, secret);
+      expect(res.status).toBe(200);
+    });
   });
 });

@@ -233,14 +233,21 @@ describe('AdminCredentialController', () => {
       expect(JSON.stringify(createArg)).not.toContain(result.clientSecret);
     });
 
-    it('R7: the first oauth_client uses the client-id-<endpointId> + client-secret-<uuid> format', async () => {
+    it('R7 + P1 hybrid: the first oauth_client keeps client-id-<endpointId> and gains a keyed secret', async () => {
       mockCredentialRepo.findByEndpoint.mockResolvedValue([]);
       const result = await controller.createCredential(mockEndpoint.id, {
         credentialType: 'oauth_client',
       });
-      // Readable, operator-requested formats.
+      // Readable, operator-requested formats. The clientId is unchanged.
       expect(result.clientId).toBe(`client-id-${mockEndpoint.id}`);
-      expect(result.clientSecret).toMatch(
+      // The secret keeps its readable prefix but is now
+      // `client-secret-<24 hex lookupKey>-<base64url secret>` rather than
+      // `client-secret-<uuid>`, so it verifies with one indexed read + one HMAC
+      // instead of joining the O(N) bcrypt scan. The prefix is the part the
+      // operator asked for and is deliberately preserved.
+      expect(result.clientSecret).toMatch(/^client-secret-[0-9a-f]{24}-[A-Za-z0-9_-]{20,}$/);
+      // The old UUID shape must NOT come back - that is what this test now pins.
+      expect(result.clientSecret).not.toMatch(
         /^client-secret-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
       );
     });

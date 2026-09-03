@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.16`
+> **Status:** Living reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.17`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -284,6 +284,19 @@ Two steps: mint a client, then exchange it for a short-lived access token.
   "clientSecret": "<shown once>"
 }
 ```
+
+> **Secret format (v0.55.17).** The `clientSecret` is issued as
+> `client-secret-<lookupKey>-<secret>`. The readable `client-secret-` prefix is
+> unchanged; the `lookupKey` in the middle is a **public identifier** that lets
+> the server find the one credential it belongs to, so verification is a single
+> indexed lookup plus one constant-time comparison instead of a hash comparison
+> against every credential on the endpoint.
+>
+> **Treat the whole string as opaque and copy it verbatim** - the secret half is
+> base64url and legitimately contains `-` and `_`, so splitting on `-` will
+> corrupt it. **Secrets issued before v0.55.17 (`client-secret-<uuid>`) keep
+> working unchanged** and are upgraded when you rotate them; rotation preserves
+> the public `clientId`, so only the secret changes.
 
 **Exchange it:**
 

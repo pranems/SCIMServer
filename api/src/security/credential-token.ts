@@ -28,6 +28,20 @@ import * as crypto from 'crypto';
 /** Greppable prefix so secret scanners (GitHub, trufflehog) can spot a leak. */
 export const CREDENTIAL_TOKEN_PREFIX = 'scim';
 
+/**
+ * The readable prefix an oauth_client secret keeps (an explicit operator
+ * request). The hybrid format preserves it AND adds a lookup key:
+ *
+ *     client-secret-<24 hex lookupKey>-<43 char base64url secret>
+ *
+ * The key is hex for a sharper reason than on the bearer format: the separator
+ * here is `-`, and the base64url alphabet CONTAINS `-`. A hex key cannot contain
+ * `-`, so the boundary is unambiguous and the secret is simply everything after
+ * it. It also guarantees a legacy `client-secret-<uuid>` can never false-match,
+ * because a UUID's longest run of hex is 12 characters and the key needs 24.
+ */
+export const OAUTH_CLIENT_SECRET_PREFIX = 'client-secret-';
+
 /** Persisted in `hashAlgo`; changing it would strand existing rows. */
 export const HASH_ALGO_HMAC_V1 = 'hmac-sha256-v1';
 
@@ -58,6 +72,9 @@ const SECRET_BYTES = 32;
  * (denser) because it is the last field - everything after the second `_`.
  */
 const TOKEN_RE = new RegExp(`^${CREDENTIAL_TOKEN_PREFIX}_([0-9a-f]+)_([A-Za-z0-9_\\-]+)$`);
+
+/** Hybrid oauth_client shape. The 24-hex key is what excludes legacy UUIDs. */
+const OAUTH_CLIENT_RE = new RegExp(`^${OAUTH_CLIENT_SECRET_PREFIX}([0-9a-f]{24})-([A-Za-z0-9_\\-]+)$`);
 
 export interface MintedCredentialToken {
   /** The full value handed to the caller ONCE. Never stored. */
@@ -119,6 +136,22 @@ export function mintCredentialToken(pepper: string = loadCredentialPepper()): Mi
 }
 
 /**
+ * The hybrid oauth_client secret: readable prefix, keyed lookup, same entropy
+ * and same peppered HMAC as a bearer credential.
+ */
+export function mintOAuthClientSecret(pepper: string = loadCredentialPepper()): MintedCredentialToken {
+  const lookupKey = crypto.randomBytes(LOOKUP_KEY_BYTES).toString('hex');
+  const secret = crypto.randomBytes(SECRET_BYTES).toString('base64url');
+  return {
+    token: `${OAUTH_CLIENT_SECRET_PREFIX}${lookupKey}-${secret}`,
+    lookupKey,
+    secret,
+    secretHash: computeSecretHash(secret, pepper),
+    hashAlgo: HASH_ALGO_HMAC_V1,
+  };
+}
+
+/**
  * Returns null - never throws - for anything that is not one of our tokens.
  * The authenticator treats null as "fall through to the legacy bcrypt path", so
  * throwing here would turn a legacy credential into a 500.
@@ -126,6 +159,8 @@ export function mintCredentialToken(pepper: string = loadCredentialPepper()): Mi
 export function parseCredentialToken(token: string): { lookupKey: string; secret: string } | null {
   if (typeof token !== 'string' || token.length === 0) return null;
   const m = TOKEN_RE.exec(token);
-  if (!m) return null;
-  return { lookupKey: m[1], secret: m[2] };
+  if (m) return { lookupKey: m[1], secret: m[2] };
+  const o = OAUTH_CLIENT_RE.exec(token);
+  if (o) return { lookupKey: o[1], secret: o[2] };
+  return null;
 }

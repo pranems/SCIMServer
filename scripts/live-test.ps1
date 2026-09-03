@@ -12587,9 +12587,13 @@ try {
     } | ConvertTo-Json)
     Test-Result -Success ($axCred.clientId -eq "client-id-$axId") -Message "9z-AX.T1: first oauth_client clientId is client-id-<endpointId>"
 
-    # T2: the client secret uses the client-secret-<uuid> form.
-    $axSecretOk = $axCred.clientSecret -match '^client-secret-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-    Test-Result -Success $axSecretOk -Message "9z-AX.T2: client secret is client-secret-<uuid>"
+    # T2: the client secret keeps its readable prefix and is now KEYED.
+    # P1 hybrid (v0.55.17) replaced `client-secret-<uuid>` with
+    # `client-secret-<24 hex lookupKey>-<secret>`: the readable prefix the
+    # operator asked for is preserved, and the key removes the oauth_client rows
+    # from the O(N) bcrypt scan on the resource plane.
+    $axSecretOk = $axCred.clientSecret -match '^client-secret-[0-9a-f]{24}-[A-Za-z0-9_-]{20,}$'
+    Test-Result -Success $axSecretOk -Message "9z-AX.T2: client secret is client-secret-<24 hex key>-<secret> (hybrid, readable prefix kept)"
 
     # T3: the pair authenticates at the per-endpoint token endpoint (client_credentials).
     $axTokenResp = $null
@@ -15575,6 +15579,55 @@ try {
     Test-Result -Success ($clSw.ElapsedMilliseconds -lt 1500) `
         -Message "9z-CL.T8: a wrong token against 10 active credentials answers in $($clSw.ElapsedMilliseconds)ms (pre-P1 this was ~2.9s of bcrypt)"
 
+    # --- HYBRID oauth_client: readable prefix AND keyed lookup ---
+    # An oauth_client secret is presented at the TOKEN endpoint, not as a
+    # resource bearer, and its readable `client-secret-` prefix was an explicit
+    # operator request. The hybrid keeps the prefix and adds a lookup key.
+    $clOauthEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-cl-hybrid-$(Get-Random)"
+    } | ConvertTo-Json)
+    $clOauthId = $clOauthEp.id
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
+    } | ConvertTo-Json -Depth 5)
+
+    $clOauthCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'oauth_client'; label = 'cl-hybrid' } | ConvertTo-Json) -ContentType 'application/json'
+
+    Test-Result -Success ($clOauthCred.clientSecret -like 'client-secret-*') `
+        -Message "9z-CL.T9: the oauth_client secret keeps its readable client-secret- prefix"
+    Test-Result -Success ($clOauthCred.clientSecret -match '^client-secret-[0-9a-f]{24}-') `
+        -Message "9z-CL.T10: ...and is now KEYED (client-secret-<24 hex>-<secret>)"
+
+    # It must actually mint a token at the per-endpoint token endpoint.
+    $clMintBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clOauthCred.clientId))&client_secret=$([uri]::EscapeDataString($clOauthCred.clientSecret))"
+    $clMinted = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+        -Body $clMintBody -ContentType 'application/x-www-form-urlencoded'
+    Test-Result -Success ([string]::IsNullOrWhiteSpace($clMinted.access_token) -eq $false) `
+        -Message "9z-CL.T11: the hybrid oauth_client secret mints an access token"
+
+    # A forged secret under the REAL clientId must be refused.
+    $clOauthForged = $false
+    try {
+        $clBadBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clOauthCred.clientId))&client_secret=client-secret-$('a'*24)-forged"
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+            -Body $clBadBody -ContentType 'application/x-www-form-urlencoded'
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 401) { $clOauthForged = $true }
+    }
+    Test-Result -Success $clOauthForged -Message "9z-CL.T12: a forged secret under a real clientId is refused with 401"
+
+    # Rotation keeps the public clientId and reissues in the hybrid format.
+    $clOauthRot = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId/credentials/$($clOauthCred.id)/rotate" -Method POST -Headers $headers
+    Test-Result -Success ($clOauthRot.clientSecret -match '^client-secret-[0-9a-f]{24}-') `
+        -Message "9z-CL.T13: rotation reissues an oauth_client secret in the hybrid format"
+    $clRotBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clOauthRot.clientId))&client_secret=$([uri]::EscapeDataString($clOauthRot.clientSecret))"
+    $clRotMinted = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+        -Body $clRotBody -ContentType 'application/x-www-form-urlencoded'
+    Test-Result -Success ([string]::IsNullOrWhiteSpace($clRotMinted.access_token) -eq $false) `
+        -Message "9z-CL.T14: the rotated hybrid secret still mints (public clientId survives rotation)"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId2" -Method DELETE -Headers $headers
 } catch {

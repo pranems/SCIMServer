@@ -1,11 +1,14 @@
+import * as crypto from 'crypto';
 import {
   CREDENTIAL_TOKEN_PREFIX,
   DEFAULT_CREDENTIAL_PEPPER,
   HASH_ALGO_HMAC_V1,
+  OAUTH_CLIENT_SECRET_PREFIX,
   computeSecretHash,
   isDefaultPepper,
   loadCredentialPepper,
   mintCredentialToken,
+  mintOAuthClientSecret,
   parseCredentialToken,
   verifySecretHash,
 } from './credential-token';
@@ -156,5 +159,88 @@ describe('credential-token (P1)', () => {
   it('P1-T17: the algorithm discriminator is stable', () => {
     // Persisted in every row; changing it silently would strand existing rows.
     expect(HASH_ALGO_HMAC_V1).toBe('hmac-sha256-v1');
+  });
+
+  /**
+   * P1-H - the HYBRID oauth_client format.
+   *
+   * An oauth_client secret keeps its readable `client-secret-` prefix (an
+   * explicit operator request) and gains a lookup key, so it can be verified
+   * with one indexed read like a bearer credential:
+   *
+   *     client-secret-<24 hex lookupKey>-<43 char base64url secret>
+   *
+   * The key is HEX for the same reason it is on the bearer format, and the point
+   * is sharper here: the separator is `-`, and base64url CONTAINS `-`. A hex key
+   * cannot contain `-`, so the boundary is unambiguous; the secret is simply
+   * everything after it.
+   */
+  describe('P1-H: hybrid oauth_client secret', () => {
+    it('P1-H1: round-trips through the shared parser', () => {
+      const minted = mintOAuthClientSecret();
+      const parsed = parseCredentialToken(minted.token);
+      expect(parsed).not.toBeNull();
+      expect(parsed!.lookupKey).toBe(minted.lookupKey);
+      expect(parsed!.secret).toBe(minted.secret);
+    });
+
+    it('P1-H2: keeps the readable prefix an operator asked for', () => {
+      expect(mintOAuthClientSecret().token.startsWith(OAUTH_CLIENT_SECRET_PREFIX)).toBe(true);
+    });
+
+    it('P1-H3: carries the same 256-bit entropy as a bearer secret', () => {
+      const { secret } = mintOAuthClientSecret();
+      expect(Buffer.from(secret, 'base64url').length).toBeGreaterThanOrEqual(32);
+    });
+
+    it('P1-H4: the secret is stored only as a peppered HMAC', () => {
+      const minted = mintOAuthClientSecret();
+      expect(minted.secretHash).toEqual(expect.stringMatching(/^[0-9a-f]{64}$/));
+      expect(minted.secretHash).not.toContain(minted.secret);
+      expect(minted.hashAlgo).toBe(HASH_ALGO_HMAC_V1);
+    });
+
+    it('P1-H5: a secret containing the "-" separator still round-trips intact', () => {
+      // base64url includes `-`, so this is the failure mode the hex key exists to
+      // prevent. Generate until we actually produce one rather than assuming.
+      let minted = mintOAuthClientSecret();
+      for (let i = 0; i < 200 && !minted.secret.includes('-'); i++) minted = mintOAuthClientSecret();
+      expect(minted.secret).toContain('-');
+      expect(parseCredentialToken(minted.token)!.secret).toBe(minted.secret);
+    });
+
+    it('P1-H6: NEGATIVE CONTROL - a LEGACY client-secret-<uuid> does NOT parse', () => {
+      // This is the assertion the whole migration rests on. A legacy secret must
+      // fall through to the bcrypt path; if it parsed here it would be looked up
+      // by a bogus key, miss, and stop authenticating - a silent outage.
+      const legacy = 'client-secret-550e8400-e29b-41d4-a716-446655440000';
+      expect(parseCredentialToken(legacy)).toBeNull();
+    });
+
+    it('P1-H7: many real UUIDs never false-match the hybrid shape', () => {
+      // A UUID's longest run of hex is 12 chars (the final group), and the key
+      // needs 24, so no UUID can satisfy it. Asserted over real values rather
+      // than argued, because the cost of being wrong is a customer outage.
+      for (let i = 0; i < 500; i++) {
+        expect(parseCredentialToken(`client-secret-${crypto.randomUUID()}`)).toBeNull();
+      }
+    });
+
+    it('P1-H8: the two formats never collide', () => {
+      const bearer = mintCredentialToken();
+      const oauth = mintOAuthClientSecret();
+      expect(bearer.token.startsWith(CREDENTIAL_TOKEN_PREFIX)).toBe(true);
+      expect(oauth.token.startsWith(OAUTH_CLIENT_SECRET_PREFIX)).toBe(true);
+      // Each parses to its OWN key, never the other's.
+      expect(parseCredentialToken(bearer.token)!.lookupKey).toBe(bearer.lookupKey);
+      expect(parseCredentialToken(oauth.token)!.lookupKey).toBe(oauth.lookupKey);
+      expect(bearer.lookupKey).not.toBe(oauth.lookupKey);
+    });
+
+    it('P1-H9: verification works through the shared hash functions', () => {
+      const minted = mintOAuthClientSecret();
+      expect(verifySecretHash(minted.secret, minted.secretHash)).toBe(true);
+      expect(verifySecretHash('wrong', minted.secretHash)).toBe(false);
+    });
   });
 });

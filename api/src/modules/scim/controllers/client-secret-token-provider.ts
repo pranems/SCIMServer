@@ -15,6 +15,7 @@
  */
 import { Inject, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { HASH_ALGO_HMAC_V1, parseCredentialToken, verifySecretHash } from '../../../security/credential-token';
 import type { AccessToken } from '../../../oauth/oauth.service';
 import { OAuthService } from '../../../oauth/oauth.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
@@ -57,8 +58,18 @@ export class ClientSecretTokenProvider {
       (c) => c.credentialType === 'oauth_client' && c.metadata?.clientId === req.clientId,
     );
 
+    // P1 hybrid: a secret minted after v0.55.17 carries its own lookup key and is
+    // verified with one peppered HMAC. Legacy `client-secret-<uuid>` secrets have
+    // no key, so they keep the bcrypt path until rotated. The candidate is still
+    // selected by clientId either way - that is the contract the caller presents.
+    const parsed = parseCredentialToken(req.clientSecret);
     const secretValid =
-      candidate != null && (await bcrypt.compare(req.clientSecret, candidate.credentialHash));
+      candidate == null
+        ? false
+        : parsed != null && candidate.hashAlgo === HASH_ALGO_HMAC_V1 && candidate.secretHash
+          ? candidate.lookupKey === parsed.lookupKey &&
+            verifySecretHash(parsed.secret, candidate.secretHash)
+          : await bcrypt.compare(req.clientSecret, candidate.credentialHash);
 
     // The per-check trace: real expected-vs-received, never the secret value.
     const checks: AuthCheck[] = [

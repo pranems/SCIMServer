@@ -51,7 +51,7 @@ import type {
   WifDebugAssertionResponse,
   WifDebugTrustResult,
 } from '../../../shared/types/wif-debug.types';
-import { mintCredentialToken, P1_KEYED_HASH_PLACEHOLDER } from '../../../security/credential-token';
+import { mintCredentialToken, mintOAuthClientSecret, P1_KEYED_HASH_PLACEHOLDER } from '../../../security/credential-token';
 import { getConfigBoolean, getConfigNumber, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, ENDPOINT_CONFIG_FLAGS_DEFINITIONS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
@@ -595,11 +595,13 @@ export class AdminCredentialController {
           ? `client-id-${crypto.randomUUID()}`
           : `client-id-${endpointId}`;
       }
-      // R7: the oauth_client secret uses the readable `client-secret-<uuid>`
-      // form (operator request) instead of the generic random token. It is
-      // still hashed with bcrypt and only its hash is stored.
-      const oauthSecret = `client-secret-${crypto.randomUUID()}`;
-      const oauthHash = await bcrypt.hash(oauthSecret, BCRYPT_SALT_ROUNDS);
+      // P1 hybrid: keeps the readable `client-secret-` prefix the operator asked
+      // for, and adds a lookup key so verification is one indexed read plus one
+      // HMAC instead of a bcrypt compare. Legacy `client-secret-<uuid>` secrets
+      // keep working until rotated.
+      const oauthMinted = mintOAuthClientSecret();
+      const oauthSecret = oauthMinted.token;
+      const oauthHash = P1_KEYED_HASH_PLACEHOLDER;
       const oauthDescription = normalizeCredentialDescription(dto.description);
       const credential = await this.credentialRepo.create({
         endpointId,
@@ -608,6 +610,9 @@ export class AdminCredentialController {
         label: dto.label ?? null,
         metadata: oauthDescription != null ? { clientId, description: oauthDescription } : { clientId },
         secretEnvelope: await this.maybeRetainSecret(config, oauthSecret),
+        lookupKey: oauthMinted.lookupKey,
+        secretHash: oauthMinted.secretHash,
+        hashAlgo: oauthMinted.hashAlgo,
         expiresAt,
       });
 
@@ -1046,15 +1051,11 @@ export class AdminCredentialController {
     let plaintext: string;
     let hash: string;
     let keyed: { lookupKey: string; secretHash: string; hashAlgo: string } | null = null;
-    if (isOauth) {
-      plaintext = `client-secret-${crypto.randomUUID()}`;
-      hash = await bcrypt.hash(plaintext, BCRYPT_SALT_ROUNDS);
-    } else {
-      const minted = mintCredentialToken();
-      plaintext = minted.token;
-      hash = P1_KEYED_HASH_PLACEHOLDER;
-      keyed = { lookupKey: minted.lookupKey, secretHash: minted.secretHash, hashAlgo: minted.hashAlgo };
-    }
+    // Both types are keyed now; they differ only in the readable prefix.
+    const minted = isOauth ? mintOAuthClientSecret() : mintCredentialToken();
+    plaintext = minted.token;
+    hash = P1_KEYED_HASH_PLACEHOLDER;
+    keyed = { lookupKey: minted.lookupKey, secretHash: minted.secretHash, hashAlgo: minted.hashAlgo };
     const secretEnvelope = await this.maybeRetainSecret(config, plaintext);
 
     // oauth_client keeps its public client_id so only the secret changes.
