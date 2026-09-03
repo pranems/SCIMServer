@@ -15697,6 +15697,34 @@ try {
     Test-Result -Success ($cmStatus.endpoints.Count -eq 0 -or $cmStatus.readyToRetireLegacyPath -eq $false) `
         -Message "9z-CM.T9: the phase-5 gate agrees with the per-endpoint queue (ready=$($cmStatus.readyToRetireLegacyPath), queue=$($cmStatus.endpoints.Count))"
 
+    # The gate is ACTIVE legacy, not TOTAL. A total-based gate is unreachable:
+    # rotation deactivates the old row and creates a new one, DELETE is a
+    # soft-deactivate, and no hard-delete route exists - so every migration path
+    # converts active legacy into inactive legacy.
+    Test-Result -Success ($cmStatus.readyToRetireLegacyPath -eq ($cmStatus.legacy.active -eq 0)) `
+        -Message "9z-CM.T10: readyToRetireLegacyPath tracks legacy.ACTIVE (=$($cmStatus.legacy.active)), not legacy.total (=$($cmStatus.legacy.total))"
+
+    # The credential list must report hashAlgo, or the report says how many are
+    # legacy without saying WHICH - and guessing is how the wrong live
+    # credential gets rotated.
+    $cmCreds = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId/credentials" -Headers $headers
+    $cmKeyed = @($cmCreds | Where-Object { $_.hashAlgo -eq 'hmac-sha256-v1' })
+    Test-Result -Success ($cmKeyed.Count -ge 1) `
+        -Message "9z-CM.T11: the credential list reports hashAlgo (the minted credential is hmac-sha256-v1)"
+    $cmLeaked = @($cmCreds | Where-Object { $_.PSObject.Properties.Name -contains 'credentialHash' -or $_.PSObject.Properties.Name -contains 'secretHash' -or $_.PSObject.Properties.Name -contains 'lookupKey' })
+    Test-Result -Success ($cmLeaked.Count -eq 0) `
+        -Message "9z-CM.T12: exposing hashAlgo did not leak the hash, secretHash or lookupKey"
+
+    # Two independent code paths compute the legacy count - a grouped DB count
+    # and a per-row projection. Disagreement means the one-way gate's number is
+    # not trustworthy.
+    $cmStatus2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/credentials/migration-status" -Headers $headers
+    $cmRow = $cmStatus2.endpoints | Where-Object { $_.endpointId -eq $cmId }
+    $cmListLegacy = @($cmCreds | Where-Object { $_.credentialType -ne 'wif' -and $_.hashAlgo -ne 'hmac-sha256-v1' }).Count
+    $cmRowLegacy = if ($cmRow) { $cmRow.legacyTotal } else { 0 }
+    Test-Result -Success ($cmRowLegacy -eq $cmListLegacy) `
+        -Message "9z-CM.T13: the report and the credential list agree on this endpoint's legacy count ($cmRowLegacy)"
+
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId" -Method DELETE -Headers $headers
 } catch {
     Test-Result -Success $false -Message "9z-CM: credential migration status section threw: $($_.Exception.Message)"

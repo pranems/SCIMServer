@@ -673,11 +673,13 @@ Authorization: Bearer changeme-scim
 | `legacy` | Credentials that still carry a bcrypt secret. **This is the tail.** |
 | `keyed` | Migrated to `hmac-sha256-v1` (issued at create or by rotation). |
 | `secretless` | Rows with no secret at all (`wif`) - verified as a JWT against a JWKS, never bcrypt. Counted separately so they cannot hold the gate shut forever. |
-| `readyToRetireLegacyPath` | `legacy.total === 0`. **Inactive rows count**, because a deactivated credential can be reactivated. |
+| `readyToRetireLegacyPath` | `legacy.active === 0`. **Not** total-based: nothing can ever clear an inactive row (rotation and DELETE both *create* them), so a total-based gate could never open. |
 | `endpoints[]` | Only endpoints that still hold legacy rows - the array IS the work queue, and empty means done. |
 
 **Rotation is the migration path:** `POST .../credentials/:id/rotate` reissues
-in the keyed format, so draining the tail needs no new operator concept.
+in the keyed format, so draining the tail needs no new operator concept. The
+credential list reports `hashAlgo` per credential, so you can see **which** rows
+still need rotating rather than only how many.
 
 ---
 

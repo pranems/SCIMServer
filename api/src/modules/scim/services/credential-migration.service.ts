@@ -30,7 +30,19 @@ export interface CredentialMigrationStatus {
   /** Rows with no secret at all (wif) - never bcrypt-verified, so not the tail. */
   secretless: CredentialPopulationSplit;
   byAlgo: Record<string, number>;
-  /** True only when NO credential anywhere still needs the bcrypt verifier. */
+  /**
+   * True when no ACTIVE credential still needs the bcrypt verifier.
+   *
+   * Deliberately not `legacy.total === 0`, which is unreachable: rotation
+   * deactivates the old row and creates a new one, DELETE is a soft-deactivate,
+   * and no hard-delete route exists - so every migration path converts active
+   * legacy into INACTIVE legacy and a total-based gate is shut permanently by
+   * its own success criterion. Active-zero is also the honest security
+   * condition, because the O(N) scan only ever iterated active credentials.
+   *
+   * Phase 5 must therefore ship a guard that refuses to reactivate a legacy
+   * row, since `legacy.inactive` rows survive and remain reactivatable.
+   */
   readyToRetireLegacyPath: boolean;
   /** Only endpoints that still hold legacy rows - the list IS the work queue. */
   endpoints: EndpointLegacyCredentials[];
@@ -111,7 +123,7 @@ export class CredentialMigrationService {
       keyed,
       secretless,
       byAlgo,
-      readyToRetireLegacyPath: legacy.total === 0,
+      readyToRetireLegacyPath: legacy.active === 0,
       endpoints: Array.from(perEndpoint.values())
         .filter((e) => e.legacyTotal > 0)
         .sort((a, b) => b.legacyTotal - a.legacyTotal),

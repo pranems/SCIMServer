@@ -102,11 +102,10 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
     expect(row.endpointName).toBeTruthy();
   });
 
-  it('P4-X4: DEACTIVATING a legacy credential does NOT clear it from the tail', async () => {
-    // The safety property the whole report exists for. `activate` can bring a
-    // deactivated credential back; if phase 5 had already deleted the bcrypt
-    // verifier it would return and silently fail to authenticate. So the gate
-    // must not open just because the row is currently dormant.
+  it('P4-X4: DEACTIVATING a legacy credential clears it from the ACTIVE tail but keeps it visible', async () => {
+    // The gate is legacy.active, because nothing can ever remove an inactive
+    // row - but the row stays counted in legacy.total so the reactivation
+    // hazard remains visible, and phase 5 must ship a guard for it.
     const endpointId = await createEndpointWithConfig(app, token, {
       SecretTokenBearerAuthEnabled: true,
     });
@@ -121,7 +120,7 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
     const after = (await status().expect(200)).body;
     expect(after.legacy.total).toBe(before.legacy.total);
     expect(after.legacy.inactive).toBe(before.legacy.inactive + 1);
-    expect(after.readyToRetireLegacyPath).toBe(false);
+    expect(after.legacy.active).toBe(before.legacy.active - 1);
   });
 
   it('P4-X5: rotating a legacy credential moves it OUT of the tail - rotation is the migration path', async () => {
@@ -199,5 +198,66 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
 
     const row = after.endpoints.find((e: { endpointId: string }) => e.endpointId === endpointId);
     expect(row).toBeUndefined();
+  });
+
+  it('P4-X10: the credential list reports hashAlgo, so the report can be ACTED on', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      SecretTokenBearerAuthEnabled: true,
+    });
+    const planted = await plantLegacy(endpointId);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ credentialType: 'bearer', label: 'keyed-one' })
+      .expect(201);
+
+    const list = (
+      await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+    ).body as Array<{ id: string; hashAlgo: string }>;
+
+    expect(list.find((c) => c.id === planted.id)?.hashAlgo).toBe(HASH_ALGO_BCRYPT);
+    expect(list.some((c) => c.hashAlgo === HASH_ALGO_HMAC_V1)).toBe(true);
+
+    for (const c of list) {
+      expect(c).not.toHaveProperty('credentialHash');
+      expect(c).not.toHaveProperty('secretHash');
+      expect(c).not.toHaveProperty('lookupKey');
+    }
+  });
+
+  it('P4-X11: the report and the credential list AGREE on the legacy count for an endpoint', async () => {
+    // Two independent code paths compute this - a grouped DB count and a
+    // per-row projection. If they ever disagree, the number the one-way gate
+    // depends on is not trustworthy, and neither is the work queue.
+    const endpointId = await createEndpointWithConfig(app, token, {
+      SecretTokenBearerAuthEnabled: true,
+    });
+    await plantLegacy(endpointId);
+    await plantLegacy(endpointId);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ credentialType: 'bearer', label: 'keyed-agree' })
+      .expect(201);
+
+    const list = (
+      await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+    ).body as Array<{ credentialType: string; hashAlgo: string }>;
+
+    const listLegacy = list.filter(
+      (c) => c.credentialType !== 'wif' && c.hashAlgo !== HASH_ALGO_HMAC_V1,
+    ).length;
+
+    const report = (await status().expect(200)).body;
+    const row = report.endpoints.find((e: { endpointId: string }) => e.endpointId === endpointId);
+
+    expect(row).toBeDefined();
+    expect(row.legacyTotal).toBe(listLegacy);
   });
 });

@@ -55,10 +55,9 @@ describe('CredentialMigrationService (P1 phase 4)', () => {
   });
 
   it('P4-S2: an INACTIVE legacy credential still counts, because it can be reactivated', async () => {
-    // This is the whole reason the gate is not "active legacy === 0". The
-    // activate route can bring a deactivated credential back; if phase 5 had
-    // already deleted the bcrypt verifier, it would return and silently fail
-    // to authenticate. So the tail we must drain includes dormant rows.
+    // Inactive legacy rows remain VISIBLE in the tail because `activate` can
+    // bring one back, and phase 5 must ship a guard for that. They no longer
+    // hold the gate shut, though - see P4-S12.
     credRepo.countByHashAlgo.mockResolvedValue([
       { endpointId: EP_A, hashAlgo: HASH_ALGO_BCRYPT, active: false, count: 1 },
       { endpointId: EP_A, hashAlgo: HASH_ALGO_HMAC_V1, active: true, count: 9 },
@@ -69,10 +68,40 @@ describe('CredentialMigrationService (P1 phase 4)', () => {
     expect(report.legacy.total).toBe(1);
     expect(report.legacy.active).toBe(0);
     expect(report.legacy.inactive).toBe(1);
-    expect(report.readyToRetireLegacyPath).toBe(false);
   });
 
-  it('P4-S3: the phase-5 gate opens only when the legacy count is zero', async () => {
+  it('P4-S12: the gate is ACTIVE legacy, because no action can ever clear an inactive row', async () => {
+    // Gating on legacy.total was unreachable: rotation deactivates the old row
+    // and creates a new one, DELETE is a soft-deactivate, and no hard-delete
+    // route exists - so every migration path converts active legacy into
+    // INACTIVE legacy. The gate was shut permanently by its own success
+    // criterion. legacy.active is what rotation can drive to zero, and it is
+    // also the honest security condition: the O(N) bcrypt scan only ever
+    // iterated ACTIVE credentials.
+    credRepo.countByHashAlgo.mockResolvedValue([
+      { endpointId: EP_A, hashAlgo: HASH_ALGO_BCRYPT, active: false, count: 7 },
+      { endpointId: EP_A, hashAlgo: HASH_ALGO_HMAC_V1, active: true, count: 3 },
+    ]);
+
+    const report = await service.getMigrationStatus();
+
+    expect(report.legacy.total).toBe(7);
+    expect(report.readyToRetireLegacyPath).toBe(true);
+  });
+
+  it('P4-S13: a single ACTIVE legacy credential holds the gate shut', async () => {
+    credRepo.countByHashAlgo.mockResolvedValue([
+      { endpointId: EP_A, hashAlgo: HASH_ALGO_BCRYPT, active: true, count: 1 },
+      { endpointId: EP_B, hashAlgo: HASH_ALGO_HMAC_V1, active: true, count: 500 },
+    ]);
+
+    const report = await service.getMigrationStatus();
+
+    expect(report.readyToRetireLegacyPath).toBe(false);
+    expect(report.endpoints).toHaveLength(1);
+  });
+
+  it('P4-S3: the phase-5 gate opens only when no ACTIVE legacy credential remains', async () => {
     credRepo.countByHashAlgo.mockResolvedValue([
       { endpointId: EP_A, hashAlgo: HASH_ALGO_HMAC_V1, active: true, count: 4 },
       { endpointId: EP_B, hashAlgo: HASH_ALGO_HMAC_V1, active: false, count: 2 },
@@ -116,7 +145,6 @@ describe('CredentialMigrationService (P1 phase 4)', () => {
     expect(report.keyed.total).toBe(0);
     expect(report.readyToRetireLegacyPath).toBe(false);
   });
-
   it('P4-S6: an unrecognised algorithm is NOT silently treated as migrated', async () => {
     // Fail closed: an algo we do not know about must not open the one-way gate.
     credRepo.countByHashAlgo.mockResolvedValue([

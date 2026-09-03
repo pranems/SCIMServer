@@ -306,11 +306,12 @@ IS the work queue and an empty array means the work is done.
 
 **Two counting decisions carry the whole safety property.**
 
-**1. Inactive rows still count.** A deactivated credential can be brought back
-by `POST .../credentials/:id/activate`. If phase 5 had already deleted the
-bcrypt verifier, that credential would return and silently fail to
-authenticate. So the gate is `legacy.total === 0`, not `legacy.active === 0`.
-`P4-S2` and `P4-X4` pin this.
+**1. Inactive rows stay VISIBLE, but no longer hold the gate shut.** A
+deactivated credential can be brought back by `POST .../credentials/:id/activate`,
+so `legacy.inactive` is reported and phase 5 must ship a guard for it (§4.5).
+The gate itself is `legacy.active === 0`, because nothing can ever clear an
+inactive row - see §4.5 for why a total-based gate was unreachable.
+`P4-S12`, `P4-S13` and `P4-X4` pin this.
 
 **2. A WIF trust is `secretless`, not legacy - and this was found by
 measuring, not by reasoning.** The first run of this report against a live node
@@ -355,16 +356,20 @@ So every migration path converts *active* legacy into *inactive* legacy, and
 its own success criterion** - the second time this measurement corrected a
 belief that reasoning alone had not.
 
-**Recommended change to phase 5** (not yet applied - it is a one-way decision):
+**Recommended change to phase 5** - **rule 1 APPLIED v0.55.19**, rule 2 ships with
+phase 5 itself:
 
-1. **Gate on `legacy.active === 0`**, which rotation *can* achieve, and which is
-   also the honest security condition: the O(N) bcrypt scan only ever iterated
-   **active** credentials, so active-zero is when the amplification is actually
-   gone.
+1. **Gate on `legacy.active === 0`** (done), which rotation *can* achieve, and
+   which is also the honest security condition: the O(N) bcrypt scan only ever
+   iterated **active** credentials, so active-zero is when the amplification is
+   actually gone. `P4-S12` and `P4-S13` pin it.
 2. **Make `activateCredential` refuse to reactivate a legacy row** once the
    verifier is deleted, failing closed with a message telling the operator to
-   rotate instead. That removes the hazard rule 1 exists to prevent, without
-   requiring anything to be deleted.
+   rotate instead. **Not built yet on purpose** - it guards a state that does
+   not exist while bcrypt is still present, and a guard for a hypothetical
+   state is untestable in the way that matters. It lands in the same commit
+   that deletes the verifier. `legacy.inactive` stays reported so the hazard it
+   addresses remains visible in the meantime.
 
 This is strictly safer than the original plan *and* achievable: it keeps the
 credential audit trail intact - hard-deleting rows to satisfy a gate would be
