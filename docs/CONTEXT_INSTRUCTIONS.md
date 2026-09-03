@@ -1,8 +1,9 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Version**: 0.55.8  
-> **Last Updated**: July 30, 2026
+> **Version**: 0.55.17  
+> **Last Updated**: September 2, 2026  
+> **Last verified:** 2026-09-02
 
 ---
 
@@ -344,7 +345,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** - all passing (0 failures). **Unit**: 4,675 (156 suites, measured 2026-08-04). **E2E**: 1,439 (87 suites). **Live integration** - 1,373 assertions
+- **Unit** and **E2E** - all passing (0 failures). **Unit**: 4,874 (169 suites, measured 2026-09-02). **E2E**: 1,501 (94 suites). **Web vitest**: 1,285 (104 files). **Live integration** - 1,464 assertions. **Playwright**: 198 passed / 4 skipped vs dev
 - **SCIM Validator**: 10/12 mandatory (2 FP on Lexmark returned:never), 25/25 on standard profile + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

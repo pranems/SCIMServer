@@ -7,10 +7,20 @@
     "instead of aspirational: if a coupled source changes in a push and the doc",
     "does not, the gate fails.",
     "",
-    "'sources' are path PREFIXES matched against the changed-file list.",
+    "'sources' are path PREFIXES matched against the changed-file list. An empty",
+    "array means the doc is gated for currency (F1/F2/F3) but is not coupled to",
+    "any one code path - use it rather than inventing a prefix, because a prefix",
+    "that matches nothing makes F4 silently dead (which is what F5 exists to catch).",
     "'maxAgeDays' bounds how stale the '**Last verified:**' stamp may get.",
     "Add a doc here the moment it becomes user-facing. Docs NOT listed here are",
-    "internal design/phase notes and are deliberately not gated."
+    "internal design/phase notes and are deliberately not gated.",
+    "",
+    "ONE deliberate exception to 'user-facing': docs/CONTEXT_INSTRUCTIONS.md is",
+    "agent-facing, and is gated anyway. It advertised v0.55.8 for nine patch",
+    "releases while Stage 6.3 mandated updating it every release - a mandate that",
+    "lived only in a prompt nobody was obliged to run. A confidently wrong context",
+    "doc is worse than no doc, because it misleads every future session at the",
+    "point where an investigation starts."
   ],
   "docs": [
     {
@@ -172,6 +182,12 @@
     {
       "path": "docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md",
       "title": "Canonical infrastructure reference",
+      "sources": [],
+      "maxAgeDays": 90
+    },
+    {
+      "path": "docs/CONTEXT_INSTRUCTIONS.md",
+      "title": "Agent-facing project context (gated for version currency, not user-facing)",
       "sources": [],
       "maxAgeDays": 90
     }
