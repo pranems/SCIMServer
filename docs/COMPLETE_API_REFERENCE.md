@@ -1,10 +1,10 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.17`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.18`
 
-> **Version:** 0.55.17 - **Updated:** 2026-07-31  
+> **Version:** 0.55.18 - **Updated:** 2026-07-31  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
-> **117 route handlers** across 31 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
+> **118 route handlers** across 32 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 
 ---
 
@@ -635,6 +635,49 @@ Authorization: Bearer changeme-scim
   }
 ]
 ```
+
+---
+
+### GET /scim/admin/credentials/migration-status
+
+Report how much of the credential population still needs the legacy `bcrypt`
+verifier. Admin-only, estate-wide.
+
+Retiring the legacy verifier is a **one-way** change, so it is gated on this
+report reading zero rather than on elapsed time.
+
+```http
+GET /scim/admin/credentials/migration-status HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+```
+
+```json
+{
+  "generatedAt": "2026-09-03T02:41:07.912Z",
+  "total": 75,
+  "legacy": { "total": 0, "active": 0, "inactive": 0 },
+  "keyed": { "total": 59, "active": 51, "inactive": 8 },
+  "secretless": { "total": 16, "active": 16, "inactive": 0 },
+  "byAlgo": {
+    "bcrypt": 16,
+    "hmac-sha256-v1": 59
+  },
+  "readyToRetireLegacyPath": true,
+  "endpoints": []
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `legacy` | Credentials that still carry a bcrypt secret. **This is the tail.** |
+| `keyed` | Migrated to `hmac-sha256-v1` (issued at create or by rotation). |
+| `secretless` | Rows with no secret at all (`wif`) - verified as a JWT against a JWKS, never bcrypt. Counted separately so they cannot hold the gate shut forever. |
+| `readyToRetireLegacyPath` | `legacy.total === 0`. **Inactive rows count**, because a deactivated credential can be reactivated. |
+| `endpoints[]` | Only endpoints that still hold legacy rows - the array IS the work queue, and empty means done. |
+
+**Rotation is the migration path:** `POST .../credentials/:id/rotate` reissues
+in the keyed format, so draining the tail needs no new operator concept.
 
 ---
 

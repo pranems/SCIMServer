@@ -8,6 +8,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { CredentialMigrationController } from './controllers/credential-migration.controller';
 import { AdminConnectionInfoController } from './controllers/admin-connection-info.controller';
 import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
 import { AuthDecisionsController } from './controllers/auth-decisions.controller';
@@ -37,6 +38,7 @@ import { EndpointScimGenericService } from './services/endpoint-scim-generic.ser
 import { BulkProcessorService } from './services/bulk-processor.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ConnectionInfoService } from './services/connection-info.service';
+import { CredentialMigrationService } from './services/credential-migration.service';
 import { ConnectionSecretResolverService } from './services/connection-secret-resolver.service';
 import { CredentialEncryptionService } from '../../security/credential-encryption.service';
 import { CredentialSecurityService } from '../../security/credential-security.service';
@@ -55,6 +57,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     SchemasController,
     AdminController,
     AdminCredentialController,
+    CredentialMigrationController,
     AdminConnectionInfoController,
     AdminAuthenticationMethodController,
     AdminJwksHostController,
@@ -86,6 +89,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     BulkProcessorService,
     EndpointContextStorage,
     ConnectionInfoService,
+    CredentialMigrationService,
     ConnectionSecretResolverService,
     CredentialEncryptionService,
     CredentialSecurityService,

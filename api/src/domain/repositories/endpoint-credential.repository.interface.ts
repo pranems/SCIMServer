@@ -6,6 +6,22 @@
  */
 import type { EndpointCredentialModel, EndpointCredentialCreateInput } from '../models/endpoint-credential.model';
 
+/**
+ * P1 phase 4 - one grouped row of the credential population.
+ *
+ * Deliberately a COUNT rather than the rows themselves: the phase-5 gate has to
+ * be answerable on an estate with a large credential table without loading it.
+ */
+export interface CredentialAlgoCount {
+  endpointId: string;
+  /** Needed to tell a SECRETLESS row (wif) from one that really needs bcrypt. */
+  credentialType?: string;
+  /** Nullable because a hand-built row may omit it; absent means legacy. */
+  hashAlgo: string | null | undefined;
+  active: boolean;
+  count: number;
+}
+
 export interface IEndpointCredentialRepository {
   /** Create a new credential record. */
   create(input: EndpointCredentialCreateInput): Promise<EndpointCredentialModel>;
@@ -19,6 +35,16 @@ export interface IEndpointCredentialRepository {
    * registered trusts before any request has named an endpoint.
    */
   findAllActiveByType(credentialType: string): Promise<EndpointCredentialModel[]>;
+
+  /**
+   * P1 phase 4 - the credential population grouped by endpoint, algorithm and
+   * active flag, so the legacy tail is MEASURED rather than assumed.
+   *
+   * Counts inactive rows too: `activate` can bring a deactivated credential
+   * back, and one that returned after the bcrypt verifier was deleted would
+   * silently stop authenticating.
+   */
+  countByHashAlgo(): Promise<CredentialAlgoCount[]>;
 
   /** Find a credential by ID. */
   findById(id: string): Promise<EndpointCredentialModel | null>;

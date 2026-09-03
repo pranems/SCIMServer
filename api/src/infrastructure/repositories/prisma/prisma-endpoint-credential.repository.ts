@@ -3,7 +3,7 @@
  */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../modules/prisma/prisma.service';
-import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
+import type { IEndpointCredentialRepository, CredentialAlgoCount } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import type { EndpointCredentialModel, EndpointCredentialCreateInput } from '../../../domain/models/endpoint-credential.model';
 
 @Injectable()
@@ -72,6 +72,20 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
       },
     });
     return rows.map((r) => this.toModel(r));
+  }
+
+  async countByHashAlgo(): Promise<CredentialAlgoCount[]> {
+    const groups = await this.prisma.endpointCredential.groupBy({
+      by: ['endpointId', 'credentialType', 'hashAlgo', 'active'],
+      _count: { _all: true },
+    });
+    return groups.map((g) => ({
+      endpointId: g.endpointId,
+      credentialType: g.credentialType,
+      hashAlgo: g.hashAlgo,
+      active: g.active,
+      count: g._count._all,
+    }));
   }
 
   async findById(id: string): Promise<EndpointCredentialModel | null> {

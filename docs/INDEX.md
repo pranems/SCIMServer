@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.17`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.18`
 
-> **Version:** 0.55.17 - **Updated:** 2026-07-31  
+> **Version:** 0.55.18 - **Updated:** 2026-07-31  
 > 6 presets - **38 endpoint settings controls** (21 boolean flags + 3 enums + 14 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
 
 ### Start here
@@ -63,7 +63,7 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 117 route handlers, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 118 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) | **Concurrent config edits (B/C/D)** - which profile sections can actually lose data and which merge safely, the `ETag` on endpoint reads, opt-in `If-Match` with `412 versionMismatch`, the conflict dialog flow, and the per-endpoint lock that fixed the silent auth-method race |

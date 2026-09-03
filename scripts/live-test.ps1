@@ -15637,6 +15637,74 @@ try {
 Write-Host "`n--- 9z-CL: Keyed Credential Lookup Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CM: Credential Migration Status (P1 phase 4)
+$script:currentSection = "9z-CM: Credential Migration Status"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CM: Credential Migration Status (P1 phase 4) ===" -ForegroundColor Cyan
+
+try {
+    $cmStatus = Invoke-RestMethod -Uri "$baseUrl/scim/admin/credentials/migration-status" -Headers $headers
+
+    Test-Result -Success ($null -ne $cmStatus.readyToRetireLegacyPath) `
+        -Message "9z-CM.T1: the migration-status report is reachable"
+
+    # The response must carry ONLY documented keys (response-contract rule).
+    $cmAllowed = @('generatedAt', 'total', 'legacy', 'keyed', 'secretless', 'byAlgo', 'readyToRetireLegacyPath', 'endpoints')
+    $cmExtra = $cmStatus.PSObject.Properties.Name | Where-Object { $cmAllowed -notcontains $_ }
+    Test-Result -Success ($cmExtra.Count -eq 0) `
+        -Message "9z-CM.T2: the report carries only documented keys$(if ($cmExtra) { " (unexpected: $($cmExtra -join ', '))" })"
+
+    # The counts must reconcile, or the number the one-way gate depends on is not trustworthy.
+    Test-Result -Success ($cmStatus.total -eq ($cmStatus.legacy.total + $cmStatus.keyed.total + $cmStatus.secretless.total)) `
+        -Message "9z-CM.T3: total reconciles to legacy + keyed + secretless ($($cmStatus.total) = $($cmStatus.legacy.total) + $($cmStatus.keyed.total) + $($cmStatus.secretless.total))"
+    Test-Result -Success ($cmStatus.legacy.total -eq ($cmStatus.legacy.active + $cmStatus.legacy.inactive)) `
+        -Message "9z-CM.T4: the legacy split reconciles (active + inactive)"
+
+    $cmAlgoSum = 0
+    foreach ($p in $cmStatus.byAlgo.PSObject.Properties) { $cmAlgoSum += $p.Value }
+    Test-Result -Success ($cmAlgoSum -eq $cmStatus.total) `
+        -Message "9z-CM.T5: byAlgo sums to the total ($cmAlgoSum)"
+
+    # A freshly minted credential must land in the KEYED bucket, not the tail.
+    $cmEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-cm-migration-$(Get-Random)"
+    } | ConvertTo-Json)
+    $cmId = $cmEp.id
+    $cmPatch = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 4
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId" -Method PATCH -Headers $headers -Body $cmPatch -ContentType 'application/json'
+    $cmBefore = Invoke-RestMethod -Uri "$baseUrl/scim/admin/credentials/migration-status" -Headers $headers
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'bearer'; label = 'cm-probe' } | ConvertTo-Json) -ContentType 'application/json'
+    $cmAfter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/credentials/migration-status" -Headers $headers
+
+    Test-Result -Success ($cmAfter.keyed.total -eq ($cmBefore.keyed.total + 1)) `
+        -Message "9z-CM.T6: a newly minted credential is counted as KEYED"
+    Test-Result -Success ($cmAfter.legacy.total -eq $cmBefore.legacy.total) `
+        -Message "9z-CM.T7: ...and does NOT grow the legacy tail"
+
+    # The report is only useful if it MOVES; a static 'ready' would be worse than none.
+    Test-Result -Success ($cmAfter.total -gt $cmBefore.total) `
+        -Message "9z-CM.T8: NEGATIVE CONTROL - the report is live, not cached (total moved)"
+
+    # Report the actual tail for THIS estate. Phase 5 is gated on this reading zero.
+    Write-Host "    tail on this estate: legacy=$($cmStatus.legacy.total) (active=$($cmStatus.legacy.active), inactive=$($cmStatus.legacy.inactive)), keyed=$($cmStatus.keyed.total), secretless=$($cmStatus.secretless.total), endpoints-with-legacy=$($cmStatus.endpoints.Count)" -ForegroundColor Yellow
+    if ($cmStatus.endpoints.Count -gt 0) {
+        foreach ($e in ($cmStatus.endpoints | Select-Object -First 10)) {
+            $cmLabel = if ($e.endpointName) { $e.endpointName } else { $e.endpointId }
+            Write-Host "      ${cmLabel}: $($e.legacyTotal) legacy ($($e.legacyActive) active)" -ForegroundColor Yellow
+        }
+    }
+    Test-Result -Success ($cmStatus.endpoints.Count -eq 0 -or $cmStatus.readyToRetireLegacyPath -eq $false) `
+        -Message "9z-CM.T9: the phase-5 gate agrees with the per-endpoint queue (ready=$($cmStatus.readyToRetireLegacyPath), queue=$($cmStatus.endpoints.Count))"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId" -Method DELETE -Headers $headers
+} catch {
+    Test-Result -Success $false -Message "9z-CM: credential migration status section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-CM: Credential Migration Status Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

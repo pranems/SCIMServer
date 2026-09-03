@@ -114,7 +114,7 @@ hole exists to close unilaterally).
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
 | **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - . `findAllActiveByType` landed with W1.2; the per-endpoint cache and the composite index remain |
-| **P1** | ~~Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint~~ | resource plane | **High** | **DONE for BOTH types** - `bearer` v0.55.16, `oauth_client` v0.55.17 (hybrid `client-secret-<24 hex>-<secret>`, readable prefix kept). Measured **7 ms** against 10 active credentials, was ~2.9 s. Un-rotated legacy rows remain on bcrypt by design; phases 4-5 (report the tail, then retire the scan) are the remainder |
+| **P1** | ~~Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint~~ | resource plane | **High** | **DONE for BOTH types** - `bearer` v0.55.16, `oauth_client` v0.55.17 (hybrid `client-secret-<24 hex>-<secret>`, readable prefix kept). Measured **7 ms** against 10 active credentials, was ~2.9 s. **Phase 4 DONE (v0.55.18)** - `GET /admin/credentials/migration-status` measures the tail. Only **phase 5** (retire the scan, one-way) remains, gated on that report reading zero on every estate |
 | **P2** | ~~Nothing caps or prunes credentials or request-log rows~~ | resource plane + storage | Med | **DONE** (v0.55.15) |
 
 **P2 is DONE (v0.55.15).** Delivered in two slices:
@@ -155,6 +155,18 @@ about 68,000x faster than one bcrypt compare**, and no longer multiplied by N), 
 to preserve the database-dump resistance bcrypt gave for free, and a five-phase migration in which
 the **existing rotation flow is the upgrade path**. Retirement of the legacy scan is gated on a
 measured zero legacy count, not on elapsed time.
+
+**Phase 4 shipped v0.55.18, and measuring immediately corrected the measurement.** The first live
+run of `GET /admin/credentials/migration-status` reported **32 legacy credentials on an estate where
+every credential had just been minted in the keyed format**. All 32 were **WIF trusts**: a WIF row
+stores no secret (`credentialHash: ''`) and sets no `hashAlgo`, so it inherits the column default of
+`bcrypt` and looks legacy, while actually being verified as a JWT against a JWKS and never touching
+the bcrypt path. Left uncorrected, the phase-5 gate would have been **permanently shut** by rows that
+can never be migrated. The report now classifies by credential type first (`secretless`), which fixes
+existing and future rows with no data migration. **The lesson generalises past this bug:** a `TODO`
+reading "confirm the tail is empty" would have been discharged by a number that happened to be wrong
+in the safe direction, and nothing guarantees the next miscount is as harmless. Phase 5 stays gated
+on this report, and the report now has its own regression tests (`P4-S9`, `P4-S10`, `P4-X9`).
 
 ### 2.4 Structure and configuration
 

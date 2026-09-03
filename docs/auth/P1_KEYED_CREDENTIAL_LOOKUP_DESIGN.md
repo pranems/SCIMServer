@@ -220,7 +220,7 @@ flowchart LR
 | 1 **DONE** | Added `lookupKey` (unique), `secretHash`, `hashAlgo` (default `bcrypt`). Verification handles both. Strictly additive - every existing row stays valid. | yes |
 | 2 **DONE** | New `bearer` credentials mint `scim_<lookupKey>_<secret>` + HMAC. Legacy rows untouched. | yes |
 | 3 **DONE** | `POST .../rotate` issues the new format, so the existing rotation flow **is** the migration path - no new operator concept. | yes |
-| 4 TODO | Surface a per-endpoint count of remaining legacy credentials so the tail is **visible** rather than assumed. | yes |
+| 4 **DONE** | `GET /admin/credentials/migration-status` reports the remaining tail per endpoint, so it is **measured** rather than assumed. See [§4.4](#44-phase-4---the-measurement-surface). | yes |
 | 5 TODO | Only once the measured legacy count is zero across all estates: delete the loop and the `bcrypt` dependency. | one-way |
 
 **Phase 5 must be gated on measurement, not on elapsed time.** "It has been three
@@ -279,6 +279,59 @@ Until phase 5, the legacy scan still exists. It should:
 - iterate only credentials with `hashAlgo = 'bcrypt'`.
 
 Both narrow the window without changing behaviour for anyone.
+
+### 4.4 Phase 4 - the measurement surface
+
+`GET /scim/admin/credentials/migration-status` (admin-only) answers the one
+question phase 5 depends on:
+
+```json
+{
+  "generatedAt": "2026-09-03T02:41:07.912Z",
+  "total": 75,
+  "legacy": { "total": 0, "active": 0, "inactive": 0 },
+  "keyed": { "total": 59, "active": 51, "inactive": 8 },
+  "secretless": { "total": 16, "active": 16, "inactive": 0 },
+  "byAlgo": {
+    "bcrypt": 16,
+    "hmac-sha256-v1": 59
+  },
+  "readyToRetireLegacyPath": true,
+  "endpoints": []
+}
+```
+
+`endpoints[]` lists **only** endpoints that still hold legacy rows, so the array
+IS the work queue and an empty array means the work is done.
+
+**Two counting decisions carry the whole safety property.**
+
+**1. Inactive rows still count.** A deactivated credential can be brought back
+by `POST .../credentials/:id/activate`. If phase 5 had already deleted the
+bcrypt verifier, that credential would return and silently fail to
+authenticate. So the gate is `legacy.total === 0`, not `legacy.active === 0`.
+`P4-S2` and `P4-X4` pin this.
+
+**2. A WIF trust is `secretless`, not legacy - and this was found by
+measuring, not by reasoning.** The first run of this report against a live node
+showed **32 legacy credentials on an estate where every credential had just
+been minted in the keyed format**. They were all WIF trusts. A WIF row stores
+no secret at all (`credentialHash: ''`) and sets no `hashAlgo`, so it inherits
+the column default of `bcrypt` and *looks* legacy - but it is verified as a JWT
+against a JWKS and never touches the bcrypt path. Counted naively it is a
+legacy row that **can never be migrated**, so the gate would have been shut
+permanently. The report classifies by credential type first, which fixes both
+existing and future rows without a data migration. `P4-S9`, `P4-S10` and
+`P4-X9` are the regression tests.
+
+> This is the argument for phase 4 existing at all. A `TODO` that said
+> "check the tail is empty before phase 5" would have been satisfied by a
+> reading that was wrong in the safe direction *this* time - and there is no
+> reason to assume the next miscount would be as harmless.
+
+**Unrecognised algorithms fail closed.** Anything that is not provably
+`hmac-sha256-v1` and not a secretless type counts as legacy, so introducing a
+third algorithm cannot silently open the gate (`P4-S6`).
 
 ---
 

@@ -8,8 +8,9 @@
 /* eslint-disable @typescript-eslint/require-await */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
+import type { IEndpointCredentialRepository, CredentialAlgoCount } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import type { EndpointCredentialModel, EndpointCredentialCreateInput } from '../../../domain/models/endpoint-credential.model';
+import { HASH_ALGO_BCRYPT } from '../../../security/credential-token';
 
 @Injectable()
 export class InMemoryEndpointCredentialRepository implements IEndpointCredentialRepository {
@@ -74,6 +75,27 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
 
   async findById(id: string): Promise<EndpointCredentialModel | null> {
     return this.store.get(id) ?? null;
+  }
+
+  async countByHashAlgo(): Promise<CredentialAlgoCount[]> {
+    const buckets = new Map<string, CredentialAlgoCount>();
+    for (const c of this.store.values()) {
+      const algo = c.hashAlgo ?? HASH_ALGO_BCRYPT;
+      const key = `${c.endpointId}|${c.credentialType}|${algo}|${c.active}`;
+      const hit = buckets.get(key);
+      if (hit) {
+        hit.count += 1;
+      } else {
+        buckets.set(key, {
+          endpointId: c.endpointId,
+          credentialType: c.credentialType,
+          hashAlgo: algo,
+          active: c.active,
+          count: 1,
+        });
+      }
+    }
+    return Array.from(buckets.values());
   }
 
   async findByEndpoint(endpointId: string): Promise<EndpointCredentialModel[]> {
