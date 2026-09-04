@@ -687,7 +687,7 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 
 ## API Reference (Summary)
 
-**118 route handlers** across 32 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
+**118 route handlers** across 33 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
 
 ### Health & Version
 

@@ -4,7 +4,7 @@
 
 > **Version:** 0.55.20 - **Updated:** 2026-07-31  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
-> **118 route handlers** across 32 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
+> **118 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 
 ---
 
