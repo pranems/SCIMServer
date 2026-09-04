@@ -26,7 +26,6 @@ describe('AdminCredentialController', () => {
   let mockEndpointService: Record<string, jest.Mock>;
   let mockEventEmitter: { emit: jest.Mock };
   let mockWifResolver: { resolve: jest.Mock; verifyTrust: jest.Mock };
-  let mockWifValidator: { validate: jest.Mock; debug: jest.Mock };
   let loggerSpy: { info: jest.Mock; warn: jest.Mock; error: jest.Mock };
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
@@ -103,7 +102,6 @@ describe('AdminCredentialController', () => {
       // retention a no-op (isReady=false) so existing tests are unaffected.
       { isReady: jest.fn().mockReturnValue(false), encrypt: jest.fn(), decrypt: jest.fn() } as any,
       { getEffectiveVisibility: jest.fn().mockResolvedValue('always'), getServerVisibility: jest.fn().mockResolvedValue('always'), purgeRetainedSecrets: jest.fn() } as any,
-      (mockWifValidator = { validate: jest.fn(), debug: jest.fn() }) as any,
     );
   });
 
@@ -511,173 +509,9 @@ describe('AdminCredentialController', () => {
     });
   });
 
-  describe('WI-D7 - debugWifAssertion (assertion debugger dry-run)', () => {
-    const wifEndpoint = {
-      ...mockEndpoint,
-      profile: { settings: { WifCredentialsEnabled: true } },
-    };
-    const wifCred = {
-      ...mockCredential,
-      credentialType: 'wif',
-      metadata: {
-        expectedIssuer: 'https://idp/v2.0',
-        expectedSubject: 'sub-abc',
-        expectedAudience: 'api://app',
-        jwksUri: 'https://login.microsoftonline.com/tid/discovery/v2.0/keys',
-        allowedTenantId: 'tid',
-      },
-    };
-
-    beforeEach(() => {
-      mockEndpointService.getEndpoint.mockResolvedValue(wifEndpoint);
-      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([wifCred]);
-    });
-
-    it('runs the validator dry-run per trust and returns overallOutcome accept when a trust accepts', async () => {
-      mockWifValidator.debug.mockResolvedValue({
-        outcome: 'accept',
-        trace: { plane: 'token-mint', method: 'wif', outcome: 'accept', checks: [] },
-      });
-
-      const result = await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
-
-      expect(mockWifValidator.debug).toHaveBeenCalledWith(
-        'a.b.c',
-        expect.objectContaining({ expectedIssuer: 'https://idp/v2.0', jwksUri: wifCred.metadata.jwksUri }),
-      );
-      expect(result.overallOutcome).toBe('accept');
-      expect(result.results).toHaveLength(1);
-      expect(result.results[0].expectedIssuer).toBe('https://idp/v2.0');
-    });
-
-    it('returns overallOutcome reject with the per-trust reasonCode when the assertion fails', async () => {
-      mockWifValidator.debug.mockResolvedValue({
-        outcome: 'reject',
-        reasonCode: 'wif_audience_mismatch',
-        trace: { plane: 'token-mint', method: 'wif', outcome: 'reject', reasonCode: 'wif_audience_mismatch', checks: [] },
-      });
-
-      const result = await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
-
-      expect(result.overallOutcome).toBe('reject');
-      expect(result.results[0].reasonCode).toBe('wif_audience_mismatch');
-    });
-
-    it('rejects an empty assertion body with a 400', async () => {
-      await expect(
-        controller.debugWifAssertion(mockEndpoint.id, { assertion: '   ' }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects when WifCredentialsEnabled is off', async () => {
-      mockEndpointService.getEndpoint.mockResolvedValue({
-        ...mockEndpoint,
-        profile: { settings: { WifCredentialsEnabled: false } },
-      });
-      await expect(
-        controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-    });
-
-    it('surfaces a misconfigured trust row as a reject result instead of throwing', async () => {
-      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
-        { ...wifCred, metadata: { expectedIssuer: 'https://idp/v2.0' } }, // missing required fields
-      ]);
-      const result = await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
-      expect(result.overallOutcome).toBe('reject');
-      expect(result.results[0].reasonCode).toBe('wif_no_trust_configured');
-      expect(mockWifValidator.debug).not.toHaveBeenCalled();
-    });
-
-    // ── Phase 4 (auth-obs) - config-time audit event ──
-    it('Phase 4: emits an "Auth config change" success event (dryRun) when the debug accepts', async () => {
-      mockWifValidator.debug.mockResolvedValue({
-        outcome: 'accept',
-        trace: { plane: 'token-mint', method: 'wif', outcome: 'accept', checks: [] },
-      });
-      await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
-      const call = loggerSpy.info.mock.calls.find((c) => c[1] === 'Auth config change');
-      expect(call).toBeDefined();
-      expect(call![2]).toMatchObject({ action: 'wif_debug_assertion', outcome: 'success', dryRun: true, endpointId: mockEndpoint.id });
-    });
-
-    it('Phase 4: emits an "Auth config change" failure event (dryRun) with the reason code when the debug rejects', async () => {
-      mockWifValidator.debug.mockResolvedValue({
-        outcome: 'reject',
-        reasonCode: 'wif_audience_mismatch',
-        trace: { plane: 'token-mint', method: 'wif', outcome: 'reject', reasonCode: 'wif_audience_mismatch', checks: [] },
-      });
-      await controller.debugWifAssertion(mockEndpoint.id, { assertion: 'a.b.c' });
-      const call = loggerSpy.warn.mock.calls.find((c) => c[1] === 'Auth config change');
-      expect(call).toBeDefined();
-      expect(call![2]).toMatchObject({ action: 'wif_debug_assertion', outcome: 'failure', dryRun: true, reasonCode: 'wif_audience_mismatch' });
-    });
-  });
-
-  // ── Phase 4 (auth-obs) - verifyWifTrust config-time audit event ──
-  describe('Phase 4 - verifyWifTrust audit event', () => {
-    const wifEndpoint = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: true } } };
-    beforeEach(() => {
-      mockEndpointService.getEndpoint.mockResolvedValue(wifEndpoint);
-    });
-
-    it('emits an "Auth config change" success event when the verify passes', async () => {
-      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
-      await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys' } as never);
-      const call = loggerSpy.info.mock.calls.find((c) => c[1] === 'Auth config change');
-      expect(call).toBeDefined();
-      expect(call![2]).toMatchObject({ action: 'wif_verify', outcome: 'success', method: 'wif', endpointId: mockEndpoint.id });
-    });
-
-    it('emits an "Auth config change" failure event when the verify fails', async () => {
-      mockWifResolver.verifyTrust.mockResolvedValue({ ok: false, checks: [{ id: 'jwksReachable', label: 'x', ok: false }] });
-      await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys' } as never);
-      const call = loggerSpy.warn.mock.calls.find((c) => c[1] === 'Auth config change');
-      expect(call).toBeDefined();
-      expect(call![2]).toMatchObject({ action: 'wif_verify', outcome: 'failure' });
-    });
-  });
-
-  describe('V7 - verify persists lastVerifiedAt on a saved trust', () => {
-    const wifEndpoint = { ...mockEndpoint, profile: { settings: { WifCredentialsEnabled: true } } };
-    beforeEach(() => {
-      mockEndpointService.getEndpoint.mockResolvedValue(wifEndpoint);
-    });
-
-    it('stamps lastVerifiedAt on the credential when a passing verify supplies its credentialId', async () => {
-      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
-      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'wif-v7', credentialType: 'wif', credentialHash: '', metadata: { expectedIssuer: 'https://idp/v2.0' } });
-      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys', credentialId: 'wif-v7' } as never);
-      const meta = mockCredentialRepo.updateMetadata.mock.calls.at(-1)?.[1] as Record<string, unknown>;
-      expect(typeof meta.lastVerifiedAt).toBe('string');
-      expect(res.lastVerifiedAt).toBe(meta.lastVerifiedAt);
-      // The prior metadata is preserved.
-      expect(meta.expectedIssuer).toBe('https://idp/v2.0');
-    });
-
-    it('does NOT persist when no credentialId is supplied (pure dry-run)', async () => {
-      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
-      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys' } as never);
-      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
-      expect(res.lastVerifiedAt).toBeUndefined();
-    });
-
-    it('does NOT persist when the verify fails even with a credentialId', async () => {
-      mockWifResolver.verifyTrust.mockResolvedValue({ ok: false, checks: [{ id: 'jwksReachable', label: 'x', ok: false }] });
-      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'wif-v7', credentialType: 'wif', credentialHash: '' });
-      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys', credentialId: 'wif-v7' } as never);
-      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
-      expect(res.lastVerifiedAt).toBeUndefined();
-    });
-
-    it('does NOT persist when the credentialId is not a wif credential of this endpoint', async () => {
-      mockWifResolver.verifyTrust.mockResolvedValue({ ok: true, checks: [] });
-      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'br-1', credentialType: 'bearer' });
-      const res = await controller.verifyWifTrust(mockEndpoint.id, { expectedIssuer: 'https://idp/v2.0', jwksUri: 'https://idp/keys', credentialId: 'br-1' } as never);
-      expect(mockCredentialRepo.updateMetadata).not.toHaveBeenCalled();
-      expect(res.lastVerifiedAt).toBeUndefined();
-    });
-  });
+  // WI-D7 debugWifAssertion, the Phase 4 verifyWifTrust audit events and the V7
+  // lastVerifiedAt cases moved with their routes to
+  // admin-wif-diagnostics.controller.spec.ts (D1 step 1).
 
   describe('WI-13 - WIF trust claim-name input aliases + expectedTenantId', () => {
     beforeEach(() => {

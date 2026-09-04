@@ -8,6 +8,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { AdminWifDiagnosticsController } from './controllers/admin-wif-diagnostics.controller';
 import { CredentialMigrationController } from './controllers/credential-migration.controller';
 import { AdminConnectionInfoController } from './controllers/admin-connection-info.controller';
 import { AdminJwksHostController } from './controllers/admin-jwks-host.controller';
@@ -57,6 +58,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     SchemasController,
     AdminController,
     AdminCredentialController,
+    AdminWifDiagnosticsController,
     CredentialMigrationController,
     AdminConnectionInfoController,
     AdminAuthenticationMethodController,
