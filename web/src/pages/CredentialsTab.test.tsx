@@ -17,6 +17,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { CredentialsTab } from './CredentialsTab';
+import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 
 const mockUseEndpointOverview = vi.fn();
@@ -32,6 +33,7 @@ const mockAddJwksHost = vi.fn();
 const mockUpdateWif = vi.fn();
 const mockVerifyWif = vi.fn();
 const mockDebugWif = vi.fn();
+const mockUpdateConfigMutate = vi.fn();
 const mockNavigate = vi.fn();
 let mockRetainedSecrets: Record<string, string> = {};
 vi.mock('@tanstack/react-router', async () => {
@@ -81,6 +83,7 @@ vi.mock('../api/queries', async () => {
     // P5 - the unified Connect tab embeds ConnectionPanel + AuthDiagnosticsPanel;
     // stub their hooks so these tests need no live network.
     useConnectionRetainedSecrets: () => mockRetainedSecrets,
+    useUpdateEndpointConfig: () => ({ mutate: mockUpdateConfigMutate, isPending: false }),
     useAuthDecisions: () => ({ data: { count: 0, records: [] }, isLoading: false, error: null }),
   };
 });
@@ -688,7 +691,7 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-connect-tokenurl-cred-conn')).toBeInTheDocument();
   });
 
-  it('U2: an oauth_client credential row has a Connect button that reveals its params', () => {
+  it('P7: an oauth_client credential row shows its Connect params WITHOUT any click', () => {
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
       configFlags: { OAuthClientCredentialsAuthEnabled: true },
@@ -706,10 +709,9 @@ describe('CredentialsTab', () => {
     };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // The connect panel is hidden until Connect is clicked.
-    expect(screen.queryByTestId('credential-connect-panel-oc-1')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('credential-connect-oc-1'));
+    // P7 - the panel is rendered up front; the Connect toggle button is gone.
     expect(screen.getByTestId('credential-connect-panel-oc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-connect-oc-1')).not.toBeInTheDocument();
     // The client identifier is this credential's client id; the app URL is shown.
     expect(screen.getByTestId('credential-connect-clientid-oc-1').textContent).toContain('client-id-ep-1');
     expect(screen.getByTestId('credential-connect-appurl-oc-1')).toBeInTheDocument();
@@ -722,6 +724,9 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credential-connect-appurl-info-oc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-connect-tokenurl-info-oc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-connect-clientid-info-oc-1')).toBeInTheDocument();
+    // The secret still costs one deliberate click rather than rendering by default.
+    expect(screen.getByTestId('credential-connect-secret-reveal-oc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-connect-secret-oc-1')).not.toBeInTheDocument();
   });
 
   function wifTrustOverview(id: string): EndpointOverviewResponse {
@@ -830,21 +835,34 @@ describe('CredentialsTab', () => {
     expect(mockActivateMutate).toHaveBeenCalledWith('bc-1');
   });
 
+  it('P7: Rotate is a first-class card action, not buried in the overflow menu', () => {
+    mockRotateMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    // Visible on the card WITHOUT opening the overflow menu, and it fires the
+    // rotate mutation - presence alone would not prove it is still wired up.
+    const rotate = screen.getByTestId('credential-rotate-bc-1');
+    expect(rotate).toBeInTheDocument();
+    fireEvent.click(rotate);
+    expect(mockRotateMutate).toHaveBeenCalledWith('bc-1', expect.anything());
+  });
+
   it('W7: primary actions stay visible; secondary/destructive actions live in the overflow menu', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // Primary actions are visible directly on the card (bearer has a Connect button).
-    expect(screen.getByTestId('credential-connect-bc-1')).toBeInTheDocument();
+    // P7 - Connect is no longer a button (the panel is always rendered); Rotate
+    // was promoted OUT of the overflow menu onto the card.
+    expect(screen.queryByTestId('credential-connect-bc-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('credential-rotate-bc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-edit-label-bc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-export-bc-1')).toBeInTheDocument();
     // The overflow trigger is present; the secondary actions are hidden until opened.
     expect(screen.getByTestId('credential-more-bc-1')).toBeInTheDocument();
     expect(screen.queryByTestId('credential-delete-bc-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('credential-toggle-active-bc-1')).not.toBeInTheDocument();
-    // Opening the menu reveals Reveal / Rotate / Deactivate / Revoke.
+    // Opening the menu reveals Reveal / Deactivate / Revoke.
     fireEvent.click(screen.getByTestId('credential-more-bc-1'));
     expect(screen.getByTestId('credential-reveal-bc-1')).toBeInTheDocument();
-    expect(screen.getByTestId('credential-rotate-bc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-toggle-active-bc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-delete-bc-1')).toBeInTheDocument();
   });
@@ -886,7 +904,7 @@ describe('CredentialsTab', () => {
     };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    fireEvent.click(screen.getByTestId('credential-connect-oc-v4'));
+    fireEvent.click(screen.getByTestId('credential-connect-secret-reveal-oc-v4'));
     expect(screen.getByTestId('credential-connect-secret-oc-v4').textContent).toContain('super-secret-value');
   });
 
@@ -899,7 +917,7 @@ describe('CredentialsTab', () => {
     );
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    fireEvent.click(screen.getByTestId('credential-connect-bc-1'));
+    fireEvent.click(screen.getByTestId('credential-connect-secret-reveal-bc-1'));
     expect(screen.getByTestId('credential-connect-secret-bc-1').textContent).toContain('bearer-token-value');
   });
 
@@ -1782,8 +1800,8 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
       },
     );
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // Default tab = bearer; open the card's Connect subpanel.
-    fireEvent.click(screen.getByTestId('credential-connect-cred-b1'));
+    // Default tab = bearer; the panel is already open, so only the secret needs a click.
+    fireEvent.click(screen.getByTestId('credential-connect-secret-reveal-cred-b1'));
     // The retained secret is rendered inline (re-viewable) rather than hidden.
     expect(screen.getByTestId('credential-connect-secret-cred-b1').textContent).toContain('super-secret-token-value');
   });
@@ -1813,13 +1831,12 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
 
   // ─── W8 / W9 / W10: bearer Connect subpanel + rename + param tooltips ─
 
-  it('W8/W9/W10: a bearer credential card has a retractable Connect subpanel with the renamed header + InfoLabel help', () => {
+  it('W8/W9/W10 + P7: a bearer credential card renders its Connect subpanel up front with the renamed header + InfoLabel help', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     fireEvent.click(screen.getByTestId('credentials-method-tab-bearer'));
-    // W8 - the bearer card now carries a Connect button; the subpanel is hidden until clicked.
-    expect(screen.queryByTestId('credential-connect-panel-cred-b1')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('credential-connect-cred-b1'));
+    // P7 - the subpanel is visible without a click and the Connect toggle is gone.
+    expect(screen.queryByTestId('credential-connect-cred-b1')).not.toBeInTheDocument();
     const panel = screen.getByTestId('credential-connect-panel-cred-b1');
     // W9 - the subpanel header uses the renamed text.
     expect(panel.textContent).toContain('Connect this endpoint to IdP like Entra ID');
@@ -1831,5 +1848,117 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
     expect(screen.getByTestId('credential-connect-appurl-info-cred-b1')).toBeInTheDocument();
     // W6 - the bearer subpanel also carries the connection-bundle export.
     expect(screen.getByTestId('credential-connect-export-cred-b1-copy')).toBeInTheDocument();
+  });
+});
+
+// ─── P7: legacy-vs-keyed visibility + inline auth-method switches ──────
+
+describe('CredentialsTab - bcrypt to keyed migration surface (P7)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRetainedSecrets = {};
+  });
+
+  function overviewWith(hashAlgos: Array<string | undefined>): EndpointOverviewResponse {
+    return {
+      ...baseOverview,
+      configFlags: { SecretTokenBearerAuthEnabled: true },
+      credentials: hashAlgos.map((h, i) => ({
+        id: `bc-${i}`,
+        credentialType: 'bearer',
+        label: `cred ${i}`,
+        active: true,
+        createdAt: '2026-05-01T00:00:00Z',
+        expiresAt: null,
+        ...(h === undefined ? {} : { hashAlgo: h }),
+      })),
+    };
+  }
+
+  it('badges a bcrypt credential Legacy and a keyed one Keyed', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: overviewWith(['bcrypt', 'hmac-sha256-v1']),
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credential-hashalgo-bc-0').textContent).toContain('Legacy');
+    expect(screen.getByTestId('credential-hashalgo-bc-1').textContent).toContain('Keyed');
+  });
+
+  it('treats a MISSING hashAlgo as legacy, not as already-migrated', () => {
+    // Rows issued before the keyed migration carry no algo at all. Reading
+    // absence as "fine" would under-report exactly the rows that need work.
+    mockUseEndpointOverview.mockReturnValue({ data: overviewWith([undefined]), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('credential-hashalgo-bc-0').textContent).toContain('Legacy');
+    expect(screen.getByTestId('connect-legacy-banner')).toBeInTheDocument();
+  });
+
+  it('counts every legacy credential in the banner and hides it when none remain', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: overviewWith(['bcrypt', 'bcrypt', 'hmac-sha256-v1']),
+      isLoading: false,
+      error: null,
+    });
+    const { rerender } = renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.getByTestId('connect-legacy-banner').textContent).toContain('2 active credentials');
+
+    mockUseEndpointOverview.mockReturnValue({
+      data: overviewWith(['hmac-sha256-v1', 'hmac-sha256-v1']),
+      isLoading: false,
+      error: null,
+    });
+    rerender(<CredentialsTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('connect-legacy-banner')).not.toBeInTheDocument();
+  });
+
+  it('renders every auth-method switch inline and persists a toggle without leaving the tab', () => {
+    mockUpdateConfigMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({ data: overviewWith(['hmac-sha256-v1']), isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    for (const flag of AUTH_METHOD_FLAGS) {
+      expect(screen.getByTestId(`connect-auth-flag-${flag.key}`)).toBeInTheDocument();
+    }
+    // Assert the OUTCOME (the mutation body), not merely that a switch exists.
+    fireEvent.click(screen.getByTestId('connect-auth-flag-WifCredentialsEnabled'));
+    expect(mockUpdateConfigMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ profile: { settings: expect.objectContaining({ WifCredentialsEnabled: expect.any(Boolean) }) } }),
+    );
+  });
+
+  it('sends an explicit clientId on create so a second secret can share one client id', () => {
+    mockCreateMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...overviewWith(['bcrypt']), configFlags: { OAuthClientCredentialsAuthEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-create-button'));
+    const container = screen.getByTestId('credentials-clientid-input');
+    const clientIdInput = container.tagName === 'INPUT' ? container : container.querySelector('input') ?? container;
+    fireEvent.change(clientIdInput, { target: { value: 'client-id-existing' } });
+    fireEvent.click(screen.getByTestId('credentials-create-dialog-submit'));
+    expect(mockCreateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ credentialType: 'oauth_client', clientId: 'client-id-existing' }),
+      expect.anything(),
+    );
+  });
+
+  it('omits clientId when the field is left blank (server assigns a fresh one)', () => {
+    mockCreateMutate.mockClear();
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...overviewWith(['bcrypt']), configFlags: { OAuthClientCredentialsAuthEnabled: true } },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('credentials-create-button'));
+    fireEvent.click(screen.getByTestId('credentials-create-dialog-submit'));
+    expect(mockCreateMutate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ clientId: expect.anything() }),
+      expect.anything(),
+    );
   });
 });

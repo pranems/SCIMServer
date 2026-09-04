@@ -39,6 +39,11 @@ const repoRoot = join(__dirname, '..', '..', '..', '..');
 const SETTINGS_SOURCES = [
   join('web', 'src', 'pages', 'SettingsTab.tsx'),
   join('web', 'src', 'pages', 'SettingsPage.tsx'),
+  // The auth-method flags moved here when the Connect tab began rendering them
+  // inline as well; both pages import this one list. Leaving it out made all
+  // five read as unreachable, which is the gate working - a control the scan
+  // cannot see is indistinguishable from one that does not exist.
+  join('web', 'src', 'pages', 'endpoint-auth-flags.ts'),
 ];
 
 /**

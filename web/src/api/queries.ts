@@ -1483,6 +1483,12 @@ export function useCreateCredential(endpointId: string) {
       description?: string;
       expiresAt?: string;
       credentialType?: string;
+      /**
+       * Optional explicit client_id for an `oauth_client`. Reusing an existing
+       * one issues a SECOND secret under it, which is what makes a zero-downtime
+       * handover possible; omitted, the server assigns a fresh one.
+       */
+      clientId?: string;
       wif?: Record<string, unknown>;
       verify?: boolean;
     }) =>

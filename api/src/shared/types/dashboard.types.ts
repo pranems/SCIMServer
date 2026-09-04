@@ -308,6 +308,14 @@ export interface EndpointOverviewCredential {
    * Connect-to-Entra bundle. Absent for other credential types. Never a secret.
    */
   oauthClientId?: string | null;
+  /**
+   * Which verifier this row needs: `bcrypt` (legacy, O(N) scan) or
+   * `hmac-sha256-v1` (keyed, one indexed read). The migration-status report
+   * says HOW MANY are legacy; the operator acts per credential, so the UI
+   * needs to say WHICH. Public by nature - an algorithm name reveals nothing
+   * the token does not.
+   */
+  hashAlgo?: string | null;
 }
 
 /**

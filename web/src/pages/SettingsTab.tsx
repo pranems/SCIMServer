@@ -53,6 +53,7 @@ import {
   useUpdateEndpointConfig,
 } from '../api/queries';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
+import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 import { LoadingSkeleton, SettingsJsonExport } from '../components/primitives';
 
 // ─── Curated boolean flag registry ────────────────────────────────────
@@ -194,41 +195,15 @@ const BOOLEAN_FLAGS: ReadonlyArray<BoolFlag> = [
     defaultValue: false,
     category: 'Validation & schema',
   },
-  {
-    key: 'PerEndpointCredentialsEnabled',
-    label: 'PerEndpointCredentialsEnabled',
-    description: 'Validate the bearer token against this endpoint\'s credential set.',
-    defaultValue: false,
-    category: 'Authentication methods',
-  },
-  {
-    key: 'SecretTokenBearerAuthEnabled',
-    label: 'SecretTokenBearerAuthEnabled',
-    description: 'WI-11: accept a per-endpoint bcrypt bearer token (Entra "Secret Token"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
-    defaultValue: false,
-    category: 'Authentication methods',
-  },
-  {
-    key: 'OAuthClientCredentialsAuthEnabled',
-    label: 'OAuthClientCredentialsAuthEnabled',
-    description: 'WI-11: accept a per-endpoint oauth_client credential (Entra "OAuth2 client-credentials"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
-    defaultValue: false,
-    category: 'Authentication methods',
-  },
-  {
-    key: 'SharedSecretBearerAuthEnabled',
-    label: 'SharedSecretBearerAuthEnabled',
-    description: 'WI-11: whether this endpoint accepts the global SCIM shared secret. Turn OFF to make the endpoint accept only its own credentials. Defaults to on.',
-    defaultValue: true,
-    category: 'Authentication methods',
-  },
-  {
-    key: 'WifCredentialsEnabled',
-    label: 'WifCredentialsEnabled',
-    description: 'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',
-    defaultValue: false,
-    category: 'Authentication methods',
-  },
+  // The auth-method flags live in endpoint-auth-flags.ts because the Connect
+  // tab renders them inline too; a second copy here would drift.
+  ...AUTH_METHOD_FLAGS.map((f) => ({
+    key: f.key,
+    label: f.label,
+    description: f.description,
+    defaultValue: f.defaultValue,
+    category: 'Authentication methods' as FlagCategory,
+  })),
   // ── Logging & privacy ─────────────────────────────────────────────
   {
     key: 'PersistRequestSecrets',

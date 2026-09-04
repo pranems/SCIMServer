@@ -24,6 +24,7 @@ import type { IEndpointCredentialRepository } from '../../domain/repositories/en
 import { ConnectionInfoService } from '../scim/services/connection-info.service';
 import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
 import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
+import { HASH_ALGO_BCRYPT } from '../../security/credential-token';
 import type { EndpointConfig } from '../endpoint/endpoint-config.interface';
 import type {
   DashboardResponse,
@@ -251,6 +252,10 @@ export class DashboardController {
       ...(c.credentialType === 'oauth_client' && typeof c.metadata?.clientId === 'string'
         ? { oauthClientId: c.metadata.clientId }
         : {}),
+      // P1 phase 4: which verifier this row needs, so the Connect tab can flag
+      // the ones still on the legacy bcrypt path. A row with no stored algo
+      // predates the keyed migration and is therefore bcrypt.
+      hashAlgo: c.hashAlgo ?? HASH_ALGO_BCRYPT,
     }));
 
     // Recent activity projection - same shape as DashboardActivity but

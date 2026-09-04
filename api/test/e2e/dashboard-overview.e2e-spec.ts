@@ -192,6 +192,47 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     expect(cred).not.toHaveProperty('secretEnvelope');
   });
 
+  it('P7: the overview reports hashAlgo so the UI can flag credentials still on the legacy verifier', async () => {
+    const endpointRes = await request(app.getHttpServer() as any)
+      .post('/scim/admin/endpoints')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: `e2e-overview-algo-${Date.now()}`, profilePreset: 'rfc-standard' })
+      .expect(201);
+    const endpointId = endpointRes.body.id as string;
+
+    await request(app.getHttpServer() as any)
+      .patch(`/scim/admin/endpoints/${endpointId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ profile: { settings: { SecretTokenBearerAuthEnabled: 'True' } } })
+      .expect(200);
+
+    const credRes = await request(app.getHttpServer() as any)
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ credentialType: 'bearer', label: 'algo probe' })
+      .expect(201);
+    const credentialId = credRes.body.id as string;
+
+    const overviewRes = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/overview`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const cred = overviewRes.body.credentials.find((c: any) => c.id === credentialId);
+    expect(cred).toBeDefined();
+    // A credential minted today is keyed. Asserting the VALUE (not merely that
+    // the key exists) is what makes the UI's Legacy/Keyed badge trustworthy -
+    // a present-but-wrong algo would render a green badge over a legacy row.
+    expect(cred.hashAlgo).toBe('hmac-sha256-v1');
+    // The algo name is public, but it must not drag any secret material with it.
+    expect(cred).not.toHaveProperty('credentialHash');
+    expect(cred).not.toHaveProperty('secretHash');
+    expect(cred).not.toHaveProperty('lookupKey');
+  });
+
   it('X3/X4: a credential description is persisted and surfaced in the overview (never a secret)', async () => {
     const endpointRes = await request(app.getHttpServer() as any)
       .post('/scim/admin/endpoints')

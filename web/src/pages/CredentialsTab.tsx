@@ -46,6 +46,7 @@ import {
   AccordionItem,
   AccordionHeader,
   AccordionPanel,
+  Switch,
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -57,6 +58,8 @@ import {
   Warning24Regular,
   ShieldKeyhole24Regular,
   PlugConnected24Regular,
+  ArrowSync24Regular,
+  Eye24Regular,
 } from '@fluentui/react-icons';
 import {
   useEndpointOverview,
@@ -78,7 +81,9 @@ import {
   useDebugWifAssertion,
   type WifDebugAssertionResponse,
   useConnectionRetainedSecrets,
+  useUpdateEndpointConfig,
 } from '../api/queries';
+import { AUTH_METHOD_FLAGS, effectiveAuthFlag } from './endpoint-auth-flags';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import type { ConnectionInfo, ConnectionMethod } from '@scim/types/connection-info.types';
 import {
@@ -184,6 +189,14 @@ const useStyles = makeStyles({
     marginTop: '10px',
     paddingTop: '10px',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  // Percentage-free auto-fit so the switches wrap instead of overflowing at a
+  // narrow viewport (R5).
+  authFlagGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    columnGap: '16px',
+    rowGap: '4px',
   },
   connectRow: {
     display: 'grid',
@@ -365,6 +378,17 @@ const useWifStyles = makeStyles({
 
 export interface CredentialsTabProps {
   endpointId: string;
+}
+
+/**
+ * P7 - a credential is on the legacy verifier unless it explicitly says
+ * otherwise. Absence must read as bcrypt, not as "unknown, assume fine": rows
+ * issued before the keyed migration carry no algo at all, and treating those as
+ * already-migrated would under-report exactly the ones that need work.
+ */
+const KEYED_HASH_ALGO = 'hmac-sha256-v1';
+export function isLegacyHash(hashAlgo: string | null | undefined): boolean {
+  return hashAlgo !== KEYED_HASH_ALGO;
 }
 
 interface CreatedCredential {
@@ -1839,6 +1863,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const editLabelMutation = useEditCredentialLabel(endpointId);
   const revealMutation = useRevealCredential(endpointId);
   const rotateMutation = useRotateCredential(endpointId);
+  const configMutation = useUpdateEndpointConfig(endpointId);
 
   // V3 - which credential's label is being edited inline, + its draft value.
   const [editLabelId, setEditLabelId] = React.useState<string | null>(null);
@@ -1849,6 +1874,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const [labelInput, setLabelInput] = React.useState('');
   // X4 - optional operator description for the credential being created.
   const [descriptionInput, setDescriptionInput] = React.useState('');
+  const [clientIdInput, setClientIdInput] = React.useState('');
   // R7 - which credential type the create dialog will mint.
   const [createType, setCreateType] = React.useState<'bearer' | 'oauth_client'>('bearer');
   // R6 - the selected per-method sub-tab.
@@ -1883,6 +1909,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const onOpenCreate = (type: 'bearer' | 'oauth_client' = 'bearer'): void => {
     setLabelInput('');
     setDescriptionInput('');
+    setClientIdInput('');
     setCreateType(type);
     setCreateError(null);
     setCreatedCred(null);
@@ -1894,13 +1921,21 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
     setCreatedCred(null);
     setLabelInput('');
     setDescriptionInput('');
+    setClientIdInput('');
     setCreateError(null);
   };
 
   const onSubmitCreate = (): void => {
     setCreateError(null);
     createMutation.mutate(
-      { label: labelInput.trim() || undefined, description: descriptionInput.trim() || undefined, credentialType: createType },
+      {
+        label: labelInput.trim() || undefined,
+        description: descriptionInput.trim() || undefined,
+        credentialType: createType,
+        ...(createType === 'oauth_client' && clientIdInput.trim()
+          ? { clientId: clientIdInput.trim() }
+          : {}),
+      },
       {
         onSuccess: (raw) => {
           // Bearer returns { id, label, token, createdAt }; oauth_client
@@ -1986,6 +2021,13 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // method. `noMethods` covers the rare case where every auth method is disabled.
   const configFlags = (data?.configFlags ?? {}) as Record<string, unknown>;
   const methodTabs = enabledMethodTabs(configFlags);
+  // P7 - counted across ALL credentials, not just the active sub-tab: the point
+  // of the banner is to tell an operator there is work on this endpoint at all,
+  // and a legacy bearer is invisible from the oauth_client tab. WIF trusts hold
+  // no secret and are excluded.
+  const legacyActiveCount = credentials.filter(
+    (c) => c.active && c.credentialType !== 'wif' && isLegacyHash(c.hashAlgo),
+  ).length;
   const noMethods = methodTabs.length === 0;
   // Default to the first configured PER-ENDPOINT method (bearer / oauth_client /
   // wif) when one exists - that is the auth the operator deliberately set up for
@@ -2044,14 +2086,58 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         Set up, connect, and monitor authentication for this endpoint. Pick a method below to
         create/rotate its credential (Setup), copy the exact values to paste into your identity
         provider (Connect), and see its recent auth outcomes (Health). Secrets are shown here when
-        the credential secret visibility is set to Always.{' '}
+        the credential secret visibility is set to Always.
+      </Caption1>
+
+      {/* P7 - the auth-method switches, inline. Turning a method on is a
+          prerequisite for every other action on this tab, so sending the
+          operator to Settings and back was a round trip through an unrelated
+          page. Same flags, same mutation as Settings - one definition in
+          endpoint-auth-flags.ts. */}
+      <div className={classes.connectPanel} data-testid="connect-auth-methods">
+        <Caption1>
+          <strong>Authentication methods</strong> - which credential types this endpoint accepts.
+        </Caption1>
+        <div className={classes.authFlagGrid}>
+          {AUTH_METHOD_FLAGS.map((flag) => (
+            <Switch
+              key={flag.key}
+              checked={effectiveAuthFlag(configFlags as Record<string, unknown>, flag)}
+              disabled={configMutation.isPending}
+              label={flag.shortLabel}
+              title={flag.description}
+              onChange={(_, d) =>
+                configMutation.mutate({ profile: { settings: { [flag.key]: d.checked } } })
+              }
+              data-testid={`connect-auth-flag-${flag.key}`}
+            />
+          ))}
+        </div>
         <Link
           data-testid="connect-tab-link-settings"
           onClick={() => void navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } })}
         >
-          Enable / disable auth methods (Settings)
+          All endpoint settings
         </Link>
-      </Caption1>
+      </div>
+
+      {/* P7 - migration prompt. The credential badges say WHICH rows are legacy;
+          this says whether this endpoint has any at all, so an operator does not
+          have to scan every card to find out there is nothing to do. */}
+      {legacyActiveCount > 0 && (
+        <MessageBar intent="warning" data-testid="connect-legacy-banner">
+          <MessageBarBody>
+            <MessageBarTitle>
+              {legacyActiveCount} active credential{legacyActiveCount === 1 ? '' : 's'} still
+              {' '}on the legacy bcrypt verifier
+            </MessageBarTitle>
+            Legacy secrets are verified by scanning every active credential on this endpoint
+            (about 290ms each), and they block retiring that code path server-side. Rotate replaces
+            one with a keyed secret but revokes the old immediately - to keep both live during a
+            handover, add a second credential instead and revoke the old once traffic has moved.
+          </MessageBarBody>
+        </MessageBar>
+      )}
 
       {/* W11 - per-method sub-tabs (only enabled methods) are the single method axis. */}
       <TabList
@@ -2136,30 +2222,40 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                   {cred.active ? 'Active' : 'Revoked'}
                 </Badge>
-                {/* W7 - primary actions first (Connect, Edit, Export), the
-                    less-common + destructive actions in a "More" overflow menu. */}
-                {(cred.credentialType === 'oauth_client' || cred.credentialType === 'bearer') && (
-                  <Tooltip content="Connect this endpoint to IdP like Entra ID" relationship="label" positioning="above">
+                {/* P7 - which verifier this credential needs. A `bcrypt` row is
+                    on the legacy O(N) scan path and is what blocks retiring it
+                    server-side; the operator cannot act on that without being
+                    told WHICH row it is. WIF trusts hold no secret, so the
+                    badge would be meaningless there. */}
+                {cred.credentialType !== 'wif' && (
+                  <Badge
+                    appearance="tint"
+                    color={isLegacyHash(cred.hashAlgo) ? 'warning' : 'success'}
+                    data-testid={`credential-hashalgo-${cred.id}`}
+                  >
+                    {isLegacyHash(cred.hashAlgo) ? 'Legacy (bcrypt)' : 'Keyed'}
+                  </Badge>
+                )}
+                {/* P7 - Rotate was buried in the overflow menu even though it is
+                    the primary action of this whole tab during a migration. */}
+                {cred.active && cred.credentialType !== 'wif' && (
+                  <Tooltip
+                    content="Mint a new keyed secret. The old secret stops working immediately."
+                    relationship="label"
+                    positioning="above"
+                  >
                     <Button
-                      appearance="secondary"
-                      icon={<PlugConnected24Regular />}
+                      appearance={isLegacyHash(cred.hashAlgo) ? 'primary' : 'secondary'}
+                      icon={<ArrowSync24Regular />}
+                      disabled={rotateMutation.isPending}
                       onClick={() => {
-                        const next = connectCredId === cred.id ? null : cred.id;
-                        setConnectCredId(next);
-                        setConnectSecret(null);
-                        // V4 - auto-reveal the retained secret so it shows inline
-                        // with the params (a no-op when visibility is `once`).
-                        if (next) {
-                          revealMutation.mutate(next, {
-                            onSuccess: (r) =>
-                              setConnectSecret({ id: next, retained: r.retained, clientSecret: r.clientSecret, token: r.token }),
-                          });
-                        }
+                        setRotateResult(null);
+                        rotateMutation.mutate(cred.id, { onSuccess: (r) => setRotateResult(r) });
                       }}
-                      aria-label={`Show connection parameters for ${cred.label ?? cred.id}`}
-                      data-testid={`credential-connect-${cred.id}`}
+                      aria-label={`Rotate secret for ${cred.label ?? cred.id}`}
+                      data-testid={`credential-rotate-${cred.id}`}
                     >
-                      Connect
+                      Rotate
                     </Button>
                   </Tooltip>
                 )}
@@ -2198,18 +2294,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                           data-testid={`credential-reveal-${cred.id}`}
                         >
                           Reveal secret
-                        </MenuItem>
-                      )}
-                      {cred.active && cred.credentialType !== 'wif' && (
-                        <MenuItem
-                          onClick={() => {
-                            setRotateResult(null);
-                            rotateMutation.mutate(cred.id, { onSuccess: (r) => setRotateResult(r) });
-                          }}
-                          disabled={rotateMutation.isPending}
-                          data-testid={`credential-rotate-${cred.id}`}
-                        >
-                          Rotate secret
                         </MenuItem>
                       )}
                       <MenuItem
@@ -2283,9 +2367,14 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   </div>
                 </div>
               )}
-              {/* U2 / W8 - per-credential Connect params (in-card), for both
-                  oauth_client and bearer credentials. */}
-              {(cred.credentialType === 'oauth_client' || cred.credentialType === 'bearer') && connectCredId === cred.id && (
+              {/* U2 / W8 / P7 - per-credential Connect params, ALWAYS shown.
+                  These four values are the entire reason an operator opens this
+                  tab, and hiding them behind a toggle meant a click plus a hunt
+                  for every credential. Only the secret still costs a click,
+                  because auto-revealing every retained secret on render would
+                  put them all on screen by default and fire one request per
+                  card. */}
+              {(cred.credentialType === 'oauth_client' || cred.credentialType === 'bearer') && (
                 <div className={classes.connectPanel} data-testid={`credential-connect-panel-${cred.id}`}>
                   <Caption1>
                     <strong>Connect this endpoint to IdP like Entra ID</strong> - paste these into
@@ -2340,24 +2429,52 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       cred.credentialType === 'oauth_client'
                         ? connectSecret?.clientSecret
                         : connectSecret?.token;
-                    return connectSecret?.id === cred.id && connectSecret.retained && secretValue ? (
+                    if (connectSecret?.id === cred.id && connectSecret.retained && secretValue) {
+                      return (
+                        <div className={classes.connectRow}>
+                          <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
+                            {cred.credentialType === 'oauth_client' ? 'Client secret' : 'Secret token (bearer)'}
+                          </InfoLabel>
+                          <CopyableField
+                            value={secretValue}
+                            monospace
+                            truncate
+                            data-testid={`credential-connect-secret-${cred.id}`}
+                          />
+                        </div>
+                      );
+                    }
+                    if (connectSecret?.id === cred.id && !connectSecret.retained) {
+                      return (
+                        <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
+                          This endpoint does not retain secrets
+                          (CredentialSecretVisibility=once), so the{' '}
+                          {cred.credentialType === 'oauth_client' ? 'client secret' : 'bearer token'} cannot
+                          be shown again. Rotate to get a fresh one.
+                        </Caption1>
+                      );
+                    }
+                    return (
                       <div className={classes.connectRow}>
                         <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
                           {cred.credentialType === 'oauth_client' ? 'Client secret' : 'Secret token (bearer)'}
                         </InfoLabel>
-                        <CopyableField
-                          value={secretValue}
-                          monospace
-                          truncate
-                          data-testid={`credential-connect-secret-${cred.id}`}
-                        />
+                        <Button
+                          appearance="secondary"
+                          size="small"
+                          icon={<Eye24Regular />}
+                          disabled={!cred.active || revealMutation.isPending}
+                          onClick={() =>
+                            revealMutation.mutate(cred.id, {
+                              onSuccess: (r) =>
+                                setConnectSecret({ id: cred.id, retained: r.retained, clientSecret: r.clientSecret, token: r.token }),
+                            })
+                          }
+                          data-testid={`credential-connect-secret-reveal-${cred.id}`}
+                        >
+                          Reveal
+                        </Button>
                       </div>
-                    ) : (
-                      <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
-                        The {cred.credentialType === 'oauth_client' ? 'client secret' : 'bearer token'} is
-                        shown here when the endpoint retains it (CredentialSecretVisibility=always);
-                        otherwise Rotate to get a fresh one.
-                      </Caption1>
                     );
                   })()}
                 </div>
@@ -2436,6 +2553,24 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                 data-testid="credentials-description-input"
               />
             </Field>
+            {/* P7 - the zero-downtime handover. Reusing an existing client_id
+                issues a SECOND secret under it, so the old and new both mint
+                until the old is revoked. Left blank, the server assigns a fresh
+                client_id, which also works but makes the client change two
+                values instead of one. */}
+            {createType === 'oauth_client' && (
+              <Field
+                label="Client identifier (optional)"
+                hint="Leave blank for a new client id. Paste an EXISTING client id to issue a second secret under it - both secrets then work until you revoke the old one."
+              >
+                <Input
+                  value={clientIdInput}
+                  onChange={(_, d) => setClientIdInput(d.value)}
+                  placeholder="e.g. client-id-<endpointId>"
+                  data-testid="credentials-clientid-input"
+                />
+              </Field>
+            )}
           </div>
         )}
         {createdCred && createdCred.credentialType === 'oauth_client' && (
