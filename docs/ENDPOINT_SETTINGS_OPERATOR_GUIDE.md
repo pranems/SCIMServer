@@ -1,6 +1,6 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-07-31 - **Product version at capture:** `0.55.1`
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-04 - **Product version at capture:** `0.55.20`
 > **Every value in this document was measured against a running server**, not transcribed from source. The preset matrix in [Section 3](#3-preset-matrix-measured) was produced by creating one endpoint per preset on the live dev estate, reading back what the server actually published, and deleting them. The request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) are verbatim wire captures.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
@@ -82,6 +82,8 @@ flowchart LR
 ### 2.6 Authentication
 
 These five decide **who may call this endpoint's SCIM data plane**. They are covered in depth in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
+
+> These five are also editable **inline on the endpoint's Connect tab**, since enabling a method is a prerequisite for setting up its credential. Both surfaces read one definition (`web/src/pages/endpoint-auth-flags.ts`) and write the same setting, so it does not matter which you use.
 
 | Setting | What it actually does |
 |---|---|

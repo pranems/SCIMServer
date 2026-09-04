@@ -1,6 +1,6 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.20`
+> **Status:** User-facing reference - **Last verified:** 2026-09-04 - **Product version:** `0.55.20`
 
 > **Status:** Active | **Last Updated:** 2026-07-31 | **Version:** 0.55.20
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
@@ -215,7 +215,7 @@ Each row shows the type name, its endpoint path and its schema URN. **Create** a
 
 **Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`. One row per schema showing its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
 
-**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
+**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md). Three things worth knowing here: the **Authentication methods** switches are on this tab (you no longer detour to Settings to enable a method), each credential card renders its IdP connection values **without a click** (only the secret itself needs one), and **Rotate** is a button on the card rather than an overflow-menu item. Each card also carries a **Legacy (bcrypt)** or **Keyed** badge showing which verifier that credential still needs.
 
 **Logs** is this endpoint's slice of the request log, including the per-row auth outcome chip and the decision trace behind it. See [section 12](#12-logs).
 
