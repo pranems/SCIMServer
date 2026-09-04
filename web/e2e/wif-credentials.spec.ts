@@ -216,13 +216,11 @@ test.describe('CredentialsTab - Federated Identity (WIF) section', () => {
     });
     await bearerTab.click();
 
-    const connectBtn = page.locator('button[data-testid^="credential-connect-"]').first();
-    // Fixture seeds a bearer credential, so a Connect button MUST be present.
-    await expect(connectBtn, 'fixture bearer credential must expose a Connect button').toBeVisible({ timeout: 15_000 });
-    const testId = (await connectBtn.getAttribute('data-testid')) ?? '';
-    const credId = testId.replace(/^credential-connect-/, '');
-    await connectBtn.click();
-    await expect(page.getByTestId(`credential-connect-panel-${credId}`)).toBeVisible();
+    // P7 - the panel renders up front; there is no Connect button to click.
+    const panel = page.locator('[data-testid^="credential-connect-panel-"]').first();
+    await expect(panel, 'fixture bearer credential must expose a Connect panel').toBeVisible({ timeout: 15_000 });
+    const testId = (await panel.getAttribute('data-testid')) ?? '';
+    const credId = testId.replace(/^credential-connect-panel-/, '');
     // Common to both credential types: Application API URL.
     await expect(page.getByTestId(`credential-connect-appurl-${credId}`)).toBeVisible();
     // W6 - the subpanel carries a copy/download export of the IdP connection bundle.

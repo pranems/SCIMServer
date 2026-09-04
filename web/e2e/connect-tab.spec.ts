@@ -201,7 +201,7 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
     // (the endpoint ConnectionPanel is shared-secret-only). The oauth_client tab
     // is the default (first per-endpoint method); open the card's Connect
     // subpanel - the auto-reveal returns the retained secret.
-    await page.getByTestId('credential-connect-cred-r3').click();
+    await page.getByTestId('credential-connect-secret-reveal-cred-r3').click();
     await expect(page.getByTestId('credential-connect-secret-cred-r3')).toContainText('retained-secret-r3');
     // W9/W10 - the subpanel header names the IdP (Entra as the example) and each
     // parameter carries an InfoLabel help affordance.
@@ -287,7 +287,7 @@ test.describe('Connect tab - retained bearer secret (X2)', () => {
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
     // The bearer tab is the default (first per-endpoint method); open the card's
     // Connect subpanel - the auto-reveal returns the retained Secret Token.
-    await page.getByTestId('credential-connect-cred-x2').click();
+    await page.getByTestId('credential-connect-secret-reveal-cred-x2').click();
     await expect(page.getByTestId('credential-connect-secret-cred-x2')).toContainText('retained-bearer-token-x2');
     // The secret is labelled as the bearer Secret Token, not a client secret.
     await expect(page.getByTestId('credential-connect-secret-info-cred-x2')).toContainText(/Secret token/i);
