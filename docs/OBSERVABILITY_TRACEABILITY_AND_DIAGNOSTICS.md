@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.19`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.20`
 
 > **What this is.** The cross-cutting synthesis of how SCIMServer makes a request *observable*: the single correlation id and why it is not split into a trace/span family, the custom logging stack, the persistent request log, the SCIM/OAuth error envelopes with their diagnostics extension, and the Auth Decision Trace that renders one decision at three fidelities. It carries worked HTTP examples (headers + request/response bodies), Mermaid flows, endpoint tables, and an honest cross-domain comparison against W3C Trace Context, OpenTelemetry, Elastic Common Schema, and RFC 9457.
 

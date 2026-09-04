@@ -84,4 +84,140 @@ describe('ClientSecretTokenProvider (W2.3)', () => {
       expect(JSON.stringify(res.checks)).not.toContain('wrong-secret');
     }
   });
+
+  // ── P6: parallel credentials during a migration ────────────────────────────
+  //
+  // Every oauth_client credential on an endpoint shares one clientId
+  // (`client-id-<endpointId>`), so selecting the candidate with `.find()` meant
+  // only ONE could ever authenticate. The P2 caps allow five, and a live estate
+  // already had two active - so the second was dead weight that looked healthy
+  // in the UI, and `findActiveByEndpoint` has no `orderBy`, leaving which one
+  // wins unspecified on Postgres.
+  //
+  // This blocks the only zero-downtime migration path there is: issue the new
+  // keyed secret alongside the old one, let the integration owner switch at
+  // their convenience, then retire the old.
+  describe('P6 - more than one credential under the same clientId', () => {
+    const CID = 'client-id-11111111-1111-1111-1111-111111111111';
+
+    it('P6-T1: a legacy secret still authenticates when a KEYED credential was added alongside it', async () => {
+      const bcrypt = require('bcrypt');
+      const { mintOAuthClientSecret } = require('../../../security/credential-token');
+      const minted = mintOAuthClientSecret();
+      const legacyHash = await bcrypt.hash('client-secret-legacy-uuid', 4);
+
+      // Keyed row FIRST, so `.find()` would select it and never try the legacy one.
+      const { provider } = makeProvider([
+        {
+          credentialType: 'oauth_client',
+          credentialHash: 'p1-keyed-see-secretHash',
+          hashAlgo: 'hmac-sha256-v1',
+          lookupKey: minted.lookupKey,
+          secretHash: minted.secretHash,
+          metadata: { clientId: CID },
+        },
+        { credentialType: 'oauth_client', credentialHash: legacyHash, metadata: { clientId: CID } },
+      ]);
+
+      const res = await provider.mintFromClientSecret(ENDPOINT_ID, {
+        clientId: CID,
+        clientSecret: 'client-secret-legacy-uuid',
+        credentialLocation: 'client_secret_post',
+      });
+
+      expect(res.outcome).toBe('accept');
+    });
+
+    it('P6-T2: the NEW keyed secret authenticates when the legacy row is listed first', async () => {
+      const bcrypt = require('bcrypt');
+      const { mintOAuthClientSecret } = require('../../../security/credential-token');
+      const minted = mintOAuthClientSecret();
+      const legacyHash = await bcrypt.hash('client-secret-legacy-uuid', 4);
+
+      const { provider } = makeProvider([
+        { credentialType: 'oauth_client', credentialHash: legacyHash, metadata: { clientId: CID } },
+        {
+          credentialType: 'oauth_client',
+          credentialHash: 'p1-keyed-see-secretHash',
+          hashAlgo: 'hmac-sha256-v1',
+          lookupKey: minted.lookupKey,
+          secretHash: minted.secretHash,
+          metadata: { clientId: CID },
+        },
+      ]);
+
+      const res = await provider.mintFromClientSecret(ENDPOINT_ID, {
+        clientId: CID,
+        clientSecret: minted.token,
+        credentialLocation: 'client_secret_post',
+      });
+
+      expect(res.outcome).toBe('accept');
+    });
+
+    it('P6-T3: NEGATIVE CONTROL - a wrong secret is still refused with several credentials present', async () => {
+      const bcrypt = require('bcrypt');
+      const { mintOAuthClientSecret } = require('../../../security/credential-token');
+      const minted = mintOAuthClientSecret();
+      const { provider } = makeProvider([
+        { credentialType: 'oauth_client', credentialHash: await bcrypt.hash('one', 4), metadata: { clientId: CID } },
+        { credentialType: 'oauth_client', credentialHash: await bcrypt.hash('two', 4), metadata: { clientId: CID } },
+        {
+          credentialType: 'oauth_client',
+          credentialHash: 'p1-keyed-see-secretHash',
+          hashAlgo: 'hmac-sha256-v1',
+          lookupKey: minted.lookupKey,
+          secretHash: minted.secretHash,
+          metadata: { clientId: CID },
+        },
+      ]);
+
+      const res = await provider.mintFromClientSecret(ENDPOINT_ID, {
+        clientId: CID,
+        clientSecret: 'not-any-of-them',
+        credentialLocation: 'client_secret_post',
+      });
+
+      expect(res.outcome).toBe('reject');
+    });
+
+    it('P6-T4: a keyed secret is matched by its OWN lookupKey, not by position', async () => {
+      const { mintOAuthClientSecret } = require('../../../security/credential-token');
+      const a = mintOAuthClientSecret();
+      const b = mintOAuthClientSecret();
+      const row = (m: { lookupKey: string; secretHash: string }) => ({
+        credentialType: 'oauth_client',
+        credentialHash: 'p1-keyed-see-secretHash',
+        hashAlgo: 'hmac-sha256-v1',
+        lookupKey: m.lookupKey,
+        secretHash: m.secretHash,
+        metadata: { clientId: CID },
+      });
+      const { provider } = makeProvider([row(a), row(b)]);
+
+      // b is second; a positional match would fail it.
+      const res = await provider.mintFromClientSecret(ENDPOINT_ID, {
+        clientId: CID,
+        clientSecret: b.token,
+        credentialLocation: 'client_secret_post',
+      });
+
+      expect(res.outcome).toBe('accept');
+    });
+
+    it('P6-T5: a credential for a DIFFERENT clientId is never considered', async () => {
+      const bcrypt = require('bcrypt');
+      const { provider } = makeProvider([
+        { credentialType: 'oauth_client', credentialHash: await bcrypt.hash('right', 4), metadata: { clientId: 'other-client' } },
+      ]);
+
+      const res = await provider.mintFromClientSecret(ENDPOINT_ID, {
+        clientId: CID,
+        clientSecret: 'right',
+        credentialLocation: 'client_secret_post',
+      });
+
+      expect(res.outcome).toBe('reject');
+    });
+  });
 });

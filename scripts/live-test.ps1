@@ -15627,6 +15627,41 @@ try {
     Test-Result -Success ([string]::IsNullOrWhiteSpace($clRotMinted.access_token) -eq $false) `
         -Message "9z-CL.T14: the rotated hybrid secret still mints (public clientId survives rotation)"
 
+    # --- P6: two oauth_client credentials on ONE endpoint must BOTH mint ---
+    # Every oauth_client credential on an endpoint shares one clientId
+    # (`client-id-<endpointId>`), and the token endpoint used to select the
+    # candidate with `.find()` - so a second credential SHADOWED the first, and
+    # the row order is unspecified on Postgres. That blocked the only
+    # zero-downtime migration path: issue the new secret alongside the old, let
+    # the integration owner switch when convenient, then retire the old.
+    $clSecondCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'oauth_client'; label = 'cl-parallel-second' } | ConvertTo-Json) -ContentType 'application/json'
+    Test-Result -Success ($clSecondCred.clientId -eq $clOauthRot.clientId) `
+        -Message "9z-CL.T15: a second oauth_client credential shares the endpoint's clientId (that is why shadowing was possible)"
+
+    $clFirstBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clOauthRot.clientId))&client_secret=$([uri]::EscapeDataString($clOauthRot.clientSecret))"
+    $clFirstStill = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+        -Body $clFirstBody -ContentType 'application/x-www-form-urlencoded'
+    Test-Result -Success ([string]::IsNullOrWhiteSpace($clFirstStill.access_token) -eq $false) `
+        -Message "9z-CL.T16: the FIRST secret still mints after a second credential was added (no shadowing)"
+
+    $clSecondBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clSecondCred.clientId))&client_secret=$([uri]::EscapeDataString($clSecondCred.clientSecret))"
+    $clSecondMint = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+        -Body $clSecondBody -ContentType 'application/x-www-form-urlencoded'
+    Test-Result -Success ([string]::IsNullOrWhiteSpace($clSecondMint.access_token) -eq $false) `
+        -Message "9z-CL.T17: ...and so does the SECOND - the overlap IS the grace period"
+
+    $clBothRefused = $false
+    try {
+        $clBadParallel = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clSecondCred.clientId))&client_secret=client-secret-$('b'*24)-forged"
+        $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+            -Body $clBadParallel -ContentType 'application/x-www-form-urlencoded'
+    } catch {
+        if ((Get-HttpErrorStatus $_) -eq 401) { $clBothRefused = $true }
+    }
+    Test-Result -Success $clBothRefused `
+        -Message "9z-CL.T18: NEGATIVE CONTROL - a forged secret is still refused with two credentials present"
+
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId2" -Method DELETE -Headers $headers

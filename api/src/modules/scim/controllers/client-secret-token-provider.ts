@@ -54,22 +54,50 @@ export class ClientSecretTokenProvider {
     req: ClientSecretMintRequest,
   ): Promise<ClientSecretMintOutcome> {
     const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
-    const candidate = credentials.find(
+    const candidates = credentials.filter(
       (c) => c.credentialType === 'oauth_client' && c.metadata?.clientId === req.clientId,
     );
 
-    // P1 hybrid: a secret minted after v0.55.17 carries its own lookup key and is
-    // verified with one peppered HMAC. Legacy `client-secret-<uuid>` secrets have
-    // no key, so they keep the bcrypt path until rotated. The candidate is still
-    // selected by clientId either way - that is the contract the caller presents.
+    // P6: every oauth_client credential on an endpoint shares one clientId
+    // (`client-id-<endpointId>`), so picking the candidate with `.find()` meant
+    // only ONE could ever authenticate - while the P2 caps allow five, and
+    // `findActiveByEndpoint` has no `orderBy`, leaving WHICH one unspecified on
+    // Postgres. That also blocked the only zero-downtime migration path: issue
+    // the new keyed secret alongside the old, let the integration owner switch
+    // when convenient, then retire the old.
+    //
+    // P1 hybrid: a secret minted after v0.55.17 carries its own lookup key, so
+    // it names its row exactly - no scan, unambiguous at any number of
+    // credentials. Legacy `client-secret-<uuid>` secrets carry nothing
+    // identifying, so each pre-migration row must be tried; that loop is bounded
+    // by MaxActiveOAuthClientCredentials and shrinks as rotation progresses.
     const parsed = parseCredentialToken(req.clientSecret);
-    const secretValid =
-      candidate == null
-        ? false
-        : parsed != null && candidate.hashAlgo === HASH_ALGO_HMAC_V1 && candidate.secretHash
-          ? candidate.lookupKey === parsed.lookupKey &&
-            verifySecretHash(parsed.secret, candidate.secretHash)
-          : await bcrypt.compare(req.clientSecret, candidate.credentialHash);
+    let candidate: (typeof candidates)[number] | undefined;
+
+    if (parsed) {
+      const keyed = candidates.find(
+        (c) => c.hashAlgo === HASH_ALGO_HMAC_V1 && c.lookupKey === parsed.lookupKey,
+      );
+      if (keyed?.secretHash && verifySecretHash(parsed.secret, keyed.secretHash)) {
+        candidate = keyed;
+      }
+    }
+
+    if (!candidate) {
+      for (const c of candidates) {
+        if (c.hashAlgo === HASH_ALGO_HMAC_V1) continue;
+        if (await bcrypt.compare(req.clientSecret, c.credentialHash)) {
+          candidate = c;
+          break;
+        }
+      }
+    }
+
+    // `client_found` answers "is this clientId registered at all", which is not
+    // the same question as "did a secret verify" - keep them distinct so the
+    // trace still tells an operator which half failed.
+    const clientFound = candidates.length > 0;
+    const secretValid = candidate != null;
 
     // The per-check trace: real expected-vs-received, never the secret value.
     const checks: AuthCheck[] = [
@@ -88,9 +116,9 @@ export class ClientSecretTokenProvider {
       },
       {
         id: 'client_found',
-        status: candidate != null ? 'pass' : 'fail',
+        status: clientFound ? 'pass' : 'fail',
         expected: '(a registered oauth_client for this endpoint)',
-        received: candidate != null ? 'found' : 'not found',
+        received: clientFound ? 'found' : 'not found',
       },
       {
         id: 'secret_match',

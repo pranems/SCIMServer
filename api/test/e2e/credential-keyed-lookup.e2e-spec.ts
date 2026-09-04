@@ -7,7 +7,12 @@ import { getAuthToken } from './helpers/auth.helper';
 import { createEndpointWithConfig } from './helpers/request.helper';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../src/domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../src/domain/repositories/endpoint-credential.repository.interface';
-import { CREDENTIAL_TOKEN_PREFIX, HASH_ALGO_HMAC_V1 } from '../../src/security/credential-token';
+import {
+  CREDENTIAL_TOKEN_PREFIX,
+  HASH_ALGO_HMAC_V1,
+  P1_KEYED_HASH_PLACEHOLDER,
+  mintOAuthClientSecret,
+} from '../../src/security/credential-token';
 
 /**
  * P1 - keyed credential lookup, over HTTP.
@@ -284,6 +289,121 @@ describe('P1 keyed credential lookup (E2E)', () => {
       // The public clientId must survive rotation - only the secret changes.
       const res = await mintToken(endpointId, rotated.body.clientId as string, secret);
       expect(res.status).toBe(200);
+    });
+  });
+
+  // ── P6: the zero-downtime migration path ───────────────────────────────────
+  //
+  // Rotation is destructive: it invalidates the owner's secret the moment it
+  // runs. For an integration we do not control (a live Entra provisioning job),
+  // the only humane path is to issue the NEW secret alongside the old, let the
+  // owner switch when convenient, and retire the old afterwards.
+  //
+  // That was impossible before v0.55.20: every oauth_client credential on an
+  // endpoint shares one clientId, and the token endpoint selected the candidate
+  // with `.find()` - so a second credential could SHADOW the working one, and
+  // `findActiveByEndpoint` has no `orderBy`, leaving which one wins unspecified.
+  describe('P6: a new secret can run alongside the old one', () => {
+    const mintToken = (endpointId: string, clientId: string, clientSecret: string) =>
+      request(app.getHttpServer())
+        .post(`/scim/endpoints/${endpointId}/oauth/token`)
+        .type('form')
+        .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret });
+
+    it('P6-X1: the legacy secret still mints AFTER a keyed one is added under the same clientId', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const legacySecret = `client-secret-${randomUUID()}`;
+      const clientId = `parallel-client-${Date.now()}`;
+
+      await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: await bcrypt.hash(legacySecret, 10),
+        label: 'legacy-still-in-use',
+        metadata: { clientId },
+      });
+
+      const minted = mintOAuthClientSecret();
+      await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: P1_KEYED_HASH_PLACEHOLDER,
+        label: 'new-keyed-alongside',
+        metadata: { clientId },
+        lookupKey: minted.lookupKey,
+        secretHash: minted.secretHash,
+        hashAlgo: minted.hashAlgo,
+      });
+
+      // BOTH must work - that overlap IS the grace period.
+      expect((await mintToken(endpointId, clientId, legacySecret)).status).toBe(200);
+      expect((await mintToken(endpointId, clientId, minted.token)).status).toBe(200);
+    });
+
+    it('P6-X2: retiring the legacy row leaves the keyed one working', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const legacySecret = `client-secret-${randomUUID()}`;
+      const clientId = `cutover-client-${Date.now()}`;
+
+      const legacy = await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: await bcrypt.hash(legacySecret, 10),
+        label: 'legacy-to-retire',
+        metadata: { clientId },
+      });
+      const minted = mintOAuthClientSecret();
+      await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: P1_KEYED_HASH_PLACEHOLDER,
+        label: 'keyed-survivor',
+        metadata: { clientId },
+        lookupKey: minted.lookupKey,
+        secretHash: minted.secretHash,
+        hashAlgo: minted.hashAlgo,
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/scim/admin/endpoints/${endpointId}/credentials/${legacy.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+
+      expect((await mintToken(endpointId, clientId, minted.token)).status).toBe(200);
+      expect((await mintToken(endpointId, clientId, legacySecret)).status).toBe(401);
+    });
+
+    it('P6-X3: NEGATIVE CONTROL - a wrong secret is refused even with several credentials present', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        OAuthClientCredentialsAuthEnabled: true,
+      });
+      const clientId = `neg-client-${Date.now()}`;
+      for (const label of ['one', 'two']) {
+        await repo.create({
+          endpointId,
+          credentialType: 'oauth_client',
+          credentialHash: await bcrypt.hash(`client-secret-${randomUUID()}`, 10),
+          label,
+          metadata: { clientId },
+        });
+      }
+      const minted = mintOAuthClientSecret();
+      await repo.create({
+        endpointId,
+        credentialType: 'oauth_client',
+        credentialHash: P1_KEYED_HASH_PLACEHOLDER,
+        label: 'three',
+        metadata: { clientId },
+        lookupKey: minted.lookupKey,
+        secretHash: minted.secretHash,
+        hashAlgo: minted.hashAlgo,
+      });
+
+      expect((await mintToken(endpointId, clientId, 'client-secret-not-any-of-them')).status).toBe(401);
     });
   });
 });
