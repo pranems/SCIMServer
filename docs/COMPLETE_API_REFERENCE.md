@@ -1,6 +1,6 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.20`
+> **Status:** User-facing reference - **Last verified:** 2026-09-03 - **Product version:** `0.55.20`
 
 > **Version:** 0.55.20 - **Updated:** 2026-07-31  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
@@ -2434,6 +2434,9 @@ The `urn:scimserver:api:messages:2.0:Diagnostics` extension is automatically add
 | 12 | POST | `/scim/admin/endpoints/:id/credentials` | Bearer | AdminCredentialController |
 | 13 | GET | `/scim/admin/endpoints/:id/credentials` | Bearer | AdminCredentialController |
 | 14 | DELETE | `/scim/admin/endpoints/:id/credentials/:cid` | Bearer | AdminCredentialController |
+| 14a | POST | `/scim/admin/endpoints/:id/wif/resolve` | Bearer | AdminWifDiagnosticsController (config-time issuer + JWKS discovery) |
+| 14b | POST | `/scim/admin/endpoints/:id/wif/verify` | Bearer | AdminWifDiagnosticsController (reachability + liveness checklist) |
+| 14c | POST | `/scim/admin/endpoints/:id/wif/debug-assertion` | Bearer | AdminWifDiagnosticsController (assertion dry-run, mints nothing) |
 | 15 | GET | `/scim/admin/logs` | Bearer | AdminController |
 | 16 | GET | `/scim/admin/logs/:id` | Bearer | AdminController |
 | 17 | POST | `/scim/admin/logs/clear` | Bearer | AdminController |
