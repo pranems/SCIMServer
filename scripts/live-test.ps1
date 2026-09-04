@@ -15627,28 +15627,48 @@ try {
     Test-Result -Success ([string]::IsNullOrWhiteSpace($clRotMinted.access_token) -eq $false) `
         -Message "9z-CL.T14: the rotated hybrid secret still mints (public clientId survives rotation)"
 
-    # --- P6: two oauth_client credentials on ONE endpoint must BOTH mint ---
-    # Every oauth_client credential on an endpoint shares one clientId
-    # (`client-id-<endpointId>`), and the token endpoint used to select the
-    # candidate with `.find()` - so a second credential SHADOWED the first, and
-    # the row order is unspecified on Postgres. That blocked the only
-    # zero-downtime migration path: issue the new secret alongside the old, let
-    # the integration owner switch when convenient, then retire the old.
+    # --- P6: two oauth_client credentials sharing ONE clientId must BOTH mint ---
+    # Create auto-assigns a FRESH `client-id-<uuid>` to the second and later
+    # oauth_client credentials, so the collision is NOT the default - it is
+    # reachable only when the operator passes an explicit duplicate clientId,
+    # which is precisely how a zero-downtime secret handover is done: issue the
+    # new secret under the SAME clientId, let the integration owner switch when
+    # convenient, then retire the old. The token endpoint used to pick the
+    # candidate with `.find()`, so the second credential SHADOWED the first and
+    # the row order is unspecified on Postgres.
+    #
+    # The explicit clientId is the whole point of this block. Omit it and the
+    # two credentials get distinct clientIds, `.find()` is unambiguous, and
+    # T16/T17 pass with or without the fix - a test that proves nothing.
     $clSecondCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId/credentials" -Method POST -Headers $headers `
-        -Body (@{ credentialType = 'oauth_client'; label = 'cl-parallel-second' } | ConvertTo-Json) -ContentType 'application/json'
+        -Body (@{ credentialType = 'oauth_client'; label = 'cl-parallel-second'; clientId = $clOauthRot.clientId } | ConvertTo-Json) -ContentType 'application/json'
     Test-Result -Success ($clSecondCred.clientId -eq $clOauthRot.clientId) `
-        -Message "9z-CL.T15: a second oauth_client credential shares the endpoint's clientId (that is why shadowing was possible)"
+        -Message "9z-CL.T15: a second oauth_client credential can be issued under the SAME clientId (the handover path)"
+    Test-Result -Success ($clSecondCred.clientSecret -ne $clOauthRot.clientSecret) `
+        -Message "9z-CL.T15b: ...with a DIFFERENT secret (otherwise there is nothing to hand over)"
 
+    # T16/T17 are the two halves of the P6 fix, and either can fail with a 401
+    # rather than a falsy body. Catch per-test: letting the 401 escape to the
+    # section-level handler reports "section threw" and names no test, which is
+    # exactly how this read on the pre-fix binary during the negative control.
     $clFirstBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clOauthRot.clientId))&client_secret=$([uri]::EscapeDataString($clOauthRot.clientSecret))"
-    $clFirstStill = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
-        -Body $clFirstBody -ContentType 'application/x-www-form-urlencoded'
-    Test-Result -Success ([string]::IsNullOrWhiteSpace($clFirstStill.access_token) -eq $false) `
+    $clFirstOk = $false
+    try {
+        $clFirstStill = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+            -Body $clFirstBody -ContentType 'application/x-www-form-urlencoded'
+        $clFirstOk = [string]::IsNullOrWhiteSpace($clFirstStill.access_token) -eq $false
+    } catch { $clFirstOk = $false }
+    Test-Result -Success $clFirstOk `
         -Message "9z-CL.T16: the FIRST secret still mints after a second credential was added (no shadowing)"
 
     $clSecondBody = "grant_type=client_credentials&client_id=$([uri]::EscapeDataString($clSecondCred.clientId))&client_secret=$([uri]::EscapeDataString($clSecondCred.clientSecret))"
-    $clSecondMint = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
-        -Body $clSecondBody -ContentType 'application/x-www-form-urlencoded'
-    Test-Result -Success ([string]::IsNullOrWhiteSpace($clSecondMint.access_token) -eq $false) `
+    $clSecondOk = $false
+    try {
+        $clSecondMint = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$clOauthId/oauth/token" -Method POST `
+            -Body $clSecondBody -ContentType 'application/x-www-form-urlencoded'
+        $clSecondOk = [string]::IsNullOrWhiteSpace($clSecondMint.access_token) -eq $false
+    } catch { $clSecondOk = $false }
+    Test-Result -Success $clSecondOk `
         -Message "9z-CL.T17: ...and so does the SECOND - the overlap IS the grace period"
 
     $clBothRefused = $false
@@ -15661,6 +15681,17 @@ try {
     }
     Test-Result -Success $clBothRefused `
         -Message "9z-CL.T18: NEGATIVE CONTROL - a forged secret is still refused with two credentials present"
+
+    # T19 locks the design fact that makes the T15 collision DELIBERATE rather
+    # than accidental: without an explicit clientId, create hands the second and
+    # later oauth_client credentials a fresh `client-id-<uuid>`. An earlier draft
+    # of this section assumed the opposite and shipped two tests that passed
+    # trivially. If this ever flips to auto-collide, T16/T17 stop proving the
+    # fix and start proving the default - so this assertion guards them.
+    $clThirdCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId/credentials" -Method POST -Headers $headers `
+        -Body (@{ credentialType = 'oauth_client'; label = 'cl-parallel-third' } | ConvertTo-Json) -ContentType 'application/json'
+    Test-Result -Success ($clThirdCred.clientId -ne $clOauthRot.clientId) `
+        -Message "9z-CL.T19: an oauth_client created WITHOUT an explicit clientId gets a distinct one (collision is opt-in)"
 
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clOauthId" -Method DELETE -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$clId" -Method DELETE -Headers $headers
