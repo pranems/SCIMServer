@@ -44,7 +44,7 @@ export interface CredentialMigrationStatus {
    * row, since `legacy.inactive` rows survive and remain reactivatable.
    */
   readyToRetireLegacyPath: boolean;
-  /** Only endpoints that still hold legacy rows - the list IS the work queue. */
+  /** Only endpoints that still hold ACTIVE legacy rows - the list IS the work queue. */
   endpoints: EndpointLegacyCredentials[];
 }
 
@@ -124,9 +124,17 @@ export class CredentialMigrationService {
       secretless,
       byAlgo,
       readyToRetireLegacyPath: legacy.active === 0,
+      // The queue must contain WORK, so it is filtered on ACTIVE legacy rows -
+      // the same condition as the gate above. Filtering on legacyTotal instead
+      // left an endpoint whose legacy rows were all revoked sitting in the queue
+      // forever while the gate said ready, which is incoherent: an inactive row
+      // cannot authenticate and never enters the bcrypt scan
+      // (`findActiveByEndpoint`), so there is nothing to rotate. Surfaced by
+      // 9z-CM.T9 the moment dev became the first estate to reach active=0 with
+      // inactive rows left over.
       endpoints: Array.from(perEndpoint.values())
-        .filter((e) => e.legacyTotal > 0)
-        .sort((a, b) => b.legacyTotal - a.legacyTotal),
+        .filter((e) => e.legacyActive > 0)
+        .sort((a, b) => b.legacyActive - a.legacyActive),
     };
   }
 

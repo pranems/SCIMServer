@@ -179,7 +179,28 @@ describe('CredentialMigrationService (P1 phase 4)', () => {
 
     expect(report.byAlgo[HASH_ALGO_BCRYPT]).toBe(5);
     expect(report.byAlgo[HASH_ALGO_HMAC_V1]).toBe(4);
-    expect(report.endpoints).toHaveLength(2);
+    // EP_B's 3 bcrypt rows are INACTIVE, so it carries no work and is not in the
+    // queue. byAlgo still counts them - it is a census of the estate, not a
+    // to-do list.
+    expect(report.endpoints.map((e) => e.endpointId)).toEqual([EP_A]);
+  });
+
+  it('P4-S8b: the queue and the phase-5 gate cannot disagree', async () => {
+    // Coherence property. Filtering the queue on legacyTotal while gating on
+    // legacy.active let an endpoint whose legacy rows were all revoked sit in
+    // the queue forever while the gate reported ready. Caught live by 9z-CM.T9
+    // the moment an estate first reached active=0 with inactive rows left.
+    credRepo.countByHashAlgo.mockResolvedValue([
+      { endpointId: EP_A, hashAlgo: HASH_ALGO_BCRYPT, active: false, count: 5 },
+      { endpointId: EP_B, hashAlgo: HASH_ALGO_HMAC_V1, active: true, count: 2 },
+    ]);
+
+    const report = await service.getMigrationStatus();
+
+    expect(report.readyToRetireLegacyPath).toBe(true);
+    expect(report.endpoints).toEqual([]);
+    // The inactive rows are still REPORTED, just not queued as work.
+    expect(report.legacy.inactive).toBe(5);
   });
 
   it('P4-S9: a WIF trust is SECRETLESS, not legacy - it would block the gate forever', async () => {
