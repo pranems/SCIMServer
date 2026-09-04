@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-04 - **Product version:** `0.55.20`
+> **Status:** User-facing reference - **Last verified:** 2026-09-04 - **Product version:** `0.55.21`
 
-> **Status:** Active | **Last Updated:** 2026-07-31 | **Version:** 0.55.20
+> **Status:** Active | **Last Updated:** 2026-07-31 | **Version:** 0.55.21
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
 >
