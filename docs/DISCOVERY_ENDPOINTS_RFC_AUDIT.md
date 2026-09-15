@@ -46,7 +46,7 @@ SCIMServer exposes all three RFC-mandated discovery endpoints (`/ServiceProvider
 
 **Cross-cutting rules (all three endpoints):**
 
-1. **SHALL NOT require authentication** - RFC 7644 §4 explicitly states: *"service provider configuration endpoints...SHALL NOT require authentication"*
+1. **Authentication is deployment policy** - RFC 7644 §4 defines the GET discovery contract but does not require anonymous access. RFC 7644 §2 permits standard HTTP authentication and §2.2 says anonymous requests MAY be accepted. This server intentionally exposes discovery without authentication for interoperability.
 2. **`application/scim+json`** content type on all responses
 3. **Read-only** - only `GET` is defined; no `POST`/`PUT`/`PATCH`/`DELETE`
 4. **No filter/sort/pagination support** - these are metadata singletons or small lists
@@ -260,7 +260,7 @@ sequenceDiagram
     S->>C: 200 + SPC JSON
 ```
 
-> **✅ Resolved**: All discovery controllers now have `@Public()` decorator at class level, bypassing the global `SharedSecretGuard`. Discovery endpoints are accessible without authentication per RFC 7644 §4.
+> **✅ Resolved by product policy**: All discovery controllers now have `@Public()` at class level, bypassing the global `SharedSecretGuard`. Anonymous discovery is an intentional interoperability choice permitted, but not mandated, by RFC 7644 §§2, 2.2, and 4.
 
 ### 3.4 Response Shape Analysis
 
@@ -358,7 +358,7 @@ sequenceDiagram
 | `meta.location` | ✅ | `"/ServiceProviderConfig"` |
 | `documentationUri` | ✅ | GitHub URL |
 | Content-Type `application/scim+json` | ✅ | `@Header` decorator |
-| **SHALL NOT require auth** | ✅ D1 | `@Public()` decorator on controller class |
+| Public without auth by product policy | ✅ D1 | `@Public()` decorator on controller class |
 | Singleton (no `ListResponse`, no `/{id}`) | ✅ | Correct - `@Get()` only |
 | Dynamic per-endpoint `bulk.supported` | ✅ | `BulkOperationsEnabled` flag honored |
 
@@ -372,7 +372,7 @@ sequenceDiagram
 | `meta.location` | ✅ | `/ResourceTypes/User`, `/ResourceTypes/Group` |
 | ListResponse wrapper | ✅ | `ScimDiscoveryService.getResourceTypes()` wraps in `schemas`/`totalResults`/`Resources` |
 | Content-Type `application/scim+json` | ✅ | `@Header` decorator |
-| **SHALL NOT require auth** | ✅ D1 | `@Public()` decorator on controller class |
+| Public without auth by product policy | ✅ D1 | `@Public()` decorator on controller class |
 | `GET /ResourceTypes/{id}` individual lookup | ✅ D3 | `@Get(':id')` route on ResourceTypesController + EndpointScimDiscoveryController |
 | Each resource has `schemas` array | ✅ D5 | `schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"]` on all RT resources |
 
@@ -387,7 +387,7 @@ sequenceDiagram
 | `meta.location` | ✅ | `/Schemas/{urn}` format |
 | ListResponse wrapper | ✅ | `ScimDiscoveryService.getSchemas()` wraps correctly |
 | Content-Type `application/scim+json` | ✅ | `@Header` decorator |
-| **SHALL NOT require auth** | ✅ D1 | `@Public()` decorator on controller class |
+| Public without auth by product policy | ✅ D1 | `@Public()` decorator on controller class |
 | `GET /Schemas/{uri}` individual lookup by URN | ✅ D2 | `@Get(':uri')` route on SchemasController + EndpointScimDiscoveryController |
 | Each resource has `schemas` array | ✅ D4 | `schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"]` on all schema definitions |
 
@@ -399,7 +399,7 @@ sequenceDiagram
 ┌────┬──────────────────────────────────────────────────┬──────────┬──────────────────────────────────────────┬────────┐
 │ #  │ Gap                                              │ Severity │ RFC Reference                            │ Status │
 ├────┼──────────────────────────────────────────────────┼──────────┼──────────────────────────────────────────┼────────┤
-│ D1 │ Discovery endpoints require authentication       │ HIGH     │ RFC 7644 §4 - "SHALL NOT require auth"   │ ✅     │
+│ D1 │ Discovery endpoints required local authentication│ POLICY   │ Anonymous access is permitted, not required│ ✅     │
 │ D2 │ No GET /Schemas/{uri} individual lookup          │ MEDIUM   │ RFC 7643 §7 + RFC 7644 §4               │ ✅     │
 │ D3 │ No GET /ResourceTypes/{id} individual lookup     │ MEDIUM   │ RFC 7643 §6 + RFC 7644 §4               │ ✅     │
 │ D4 │ Schema resources missing own `schemas` array     │ LOW      │ RFC 7643 §7 - each resource is a Schema │ ✅     │
@@ -408,9 +408,9 @@ sequenceDiagram
 └────┴──────────────────────────────────────────────────┴──────────┴──────────────────────────────────────────┴────────┘
 ```
 
-### D1 - Discovery Endpoints Require Authentication (HIGH) - ✅ RESOLVED
+### D1 - Public Discovery Product Policy - ✅ RESOLVED
 
-**Problem**: The global `SharedSecretGuard` was registered as `APP_GUARD` in `auth.module.ts`. It applied to every route unless explicitly bypassed with `@Public()`. All four discovery controllers (3 root + 1 endpoint-scoped) were behind auth.
+**Problem**: The global `SharedSecretGuard` was registered as `APP_GUARD` in `auth.module.ts`. It applied to every route unless explicitly bypassed with `@Public()`. All four discovery controllers (3 root + 1 endpoint-scoped) were behind auth, contrary to this product's intended public-discovery policy. This was not an RFC violation: RFC 7644 does not require discovery endpoints to be anonymous.
 
 **Resolution**: Added `@Public()` decorator at class level to all 4 discovery controllers:
 - `ServiceProviderConfigController`
@@ -531,6 +531,7 @@ All test gaps identified in the original audit have been addressed with both uni
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | Config flags affecting SPC (e.g., `BulkOperationsEnabled`) |
 | [phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md](phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md) | Phase 6 implementation history |
 | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | API routes - multi-tenant two-tier discovery documented with 10 routes |
+| [OPENTEXT_ISV5_CORRECTIONS.md](OPENTEXT_ISV5_CORRECTIONS.md) | Source/live vendor discovery comparison, corrected ISV-6 contract, and drift verifier |
 
 ---
 
