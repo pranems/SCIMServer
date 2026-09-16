@@ -936,7 +936,7 @@ Local session analysis used the read-only VS Code Chronicle index at `session-st
 | File-scoped Mermaid grammar | PASS, 9/9 blocks |
 | Real Chromium Mermaid render | PASS, 692 repository blocks in both themes under strict security |
 | Documentation content truth | PASS, 25 user-facing docs |
-| Documentation freshness | PASS, 25 user-facing docs at version 0.55.21 |
+| Documentation freshness | PASS, 25 user-facing docs at version 0.55.22 |
 | Added-line Unicode dash scan | PASS, no U+2013 or U+2014 |
 | Local Markdown links | PASS |
 | Markdown fence balance | PASS, 12 opening and 12 closing fences |
