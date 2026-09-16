@@ -1,6 +1,6 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-04 - **Product version at capture:** `0.55.20`
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-15 - **Product version at capture:** `0.55.22`
 > **Every value in this document was measured against a running server**, not transcribed from source. The preset matrix in [Section 3](#3-preset-matrix-measured) was produced by creating one endpoint per preset on the live dev estate, reading back what the server actually published, and deleting them. The request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) are verbatim wire captures.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
@@ -10,14 +10,16 @@
 
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 
-The Settings tab renders **27 controls**:
+The Settings tab renders **all 38 server-registered endpoint settings**:
 
 | Kind | Count | Examples |
 |---|---|---|
 | Boolean switches | **21** | `StrictSchemaValidation`, `RequireIfMatch`, `UserHardDeleteEnabled` |
 | Enum dropdowns | **2** | `PrimaryEnforcement`, `logLevel` |
-| Numeric inputs | **4** | the JWKS egress knobs |
-| Radio group | **1** | `CredentialSecretVisibility` (on the Credentials tab) |
+| Numeric inputs | **14** | JWKS egress/safety/refresh knobs and per-method credential caps |
+| Radio group | **1** | `CredentialSecretVisibility` |
+
+Settings remains the complete, structured inventory. Operational tabs also show the subset relevant to their workflow: Users, Groups, Schemas, Resource types, Logs, and each Connect authentication method. Both presentations consume `web/src/pages/endpoint-settings-definitions.ts`, so changing a value in either place writes the same endpoint profile and the other surface reflects it.
 
 Two properties of this system matter before you change anything:
 
@@ -105,7 +107,7 @@ These five decide **who may call this endpoint's SCIM data plane**. They are cov
 
 ### 2.8 Runtime egress (WIF JWKS fetch)
 
-Four numeric knobs controlling how the server fetches signing keys when verifying a federated trust. Leave blank to inherit the server default.
+Fourteen numeric controls cover how the server fetches and caches signing keys plus the active-credential limits for each authentication method. Leave a numeric override blank to inherit the server default.
 
 | Setting | Bounds | Server default |
 |---|---|---|

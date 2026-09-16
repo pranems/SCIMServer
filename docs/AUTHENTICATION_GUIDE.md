@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-04 - **Product version:** `0.55.21`
+> **Status:** Living reference - **Last verified:** 2026-09-15 - **Product version:** `0.55.22`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -93,7 +93,7 @@ The tab is organised as **Setup -> Connect -> Health**:
 - **Connect** - copy the exact values to paste into your identity provider
 - **Health** - recent authentication outcomes for this endpoint
 
-One sub-tab per method. Only **enabled** methods appear, so the sub-tab row is itself a live readout of the endpoint's auth configuration.
+One sub-tab per method. The **Authentication methods** switches stay visible at the top of Connect, so a disabled method can be enabled without leaving the workflow. The selected method then shows its related endpoint controls beside Setup, Connect, and Health: bearer/OAuth active-credential limits, or the WIF trust cap and JWKS fetch/cache/safety controls. Settings continues to show the same controls in its complete all-in-one inventory.
 
 | Sub-tab | Testid |
 |---|---|
@@ -114,7 +114,7 @@ One sub-tab per method. Only **enabled** methods appear, so the sub-tab row is i
 
 ![OAuth2 client credential](screenshots/prod-auth-04-connect-oauth.png)
 
-The auth switches themselves live on **Settings**:
+The same auth switches also live in the complete **Settings** inventory:
 
 ![Auth settings](screenshots/prod-auth-09-settings-auth-flags.png)
 
@@ -128,7 +128,7 @@ The auth switches themselves live on **Settings**:
 > roughly **293 ms per comparison** - so three credentials already push a failed attempt past the
 > 800 ms latency budget. Defaults are `MaxActiveBearerCredentials` **5**,
 > `MaxActiveOAuthClientCredentials` **5**, `MaxActiveWifTrusts` **10** (bounds 1 - 25, editable per
-> endpoint on the Settings tab). WIF is more generous on purpose: WIF trusts are verified against a
+> endpoint on the matching Connect method or in Settings). WIF is more generous on purpose: WIF trusts are verified against a
 > JWKS and never enter that comparison loop. Exceeding a cap refuses the **create** with `400`; it
 > never affects credentials that already exist. Deactivating one frees a slot immediately.
 

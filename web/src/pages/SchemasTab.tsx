@@ -37,6 +37,8 @@ import {
   type ScimSchemaResource,
 } from '../api/queries';
 import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../components/primitives';
+import { EndpointRelatedSettings } from './EndpointRelatedSettings';
+import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 
 const useStyles = makeStyles({
   root: {
@@ -128,7 +130,14 @@ export const SchemasTab: React.FC<SchemasTabProps> = ({ endpointId }) => {
 
   if (error) {
     return (
-      <div data-testid="tab-schemas">
+      <div className={classes.root} data-testid="tab-schemas">
+        <EndpointRelatedSettings
+          endpointId={endpointId}
+          settingKeys={TAB_SETTING_KEYS.schemas}
+          title="Schema behavior settings"
+          description="Discovery publication and strict schema-validation controls for this endpoint."
+          data-testid="schemas-related-settings"
+        />
         <div className={classes.errorBlock} data-testid="schemas-error">
           <Body1>Failed to load schemas: {(error as Error).message}</Body1>
         </div>
@@ -138,8 +147,15 @@ export const SchemasTab: React.FC<SchemasTabProps> = ({ endpointId }) => {
 
   if (!data || data.Resources.length === 0) {
     return (
-      <div data-testid="tab-schemas">
+      <div className={classes.root} data-testid="tab-schemas">
         <Subtitle2 style={{ marginBottom: '12px' }}>Schemas</Subtitle2>
+        <EndpointRelatedSettings
+          endpointId={endpointId}
+          settingKeys={TAB_SETTING_KEYS.schemas}
+          title="Schema behavior settings"
+          description="Discovery publication and strict schema-validation controls for this endpoint."
+          data-testid="schemas-related-settings"
+        />
         <EmptyState
           icon={<DocumentBulletList24Regular />}
           title="No schemas available"
@@ -153,6 +169,13 @@ export const SchemasTab: React.FC<SchemasTabProps> = ({ endpointId }) => {
   return (
     <div className={classes.root} data-testid="tab-schemas">
       <Subtitle2>Schemas</Subtitle2>
+      <EndpointRelatedSettings
+        endpointId={endpointId}
+        settingKeys={TAB_SETTING_KEYS.schemas}
+        title="Schema behavior settings"
+        description="Discovery publication and strict schema-validation controls for this endpoint."
+        data-testid="schemas-related-settings"
+      />
       <div data-testid="schemas-tree">
         {data.Resources.map((schema) => (
           <SchemaRow key={schema.id} schema={schema} />

@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.21`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.22`
 
-> **Version:** 0.55.21 - **Updated:** 2026-07-31  
+> **Version:** 0.55.22 - **Updated:** 2026-07-31
 > 6 presets - **38 endpoint settings controls** (21 boolean flags + 3 enums + 14 numerics) - **8,973 checks** measured on 2026-07-31 (4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright)
 
 ### Start here
@@ -10,6 +10,7 @@
 | If you want to... | Read |
 |---|---|
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+| Review contextual-settings execution issues and preventions | [ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md](ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md) |
 | Wire up authentication (4 methods), connect Entra ID, or diagnose an auth failure | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | Know where every auth setting is persisted and which route or screen changes it | [AUTHENTICATION_CONFIGURATION_REFERENCE.md](AUTHENTICATION_CONFIGURATION_REFERENCE.md) |
 | Tour the admin UI screen by screen | [UI_GUIDE.md](UI_GUIDE.md) |

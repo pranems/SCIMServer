@@ -84,6 +84,8 @@ import {
   useUpdateEndpointConfig,
 } from '../api/queries';
 import { AUTH_METHOD_FLAGS, effectiveAuthFlag } from './endpoint-auth-flags';
+import { EndpointRelatedSettings } from './EndpointRelatedSettings';
+import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import type { ConnectionInfo, ConnectionMethod } from '@scim/types/connection-info.types';
 import {
@@ -2048,6 +2050,20 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const listCredentials = activeDef?.credentialType
     ? credentials.filter((c) => c.credentialType === activeDef.credentialType)
     : [];
+  const methodSettingKeys =
+    activeTab === 'bearer'
+      ? TAB_SETTING_KEYS.connectBearer
+      : activeTab === 'oauth_client'
+        ? TAB_SETTING_KEYS.connectOauthClient
+        : activeTab === 'wif'
+          ? TAB_SETTING_KEYS.connectWif
+          : [];
+  const methodSettingsTitle =
+    activeTab === 'wif'
+      ? 'WIF trust and JWKS settings'
+      : activeTab === 'oauth_client'
+        ? 'OAuth client credential limits'
+        : 'Bearer credential limits';
   // A method tab only appears when its method is enabled, so per-tab creation is
   // always allowed.
   const flagEnabledForTab = true;
@@ -2152,12 +2168,21 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         ))}
       </TabList>
 
+      {methodSettingKeys.length > 0 && (
+        <EndpointRelatedSettings
+          endpointId={endpointId}
+          settingKeys={methodSettingKeys}
+          title={methodSettingsTitle}
+          description="Settings applied to the authentication method selected above."
+          data-testid={`connect-related-settings-${activeTab}`}
+        />
+      )}
+
       {noMethods && (
         <MessageBar intent="warning" data-testid="credentials-no-methods">
           <MessageBarBody>
             <MessageBarTitle>No auth methods enabled</MessageBarTitle>
-            This endpoint has no authentication method enabled. Enable one in{' '}
-            <a href={`/endpoints/${endpointId}/settings`}>Settings</a>.
+            This endpoint has no authentication method enabled. Enable one in Authentication methods above.
           </MessageBarBody>
         </MessageBar>
       )}

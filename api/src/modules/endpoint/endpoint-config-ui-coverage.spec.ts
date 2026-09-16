@@ -39,10 +39,17 @@ const repoRoot = join(__dirname, '..', '..', '..', '..');
 const SETTINGS_SOURCES = [
   join('web', 'src', 'pages', 'SettingsTab.tsx'),
   join('web', 'src', 'pages', 'SettingsPage.tsx'),
+  join('web', 'src', 'pages', 'endpoint-settings-definitions.ts'),
   // The auth-method flags moved here when the Connect tab began rendering them
   // inline as well; both pages import this one list. Leaving it out made all
   // five read as unreachable, which is the gate working - a control the scan
   // cannot see is indistinguishable from one that does not exist.
+  join('web', 'src', 'pages', 'endpoint-auth-flags.ts'),
+];
+
+const SETTINGS_TAB_PATH = join('web', 'src', 'pages', 'SettingsTab.tsx');
+const SETTINGS_TAB_DECLARATIVE_SOURCES = [
+  join('web', 'src', 'pages', 'endpoint-settings-definitions.ts'),
   join('web', 'src', 'pages', 'endpoint-auth-flags.ts'),
 ];
 
@@ -68,6 +75,13 @@ function declaredControlKeys(): string[] {
   return SETTINGS_SOURCES.flatMap((rel) => {
     const src = readFileSync(join(repoRoot, rel), 'utf8');
     return [...src.matchAll(/\bkey:\s*'([^']+)'/g)].map((m) => m[1]);
+  });
+}
+
+function declaredKeysIn(sources: readonly string[]): string[] {
+  return sources.flatMap((rel) => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    return [...src.matchAll(/\bkey:\s*'([^']+)'/g)].map((match) => match[1]);
   });
 }
 
@@ -122,5 +136,24 @@ describe('endpoint config flag UI coverage', () => {
     // own description string, so documentation counted as a control.
     const proseOnly = "description: 'Bounds how many MaxActiveWifTrusts exist.'";
     expect([...proseOnly.matchAll(/\bkey:\s*'([^']+)'/g)].map((m) => m[1])).toEqual([]);
+  });
+
+  it('U-T7: Settings remains the complete all-in-one endpoint settings inventory', () => {
+    const settingsSource = readFileSync(join(repoRoot, SETTINGS_TAB_PATH), 'utf8');
+    const declarative = declaredKeysIn(SETTINGS_TAB_DECLARATIVE_SOURCES);
+    const settingsBespoke = ['CredentialSecretVisibility'];
+    const missing = registered.filter(
+      (key) => !declarative.includes(key) && !settingsBespoke.includes(key),
+    );
+
+    expect(missing).toEqual([]);
+    expect(new Set([...declarative, ...settingsBespoke]).size).toBe(registered.length);
+
+    // Owning a definition is not enough: Settings must render every registry
+    // family plus its one purpose-built radio control.
+    expect(settingsSource).toMatch(/BOOLEAN_FLAGS\.filter/);
+    expect(settingsSource).toMatch(/ENUM_SETTINGS\.map/);
+    expect(settingsSource).toMatch(/NUMBER_SETTINGS\.map/);
+    expect(settingsSource).toMatch(/aria-label="CredentialSecretVisibility"/);
   });
 });

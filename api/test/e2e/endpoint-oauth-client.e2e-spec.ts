@@ -16,6 +16,7 @@ import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { createEndpointWithConfig } from './helpers/request.helper';
+import { waitForLogRowByRequestId } from './helpers/log-wait.helper';
 
 function decodePayload(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf-8'));
@@ -171,19 +172,10 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
 
   it('V10: a rejected oauth_client token request persists the auth summary on its RequestLog row', async () => {
     const { clientId } = await createOauthClient(endpointA);
-    await mintEndpointToken(endpointA, clientId, 'wrong-secret-v10').expect(401);
-
-    const logs = await request(app.getHttpServer())
-      .get('/scim/admin/logs?pageSize=100')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(200);
-
-    const tokenRow = (logs.body.items as Array<Record<string, unknown>>).find(
-      (r) =>
-        typeof r.url === 'string' &&
-        r.url.includes(`/scim/endpoints/${endpointA}/oauth/token`) &&
-        r.status === 401,
-    );
+    const rejected = await mintEndpointToken(endpointA, clientId, 'wrong-secret-v10').expect(401);
+    const requestId = rejected.headers['x-request-id'];
+    expect(typeof requestId).toBe('string');
+    const tokenRow = await waitForLogRowByRequestId(app, adminToken, requestId);
     // V10 - the auth decision is persisted directly on the request-log row, so
     // the logs list can render the outcome without a second auth-decision query.
     expect(tokenRow).toBeDefined();
@@ -194,18 +186,10 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
 
   it('W1: the request-log row detail carries the FULL auth decision trace (durable, no store)', async () => {
     const { clientId } = await createOauthClient(endpointA);
-    await mintEndpointToken(endpointA, clientId, 'wrong-secret-w1').expect(401);
-
-    const logs = await request(app.getHttpServer())
-      .get('/scim/admin/logs?pageSize=100')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(200);
-    const tokenRow = (logs.body.items as Array<Record<string, unknown>>).find(
-      (r) =>
-        typeof r.url === 'string' &&
-        r.url.includes(`/scim/endpoints/${endpointA}/oauth/token`) &&
-        r.status === 401,
-    );
+    const rejected = await mintEndpointToken(endpointA, clientId, 'wrong-secret-w1').expect(401);
+    const requestId = rejected.headers['x-request-id'];
+    expect(typeof requestId).toBe('string');
+    const tokenRow = await waitForLogRowByRequestId(app, adminToken, requestId);
     expect(tokenRow).toBeDefined();
 
     const detail = await request(app.getHttpServer())

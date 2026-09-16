@@ -29,12 +29,14 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
 import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { UsersSearch } from '../routes/search-schemas';
-import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
+import { ResourceDetailDrawer, type ScimResource } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
+import { EndpointRelatedSettings } from './EndpointRelatedSettings';
+import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
@@ -183,24 +185,43 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
     );
   }
 
-  const users = data?.Resources ?? [];
+  const users = (data?.Resources ?? []) as ScimResource[];
   const total = data?.totalResults ?? 0;
+  const selectedUser: ScimResource | undefined = detailId
+    ? users.find((user) => user.id === detailId)
+    : undefined;
 
   if (total === 0) {
     // G2 - EmptyState replaces ad-hoc Text. No CTA: user creation
     // happens via SCIM POST from the IdP, but the manual provision
     // page exists for manual onboarding.
     return (
-      <EmptyState
-        data-testid="users-empty"
-        title="No users in this endpoint"
-        body="Users are provisioned to this endpoint via SCIM POST /Users from your identity provider, or manually from the Manual Provision page."
-      />
+      <div className={classes.container} data-testid="users-tab">
+        <EndpointRelatedSettings
+          endpointId={endpointId}
+          settingKeys={TAB_SETTING_KEYS.users}
+          title="User behavior settings"
+          description="Validation, concurrency, PATCH, and lifecycle controls applied to this endpoint's Users resource."
+          data-testid="users-related-settings"
+        />
+        <EmptyState
+          data-testid="users-empty"
+          title="No users in this endpoint"
+          body="Users are provisioned to this endpoint via SCIM POST /Users from your identity provider, or manually from the Manual Provision page."
+        />
+      </div>
     );
   }
 
   return (
     <div className={classes.container} data-testid="users-tab">
+      <EndpointRelatedSettings
+        endpointId={endpointId}
+        settingKeys={TAB_SETTING_KEYS.users}
+        title="User behavior settings"
+        description="Validation, concurrency, PATCH, and lifecycle controls applied to this endpoint's Users resource."
+        data-testid="users-related-settings"
+      />
       <div className={classes.header}>
         <Subtitle2>{total} users</Subtitle2>
         <ExportSplitButton
@@ -296,11 +317,11 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
         </div>
       )}
 
-      {detailId && users.find((u: any) => u.id === detailId) && (
+      {detailId && selectedUser && (
         <ResourceDetailDrawer
           kind="user"
           endpointId={endpointId}
-          resource={users.find((u: any) => u.id === detailId)}
+          resource={selectedUser}
           open
           onClose={closeDetail}
         />

@@ -23,12 +23,14 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
 import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { GroupsSearch } from '../routes/search-schemas';
-import { ResourceDetailDrawer } from '../components/detail/ResourceDetailDrawer';
+import { ResourceDetailDrawer, type ScimResource } from '../components/detail/ResourceDetailDrawer';
 import { EmptyState, ExportSplitButton, LoadingSkeleton, CopyableField } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
+import { EndpointRelatedSettings } from './EndpointRelatedSettings';
+import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
@@ -123,23 +125,42 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
     );
   }
 
-  const groups = data?.Resources ?? [];
+  const groups = (data?.Resources ?? []) as ScimResource[];
   const total = data?.totalResults ?? 0;
+  const selectedGroupResource: ScimResource | undefined = detailId
+    ? groups.find((group: ScimResource) => group.id === detailId)
+    : undefined;
 
   if (total === 0) {
     // G2 - EmptyState replaces ad-hoc Text. No CTA: group creation
     // happens via SCIM POST from the IdP, not from the UI.
     return (
-      <EmptyState
-        data-testid="groups-empty"
-        title="No groups in this endpoint"
-        body="Groups are provisioned to this endpoint via SCIM POST /Groups from your identity provider."
-      />
+      <div className={classes.container} data-testid="groups-tab">
+        <EndpointRelatedSettings
+          endpointId={endpointId}
+          settingKeys={TAB_SETTING_KEYS.groups}
+          title="Group behavior settings"
+          description="Membership PATCH, validation, concurrency, and deletion controls applied to Groups."
+          data-testid="groups-related-settings"
+        />
+        <EmptyState
+          data-testid="groups-empty"
+          title="No groups in this endpoint"
+          body="Groups are provisioned to this endpoint via SCIM POST /Groups from your identity provider."
+        />
+      </div>
     );
   }
 
   return (
     <div className={classes.container} data-testid="groups-tab">
+      <EndpointRelatedSettings
+        endpointId={endpointId}
+        settingKeys={TAB_SETTING_KEYS.groups}
+        title="Group behavior settings"
+        description="Membership PATCH, validation, concurrency, and deletion controls applied to Groups."
+        data-testid="groups-related-settings"
+      />
       <div className={classes.header}>
         <Subtitle2>{total} groups</Subtitle2>
         <ExportSplitButton
@@ -201,11 +222,11 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
         </div>
       )}
 
-      {detailId && groups.find((g: any) => g.id === detailId) && (
+      {detailId && selectedGroupResource && (
         <ResourceDetailDrawer
           kind="group"
           endpointId={endpointId}
-          resource={groups.find((g: any) => g.id === detailId)}
+          resource={selectedGroupResource}
           open
           onClose={closeDetail}
         />

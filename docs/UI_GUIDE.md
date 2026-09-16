@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-04 - **Product version:** `0.55.21`
+> **Status:** User-facing reference - **Last verified:** 2026-09-15 - **Product version:** `0.55.22`
 
-> **Status:** Active | **Last Updated:** 2026-07-31 | **Version:** 0.55.21
+> **Status:** Active | **Last Updated:** 2026-09-15 | **Version:** 0.55.22
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
 >
@@ -180,7 +180,7 @@ Ten tabs:
 | **Schemas** | `/endpoints/{id}/schemas` | The `/Schemas` this endpoint publishes |
 | **Connect** | `/endpoints/{id}/connect` | Authentication: set up, connect, and monitor. See [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | **Logs** | `/endpoints/{id}/logs` | This endpoint's request log, with auth decision detail |
-| **Settings** | `/endpoints/{id}/settings` | All 28 settings controls. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+| **Settings** | `/endpoints/{id}/settings` | Complete structured inventory of all 38 endpoint settings. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
 
 Two details worth knowing:
 
@@ -189,7 +189,7 @@ Two details worth knowing:
 
 ### 6.3 What each tab does
 
-**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Selecting a row opens a detail drawer where you can edit the resource and save it back over SCIM, with ETag concurrency applied when `RequireIfMatch` is on. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
+**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Each tab starts with its related validation, concurrency, PATCH, and lifecycle settings; Groups also includes the member-PATCH controls. Selecting a row opens a detail drawer where you can edit the resource and save it back over SCIM, with ETag concurrency applied when `RequireIfMatch` is on. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
 
 **Activity** is the provisioning story rather than the raw request log: the server parses requests into human events, each with a severity badge. Filter by **type** (`user`, `group`, `system`), by **severity** (`info`, `success`, `warning`, `error`), or by free text. The filters live **in the URL**, so a filtered view is a shareable link - useful when handing an investigation to someone else. Use Activity to answer "what did this provisioning job actually do?"; use **Logs** when you need the wire detail behind one of those events.
 
@@ -207,19 +207,19 @@ Two details worth knowing:
 
 The cap is **1000 operations and a 1 MB payload**. Before submitting you get a preview of the first ten operations and a **Copy full envelope as JSON** button, so you can inspect exactly what will be sent. Afterwards, **failure rows are downloadable as CSV** carrying the per-operation `scimType` and `detail` - fix that file and re-submit it rather than re-deriving which rows failed.
 
-**Resource types** lists what this endpoint serves, and creates custom ones beyond User and Group.
+**Resource types** lists what this endpoint serves, creates custom ones beyond User and Group, and exposes the related discovery/enforcement settings above the inventory.
 
 ![Resource types](screenshots/prod-12-endpoint-resource-types.png)
 
 Each row shows the type name, its endpoint path and its schema URN. **Create** asks for a name, an endpoint path (mounted under `/scim/endpoints/{id}`), a schema URN and an optional description. Delete asks for confirmation. The list renders whether or not custom types are currently enabled, so you can always see what a client would discover at `/ResourceTypes`.
 
-**Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`. One row per schema showing its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
+**Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`, with discovery and strict-validation controls in the same tab. One row per schema shows its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
 
-**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md). Three things worth knowing here: the **Authentication methods** switches are on this tab (you no longer detour to Settings to enable a method), each credential card renders its IdP connection values **without a click** (only the secret itself needs one), and **Rotate** is a button on the card rather than an overflow-menu item. Each card also carries a **Legacy (bcrypt)** or **Keyed** badge showing which verifier that credential still needs.
+**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md). The **Authentication methods** switches are on this tab, and the selected bearer/OAuth/WIF subtab shows its credential limit or WIF/JWKS controls. Each credential card renders its IdP connection values **without a click** (only the secret itself needs one), and **Rotate** is a button on the card rather than an overflow-menu item. Each card also carries a **Legacy (bcrypt)** or **Keyed** badge showing which verifier that credential still needs.
 
-**Logs** is this endpoint's slice of the request log, including the per-row auth outcome chip and the decision trace behind it. See [section 12](#12-logs).
+**Logs** is this endpoint's slice of the request log, including the per-row auth outcome chip and the decision trace behind it. Its request-persistence, file-output, and per-endpoint log-level controls appear above the rows. See [section 12](#12-logs).
 
-**Settings** exposes all 28 controls for this endpoint. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md).
+**Settings** remains the complete structured inventory of all 38 endpoint controls even though related subsets also appear in operational tabs. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md).
 
 | Action | Endpoint |
 |--------|----------|

@@ -162,7 +162,7 @@ const useStyles = makeStyles({
 
 // ─── Resource shape (loose, mirrors what the SCIM list returns) ─────
 
-interface ScimResource {
+export interface ScimResource {
   id: string;
   userName?: string;
   displayName?: string;

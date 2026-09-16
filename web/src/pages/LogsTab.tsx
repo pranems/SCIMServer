@@ -32,6 +32,8 @@ import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle'
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
+import { EndpointRelatedSettings } from './EndpointRelatedSettings';
+import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -111,6 +113,16 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     return map;
   }, [authDecisions.data]);
 
+  const relatedSettings = (
+    <EndpointRelatedSettings
+      endpointId={endpointId}
+      settingKeys={TAB_SETTING_KEYS.logs}
+      title="Log capture settings"
+      description="Per-endpoint persistence, file output, and verbosity controls for these request logs."
+      data-testid="logs-related-settings"
+    />
+  );
+
   const updateSearch = (next: { page?: number; urlContains?: string }): void => {
     navigate({
       to: LOGS_ROUTE_PATH,
@@ -161,15 +173,19 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     // filter is active (so the user can recover from over-narrow
     // input).
     return urlContains ? (
-      <EmptyState
-        data-testid="logs-tab-empty-filtered"
-        title="No logs match these filters"
-        body={`No request logs contain "${urlContains}".`}
-        actionLabel="Reset filter"
-        onAction={() => updateSearch({ urlContains: '' })}
-      />
+      <div className={classes.container} data-testid="logs-tab-empty-filtered-wrap">
+        {relatedSettings}
+        <EmptyState
+          data-testid="logs-tab-empty-filtered"
+          title="No logs match these filters"
+          body={`No request logs contain "${urlContains}".`}
+          actionLabel="Reset filter"
+          onAction={() => updateSearch({ urlContains: '' })}
+        />
+      </div>
     ) : (
       <div className={classes.container} data-testid="logs-tab-empty-wrap">
+        {relatedSettings}
         <EmptyState
           data-testid="logs-tab-empty"
           title="No request logs yet"
@@ -181,6 +197,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
 
   return (
     <div className={classes.container} data-testid="logs-tab">
+      {relatedSettings}
       {/* U12 - the endpoint auth-diagnostics panel is re-scoped to Connect ->
           Health. Per-request auth now renders inline in the log detail (U11)
           and as a per-row chip below. */}

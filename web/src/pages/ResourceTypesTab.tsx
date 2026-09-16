@@ -48,6 +48,8 @@ import {
   CubeTree24Regular,
 } from '@fluentui/react-icons';
 import { useEndpoint, useUpdateEndpointConfig } from '../api/queries';
+import { EndpointRelatedSettings } from './EndpointRelatedSettings';
+import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 import { LoadingSkeleton } from '../components/primitives';
 import { FormDialog } from '../components/primitives/FormDialog';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -270,6 +272,13 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
 
   return (
     <div className={classes.page} data-testid="resource-types-tab">
+      <EndpointRelatedSettings
+        endpointId={endpointId}
+        settingKeys={TAB_SETTING_KEYS.resourceTypes}
+        title="Resource type settings"
+        description="Controls discovery publication and enforcement of the resource types shown below."
+        data-testid="resource-types-related-settings"
+      />
       <ConflictDialog
         open={conflict !== null}
         pendingDiff={conflict ?? {}}

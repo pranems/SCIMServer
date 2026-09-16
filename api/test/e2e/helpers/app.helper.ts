@@ -49,6 +49,10 @@ export async function createTestApp(
   process.env.OAUTH_CLIENT_ID = 'e2e-client';
   process.env.OAUTH_CLIENT_SECRET = 'e2e-client-secret';
   process.env.NODE_ENV = 'test';
+  // Every Jest worker creates its own app, but the production default points
+  // every process at the same logs/scimserver.log. Disable that shared main
+  // file in E2E; FileLogTransport unit tests own physical file/rotation coverage.
+  process.env.LOG_FILE = '';
   // W1.7b knobs: shorten the RequestLog buffer flush interval for E2E so a row
   // becomes durable in ~100 ms instead of the 3 s production default. Log-reading
   // specs still POLL via waitForLogRow (a shorter timer narrows the race, it does
