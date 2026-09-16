@@ -139,6 +139,7 @@ param(
 $ErrorActionPreference = 'Continue'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
+. (Join-Path $PSScriptRoot 'github-workflow-run.ps1')
 
 if ([string]::IsNullOrWhiteSpace($ReportDir)) {
     $ReportDir = Join-Path $repoRoot 'test-results'
@@ -508,17 +509,46 @@ if (-not $SkipDeploy) {
     } | Out-Null
 
     Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $publishRef)" {
+        $expectedHeadSha = (git rev-parse $publishRef).Trim()
+        $dispatchedAfter = [DateTimeOffset]::UtcNow.AddSeconds(-5)
         gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true
-        Start-Sleep -Seconds 6
-        $runId = (gh run list --workflow=publish-ghcr.yml --branch $publishRef --limit 1 --json databaseId --jq '.[0].databaseId')
-        gh run watch $runId --exit-status
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to dispatch publish-ghcr.yml.'
+        }
+
+        $selectedRun = $null
+        for ($attempt = 1; $attempt -le 15 -and $null -eq $selectedRun; $attempt++) {
+            $runJson = gh run list --workflow=publish-ghcr.yml --branch $publishRef --event workflow_dispatch --limit 20 --json databaseId,headSha,createdAt,status,conclusion
+            if ($LASTEXITCODE -eq 0) {
+                $runs = @($runJson | ConvertFrom-Json)
+                $selectedRun = Select-GithubWorkflowRun -Runs $runs -ExpectedHeadSha $expectedHeadSha -DispatchedAfter $dispatchedAfter
+            }
+            if ($null -eq $selectedRun) {
+                Start-Sleep -Seconds 2
+            }
+        }
+        if ($null -eq $selectedRun) {
+            throw "Could not find the dispatched publish run for master SHA $expectedHeadSha."
+        }
+        Write-Host "    Watching workflow run $($selectedRun.databaseId) for $($expectedHeadSha.Substring(0,8))" -ForegroundColor DarkGray
+        gh run watch $selectedRun.databaseId --exit-status
     } | Out-Null
 
     # 4.4 - Verify anonymous GHCR pull
     Invoke-Gate '4.4' "Anonymous pull $RegistryGhcr:latest" {
         docker logout ghcr.io 2>&1 | Out-Null
+        docker rmi "${RegistryGhcr}:$version" -f 2>&1 | Out-Null
         docker rmi "${RegistryGhcr}:latest" -f 2>&1 | Out-Null
+        docker pull "${RegistryGhcr}:$version"
+        if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:$version" }
         docker pull "${RegistryGhcr}:latest"
+        if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:latest" }
+        $versionImageId = (docker image inspect "${RegistryGhcr}:$version" --format '{{.Id}}').Trim()
+        $latestImageId = (docker image inspect "${RegistryGhcr}:latest" --format '{{.Id}}').Trim()
+        if (-not $versionImageId -or $latestImageId -ne $versionImageId) {
+            throw "Version/latest image mismatch: $version=$versionImageId latest=$latestImageId"
+        }
+        Write-Host "    version/latest image content matches ($versionImageId)" -ForegroundColor DarkGray
     } | Out-Null
 
     # 4.5 - Import the CI-BUILT image from GHCR into ACR.

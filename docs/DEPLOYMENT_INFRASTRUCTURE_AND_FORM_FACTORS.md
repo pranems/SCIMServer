@@ -639,7 +639,7 @@ Without `-BlueGreen` the script falls back to a legacy auto-flip: update the ima
 | 1 | 1.1 api build, 1.2 api lint (errors only), 1.3 `web` `tsc --noEmit` with a ratchet of 9 prod / 96 total, 1.5 web build, 1.6 size-limit |
 | 2 | Starts an ephemeral `postgres:17` container if nothing is on 5432; 2.1 api unit, 2.2 api E2E (prisma), 2.3 web vitest, 2.4 web coverage (78/70/65/75), 2.6 `test-all-modes.ps1` |
 | 3 | Eleven audit prompts recorded as `PENDING` (advisory, not executed by the script) |
-| 4 | 4.1 full-validation pipeline, 4.2 optional ACR mirror, 4.3 dispatch `publish-ghcr.yml` pinned to the current branch, 4.4 anonymous-pull proof, 4.5 `az acr import`, 4.5b tag-visible check, 4.6 `az containerapp update`, 4.6b version-echo poll, 4.7 `live-test.ps1` **gated on 4.6b** |
+| 4 | 4.1 full-validation pipeline, 4.2 optional ACR mirror, 4.3 dispatch `publish-ghcr.yml` from merged `master` and select the run by exact head SHA + dispatch time, 4.4 prove anonymous version/latest pulls resolve to identical image content, 4.5 `az acr import`, 4.5b tag-visible check, 4.6 `az containerapp update`, 4.6b version-echo poll, 4.7 `live-test.ps1` **gated on 4.6b** |
 | 5 | 5.3 Playwright against the dev FQDN with `E2E_TOKEN=changeme-scim` |
 | 6 | Post-deploy state diff vs the before-snapshot; fails on endpoint count delta or any missing ID |
 | 6.5 | Auto-canary to the `purplecliff` canary prod, blocked by any FAIL, any SKIPPED, the freeze file `scripts/.deploy-freeze`, or `SCIMSERVER_AUTOCANARY_DISABLE` |

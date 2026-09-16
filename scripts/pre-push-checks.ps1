@@ -288,6 +288,10 @@ Invoke-Gate -Name 'deploy: revision retention selector' -WorkingDir $repoRoot -A
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test-prune-revisions.ps1') 2>&1 | Out-Host
 }
 
+Invoke-Gate -Name 'deploy: workflow run selector' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/select-github-workflow-run.contract.ps1') 2>&1 | Out-Host
+}
+
 # The live verifier is deliberately on-demand, but its contract must stay
 # complete and parseable on every push without requiring network access.
 Invoke-Gate -Name 'discovery: OpenText ISV-6 verifier contract' -WorkingDir $repoRoot -Action {

@@ -12,12 +12,12 @@
 
 ## 1. Summary
 
-The feature completed its local implementation with thirteen execution issues: eight medium-severity correctness/process findings and five low-severity tooling or hygiene findings. No runtime API defect, persistence-backend parity defect, database migration, or security-boundary change was found.
+The feature completed its local implementation with fourteen execution issues: nine medium-severity correctness/process findings and five low-severity tooling or hygiene findings. No runtime API defect, persistence-backend parity defect, database migration, or security-boundary change was found.
 
 ```mermaid
 pie showData
     title Contextual settings issues by severity
-    "Medium" : 8
+    "Medium" : 9
     "Low" : 5
 ```
 
@@ -27,7 +27,7 @@ pie showData
     "Architecture" : 1
     "Test correctness" : 4
     "Tooling" : 5
-    "Process and docs" : 3
+    "Process and docs" : 4
 ```
 
 ## 2. Issue Dashboard
@@ -47,6 +47,7 @@ pie showData
 | CS-11 | Test correctness | Medium | Parallel E2E apps rotated one shared production-default log file and raced on rename | Stage 2 six-mode matrix | E2E harness configuration |
 | CS-12 | Process and docs | Medium | Production audit found newly published patched floors in four transitive dependency chains | Stage 3b.5 dependency sweep | Scheduled dependency intake |
 | CS-13 | Tooling | Medium | The public-registry lock selected sql-escaper 1.5.2, which the corporate feed does not carry | Lockfile reproducibility check | CI artifact review plus managed-device `npm ci` |
+| CS-14 | Process and docs | Medium | The dev pipeline could watch an older workflow run and accept stale `latest` content | Stage 4 pre-deploy review | Pipeline contract test |
 
 ## 3. Detection Density
 
@@ -191,6 +192,16 @@ flowchart LR
 - **Prevention:** After every CI lockfile regeneration, run `npm ci` on a managed device before accepting the artifact. The workflow's publish-age report should eventually add a configured-feed availability check for every newly introduced package.
 - **Escape delta:** Caught immediately at the required post-artifact `npm ci`; the earliest possible detector is the same cross-environment reproduction check.
 
+### CS-14 - Publish gate selected the newest workflow run without artifact identity
+
+- **Type:** Process and docs (deployment gate correctness). **Severity:** Medium because a false-green publish gate can validate or deploy an older image.
+- **Symptom:** Immediately after dispatching v0.55.22, `gh run list --limit 1` returned an older completed master run before the new event appeared. The pipeline used the same newest-run query after a fixed sleep, and its `latest` pull checked only that some image downloaded.
+- **Root cause:** Run recency is not run identity. GitHub workflow-dispatch indexing is eventually consistent, so the newest visible row can predate the dispatch or carry another SHA. A successful anonymous pull likewise proves reachability, not that `latest` equals the requested version.
+- **Fix:** Add `Select-GithubWorkflowRun`, filtering candidates by exact expected head SHA and `createdAt >= dispatch time`; poll boundedly until that run appears. Stage 4.4 now pulls both the version and latest tags and requires identical local image IDs.
+- **Why the fix works:** The watched run is causally tied to the dispatch and source commit, and the pulled alias is byte-content-equivalent to the version tag before import/deploy.
+- **Prevention:** The 8-assertion selector contract is a default Fast pre-push gate. It rejects an older different-SHA run, a stale same-SHA run, the prior newest-run query, missing pipeline integration, and a missing version/latest mismatch guard.
+- **Escape delta:** Caught in Stage 4 pre-deploy review before any v0.55.22 deployment. The earliest automated detector is the new contract test.
+
 ## 5. Escape Analysis
 
 | Issue | Detected stage | Earliest stage | Escape delta | Disposition |
@@ -208,6 +219,7 @@ flowchart LR
 | CS-11 | Stage 2 Prisma matrix | Harness design | 2 | Applied: disable shared E2E main log file |
 | CS-12 | Stage 3b.5 | Scheduled dependency intake | 0 | Applied: aged overrides + CI lockfile regeneration |
 | CS-13 | Lockfile reproduction | Cross-registry availability | 0 | Applied: shared-availability sql-escaper pin |
+| CS-14 | Stage 4 pre-deploy | Pipeline contract | 1 | Applied: exact-SHA selector + image-ID equality gate |
 
 ## 6. Verified Non-Issues
 
