@@ -12,12 +12,12 @@
 
 ## 1. Summary
 
-The feature completed its local implementation with fourteen execution issues: nine medium-severity correctness/process findings and five low-severity tooling or hygiene findings. No runtime API defect, persistence-backend parity defect, database migration, or security-boundary change was found.
+The feature completed its local implementation with fifteen execution issues: ten medium-severity correctness/process findings and five low-severity tooling or hygiene findings. No runtime API defect, persistence-backend parity defect, database migration, or security-boundary change was found.
 
 ```mermaid
 pie showData
     title Contextual settings issues by severity
-    "Medium" : 9
+    "Medium" : 10
     "Low" : 5
 ```
 
@@ -25,7 +25,7 @@ pie showData
 pie showData
     title Contextual settings issues by type
     "Architecture" : 1
-    "Test correctness" : 4
+    "Test correctness" : 5
     "Tooling" : 5
     "Process and docs" : 4
 ```
@@ -48,6 +48,7 @@ pie showData
 | CS-12 | Process and docs | Medium | Production audit found newly published patched floors in four transitive dependency chains | Stage 3b.5 dependency sweep | Scheduled dependency intake |
 | CS-13 | Tooling | Medium | The public-registry lock selected sql-escaper 1.5.2, which the corporate feed does not carry | Lockfile reproducibility check | CI artifact review plus managed-device `npm ci` |
 | CS-14 | Process and docs | Medium | The dev pipeline could watch an older workflow run and accept stale `latest` content | Stage 4 pre-deploy review | Pipeline contract test |
+| CS-15 | Test correctness | Medium | The Prisma matrix consumed a stale `inmemory` marker as its database URL | Full deployment Stage 2 matrix | Cross-mode harness contract |
 
 ## 3. Detection Density
 
@@ -202,6 +203,17 @@ flowchart LR
 - **Prevention:** The 8-assertion selector contract is a default Fast pre-push gate. It rejects an older different-SHA run, a stale same-SHA run, the prior newest-run query, missing pipeline integration, and a missing version/latest mismatch guard.
 - **Escape delta:** Caught in Stage 4 pre-deploy review before any v0.55.22 deployment. The earliest automated detector is the new contract test.
 
+### CS-15 - Cross-mode marker leaked InMemory state into Prisma E2E
+
+- **Type:** Test correctness. **Severity:** Medium because the authoritative matrix produced 304 false failures across 14 unrelated suites and skipped database cleanup.
+- **Symptom:** Prisma apps logged `Using database: inmemory`, then pg interpreted the malformed connection string as host `base` and returned `Can't reach database server at base` during endpoint creation.
+- **Root cause:** InMemory global setup writes the literal `inmemory` to `.test-db-path`. `createTestApp` in Prisma mode trusted any marker content and assigned it to `DATABASE_URL`. Prisma global teardown could then also see `inmemory`, skip truncation, and leave hundreds of fixture endpoints accumulated in local `scimdb`.
+- **Fix:** Add `resolveTestDatabaseUrl`, accepting only `postgresql://` or `postgres://` marker values and otherwise using the current environment/default PostgreSQL URL. The focused E2E contract covers stale InMemory, both valid schemes, empty, and malformed markers.
+- **Why the fix works:** Backend mode remains the authority; a marker from another mode cannot override Prisma with a non-URL sentinel.
+- **Prevention:** Every cross-mode filesystem marker must be parsed as a typed value rather than trusted as an arbitrary string. Run the full mode sequence on a clean local test database before deployment.
+- **Confirmed resolution:** After resetting only local `scimdb`, all six modes passed in sequence; API E2E was 1,520/1,520 on both InMemory and Prisma. The failed deployment pipeline was stopped before Stage 4, so no image or estate received the invalid run.
+- **Escape delta:** The issue appeared only when the official pipeline repeated the complete mode sequence. The earliest possible detector is the new pure marker contract.
+
 ## 5. Escape Analysis
 
 | Issue | Detected stage | Earliest stage | Escape delta | Disposition |
@@ -220,6 +232,7 @@ flowchart LR
 | CS-12 | Stage 3b.5 | Scheduled dependency intake | 0 | Applied: aged overrides + CI lockfile regeneration |
 | CS-13 | Lockfile reproduction | Cross-registry availability | 0 | Applied: shared-availability sql-escaper pin |
 | CS-14 | Stage 4 pre-deploy | Pipeline contract | 1 | Applied: exact-SHA selector + image-ID equality gate |
+| CS-15 | Stage 2 full pipeline | Cross-mode harness contract | 2 | Applied: typed database-marker resolution |
 
 ## 6. Verified Non-Issues
 

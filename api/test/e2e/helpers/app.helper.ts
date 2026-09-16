@@ -13,6 +13,14 @@ import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
 import { applyCorrelationMiddleware } from '@app/bootstrap/correlation-middleware';
 import { applyBodyParsers } from '@app/bootstrap/body-parsers';
 
+export function resolveTestDatabaseUrl(marker: string | undefined, fallback: string): string {
+  const candidate = marker?.trim();
+  if (candidate?.startsWith('postgresql://') || candidate?.startsWith('postgres://')) {
+    return candidate;
+  }
+  return fallback;
+}
+
 /**
  * Bootstraps a full NestJS application for E2E testing.
  *
@@ -34,12 +42,11 @@ export async function createTestApp(
   const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
 
   if (backend !== 'inmemory') {
-    let dbUrl: string;
-    if (fs.existsSync(markerPath)) {
-      dbUrl = fs.readFileSync(markerPath, 'utf-8').trim();
-    } else {
-      dbUrl = process.env.DATABASE_URL ?? 'postgresql://scim:scim@localhost:5432/scimdb';
-    }
+    const marker = fs.existsSync(markerPath)
+      ? fs.readFileSync(markerPath, 'utf-8')
+      : undefined;
+    const fallback = process.env.DATABASE_URL ?? 'postgresql://scim:scim@localhost:5432/scimdb';
+    const dbUrl = resolveTestDatabaseUrl(marker, fallback);
     process.env.DATABASE_URL = dbUrl;
   }
 
