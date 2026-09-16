@@ -4,7 +4,7 @@
 >
 > **Measured:** 2026-09-15
 >
-> **Repository baseline:** SCIMServer `0.55.22`, commit `43386dbe`
+> **Repository baseline:** SCIMServer `0.55.22`, commit `1fc14dfb`
 >
 > **Budget constraint:** 300,000 GitHub AI credits per calendar month
 
@@ -556,7 +556,7 @@ For the repeated `deepmerge-ts` advisory, add a pre-build Trivy filesystem/SBOM 
 
 ### 4.7 Build once and promote by digest
 
-Current production promotion already resolves a digest. Extend that invariant to dev and CI.
+Current production promotion already resolves a digest. Commit `1fc14dfb` also closes the stale-workflow-run selection gap by requiring the exact master SHA and dispatch time before accepting a publish result. Extend the remaining artifact-identity invariant to dev and CI: build once, return the digest, and deploy that digest instead of trusting a mutable version tag.
 
 ```mermaid
 sequenceDiagram
