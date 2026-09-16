@@ -12,22 +12,22 @@
 
 ## 1. Summary
 
-The feature completed its local implementation with fifteen execution issues: ten medium-severity correctness/process findings and five low-severity tooling or hygiene findings. No runtime API defect, persistence-backend parity defect, database migration, or security-boundary change was found.
+The feature completed its local implementation with seventeen execution issues: eleven medium-severity correctness/process findings and six low-severity tooling or hygiene findings. No runtime API defect, persistence-backend parity defect, database migration, or security-boundary change was found.
 
 ```mermaid
 pie showData
     title Contextual settings issues by severity
-    "Medium" : 10
-    "Low" : 5
+    "Medium" : 11
+    "Low" : 6
 ```
 
 ```mermaid
 pie showData
     title Contextual settings issues by type
     "Architecture" : 1
-    "Test correctness" : 5
+    "Test correctness" : 6
     "Tooling" : 5
-    "Process and docs" : 4
+    "Process and docs" : 5
 ```
 
 ## 2. Issue Dashboard
@@ -49,6 +49,8 @@ pie showData
 | CS-13 | Tooling | Medium | The public-registry lock selected sql-escaper 1.5.2, which the corporate feed does not carry | Lockfile reproducibility check | CI artifact review plus managed-device `npm ci` |
 | CS-14 | Process and docs | Medium | The dev pipeline could watch an older workflow run and accept stale `latest` content | Stage 4 pre-deploy review | Pipeline contract test |
 | CS-15 | Test correctness | Medium | The Prisma matrix consumed a stale `inmemory` marker as its database URL | Full deployment Stage 2 matrix | Cross-mode harness contract |
+| CS-16 | Process and docs | Medium | The Schemas visual baseline correctly failed on the new contextual panel | Stage 5.3 Playwright | Visual-regression review |
+| CS-17 | Test correctness | Low | Connect Playwright assumed bearer was the default selected method | Full Playwright vs dev | Browser test authoring |
 
 ## 3. Detection Density
 
@@ -214,6 +216,26 @@ flowchart LR
 - **Confirmed resolution:** After resetting only local `scimdb`, all six modes passed in sequence; API E2E was 1,520/1,520 on both InMemory and Prisma. The failed deployment pipeline was stopped before Stage 4, so no image or estate received the invalid run.
 - **Escape delta:** The issue appeared only when the official pipeline repeated the complete mode sequence. The earliest possible detector is the new pure marker contract.
 
+### CS-16 - Schemas and Users visual baselines detected intended layout changes
+
+- **Type:** Process and docs (visual review). **Severity:** Medium because baseline changes must never be accepted blindly.
+- **Symptom:** Stage 5.3 first failed the Schemas pixel baseline; the subsequent complete suite also captured the stable Users-panel layout and failed that prior baseline. Auto-canary remained blocked.
+- **Root cause:** The previous baselines showed the schema inventory and Users content immediately below their headings. v0.55.22 intentionally inserts `Schema behavior settings` and `User behavior settings` panels.
+- **Classification:** Intended visual changes. Both expected/actual/diff PNG triplets were opened before their baseline updates. Diffs were confined to the new panels and resulting downward content shifts; app chrome, tabs, schema inventory, and Users empty state remained coherent.
+- **Fix:** Regenerate only the Schemas and Users baselines against deployed v0.55.22 dev, then rerun the full Playwright suite before canary.
+- **Prevention:** Keep baseline refresh behind written intended/unintended classification and diff inspection. Never bulk-update snapshots from a failing full run.
+- **Escape delta:** Zero. The visual gate fired at the first stage capable of observing the intended layout change.
+
+### CS-17 - Connect browser test assumed the default method tab
+
+- **Type:** Test correctness. **Severity:** Low.
+- **Symptom:** The Connect contextual-settings journey expected the bearer panel immediately after navigation, but WIF was the selected first enabled per-endpoint method.
+- **Root cause:** The test asserted an incidental ordering/default instead of exercising the behavior named in the test: settings follow the operator's selected method.
+- **Fix:** Explicitly click the bearer tab and assert its active-credential limit, then click WIF and assert its trust/JWKS controls.
+- **Why the fix works:** The test now controls its own precondition and verifies both method-specific transitions rather than depending on tab order.
+- **Prevention:** Browser tests for tab-specific content must select the tab they assert unless the default-selection contract itself is the behavior under test.
+- **Escape delta:** Caught by the first complete Playwright run against deployed v0.55.22; isolated DOM/unit tests could not detect the navigation assumption.
+
 ## 5. Escape Analysis
 
 | Issue | Detected stage | Earliest stage | Escape delta | Disposition |
@@ -233,6 +255,8 @@ flowchart LR
 | CS-13 | Lockfile reproduction | Cross-registry availability | 0 | Applied: shared-availability sql-escaper pin |
 | CS-14 | Stage 4 pre-deploy | Pipeline contract | 1 | Applied: exact-SHA selector + image-ID equality gate |
 | CS-15 | Stage 2 full pipeline | Cross-mode harness contract | 2 | Applied: typed database-marker resolution |
+| CS-16 | Stage 5.3 | Stage 5.3 | 0 | Applied: inspected single-baseline update |
+| CS-17 | Full Playwright | Browser test authoring | 0 | Applied: explicit tab selection |
 
 ## 6. Verified Non-Issues
 

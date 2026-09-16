@@ -71,6 +71,7 @@ test.describe('Endpoint contextual settings', () => {
     const id = await openFixture(page);
     await page.goto(`/endpoints/${id}/connect`);
 
+    await page.getByTestId('credentials-method-tab-bearer').click();
     await expect(page.getByTestId('connect-related-settings-bearer')).toBeVisible({ timeout: 30_000 });
     await expect(
       page.getByTestId('connect-related-settings-bearer-MaxActiveBearerCredentials'),
