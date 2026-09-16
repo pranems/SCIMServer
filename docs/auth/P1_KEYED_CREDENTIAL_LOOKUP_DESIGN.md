@@ -375,6 +375,31 @@ This is strictly safer than the original plan *and* achievable: it keeps the
 credential audit trail intact - hard-deleting rows to satisfy a gate would be
 destroying history to make a number look right.
 
+### 4.6 Measured migration queue - 2026-09-16
+
+Phase 5 remains blocked by live measurement after the v0.55.22 dev/canary rollout:
+
+| Estate | Version | Active legacy | Existing keyed | Ready | Required next action |
+|---|---:|---:|---:|---|---|
+| dev | 0.55.22 | 0 | 4 | yes | No credential migration; keep phase-5 code removal separate |
+| canary | 0.55.22 | 1 OAuth client | 4 | no | Issue overlap under the existing client ID, coordinate the live Entra owner, then deactivate legacy |
+| customer prod | 0.55.20 | 1 bearer + 5 OAuth clients | 5 | no | Promote v0.55.22 first; coordinate each owner before any credential change |
+
+The canary legacy OAuth client belongs to `Test-AV_CustomExtension_ScalarMV` and is actively used: the latest 100 non-admin rows include 11 token mints plus live AzureAD User/Group provisioning. It has no keyed overlap today, so rotation would be an outage and is forbidden.
+
+Customer-prod detail:
+
+| Endpoint | Legacy type | Keyed overlap | Recent evidence | Disposition |
+|---|---|---:|---|---|
+| `PRTest-Auth-Methods-ISV-1` | bearer | 2 | Recent calls use shared secret; legacy bearer use not proven | Controlled bearer proof, then deactivate only with owner approval |
+| `Karthik_test_tenant` | OAuth client | 0 | Active token mints; label `Test Gallery Provisioning Test App` | Coordinate gallery-app owner and issue same-client-ID overlap |
+| `ProvIAM09_AllFeaturesWithWIF` | OAuth client | 0 | Active WIF/shared-secret traffic and token mints; label `Hoxhunt entra gallery app` | Coordinate Hoxhunt owner and issue same-client-ID overlap |
+| `TestAV_CustomExtensions-Complex-SV-MV` | OAuth client | 0 | Active token mints and SCIM traffic | Identify owner, then overlap |
+| `6e56ccac-9401-4733-b3e8-0c6f73245e43` | OAuth client | 0 | Active token mints and SCIM traffic | Identify owner, then overlap |
+| `TestAV-CustomExtension-Complex-SV-MV-VerbosePATCH` | OAuth client | 0 | No recent non-admin rows in the retained window | Identify owner before treating absence as safe |
+
+No secret was retrieved and no credential was changed during this inventory. For OAuth clients the safe sequence remains: create a keyed credential with the **same explicit client ID**, give the new secret to the owner, prove traffic has moved, then deactivate the old row. Never use rotate for a coordinated handover.
+
 ---
 
 ## 4A. End-to-end walkthrough with real data
