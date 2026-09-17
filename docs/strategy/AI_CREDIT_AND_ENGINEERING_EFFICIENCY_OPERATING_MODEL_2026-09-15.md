@@ -25,6 +25,35 @@ The measured evidence points to five priority actions:
 | P0 | Remove duplicate Stage 2 executions and add an early vulnerability preflight | A full dev pipeline runs core suites two or three times; 70 image workflows reached the final Trivy step only to fail on one repeated advisory | Faster local and CI feedback without deleting assurance layers |
 | P1 | Validate and promote one immutable image digest per commit | Dev still publishes and deploys tags while production resolves digests | One build, one scan, one attestation, one artifact through dev, canary, and production |
 
+### Adoption update - 2026-09-16
+
+The operating recommendations are now active through
+[AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md).
+That document is the executable day-to-day source for change sizing, validation
+lanes, commit/push/merge rules, session boundaries, model routing, and the
+remaining automation backlog.
+
+The v0.55.23 W3.5 work supplied the first measured calibration:
+
+| Observation | Decision applied |
+|---|---|
+| One auth-cache outcome required runtime, migration, parity, live, and docs changes across about 952 changed lines. | Keep it as one integrated rollback unit; line count alone is not the split criterion. |
+| Adding RFC 8693 would introduce a second protocol and rollback story. | Stop W3.5 scope before Wave 4. |
+| The working session reached about 54 MB / 71,866 transcript lines and crossed five workflow phases. | Start consolidation in a fresh session using the document/Git handoff, not transcript replay. |
+| Full suites were already green before pre-push. | Do not rerun duplicates manually; let the required Validate hook own the final unchanged branch run. |
+| Existing pipeline scripts still duplicate Stage 2. | Preserve current gates for W3.5; land deduplication as a separate, contract-tested process change. |
+
+Implementation status of the larger efficiency roadmap remains explicit:
+
+- **Applied now:** coherent rollback-unit rule, validation lanes, fresh-session
+    boundaries, bounded-log rule, model routing, exact-tip PR/merge policy, and
+    W3.5 handoff.
+- **Scheduled separately:** instruction splitting, Stage 2 deduplication, one
+    gate registry, early advisory failure, workflow concurrency, one-digest
+    promotion, impact-selection shadowing, and live/browser manifests.
+- **Not allowed as an optimization:** removing independent assurance layers or
+    weakening pre-push before shadow evidence proves zero false negatives.
+
 The proposed monthly operating target is **180,000 planned credits**, with **90,000 incident reserve** and **30,000 uncommitted buffer**. The 300,000 limit is a hard ceiling, not a consumption target.
 
 ```mermaid

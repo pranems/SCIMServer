@@ -3,7 +3,7 @@
 > **Date:** 2026-05-16
 > **Status:** Active standing rule (in effect as of commit `cb7fe7b`)
 > **Owner:** Repo maintainers + AI coding assistants
-> **Companion:** [.github/copilot-instructions.md](../.github/copilot-instructions.md) (the operational reference); this doc is the deliberation + rationale.
+> **Companions:** [.github/copilot-instructions.md](../.github/copilot-instructions.md) (the operational reference) and [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md) (change sizing, validation frequency, Git, session, and AI-efficiency process); this doc is the gate deliberation + rationale.
 > **Why this exists:** two real defects (Finding-B inmemory parity gap, Finding-C 121 false Playwright failures) escaped the prior gate suite in May 2026. This doc captures the full deliberation that produced the new 7-stage strategy + 10 new self-improving prompts + Cross-Cutting Security Gate Map + Standing Backlog.
 
 ---
@@ -40,6 +40,23 @@ This strategy reorganizes gates into a **7-stage sequence** (Stage 0 -> 6 + Stag
 - A **Standing Backlog** captures concrete deferred items (mostly security tools) with cost + value, so they can be promoted in order.
 
 The prompt library grew from 22 to 32 files (+10 new self-improving prompts).
+
+### 1.1 Execution-frequency overlay (2026-09-16)
+
+The seven stages remain the assurance taxonomy. They are not an instruction to
+rerun every expensive command after every edit. The active delivery process
+assigns each proof to one of three lanes:
+
+| Lane | When | Evidence ownership |
+|---|---|---|
+| Developer | Each hypothesis/edit loop | Focused RED/GREEN, touched build/lint, affected live or Playwright spec. |
+| Consolidation / PR | Stable coherent change | Complete applicable audits, current Validate pre-push, exact branch-tip CI. |
+| Merge / deploy | Reviewed merge SHA | One authoritative full matrix, one artifact, full dev proof, same-artifact canary/prod promotion. |
+
+The standing principle is **remove repeated execution, not independent
+evidence**. Until impact selection has completed its shadow period, current
+hooks remain conservative. See the canonical process for the transition plan
+and the W3.5 measured precedent.
 
 ---
 

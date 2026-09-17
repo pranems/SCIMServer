@@ -7,6 +7,19 @@
 
 ---
 
+## Active Delivery Process
+
+Use [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
+for change sizing, validation lanes, commit/push/PR/merge/deploy ownership,
+session boundaries, model routing, and bounded-log/context rules. It preserves
+all independent assurance layers while preventing duplicate full-suite runs and
+mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
+`c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
+verified on dev and canary. Wave 4 and process-automation refactors remain
+separate future changes.
+
+---
+
 ## 1. Project Identity
 
 | Field | Value |
@@ -321,7 +334,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 | ✅ Groups CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
 | ✅ PATCH (add/replace/remove, valuePath, extension URNs, no-path merge) | Complete |
 | ✅ Case-insensitive behavior (RFC 7643 §2.1) | Complete |
-| ✅ Discovery endpoints | 100% - All 6 gaps (D1–D6) resolved. Two-tier multi-tenant architecture: root-level (global defaults) + endpoint-scoped (primary, per-tenant overlays). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
+| ✅ Discovery endpoints | 100% - All 6 gaps (D1-D6) resolved. Two-tier multi-tenant architecture: root-level (global defaults) + endpoint-scoped (primary, per-tenant overlays). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | ✅ Pagination (startIndex, count) | Complete |
 | ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
 | ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |
@@ -345,7 +358,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** - all passing (0 failures). **Unit**: 4,922 (173 suites, measured 2026-09-16). **E2E**: 1,521 (96 suites, measured on both InMemory and Prisma). **Web vitest**: 1,302 (105 files, unchanged). **Live integration**: local v0.55.23 **1,484/1,484**; deployed dev and canary v0.55.22 **1,483/1,483**. **Playwright**: N/A for v0.55.23 (no web change); latest deployed v0.55.22 dev 230 passed / 2 skipped, canary green and post-flip 205 passed / 4 skipped
+- **Unit** and **E2E** - all passing (0 failures). **Unit**: 4,922 (173 suites, measured 2026-09-16). **E2E**: 1,521 (96 suites, measured on both InMemory and Prisma). **Web vitest**: 1,302 (105 files, unchanged). **Live integration**: local and Docker v0.55.23 **1,484/1,484**; dev **1,484/1,484**; canary post-flip **1,485/1,485**. **Playwright**: N/A for v0.55.23 behavior (no web change); deployment regression coverage passed on dev and canary, with canary **205 passed / 4 skipped**
 - **SCIM Validator**: 10/12 mandatory (2 FP on Lexmark returned:never), 25/25 on standard profile + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -411,7 +424,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 8. **The `/scim/v2` rewrite** - Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
 9. **SchemaValidator** - 1,664-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** - `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
-11. **G2 is DONE + G17 RESOLVED (v0.20.0)** - Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
+11. **G2 is DONE + G17 RESOLVED (v0.20.0)** - Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `ScimSchemaHelpers`). All 27 migration gaps (G1-G20) are now closed.
 12. **3-tier auth guard** - `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.
 13. **CORS wildcard** - `main.ts` sets `origin: true` (accept all origins). Should be restricted for production deployments.
 
