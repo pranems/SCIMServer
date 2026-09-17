@@ -41,6 +41,7 @@ import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ConnectionInfoService } from './services/connection-info.service';
 import { CredentialMigrationService } from './services/credential-migration.service';
 import { ConnectionSecretResolverService } from './services/connection-secret-resolver.service';
+import { WifTrustCacheService } from './services/wif-trust-cache.service';
 import { CredentialEncryptionService } from '../../security/credential-encryption.service';
 import { CredentialSecurityService } from '../../security/credential-security.service';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
@@ -93,6 +94,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     ConnectionInfoService,
     CredentialMigrationService,
     ConnectionSecretResolverService,
+    WifTrustCacheService,
     CredentialEncryptionService,
     CredentialSecurityService,
     // W2.3 - the client_secret mint provider (credential lookup + bcrypt + mint).

@@ -7,6 +7,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { AuthDecisionRecordStore } from '../../../oauth/auth-decision-record.store';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
+import { WifTrustCacheService } from '../services/wif-trust-cache.service';
 
 /**
  * Q6.4 - WifAssertionTokenProvider unit tests. The three-outcome acceptor
@@ -15,6 +16,7 @@ import type { EndpointCredentialModel } from '../../../domain/models/endpoint-cr
 describe('WifAssertionTokenProvider (Q6.4)', () => {
   let provider: WifAssertionTokenProvider;
   let findActiveByEndpoint: jest.Mock;
+  let findActiveByEndpointAndType: jest.Mock;
   let validate: jest.Mock;
   let validateWithTrace: jest.Mock;
   let generateEndpointAccessToken: jest.Mock;
@@ -51,6 +53,12 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
 
   beforeEach(async () => {
     findActiveByEndpoint = jest.fn();
+    findActiveByEndpointAndType = jest.fn(async (endpointId: string, credentialType: string) => {
+      const credentials = await findActiveByEndpoint(endpointId);
+      return credentials.filter((credential: EndpointCredentialModel) =>
+        credential.credentialType === credentialType,
+      );
+    });
     validate = jest.fn();
     generateEndpointAccessToken = jest.fn();
     getEndpoint = jest.fn().mockResolvedValue({ profile: { settings: {} } });
@@ -72,7 +80,11 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         WifAssertionTokenProvider,
-        { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: { findActiveByEndpoint } },
+        WifTrustCacheService,
+        {
+          provide: ENDPOINT_CREDENTIAL_REPOSITORY,
+          useValue: { findActiveByEndpoint, findActiveByEndpointAndType },
+        },
         {
           provide: WifAssertionValidatorService,
           // Phase 1: the provider calls validateWithTrace(); wrap the existing
@@ -101,6 +113,28 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
     expect(result).toBeNull();
     expect(validate).not.toHaveBeenCalled();
+  });
+
+  it('W3.5: loads only active WIF credentials for the endpoint', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    findActiveByEndpointAndType.mockResolvedValue([wifCredential()]);
+    validate.mockResolvedValue({
+      iss: wifMetadata.expectedIssuer,
+      sub: wifMetadata.expectedSubject,
+      aud: wifMetadata.expectedAudience,
+      tid: 'tenant-123',
+      roles: ['Scim.Provision'],
+    });
+    generateEndpointAccessToken.mockResolvedValue({
+      accessToken: 'minted.jwt',
+      expiresIn: 7200,
+      scope: 'scim.read scim.write',
+    });
+
+    await provider.mintFromAssertion('ep-1', 'assertion.jwt');
+
+    expect(findActiveByEndpointAndType).toHaveBeenCalledWith('ep-1', 'wif');
+    expect(findActiveByEndpoint).not.toHaveBeenCalled();
   });
 
   it('mints the endpoint token when the assertion is valid (accept)', async () => {
@@ -636,6 +670,22 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
       expect.any(String),
       expect.objectContaining({ expectedIssuer: 'https://issuer-B/v2.0' }),
     );
+  });
+
+  it('W3.5: rejects an unknown decoded issuer without validating against unrelated trusts', async () => {
+    const first = wifCredential();
+    first.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-A/v2.0' };
+    const second = wifCredential();
+    second.metadata = { ...wifMetadata, expectedIssuer: 'https://issuer-B/v2.0' };
+    findActiveByEndpoint.mockResolvedValue([first, second]);
+    validate.mockRejectedValue(new WifAssertionInvalidError('issuer mismatch', 'wif_issuer_mismatch'));
+
+    await expect(
+      provider.mintFromAssertion('ep-1', assertionWithIssuer('https://unknown-issuer/v2.0')),
+    ).rejects.toMatchObject({ reasonCode: 'wif_issuer_mismatch' });
+
+    expect(validate).not.toHaveBeenCalled();
+    expect(generateEndpointAccessToken).not.toHaveBeenCalled();
   });
 
   it('WI-17: stamps the winning trust issuer (sourceIssuer) on the minted token', async () => {

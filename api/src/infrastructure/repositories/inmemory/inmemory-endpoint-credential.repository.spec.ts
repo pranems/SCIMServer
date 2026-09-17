@@ -66,4 +66,25 @@ describe('InMemoryEndpointCredentialRepository - findAllActiveByType (W1.2)', ()
   it('returns an empty array rather than throwing when nothing matches', async () => {
     await expect(repo.findAllActiveByType('wif')).resolves.toEqual([]);
   });
+
+  it('W3.5: filters active credentials by endpoint and type', async () => {
+    await seed({ endpointId: 'ep-1', credentialType: 'wif' });
+    await seed({ endpointId: 'ep-1', credentialType: 'oauth_client' });
+    await seed({ endpointId: 'ep-2', credentialType: 'wif' });
+    await seed({ endpointId: 'ep-1', credentialType: 'wif', active: false });
+    await seed({
+      endpointId: 'ep-1',
+      credentialType: 'wif',
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+
+    const found = await repo.findActiveByEndpointAndType('ep-1', 'wif');
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toEqual(expect.objectContaining({
+      endpointId: 'ep-1',
+      credentialType: 'wif',
+      active: true,
+    }));
+  });
 });

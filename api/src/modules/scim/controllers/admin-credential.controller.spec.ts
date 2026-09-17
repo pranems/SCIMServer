@@ -26,6 +26,7 @@ describe('AdminCredentialController', () => {
   let mockEndpointService: Record<string, jest.Mock>;
   let mockEventEmitter: { emit: jest.Mock };
   let mockWifResolver: { resolve: jest.Mock; verifyTrust: jest.Mock };
+  let mockWifTrustCache: { invalidate: jest.Mock };
   let loggerSpy: { info: jest.Mock; warn: jest.Mock; error: jest.Mock };
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
@@ -102,6 +103,7 @@ describe('AdminCredentialController', () => {
       // retention a no-op (isReady=false) so existing tests are unaffected.
       { isReady: jest.fn().mockReturnValue(false), encrypt: jest.fn(), decrypt: jest.fn() } as any,
       { getEffectiveVisibility: jest.fn().mockResolvedValue('always'), getServerVisibility: jest.fn().mockResolvedValue('always'), purgeRetainedSecrets: jest.fn() } as any,
+      (mockWifTrustCache = { invalidate: jest.fn() }) as any,
     );
   });
 
@@ -298,6 +300,7 @@ describe('AdminCredentialController', () => {
       expect(mockCredentialRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ credentialType: 'wif' }),
       );
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
     });
 
     it('rejects a wif credential when WifCredentialsEnabled is off', async () => {
@@ -767,6 +770,14 @@ describe('AdminCredentialController', () => {
       expect(mockCredentialRepo.deactivate).toHaveBeenCalledWith(mockCredential.id);
     });
 
+    it('W3.5: invalidates cached trusts after revoking a WIF credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, credentialType: 'wif' });
+
+      await controller.revokeCredential(mockEndpoint.id, mockCredential.id);
+
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
+    });
+
     it('should throw NotFoundException when credential does not exist', async () => {
       mockCredentialRepo.findById.mockResolvedValue(null);
 
@@ -796,6 +807,18 @@ describe('AdminCredentialController', () => {
       expect(res).not.toHaveProperty('credentialHash');
     });
 
+    it('W3.5: invalidates cached trusts after reactivating a WIF credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({
+        ...mockCredential,
+        credentialType: 'wif',
+        active: false,
+      });
+
+      await controller.activateCredential(mockEndpoint.id, mockCredential.id);
+
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
+    });
+
     it('throws NotFoundException for an unknown / cross-endpoint credential', async () => {
       mockCredentialRepo.findById.mockResolvedValue(null);
       await expect(controller.activateCredential(mockEndpoint.id, 'nope')).rejects.toThrow(NotFoundException);
@@ -809,6 +832,14 @@ describe('AdminCredentialController', () => {
       expect(mockCredentialRepo.updateLabel).toHaveBeenCalledWith(mockCredential.id, 'renamed');
       expect(res.label).toBe('renamed');
       expect(res).not.toHaveProperty('credentialHash');
+    });
+
+    it('W3.5: invalidates cached trusts after editing a WIF credential', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, credentialType: 'wif' });
+
+      await controller.editCredential(mockEndpoint.id, mockCredential.id, { label: 'renamed' });
+
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
     });
 
     it('throws BadRequest when no label is supplied', async () => {
@@ -861,6 +892,7 @@ describe('AdminCredentialController', () => {
         }),
       );
       expect(result.wif).toMatchObject({ expectedIssuer: 'https://new.example/v2.0' });
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
       // No secret ever appears on a wif response.
       expect((result as unknown as Record<string, unknown>).token).toBeUndefined();
     });

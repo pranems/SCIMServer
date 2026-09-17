@@ -48,6 +48,20 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     );
   }
 
+  async findActiveByEndpointAndType(
+    endpointId: string,
+    credentialType: string,
+  ): Promise<EndpointCredentialModel[]> {
+    const now = new Date();
+    return Array.from(this.store.values()).filter(
+      (credential) =>
+        credential.endpointId === endpointId &&
+        credential.credentialType === credentialType &&
+        credential.active &&
+        (credential.expiresAt === null || credential.expiresAt > now),
+    );
+  }
+
   // P1 - mirrors the Prisma implementation's active/expiry semantics exactly;
   // a parity gap here would make the fast path behave differently per backend.
   async findActiveByLookupKey(lookupKey: string): Promise<EndpointCredentialModel | null> {

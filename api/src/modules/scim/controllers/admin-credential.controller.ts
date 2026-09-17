@@ -46,6 +46,7 @@ import {
   SCIM_EVENTS,
   type ScimCredentialEventPayload,
 } from '../../stats/scim-events';
+import { WifTrustCacheService } from '../services/wif-trust-cache.service';
 
 // P1: this controller no longer hashes anything. Both credential types are
 // minted as keyed tokens with a peppered HMAC, so bcrypt survives only in the
@@ -208,6 +209,7 @@ export class AdminCredentialController {
     private readonly wifResolver: WifDiscoveryResolverService,
     private readonly credentialEncryption: CredentialEncryptionService,
     private readonly credentialSecurity: CredentialSecurityService,
+    private readonly wifTrustCache: WifTrustCacheService,
   ) {}
 
   /** The registry is the single source of the default; never hardcode it here. */
@@ -528,6 +530,9 @@ export class AdminCredentialController {
     }
 
     await this.credentialRepo.deactivate(credentialId);
+    if (credential.credentialType === 'wif') {
+      this.wifTrustCache.invalidate(endpointId);
+    }
     this.logger.info(LogCategory.AUTH, `Revoked credential "${credentialId}" for endpoint "${endpointId}"`);
 
     // Phase J (v0.48.1): emit-after-commit; symmetrical with create.
@@ -579,6 +584,9 @@ export class AdminCredentialController {
     if (!updated) {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
     }
+    if (credential.credentialType === 'wif') {
+      this.wifTrustCache.invalidate(endpointId);
+    }
     this.logger.info(LogCategory.AUTH, `Reactivated credential "${credentialId}" for endpoint "${endpointId}"`);
     return {
       id: updated.id,
@@ -619,6 +627,9 @@ export class AdminCredentialController {
     const updated = await this.credentialRepo.updateLabel(credentialId, dto.label);
     if (!updated) {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    if (credential.credentialType === 'wif') {
+      this.wifTrustCache.invalidate(endpointId);
     }
     this.logger.info(LogCategory.AUTH, `Edited credential "${credentialId}" label for endpoint "${endpointId}"`);
     return {
@@ -708,6 +719,7 @@ export class AdminCredentialController {
     if (dto.label !== undefined && dto.label !== updated.label && this.credentialRepo.updateLabel) {
       labelled = (await this.credentialRepo.updateLabel(credentialId, dto.label)) ?? updated;
     }
+    this.wifTrustCache.invalidate(endpointId);
     this.logger.info(LogCategory.AUTH, `Updated wif credential "${credentialId}" for endpoint "${endpointId}"`);
 
     return {
@@ -993,6 +1005,8 @@ export class AdminCredentialController {
       label: dto.label ?? null,
       metadata,
     });
+
+    this.wifTrustCache.invalidate(endpointId);
 
     this.logger.info(LogCategory.AUTH, `Created wif credential "${credential.id}" for endpoint "${endpointId}"`);
 

@@ -60,6 +60,7 @@ import {
 import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { emitAuthAdminEvent } from '../../../oauth/auth-admin-event';
+import { WifTrustCacheService } from '../services/wif-trust-cache.service';
 
 @Controller('admin/endpoints')
 export class AdminWifDiagnosticsController {
@@ -70,6 +71,7 @@ export class AdminWifDiagnosticsController {
     private readonly logger: ScimLogger,
     private readonly wifResolver: WifDiscoveryResolverService,
     private readonly wifValidator: WifAssertionValidatorService,
+    private readonly wifTrustCache: WifTrustCacheService,
   ) {}
 
   /**
@@ -121,6 +123,7 @@ export class AdminWifDiagnosticsController {
         verifiedAt = new Date().toISOString();
         const nextMetadata: Record<string, unknown> = { ...(credential.metadata ?? {}), lastVerifiedAt: verifiedAt };
         await this.credentialRepo.updateMetadata(body.credentialId, nextMetadata);
+        this.wifTrustCache.invalidate(endpointId);
       }
     }
     // Phase 4 - config-time auth audit event for a WIF trust verification.

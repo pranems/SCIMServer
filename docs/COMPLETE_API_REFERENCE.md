@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-03 - **Product version:** `0.55.22`
+> **Status:** User-facing reference - **Last verified:** 2026-09-16 - **Product version:** `0.55.23`
 
-> **Version:** 0.55.22 - **Updated:** 2026-07-31
+> **Version:** 0.55.23 - **Updated:** 2026-07-31
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **118 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 
@@ -1067,6 +1067,13 @@ Non-verifying JWT decoder, for reading a token you are holding. It **never** val
 The effective runtime schema/resource configuration, plus `invariantWarnings` when the loaded configuration is internally inconsistent.
 
 **Response keys:** `schemas`, `groups`, `invariantWarnings`.
+
+The `auth` group includes the WIF trust-cache controls:
+
+| Setting | Default | Bounds |
+|---|---:|---:|
+| `wifTrustCacheTtlMs` (`WIF_TRUST_CACHE_TTL_MS`) | `30000` | `1000` - `300000` |
+| `wifTrustCacheMaxEndpoints` (`WIF_TRUST_CACHE_MAX_ENDPOINTS`) | `256` | `16` - `10000` |
 
 ### POST /scim/admin/logs/flush
 
@@ -2263,7 +2270,7 @@ The **per-endpoint** token endpoint. Distinct from the server-level `/scim/oauth
 }
 ```
 
-Send exactly one of `client_secret` or `client_assertion`; sending both is `mutually_exclusive_credentials` and sending neither is `missing_credentials`. For WIF, the token lifetime is **capped to the assertion's own lifetime**, so a token can never outlive the authorization that produced it. Failure reason codes are listed in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
+Send exactly one of `client_secret` or `client_assertion`; sending both is `mutually_exclusive_credentials` and sending neither is `missing_credentials`. For WIF, the token lifetime is **capped to the assertion's own lifetime**, so a token can never outlive the authorization that produced it. A decoded issuer that matches no active RFC 7523 trust returns `401 invalid_client` with `reason_code: wif_issuer_mismatch` before any unrelated trust's JWKS is fetched. Failure reason codes are listed in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
 
 > The minted token is **never written to the request log**. A token-mint log row records only `clientId`, `endpointId`, `expiresIn` and `scopes`.
 

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { AccessToken } from '../../../oauth/oauth.service';
 import { OAuthService } from '../../../oauth/oauth.service';
 import {
@@ -7,8 +7,6 @@ import {
   type WifTrust,
   type WifValidatedClaims,
 } from '../../../oauth/wif-assertion-validator.service';
-import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
-import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { computeShadowDecision } from '../../../oauth/wif-shadow-telemetry';
@@ -23,6 +21,7 @@ import type { IAssertionTokenProvider, AssertionMintRequest } from './assertion-
 import { WIF_PROFILE_RFC7523, resolveTrustProfiles, trustEnablesProfile } from './assertion-token-provider';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { resolveEndpointEgressOverrides } from '../../endpoint/endpoint-config.interface';
+import { WifTrustCacheService } from '../services/wif-trust-cache.service';
 
 /**
  * WifAssertionTokenProvider (Q6.4) - binds the A3 `IAssertionTokenProvider`
@@ -47,8 +46,7 @@ import { resolveEndpointEgressOverrides } from '../../endpoint/endpoint-config.i
 @Injectable()
 export class WifAssertionTokenProvider implements IAssertionTokenProvider {
   constructor(
-    @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
-    private readonly credentialRepo: IEndpointCredentialRepository,
+    private readonly trustCache: WifTrustCacheService,
     private readonly validator: WifAssertionValidatorService,
     private readonly oauthService: OAuthService,
     private readonly logger: ScimLogger,
@@ -68,8 +66,8 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
   ): Promise<AccessToken | null> {
     const requestResource = request?.resource;
     const requestClientId = request?.clientId;
-    const credentials = await this.credentialRepo.findActiveByEndpoint(endpointId);
-    const wifCredentials = credentials.filter((c) => c.credentialType === 'wif');
+    const trustSet = await this.trustCache.get(endpointId);
+    const wifCredentials = trustSet.credentials;
 
     // Not-mine-continue: no WIF trust configured for this endpoint.
     if (wifCredentials.length === 0) {
@@ -112,17 +110,37 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       .catch(() => undefined);
     const egressOverrides = resolveEndpointEgressOverrides(endpoint?.profile?.settings);
 
-    // From here on the assertion is "mine": one of the configured WIF trusts
-    // must accept it. WI-17 orders the trusts issuer-first - decode the
-    // assertion's `iss` WITHOUT verifying it and try the trust whose
-    // `expectedIssuer` matches FIRST, so the common multi-IdP case does exactly
-    // one JWKS verification (O(1)) instead of N. The decoded `iss` only SELECTS
-    // the order; the signature is still verified against that trust's JWKS, so
-    // an attacker cannot gain anything by spoofing the unverified claim. WI-16
-    // guarantees the fallback: if the issuer is undecodable or matches nothing,
-    // every trust is tried in turn. A rejecting or misconfigured trust is a
-    // non-match; if NONE accepts, we fail closed (throw) and NEVER fall through.
-    const orderedTrusts = this.orderByAssertionIssuer(profileCredentials, clientAssertion);
+    // From here on the assertion is "mine": one configured WIF trust must
+    // accept it. W3.5 uses the cached exact-issuer map to select only trusts for
+    // a decoded `iss`; an unknown issuer rejects before any unrelated JWKS
+    // fetch. The unverified claim only selects candidates - every selected
+    // trust still performs signature and claim validation. If `iss` cannot be
+    // decoded, the legacy fail-closed iteration remains for a precise error.
+    const assertionIssuer = this.decodeUnverifiedIssuer(clientAssertion);
+    const orderedTrusts = assertionIssuer
+      ? (trustSet.byIssuer.get(assertionIssuer) ?? []).filter((credential) =>
+          trustEnablesProfile(credential.metadata, WIF_PROFILE_RFC7523),
+        )
+      : profileCredentials;
+
+    if (assertionIssuer && orderedTrusts.length === 0) {
+      const trace: AuthDecisionTrace = {
+        plane: 'token-mint',
+        method: 'wif',
+        outcome: 'reject',
+        reasonCode: 'wif_issuer_mismatch',
+        correlationId: getCorrelationContext()?.requestId,
+        endpointId,
+        checks: [{
+          id: 'issuer_match',
+          status: 'fail',
+          expected: [...trustSet.byIssuer.keys()].join(', '),
+          received: assertionIssuer,
+        }],
+      };
+      this.recordAndEmit(trace);
+      throw new WifAssertionInvalidError('issuer mismatch', 'wif_issuer_mismatch', trace);
+    }
 
     let lastError: unknown;
     const subTraces: AuthDecisionTrace[] = [];
@@ -310,35 +328,6 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       'No configured WIF trust accepted the assertion.',
       'wif_no_trust_accepted',
     );
-  }
-
-  /**
-   * WI-17 - order the WIF trusts so the one whose `expectedIssuer` matches the
-   * assertion's (UNVERIFIED) `iss` claim is tried first. Selection only; the
-   * signature is still verified against the chosen trust's JWKS. If the `iss`
-   * cannot be decoded (non-JWT string, malformed segment) or matches no trust,
-   * the original order is preserved and every trust is tried (WI-16 fallback).
-   */
-  private orderByAssertionIssuer<T extends { metadata: Record<string, unknown> | null }>(
-    trusts: T[],
-    assertion: string,
-  ): T[] {
-    if (trusts.length <= 1) {
-      return trusts;
-    }
-    const iss = this.decodeUnverifiedIssuer(assertion);
-    if (!iss) {
-      return trusts;
-    }
-    const matchIndex = trusts.findIndex((t) => (t.metadata ?? {}).expectedIssuer === iss);
-    if (matchIndex <= 0) {
-      // -1 (no match) or 0 (already first) -> nothing to reorder.
-      return trusts;
-    }
-    const reordered = [...trusts];
-    const [match] = reordered.splice(matchIndex, 1);
-    reordered.unshift(match);
-    return reordered;
   }
 
   /**

@@ -75,6 +75,7 @@ model RequestLog {
   @@index([endpointId])
   @@index([identifier])
   @@index([requestId])
+  @@index([authOutcome])
   @@index([createdAt, method, url])  // Composite for activity summary count queries
 }
 
@@ -169,6 +170,7 @@ model EndpointCredential {
   endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 
   @@index([endpointId, active])
+  @@index([endpointId, credentialType, active])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -198,6 +200,8 @@ model CredentialDek {
   kekSalt    String   @db.VarChar(255)         // base64url scrypt salt
   active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @db.Timestamptz
+
+  @@index([active])
 }
 
 // WI-7: server-global key/value settings store. Holds the server-scope

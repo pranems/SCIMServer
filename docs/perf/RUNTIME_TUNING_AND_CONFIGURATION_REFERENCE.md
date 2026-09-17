@@ -1,6 +1,6 @@
 # Runtime tuning and configuration reference - every perf/resilience knob, its recommended value per environment, and the gaps (X15)
 
-Status: ANALYSIS + REFERENCE (source-audited against api v0.54.81 on 2026-07-28).
+Status: ANALYSIS + REFERENCE (source-audited against api v0.55.23 on 2026-09-16).
 Companion to the X11 token-mint latency analysis ([WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](WIF_TOKEN_MINT_LATENCY_ANALYSIS.md))
 and the X9 resource-plane RCA ([DEV_LATENCY_REGRESSION_RCA.md](DEV_LATENCY_REGRESSION_RCA.md)).
 The work items proposed here are sequenced in [auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md](../auth/AUTH_CONSOLIDATED_DELIVERY_PLAN.md)
@@ -609,7 +609,14 @@ tier exists for the case where one customer's IdP is genuinely slower.
 | `LOG_SLOW_REQUEST_MS` | `2000` | `2000` | **`2000`** | **`1000`** | Prod should surface a 1 s request as slow given the measured 36 ms warm mint. |
 | `LOG_RETENTION_DAYS` | `7` | `7` | **`21`** | **`21`** | Existing key. |
 
-### 7.5 SCIM protocol caps - Tier 1
+### 7.5 Authentication caches - Tier 1
+
+| Key | L | D | A-dev | A-prod | Rationale |
+|---|---|---|---|---|---|
+| `WIF_TRUST_CACHE_TTL_MS` | `30000` | `30000` | **`30000`** | **`30000`** | Warm assertion bursts skip the credential query. Successful local mutations invalidate immediately; the TTL bounds stale state if an estate grows beyond one replica. |
+| `WIF_TRUST_CACHE_MAX_ENDPOINTS` | `256` | `256` | **`256`** | **`1024`** | The LRU bound prevents arbitrary endpoint IDs on the public token route from growing process memory without limit. |
+
+### 7.6 SCIM protocol caps - Tier 1
 
 | Key | L | D | A-dev | A-prod | Rationale |
 |---|---|---|---|---|---|
@@ -652,6 +659,9 @@ tier exists for the case where one customer's IdP is genuinely slower.
   "LOG_INCLUDE_PAYLOADS": "false",
   "LOG_SLOW_REQUEST_MS": "1000",
 
+  "WIF_TRUST_CACHE_TTL_MS": "30000",
+  "WIF_TRUST_CACHE_MAX_ENDPOINTS": "1024",
+
   "SCIM_DEFAULT_COUNT": "100",
   "SCIM_MAX_COUNT": "200"
 }
@@ -685,6 +695,8 @@ are clamped, not rejected, and the clamp is logged.
 | `DB_TX_TIMEOUT_MS` | `1000` | `300000` |
 | `LOG_FLUSH_INTERVAL_MS` | `100` | `60000` |
 | `LOG_FLUSH_MAX_BUFFER` | `1` | `10000` |
+| `WIF_TRUST_CACHE_TTL_MS` | `1000` | `300000` |
+| `WIF_TRUST_CACHE_MAX_ENDPOINTS` | `16` | `10000` |
 | `SCIM_DEFAULT_COUNT` | `1` | `1000` |
 | `SCIM_MAX_COUNT` | `1` | `1000` |
 

@@ -303,6 +303,7 @@ Promotes the environment-dependent values that are currently hardcoded into a cl
 - Tasks: per-endpoint WIF-trust cache (invalidate on credential change); `findActiveByEndpointAndType('wif')`; composite index `(endpointId, credentialType, active)` (Prisma migration + in-memory parity); compile/cache exact issuer->trust selection; reject unknown issuers without unrelated JWKS fetches.
 - Acceptance: warm mint no longer hits the DB for the trust set; unknown-issuer path does zero network; index migration + parity tests; `prismaMigrationAudit` green.
 - Deps: W3.1. Estimate: **M**. Risk: Medium (cache invalidation correctness).
+- **Status: DELIVERED LOCALLY.** Typed lookup and backend parity, additive composite-index migration, bounded/expiry-aware/generation-safe per-endpoint cache, exact issuer map, zero-JWKS unknown-issuer rejection, and create/edit/activate/deactivate/delete invalidation are implemented. Report: [WAVE3_W3_5_IMPLEMENTATION_REPORT.md](WAVE3_W3_5_IMPLEMENTATION_REPORT.md).
 
 ### Wave 4 - RFC 8693 token exchange
 

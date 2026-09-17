@@ -27,6 +27,27 @@ interface RequiredConstraint {
 
 const REQUIRED_CONSTRAINTS: ReadonlyArray<RequiredConstraint> = [
   {
+    id: 'Migration-history RequestLog auth outcome index',
+    model: 'RequestLog',
+    declaration: '@@index([authOutcome])',
+    rationale:
+      'Keeps the auth-outcome query index declared in schema.prisma so future migrations do not drop it.',
+  },
+  {
+    id: 'Migration-history active credential DEK index',
+    model: 'CredentialDek',
+    declaration: '@@index([active])',
+    rationale:
+      'Keeps the active-DEK lookup index declared in schema.prisma so future migrations do not drop it.',
+  },
+  {
+    id: 'W3.5 typed credential lookup',
+    model: 'EndpointCredential',
+    declaration: '@@index([endpointId, credentialType, active])',
+    rationale:
+      'Supports active per-endpoint credential lookup by type without scanning unrelated credential rows.',
+  },
+  {
     id: 'Tier-0 #5',
     model: 'ResourceMember',
     // SCIM identifies a member by its `value` sub-attribute (always populated).
