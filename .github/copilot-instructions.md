@@ -12,6 +12,40 @@
 7. 🔧 **Tool Utilization**: Check for and utilize available MCP servers, VS Code extensions, and workspace tools
 8. 🎨 **Code Quality**: Apply industry best practices, design patterns, and maintain consistent code style
 
+## AI-Efficient Change Delivery Rule (CRITICAL - added 2026-09-16)
+
+The canonical operating process is
+[docs/strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](../docs/strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md).
+It operationalizes the measured credit/engineering analysis from commit
+`df8435251a6c999f867b5ca601cf5dc4921e0f7d` without weakening any assurance
+layer.
+
+1. One PR is one coherent behavioral outcome and rollback unit. Split a new
+  protocol, unrelated refactor, gate redesign, or second migration into its
+  own change.
+2. Use the three validation lanes: focused RED/GREEN during development,
+  complete applicable evidence at consolidation/pre-push, and one
+  authoritative matrix plus immutable artifact after merge.
+3. Remove repeated execution, never independent evidence. Unit, E2E, backend
+  parity, migration replay, live HTTP, Playwright, security, and deployment
+  checks remain distinct claims.
+4. Do not manually rerun a full suite immediately before a hook or pipeline
+  that owns the same unchanged run. Re-run when relevant files, dependencies,
+  environment, or the required gate changed.
+5. Start a fresh session when crossing research -> implementation,
+  implementation -> consolidation/PR, consolidation -> deployment, or one
+  feature -> another. The persistent context is Git plus the focused handoff
+  docs, not the transcript.
+6. Never paste a complete log or transcript over 20,000 characters. Store the
+  artifact and request only distinct failures, first causal stacks, and
+  cascade classification.
+7. Use Auto Efficiency for routine bounded work; escalate model/context only
+  for a written architecture, security, incident, or repeatedly-falsified
+  question with an executable acceptance check.
+8. Merge through a reviewed PR only after exact-tip CI is green. Build from
+  merged `master`, then promote the same digest through dev, canary, and only
+  with explicit approval to customer prod.
+
 ## 📁 Intelligent File & Context Management
 
 **Session File Priority & Discovery:**

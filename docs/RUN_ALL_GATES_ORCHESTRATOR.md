@@ -1,6 +1,6 @@
 # run-all-gates.ps1 - 7-stage Mandatory Quality Gates orchestrator
 
-**Status:** Active standing tool (2026-05-17)
+**Status:** Active standing tool (2026-05-17); execution-frequency transition documented 2026-09-16
 **Source recommendation:** [docs/strategy/SELF_AUDIT_2026-05-16.md](strategy/SELF_AUDIT_2026-05-16.md) Section D.1
 **Related:** [docs/MANDATORY_QUALITY_GATES_STRATEGY.md](MANDATORY_QUALITY_GATES_STRATEGY.md), [.github/copilot-instructions.md](../.github/copilot-instructions.md) Mandatory Quality Gates section
 
@@ -13,6 +13,24 @@ The first Stage X.1 self-audit found a ~25 % gate-invocation rate on the first f
 [scripts/run-all-gates.ps1](../scripts/run-all-gates.ps1) is that walker.
 
 **Smoke-screen risk (from Section D.1):** operators could fall into the trap of "I ran the script so I'm done" without engaging with the findings. The mitigation is structural: the orchestrator pauses on every prompt-gate finding and requires explicit acknowledgment (PASS / FAIL / SKIPPED / PARTIAL + note). Operator discipline is still required; the script is the scaffold, not the substitute.
+
+### 1.1 Efficiency transition
+
+The orchestrator remains the complete registry/walker, but it is not the
+default command after every edit. Use the lane model in
+[AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md):
+
+- focused checks own developer feedback;
+- `pre-push-checks.ps1 -Mode Validate` owns the final unchanged branch run;
+- the complete authoritative matrix owns merged-SHA evidence;
+- `run-all-gates.ps1` owns applicability preview, judgment-audit walk, and
+    release evidence, not repeated execution for its own sake.
+
+Today the registry and deployment pipeline still call some Stage 2 suites both
+directly and through `test-all-modes.ps1`. Do not delete those calls inside a
+feature release. The scheduled deduplication change must first make the matrix
+the sole owner, emit equivalent evidence, and add a contract test that fails on
+duplicate ownership.
 
 ---
 

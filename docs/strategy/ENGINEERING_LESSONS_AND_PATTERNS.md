@@ -91,12 +91,12 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (24 seeded)
+    title Patterns by category (26 seeded)
     "A Test/gate integrity" : 8
     "B Environment/deploy" : 3
     "C Framework/middleware" : 3
     "D Security at sinks" : 2
-    "E Process/introspection" : 3
+    "E Process/introspection" : 5
     "F Design/architecture" : 1
     "G Config/op defaults" : 4
 ```
@@ -154,6 +154,8 @@ How the agent learns reliably across compaction boundaries.
 | **PE-1** | Capture RCA at fix-confirmation time | Writing all RCA at build-end after compaction lost fidelity (a ~50x recurrence was misremembered as "3+") | Record each issue's symptom/RCA/fix/why the moment the fix goes RED->GREEN, into the per-build ledger | Discipline D1 (this doc) + RCA-ledger rule | operator 2026-06-19 |
 | **PE-2** | Reconcile against the full transcript at build end | In-context recollection alone cannot survive multiple compactions across a long build | Scan the session transcript jsonl for issue signals; map every diagnosed problem to a ledger entry; record provenance | Discipline D2 (this doc) + RCA-ledger rule | operator 2026-06-19 |
 | **PE-3** | Smoke-run before batching | Q6 batched ALL live-tests to a checkpoint; a live-only test bug (PA-2) surfaced one stage later than a per-step local-node run would have | Author AND smoke-run each new live section against one live node in the same step, before deferring the rest of the matrix | Rule: "Author-and-smoke-run-before-batch" | auth I-05 escape |
+| **PE-4** | A workflow boundary is a session boundary | The W3.5 session crossed research, implementation, full validation, live testing, release docs, roadmap analysis, and consolidation; its transcript reached about 54 MB / 71,866 lines while the persistent handoff already held the needed facts | Start a fresh session when moving research -> implementation, implementation -> consolidation/PR, consolidation -> deployment, or one feature -> another. Continue from Git plus a bounded handoff; never replay the whole transcript | AI-Efficient Change Delivery Rule + [operating process](AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md) | W3.5 / commit df843525 analysis |
+| **PE-5** | One PR is one coherent rollback unit | W3.5 is large in file count because one cache/index outcome requires parity, migration, live, RCA, and docs; adding W4 RFC 8693 would mix a second protocol, risk model, and rollback story merely because the branch/session was already open | Split by behavioral outcome, coupling, and rollback, not raw line count. A migration plus its implementation/tests/docs stays together; an unrelated protocol or gate redesign moves to another PR | AI-Efficient Change Delivery Rule + [operating process](AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md) | W3.5 consolidation review |
 
 ### Category F - Design and architecture (structural drift)
 
@@ -198,6 +200,8 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PD-2 (fix the class, enumerate every column of the type) | 2 (high-sev, same vector: `requestId` v0.54.85, `endpointId` v0.54.89) | YES - Security Gate Map row + one shared guard module |
 | PE-1 / PE-2 (capture timing + transcript) | 1 (operator-surfaced) | YES - this doc + RCA rule |
 | PE-3 (smoke before batch) | 1 | convention; revisit if a 2nd escape |
+| PE-4 (workflow boundary = session boundary) | 1 measured high-cost session plus exact 91:1 token sample | YES - AI-Efficient Change Delivery Rule and handoff template |
+| PE-5 (coherent rollback unit) | 1 measured W3.5 release boundary | YES - AI-Efficient Change Delivery Rule; apply before every PR |
 | PG-1 (env-dependent value = clamped setting) | 1 (multi-site: pool, body limits, log buffer, pagination) | scheduled (W1.7); promote to a rule after the 2nd sighting |
 | PG-2 (assert the library default you depend on) | 1 (medium-sev: Prisma v7 dropped the pool acquire timeout) | scheduled (unit lock with W1.7a) |
 | PG-3 (knob name must match what it bounds) | 1 (medium-sev: `REQUEST_TIMEOUT_MS` does not bound requests) | scheduled (W1.7b) |
