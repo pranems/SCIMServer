@@ -840,7 +840,7 @@ flowchart LR
     W0["Wave 0<br/>W0.2 DONE, W0.3 DONE<br/>W0.1 declined"]:::done
     W1["Wave 1 - perf<br/>W1.1-W1.6 NOT STARTED"]:::todo
     W2["Wave 2 - seam<br/>W2.1-W2.5 ALL DONE"]:::done
-    W3["Wave 3 - RFC 7523<br/>W3.2 partial, W3.4 DONE<br/>W3.1/W3.5 not started<br/>W3.3 deferred"]:::part
+    W3["Wave 3 - RFC 7523<br/>W3.1/W3.2/W3.4/W3.5 DONE<br/>W3.3 deferred"]:::part
     W4["Wave 4 - RFC 8693<br/>NOT STARTED"]:::todo
     W5["Wave 5 - persona/claims<br/>NOT STARTED"]:::todo
     W6["Wave 6 - cleanup<br/>NOT STARTED"]:::todo
@@ -888,7 +888,7 @@ run confirms the JWKS fetch is on the hot path today.
 | connection-info `targetClientId` (F5) | **DONE v0.54.79 (W3.9)** | - |
 | Per-variation profile routing (F6, W3.1 right-sized) | **DONE v0.54.80** | - |
 | Full `WifTrustV2` aggregate + migration machine | Deferred (YAGNI) | No |
-| Trust cache + composite index (W3.5) | Not started | No (perf) |
+| Trust cache + composite index (W3.5) | **DONE locally** | No (perf) |
 | Wave 1 perf foundation (W1.1-W1.6) | Not started | Recommended before Wave 4 |
 | RFC 8693 handler (W4.1-W4.3) | Not started | Yes for SyncFabric parity |
 | `azp` / `oid` enforcement (W5.2, F7) | Not started | Gated on 1P capture |

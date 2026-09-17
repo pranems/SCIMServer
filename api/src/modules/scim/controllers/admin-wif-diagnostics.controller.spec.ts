@@ -20,6 +20,7 @@ describe('AdminWifDiagnosticsController', () => {
   let mockEndpointService: Record<string, jest.Mock>;
   let mockWifResolver: { resolve: jest.Mock; verifyTrust: jest.Mock };
   let mockWifValidator: { validate: jest.Mock; debug: jest.Mock };
+  let mockWifTrustCache: { invalidate: jest.Mock };
   let loggerSpy: { info: jest.Mock; warn: jest.Mock; error: jest.Mock };
 
   const mockEndpoint = {
@@ -78,6 +79,7 @@ describe('AdminWifDiagnosticsController', () => {
         verifyTrust: jest.fn().mockResolvedValue({ ok: true, checks: [] }),
       }) as any,
       (mockWifValidator = { validate: jest.fn(), debug: jest.fn() }) as any,
+      (mockWifTrustCache = { invalidate: jest.fn() }) as any,
     );
   });
 
@@ -252,6 +254,7 @@ describe('AdminWifDiagnosticsController', () => {
       expect(res.lastVerifiedAt).toBe(meta.lastVerifiedAt);
       // The prior metadata is preserved.
       expect(meta.expectedIssuer).toBe('https://idp/v2.0');
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
     });
 
     it('does NOT persist when no credentialId is supplied (pure dry-run)', async () => {

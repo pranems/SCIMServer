@@ -886,6 +886,33 @@ question in conclusion 2 is **(b) scheduled** for operator decision.
 
 ---
 
+## 10G. W3.5 typed WIF lookup and trust cache (2026-09-16, api v0.55.23)
+
+| # | Type | Sev | Symptom | Root cause | Fix | Why it works | Prevention |
+|---|---|---|---|---|---|---|---|
+| **I-50** | Migration/schema drift | **High** | Prisma generated the requested WIF composite index plus `DROP INDEX CredentialDek_active_idx` and `DROP INDEX RequestLog_authOutcome_idx`. | Both indexes existed in committed migration history and the live database but were absent from `schema.prisma`. `migrate dev` correctly treated the declared schema as authoritative and proposed removing database objects it could not see there. | Add both index declarations to `schema.prisma`, remove the unrelated drops from the new migration, and replay all 20 migrations on disposable PostgreSQL 17. | Schema, migration history, and fresh runtime now agree. The W3.5 migration contains one additive `CREATE INDEX`; physical verification confirms all three indexes survive. | `required-schema-constraints.spec.ts` now protects both historical indexes plus the W3.5 index. Fresh-database migration replay checks physical `pg_indexes`, not only migration status. |
+| **I-51** | Cache invalidation race | **High** | Invalidation during a cold repository load allowed the pre-change promise to resolve afterward and repopulate the cache with stale trusts. | Deleting the completed cache entry was insufficient: the pending-load map still owned a promise, and `get()` reused it after invalidation. | Per-endpoint generations detach pending work on invalidation; a load writes only when its captured generation still matches. The pending map removes a promise only if it is still the current one. | A pre-mutation load may still return to its original caller, but it cannot overwrite a newer generation or be reused by a post-mutation request. | A controlled deferred-promise test proves stale in-flight data cannot survive create/edit/revoke invalidation. |
+| **I-52** | Design/configuration drift | Medium | The first cache implementation hardcoded a 60-second TTL and 256-entry capacity. | The local implementation focused on cache correctness but missed the repository's standing rule that environment-dependent performance and resilience values use the bounded runtime-config registry. The TTL also defines the stale window if replica count grows beyond one. | Add bounded `WIF_TRUST_CACHE_TTL_MS` and `WIF_TRUST_CACHE_MAX_ENDPOINTS` settings to `RUNTIME_CONFIG_SPECS`; consume their effective values once per cache instance and expose them through `/admin/runtime-config`. | Operators can tune by form factor without rebuilding, invalid values clamp safely, and effective values/provenance remain observable through the existing surface. | Runtime-config tests cover defaults, overrides, and non-zero lower bounds; the tuning reference publishes recommended values and bounds. |
+| **I-53** | Test completeness / environment | Medium | The first `test-all-modes.ps1` run printed "All 4 modes passed" while silently skipping both Prisma modes because `DATABASE_URL` was absent from the shell. | The orchestrator treats an absent database URL as a supported partial run rather than a failure, and its success headline reflects only executed modes. | Export the documented local PostgreSQL URL and rerun; all six modes pass, including Prisma unit and E2E. | Completion reports must enumerate executed modes. "All modes" is valid only when the table includes `api-unit-prisma` and `api-e2e-prisma`; the W3.5 report records the six explicit rows. |
+
+**Detection-stage escape analysis.**
+
+| # | Caught at | Earliest possible | Escape delta | Note |
+|---|---|---|---|---|
+| I-50 | Stage 1.9 migration generation review | Stage 1.9 | none | The generated SQL was inspected before commit or deployment; fresh replay supplied the discriminating proof. |
+| I-51 | Stage 0 adversarial cache test | Stage 0 | none | The basic invalidation test was green; the concurrency negative control found the real race before broad tests. |
+| I-52 | Design/architecture gate | Stage 0 planning | 3 stages | Behavior tests were green. Only the explicit configuration/policy review surfaced the hardcoded operational contract. |
+| I-53 | Stage 2.6 output review | Stage 2.6 | none | Exit zero alone was insufficient; reading the per-mode table exposed the skipped backends. |
+
+**Self-improvement disposition:** **(a) applied.** Required-index guards, the stale-load race test,
+bounded runtime settings, fresh physical migration replay, and explicit six-row parity evidence all
+land in this change chain. No new abstraction beyond the cohesive cache service is justified.
+
+**Provenance note:** captured at fix time from the RED/GREEN evidence. Full-session transcript
+reconciliation remains required before the W3.5 release is declared complete.
+
+---
+
 ## 11. Reference
 - Execution status (what shipped, per step): [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)
 - Per-step feature docs: [Pre-Q.B](ASYMMETRIC_SIGNING_AND_JWKS.md), [A0](AUTHENTICATION_METHODS_MODEL.md), [Q0](OAUTH_DISCOVERY_AND_BEARER_ERRORS.md), [Q1](PER_ENDPOINT_OAUTH_CLIENT.md), [Q2](EXTERNAL_JWKS_VALIDATOR.md), [A1](AUTHENTICATION_METHODS_ADMIN_API.md), [A2](COMPUTED_AUTHENTICATION_SCHEMES.md), [A3](TOKEN_ENDPOINT_ROUTING_CASCADE.md), [Q6](WIF_Q6_VALIDATE_ISSUE_UI.md), [A4](WIF_A4_AUTHZ_SEAMS_SHADOW_TELEMETRY.md)

@@ -155,6 +155,23 @@ export const RUNTIME_CONFIG_SPECS = {
       integer: true,
     },
   },
+  auth: {
+    wifTrustCacheTtlMs: {
+      kind: 'number',
+      env: 'WIF_TRUST_CACHE_TTL_MS',
+      default: 30_000,
+      min: 1_000,
+      max: 300_000,
+    },
+    wifTrustCacheMaxEndpoints: {
+      kind: 'number',
+      env: 'WIF_TRUST_CACHE_MAX_ENDPOINTS',
+      default: 256,
+      min: 16,
+      max: 10_000,
+      integer: true,
+    },
+  },
   scim: {
     defaultCount: { kind: 'number', env: 'SCIM_DEFAULT_COUNT', default: 100, min: 1, max: 1_000, integer: true },
     maxCount: { kind: 'number', env: 'SCIM_MAX_COUNT', default: 200, min: 1, max: 1_000, integer: true },

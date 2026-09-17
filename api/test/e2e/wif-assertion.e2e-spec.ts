@@ -43,6 +43,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
   let adminToken: string;
   let endpointId: string;
   let privateKey: crypto.KeyObject;
+  let fetchMock: jest.Mock;
 
   /** Sign an RS256 assertion with the test key, overriding claims as needed. */
   async function signAssertion(overrides: Record<string, unknown> = {}): Promise<string> {
@@ -80,7 +81,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       issuer: ISSUER,
       jwks_uri: JWKS_URI,
     };
-    const fetchMock = jest.fn().mockImplementation((url: string) =>
+    fetchMock = jest.fn().mockImplementation((url: string) =>
       Promise.resolve({
         ok: true,
         json: async () =>
@@ -120,9 +121,9 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     await app.close();
   });
 
-  function postAssertion(assertion: string) {
+  function postAssertion(assertion: string, targetEndpointId = endpointId) {
     return request(app.getHttpServer())
-      .post(`/scim/endpoints/${endpointId}/oauth/token`)
+      .post(`/scim/endpoints/${targetEndpointId}/oauth/token`)
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER });
   }
@@ -529,7 +530,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
             expectedIssuer: `https://login.microsoftonline.com/${tenant}/v2.0`,
             expectedSubject: SUBJECT,
             expectedAudience: AUDIENCE,
-            jwksUri: JWKS_URI,
+            jwksUri: `https://login.microsoftonline.com/${tenant}/keys`,
             allowedTenantId: tenant,
             requiredRoles: ['Scim.Provision'],
             issuedTokenTtlSec: 3600,
@@ -539,14 +540,61 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     }
 
     const assertion = await signAssertion(); // iss=ISSUER, tid=TENANT - matches neither
-    const res = await request(app.getHttpServer())
-      .post(`/scim/endpoints/${multiEndpoint}/oauth/token`)
-      .type('form')
-      .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER })
-      .expect(401);
+    const fetchCountBeforeMint = fetchMock.mock.calls.length;
+    const res = await postAssertion(assertion, multiEndpoint).expect(401);
     expect(res.body.error).toBe('invalid_client');
-    // WI-D3: multiple trusts, none accepted -> aggregate reason code.
-    expect(res.body.reason_code).toBe('wif_no_trust_accepted');
+    expect(res.body.reason_code).toBe('wif_issuer_mismatch');
+    expect(fetchMock).toHaveBeenCalledTimes(fetchCountBeforeMint);
+  });
+
+  it('W3.5: invalidates cached trusts across create, revoke, reactivate, and edit routes', async () => {
+    const cacheEndpoint = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: 'True',
+    });
+    const trustBody = (expectedIssuer: string) => ({
+      assertionProfile: 'jwt-bearer',
+      expectedIssuer,
+      expectedSubject: SUBJECT,
+      expectedAudience: AUDIENCE,
+      jwksUri: JWKS_URI,
+      allowedTenantId: TENANT,
+      requiredRoles: ['Scim.Provision'],
+      scope: 'scim.read',
+    });
+    const createTrust = (expectedIssuer: string, label: string) =>
+      request(app.getHttpServer())
+        .post(`/scim/admin/endpoints/${cacheEndpoint}/credentials`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ credentialType: 'wif', label, wif: trustBody(expectedIssuer) });
+
+    await createTrust(ISSUER, 'Cache trust A').expect(201);
+    await postAssertion(await signAssertion(), cacheEndpoint).expect(200);
+
+    const secondIssuer = 'https://login.microsoftonline.com/cache-second/v2.0';
+    const second = await createTrust(secondIssuer, 'Cache trust B').expect(201);
+    const secondAssertion = await signAssertion({ iss: secondIssuer });
+    await postAssertion(secondAssertion, cacheEndpoint).expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+    await postAssertion(secondAssertion, cacheEndpoint).expect(401);
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}/activate`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    await postAssertion(secondAssertion, cacheEndpoint).expect(200);
+
+    const editedIssuer = 'https://login.microsoftonline.com/cache-edited/v2.0';
+    await request(app.getHttpServer())
+      .put(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ credentialType: 'wif', label: 'Cache trust B', wif: trustBody(editedIssuer) })
+      .expect(200);
+    await postAssertion(secondAssertion, cacheEndpoint).expect(401);
+    await postAssertion(await signAssertion({ iss: editedIssuer }), cacheEndpoint).expect(200);
   });
 
   it('rejects a wrong issuer with invalid_client', async () => {

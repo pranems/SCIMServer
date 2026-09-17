@@ -175,7 +175,7 @@ hole exists to close unilaterally).
 
 | ID | What it is for | Affects | Sev | Blocked by |
 |---|---|---|---|---|
-| **W3.5** | Trust cache + typed lookup + composite index, so a warm mint skips the DB | token mint warm path | Med | - . `findAllActiveByType` landed with W1.2; the per-endpoint cache and the composite index remain |
+| **W3.5** | ~~Trust cache + typed lookup + composite index, so a warm mint skips the DB~~ | token mint warm path | Med | **DONE locally** - typed lookup on both backends, additive composite index, bounded compiled issuer cache, lifecycle invalidation, zero-JWKS unknown-issuer rejection. See [WAVE3_W3_5_IMPLEMENTATION_REPORT.md](WAVE3_W3_5_IMPLEMENTATION_REPORT.md). |
 | **P1** | ~~Opaque per-endpoint secrets bcrypt-compare against **every** credential on the endpoint~~ | resource plane | **High** | **DONE for BOTH types** - `bearer` v0.55.16, `oauth_client` v0.55.17 (hybrid `client-secret-<24 hex>-<secret>`, readable prefix kept). Measured **7 ms** against 10 active credentials, was ~2.9 s. **Phase 4 DONE (v0.55.18)** - `GET /admin/credentials/migration-status` measures the tail. Only **phase 5** (retire the scan, one-way) remains, gated on that report reading zero on every estate |
 | **P2** | ~~Nothing caps or prunes credentials or request-log rows~~ | resource plane + storage | Med | **DONE** (v0.55.15) |
 
@@ -341,14 +341,14 @@ must happen in CI.
 
 ## 3. What is delivered
 
-**Delivery-plan waves: 21 of 33 delivered, 2 settled, 10 open.**
+**Delivery-plan waves: 22 of 33 delivered, 2 settled, 9 open.**
 
 | Wave | State |
 |---|---|
 | **0** Correctness | **Complete** - W0.2, W0.3 (W0.1 declined) |
 | **1** Perf foundation | **Complete** - W1.1, W1.2, W1.3, W1.4, W1.5, W1.6, W1.7a/b/c (W1.2 closed it in v0.55.10) |
 | **2** Structural seam | **Complete** - W2.1 .. W2.5 |
-| **3** RFC 7523 correctness | W3.2, W3.4, W3.6, W3.7, W3.8, W3.9 + W3.1 partial. W3.5 open, W3.3 deferred |
+| **3** RFC 7523 correctness | W3.2, W3.4, W3.5, W3.6, W3.7, W3.8, W3.9 + W3.1 partial delivered. W3.3 deferred by operator decision |
 | **4, 5, 6** | Not started |
 
 **Guide actions: 5 of 15 closed** - A1/A13 (mirror re-synced, byte-identical at 6,503 lines), A4
@@ -370,16 +370,17 @@ Sequenced by value per unit of effort.
 
 ```mermaid
 flowchart TD
-    N2["N2 liveness probe<br/>High, estate visibility"] --> A3["A3' + P2 log retention and pruning<br/>one problem, two framings"]
-    A3 --> N8["N8 stop advertising unenforced methods"]
-    N8 --> W35["W3.5 trust cache + index"]
-    W35 --> W41["Wave 4 RFC 8693<br/>carries N7: no client_id"]
+  C35["Consolidate W3.5<br/>commit, PR, merged-master image"] --> DEV["Deploy and validate dev"]
+  DEV --> CANARY["Promote same artifact to canary"]
+  CANARY --> W41["Wave 4 RFC 8693<br/>carries N7: no client_id"]
+  W41 --> W42["Truthful metadata when active"]
+  W42 --> W43["Real SyncFabric RFC 8693 proof"]
 ```
 
-**Why this order.** **N2** is now the only remaining High-severity item (**A9** shipped in v0.55.12).
-**A3' and P2 are the same problem**
-(unbounded request-log growth) seen from the security and performance sides, so they should be solved
-once, not twice. **W3.5** is the last thing gating Wave 4.
+**Why this order.** W3.5 is locally complete but not yet a reviewable commit or deployed artifact.
+Mixing Wave 4 into the same diff would erase the rollback and review boundary between a cache/index
+change and a new OAuth protocol handler. Consolidate W3.5 first, prove the migration and runtime on
+dev/canary, then start W4.1 in a new branch and fresh session.
 
 **Two constraints to carry into Wave 4:** **N7** - RFC 8693 omits `client_id` by design, so A4's
 "require `client_id`" must **not** be generalized to the 8693 handler or the integration breaks

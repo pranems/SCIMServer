@@ -29,6 +29,12 @@ export interface IEndpointCredentialRepository {
   /** Find all active, non-expired credentials for an endpoint. */
   findActiveByEndpoint(endpointId: string): Promise<EndpointCredentialModel[]>;
 
+  /** Find active, non-expired credentials of one type for an endpoint. */
+  findActiveByEndpointAndType(
+    endpointId: string,
+    credentialType: string,
+  ): Promise<EndpointCredentialModel[]>;
+
   /**
    * W1.2 - all active, non-expired credentials of one type, ACROSS every
    * endpoint. Used by the boot-time JWKS prewarm, which needs the set of

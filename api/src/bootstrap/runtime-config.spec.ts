@@ -48,6 +48,16 @@ describe('runtime-config', () => {
       const cfg = resolveRuntimeConfig(getFrom({ DB_POOL_MAX: '7.9' }));
       expect(cfg.groups.database.poolMax.effective).toBe(7);
     });
+
+    it('resolves bounded WIF trust cache settings', () => {
+      const cfg = resolveRuntimeConfig(getFrom({
+        WIF_TRUST_CACHE_TTL_MS: '15000',
+        WIF_TRUST_CACHE_MAX_ENDPOINTS: '512',
+      }));
+
+      expect(cfg.groups.auth.wifTrustCacheTtlMs.effective).toBe(15000);
+      expect(cfg.groups.auth.wifTrustCacheMaxEndpoints.effective).toBe(512);
+    });
   });
 
   describe('clamping', () => {
@@ -68,10 +78,17 @@ describe('runtime-config', () => {
 
     it('never lets a configuration path disable a bound entirely', () => {
       const cfg = resolveRuntimeConfig(
-        getFrom({ HTTP_REQUEST_TIMEOUT_MS: '0', DB_POOL_ACQUIRE_TIMEOUT_MS: '0' }),
+        getFrom({
+          HTTP_REQUEST_TIMEOUT_MS: '0',
+          DB_POOL_ACQUIRE_TIMEOUT_MS: '0',
+          WIF_TRUST_CACHE_TTL_MS: '0',
+          WIF_TRUST_CACHE_MAX_ENDPOINTS: '0',
+        }),
       );
       expect(cfg.groups.http.requestTimeoutMs.effective).toBeGreaterThan(0);
       expect(cfg.groups.database.poolAcquireTimeoutMs.effective).toBeGreaterThan(0);
+      expect(cfg.groups.auth.wifTrustCacheTtlMs.effective).toBeGreaterThan(0);
+      expect(cfg.groups.auth.wifTrustCacheMaxEndpoints.effective).toBeGreaterThan(0);
     });
   });
 

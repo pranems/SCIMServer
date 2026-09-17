@@ -42,6 +42,24 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     return rows.map((r) => this.toModel(r));
   }
 
+  async findActiveByEndpointAndType(
+    endpointId: string,
+    credentialType: string,
+  ): Promise<EndpointCredentialModel[]> {
+    const rows = await this.prisma.endpointCredential.findMany({
+      where: {
+        endpointId,
+        credentialType,
+        active: true,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
+      },
+    });
+    return rows.map((row) => this.toModel(row));
+  }
+
   // P1 - the whole point of the keyed format: ONE indexed read. `lookupKey` is
   // UNIQUE, so this can never fan out. Active/expiry filtering matches
   // findActiveByEndpoint exactly, or a key would outlive the credential.

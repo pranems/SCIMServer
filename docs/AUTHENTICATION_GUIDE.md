@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-15 - **Product version:** `0.55.22`
+> **Status:** Living reference - **Last verified:** 2026-09-15 - **Product version:** `0.55.23`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -424,7 +424,22 @@ Note `issuer_match` expects the **v2.0** issuer (`login.microsoftonline.com`) wh
 
 > **Every active trust authenticates at the same time.** An assertion from *any* configured trust can provision the endpoint, and all resources land in one common pool. For isolation between identity providers, create a **separate endpoint per provider**. The UI states this on the WIF tab.
 
-The reference endpoint has **six** trusts. On a token mint the server evaluates them in order and records a sub-trace per rejected trust, so `wif_no_trust_accepted` always tells you which trust came closest.
+The reference endpoint has **six** trusts. On a token mint the server decodes the unverified `iss`
+only to select the exact matching issuer bucket, then performs full signature and claim validation
+against those candidates. An issuer matching no configured trust returns `wif_issuer_mismatch`
+before any unrelated identity provider's JWKS is fetched. Multiple trusts with the same issuer are
+still evaluated in order and record a sub-trace per rejected trust, which preserves the
+slice-dependent audience pattern below.
+
+The active trust set is cached per endpoint. Successful WIF create, edit, verify, revoke,
+reactivate, and endpoint-delete operations invalidate the local entry immediately; credential
+expiry also bounds each entry. Two server-level runtime settings are visible through
+`GET /scim/admin/runtime-config`:
+
+| Setting | Default | Bounds | Effect |
+|---|---:|---:|---|
+| `WIF_TRUST_CACHE_TTL_MS` | `30000` | `1000` - `300000` | Maximum local cache age and cross-replica stale window. |
+| `WIF_TRUST_CACHE_MAX_ENDPOINTS` | `256` | `16` - `10000` | Per-process LRU endpoint limit. |
 
 #### Two trusts for one caller: the slice-dependent audience
 

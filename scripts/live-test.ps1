@@ -11704,20 +11704,21 @@ try {
     Test-Result -Success ($atWif.credentialType -eq "wif") -Message "9z-AT.T3: wif credential persisted"
     Test-Result -Success (-not ($atWifJson -match '"token"|"clientSecret"|"credentialHash"')) -Message "9z-AT.T4: wif credential response carries NO secret/hash/token"
 
-    # T5: a structurally-valid but untrusted client_assertion fails closed -> invalid_client (401).
-    # The JWKS host is on no allowlist on the server (or the assertion signature
-    # cannot be verified), so validation rejects; the happy-path mint requires a
-    # reachable trusted JWKS and is covered by the E2E suite with a mocked fetch.
+    # T5: a decoded issuer that matches no configured trust fails before any
+    # unrelated JWKS lookup. The happy-path mint is covered by E2E with a local
+    # key set; live locks the stable early-rejection contract.
     $atReject = $false
-    $atFakeAssertion = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImxpdmUifQ.eyJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vdGVuYW50LWxpdmUvdjIuMCJ9.c2ln"
+    $atRejectReason = $null
+    $atFakeAssertion = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImxpdmUifQ.eyJpc3MiOiJodHRwczovL3Vua25vd24uZXhhbXBsZS92Mi4wIn0.c2ln"
     try {
         Invoke-RestMethod -Uri $atTokenUrl -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
             grant_type = "client_credentials"; client_assertion = $atFakeAssertion; client_assertion_type = $atJwtBearer
         } | Out-Null
     } catch {
         $atReject = ($_.Exception.Response.StatusCode.value__ -eq 401)
+        try { $atRejectReason = ($_.ErrorDetails.Message | ConvertFrom-Json).reason_code } catch {}
     }
-    Test-Result -Success $atReject -Message "9z-AT.T5: untrusted client_assertion fails closed -> 401 invalid_client"
+    Test-Result -Success ($atReject -and $atRejectReason -eq 'wif_issuer_mismatch') -Message "9z-AT.T5: unknown assertion issuer fails before unrelated JWKS lookup -> 401 wif_issuer_mismatch"
 
     # T6: revoke the wif credential
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$atId/credentials/$($atWif.id)" -Method DELETE -Headers $headers | Out-Null
@@ -14306,9 +14307,9 @@ try {
 
     # T6 - every group present
     $groupNames = @($rc.groups.PSObject.Properties.Name | Sort-Object)
-    $expectedGroups = @('database', 'http', 'logging', 'scim')
+    $expectedGroups = @('auth', 'database', 'http', 'logging', 'scim')
     Test-Result -Success (-not (Compare-Object $groupNames $expectedGroups)) `
-        -Message "9z-BZ.T6: reports all four config groups (got: $($groupNames -join ','))"
+        -Message "9z-BZ.T6: reports all five config groups (got: $($groupNames -join ','))"
 
     # T7 - SELF-CONSISTENCY: every numeric effective value sits inside its own bounds.
     $outOfBounds = @()
@@ -14362,6 +14363,14 @@ try {
     # T12 - a coherent deployment reports no invariant warnings
     Test-Result -Success ($rc.invariantWarnings.Count -eq 0) `
         -Message "9z-BZ.T12: no cross-key invariant warnings on this deployment$(if ($rc.invariantWarnings) { ' - ' + ($rc.invariantWarnings -join '; ') })"
+
+    # T13/T14 - W3.5 trust cache controls are present, positive, and bounded.
+    $wifCacheTtl = $rc.groups.auth.wifTrustCacheTtlMs
+    Test-Result -Success ($null -ne $wifCacheTtl -and $wifCacheTtl.effective -gt 0 -and $wifCacheTtl.effective -ge $wifCacheTtl.min -and $wifCacheTtl.effective -le $wifCacheTtl.max) `
+        -Message "9z-BZ.T13: WIF trust cache TTL is present and bounded ($($wifCacheTtl.effective)ms)"
+    $wifCacheMaxEndpoints = $rc.groups.auth.wifTrustCacheMaxEndpoints
+    Test-Result -Success ($null -ne $wifCacheMaxEndpoints -and $wifCacheMaxEndpoints.effective -gt 0 -and $wifCacheMaxEndpoints.effective -ge $wifCacheMaxEndpoints.min -and $wifCacheMaxEndpoints.effective -le $wifCacheMaxEndpoints.max) `
+        -Message "9z-BZ.T14: WIF trust cache endpoint capacity is present and bounded ($($wifCacheMaxEndpoints.effective))"
 
 } catch {
     Test-Result -Success $false -Message "9z-BZ: runtime config section threw: $($_.Exception.Message)"
