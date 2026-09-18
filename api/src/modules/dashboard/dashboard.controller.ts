@@ -52,6 +52,7 @@ function projectWifTrust(
   return {
     expectedIssuer: asString(metadata.expectedIssuer),
     expectedSubject: asString(metadata.expectedSubject),
+    targetClientId: asString(metadata.targetClientId),
     expectedAudience: asString(metadata.expectedAudience),
     jwksUri: asString(metadata.jwksUri),
     allowedTenantId: asString(metadata.allowedTenantId),

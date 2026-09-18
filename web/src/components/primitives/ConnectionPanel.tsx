@@ -54,6 +54,10 @@ const useStyles = makeStyles({
     gap: '12px',
     padding: '6px 0',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    '@media (max-width: 700px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+      rowGap: '4px',
+    },
   },
   labelCell: { display: 'flex', flexDirection: 'column', gap: '2px' },
   fieldLabel: { color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightSemibold },
@@ -76,6 +80,7 @@ const FIELD_LABELS: Record<string, string> = {
   clientSecret: 'Client Secret',
   secretToken: 'Secret Token',
   expectedAudience: 'Audience',
+  expectedAssertionSubject: 'Expected assertion subject (sub)',
 };
 
 /**
@@ -97,6 +102,8 @@ const FIELD_DESCRIPTIONS: Record<string, string> = {
     'The confidential client secret for the OAuth client_credentials grant. Entra/Okta call it "Client Secret".',
   expectedAudience:
     'For Workload Identity Federation: the audience (aud) claim the source IdP token must carry when calling this endpoint.',
+  expectedAssertionSubject:
+    'For Workload Identity Federation: the exact subject (sub) claim the source IdP assertion must carry. This is distinct from the target Client ID SCIMServer issues into its access token.',
 };
 
 /** Map an Entra field key to its `.env` variable name. */
@@ -107,6 +114,7 @@ const ENV_KEYS: Record<string, string> = {
   clientSecret: 'SCIM_CLIENT_SECRET',
   secretToken: 'SCIM_SECRET_TOKEN',
   expectedAudience: 'SCIM_EXPECTED_AUDIENCE',
+  expectedAssertionSubject: 'SCIM_EXPECTED_ASSERTION_SUBJECT',
 };
 
 export interface ConnectionPanelProps {
@@ -161,6 +169,7 @@ function buildPayload(
     }
   }
   if (method.expectedAudience) out.expectedAudience = method.expectedAudience;
+  if (method.expectedAssertionSubject) out.expectedAssertionSubject = method.expectedAssertionSubject;
   return out;
 }
 
@@ -284,21 +293,18 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 
       <div className={classes.fieldGrid} data-testid={`${testId}-fields`}>
         {Object.entries(method.entraFields).map(([key, value]) => {
-          // WIF maps Entra's "Client identifier" field to the sub claim, so use
-          // a WIF-specific label + description there (generic OAuth wording is
-          // wrong for WIF). All other keys use the shared labels.
-          const isWifSubject = method.method === 'wif' && key === 'clientIdentifier';
           // U10 - for WIF the first field is the endpoint's SCIM/API URL that
           // the source application calls; Entra labels it "Application API URL",
           // not the generic "Tenant URL".
           const isWifAppUrl = method.method === 'wif' && key === 'tenantUrl';
-          const label = isWifSubject
-            ? 'Client identifier (sub claim)'
+          const isWifClientIdentifier = method.method === 'wif' && key === 'clientIdentifier';
+          const label = isWifClientIdentifier
+            ? 'Client identifier'
             : isWifAppUrl
               ? 'Application API URL'
               : (FIELD_LABELS[key] ?? key);
-          const desc = isWifSubject
-            ? 'For Workload Identity Federation: Entra\'s "Client identifier" field takes the subject (sub) claim the source IdP token must carry - i.e. the service-principal object id this endpoint expects.'
+          const desc = isWifClientIdentifier
+            ? 'The target OAuth client identity SCIMServer places in the issued access token. This is distinct from the source assertion subject below.'
             : isWifAppUrl
               ? 'The SCIM base URL for this endpoint - the "Application API URL" the source application calls. Paste it into your IdP\'s SCIM connector / Application API URL field.'
               : FIELD_DESCRIPTIONS[key];
@@ -345,6 +351,22 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               monospace
               truncate
               data-testid={`${testId}-value-expectedAudience`}
+            />
+          </div>
+        )}
+        {method.expectedAssertionSubject && (
+          <div className={classes.fieldRow} data-testid={`${testId}-field-expectedAssertionSubject`}>
+            <div className={classes.labelCell}>
+              <Text className={classes.fieldLabel}>{FIELD_LABELS.expectedAssertionSubject}</Text>
+              <Caption1 className={classes.fieldDesc}>
+                {FIELD_DESCRIPTIONS.expectedAssertionSubject}
+              </Caption1>
+            </div>
+            <CopyableField
+              value={method.expectedAssertionSubject}
+              monospace
+              truncate
+              data-testid={`${testId}-value-expectedAssertionSubject`}
             />
           </div>
         )}

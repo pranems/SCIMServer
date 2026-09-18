@@ -40,10 +40,11 @@ function info(over: Partial<ConnectionInfo> = {}): ConnectionInfo {
         entraFields: {
           tenantUrl: `https://scim.example.com/scim/v2/endpoints/${ID}`,
           tokenEndpoint: `https://scim.example.com/scim/endpoints/${ID}/oauth/token`,
-          clientIdentifier: 'sp-object-id-abc',
+          clientIdentifier: 'target-client-id-abc',
         },
         clientSecretState: 'none',
         expectedAudience: `api://scimserver/${ID}`,
+        expectedAssertionSubject: 'sp-object-id-abc',
       },
     ],
     disabledMethods: [
@@ -96,8 +97,8 @@ describe('ConnectionPanel (WI-4)', () => {
     renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
     // Select WIF.
     fireEvent.click(screen.getByTestId('connection-panel-method-wif'));
-    // WIF surfaces the sub claim as the Client identifier + an expected audience.
-    expect(screen.getByTestId('connection-panel-value-clientIdentifier')).toHaveTextContent('sp-object-id-abc');
+    expect(screen.getByTestId('connection-panel-value-clientIdentifier')).toHaveTextContent('target-client-id-abc');
+    expect(screen.getByTestId('connection-panel-value-expectedAssertionSubject')).toHaveTextContent('sp-object-id-abc');
     expect(screen.getByTestId('connection-panel-value-expectedAudience')).toHaveTextContent(`api://scimserver/${ID}`);
   });
 
@@ -109,12 +110,15 @@ describe('ConnectionPanel (WI-4)', () => {
     );
   });
 
-  it('WIF: the Client identifier field is labelled with the sub claim', () => {
+  it('WIF: distinguishes the target Client identifier from the expected assertion subject', () => {
     renderWithFluent(<ConnectionPanel connectionInfo={info()} />);
     fireEvent.click(screen.getByTestId('connection-panel-method-wif'));
     const row = screen.getByTestId('connection-panel-field-clientIdentifier');
-    expect(row).toHaveTextContent('Client identifier (sub claim)');
-    expect(screen.getByTestId('connection-panel-desc-clientIdentifier')).toHaveTextContent(/sub.*claim/i);
+    expect(row).toHaveTextContent('Client identifier');
+    expect(row).not.toHaveTextContent('sub claim');
+    expect(screen.getByTestId('connection-panel-field-expectedAssertionSubject')).toHaveTextContent(
+      'Expected assertion subject (sub)',
+    );
   });
 
   it('WIF (U10): the tenantUrl field is labelled "Application API URL", not "Tenant URL"', () => {

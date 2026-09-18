@@ -12143,19 +12143,28 @@ try {
     $at8NoOcSecret = ($at8Oc.clientSecretState -eq "create-required")
     Test-Result -Success (($at8EnabledMethods -contains "oauth_client") -and ($at8EnabledMethods -contains "wif") -and $at8NoOcSecret) -Message "9z-AT8.T4: oauth_client + wif enabled and no per-endpoint credential secret present"
 
-    # T5: an unknown endpoint returns 404.
+    # T5: every method reports the source of its effective enablement.
+    $at8Methods = @($at8Info.enabledMethods) + @($at8Info.disabledMethods)
+    $at8AllowedSources = @("authentication-method", "dedicated-setting", "legacy-setting", "default")
+    $at8SourcesValid = ($at8Methods.Count -eq 4) -and `
+        (@($at8Methods | Where-Object { $at8AllowedSources -notcontains $_.enablementSource }).Count -eq 0) -and `
+        (($at8Methods | Where-Object { $_.method -eq "oauth_client" }).enablementSource -eq "dedicated-setting") -and `
+        (($at8Methods | Where-Object { $_.method -eq "wif" }).enablementSource -eq "dedicated-setting")
+    Test-Result -Success $at8SourcesValid -Message "9z-AT8.T5: all four auth methods report valid effective-enablement provenance"
+
+    # T6: an unknown endpoint returns 404.
     $at8NotFound = $false
     try {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/00000000-0000-0000-0000-000000000000/connection-info" -Method GET -Headers $headers | Out-Null
     } catch { $at8NotFound = ($_.Exception.Response.StatusCode.value__ -eq 404) }
-    Test-Result -Success $at8NotFound -Message "9z-AT8.T5: connection-info for an unknown endpoint -> 404"
+    Test-Result -Success $at8NotFound -Message "9z-AT8.T6: connection-info for an unknown endpoint -> 404"
 
-    # T6 (WI-3): the per-endpoint Overview BFF now embeds the same connectionInfo.
+    # T7 (WI-3): the per-endpoint Overview BFF now embeds the same connectionInfo.
     $at8Overview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id/overview" -Method GET -Headers $headers
     $at8OverviewHasCi = ($null -ne $at8Overview.connectionInfo) -and `
         ($at8Overview.connectionInfo.endpointId -eq $at8Id) -and `
         ($at8Overview.connectionInfo.urls.scimBaseUrl -like "*/scim/v2/endpoints/$at8Id")
-    Test-Result -Success $at8OverviewHasCi -Message "9z-AT8.T6: WI-3 overview BFF embeds connectionInfo (absolute URLs)"
+    Test-Result -Success $at8OverviewHasCi -Message "9z-AT8.T7: WI-3 overview BFF embeds connectionInfo (absolute URLs)"
 
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at8Id" -Method DELETE -Headers $headers | Out-Null } catch {}
@@ -14080,6 +14089,10 @@ try {
         $bvAfter = 0
         try { Invoke-RestMethod -Uri "$baseUrl/scim/v2/endpoints/$bvId/Users" -Method GET -Headers $bvHeaders | Out-Null; $bvAfter = 200 } catch { $bvAfter = $_.Exception.Response.StatusCode.value__ }
         Test-Result -Success ($bvAfter -eq 401) -Message "9z-BV.T2: an explicit 'bearer' method enabled:false refuses the same bearer (disabled-with-credential, HTTP $bvAfter)"
+
+        $bvInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/connection-info" -Method GET -Headers $headers
+        $bvBearer = @($bvInfo.disabledMethods | Where-Object { $_.method -eq "bearer" })[0]
+        Test-Result -Success ($null -ne $bvBearer -and $bvBearer.enablementSource -eq "authentication-method") -Message "9z-BV.T3: connection-info identifies the authentication-method entry as the authoritative bearer state"
     } finally {
         try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId" -Method DELETE -Headers $headers | Out-Null } catch {}
     }

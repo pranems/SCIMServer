@@ -101,6 +101,40 @@ describe('ConnectionInfoService', () => {
       expect(info.enabledMethods.some((m) => m.method === 'oauth_client')).toBe(true);
     });
 
+    it('reports the authoritative enablement source for every method', () => {
+      const info = service.assemble(
+        endpoint(
+          {
+            PerEndpointCredentialsEnabled: true,
+            OAuthClientCredentialsAuthEnabled: false,
+          },
+          {
+            profile: {
+              settings: {
+                PerEndpointCredentialsEnabled: true,
+                OAuthClientCredentialsAuthEnabled: false,
+              },
+              authentication: {
+                methods: [{ type: 'bearer', enabled: false }],
+              },
+            },
+          },
+        ),
+        [],
+        'https://scim.example.com',
+      );
+
+      expect(info.disabledMethods.find((m) => m.method === 'bearer')?.enablementSource).toBe(
+        'authentication-method',
+      );
+      expect(info.disabledMethods.find((m) => m.method === 'oauth_client')?.enablementSource).toBe(
+        'dedicated-setting',
+      );
+      expect(info.enabledMethods.find((m) => m.method === 'shared_secret')?.enablementSource).toBe(
+        'default',
+      );
+    });
+
     it('a disabled method carries a reason + enableHint', () => {
       const info = service.assemble(endpoint({ WifCredentialsEnabled: 'False' }), [], 'https://scim.example.com');
       const wif = info.disabledMethods.find((m) => m.method === 'wif');

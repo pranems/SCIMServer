@@ -413,6 +413,7 @@ describe('DashboardController', () => {
           metadata: {
             expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
             expectedSubject: 'sp-obj-id',
+            targetClientId: 'target-client-id',
             expectedAudience: 'api://app',
             jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
             allowedTenantId: 'tenant-guid',
@@ -433,6 +434,7 @@ describe('DashboardController', () => {
       const trust = cred.wif!;
       expect(trust.expectedIssuer).toBe('https://login.microsoftonline.com/t/v2.0');
       expect(trust.expectedSubject).toBe('sp-obj-id');
+      expect(trust.targetClientId).toBe('target-client-id');
       expect(trust.expectedAudience).toBe('api://app');
       expect(trust.jwksUri).toBe('https://login.microsoftonline.com/t/discovery/v2.0/keys');
       expect(trust.allowedTenantId).toBe('tenant-guid');
@@ -453,6 +455,7 @@ describe('DashboardController', () => {
           'requiredRoles',
           'roleEnforcement',
           'scope',
+          'targetClientId',
         ].sort(),
       );
       expect((trust as unknown as Record<string, unknown>).roleScopeMap).toBeUndefined();

@@ -17,9 +17,10 @@
  *    facing SCIM base is the LEADING `/scim/v2/endpoints/{id}` form (WI-1),
  *    the per-endpoint token endpoint is the bare `/scim/endpoints/{id}/oauth/token`
  *    form, and the per-endpoint RFC 8414 metadata is the WI-12 append form.
- *  - The method-enablement decisions reuse `resolveEndpointAuthEnablement` +
- *    `getConfigBoolean`, so they agree byte-for-byte with the create-gate and
- *    the resource-plane guard (all read the one per-method enablement source).
+ *  - The method-enablement decisions reuse
+ *    `resolveEndpointAuthEnablementDetails`, so they agree byte-for-byte with
+ *    the create-gate and resource-plane guard while also reporting which
+ *    source supplied each effective value.
  *
  * The service is PURE: it takes the already-loaded endpoint + credentials + a
  * base URL and returns the assembled shape. Host derivation (X-Forwarded-*)
@@ -29,8 +30,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   ENDPOINT_CONFIG_FLAGS,
-  getConfigBoolean,
-  resolveEndpointAuthEnablement,
+  getOptionalConfigBoolean,
+  resolveEndpointAuthEnablementDetails,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
 import type { EndpointCredentialModel } from '../../../domain/models/endpoint-credential.model';
@@ -152,8 +153,10 @@ export class ConnectionInfoService {
     const endpointId = endpoint.id;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const urls = this.buildUrls(baseUrl, endpointId);
-    const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
-    const wifEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED);
+    const effective = resolveEndpointAuthEnablementDetails(config, endpoint.profile?.authentication?.methods);
+    const wifExplicit = getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED);
+    const wifEnabled = wifExplicit ?? false;
+    const wifEnablementSource = wifExplicit === undefined ? 'default' : 'dedicated-setting';
 
     const activeCreds = credentials.filter((c) => c.active);
 
@@ -161,13 +164,14 @@ export class ConnectionInfoService {
     const disabledMethods: ConnectionDisabledMethod[] = [];
 
     // ── shared_secret (global SCIM_SHARED_SECRET bearer) ──────────────────
-    if (effective.sharedSecretBearer) {
+    if (effective.sharedSecretBearer.enabled) {
       // The secret is the server-configured global SCIM_SHARED_SECRET. It is
       // inlined ONLY when the server visibility is `always` (resolved upstream
       // and passed in as `secrets.sharedSecret`); otherwise it stays null.
       const sharedSecretValue = secrets?.sharedSecret ?? null;
       enabledMethods.push({
         method: 'shared_secret',
+        enablementSource: effective.sharedSecretBearer.source,
         label: 'Shared-secret bearer token',
         entraAuthenticationMethod: 'Secret Token',
         entraFields: {
@@ -180,19 +184,21 @@ export class ConnectionInfoService {
     } else {
       disabledMethods.push({
         method: 'shared_secret',
+        enablementSource: effective.sharedSecretBearer.source,
         reason: `${ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED} is false`,
         enableHint: `Set ${ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED}=True in endpoint Settings`,
       });
     }
 
     // ── bearer (per-endpoint Secret Token) ────────────────────────────────
-    if (effective.secretTokenBearer) {
+    if (effective.secretTokenBearer.enabled) {
       const bearerCred = activeCreds.find((c) => c.credentialType === 'bearer');
       // Inline the decrypted token ONLY when the effective visibility is
       // `always` AND the credential retained an envelope (resolved upstream).
       const bearerSecret = bearerCred ? (secrets?.bearerToken ?? null) : null;
       enabledMethods.push({
         method: 'bearer',
+        enablementSource: effective.secretTokenBearer.source,
         label: 'Per-endpoint bearer token (Secret Token)',
         entraAuthenticationMethod: 'Secret Token',
         entraFields: {
@@ -207,13 +213,14 @@ export class ConnectionInfoService {
     } else {
       disabledMethods.push({
         method: 'bearer',
+        enablementSource: effective.secretTokenBearer.source,
         reason: `${ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED} is not set`,
         enableHint: `Set ${ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED}=True in endpoint Settings`,
       });
     }
 
     // ── oauth_client (per-endpoint OAuth2 client credentials) ─────────────
-    if (effective.oauthClientCredentials) {
+    if (effective.oauthClientCredentials.enabled) {
       const oauthCred = activeCreds.find((c) => c.credentialType === 'oauth_client');
       const clientId =
         typeof oauthCred?.metadata?.clientId === 'string' ? oauthCred.metadata.clientId : null;
@@ -222,6 +229,7 @@ export class ConnectionInfoService {
       const oauthSecret = oauthCred ? (secrets?.oauthClientSecret ?? null) : null;
       enabledMethods.push({
         method: 'oauth_client',
+        enablementSource: effective.oauthClientCredentials.source,
         label: 'OAuth2 client credentials',
         entraAuthenticationMethod: 'OAuth2 Client Credentials Grant',
         entraFields: {
@@ -238,6 +246,7 @@ export class ConnectionInfoService {
     } else {
       disabledMethods.push({
         method: 'oauth_client',
+        enablementSource: effective.oauthClientCredentials.source,
         reason: `${ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED} is not set`,
         enableHint: `Set ${ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED}=True in endpoint Settings`,
       });
@@ -272,6 +281,7 @@ export class ConnectionInfoService {
             : null;
       enabledMethods.push({
         method: 'wif',
+        enablementSource: wifEnablementSource,
         label: 'Workload Identity Federation',
         // The Entra auth-method dropdown label for this method (NOT OAuth2
         // client credentials, which is a different selection).
@@ -294,6 +304,7 @@ export class ConnectionInfoService {
     } else {
       disabledMethods.push({
         method: 'wif',
+        enablementSource: wifEnablementSource,
         reason: `${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED} is not set`,
         enableHint: `Set ${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}=True in endpoint Settings`,
       });

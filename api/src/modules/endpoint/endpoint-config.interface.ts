@@ -1086,6 +1086,23 @@ export interface EffectiveAuthEnablement {
   sharedSecretBearer: boolean;
 }
 
+export type AuthEnablementSource =
+  | 'authentication-method'
+  | 'dedicated-setting'
+  | 'legacy-setting'
+  | 'default';
+
+export interface EffectiveAuthEnablementDetail {
+  enabled: boolean;
+  source: AuthEnablementSource;
+}
+
+export interface EffectiveAuthEnablementDetails {
+  secretTokenBearer: EffectiveAuthEnablementDetail;
+  oauthClientCredentials: EffectiveAuthEnablementDetail;
+  sharedSecretBearer: EffectiveAuthEnablementDetail;
+}
+
 export function getEffectiveAuthEnablement(
   config: EndpointConfig | undefined,
 ): EffectiveAuthEnablement {
@@ -1158,13 +1175,59 @@ export function resolveEndpointAuthEnablement(
   config: EndpointConfig | undefined,
   methods?: readonly AuthMethodEnablementEntry[],
 ): EffectiveAuthEnablement {
-  const flat = getEffectiveAuthEnablement(config);
+  const details = resolveEndpointAuthEnablementDetails(config, methods);
+  return {
+    secretTokenBearer: details.secretTokenBearer.enabled,
+    oauthClientCredentials: details.oauthClientCredentials.enabled,
+    sharedSecretBearer: details.sharedSecretBearer.enabled,
+  };
+}
+
+export function resolveEndpointAuthEnablementDetails(
+  config: EndpointConfig | undefined,
+  methods?: readonly AuthMethodEnablementEntry[],
+): EffectiveAuthEnablementDetails {
+  const legacy = getOptionalConfigBoolean(
+    config,
+    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+  );
+
+  const flatDetail = (
+    dedicatedKey: string,
+    fallback: boolean,
+    usesLegacy: boolean,
+  ): EffectiveAuthEnablementDetail => {
+    const dedicated = getOptionalConfigBoolean(config, dedicatedKey);
+    if (dedicated !== undefined) return { enabled: dedicated, source: 'dedicated-setting' };
+    if (usesLegacy && legacy !== undefined) return { enabled: legacy, source: 'legacy-setting' };
+    return { enabled: fallback, source: 'default' };
+  };
+
+  const flat: EffectiveAuthEnablementDetails = {
+    secretTokenBearer: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
+      false,
+      true,
+    ),
+    oauthClientCredentials: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
+      false,
+      true,
+    ),
+    sharedSecretBearer: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
+      true,
+      false,
+    ),
+  };
   if (!methods || methods.length === 0) return flat;
 
-  const resolveFacet = (facet: keyof EffectiveAuthEnablement): boolean => {
+  const resolveFacet = (facet: keyof EffectiveAuthEnablement): EffectiveAuthEnablementDetail => {
     const types = AUTH_FACET_METHOD_TYPES[facet];
     const entry = methods.find((m) => types.includes(m.type));
-    return entry ? entry.enabled !== false : flat[facet];
+    return entry
+      ? { enabled: entry.enabled !== false, source: 'authentication-method' }
+      : flat[facet];
   };
 
   return {

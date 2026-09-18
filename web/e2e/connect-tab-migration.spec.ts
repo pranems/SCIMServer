@@ -26,6 +26,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(
     ({ key, value }) => {
       window.localStorage.setItem(key, value);
+      window.localStorage.setItem('scimserver.onboarding.completedAt', 'e2e-complete');
     },
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
@@ -49,19 +50,22 @@ test.describe('Connect tab - migration surface (P7)', () => {
     await openConnect(page);
     const panel = page.getByTestId('connect-auth-methods');
     await expect(panel).toBeVisible();
+    await expect(panel.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    await panel.getByRole('button').click();
     for (const flag of [
-      'PerEndpointCredentialsEnabled',
-      'SecretTokenBearerAuthEnabled',
       'OAuthClientCredentialsAuthEnabled',
-      'SharedSecretBearerAuthEnabled',
       'WifCredentialsEnabled',
+      'SharedSecretBearerAuthEnabled',
+      'SecretTokenBearerAuthEnabled',
     ]) {
       await expect(page.getByTestId(`connect-auth-flag-${flag}`)).toBeVisible();
     }
+    await expect(page.getByTestId('connect-auth-flag-PerEndpointCredentialsEnabled')).toHaveCount(0);
   });
 
   test('toggling an auth method from the Connect tab PERSISTS across a reload', async ({ page }) => {
     await openConnect(page);
+    await page.getByTestId('connect-auth-methods').getByRole('button').click();
     const wif = page.getByTestId('connect-auth-flag-WifCredentialsEnabled');
     const before = await wif.isChecked();
     await wif.click();
@@ -69,6 +73,7 @@ test.describe('Connect tab - migration surface (P7)', () => {
     // an optimistic switch that never persisted looks identical in the DOM.
     await page.reload();
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('connect-auth-methods').getByRole('button').click();
     await expect(page.getByTestId('connect-auth-flag-WifCredentialsEnabled')).toBeChecked({
       checked: !before,
     });
@@ -77,6 +82,7 @@ test.describe('Connect tab - migration surface (P7)', () => {
   test('a credential card shows its Connect params with no click, and has no Connect button', async ({ page }) => {
     await openConnect(page);
     // Ensure the bearer method is on, then create a credential to inspect.
+    await page.getByTestId('connect-auth-methods').getByRole('button').click();
     const bearerFlag = page.getByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled');
     if (!(await bearerFlag.isChecked())) {
       await bearerFlag.click();
@@ -102,6 +108,7 @@ test.describe('Connect tab - migration surface (P7)', () => {
 
   test('Rotate is on the card, and a newly minted credential is badged Keyed', async ({ page }) => {
     await openConnect(page);
+    await page.getByTestId('connect-auth-methods').getByRole('button').click();
     const bearerFlag = page.getByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled');
     if (!(await bearerFlag.isChecked())) {
       await bearerFlag.click();

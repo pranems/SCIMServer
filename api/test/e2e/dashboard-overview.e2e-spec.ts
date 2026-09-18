@@ -21,6 +21,13 @@ import { resetFixtureCounter } from './helpers/fixtures';
 describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
   let app: INestApplication;
   let token: string;
+  const enabledMethodKeys = [
+    'method', 'enablementSource', 'label', 'entraAuthenticationMethod', 'entraFields',
+    'clientSecretState', 'expectedAudience', 'expectedAssertionSubject', 'credentialId',
+    'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity',
+  ];
+  const disabledMethodKeys = ['method', 'enablementSource', 'reason', 'enableHint'];
+  const enablementSources = ['authentication-method', 'dedicated-setting', 'legacy-setting', 'default'];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -65,6 +72,19 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     expect(res.body.connectionInfo.urls.scimBaseUrl).toContain(`/scim/v2/endpoints/${endpointId}`);
     expect(Array.isArray(res.body.connectionInfo.enabledMethods)).toBe(true);
     expect(Array.isArray(res.body.connectionInfo.disabledMethods)).toBe(true);
+    const methods = [
+      ...res.body.connectionInfo.enabledMethods,
+      ...res.body.connectionInfo.disabledMethods,
+    ];
+    expect(methods).toHaveLength(4);
+    for (const method of res.body.connectionInfo.enabledMethods) {
+      for (const key of Object.keys(method)) expect(enabledMethodKeys).toContain(key);
+      expect(enablementSources).toContain(method.enablementSource);
+    }
+    for (const method of res.body.connectionInfo.disabledMethods) {
+      for (const key of Object.keys(method)) expect(disabledMethodKeys).toContain(key);
+      expect(enablementSources).toContain(method.enablementSource);
+    }
     // No secret ever leaks through the overview.
     expect(JSON.stringify(res.body.connectionInfo)).not.toContain('bcrypt$');
 

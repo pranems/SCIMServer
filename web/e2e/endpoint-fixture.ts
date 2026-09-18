@@ -44,6 +44,7 @@ import { expect, type Page } from '@playwright/test';
 
 export const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 export const E2E_TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
+export const ONBOARDING_COMPLETED_KEY = 'scimserver.onboarding.completedAt';
 
 /**
  * Endpoint config flags that gate the per-method credential tabs. Mirrors
@@ -83,10 +84,11 @@ let lastSeededUsers: Array<{ id: string; userName: string }> = [];
  */
 export async function seedAuthToken(page: Page): Promise<void> {
   await page.addInitScript(
-    ({ key, value }) => {
+    ({ key, value, onboardingKey }) => {
       window.localStorage.setItem(key, value);
+      window.localStorage.setItem(onboardingKey, 'e2e-complete');
     },
-    { key: TOKEN_STORAGE_KEY, value: E2E_TOKEN },
+    { key: TOKEN_STORAGE_KEY, value: E2E_TOKEN, onboardingKey: ONBOARDING_COMPLETED_KEY },
   );
 }
 

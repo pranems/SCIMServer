@@ -12,6 +12,12 @@
 /** The four SCIM auth methods a connection can use. */
 export type ConnectionMethod = 'shared_secret' | 'bearer' | 'oauth_client' | 'wif';
 
+export type ConnectionEnablementSource =
+  | 'authentication-method'
+  | 'dedicated-setting'
+  | 'legacy-setting'
+  | 'default';
+
 /** How the UI should present the method's secret. */
 export type ClientSecretState =
   | 'set-shown-once' // a credential exists; its secret was shown once at create
@@ -46,6 +52,8 @@ export interface ConnectionInfoUrls {
 /** An enabled auth method + the Entra fields it maps to (no secrets). */
 export interface ConnectionEnabledMethod {
   method: ConnectionMethod;
+  /** The authoritative source of this method's effective enabled state. */
+  enablementSource?: ConnectionEnablementSource;
   label: string;
   entraAuthenticationMethod: 'Secret Token' | 'OAuth2 Client Credentials Grant' | 'Workload Identity based authentication';
   entraFields: Record<string, string | null>;
@@ -123,6 +131,8 @@ export interface ConnectionAuthHealth {
 /** A disabled auth method + why + how to enable it. */
 export interface ConnectionDisabledMethod {
   method: ConnectionMethod;
+  /** The authoritative source of this method's effective disabled state. */
+  enablementSource?: ConnectionEnablementSource;
   reason: string;
   enableHint: string;
 }

@@ -26,6 +26,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(
     ({ key, value }) => {
       window.localStorage.setItem(key, value);
+      window.localStorage.setItem('scimserver.onboarding.completedAt', 'e2e-complete');
     },
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
@@ -473,6 +474,37 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     await expect(page.getByTestId('credential-row-br-1')).toBeVisible();
     await expect(page.getByTestId('credential-row-oc-1')).toHaveCount(0);
 
+    await page.setViewportSize({ width: 820, height: 900 });
+    const layout = await page.evaluate(() => {
+      const measure = (selector: string) => {
+        const element = document.querySelector(selector) as HTMLElement | null;
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          right: rect.right,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          overflowX: getComputedStyle(element).overflowX,
+        };
+      };
+      return {
+        main: measure('main'),
+        endpointTabs: measure('[data-testid="endpoint-detail-tabs"]'),
+        methodTabs: measure('[data-testid="credentials-method-tabs"]'),
+        card: measure('[data-testid="credential-row-br-1"]'),
+        actions: measure('[data-testid="credential-actions-br-1"]'),
+      };
+    });
+    expect(layout.main).not.toBeNull();
+    expect(layout.card).not.toBeNull();
+    expect(layout.actions).not.toBeNull();
+    expect(layout.main!.scrollWidth).toBeLessThanOrEqual(layout.main!.clientWidth + 1);
+    expect(layout.card!.scrollWidth).toBeLessThanOrEqual(layout.card!.clientWidth + 1);
+    expect(layout.actions!.right).toBeLessThanOrEqual(layout.card!.right + 1);
+    expect(layout.endpointTabs!.overflowX).toBe('auto');
+    expect(layout.methodTabs!.overflowX).toBe('auto');
+
     // Shared secret tab: info banner + no create button.
     await page.getByTestId('credentials-method-tab-shared_secret').click();
     await expect(page.getByTestId('credentials-shared-secret-info')).toBeVisible();
@@ -534,6 +566,7 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
     // Close the menu before the next interaction.
     await page.keyboard.press('Escape');
     // V3 - Edit opens the inline label form.
+    await page.getByTestId('credential-more-br-1').click();
     await page.getByTestId('credential-edit-label-br-1').click();
     await expect(page.getByTestId('credential-edit-label-form-br-1')).toBeVisible();
   });

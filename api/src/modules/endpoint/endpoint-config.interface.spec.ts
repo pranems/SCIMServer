@@ -8,6 +8,7 @@ import {
   getOptionalConfigBoolean,
   getEffectiveAuthEnablement,
   resolveEndpointAuthEnablement,
+  resolveEndpointAuthEnablementDetails,
   getEffectiveCredentialSecretVisibility,
   normalizeCredentialSecretVisibility,
   resolveEndpointEgressOverrides,
@@ -1448,6 +1449,28 @@ describe('endpoint-config.interface', () => {
         const eff = resolveEndpointAuthEnablement(config, [{ type: 'wif-7523', enabled: false }]);
         // wif is not a resolved facet -> the flat values are unchanged.
         expect(eff).toEqual(getEffectiveAuthEnablement(config));
+      });
+
+      it('reports whether each effective value came from a method, dedicated setting, legacy fallback, or default', () => {
+        expect(
+          resolveEndpointAuthEnablementDetails(
+            {
+              PerEndpointCredentialsEnabled: true,
+              OAuthClientCredentialsAuthEnabled: false,
+            },
+            [{ type: 'bearer', enabled: false }],
+          ),
+        ).toEqual({
+          secretTokenBearer: { enabled: false, source: 'authentication-method' },
+          oauthClientCredentials: { enabled: false, source: 'dedicated-setting' },
+          sharedSecretBearer: { enabled: true, source: 'default' },
+        });
+
+        expect(resolveEndpointAuthEnablementDetails({ PerEndpointCredentialsEnabled: true })).toEqual({
+          secretTokenBearer: { enabled: true, source: 'legacy-setting' },
+          oauthClientCredentials: { enabled: true, source: 'legacy-setting' },
+          sharedSecretBearer: { enabled: true, source: 'default' },
+        });
       });
     });
 

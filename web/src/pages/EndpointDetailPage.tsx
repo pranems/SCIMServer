@@ -45,6 +45,8 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '20px',
     maxWidth: '1400px',
+    width: '100%',
+    minWidth: 0,
   },
   header: {
     display: 'flex',
@@ -66,6 +68,12 @@ const useStyles = makeStyles({
   },
   tabContent: {
     marginTop: '8px',
+    minWidth: 0,
+  },
+  tabList: {
+    maxWidth: '100%',
+    overflowX: 'auto',
+    overflowY: 'hidden',
   },
   center: {
     display: 'flex',
@@ -256,6 +264,8 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
 
       {/* Tab bar - selectedValue comes from URL */}
       <TabList
+        className={classes.tabList}
+        data-testid="endpoint-detail-tabs"
         selectedValue={activeTab}
         onTabSelect={(_, d) => handleTabSelect(d.value as TabValue)}
       >
