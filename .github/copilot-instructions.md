@@ -426,6 +426,17 @@ This rule is the general form of R1 (measure bounds, not CSS), R3 (a FAIL/baseli
 
 **Static gate: `scripts/audit-table-layout.ps1`** - flags any `web/src/**/*.tsx` that both renders a `<table>` and imports a truncation primitive but does NOT set `tableLayout: 'fixed'`, and warns on tables whose known R5.3 status has not been cleared. Run in Stage 1 whenever `web/src/**/*.tsx` tables change.
 
+### R11. A displayed control must use the authoritative effective state (CRITICAL - added 2026-09-17)
+
+Origin: v0.55.24 endpoint auth UX review. Connect rendered and mutated flat `profile.settings` switches, while enforcement, credential creation and connection info gave matching `profile.authentication.methods[]` entries higher precedence. An operator could flip a switch, see it persist, and still leave the effective authentication state unchanged.
+
+1. A UI control for an effective setting MUST consume the same resolver or server-computed result used by enforcement. Reimplementing only one layer of a precedence cascade in the client is forbidden.
+2. When a higher-precedence source makes the local control non-authoritative, display the effective value, expose its provenance, disable the misleading write path, and direct the operator to the owning surface.
+3. API responses carrying effective configuration MUST report enough provenance to distinguish explicit, inherited, legacy-fallback and default values. Provenance is non-secret and belongs in response key allowlists.
+4. Tests MUST create conflicting lower- and higher-precedence values, then assert the rendered effective state and that the non-authoritative control cannot issue a write. A same-value fixture does not discriminate.
+
+This is the configuration-control form of R10: persistence success is not effective-behavior correctness.
+
 ## Design & Architecture Self-Improvement Gate (CRITICAL - added 2026-07-23)
 
 Origin: 2026-07-23 operator request during the X12 auth-source refactoring analysis - "with all changes have a self improving step check gate for design and architecture as well remember this." This is the design/architecture sibling of the R7 self-improvement step (which is scoped to tests/gates) and the operationalized, mandatory-per-change form of the Stage 3c.1 `codeReviewSelfAudit` prompt. It exists because the class of drift it catches - a thin orchestrator (guard/controller/service) silently accreting per-method or per-case logic until it is a god-class - does NOT surface in a correctness-only gate and is only found by an explicit structural look. Reference analysis + the full gate definition with Mermaid: [docs/auth/AUTH_SOURCE_REFACTORING_ANALYSIS.md](docs/auth/AUTH_SOURCE_REFACTORING_ANALYSIS.md) Section 7; the generalizable pattern lives in [docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md).

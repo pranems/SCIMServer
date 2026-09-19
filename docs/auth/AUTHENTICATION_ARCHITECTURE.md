@@ -1,6 +1,6 @@
 # SCIMServer Authentication Architecture
 
-> **Status:** Analysis + design. Dated 2026-06-18. Authoritative companion that consolidates the multi-turn auth design into one coherent architecture. **Analysis + design only - no code has been implemented for the new `authentication.methods[]` model.** The current shipped state (3-tier guard chain, global OAuth issuer, per-endpoint bcrypt bearer) is described in [section 4](#4-current-scimserver-state-source-grounded) and is the factual baseline; everything past Phase Q is proposed.
+> **Status:** Architecture rationale and historical execution plan, originally dated 2026-06-18. The `profile.authentication.methods[]` model, method CRUD, resolver, provider chain, WIF RFC 7523, per-endpoint OAuth client, discovery, and diagnostics are now shipped. Tables labeled current in this document are snapshots from the original analysis date. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for the current cross-cutting state and target reconciliation.
 
 > **Why this doc exists.** [WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md](WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md) designs **one** auth mechanism (WIF) in depth, and [ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md](ISV_AUTH_PATTERNS_AND_SCIMSERVER_GAP_PLAN.md) surveys the **eight** ISV patterns and schedules them as Phase Q. Neither answers the cross-cutting question: *how should SCIMServer model "an endpoint can have several authentication methods active at once, new ones get added over time, old ones get retired" - at every layer (API, processing, persistence, discovery, UI, deployment)?* This document is that answer. The two sibling docs remain authoritative for their narrower scopes; this one is authoritative for the **overall authentication architecture and vocabulary**.
 
@@ -1098,4 +1098,4 @@ Each step satisfies the standing Feature / Bug-Fix Commit Checklist: unit + E2E 
 
 ---
 
-This document is analysis + design only; no code has been implemented for the `authenticationMethods[]` model. The current shipped baseline is described in [section 4](#4-current-scimserver-state-source-grounded) and is the factual source of truth.
+This document preserves the original architecture rationale and phased plan. The authentication method model is now live and enforced. Use [AUTHENTICATION_METHODS_MODEL.md](AUTHENTICATION_METHODS_MODEL.md) for its current behavior and [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for the reconciled endpoint/profile/discovery design.

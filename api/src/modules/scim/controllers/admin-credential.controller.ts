@@ -37,7 +37,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { WifDiscoveryResolverService } from '../../../oauth/wif-discovery-resolver.service';
 import { inferAllowedTenantId } from '../../../oauth/infer-allowed-tenant-id';
 import { mintCredentialToken, mintOAuthClientSecret, P1_KEYED_HASH_PLACEHOLDER, HASH_ALGO_BCRYPT } from '../../../security/credential-token';
-import { getConfigBoolean, getConfigNumber, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, ENDPOINT_CONFIG_FLAGS_DEFINITIONS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigNumber, resolveEndpointAuthEnablement, ENDPOINT_CONFIG_FLAGS, ENDPOINT_CONFIG_FLAGS_DEFINITIONS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { CredentialEncryptionService } from '../../../security/credential-encryption.service';
@@ -300,10 +300,12 @@ export class AdminCredentialController {
       );
     }
 
-    // A1 - orthogonal create gate. WIF rides its own enabling flag
-    // (WifCredentialsEnabled), independent of the bcrypt-bearer gate.
+    const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
+
+    // A1 / R11 - WIF uses the same method-entry precedence as every other
+    // displayed authentication method.
     if (credentialType === 'wif') {
-      if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
+      if (!effective.workloadIdentityFederation) {
         throw new ForbiddenException(
           `WIF credentials are not enabled for endpoint "${endpointId}". ` +
           `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,
@@ -318,7 +320,6 @@ export class AdminCredentialController {
     // explicit `profile.authentication.methods[]` entry wins, else the flat flags
     // (SecretTokenBearerAuthEnabled / OAuthClientCredentialsAuthEnabled, each
     // falling back to the legacy PerEndpointCredentialsEnabled).
-    const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
     if (credentialType === 'bearer' && !effective.secretTokenBearer) {
       throw new ForbiddenException(
         `Per-endpoint bearer (Secret Token) auth is not enabled for endpoint "${endpointId}". ` +

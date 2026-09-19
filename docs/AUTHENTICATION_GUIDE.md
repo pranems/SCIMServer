@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-15 - **Product version:** `0.55.23`
+> **Status:** Living reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.24`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -75,7 +75,9 @@ flowchart TD
 | **OAuth client credentials** | `OAuthClientCredentialsAuthEnabled` | exchange client id + secret for an `access_token` | token 1 hour, secret until rotated |
 | **Workload Identity Federation** | `WifCredentialsEnabled` | RFC 7523 `jwt-bearer` assertion | assertion about 1 hour, **no stored secret** |
 
-> `PerEndpointCredentialsEnabled` is a legacy master switch. The bearer and OAuth flags fall back to it when unset, so leaving it on is harmless.
+> `PerEndpointCredentialsEnabled` is a legacy compatibility fallback, not a fifth method. Bearer and OAuth2 fall back to it when their dedicated setting is absent. It is shown under Endpoint Settings -> Legacy compatibility, not in the Connect method selector.
+
+An explicit `profile.authentication.methods[]` entry is authoritative for all four methods, including WIF. When such an entry exists, Connect and Endpoint Settings show its effective state and disable the lower-precedence flat switch. Change the method entry from Connect instead. For WIF, any enabled `wif-7523` or `wif-8693` entry enables the method; WIF is disabled only when all declared WIF entries are disabled.
 
 **These are not mutually exclusive.** The reference endpoint runs all four simultaneously, which is exactly why its diagnostics show `shared_secret`, `bearer_jwt` and `wif` decisions interleaved.
 
@@ -93,14 +95,16 @@ The tab is organised as **Setup -> Connect -> Health**:
 - **Connect** - copy the exact values to paste into your identity provider
 - **Health** - recent authentication outcomes for this endpoint
 
-One sub-tab per method. The **Authentication methods** switches stay visible at the top of Connect, so a disabled method can be enabled without leaving the workflow. The selected method then shows its related endpoint controls beside Setup, Connect, and Health: bearer/OAuth active-credential limits, or the WIF trust cap and JWKS fetch/cache/safety controls. Settings continues to show the same controls in its complete all-in-one inventory.
+One sub-tab per method. The collapsed **Authentication methods** pane stays at the top of Connect and shows `4 methods - N enabled` in its header. Expand it to enable or disable a method without leaving the workflow. Controls are ordered OAuth2, WIF, global shared secret, then per-endpoint bearer. The selected method then shows its own collapsed settings pane beside Setup, Connect, and Health: bearer/OAuth active-credential limits, or the WIF trust cap and JWKS fetch/cache/safety controls. Settings continues to show the complete all-in-one inventory.
+
+Connect uses the server-resolved effective state. If a `profile.authentication.methods[]` entry controls a method, its switch is disabled and labeled as managed by that entry. The `enablementSource` field in connection info makes this provenance explicit.
 
 | Sub-tab | Testid |
 |---|---|
 | OAuth2 Client-Credential | `credentials-method-tab-oauth_client` |
 | WIF | `credentials-method-tab-wif` |
-| Per-endpoint bearer | `credentials-method-tab-bearer` |
 | Global Shared secret | `credentials-method-tab-shared_secret` |
+| Per-endpoint bearer | `credentials-method-tab-bearer` |
 
 **Global Shared secret** - the server-wide credential, shown here so you can see whether this endpoint still accepts it:
 
@@ -113,6 +117,8 @@ One sub-tab per method. The **Authentication methods** switches stay visible at 
 **OAuth2 Client-Credential** - client id, client secret and token endpoint:
 
 ![OAuth2 client credential](screenshots/prod-auth-04-connect-oauth.png)
+
+Credential cards keep only the primary workflow in the header: **Rotate** for bearer/OAuth, and **Verify + Connect** for WIF. Edit, reveal and reversible activate/deactivate actions are grouped under **More**. Credential JSON and connection JSON remain visible in labeled export rows below the summary. There is no separate irreversible Revoke command because the server DELETE route deactivates and can be reversed with Activate.
 
 The same auth switches also live in the complete **Settings** inventory:
 
@@ -340,12 +346,13 @@ Secretless. The client presents a JWT signed by an identity provider the endpoin
 
 ### 6.1 What a trust pins
 
-All five values are **public**; no secret is stored.
+All values are **public**; no secret is stored.
 
 | Field | Must match | In Entra this is |
 |---|---|---|
 | `expectedIssuer` | assertion `iss` | `https://login.microsoftonline.com/<tenantId>/v2.0` |
 | `expectedSubject` | assertion `sub` | the **service principal object id** |
+| `targetClientId` | issued access-token `client_id` | optional target client identity; defaults to the endpoint id |
 | `expectedAudience` | assertion `aud` | the resource app's Application ID URI or app id |
 | `expectedTenantId` | assertion `tid` | your tenant id |
 | `requiredRoles` | subset of assertion `roles` | an app role such as `Scim.Provision` |
@@ -355,6 +362,8 @@ Creating one, with the JWKS host allowlist shown inline:
 ![Add a WIF trust](screenshots/prod-auth-06-wif-add-trust.png)
 
 **Resolve from IdP** fills the issuer and JWKS URI from a tenant id, which avoids the most common source of typos.
+
+Do not put the assertion subject into Entra's **Client identifier** output field. Connect shows two distinct rows: **Client identifier** is `targetClientId ?? endpointId`, the identity SCIMServer places in its issued access token; **Expected assertion subject (sub)** is the source service-principal identity the incoming assertion must carry. The create/edit form exposes both values and exports both names explicitly.
 
 ### 6.2 A real accepted assertion
 
@@ -851,7 +860,7 @@ one.
 | Create a credential | `POST /scim/admin/endpoints/{id}/credentials` |
 | List credentials (metadata only) | `GET /scim/admin/endpoints/{id}/credentials` |
 | Rotate / revoke | `POST .../credentials/{cid}/rotate`, `DELETE .../credentials/{cid}` |
-| Entra field values per method | `GET /scim/admin/endpoints/{id}/connection-info` |
+| Entra field values per method | `GET /scim/admin/endpoints/{id}/connection-info` - the explicit, audit-logged secret-disclosure boundary when visibility is `always` |
 | Recent auth decisions | `GET /scim/admin/endpoints/{id}/auth-decisions` |
 | All endpoints' auth decisions | `GET /scim/admin/auth-decisions` |
 | Resolve issuer + JWKS from a tenant | `POST /scim/admin/endpoints/{id}/wif/resolve` |
@@ -875,6 +884,8 @@ one.
 | `CredentialSecretVisibility` | `once` | whether the UI keeps a secret on screen |
 | `PersistRequestSecrets` | on | whether request logs retain secret-bearing values |
 | `JwksFetchTimeoutMs` / `JwksFetchRetries` / `JwksFetchRetryBackoffMs` / `JwksCacheMaxAgeMs` | see settings guide | JWKS fetch behaviour |
+
+The broad endpoint overview response used by Users, Groups, Logs, Settings, and other tabs never carries plaintext credentials. The Connect tab separately requests `connection-info`; under `CredentialSecretVisibility=always`, that dedicated admin route may return retained values and emits an AUTH disclosure audit event.
 
 ### Source
 

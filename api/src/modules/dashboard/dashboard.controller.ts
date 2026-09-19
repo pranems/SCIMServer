@@ -23,9 +23,7 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/reposi
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import { ConnectionInfoService } from '../scim/services/connection-info.service';
 import { AuthDecisionRecordStore } from '../../oauth/auth-decision-record.store';
-import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
 import { HASH_ALGO_BCRYPT } from '../../security/credential-token';
-import type { EndpointConfig } from '../endpoint/endpoint-config.interface';
 import type {
   DashboardResponse,
   DashboardEndpoint,
@@ -52,6 +50,7 @@ function projectWifTrust(
   return {
     expectedIssuer: asString(metadata.expectedIssuer),
     expectedSubject: asString(metadata.expectedSubject),
+    targetClientId: asString(metadata.targetClientId),
     expectedAudience: asString(metadata.expectedAudience),
     jwksUri: asString(metadata.jwksUri),
     allowedTenantId: asString(metadata.allowedTenantId),
@@ -98,7 +97,6 @@ export class DashboardController {
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly connectionInfo: ConnectionInfoService,
-    private readonly secretResolver: ConnectionSecretResolverService,
     @Optional()
     @Inject(AuthDecisionRecordStore)
     private readonly decisionStore?: AuthDecisionRecordStore,
@@ -292,23 +290,16 @@ export class DashboardController {
         ? { ...(profile.settings as Record<string, unknown>) }
         : {};
 
-    // WI-3: assemble the connection-info (absolute URLs + per-method Entra
-    // field set) so the Overview UI never hand-builds URLs. Host is derived
-    // from the request exactly as the connection-info controller does.
+    // WI-3: assemble the non-secret connection-info shape so every endpoint
+    // tab gets authoritative URLs and method state without receiving retained
+    // plaintext. Connect separately calls the audited connection-info route.
     const proto = req.headers['x-forwarded-proto']?.toString() ?? req.protocol;
     const host = req.headers['x-forwarded-host']?.toString() ?? req.get('host');
-    // When CredentialSecretVisibility=always, inline the actual secrets so the
-    // Connect tab (which reads this BFF) can show every connection parameter
-    // (incl. the global shared_secret, which has no per-credential reveal path).
-    const overviewSecrets = await this.secretResolver.resolveForEndpoint(
-      configFlags as EndpointConfig,
-      credentialRows,
-    );
     const connectionInfo = this.connectionInfo.assemble(
       endpoint,
       credentialRows,
       `${proto}://${host}`,
-      overviewSecrets,
+      undefined,
       this.decisionStore
         ? ConnectionInfoService.buildAuthHealth(
             this.decisionStore.latestByMethodForEndpoint(endpoint.id),

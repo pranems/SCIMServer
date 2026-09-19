@@ -1070,6 +1070,7 @@ export function getOptionalConfigBoolean(
  *                               legacy PerEndpointCredentialsEnabled, else false.
  *  - `oauthClientCredentials` = OAuthClientCredentialsAuthEnabled if set, else the
  *                               legacy PerEndpointCredentialsEnabled, else false.
+ *  - `workloadIdentityFederation` = WifCredentialsEnabled if set, else false.
  *  - `sharedSecretBearer`     = SharedSecretBearerAuthEnabled if set, else true
  *                               (back-compat: every endpoint accepts the global
  *                               secret today).
@@ -1082,8 +1083,28 @@ export interface EffectiveAuthEnablement {
   secretTokenBearer: boolean;
   /** Per-endpoint `oauth_client` credential (Entra OAuth2 client-credentials). */
   oauthClientCredentials: boolean;
+  /** Per-endpoint workload identity federation trust (RFC 7523 / RFC 8693). */
+  workloadIdentityFederation: boolean;
   /** Whether this endpoint accepts the global SCIM_SHARED_SECRET. */
   sharedSecretBearer: boolean;
+}
+
+export type AuthEnablementSource =
+  | 'authentication-method'
+  | 'dedicated-setting'
+  | 'legacy-setting'
+  | 'default';
+
+export interface EffectiveAuthEnablementDetail {
+  enabled: boolean;
+  source: AuthEnablementSource;
+}
+
+export interface EffectiveAuthEnablementDetails {
+  secretTokenBearer: EffectiveAuthEnablementDetail;
+  oauthClientCredentials: EffectiveAuthEnablementDetail;
+  workloadIdentityFederation: EffectiveAuthEnablementDetail;
+  sharedSecretBearer: EffectiveAuthEnablementDetail;
 }
 
 export function getEffectiveAuthEnablement(
@@ -1101,11 +1122,18 @@ export function getEffectiveAuthEnablement(
   const oauthClientCredentials =
     getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED) ??
     legacyOrFalse;
+  const workloadIdentityFederation =
+    getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED) ?? false;
   const sharedSecretBearer =
     getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED) ??
     true;
 
-  return { secretTokenBearer, oauthClientCredentials, sharedSecretBearer };
+  return {
+    secretTokenBearer,
+    oauthClientCredentials,
+    workloadIdentityFederation,
+    sharedSecretBearer,
+  };
 }
 
 /**
@@ -1129,6 +1157,7 @@ export interface AuthMethodEnablementEntry {
 const AUTH_FACET_METHOD_TYPES: Record<keyof EffectiveAuthEnablement, readonly string[]> = {
   secretTokenBearer: ['bearer'],
   oauthClientCredentials: ['oauth-client'],
+  workloadIdentityFederation: ['wif-7523', 'wif-8693'],
   sharedSecretBearer: ['shared-secret'],
 };
 
@@ -1158,18 +1187,74 @@ export function resolveEndpointAuthEnablement(
   config: EndpointConfig | undefined,
   methods?: readonly AuthMethodEnablementEntry[],
 ): EffectiveAuthEnablement {
-  const flat = getEffectiveAuthEnablement(config);
+  const details = resolveEndpointAuthEnablementDetails(config, methods);
+  return {
+    secretTokenBearer: details.secretTokenBearer.enabled,
+    oauthClientCredentials: details.oauthClientCredentials.enabled,
+    workloadIdentityFederation: details.workloadIdentityFederation.enabled,
+    sharedSecretBearer: details.sharedSecretBearer.enabled,
+  };
+}
+
+export function resolveEndpointAuthEnablementDetails(
+  config: EndpointConfig | undefined,
+  methods?: readonly AuthMethodEnablementEntry[],
+): EffectiveAuthEnablementDetails {
+  const legacy = getOptionalConfigBoolean(
+    config,
+    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+  );
+
+  const flatDetail = (
+    dedicatedKey: string,
+    fallback: boolean,
+    usesLegacy: boolean,
+  ): EffectiveAuthEnablementDetail => {
+    const dedicated = getOptionalConfigBoolean(config, dedicatedKey);
+    if (dedicated !== undefined) return { enabled: dedicated, source: 'dedicated-setting' };
+    if (usesLegacy && legacy !== undefined) return { enabled: legacy, source: 'legacy-setting' };
+    return { enabled: fallback, source: 'default' };
+  };
+
+  const flat: EffectiveAuthEnablementDetails = {
+    secretTokenBearer: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
+      false,
+      true,
+    ),
+    oauthClientCredentials: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
+      false,
+      true,
+    ),
+    workloadIdentityFederation: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
+      false,
+      false,
+    ),
+    sharedSecretBearer: flatDetail(
+      ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
+      true,
+      false,
+    ),
+  };
   if (!methods || methods.length === 0) return flat;
 
-  const resolveFacet = (facet: keyof EffectiveAuthEnablement): boolean => {
+  const resolveFacet = (facet: keyof EffectiveAuthEnablement): EffectiveAuthEnablementDetail => {
     const types = AUTH_FACET_METHOD_TYPES[facet];
-    const entry = methods.find((m) => types.includes(m.type));
-    return entry ? entry.enabled !== false : flat[facet];
+    const entries = methods.filter((method) => types.includes(method.type));
+    return entries.length > 0
+      ? {
+          enabled: entries.some((entry) => entry.enabled !== false),
+          source: 'authentication-method',
+        }
+      : flat[facet];
   };
 
   return {
     secretTokenBearer: resolveFacet('secretTokenBearer'),
     oauthClientCredentials: resolveFacet('oauthClientCredentials'),
+    workloadIdentityFederation: resolveFacet('workloadIdentityFederation'),
     sharedSecretBearer: resolveFacet('sharedSecretBearer'),
   };
 }

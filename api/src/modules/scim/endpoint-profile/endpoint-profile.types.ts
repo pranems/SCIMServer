@@ -130,7 +130,7 @@ export interface ProfileSettings {
   [key: string]: unknown;
 }
 
-// ─── Authentication model (A0 - inert) ──────────────────────────────────────
+// ─── Authentication model ────────────────────────────────────────────────────
 
 /** Which resolver plane consults a method (architecture section 2.1). */
 export type AuthenticationMethodPlane = 'token' | 'resource' | 'both';
@@ -148,9 +148,8 @@ export type AuthenticationMethodLifecycle = 'active' | 'deprecated' | 'disabled'
  * it is referenced by `credentialRef` and lives in `EndpointCredential`
  * (architecture section 2.3, the three data classes).
  *
- * **INERT in A0:** persisted + round-tripped on the endpoint profile, but not yet
- * consulted by any token-mint or resource-plane resolver. Consumers arrive in
- * A1 (admin CRUD), A2 (discovery), A3 (routing), Q1/Q2/Q6 (providers).
+ * This block is the highest-precedence desired-method source. Dedicated and
+ * legacy endpoint settings are compatibility fallbacks when no method exists.
  */
 export interface AuthenticationMethod {
   /** Stable instance handle (distinct from `type`); the target of enable/disable/rotate. */
@@ -167,7 +166,7 @@ export interface AuthenticationMethod {
   plane?: AuthenticationMethodPlane;
   /** RFC 8414 `token_endpoint_auth_method` (token-plane only). */
   tokenEndpointAuthMethod?: string;
-  /** Whether the method participates in resolution (inert in A0). */
+  /** Whether the method participates in resolution. */
   enabled?: boolean;
   /** Resource-plane acceptor priority (lower = earlier). */
   priority?: number;
@@ -199,11 +198,12 @@ export interface ProfileAuthentication {
 /**
  * The unified endpoint profile - stored as a single JSONB column on Endpoint.
  *
- * Contains three RFC-native discovery document sections plus project settings:
+ * Contains three RFC-native discovery document sections plus endpoint policy:
  * - `schemas`             - RFC 7643 §7 schema definitions
  * - `resourceTypes`       - RFC 7643 §6 resource type declarations
  * - `serviceProviderConfig` - RFC 7644 §4 capability advertisement
  * - `settings`            - Project-specific behavioral flags (not RFC-governed)
+ * - `authentication`      - Non-secret desired authentication methods
  *
  * @see docs/SCHEMA_TEMPLATES_DESIGN.md §5.1
  */
@@ -221,8 +221,8 @@ export interface EndpointProfile {
   settings: ProfileSettings;
 
   /**
-   * A0 - embedded authentication block (methods + defaultMethodId + policy).
-   * INERT: persisted + round-tripped but not yet consulted by any resolver.
+  * Embedded authentication block (methods + defaultMethodId + policy).
+  * Consulted before dedicated and legacy compatibility settings.
    * Rides the existing profile JSONB; secret material is never stored here.
    */
   authentication?: ProfileAuthentication;
@@ -261,7 +261,7 @@ export interface ShorthandProfileInput {
   resourceTypes?: ScimResourceType[];
   serviceProviderConfig?: Partial<ServiceProviderConfig>;
   settings?: ProfileSettings;
-  /** A0 - inert authentication block; threaded through expansion unchanged (secrets stripped). */
+  /** Authentication block; threaded through expansion with secret-looking config stripped. */
   authentication?: ProfileAuthentication;
 }
 

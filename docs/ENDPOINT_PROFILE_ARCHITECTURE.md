@@ -1,9 +1,11 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.23`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
 
-> **Updated:** 2026-08-04  
+> **Updated:** 2026-09-18
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
+>
+> **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines the portability boundary, discovery translation, authentication provenance, API/DB ownership, and target UX. This document remains authoritative for current profile expansion and PATCH merge semantics.
 
 ---
 
@@ -30,6 +32,7 @@ Every endpoint has a **profile** that fully defines its SCIM behavior. A profile
 2. **What resource types** are supported (Users, Groups, custom types)
 3. **What capabilities** the endpoint advertises (bulk, sort, filter, ETag)
 4. **How the endpoint behaves** (validation, PATCH, delete, auth flags)
+5. **Which non-secret authentication methods** the endpoint declares
 
 ```mermaid
 flowchart TD
@@ -49,7 +52,7 @@ flowchart TD
 
 ## Profile Structure
 
-A full expanded profile has 4 top-level sections:
+A full expanded profile has five persisted top-level sections:
 
 ```typescript
 interface EndpointProfile {
@@ -57,6 +60,7 @@ interface EndpointProfile {
   resourceTypes: ScimResourceType[];      // RFC 7643 S6
   serviceProviderConfig: ServiceProviderConfig;  // RFC 7644 S4
   settings: ProfileSettings;              // Project-specific flags
+  authentication?: ProfileAuthentication; // Non-secret method declarations
 }
 ```
 
@@ -125,7 +129,11 @@ interface ServiceProviderConfig {
 
 ### settings
 
-See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) for all 16 flags.
+See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) for the complete current endpoint settings inventory and effective-value rules.
+
+### authentication
+
+`profile.authentication.methods[]` stores non-secret desired method declarations. Explicit method state has higher precedence than dedicated and legacy compatibility settings. Credential material, WIF trust rows, secret envelopes, and effective-state provenance remain outside the profile. See [AUTHENTICATION_METHODS_MODEL.md](auth/AUTHENTICATION_METHODS_MODEL.md) and the [canonical cross-cutting design](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
 ---
 

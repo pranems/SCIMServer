@@ -1,6 +1,6 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-15 - **Product version at capture:** `0.55.22`
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-17 - **Product version at capture:** `0.55.24`
 > **Every value in this document was measured against a running server**, not transcribed from source. The preset matrix in [Section 3](#3-preset-matrix-measured) was produced by creating one endpoint per preset on the live dev estate, reading back what the server actually published, and deleting them. The request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) are verbatim wire captures.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
@@ -19,7 +19,20 @@ The Settings tab renders **all 38 server-registered endpoint settings**:
 | Numeric inputs | **14** | JWKS egress/safety/refresh knobs and per-method credential caps |
 | Radio group | **1** | `CredentialSecretVisibility` |
 
-Settings remains the complete, structured inventory. Operational tabs also show the subset relevant to their workflow: Users, Groups, Schemas, Resource types, Logs, and each Connect authentication method. Both presentations consume `web/src/pages/endpoint-settings-definitions.ts`, so changing a value in either place writes the same endpoint profile and the other surface reflects it.
+Settings remains the complete, structured inventory. Operational tabs also show a collapsed **Related settings** disclosure containing only controls unique to that workflow. Both presentations consume `web/src/pages/endpoint-settings-definitions.ts`, so changing a value in either place writes the same endpoint profile and the other surface reflects it.
+
+The ownership rule is deliberate:
+
+| Surface | Contextual controls | Kept only in Endpoint Settings |
+|---|---|---|
+| Users | `UserSoftDeleteEnabled`, `UserHardDeleteEnabled` | Common validation, boolean coercion, primary enforcement, PATCH semantics and ETags |
+| Groups | `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `PatchOpAllowRemoveAllMembers` | Common validation, boolean coercion, primary enforcement, general PATCH semantics and ETags |
+| Schemas | Discovery and schema-validation controls | Unrelated lifecycle, auth and logging controls |
+| Resource types | Discovery and resource-type enforcement | Unrelated lifecycle, auth and logging controls |
+| Logs | Request persistence, file output and endpoint log level | Unrelated resource and auth controls |
+| Connect method | The selected method's credential cap or WIF/JWKS policy | Other methods and unrelated endpoint behavior |
+
+This avoids presenting the same common setting in both Users and Groups, where an operator could reasonably mistake it for two independent values. The collapsed header always shows the pane title and setting count; expand it only when changing that workflow's behavior.
 
 Two properties of this system matter before you change anything:
 
@@ -83,17 +96,22 @@ flowchart LR
 
 ### 2.6 Authentication
 
-These five decide **who may call this endpoint's SCIM data plane**. They are covered in depth in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
+Four real methods decide **who may call this endpoint's SCIM data plane**. They are covered in depth in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
 
-> These five are also editable **inline on the endpoint's Connect tab**, since enabling a method is a prerequisite for setting up its credential. Both surfaces read one definition (`web/src/pages/endpoint-auth-flags.ts`) and write the same setting, so it does not matter which you use.
+> These four are editable in the collapsed **Authentication methods** pane on Connect, in setup order. The pane shows its enabled count without expanding. Endpoint Settings keeps the complete raw inventory.
+
+When `profile.authentication.methods[]` declares one of these methods, that entry owns the effective state and overrides the corresponding flat setting. Both Connect and Endpoint Settings display the server-resolved value, show that it is managed by Authentication methods, and disable the lower-precedence switch. WIF follows the same rule across trust creation, diagnostics, token minting, connection info, and ServiceProviderConfig discovery.
 
 | Setting | What it actually does |
 |---|---|
+| `OAuthClientCredentialsAuthEnabled` | Accept a per-endpoint `oauth_client` credential (Entra's "OAuth2 client-credentials"). |
+| `WifCredentialsEnabled` | Accept federated-identity (WIF, RFC 7523 `jwt-bearer`) credentials and advertise the WIF authentication scheme. |
 | `SharedSecretBearerAuthEnabled` | Whether this endpoint accepts the **global** SCIM shared secret. Turn OFF to make the endpoint accept only its own credentials. Defaults to on. |
 | `SecretTokenBearerAuthEnabled` | Accept a per-endpoint bcrypt bearer token (Entra's "Secret Token" field). |
-| `OAuthClientCredentialsAuthEnabled` | Accept a per-endpoint `oauth_client` credential (Entra's "OAuth2 client-credentials"). |
-| `PerEndpointCredentialsEnabled` | Legacy master switch; the two flags above fall back to it when unset. |
-| `WifCredentialsEnabled` | Accept federated-identity (WIF, RFC 7523 `jwt-bearer`) credentials and advertise the WIF authentication scheme. |
+
+`PerEndpointCredentialsEnabled` is a **legacy compatibility fallback**, not a fifth method. It appears only in the Endpoint Settings **Legacy compatibility** category. Bearer and OAuth2 inherit it when their dedicated setting is absent.
+
+An explicit `profile.authentication.methods[]` entry is authoritative over the flat setting. Connection info reports `enablementSource` (`authentication-method`, `dedicated-setting`, `legacy-setting`, or `default`). Connect disables a flat switch managed by an authentication-method entry instead of allowing a change that would look successful but have no effect.
 
 > **These govern the DATA plane only.** Disabling `SharedSecretBearerAuthEnabled` stops the global secret working on `/scim/v2/endpoints/{id}/...`, but the admin plane (`/scim/admin/...`) keeps answering the admin bearer, so you can always get back in and re-enable it. That separation was a real bug until 0.55.1 - see [Section 7](#7-known-behaviour-worth-knowing).
 

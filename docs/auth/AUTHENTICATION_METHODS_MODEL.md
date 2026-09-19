@@ -17,7 +17,7 @@ The model rides the existing `Endpoint.profile` JSONB - **no new column or table
   "resourceTypes": [ /* ... */ ],
   "serviceProviderConfig": { /* ... */ },
   "settings": { /* ... */ },
-  "authentication": {                 // A0 - NEW, inert
+  "authentication": {                 // Canonical desired method policy
     "schemaVersion": 1,
     "methods": [
       {

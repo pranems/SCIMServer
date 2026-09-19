@@ -63,8 +63,8 @@ import {
 } from '@fluentui/react-icons';
 import {
   useEndpointOverview,
+  useConnectionInfo,
   useCreateCredential,
-  useDeleteCredential,
   useActivateCredential,
   useDeactivateCredential,
   useEditCredentialLabel,
@@ -152,6 +152,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    minWidth: 0,
   },
   header: {
     display: 'flex',
@@ -175,9 +176,41 @@ const useStyles = makeStyles({
   },
   rowGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr auto auto auto',
-    alignItems: 'center',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    alignItems: 'start',
     gap: '12px',
+    '@media (max-width: 900px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    },
+  },
+  cardSummary: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '8px',
+    marginTop: '6px',
+  },
+  cardActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: '4px',
+    '@media (max-width: 900px)': {
+      justifyContent: 'flex-start',
+    },
+  },
+  exportRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  methodTabs: {
+    maxWidth: '100%',
+    overflowX: 'auto',
+    overflowY: 'hidden',
   },
   meta: {
     color: tokens.colorNeutralForeground3,
@@ -205,6 +238,10 @@ const useStyles = makeStyles({
     gridTemplateColumns: 'minmax(120px, 180px) 1fr',
     columnGap: '12px',
     alignItems: 'center',
+    '@media (max-width: 700px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+      rowGap: '4px',
+    },
   },
   formCol: {
     display: 'flex',
@@ -294,9 +331,12 @@ const useWifStyles = makeStyles({
   },
   wifRowGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr auto auto',
-    alignItems: 'center',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    alignItems: 'start',
     gap: '12px',
+    '@media (max-width: 900px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    },
   },
   wifMeta: {
     color: tokens.colorNeutralForeground3,
@@ -393,6 +433,10 @@ export function isLegacyHash(hashAlgo: string | null | undefined): boolean {
   return hashAlgo !== KEYED_HASH_ALGO;
 }
 
+function actionErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'The credential action failed.';
+}
+
 interface CreatedCredential {
   id: string;
   label: string | null;
@@ -409,6 +453,7 @@ interface CreatedCredential {
 interface WifTrustForm {
   expectedIssuer: string;
   expectedSubject: string;
+  targetClientId: string;
   expectedAudience: string;
   jwksUri: string;
   allowedTenantId: string;
@@ -424,6 +469,7 @@ interface WifTrustForm {
 const EMPTY_WIF_FORM: WifTrustForm = {
   expectedIssuer: '',
   expectedSubject: '',
+  targetClientId: '',
   expectedAudience: '',
   jwksUri: '',
   allowedTenantId: '',
@@ -508,6 +554,7 @@ const WifTrustDetails: React.FC<{
   const rows: Array<{ key: string; label: string; value: string | null }> = [
     { key: 'issuer', label: 'Issuer (iss)', value: trust.expectedIssuer ?? null },
     { key: 'jwks', label: 'JWKS URI', value: trust.jwksUri ?? null },
+    { key: 'target-client', label: 'Target client identifier', value: trust.targetClientId ?? null },
     { key: 'subject', label: 'Subject (sub)', value: trust.expectedSubject ?? null },
     { key: 'audience', label: 'Audience (aud)', value: trust.expectedAudience ?? null },
     { key: 'tenant', label: 'Allowed tenant', value: trust.allowedTenantId ?? null },
@@ -701,7 +748,7 @@ interface WifCredentialsSectionProps {
   enabled: boolean;
   credentials: EndpointOverviewCredential[];
   createMutation: ReturnType<typeof useCreateCredential>;
-  deleteMutation: ReturnType<typeof useDeleteCredential>;
+  deactivateMutation: ReturnType<typeof useDeactivateCredential>;
 }
 
 /**
@@ -757,6 +804,14 @@ const WifTrustFieldGrid: React.FC<{
       placeholder="service-principal object id"
       monospace
       data-testid="wif-field-subject"
+    />
+    <EditableField
+      label="Target client identifier (optional)"
+      value={form.targetClientId}
+      onChange={setField('targetClientId')}
+      placeholder="Defaults to this endpoint id"
+      monospace
+      data-testid="wif-field-target-client-id"
     />
     <EditableField
       label="Audience (aud)"
@@ -841,11 +896,11 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   enabled,
   credentials,
   createMutation,
-  deleteMutation,
+  deactivateMutation,
 }) => {
   const classes = useStyles();
   const wif = useWifStyles();
-  // V2 - reactivate a deactivated WIF trust (deactivate reuses deleteMutation).
+  // V2 - reactivate a deactivated WIF trust.
   const activateMutation = useActivateCredential(endpointId);
 
   const [form, setForm] = React.useState<WifTrustForm>(EMPTY_WIF_FORM);
@@ -866,6 +921,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   const [verifyResult, setVerifyResult] = React.useState<WifVerifyResult | null>(null);
   // V8 - per-card verify result (keyed by the trust's credential id).
   const [cardVerify, setCardVerify] = React.useState<{ id: string; result: WifVerifyResult | null } | null>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
   // Item C - when a verify-gated save fails, offer an explicit override.
   const [needsOverride, setNeedsOverride] = React.useState(false);
 
@@ -922,6 +978,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       assertionProfile: 'jwt-bearer' as const,
       expectedIssuer: form.expectedIssuer.trim(),
       expectedSubject: form.expectedSubject.trim(),
+      ...(form.targetClientId.trim() ? { targetClientId: form.targetClientId.trim() } : {}),
       expectedAudience: form.expectedAudience.trim(),
       jwksUri: form.jwksUri.trim(),
       allowedTenantId: form.allowedTenantId.trim(),
@@ -1033,6 +1090,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     setForm({
       expectedIssuer: t.expectedIssuer ?? '',
       expectedSubject: t.expectedSubject ?? '',
+      targetClientId: t.targetClientId ?? '',
       expectedAudience: t.expectedAudience ?? '',
       jwksUri: t.jwksUri ?? '',
       allowedTenantId: t.allowedTenantId ?? '',
@@ -1113,13 +1171,17 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     const t = cred.wif;
     if (!t) return;
     setCardVerify({ id: cred.id, result: null });
+    setActionError(null);
     verifyMutation.mutate(
       {
         expectedIssuer: t.expectedIssuer ?? undefined,
         jwksUri: t.jwksUri ?? undefined,
         credentialId: cred.id,
       },
-      { onSuccess: (res) => setCardVerify({ id: cred.id, result: res }) },
+      {
+        onSuccess: (res) => setCardVerify({ id: cred.id, result: res }),
+        onError: (error) => setActionError(actionErrorText(error)),
+      },
     );
   };
 
@@ -1268,7 +1330,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                 <div className={wif.returnRow}>
                   <Caption1>Client ID</Caption1>
                   <CopyableField
-                    value={form.expectedSubject || saved.id}
+                    value={form.targetClientId || endpointId}
                     monospace
                     truncate
                     data-testid="wif-return-clientid"
@@ -1465,6 +1527,11 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
 
             {wifCredentials.length > 0 && (
               <div className={classes.list} data-testid="wif-credentials-list">
+                {actionError && (
+                  <MessageBar intent="error" data-testid="wif-credential-action-error">
+                    <MessageBarBody>{actionError}</MessageBarBody>
+                  </MessageBar>
+                )}
                 <div className={wif.wifListHeader} data-testid="wif-credentials-list-header">
                   <Subtitle2>
                     Configured federated trusts ({wifCredentials.length})
@@ -1486,13 +1553,26 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                             {cred.description}
                           </Caption1>
                         )}
+                        <div className={classes.cardSummary}>
+                          <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
+                            {cred.active ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Caption1>
+                            {cred.wif?.lastVerifiedAt ? 'Verified' : 'Not verified'}
+                          </Caption1>
+                        </div>
                       </div>
-                      <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
-                        {cred.active ? 'Active' : 'Revoked'}
-                      </Badge>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {/* W7 - primary actions visible (Connect, Edit, Verify,
-                            Export); Deactivate + Revoke in a "More" overflow menu. */}
+                      <div className={classes.cardActions} data-testid={`wif-credential-actions-${cred.id}`}>
+                        <Button
+                          appearance="primary"
+                          icon={<PlugConnected24Regular />}
+                          onClick={() => onVerifyTrust(cred)}
+                          disabled={verifyMutation.isPending && cardVerify?.id === cred.id}
+                          aria-label={`Verify WIF trust ${cred.label ?? cred.id}`}
+                          data-testid={`wif-credential-verify-${cred.id}`}
+                        >
+                          {verifyMutation.isPending && cardVerify?.id === cred.id ? 'Verifying...' : 'Verify'}
+                        </Button>
                         <Tooltip content="Connect this endpoint to IdP like Entra ID" relationship="label" positioning="above">
                           <Button
                             appearance="secondary"
@@ -1506,54 +1586,45 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                             Connect
                           </Button>
                         </Tooltip>
-                        <Button
-                          appearance="subtle"
-                          icon={<Edit24Regular />}
-                          onClick={() => onEditTrust(cred)}
-                          aria-label={`Edit WIF trust ${cred.label ?? cred.id}`}
-                          data-testid={`wif-credential-edit-${cred.id}`}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          appearance="subtle"
-                          icon={<PlugConnected24Regular />}
-                          onClick={() => onVerifyTrust(cred)}
-                          disabled={verifyMutation.isPending && cardVerify?.id === cred.id}
-                          aria-label={`Verify WIF trust ${cred.label ?? cred.id}`}
-                          data-testid={`wif-credential-verify-${cred.id}`}
-                        >
-                          {verifyMutation.isPending && cardVerify?.id === cred.id ? 'Verifying...' : 'Verify'}
-                        </Button>
-                        {/* W5 - copy / download this trust's public object as JSON. */}
-                        <SettingsJsonExport
-                          value={projectCredentialPublic(cred)}
-                          filename={`wif-trust-${cred.id}.json`}
-                          copyLabel="Copy JSON"
-                          data-testid={`wif-credential-export-${cred.id}`}
-                        />
                         <OverflowMenu
                           ariaLabel={`More actions for WIF trust ${cred.label ?? cred.id}`}
                           data-testid={`wif-credential-more-${cred.id}`}
                         >
-                              {/* V2 - activate / deactivate this trust (soft). */}
                               <MenuItem
-                                onClick={() => {
-                                  if (cred.active) deleteMutation.mutate(cred.id);
-                                  else activateMutation.mutate(cred.id);
-                                }}
-                                disabled={activateMutation.isPending || deleteMutation.isPending}
-                                data-testid={`wif-credential-toggle-active-${cred.id}`}
+                                icon={<Edit24Regular />}
+                                onClick={() => onEditTrust(cred)}
+                                data-testid={`wif-credential-edit-${cred.id}`}
                               >
-                                {cred.active ? 'Deactivate' : 'Activate'}
+                                Edit trust
                               </MenuItem>
-                              <MenuItem
-                                icon={<Delete24Regular />}
-                                onClick={() => deleteMutation.mutate(cred.id)}
-                                data-testid={`wif-credential-delete-${cred.id}`}
-                              >
-                                Revoke trust
-                              </MenuItem>
+                              {cred.active ? (
+                                <MenuItem
+                                  icon={<Delete24Regular />}
+                                  onClick={() => {
+                                    setActionError(null);
+                                    deactivateMutation.mutate(cred.id, {
+                                      onError: (error) => setActionError(actionErrorText(error)),
+                                    });
+                                  }}
+                                  disabled={deactivateMutation.isPending}
+                                  data-testid={`wif-credential-delete-${cred.id}`}
+                                >
+                                  Deactivate trust
+                                </MenuItem>
+                              ) : (
+                                <MenuItem
+                                  onClick={() => {
+                                    setActionError(null);
+                                    activateMutation.mutate(cred.id, {
+                                      onError: (error) => setActionError(actionErrorText(error)),
+                                    });
+                                  }}
+                                  disabled={activateMutation.isPending}
+                                  data-testid={`wif-credential-toggle-active-${cred.id}`}
+                                >
+                                  Activate trust
+                                </MenuItem>
+                              )}
                         </OverflowMenu>
                       </div>
                     </div>
@@ -1563,6 +1634,15 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                         ? `Trust does not expire; minted tokens valid ${cred.wif.issuedTokenTtlSec}s`
                         : 'Trust does not expire; minted tokens use the default TTL'}
                     </Caption1>
+                    <div className={classes.exportRow} data-testid={`wif-credential-exports-${cred.id}`}>
+                      <Caption1><strong>Trust JSON</strong></Caption1>
+                      <SettingsJsonExport
+                        value={projectCredentialPublic(cred)}
+                        filename={`wif-trust-${cred.id}.json`}
+                        copyLabel="Copy trust JSON"
+                        data-testid={`wif-credential-export-${cred.id}`}
+                      />
+                    </div>
                     <WifTrustDetails credId={cred.id} trust={cred.wif} styles={wif} />
 
                     {/* V8 - per-card verify result (in-card checklist). */}
@@ -1602,7 +1682,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                           value={{
                             applicationApiUrl: scimUrl,
                             oauthTokenEndpoint: tokenUrl,
-                            clientIdentifier: cred.wif?.expectedSubject ?? null,
+                            clientIdentifier: cred.wif?.targetClientId ?? endpointId,
+                            expectedAssertionSubject: cred.wif?.expectedSubject ?? null,
                             ...(cred.wif ?? {}),
                           }}
                           filename={`wif-trust-${cred.id}-connection.json`}
@@ -1618,12 +1699,25 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                           <CopyableField value={tokenUrl} monospace truncate data-testid={`wif-connect-tokenurl-${cred.id}`} />
                         </div>
                         <div className={wif.returnRow}>
-                          <InfoLabel info={CONNECT_PARAM_HELP.clientIdentifier} data-testid={`wif-connect-clientid-info-${cred.id}`}>Client identifier (sub)</InfoLabel>
+                          <InfoLabel info={CONNECT_PARAM_HELP.clientIdentifier} data-testid={`wif-connect-clientid-info-${cred.id}`}>Client identifier</InfoLabel>
+                          <CopyableField
+                            value={cred.wif?.targetClientId ?? endpointId}
+                            monospace
+                            truncate
+                            data-testid={`wif-connect-clientid-${cred.id}`}
+                          />
+                        </div>
+                        <div className={wif.returnRow}>
+                          <InfoLabel
+                            info="The exact subject (sub) claim the source IdP assertion must carry."
+                          >
+                            Expected assertion subject (sub)
+                          </InfoLabel>
                           <CopyableField
                             value={cred.wif?.expectedSubject ?? '-'}
                             monospace
                             truncate
-                            data-testid={`wif-connect-clientid-${cred.id}`}
+                            data-testid={`wif-connect-assertion-subject-${cred.id}`}
                           />
                         </div>
                       </div>
@@ -1735,7 +1829,24 @@ function coerceCredFlag(raw: unknown, fallback: boolean): boolean {
  * and the shared-secret flag defaults to on. W11 - there is no "All" tab; the
  * per-method tabs are the single method axis.
  */
-function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
+function enabledMethodTabs(
+  flags: Record<string, unknown>,
+  connectionInfo?: ConnectionInfo,
+): MethodTabDef[] {
+  const resolvedMethods = connectionInfo
+    ? [...connectionInfo.enabledMethods, ...connectionInfo.disabledMethods]
+    : [];
+  const hasCompleteResolvedState = new Set(resolvedMethods.map((method) => method.method)).size === 4;
+  if (hasCompleteResolvedState) {
+    const enabled = new Set(connectionInfo!.enabledMethods.map((method) => method.method));
+    const tabs: MethodTabDef[] = [];
+    if (enabled.has('oauth_client')) tabs.push({ value: 'oauth_client', label: 'OAuth2 Client-Credential', credentialType: 'oauth_client' });
+    if (enabled.has('wif')) tabs.push({ value: 'wif', label: 'WIF', credentialType: 'wif' });
+    if (enabled.has('shared_secret')) tabs.push({ value: 'shared_secret', label: 'Global Shared secret', credentialType: null });
+    if (enabled.has('bearer')) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
+    return tabs;
+  }
+
   const legacy = coerceCredFlag(flags.PerEndpointCredentialsEnabled, false);
   const sharedSecret = coerceCredFlag(flags.SharedSecretBearerAuthEnabled, true);
   const secretTokenBearer = coerceCredFlag(flags.SecretTokenBearerAuthEnabled, legacy);
@@ -1745,8 +1856,8 @@ function enabledMethodTabs(flags: Record<string, unknown>): MethodTabDef[] {
   const tabs: MethodTabDef[] = [];
   if (oauthClient) tabs.push({ value: 'oauth_client', label: 'OAuth2 Client-Credential', credentialType: 'oauth_client' });
   if (wif) tabs.push({ value: 'wif', label: 'WIF', credentialType: 'wif' });
-  if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
   if (sharedSecret) tabs.push({ value: 'shared_secret', label: 'Global Shared secret', credentialType: null });
+  if (secretTokenBearer) tabs.push({ value: 'bearer', label: 'Per-endpoint bearer', credentialType: 'bearer' });
   return tabs;
 }
 
@@ -1849,7 +1960,7 @@ const CONNECT_PARAM_HELP = {
   oauthTokenEndpoint:
     'The per-endpoint OAuth 2.0 token endpoint the identity provider calls to mint an access token for this endpoint.',
   clientIdentifier:
-    'The client identity the IdP presents. For WIF this is the expected token "sub" claim; for OAuth2 client-credentials it is this credential\u2019s client id.',
+    'The target OAuth client identity. For WIF, SCIMServer places it in the issued access token and defaults it to the endpoint id; the source assertion subject is shown separately.',
   clientSecret:
     'The secret the IdP uses to authenticate. Shown here only when the endpoint retains it (CredentialSecretVisibility=always); otherwise Rotate to get a fresh one.',
 } as const;
@@ -1858,8 +1969,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const classes = useStyles();
   const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointOverview(endpointId);
+  const { data: dedicatedConnectionInfo } = useConnectionInfo(endpointId);
   const createMutation = useCreateCredential(endpointId);
-  const deleteMutation = useDeleteCredential(endpointId);
   const activateMutation = useActivateCredential(endpointId);
   const deactivateMutation = useDeactivateCredential(endpointId);
   const editLabelMutation = useEditCredentialLabel(endpointId);
@@ -1886,14 +1997,12 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // can copy it. Cleared when the modal closes after acknowledgement.
   const [createdCred, setCreatedCred] = React.useState<CreatedCredential | null>(null);
 
-  const [deleteTarget, setDeleteTarget] = React.useState<EndpointOverviewCredential | null>(null);
-  const [deleteError, setDeleteError] = React.useState<unknown>(null);
-
   // WI-8: reveal result (retained secret or a "not retained" reason).
   const [revealResult, setRevealResult] = React.useState<RevealResult | null>(null);
 
   // WI-9: rotate result (the one-time new secret).
   const [rotateResult, setRotateResult] = React.useState<RotateResult | null>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
 
   // U2 - which oauth_client credential's Connect-to-Entra params are expanded.
   const [connectCredId, setConnectCredId] = React.useState<string | null>(null);
@@ -1966,19 +2075,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
     );
   };
 
-  const onConfirmDelete = (): void => {
-    if (!deleteTarget) return;
-    setDeleteError(null);
-    deleteMutation.mutate(deleteTarget.id, {
-      onSuccess: () => {
-        setDeleteTarget(null);
-      },
-      onError: (err) => {
-        setDeleteError(err);
-      },
-    });
-  };
-
   const onCopyToken = async (): Promise<void> => {
     if (!createdCred) return;
     try {
@@ -2014,7 +2110,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
   // 403 surfaces as the overview load succeeding but the credentials
   // array remaining empty + the create attempt later returning 403.
-  const wifEnabled = Boolean(data?.configFlags?.WifCredentialsEnabled);
   const credentials = data?.credentials ?? [];
 
   // W11 - the per-method sub-tabs are the single method axis; there is no "All"
@@ -2022,7 +2117,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // state, or a method that was turned off), fall back to the first enabled
   // method. `noMethods` covers the rare case where every auth method is disabled.
   const configFlags = (data?.configFlags ?? {}) as Record<string, unknown>;
-  const methodTabs = enabledMethodTabs(configFlags);
+  const connectionInfo = dedicatedConnectionInfo ?? data?.connectionInfo;
+  const methodTabs = enabledMethodTabs(configFlags, connectionInfo);
+  const wifEnabled = methodTabs.some((method) => method.value === 'wif');
   // P7 - counted across ALL credentials, not just the active sub-tab: the point
   // of the banner is to tell an operator there is work on this endpoint at all,
   // and a legacy bearer is invisible from the oauth_client tab. WIF trusts hold
@@ -2076,9 +2173,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           {/* W3 - copy / download the WHOLE endpoint Connect bundle: every
               enabled method + connection info + every credential/trust + the
               auth-related config flags (no secret values). */}
-          {data?.connectionInfo && (
+          {connectionInfo && (
             <SettingsJsonExport
-              value={buildEndpointConnectBundle(endpointId, data.connectionInfo, credentials, configFlags)}
+              value={buildEndpointConnectBundle(endpointId, connectionInfo, credentials, configFlags)}
               filename={`endpoint-${endpointId}-connect.json`}
               copyLabel="Copy all as JSON"
               data-testid="connect-endpoint-export"
@@ -2111,30 +2208,70 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           page. Same flags, same mutation as Settings - one definition in
           endpoint-auth-flags.ts. */}
       <div className={classes.connectPanel} data-testid="connect-auth-methods">
-        <Caption1>
-          <strong>Authentication methods</strong> - which credential types this endpoint accepts.
-        </Caption1>
-        <div className={classes.authFlagGrid}>
-          {AUTH_METHOD_FLAGS.map((flag) => (
-            <Switch
-              key={flag.key}
-              checked={effectiveAuthFlag(configFlags as Record<string, unknown>, flag)}
-              disabled={configMutation.isPending}
-              label={flag.shortLabel}
-              title={flag.description}
-              onChange={(_, d) =>
-                configMutation.mutate({ profile: { settings: { [flag.key]: d.checked } } })
-              }
-              data-testid={`connect-auth-flag-${flag.key}`}
-            />
-          ))}
-        </div>
-        <Link
-          data-testid="connect-tab-link-settings"
-          onClick={() => void navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } })}
-        >
-          All endpoint settings
-        </Link>
+        <Accordion collapsible defaultOpenItems={noMethods ? ['methods'] : []}>
+          <AccordionItem value="methods">
+            <AccordionHeader data-testid="connect-auth-methods-toggle">
+              <div>
+                <Subtitle2>Authentication methods</Subtitle2>
+                <Caption1 className={classes.meta}>
+                  4 methods - {methodTabs.length} enabled
+                </Caption1>
+              </div>
+            </AccordionHeader>
+            <AccordionPanel>
+              <Caption1>
+                Choose which credential types this endpoint accepts.
+              </Caption1>
+              <div className={classes.authFlagGrid}>
+          {AUTH_METHOD_FLAGS.map((flag) => {
+            const resolvedEnabled = data?.connectionInfo?.enabledMethods.find((item) => item.method === flag.method);
+            const resolvedDisabled = data?.connectionInfo?.disabledMethods.find((item) => item.method === flag.method);
+            const resolved = resolvedEnabled ?? resolvedDisabled;
+            const checked = resolved ? Boolean(resolvedEnabled) : effectiveAuthFlag(configFlags, flag);
+            const managed = resolved?.enablementSource === 'authentication-method';
+            return (
+              <div key={flag.key}>
+                <Switch
+                  checked={checked}
+                  disabled={configMutation.isPending || managed}
+                  label={flag.shortLabel}
+                  title={flag.description}
+                  onChange={(_, d) =>
+                    configMutation.mutate({ profile: { settings: { [flag.key]: d.checked } } })
+                  }
+                  data-testid={`connect-auth-flag-${flag.key}`}
+                />
+                {managed && (
+                  <Caption1
+                    className={classes.meta}
+                    data-testid={`connect-auth-managed-${flag.key}`}
+                  >
+                    Managed by an authentication method entry.
+                  </Caption1>
+                )}
+              </div>
+            );
+          })}
+              </div>
+              {configFlags.PerEndpointCredentialsEnabled !== undefined && (
+                <MessageBar intent="info" data-testid="connect-auth-legacy-notice">
+                  <MessageBarBody>
+                    <MessageBarTitle>Legacy compatibility</MessageBarTitle>
+                    <code>PerEndpointCredentialsEnabled</code> is a compatibility fallback, not a fifth
+                    authentication method. Bearer and OAuth2 inherit it only when their dedicated setting
+                    is unset. Manage the legacy value from All endpoint settings.
+                  </MessageBarBody>
+                </MessageBar>
+              )}
+              <Link
+                data-testid="connect-tab-link-settings"
+                onClick={() => void navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } })}
+              >
+                All endpoint settings
+              </Link>
+            </AccordionPanel>
+          </AccordionItem>
+        </Accordion>
       </div>
 
       {/* P7 - migration prompt. The credential badges say WHICH rows are legacy;
@@ -2155,8 +2292,15 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
         </MessageBar>
       )}
 
+      {actionError && (
+        <MessageBar intent="error" data-testid="credential-action-error">
+          <MessageBarBody>{actionError}</MessageBarBody>
+        </MessageBar>
+      )}
+
       {/* W11 - per-method sub-tabs (only enabled methods) are the single method axis. */}
       <TabList
+        className={classes.methodTabs}
         selectedValue={activeTab}
         onTabSelect={(_, d) => setMethodTab(d.value as MethodTab)}
         data-testid="credentials-method-tabs"
@@ -2189,10 +2333,10 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
       {/* W4 - copy / download all info for the ACTIVE method: its connection
           info + the credentials/trusts backing it (no secret values). */}
-      {!noMethods && data?.connectionInfo && (
+      {!noMethods && connectionInfo && (
         <div className={classes.headerActions} data-testid={`connect-method-export-row-${activeTab}`}>
           <SettingsJsonExport
-            value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, data.connectionInfo, listCredentials)}
+            value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, connectionInfo, listCredentials)}
             filename={`endpoint-${endpointId}-${activeTab}-connect.json`}
             copyLabel="Copy this method as JSON"
             data-testid={`connect-method-export-${activeTab}`}
@@ -2240,27 +2384,25 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       {cred.description}
                     </Caption1>
                   )}
+                  <div className={classes.cardSummary} data-testid={`credential-summary-${cred.id}`}>
+                    <Caption1>Created {new Date(cred.createdAt).toLocaleString()}</Caption1>
+                    <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
+                      {cred.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    {/* P7 - which verifier this credential needs. A `bcrypt` row is
+                        on the legacy O(N) scan path and is what blocks retiring it
+                        server-side; the operator cannot act on that without being
+                        told WHICH row it is. */}
+                    <Badge
+                      appearance="tint"
+                      color={isLegacyHash(cred.hashAlgo) ? 'warning' : 'success'}
+                      data-testid={`credential-hashalgo-${cred.id}`}
+                    >
+                      {isLegacyHash(cred.hashAlgo) ? 'Legacy (bcrypt)' : 'Keyed'}
+                    </Badge>
+                  </div>
                 </div>
-                <Caption1>
-                  Created {new Date(cred.createdAt).toLocaleString()}
-                </Caption1>
-                <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
-                  {cred.active ? 'Active' : 'Revoked'}
-                </Badge>
-                {/* P7 - which verifier this credential needs. A `bcrypt` row is
-                    on the legacy O(N) scan path and is what blocks retiring it
-                    server-side; the operator cannot act on that without being
-                    told WHICH row it is. WIF trusts hold no secret, so the
-                    badge would be meaningless there. */}
-                {cred.credentialType !== 'wif' && (
-                  <Badge
-                    appearance="tint"
-                    color={isLegacyHash(cred.hashAlgo) ? 'warning' : 'success'}
-                    data-testid={`credential-hashalgo-${cred.id}`}
-                  >
-                    {isLegacyHash(cred.hashAlgo) ? 'Legacy (bcrypt)' : 'Keyed'}
-                  </Badge>
-                )}
+                <div className={classes.cardActions} data-testid={`credential-actions-${cred.id}`}>
                 {/* P7 - Rotate was buried in the overflow menu even though it is
                     the primary action of this whole tab during a migration. */}
                 {cred.active && cred.credentialType !== 'wif' && (
@@ -2275,7 +2417,11 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       disabled={rotateMutation.isPending}
                       onClick={() => {
                         setRotateResult(null);
-                        rotateMutation.mutate(cred.id, { onSuccess: (r) => setRotateResult(r) });
+                        setActionError(null);
+                        rotateMutation.mutate(cred.id, {
+                          onSuccess: (r) => setRotateResult(r),
+                          onError: (error) => setActionError(actionErrorText(error)),
+                        });
                       }}
                       aria-label={`Rotate secret for ${cred.label ?? cred.id}`}
                       data-testid={`credential-rotate-${cred.id}`}
@@ -2284,36 +2430,30 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     </Button>
                   </Tooltip>
                 )}
-                {/* V3 - edit the label without rotating (any type). */}
-                <Button
-                  appearance="subtle"
-                  icon={<Edit24Regular />}
-                  onClick={() => {
-                    setEditLabelId(editLabelId === cred.id ? null : cred.id);
-                    setEditLabelValue(cred.label ?? '');
-                  }}
-                  aria-label={`Edit label for ${cred.label ?? cred.id}`}
-                  data-testid={`credential-edit-label-${cred.id}`}
-                >
-                  Edit
-                </Button>
-                {/* W5 - copy / download this credential's public object as JSON. */}
-                <SettingsJsonExport
-                  value={projectCredentialPublic(cred)}
-                  filename={`credential-${cred.id}.json`}
-                  copyLabel="Copy JSON"
-                  data-testid={`credential-export-${cred.id}`}
-                />
                 {/* W7/X1 - uniform "More" overflow menu for the secondary + destructive actions. */}
                 <OverflowMenu
                   ariaLabel={`More actions for ${cred.label ?? cred.id}`}
                   data-testid={`credential-more-${cred.id}`}
                 >
+                      <MenuItem
+                        icon={<Edit24Regular />}
+                        onClick={() => {
+                          setEditLabelId(editLabelId === cred.id ? null : cred.id);
+                          setEditLabelValue(cred.label ?? '');
+                        }}
+                        data-testid={`credential-edit-label-${cred.id}`}
+                      >
+                        Edit label
+                      </MenuItem>
                       {cred.active && cred.credentialType !== 'wif' && (
                         <MenuItem
                           onClick={() => {
                             setRevealResult(null);
-                            revealMutation.mutate(cred.id, { onSuccess: (r) => setRevealResult(r) });
+                            setActionError(null);
+                            revealMutation.mutate(cred.id, {
+                              onSuccess: (r) => setRevealResult(r),
+                              onError: (error) => setActionError(actionErrorText(error)),
+                            });
                           }}
                           disabled={revealMutation.isPending}
                           data-testid={`credential-reveal-${cred.id}`}
@@ -2323,25 +2463,20 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       )}
                       <MenuItem
                         onClick={() => {
-                          if (cred.active) deactivateMutation.mutate(cred.id);
-                          else activateMutation.mutate(cred.id);
+                          setActionError(null);
+                          const options = {
+                            onError: (error: unknown) => setActionError(actionErrorText(error)),
+                          };
+                          if (cred.active) deactivateMutation.mutate(cred.id, options);
+                          else activateMutation.mutate(cred.id, options);
                         }}
                         disabled={activateMutation.isPending || deactivateMutation.isPending}
                         data-testid={`credential-toggle-active-${cred.id}`}
                       >
                         {cred.active ? 'Deactivate' : 'Activate'}
                       </MenuItem>
-                      <MenuItem
-                        icon={<Delete24Regular />}
-                        onClick={() => {
-                          setDeleteError(null);
-                          setDeleteTarget(cred);
-                        }}
-                        data-testid={`credential-delete-${cred.id}`}
-                      >
-                        Revoke credential
-                      </MenuItem>
                 </OverflowMenu>
+                </div>
               </div>
               {/* V1 - remaining-validity line. */}
               {(() => {
@@ -2377,10 +2512,16 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       appearance="primary"
                       disabled={editLabelMutation.isPending}
                       onClick={() =>
-                        editLabelMutation.mutate(
-                          { credentialId: cred.id, label: editLabelValue.trim() || null },
-                          { onSuccess: () => setEditLabelId(null) },
-                        )
+                        {
+                          setActionError(null);
+                          editLabelMutation.mutate(
+                            { credentialId: cred.id, label: editLabelValue.trim() || null },
+                            {
+                              onSuccess: () => setEditLabelId(null),
+                              onError: (error) => setActionError(actionErrorText(error)),
+                            },
+                          );
+                        }
                       }
                       data-testid={`credential-edit-label-save-${cred.id}`}
                     >
@@ -2409,21 +2550,33 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       : 'bearer-token (Secret Token)'}{' '}
                     connection form.
                   </Caption1>
+                  <div className={classes.exportRow}>
+                    <Caption1><strong>Credential JSON</strong></Caption1>
+                    <SettingsJsonExport
+                      value={projectCredentialPublic(cred)}
+                      filename={`credential-${cred.id}.json`}
+                      copyLabel="Copy credential JSON"
+                      data-testid={`credential-export-${cred.id}`}
+                    />
+                  </div>
                   {/* W6 - copy / download the whole IdP-connection bundle for this credential. */}
-                  <SettingsJsonExport
-                    value={
-                      cred.credentialType === 'oauth_client'
-                        ? {
-                            applicationApiUrl: connectScimUrl,
-                            oauthTokenEndpoint: connectTokenUrl,
-                            clientIdentifier: cred.oauthClientId ?? null,
-                          }
-                        : { applicationApiUrl: connectScimUrl }
-                    }
-                    filename={`credential-${cred.id}-connection.json`}
-                    copyLabel="Copy connection JSON"
-                    data-testid={`credential-connect-export-${cred.id}`}
-                  />
+                  <div className={classes.exportRow}>
+                    <Caption1><strong>Connection JSON</strong></Caption1>
+                    <SettingsJsonExport
+                      value={
+                        cred.credentialType === 'oauth_client'
+                          ? {
+                              applicationApiUrl: connectScimUrl,
+                              oauthTokenEndpoint: connectTokenUrl,
+                              clientIdentifier: cred.oauthClientId ?? null,
+                            }
+                          : { applicationApiUrl: connectScimUrl }
+                      }
+                      filename={`credential-${cred.id}-connection.json`}
+                      copyLabel="Copy connection JSON"
+                      data-testid={`credential-connect-export-${cred.id}`}
+                    />
+                  </div>
                   <div className={classes.connectRow}>
                     <InfoLabel info={CONNECT_PARAM_HELP.applicationApiUrl} data-testid={`credential-connect-appurl-info-${cred.id}`}>Application API URL</InfoLabel>
                     <CopyableField value={connectScimUrl} monospace truncate data-testid={`credential-connect-appurl-${cred.id}`} />
@@ -2490,10 +2643,14 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                           icon={<Eye24Regular />}
                           disabled={!cred.active || revealMutation.isPending}
                           onClick={() =>
-                            revealMutation.mutate(cred.id, {
-                              onSuccess: (r) =>
-                                setConnectSecret({ id: cred.id, retained: r.retained, clientSecret: r.clientSecret, token: r.token }),
-                            })
+                            {
+                              setActionError(null);
+                              revealMutation.mutate(cred.id, {
+                                onSuccess: (r) =>
+                                  setConnectSecret({ id: cred.id, retained: r.retained, clientSecret: r.clientSecret, token: r.token }),
+                                onError: (error) => setActionError(actionErrorText(error)),
+                              });
+                            }
                           }
                           data-testid={`credential-connect-secret-reveal-${cred.id}`}
                         >
@@ -2516,7 +2673,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           enabled={wifEnabled}
           credentials={credentials}
           createMutation={createMutation}
-          deleteMutation={deleteMutation}
+          deactivateMutation={deactivateMutation}
         />
       )}
 
@@ -2525,10 +2682,10 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           carry its connection info. For bearer / oauth_client / wif the per-card
           Connect subpanels (W6/W8) provide the same values, so the redundant
           endpoint-level card is removed on those tabs. */}
-      {showSharedSecretInfo && data?.connectionInfo && (
+      {showSharedSecretInfo && connectionInfo && (
         <UnifiedConnectSection
           endpointId={endpointId}
-          connectionInfo={data.connectionInfo}
+          connectionInfo={connectionInfo}
           activeMethod="shared_secret"
         />
       )}
@@ -2670,24 +2827,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
             </div>
           </div>
         )}
-      </FormDialog>
-
-      {/* Delete confirm dialog */}
-      <FormDialog
-        open={Boolean(deleteTarget)}
-        onCancel={() => setDeleteTarget(null)}
-        onSubmit={onConfirmDelete}
-        title={`Revoke credential${deleteTarget?.label ? ` "${deleteTarget.label}"` : ''}?`}
-        submitLabel="Revoke"
-        cancelLabel="Keep"
-        busy={deleteMutation.isPending}
-        error={deleteError}
-        data-testid="credentials-delete-dialog"
-      >
-        <Body1>
-          Once revoked, any SCIM client using this token will start receiving
-          401 Unauthorized. This cannot be undone.
-        </Body1>
       </FormDialog>
 
       {/* WI-8: reveal result dialog (retained secret or "not retained" reason) */}

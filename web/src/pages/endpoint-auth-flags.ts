@@ -1,21 +1,20 @@
 /**
  * The "Authentication methods" endpoint flags, in ONE place.
  *
- * These five were declared privately inside SettingsTab, which was fine while
- * Settings was the only page that rendered them. The Connect tab now toggles
- * them inline too - an operator setting up an IdP connection should not have to
- * leave for Settings to turn the method on and then navigate back - and two
- * copies of a flag list is precisely the drift the endpoint-config-flag audit
- * exists to catch. `key` stays a literal here so the registry-to-UI coverage
- * check (U-T1) still finds every flag by its declared control.
+ * Four flags represent real methods. The legacy umbrella remains a separate
+ * compatibility definition so Settings can expose it without presenting it as
+ * a fifth method on Connect. `key` stays a literal here so the registry-to-UI
+ * coverage check (U-T1) still finds every flag by its declared control.
  *
  * The server registry in api/src/modules/endpoint/endpoint-config.interface.ts
  * remains the source of truth for defaults and bounds; this file only describes
  * how they are PRESENTED.
  */
+import type { ConnectionMethod } from '@scim/types/connection-info.types';
 
 export interface AuthMethodFlag {
   key: string;
+  method: ConnectionMethod;
   label: string;
   description: string;
   defaultValue: boolean;
@@ -25,22 +24,8 @@ export interface AuthMethodFlag {
 
 export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
   {
-    key: 'PerEndpointCredentialsEnabled',
-    label: 'PerEndpointCredentialsEnabled',
-    shortLabel: 'Per-endpoint credentials',
-    description: "Validate the bearer token against this endpoint's credential set.",
-    defaultValue: false,
-  },
-  {
-    key: 'SecretTokenBearerAuthEnabled',
-    label: 'SecretTokenBearerAuthEnabled',
-    shortLabel: 'Bearer (Entra "Secret Token")',
-    description:
-      'WI-11: accept a per-endpoint bcrypt bearer token (Entra "Secret Token"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
-    defaultValue: false,
-  },
-  {
     key: 'OAuthClientCredentialsAuthEnabled',
+    method: 'oauth_client',
     label: 'OAuthClientCredentialsAuthEnabled',
     shortLabel: 'OAuth2 client credentials',
     description:
@@ -48,7 +33,17 @@ export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
     defaultValue: false,
   },
   {
+    key: 'WifCredentialsEnabled',
+    method: 'wif',
+    label: 'WifCredentialsEnabled',
+    shortLabel: 'Federated identity (WIF)',
+    description:
+      'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',
+    defaultValue: false,
+  },
+  {
     key: 'SharedSecretBearerAuthEnabled',
+    method: 'shared_secret',
     label: 'SharedSecretBearerAuthEnabled',
     shortLabel: 'Global shared secret',
     description:
@@ -56,14 +51,25 @@ export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
     defaultValue: true,
   },
   {
-    key: 'WifCredentialsEnabled',
-    label: 'WifCredentialsEnabled',
-    shortLabel: 'Federated identity (WIF)',
+    key: 'SecretTokenBearerAuthEnabled',
+    method: 'bearer',
+    label: 'SecretTokenBearerAuthEnabled',
+    shortLabel: 'Bearer (Entra "Secret Token")',
     description:
-      'Accept federated-identity (WIF, RFC 7523 jwt-bearer) credentials and advertise the WIF authentication scheme.',
+      'WI-11: accept a per-endpoint bcrypt bearer token (Entra "Secret Token"). Falls back to the legacy PerEndpointCredentialsEnabled when unset.',
     defaultValue: false,
   },
 ];
+
+export const LEGACY_AUTH_METHOD_FLAG: AuthMethodFlag = {
+  key: 'PerEndpointCredentialsEnabled',
+  method: 'bearer',
+  label: 'PerEndpointCredentialsEnabled',
+  shortLabel: 'Legacy per-endpoint credentials umbrella',
+  description:
+    'Compatibility fallback for endpoints created before bearer and OAuth2 received independent controls. It is not an authentication method.',
+  defaultValue: false,
+};
 
 /** Resolve a flag's effective boolean from the endpoint's settings blob. */
 export function effectiveAuthFlag(

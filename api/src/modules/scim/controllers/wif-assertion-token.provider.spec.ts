@@ -61,7 +61,9 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     });
     validate = jest.fn();
     generateEndpointAccessToken = jest.fn();
-    getEndpoint = jest.fn().mockResolvedValue({ profile: { settings: {} } });
+    getEndpoint = jest.fn().mockResolvedValue({
+      profile: { settings: { WifCredentialsEnabled: true } },
+    });
     logger = { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn() };
 
     validateWithTrace = jest.fn(async (a: string, t: unknown) => ({
@@ -113,6 +115,21 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     const result = await provider.mintFromAssertion('ep-1', 'assertion.jwt');
     expect(result).toBeNull();
     expect(validate).not.toHaveBeenCalled();
+  });
+
+  it('does not mint when a WIF method entry disables a true flat flag', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    findActiveByEndpointAndType.mockResolvedValue([wifCredential()]);
+    getEndpoint.mockResolvedValue({
+      profile: {
+        settings: { WifCredentialsEnabled: true },
+        authentication: { methods: [{ type: 'wif-7523', enabled: false }] },
+      },
+    });
+
+    await expect(provider.mintFromAssertion('ep-1', 'assertion.jwt')).resolves.toBeNull();
+    expect(validate).not.toHaveBeenCalled();
+    expect(generateEndpointAccessToken).not.toHaveBeenCalled();
   });
 
   it('W3.5: loads only active WIF credentials for the endpoint', async () => {
@@ -259,6 +276,7 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     getEndpoint.mockResolvedValue({
       profile: {
         settings: {
+          WifCredentialsEnabled: true,
           JwksFetchTimeoutMs: 1500,
           JwksFetchRetries: 4,
           JwksFetchRetryBackoffMs: 50,

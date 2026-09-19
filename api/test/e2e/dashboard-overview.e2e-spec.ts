@@ -15,12 +15,19 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { createEndpoint } from './helpers/request.helper';
+import { createEndpoint, createEndpointWithConfig } from './helpers/request.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
 describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
   let app: INestApplication;
   let token: string;
+  const enabledMethodKeys = [
+    'method', 'enablementSource', 'label', 'entraAuthenticationMethod', 'entraFields',
+    'clientSecretState', 'expectedAudience', 'expectedAssertionSubject', 'credentialId',
+    'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity',
+  ];
+  const disabledMethodKeys = ['method', 'enablementSource', 'reason', 'enableHint'];
+  const enablementSources = ['authentication-method', 'dedicated-setting', 'legacy-setting', 'default'];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -65,6 +72,19 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     expect(res.body.connectionInfo.urls.scimBaseUrl).toContain(`/scim/v2/endpoints/${endpointId}`);
     expect(Array.isArray(res.body.connectionInfo.enabledMethods)).toBe(true);
     expect(Array.isArray(res.body.connectionInfo.disabledMethods)).toBe(true);
+    const methods = [
+      ...res.body.connectionInfo.enabledMethods,
+      ...res.body.connectionInfo.disabledMethods,
+    ];
+    expect(methods).toHaveLength(4);
+    for (const method of res.body.connectionInfo.enabledMethods) {
+      for (const key of Object.keys(method)) expect(enabledMethodKeys).toContain(key);
+      expect(enablementSources).toContain(method.enablementSource);
+    }
+    for (const method of res.body.connectionInfo.disabledMethods) {
+      for (const key of Object.keys(method)) expect(disabledMethodKeys).toContain(key);
+      expect(enablementSources).toContain(method.enablementSource);
+    }
     // No secret ever leaks through the overview.
     expect(JSON.stringify(res.body.connectionInfo)).not.toContain('bcrypt$');
 
@@ -90,6 +110,40 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     // configFlags is always an object (even if empty).
     expect(typeof res.body.configFlags).toBe('object');
     expect(res.body.configFlags).not.toBeNull();
+  });
+
+  it('withholds retained secrets while the dedicated connection-info endpoint discloses them', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      OAuthClientCredentialsAuthEnabled: true,
+      CredentialSecretVisibility: 'always',
+    });
+    const created = await request(app.getHttpServer() as any)
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ credentialType: 'oauth_client', label: 'overview-boundary' })
+      .expect(201);
+    const plaintext = created.body.clientSecret as string;
+
+    const overview = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/overview`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const overviewOauth = overview.body.connectionInfo.enabledMethods.find(
+      (method: { method: string }) => method.method === 'oauth_client',
+    );
+    expect(overviewOauth.entraFields.clientSecret).toBeNull();
+    expect(overviewOauth.secretRevealed).toBe(false);
+    expect(JSON.stringify(overview.body)).not.toContain(plaintext);
+
+    const connectionInfo = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const connectionOauth = connectionInfo.body.enabledMethods.find(
+      (method: { method: string }) => method.method === 'oauth_client',
+    );
+    expect(connectionOauth.entraFields.clientSecret).toBe(plaintext);
+    expect(connectionOauth.secretRevealed).toBe(true);
   });
 
   it('exposes a created credential WITHOUT leaking the hash', async () => {

@@ -1,6 +1,6 @@
 # Custom Resource Extensions - RFC-Compliant Authoring Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.23`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026
@@ -8,10 +8,13 @@
 > - [OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md](OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md) - the audit that triggered this guide
 > - [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) - operator workflow for editing endpoint profiles
 > - [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) - how custom schemas flow from profile to discovery
+> - [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) - what profile data is portable and what remains deployment-local
 > - [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) - URN namespace primer
 > - [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) - server-side discovery audit
 > - RFC 7643 (Core Schema): §2.2 attribute characteristics, §3.1 common attributes, §3.3 namespace qualifiers, §6 ResourceType meta-schema, §7 Schema meta-schema, §10 IANA considerations
 > - RFC 7644 (Protocol): §3.1 schemas array semantics, §3.5.1 POST, §3.5.2 PATCH path resolution, §3.4.2 query parameters, §4 discovery endpoints
+>
+> Custom schema and ResourceType definitions are portable profile data. Stored resources, credential bindings, generated locations, server ceilings, and effective authentication state are not copied with them.
 
 ---
 

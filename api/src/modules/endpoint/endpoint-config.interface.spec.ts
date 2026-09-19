@@ -8,6 +8,7 @@ import {
   getOptionalConfigBoolean,
   getEffectiveAuthEnablement,
   resolveEndpointAuthEnablement,
+  resolveEndpointAuthEnablementDetails,
   getEffectiveCredentialSecretVisibility,
   normalizeCredentialSecretVisibility,
   resolveEndpointEgressOverrides,
@@ -1355,6 +1356,7 @@ describe('endpoint-config.interface', () => {
         expect(eff).toEqual({
           secretTokenBearer: false,
           oauthClientCredentials: false,
+          workloadIdentityFederation: false,
           sharedSecretBearer: true,
         });
       });
@@ -1404,6 +1406,7 @@ describe('endpoint-config.interface', () => {
         expect(resolveEndpointAuthEnablement({}, [])).toEqual({
           secretTokenBearer: false,
           oauthClientCredentials: false,
+          workloadIdentityFederation: false,
           sharedSecretBearer: true,
         });
       });
@@ -1443,11 +1446,52 @@ describe('endpoint-config.interface', () => {
         expect(eff.secretTokenBearer).toBe(false);
       });
 
-      it('ignores unrelated method types', () => {
-        const config: EndpointConfig = { PerEndpointCredentialsEnabled: true };
-        const eff = resolveEndpointAuthEnablement(config, [{ type: 'wif-7523', enabled: false }]);
-        // wif is not a resolved facet -> the flat values are unchanged.
-        expect(eff).toEqual(getEffectiveAuthEnablement(config));
+      it('WIF method entries override the flat flag and aggregate without order dependence', () => {
+        const disabled = resolveEndpointAuthEnablementDetails(
+          { WifCredentialsEnabled: true },
+          [
+            { type: 'wif-7523', enabled: false },
+            { type: 'wif-8693', enabled: false },
+          ],
+        );
+        expect(disabled).toEqual(expect.objectContaining({
+          workloadIdentityFederation: { enabled: false, source: 'authentication-method' },
+        }));
+
+        const enabled = resolveEndpointAuthEnablementDetails(
+          { WifCredentialsEnabled: false },
+          [
+            { type: 'wif-7523', enabled: false },
+            { type: 'wif-8693', enabled: true },
+          ],
+        );
+        expect(enabled).toEqual(expect.objectContaining({
+          workloadIdentityFederation: { enabled: true, source: 'authentication-method' },
+        }));
+      });
+
+      it('reports whether each effective value came from a method, dedicated setting, legacy fallback, or default', () => {
+        expect(
+          resolveEndpointAuthEnablementDetails(
+            {
+              PerEndpointCredentialsEnabled: true,
+              OAuthClientCredentialsAuthEnabled: false,
+            },
+            [{ type: 'bearer', enabled: false }],
+          ),
+        ).toEqual({
+          secretTokenBearer: { enabled: false, source: 'authentication-method' },
+          oauthClientCredentials: { enabled: false, source: 'dedicated-setting' },
+          workloadIdentityFederation: { enabled: false, source: 'default' },
+          sharedSecretBearer: { enabled: true, source: 'default' },
+        });
+
+        expect(resolveEndpointAuthEnablementDetails({ PerEndpointCredentialsEnabled: true })).toEqual({
+          secretTokenBearer: { enabled: true, source: 'legacy-setting' },
+          oauthClientCredentials: { enabled: true, source: 'legacy-setting' },
+          workloadIdentityFederation: { enabled: false, source: 'default' },
+          sharedSecretBearer: { enabled: true, source: 'default' },
+        });
       });
     });
 

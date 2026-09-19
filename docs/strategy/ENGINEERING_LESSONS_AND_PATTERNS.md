@@ -91,13 +91,13 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (26 seeded)
+    title Patterns by category (27 seeded)
     "A Test/gate integrity" : 8
     "B Environment/deploy" : 3
     "C Framework/middleware" : 3
     "D Security at sinks" : 2
     "E Process/introspection" : 5
-    "F Design/architecture" : 1
+    "F Design/architecture" : 2
     "G Config/op defaults" : 4
 ```
 
@@ -164,6 +164,7 @@ Structural decay that a correctness-only gate never sees; only an explicit desig
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
 |---|---|---|---|---|---|
 | **PF-1** | Keep orchestrators thin; decouple by seam | `SharedSecretGuard` grew to 491 lines / ~7 responsibilities by inlining every resource-plane auth method (global secret + bearer + oauth_client + JWT + legacy + trace + flags); the mint plane's `client_secret` path is likewise inlined in the controller while WIF is a clean strategy - the asymmetry hid the drift | A guard/controller/service is an ORCHESTRATOR; each auth method (or per-case behavior) is a STRATEGY behind a seam (mirror the existing `IAssertionTokenProvider` + repository DI-token patterns). Adding the next method should EXTEND (a class + registration), not EDIT a god-file. Counter-check with YAGNI: a seam needs >=2 real impls or one concrete near-term one | Rule: "Design & Architecture Self-Improvement Gate" (copilot-instructions.md) | X12 2026-07-23 |
+| **PF-2** | Render the authoritative effective state, not a writable shadow | Connect displayed and wrote flat auth flags while `profile.authentication.methods[]` could override them in the runtime resolver; a switch could persist successfully yet leave enforcement unchanged | A control for a layered setting must consume the same effective resolver as enforcement. If another source wins, show provenance and disable the local write path. Tests need conflicting values so the precedence assertion discriminates | Rule R11: authoritative effective control state | v0.55.24 UX-2 2026-09-17 |
 
 ### Category G - Configuration and operational defaults (a silent default is not a decision)
 
@@ -202,6 +203,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PE-3 (smoke before batch) | 1 | convention; revisit if a 2nd escape |
 | PE-4 (workflow boundary = session boundary) | 1 measured high-cost session plus exact 91:1 token sample | YES - AI-Efficient Change Delivery Rule and handoff template |
 | PE-5 (coherent rollback unit) | 1 measured W3.5 release boundary | YES - AI-Efficient Change Delivery Rule; apply before every PR |
+| PF-2 (authoritative effective control state) | 1 high-severity latent security-configuration defect | YES - immediate (R11) |
 | PG-1 (env-dependent value = clamped setting) | 1 (multi-site: pool, body limits, log buffer, pagination) | scheduled (W1.7); promote to a rule after the 2nd sighting |
 | PG-2 (assert the library default you depend on) | 1 (medium-sev: Prisma v7 dropped the pool acquire timeout) | scheduled (unit lock with W1.7a) |
 | PG-3 (knob name must match what it bounds) | 1 (medium-sev: `REQUEST_TIMEOUT_MS` does not bound requests) | scheduled (W1.7b) |

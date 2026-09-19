@@ -671,5 +671,19 @@ describe('ScimDiscoveryService', () => {
       expect(spc.bulk.supported).toBe(false);
       expect(spc.sort.supported).toBe(false);
     });
+
+    it('does not advertise WIF when a WIF method entry disables a true flat flag', () => {
+      const profile = {
+        ...mockProfile,
+        settings: { WifCredentialsEnabled: true },
+        authentication: {
+          schemaVersion: 1,
+          methods: [{ id: 'wif-disabled', type: 'wif-7523', enabled: false }],
+        },
+      } as any;
+
+      const spc = service.getSpcFromProfile(profile);
+      expect(spc.authenticationSchemes.some((scheme) => scheme.name === 'Workload Identity Federation')).toBe(false);
+    });
   });
 });

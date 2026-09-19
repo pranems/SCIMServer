@@ -3,8 +3,9 @@
 **Status:** Proposal (idea-evaluation phase)
 **Last Updated:** 2026-05-06
 **Source Authority:** This document is the consolidated output of a `deepIdeaEvaluation` run against the latest sources in this workspace.
-**Related code:** [endpoint-profile.types.ts](api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts), [endpoint.service.ts](api/src/modules/endpoint/services/endpoint.service.ts#L327), [endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts)
-**Related docs:** [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md), [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md), [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md), [MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md), [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md)
+**Current Authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) supersedes this document for profile portability, effective authentication policy, and the minimal first import slice. This document remains the broader future evaluation of URL fetch, passive/active probing, and data replication.
+**Related code:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts), [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts#L327), [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)
+**Related docs:** [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md), [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md), [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md), [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md), [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md)
 
 ---
 
@@ -42,7 +43,7 @@
 
 The proposed feature: given an external SCIM endpoint URL plus credentials, replicate it as-is into SCIMServer as a new local endpoint, preserving "all" config and behaviors.
 
-**Bottom line:** the *full* "as-is" replica is **not achievable** because RFC 7643/7644 expose only the contract surface (schemas, resource types, capability flags). The internal behavioral knobs that drive how this server actually behaves - the 16 settings flags in [endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts) (e.g. `StrictSchemaValidation`, `PrimaryEnforcement`, `RequireIfMatch`, `UserSoftDeleteEnabled`, `VerbosePatchSupported`) - are **not part of any SCIM discovery surface** and cannot be inferred without active write probing of the source service.
+**Bottom line:** the *full* "as-is" replica is **not achievable** because RFC 7643/7644 expose only the contract surface (schemas, resource types, capability flags). SCIMServer endpoint settings, canonical authentication method declarations, credential/trust bindings, server ceilings, and effective-state provenance are **not part of any SCIM discovery surface** and cannot be recovered from discovery alone.
 
 **Recommended scope:** ship a **SCIM Profile Importer** with four modes (Discovery-only / +Passive / +Active / +Data) that always emits a `fidelityReport` distinguishing **observed**, **inferred**, **default**, and **unverified** settings. Modes A and B (read-only) are safe defaults; Modes C and D require explicit consent strings.
 
@@ -75,7 +76,7 @@ Functionally, this turns SCIMServer into a **drop-in behavioral replica** of an 
 
 ## 3. Operating Principles Used in This Evaluation
 
-These principles come from the [deepIdeaEvaluation prompt](.github/prompts/deepIdeaEvaluation.prompt.md) and are stated up-front so reviewers can challenge any deviation:
+These principles come from the [deepIdeaEvaluation prompt](../.github/prompts/deepIdeaEvaluation.prompt.md) and are stated up-front so reviewers can challenge any deviation:
 
 - Be a critic, not a cheerleader. Default stance is skeptical.
 - Disagree explicitly with the user when evidence supports it.
@@ -105,7 +106,7 @@ These principles come from the [deepIdeaEvaluation prompt](.github/prompts/deepI
 |---|---|
 | Behavioral fidelity | Differential-test harness against source: $\geq 99\%$ of replayed canonical SCIM transactions produce RFC-equivalent responses on the clone. |
 | Discovery fidelity | `GET /ServiceProviderConfig`, `/Schemas`, `/ResourceTypes` on clone are byte-equal to source after URL / `meta.location` rewriting. |
-| Auth boundary | Source credentials are never persisted; clone uses its own per-endpoint credentials per [G11_PER_ENDPOINT_CREDENTIALS.md](docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md). |
+| Auth boundary | Source credentials are never persisted; clone uses its own per-endpoint credentials per [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md). |
 | Reversibility | Clone deletion is a single `DELETE /admin/endpoints/{id}` call (cascade). |
 | Safety | Zero write operations against the source unless the operator passes the explicit `I_AUTHORIZE_WRITES_ON_SOURCE` consent string. |
 | Time-to-clone | Schema + SPC clone $< 30\text{ s}$; behavior probe $< 10\text{ min}$ for a tenant of 10k users (sampled). |
@@ -118,12 +119,12 @@ These principles come from the [deepIdeaEvaluation prompt](.github/prompts/deepI
 
 | Concern | Source of truth | What this means for the idea |
 |---|---|---|
-| Endpoint shape | [endpoint-profile.types.ts](api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts#L130-L165) - `EndpointProfile = { schemas, resourceTypes, serviceProviderConfig, settings }` | A clone is essentially: produce a valid `ShorthandProfileInput`, `POST /admin/endpoints`. |
-| Behavioral surface | [endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts#L1-L160) - 16 flags (13 boolean + `logLevel` + `PrimaryEnforcement` tri-state + `logFileEnabled`) | These are internal knobs. Not part of any RFC discovery doc. Not readable from a remote SCIM server. |
-| Creation flow | [endpoint.service.ts](api/src/modules/endpoint/services/endpoint.service.ts#L327-L405) - `createEndpoint` accepts `profilePreset` XOR inline `profile`; runs `validateAndExpandProfile`. | The plumbing to ingest a full profile already exists. We only need a new producer. |
-| Auth model | 3-tier fallback: per-endpoint bcrypt -> OAuth JWT -> global secret. | We replicate authentication *schemes advertised*, never *credentials*. |
+| Endpoint shape | [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts#L130-L165) - `EndpointProfile = { schemas, resourceTypes, serviceProviderConfig, settings, authentication? }` | A portable clone produces a valid `ShorthandProfileInput`; credentials and effective state remain separate. |
+| Behavioral surface | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts#L1-L160) plus `profile.authentication.methods[]` | These are internal policy inputs. They are not part of any RFC discovery document and are not readable from a remote SCIM server. |
+| Creation flow | [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts#L327-L405) - `createEndpoint` accepts `profilePreset` XOR inline `profile`; runs `validateAndExpandProfile`. | The plumbing to ingest a full profile already exists. We only need a new producer. |
+| Auth model | Canonical method declarations with dedicated/legacy setting fallback; credentials and public WIF trusts are separate rows. | Import may recommend methods from advertised schemes, but never activates them or copies credentials automatically. |
 | Existing "mirror" | api/src/scripts/mirror-prod-to-dev.ts | DB-to-DB copy between two SCIMServer instances; useful precedent for data-copy mechanics, irrelevant for protocol-level cloning. |
-| Discovery audit | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Confirms exactly what's readable from any RFC-compliant SCIM peer. |
+| Discovery audit | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Confirms exactly what's readable from any RFC-compliant SCIM peer. |
 
 ### 5.2 RFC ground truth
 
@@ -153,7 +154,7 @@ This is the central technical answer to the user's question "can all behavior be
 
 ### 6.1 Behavior-vs-discoverability matrix (per local config flag)
 
-For every flag in [endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts), we score discoverability:
+For every flag in [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts), we score discoverability:
 
 - **Discovery** = readable from `/SPC` + `/Schemas` + `/ResourceTypes` alone.
 - **Passive probe** = inferable from read-only requests (GET, header inspection, error sampling).
@@ -672,7 +673,7 @@ Most plausible failure narrative: a customer used Mode D to clone a 200k-user En
 
 ## 16. Reversibility and Rollback
 
-- **Two-way door at the endpoint level.** `DELETE /admin/endpoints/{id}` cascades to resources, members, credentials, logs (per [MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md#cascade-delete)). A bad clone is one HTTP DELETE away.
+- **Two-way door at the endpoint level.** `DELETE /admin/endpoints/{id}` cascades to resources, members, credentials, logs (per [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md#cascade-delete)). A bad clone is one HTTP DELETE away.
 - **One-way door at the source** for Mode C if cleanup fails. Hence the hard cap, audit log, and idempotent cleanup retry.
 - **Two-way door for data import** (Mode D) on the clone side; no source mutation.
 
@@ -686,7 +687,7 @@ Most plausible failure narrative: a customer used Mode D to clone a 200k-user En
 
 ### 17.2 Top 3 reasons
 
-1. The plumbing already exists. `ShorthandProfileInput` -> `validateAndExpandProfile` -> `createEndpoint` ([endpoint.service.ts](api/src/modules/endpoint/services/endpoint.service.ts#L327)) is the exact pipe. New code is one controller + one HTTP client + one translator + one probe matrix. Modest surface, high leverage.
+1. The plumbing already exists. `ShorthandProfileInput` -> `validateAndExpandProfile` -> `createEndpoint` ([endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts#L327)) is the exact pipe. New code is one controller + one HTTP client + one translator + one probe matrix. Modest surface, high leverage.
 2. It honestly answers a real operator question ("what does endpoint X actually do?") with a structured `fidelityReport`. That report is itself valuable even if no clone is created.
 3. Bounded blast radius. Mode A/B are read-only; deletion is a single cascade. Destructive paths are gated behind multiple consent strings.
 
@@ -712,7 +713,7 @@ The intuition-grade fidelity percentages (~30 / 50 / 75 / 95) are not measuremen
 
 ## 18. Incremental Delivery Plan
 
-TDD per [copilot-instructions.md](.github/copilot-instructions.md). Each increment ships independently; no big-bang.
+TDD per [copilot-instructions.md](../.github/copilot-instructions.md). Each increment ships independently; no big-bang.
 
 | # | Increment | Exit criteria | Effort |
 |---|---|---|---|
@@ -742,7 +743,7 @@ flowchart LR
 
 ## 19. Quality Gates and Test Strategy
 
-Per the standing rule in [copilot-instructions.md](.github/copilot-instructions.md), all 11 mandatory quality gates run after I3 and again after I5/I6.
+Per the standing rule in [copilot-instructions.md](../.github/copilot-instructions.md), all 11 mandatory quality gates run after I3 and again after I5/I6.
 
 ### 19.1 Required test levels
 
@@ -827,10 +828,10 @@ async function differentialReplay(sourceUrl: string, cloneEndpointId: string, tx
 
 When this feature lands:
 
-- Update [docs/INDEX.md](docs/INDEX.md) to point to this document.
-- Update [docs/MULTI_ENDPOINT_GUIDE.md](docs/MULTI_ENDPOINT_GUIDE.md) - new endpoint-creation pathway.
-- Update [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) - new admin route.
-- Update [docs/ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md) - new producer of profiles (importer alongside preset and inline).
+- Update [docs/INDEX.md](INDEX.md) to point to this document.
+- Update [docs/MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) - new endpoint-creation pathway.
+- Update [docs/COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - new admin route.
+- Update [docs/ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) - new producer of profiles (importer alongside preset and inline).
 - Update CHANGELOG.md - version bump.
 - Update Session_starter.md - new feature status.
 - Add a CLI wrapper (e.g. scripts/import-scim-endpoint.ps1) for parity with other admin scripts.
@@ -870,7 +871,7 @@ Consequences.
 - **Fidelity percentages are intuition.** §6.2 calls this out, but the headline numbers (~30/50/75/95) appear in §1, §6, §14. Treat them as estimates until the differential harness in §19.4 produces measurements.
 - **Vendor survey is unverified.** I claim no vendor advertises behavior flags via RFC channels, based on best-effort search rather than an exhaustive audit.
 - **Did not fetch real `/Schemas` responses** from Okta/Entra/Salesforce to verify Mode A viability. That spike (called out in §17.3) is the single best fidelity-confidence move.
-- **Cost of maintaining the probe matrix** is described qualitatively. A more rigorous estimate would track lines of probe code per supported flag and project against the rate of new flags landing in [endpoint-config.interface.ts](api/src/modules/endpoint/endpoint-config.interface.ts) (3 new flags in the last 6 months per Session_starter.md).
+- **Cost of maintaining the probe matrix** is described qualitatively. A more rigorous estimate would track lines of probe code per supported flag and project against the rate of new flags landing in [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) (3 new flags in the last 6 months per Session_starter.md).
 
 ### 23.2 Where this evaluation is strongest
 
@@ -894,7 +895,7 @@ Consequences.
 | Term | Definition |
 |---|---|
 | **Endpoint** | A multi-tenant SCIM tenant inside SCIMServer; the unit a clone produces. |
-| **EndpointProfile** | The single JSONB document defining schemas + resourceTypes + SPC + settings for an endpoint. See [endpoint-profile.types.ts](api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts). |
+| **EndpointProfile** | The single JSONB document defining schemas + resourceTypes + SPC + settings for an endpoint. See [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts). |
 | **ShorthandProfileInput** | The operator-facing partial form of EndpointProfile that the auto-expand engine inflates. |
 | **Discovery surface** | RFC 7643/7644-defined endpoints (`/SPC`, `/Schemas`, `/ResourceTypes`). |
 | **Behavior surface** | The 16 settings flags and runtime choices that govern how this server actually responds to SCIM requests. |

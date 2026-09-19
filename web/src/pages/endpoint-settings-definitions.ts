@@ -1,4 +1,4 @@
-import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
+import { AUTH_METHOD_FLAGS, LEGACY_AUTH_METHOD_FLAG } from './endpoint-auth-flags';
 
 export type SettingCategory =
   | 'Validation & schema'
@@ -7,7 +7,8 @@ export type SettingCategory =
   | 'PATCH semantics'
   | 'Discovery'
   | 'Logging & privacy'
-  | 'Authentication methods';
+  | 'Authentication methods'
+  | 'Legacy compatibility';
 
 interface SettingBase {
   key: string;
@@ -48,6 +49,7 @@ export const CATEGORY_ORDER: readonly SettingCategory[] = [
   'Concurrency & ETags',
   'Discovery',
   'Logging & privacy',
+  'Legacy compatibility',
 ];
 
 export const BOOLEAN_FLAGS: ReadonlyArray<BooleanSettingDefinition> = [
@@ -188,6 +190,15 @@ export const BOOLEAN_FLAGS: ReadonlyArray<BooleanSettingDefinition> = [
   })),
   {
     kind: 'boolean',
+    key: LEGACY_AUTH_METHOD_FLAG.key,
+    label: LEGACY_AUTH_METHOD_FLAG.label,
+    displayLabel: LEGACY_AUTH_METHOD_FLAG.shortLabel,
+    description: LEGACY_AUTH_METHOD_FLAG.description,
+    defaultValue: LEGACY_AUTH_METHOD_FLAG.defaultValue,
+    category: 'Legacy compatibility',
+  },
+  {
+    kind: 'boolean',
     key: 'PersistRequestSecrets',
     label: 'PersistRequestSecrets',
     displayLabel: 'Persist request secrets',
@@ -294,21 +305,9 @@ export const ALL_ENDPOINT_SETTINGS: ReadonlyMap<string, EndpointSettingDefinitio
   [...BOOLEAN_FLAGS, ...ENUM_SETTINGS, ...NUMBER_SETTINGS].map((setting) => [setting.key, setting]),
 );
 
-const COMMON_RESOURCE_SETTINGS = [
-  'StrictSchemaValidation',
-  'AllowAndCoerceBooleanStrings',
-  'RfcCompliantSubAttributes',
-  'RequireIfMatch',
-  'VerbosePatchSupported',
-  'IncludeWarningAboutIgnoredReadOnlyAttribute',
-  'IgnoreReadOnlyAttributesInPatch',
-  'PrimaryEnforcement',
-] as const;
-
 export const TAB_SETTING_KEYS = {
-  users: [...COMMON_RESOURCE_SETTINGS, 'UserSoftDeleteEnabled', 'UserHardDeleteEnabled'],
+  users: ['UserSoftDeleteEnabled', 'UserHardDeleteEnabled'],
   groups: [
-    ...COMMON_RESOURCE_SETTINGS,
     'GroupHardDeleteEnabled',
     'MultiMemberPatchOpForGroupEnabled',
     'PatchOpAllowRemoveAllMembers',

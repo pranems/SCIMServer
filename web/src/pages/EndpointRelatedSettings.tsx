@@ -1,5 +1,9 @@
 import React from 'react';
 import {
+  Accordion,
+  AccordionHeader,
+  AccordionItem,
+  AccordionPanel,
   Caption1,
   Card,
   Dropdown,
@@ -25,10 +29,21 @@ import {
 
 const useStyles = makeStyles({
   card: {
+    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
+  },
+  header: {
+    width: '100%',
+  },
+  headerContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalM,
+    gap: tokens.spacingVerticalXXS,
+  },
+  panel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
   },
   grid: {
     display: 'grid',
@@ -114,14 +129,24 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
 
   return (
     <Card className={classes.card} data-testid={testId}>
-      <Subtitle2>{title}</Subtitle2>
-      {description && <Caption1 className={classes.description}>{description}</Caption1>}
-      {feedback && (
-        <MessageBar intent={feedback.intent} data-testid={`${testId}-feedback`}>
-          <MessageBarBody>{feedback.text}</MessageBarBody>
-        </MessageBar>
-      )}
-      <div className={classes.grid}>
+      <Accordion collapsible>
+        <AccordionItem value="settings">
+          <AccordionHeader className={classes.header} data-testid={`${testId}-toggle`}>
+            <div className={classes.headerContent}>
+              <Subtitle2>{title}</Subtitle2>
+              <Caption1 className={classes.description}>
+                {definitions.length} {definitions.length === 1 ? 'setting' : 'settings'}
+              </Caption1>
+            </div>
+          </AccordionHeader>
+          <AccordionPanel className={classes.panel}>
+            {description && <Caption1 className={classes.description}>{description}</Caption1>}
+            {feedback && (
+              <MessageBar intent={feedback.intent} data-testid={`${testId}-feedback`}>
+                <MessageBarBody>{feedback.text}</MessageBarBody>
+              </MessageBar>
+            )}
+            <div className={classes.grid}>
         {definitions.map((definition) => {
           const disabled = update.isPending && pendingKey === definition.key;
           if (definition.kind === 'boolean') {
@@ -194,7 +219,10 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
             </Field>
           );
         })}
-      </div>
+            </div>
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
     </Card>
   );
 };
