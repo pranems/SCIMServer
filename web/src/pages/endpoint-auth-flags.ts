@@ -10,9 +10,11 @@
  * remains the source of truth for defaults and bounds; this file only describes
  * how they are PRESENTED.
  */
+import type { ConnectionMethod } from '@scim/types/connection-info.types';
 
 export interface AuthMethodFlag {
   key: string;
+  method: ConnectionMethod;
   label: string;
   description: string;
   defaultValue: boolean;
@@ -23,6 +25,7 @@ export interface AuthMethodFlag {
 export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
   {
     key: 'OAuthClientCredentialsAuthEnabled',
+    method: 'oauth_client',
     label: 'OAuthClientCredentialsAuthEnabled',
     shortLabel: 'OAuth2 client credentials',
     description:
@@ -31,6 +34,7 @@ export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
   },
   {
     key: 'WifCredentialsEnabled',
+    method: 'wif',
     label: 'WifCredentialsEnabled',
     shortLabel: 'Federated identity (WIF)',
     description:
@@ -39,6 +43,7 @@ export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
   },
   {
     key: 'SharedSecretBearerAuthEnabled',
+    method: 'shared_secret',
     label: 'SharedSecretBearerAuthEnabled',
     shortLabel: 'Global shared secret',
     description:
@@ -47,6 +52,7 @@ export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
   },
   {
     key: 'SecretTokenBearerAuthEnabled',
+    method: 'bearer',
     label: 'SecretTokenBearerAuthEnabled',
     shortLabel: 'Bearer (Entra "Secret Token")',
     description:
@@ -57,6 +63,7 @@ export const AUTH_METHOD_FLAGS: ReadonlyArray<AuthMethodFlag> = [
 
 export const LEGACY_AUTH_METHOD_FLAG: AuthMethodFlag = {
   key: 'PerEndpointCredentialsEnabled',
+  method: 'bearer',
   label: 'PerEndpointCredentialsEnabled',
   shortLabel: 'Legacy per-endpoint credentials umbrella',
   description:

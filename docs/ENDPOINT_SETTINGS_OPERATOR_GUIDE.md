@@ -100,6 +100,8 @@ Four real methods decide **who may call this endpoint's SCIM data plane**. They 
 
 > These four are editable in the collapsed **Authentication methods** pane on Connect, in setup order. The pane shows its enabled count without expanding. Endpoint Settings keeps the complete raw inventory.
 
+When `profile.authentication.methods[]` declares one of these methods, that entry owns the effective state and overrides the corresponding flat setting. Both Connect and Endpoint Settings display the server-resolved value, show that it is managed by Authentication methods, and disable the lower-precedence switch. WIF follows the same rule across trust creation, diagnostics, token minting, connection info, and ServiceProviderConfig discovery.
+
 | Setting | What it actually does |
 |---|---|
 | `OAuthClientCredentialsAuthEnabled` | Accept a per-endpoint `oauth_client` credential (Entra's "OAuth2 client-credentials"). |

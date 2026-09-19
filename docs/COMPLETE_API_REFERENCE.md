@@ -1,10 +1,12 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-16 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
 
-> **Version:** 0.55.24 - **Updated:** 2026-07-31
+> **Version:** 0.55.24 - **Updated:** 2026-09-18
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **118 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
+>
+> **Cross-cutting contract:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) explains which existing route owns each profile, method, credential, server-policy, discovery, and connection-info operation. Proposed profile-import/provider-catalogue routes in that design are not part of this current API reference.
 
 ---
 

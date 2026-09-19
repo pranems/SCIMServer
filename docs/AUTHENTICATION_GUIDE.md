@@ -77,6 +77,8 @@ flowchart TD
 
 > `PerEndpointCredentialsEnabled` is a legacy compatibility fallback, not a fifth method. Bearer and OAuth2 fall back to it when their dedicated setting is absent. It is shown under Endpoint Settings -> Legacy compatibility, not in the Connect method selector.
 
+An explicit `profile.authentication.methods[]` entry is authoritative for all four methods, including WIF. When such an entry exists, Connect and Endpoint Settings show its effective state and disable the lower-precedence flat switch. Change the method entry from Connect instead. For WIF, any enabled `wif-7523` or `wif-8693` entry enables the method; WIF is disabled only when all declared WIF entries are disabled.
+
 **These are not mutually exclusive.** The reference endpoint runs all four simultaneously, which is exactly why its diagnostics show `shared_secret`, `bearer_jwt` and `wif` decisions interleaved.
 
 ---
@@ -858,7 +860,7 @@ one.
 | Create a credential | `POST /scim/admin/endpoints/{id}/credentials` |
 | List credentials (metadata only) | `GET /scim/admin/endpoints/{id}/credentials` |
 | Rotate / revoke | `POST .../credentials/{cid}/rotate`, `DELETE .../credentials/{cid}` |
-| Entra field values per method | `GET /scim/admin/endpoints/{id}/connection-info` |
+| Entra field values per method | `GET /scim/admin/endpoints/{id}/connection-info` - the explicit, audit-logged secret-disclosure boundary when visibility is `always` |
 | Recent auth decisions | `GET /scim/admin/endpoints/{id}/auth-decisions` |
 | All endpoints' auth decisions | `GET /scim/admin/auth-decisions` |
 | Resolve issuer + JWKS from a tenant | `POST /scim/admin/endpoints/{id}/wif/resolve` |
@@ -882,6 +884,8 @@ one.
 | `CredentialSecretVisibility` | `once` | whether the UI keeps a secret on screen |
 | `PersistRequestSecrets` | on | whether request logs retain secret-bearing values |
 | `JwksFetchTimeoutMs` / `JwksFetchRetries` / `JwksFetchRetryBackoffMs` / `JwksCacheMaxAgeMs` | see settings guide | JWKS fetch behaviour |
+
+The broad endpoint overview response used by Users, Groups, Logs, Settings, and other tabs never carries plaintext credentials. The Connect tab separately requests `connection-info`; under `CredentialSecretVisibility=always`, that dedicated admin route may return retained values and emits an AUTH disclosure audit event.
 
 ### Source
 

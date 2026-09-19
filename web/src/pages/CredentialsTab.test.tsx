@@ -21,6 +21,7 @@ import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 
 const mockUseEndpointOverview = vi.fn();
+const mockUseConnectionInfo = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockActivateMutate = vi.fn();
@@ -52,6 +53,7 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useEndpointOverview: (...args: unknown[]) => mockUseEndpointOverview(...args),
+    useConnectionInfo: (...args: unknown[]) => mockUseConnectionInfo(...args),
     useCreateCredential: () => ({
       mutate: mockCreateMutate,
       isPending: createMutationState.isPending,
@@ -136,6 +138,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('CredentialsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseConnectionInfo.mockReturnValue({ data: undefined, isLoading: false, error: null });
     createMutationState = { isPending: false };
     deleteMutationState = { isPending: false };
   });
@@ -146,6 +149,12 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: undefined, isLoading: true, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     expect(screen.getByTestId('credentials-skeleton')).toBeInTheDocument();
+  });
+
+  it('loads the dedicated audited connection-info resource for Connect', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(mockUseConnectionInfo).toHaveBeenCalledWith('ep-1');
   });
 
   it('shows error block on error', () => {
@@ -554,6 +563,7 @@ describe('CredentialsTab', () => {
           createdAt: '2026-05-01T00:00:00Z',
           expiresAt: null,
           wif: {
+            targetClientId: 'target-client-id-456',
             expectedIssuer: 'https://login.microsoftonline.com/contoso/v2.0',
             expectedSubject: 'sp-object-id-123',
             expectedAudience: 'api://scim-app',
@@ -580,6 +590,9 @@ describe('CredentialsTab', () => {
     );
     expect(screen.getByTestId('wif-credential-cred-wif-subject').textContent).toContain(
       'sp-object-id-123',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-target-client').textContent).toContain(
+      'target-client-id-456',
     );
     expect(screen.getByTestId('wif-credential-cred-wif-audience').textContent).toContain(
       'api://scim-app',

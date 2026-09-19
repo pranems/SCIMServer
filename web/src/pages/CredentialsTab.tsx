@@ -63,6 +63,7 @@ import {
 } from '@fluentui/react-icons';
 import {
   useEndpointOverview,
+  useConnectionInfo,
   useCreateCredential,
   useActivateCredential,
   useDeactivateCredential,
@@ -553,6 +554,7 @@ const WifTrustDetails: React.FC<{
   const rows: Array<{ key: string; label: string; value: string | null }> = [
     { key: 'issuer', label: 'Issuer (iss)', value: trust.expectedIssuer ?? null },
     { key: 'jwks', label: 'JWKS URI', value: trust.jwksUri ?? null },
+    { key: 'target-client', label: 'Target client identifier', value: trust.targetClientId ?? null },
     { key: 'subject', label: 'Subject (sub)', value: trust.expectedSubject ?? null },
     { key: 'audience', label: 'Audience (aud)', value: trust.expectedAudience ?? null },
     { key: 'tenant', label: 'Allowed tenant', value: trust.allowedTenantId ?? null },
@@ -1967,6 +1969,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const classes = useStyles();
   const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointOverview(endpointId);
+  const { data: dedicatedConnectionInfo } = useConnectionInfo(endpointId);
   const createMutation = useCreateCredential(endpointId);
   const activateMutation = useActivateCredential(endpointId);
   const deactivateMutation = useDeactivateCredential(endpointId);
@@ -2114,7 +2117,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // state, or a method that was turned off), fall back to the first enabled
   // method. `noMethods` covers the rare case where every auth method is disabled.
   const configFlags = (data?.configFlags ?? {}) as Record<string, unknown>;
-  const methodTabs = enabledMethodTabs(configFlags, data?.connectionInfo);
+  const connectionInfo = dedicatedConnectionInfo ?? data?.connectionInfo;
+  const methodTabs = enabledMethodTabs(configFlags, connectionInfo);
   const wifEnabled = methodTabs.some((method) => method.value === 'wif');
   // P7 - counted across ALL credentials, not just the active sub-tab: the point
   // of the banner is to tell an operator there is work on this endpoint at all,
@@ -2169,9 +2173,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           {/* W3 - copy / download the WHOLE endpoint Connect bundle: every
               enabled method + connection info + every credential/trust + the
               auth-related config flags (no secret values). */}
-          {data?.connectionInfo && (
+          {connectionInfo && (
             <SettingsJsonExport
-              value={buildEndpointConnectBundle(endpointId, data.connectionInfo, credentials, configFlags)}
+              value={buildEndpointConnectBundle(endpointId, connectionInfo, credentials, configFlags)}
               filename={`endpoint-${endpointId}-connect.json`}
               copyLabel="Copy all as JSON"
               data-testid="connect-endpoint-export"
@@ -2220,15 +2224,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
               </Caption1>
               <div className={classes.authFlagGrid}>
           {AUTH_METHOD_FLAGS.map((flag) => {
-            const methodByFlag: Record<string, ConnectionMethod> = {
-              OAuthClientCredentialsAuthEnabled: 'oauth_client',
-              WifCredentialsEnabled: 'wif',
-              SharedSecretBearerAuthEnabled: 'shared_secret',
-              SecretTokenBearerAuthEnabled: 'bearer',
-            };
-            const method = methodByFlag[flag.key];
-            const resolvedEnabled = data?.connectionInfo?.enabledMethods.find((item) => item.method === method);
-            const resolvedDisabled = data?.connectionInfo?.disabledMethods.find((item) => item.method === method);
+            const resolvedEnabled = data?.connectionInfo?.enabledMethods.find((item) => item.method === flag.method);
+            const resolvedDisabled = data?.connectionInfo?.disabledMethods.find((item) => item.method === flag.method);
             const resolved = resolvedEnabled ?? resolvedDisabled;
             const checked = resolved ? Boolean(resolvedEnabled) : effectiveAuthFlag(configFlags, flag);
             const managed = resolved?.enablementSource === 'authentication-method';
@@ -2336,10 +2333,10 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
 
       {/* W4 - copy / download all info for the ACTIVE method: its connection
           info + the credentials/trusts backing it (no secret values). */}
-      {!noMethods && data?.connectionInfo && (
+      {!noMethods && connectionInfo && (
         <div className={classes.headerActions} data-testid={`connect-method-export-row-${activeTab}`}>
           <SettingsJsonExport
-            value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, data.connectionInfo, listCredentials)}
+            value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, connectionInfo, listCredentials)}
             filename={`endpoint-${endpointId}-${activeTab}-connect.json`}
             copyLabel="Copy this method as JSON"
             data-testid={`connect-method-export-${activeTab}`}
@@ -2685,10 +2682,10 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           carry its connection info. For bearer / oauth_client / wif the per-card
           Connect subpanels (W6/W8) provide the same values, so the redundant
           endpoint-level card is removed on those tabs. */}
-      {showSharedSecretInfo && data?.connectionInfo && (
+      {showSharedSecretInfo && connectionInfo && (
         <UnifiedConnectSection
           endpointId={endpointId}
-          connectionInfo={data.connectionInfo}
+          connectionInfo={connectionInfo}
           activeMethod="shared_secret"
         />
       )}

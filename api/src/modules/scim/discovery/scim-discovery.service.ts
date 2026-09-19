@@ -10,8 +10,7 @@ import { SCIM_SERVICE_PROVIDER_CONFIG } from './scim-schemas.constants';
 import { computeAuthenticationSchemes } from './authentication-schemes';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 import {
-  getConfigBoolean,
-  ENDPOINT_CONFIG_FLAGS,
+  resolveEndpointAuthEnablement,
 } from '../../endpoint/endpoint-config.interface';
 
 /**
@@ -152,10 +151,10 @@ export class ScimDiscoveryService {
     // each enabled method adds its scheme; primary on defaultMethodId).
     // Q6.6 - when the endpoint's WifCredentialsEnabled flag is on, a WIF scheme
     // is also advertised so discovery reflects the federated-identity token path.
-    const wifCredentialsEnabled = getConfigBoolean(
+    const wifCredentialsEnabled = resolveEndpointAuthEnablement(
       profile?.settings,
-      ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
-    );
+      profile?.authentication?.methods,
+    ).workloadIdentityFederation;
     const authenticationSchemes = computeAuthenticationSchemes(
       SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
       profile?.authentication,

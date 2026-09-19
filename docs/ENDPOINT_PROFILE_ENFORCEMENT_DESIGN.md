@@ -1,11 +1,12 @@
 # Endpoint Profile Enforcement - Design Document
 
-> **Status:** Proposed (Phase 1 in progress, Phase 2 deferred)
+> **Status:** Historical design and RCA. Phase 1 shipped in v0.53.3. The Phase 2 settings-only collapse remains deferred and is not the current source of truth.
 > **Branch:** `fix/profile-enforcement-gaps` (based on `58ca63b`, the v0.53.2 prod level)
 > **Target version:** v0.53.3 (Phase 1), v0.54+ (Phase 2)
 > **Author:** Engineering
 > **Date:** 2026-06-23
 > **Source of truth for behavior:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/), [scim/controllers/](../api/src/modules/scim/controllers/), [scim/discovery/scim-discovery.service.ts](../api/src/modules/scim/discovery/scim-discovery.service.ts)
+> **Current cross-cutting design:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md)
 
 ---
 

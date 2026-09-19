@@ -135,6 +135,28 @@ describe('ConnectionInfoService', () => {
       );
     });
 
+    it('uses WIF method entries instead of a conflicting flat flag', () => {
+      const info = service.assemble(
+        endpoint(
+          { WifCredentialsEnabled: true },
+          {
+            profile: {
+              settings: { WifCredentialsEnabled: true },
+              authentication: {
+                methods: [{ type: 'wif-7523', enabled: false }],
+              },
+            },
+          },
+        ),
+        [],
+        'https://scim.example.com',
+      );
+
+      const wif = info.disabledMethods.find((method) => method.method === 'wif');
+      expect(wif?.enablementSource).toBe('authentication-method');
+      expect(info.enabledMethods.some((method) => method.method === 'wif')).toBe(false);
+    });
+
     it('a disabled method carries a reason + enableHint', () => {
       const info = service.assemble(endpoint({ WifCredentialsEnabled: 'False' }), [], 'https://scim.example.com');
       const wif = info.disabledMethods.find((m) => m.method === 'wif');

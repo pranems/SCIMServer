@@ -149,6 +149,7 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
       'https://login.microsoftonline.com/contoso/v2.0',
     );
     await expect(page.getByTestId('wif-credential-wt-a-subject')).toContainText('sp-object-id-123');
+    await expect(page.getByTestId('wif-credential-wt-a-target-client')).toContainText('target-client-id-123');
     await expect(page.getByTestId('wif-credential-wt-a-audience')).toContainText('api://scim-app');
     await expect(page.getByTestId('wif-credential-wt-a-jwks')).toContainText(
       'https://login.microsoftonline.com/contoso/discovery/v2.0/keys',

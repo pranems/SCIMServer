@@ -663,8 +663,9 @@ The `access_token` is an **RS256 JWT** (the Pre-Q.B externalized key, verifiable
 
 ```json
 {
-  "sub": "11112222-3333-4444-5555-666677778888",
-  "client_id": "11112222-3333-4444-5555-666677778888",
+  "sub": "scim-wif-client-contoso",
+  "client_id": "scim-wif-client-contoso",
+  "src_sub": "11112222-3333-4444-5555-666677778888",
   "aud": "scimserver:7e3f9c21-9a4b-4c6e-8f12-2a5d9b0e1c34",
   "endpoint_id": "7e3f9c21-9a4b-4c6e-8f12-2a5d9b0e1c34",
   "scope": "scim.read scim.write",
@@ -672,7 +673,7 @@ The `access_token` is an **RS256 JWT** (the Pre-Q.B externalized key, verifiable
 }
 ```
 
-From the code: `sub` / `client_id` = the assertion's `sub` (the Entra Workload Identity object id); `aud` = `<OAUTH_TOKEN_AUDIENCE>:<endpointId>`; the `endpoint_id` claim **scopes the token to this endpoint only** (a token minted for endpoint A is rejected on endpoint B); `scope` is the admin-configured WIF scope used verbatim (`trustedScope`); `expires_in` is clamped to the Entra 1-6h window (floor 3600, ceil 21600, default 3600). On any validation failure the response is `401 { "error": "invalid_client", "error_description": "Client authentication failed." }`.
+From the code: issued `sub` / `client_id` = the trust's `targetClientId` or, when absent, the endpoint id. The source assertion subject is preserved independently as `src_sub`; it is not presented as the issued client identifier. `aud` = `<OAUTH_TOKEN_AUDIENCE>:<endpointId>`; the `endpoint_id` claim **scopes the token to this endpoint only** (a token minted for endpoint A is rejected on endpoint B); `scope` is the admin-configured WIF scope used verbatim (`trustedScope`); `expires_in` is clamped to the Entra 1-6h window (floor 3600, ceil 21600, default 3600). On validation failure the OAuth response carries `error`, `error_description`, and structured reason/correlation fields according to the auth reason catalogue.
 
 ### 5A.3 Step 3 - the SCIM resource call (every provisioning operation)
 
@@ -1120,7 +1121,7 @@ Grounding the decision against how the industry handles the same problem:
 
 > **Status.** IMPLEMENTED as WI-2 (0.54.0-alpha.21). Served by [admin-connection-info.controller.ts](../../api/src/modules/scim/controllers/admin-connection-info.controller.ts) via the pure [connection-info.service.ts](../../api/src/modules/scim/services/connection-info.service.ts) assembler. One deviation from the pre-WI-12 example below: `urls.oauthMetadata` points at the PER-ENDPOINT RFC 8414 append form (`.../scim/endpoints/{id}/.well-known/oauth-authorization-server`, WI-12) rather than the global document, since it is the single source of truth for THIS endpoint.
 
-A new admin endpoint assembles every absolute URL and the per-method property set once, server-side, reusing the host logic already in [oauth-metadata.controller.ts](../../api/src/oauth/oauth-metadata.controller.ts). No UI hand-builds URLs after this lands. No secrets are returned (secrets remain one-time on credential create).
+A new admin endpoint assembles every absolute URL and the per-method property set once, server-side, reusing the host logic already in [oauth-metadata.controller.ts](../../api/src/oauth/oauth-metadata.controller.ts). No UI hand-builds URLs after this lands. By default secrets are withheld. When the operator has explicitly selected `CredentialSecretVisibility=always`, this dedicated admin route may inline retained values and emits an AUTH disclosure audit event. The broad endpoint overview BFF always withholds plaintext; Connect requests this dedicated route separately.
 
 **Request:**
 
@@ -1547,7 +1548,7 @@ Per the repo's feature/bug-fix commit checklist and quality gates.
 
 **API:**
 
-- `ConnectionInfoService` that assembles absolute URLs (reusing the `X-Forwarded-*` host logic) + the per-method property set + the Entra-field mapping. No secrets.
+- `ConnectionInfoService` that assembles absolute URLs (reusing the `X-Forwarded-*` host logic) + the per-method property set + the Entra-field mapping. Secrets are optional assembler input and are supplied only by explicit audited disclosure routes.
 - `GET /admin/endpoints/{id}/connection-info` controller returning the [Part 6](#6-proposed-connection-info-api-single-source-of-truth) shape.
 - Add the assembled absolute URLs to the BFF overview (`useEndpointOverview`) so the UI stops hand-building URLs.
 - Fix the WIF `scimUrl` in [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) from `.../endpoints/{id}/v2` to the assembled value (decoupled small fix, can land first).
@@ -1586,10 +1587,10 @@ One epic, sequenced into independently-shippable items. Sizes are relative (S/M/
 | WI | Title | Size | Depends on | Summary |
 |---|---|---|---|---|
 | WI-1 | Fix the WIF SCIM URL (`/endpoints/{id}/v2` bug) | S | none | **DONE (2026-07-06).** Corrected [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) `scimUrl` to `/scim/v2/endpoints/{id}`; vitest regression + Playwright regression added. |
-| WI-2 | `ConnectionInfoService` + `GET /admin/endpoints/{id}/connection-info` | M | none | **DONE (2026-07-07).** Pure server-side URL + per-method assembler ([connection-info.service.ts](../../api/src/modules/scim/services/connection-info.service.ts)) + [admin-connection-info.controller.ts](../../api/src/modules/scim/controllers/admin-connection-info.controller.ts) returning the Part 6 shape; no secrets; key-allowlist contract. UI consumer is WI-3/4/5. See [6](#6-proposed-connection-info-api-single-source-of-truth). |
-| WI-3 | Surface connection info on the BFF overview | S | WI-2 | **DONE (2026-07-07).** The `GET /admin/endpoints/{id}/overview` BFF now embeds the WI-2 `connectionInfo` as a first-class field; the UI stops hand-building URLs and needs no second round trip. `ConnectionInfo` types moved to shared [connection-info.types.ts](../../api/src/shared/types/connection-info.types.ts). |
+| WI-2 | `ConnectionInfoService` + `GET /admin/endpoints/{id}/connection-info` | M | none | **DONE (2026-07-07; disclosure boundary tightened 2026-09-18).** Pure server-side URL + per-method assembler ([connection-info.service.ts](../../api/src/modules/scim/services/connection-info.service.ts)) + [admin-connection-info.controller.ts](../../api/src/modules/scim/controllers/admin-connection-info.controller.ts) returning the Part 6 shape. The route withholds secrets by default and may disclose retained values only under `CredentialSecretVisibility=always`, with AUTH audit logging. Key-allowlist contract. UI consumer is WI-3/4/5. See [6](#6-proposed-connection-info-api-single-source-of-truth). |
+| WI-3 | Surface connection info on the BFF overview | S | WI-2 | **DONE (2026-07-07; secret boundary tightened 2026-09-18).** The `GET /admin/endpoints/{id}/overview` BFF embeds a non-secret WI-2 `connectionInfo` shape so every endpoint tab can consume URLs and effective method state safely. Connect separately fetches the dedicated audited route when it needs retained values. `ConnectionInfo` types live in shared [connection-info.types.ts](../../api/src/shared/types/connection-info.types.ts). |
 | WI-4 | `<ConnectionPanel>` primitive + Entra-field mapping table | M | WI-2, WI-3 | **DONE (2026-07-07).** One reusable [ConnectionPanel.tsx](../../web/src/components/primitives/ConnectionPanel.tsx); method selector; Entra field mapping via R9 CopyableField; Copy all JSON + Copy as .env + Download .json; one-time-secret create moment; `connection-panel-*` testids. `useConnectionInfo` hook added. Wired into surfaces in WI-5. |
-| WI-5 | Connect surface + Overview card + wiring | M | WI-4 | **DONE (2026-07-07).** New per-endpoint Connect tab ([ConnectTab.tsx](../../web/src/pages/ConnectTab.tsx)) renders the ConnectionPanel from `overview.connectionInfo`; wired into [EndpointDetailPage.tsx](../../web/src/pages/EndpointDetailPage.tsx) (`/endpoints/{id}/connect`, testid `endpoint-tab-connect`); new lazy route has a size-limit budget; `connect-tab.spec.ts` Playwright coverage. **Track A complete.** |
+| WI-5 | Connect surface + Overview card + wiring | M | WI-4 | **DONE (2026-07-07; unified later).** The per-endpoint Connect tab now renders the unified method-centric [CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx), including ConnectionPanel data from the dedicated connection-info route; wired into [EndpointDetailPage.tsx](../../web/src/pages/EndpointDetailPage.tsx) at `/endpoints/{id}/connect`. **Track A complete.** |
 | WI-6 | Envelope-encryption storage (KEK -> DEK -> secret) | L | none | **DONE (2026-07-07).** Pure crypto core [credential-envelope.ts](../../api/src/security/credential-envelope.ts) (scrypt KEK derive; AES-256-GCM); [credential-kek.ts](../../api/src/security/credential-kek.ts) env loader (default `changeme-credential-kek`); [credential-encryption.service.ts](../../api/src/security/credential-encryption.service.ts) provisions + persists a wrapped DEK (`CredentialDek` table + migration `20260707100000`) and exposes encrypt/decrypt + KEK status. Prisma + InMemory parity; bcrypt auth path untouched. See [6A.4](#6a4-encryption-at-rest---the-two-level-key-hierarchy). |
 | WI-7 | `CredentialSecretVisibility` setting (server + endpoint) | M | WI-6 | **DONE (2026-07-07).** Enum `always`/`once` endpoint flag + `getEffectiveCredentialSecretVisibility` server-ceiling precedence; server value in the new `ServerSetting` table (seeded `always`); [credential-security.service.ts](../../api/src/security/credential-security.service.ts) + retain-on-create wiring (`EndpointCredential.secretEnvelope`, never exposed) + SettingsTab segmented control. Reveal/rotate follow in WI-8/9. See [6A.2](#6a2-the-setting-credentialsecretvisibility). |
 | WI-8 | Reveal endpoint + audit log | M | WI-6, WI-7 | **DONE (2026-07-07).** `POST .../reveal` admin-only, gated by the effective setting, `LogCategory.AUTH` audit each attempt; old/once credentials return non-error `{retained:false, reason}`. New `AdminSecuritySettingsController` `GET/PUT /admin/settings/security` (server ceiling + KEK status). UI: CredentialsTab reveal button + dialog + SettingsPage security card. See [6A.7](#6a7-api-surface-proposed). |

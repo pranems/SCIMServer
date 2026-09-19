@@ -79,6 +79,38 @@ test.describe('Connect tab - migration surface (P7)', () => {
     });
   });
 
+  test('Settings shows method-managed effective state instead of the writable shadow flag', async ({ page }) => {
+    fixtureEndpointId = await createFixtureEndpoint(page, {
+      namePrefix: 'e2e-authoritative-settings',
+      settings: { SecretTokenBearerAuthEnabled: true },
+    });
+    const addMethod = await page.request.post(
+      `/scim/admin/endpoints/${fixtureEndpointId}/authentication/methods`,
+      {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+        data: { type: 'bearer', enabled: false },
+      },
+    );
+    expect(addMethod.status()).toBe(201);
+
+    await page.goto(`/endpoints/${fixtureEndpointId}/settings`);
+    await expect(page.getByTestId('settings-tab')).toBeVisible({ timeout: 30_000 });
+
+    const bearer = page.getByTestId('settings-flag-SecretTokenBearerAuthEnabled');
+    await expect(bearer).not.toBeChecked();
+    await expect(bearer).toBeDisabled();
+    await expect(page.getByTestId('settings-flag-source-SecretTokenBearerAuthEnabled')).toContainText(
+      'Managed by Authentication methods',
+    );
+
+    const endpoint = await page.request.get(`/scim/admin/endpoints/${fixtureEndpointId}`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    expect(endpoint.status()).toBe(200);
+    const body = await endpoint.json();
+    expect(body.profile.settings.SecretTokenBearerAuthEnabled).toBe(true);
+  });
+
   test('a credential card shows its Connect params with no click, and has no Connect button', async ({ page }) => {
     await openConnect(page);
     // Ensure the bearer method is on, then create a credential to inspect.

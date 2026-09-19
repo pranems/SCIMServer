@@ -22,7 +22,6 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/reposi
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import type { DashboardResponse, EndpointOverviewResponse } from '../../shared/types/dashboard.types';
 import { ConnectionInfoService } from '../scim/services/connection-info.service';
-import { ConnectionSecretResolverService } from '../scim/services/connection-secret-resolver.service';
 
 /** Minimal Express-like request stub for the overview host derivation (WI-3). */
 function reqStub(): any {
@@ -141,19 +140,6 @@ describe('DashboardController', () => {
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: mockCredentialRepo },
         // WI-3: the pure connection-info assembler (real instance).
         ConnectionInfoService,
-        // Secret resolver stubbed to withhold everything (visibility=once
-        // default for these tests), preserving the no-secret-leak assertions.
-        {
-          provide: ConnectionSecretResolverService,
-          useValue: {
-            resolveForEndpoint: jest.fn().mockResolvedValue({
-              sharedSecret: null,
-              bearerToken: null,
-              oauthClientSecret: null,
-              anyEndpointSecretRevealed: false,
-            }),
-          },
-        },
       ],
     }).compile();
 
@@ -397,6 +383,34 @@ describe('DashboardController', () => {
       expect(cred.active).toBe(true);
       // Critical: hash is stripped from the projection.
       expect((cred as unknown as Record<string, unknown>).credentialHash).toBeUndefined();
+    });
+
+    it('withholds retained secrets from the broad overview response', async () => {
+      mockEndpointWithGet.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'prod-ep',
+        displayName: 'Production',
+        active: true,
+        scimBasePath: '/scim/endpoints/ep-1/v2',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-04-01T00:00:00Z',
+        profile: {
+          settings: {
+            CredentialSecretVisibility: 'always',
+            SecretTokenBearerAuthEnabled: true,
+          },
+        },
+      });
+      mockCredentialRepo.findByEndpoint.mockResolvedValueOnce([]);
+      const ordinary = await controller.getEndpointOverview(endpointId, reqStub());
+      const secretMethods = ordinary.connectionInfo.enabledMethods.filter(
+        (method) => method.method === 'bearer' || method.method === 'shared_secret',
+      );
+      expect(secretMethods).toHaveLength(2);
+      for (const method of secretMethods) {
+        expect(method.entraFields.secretToken).toBeNull();
+        expect(method.secretRevealed).toBe(false);
+      }
     });
 
     it('projects the public WIF trust fields for a wif credential', async () => {

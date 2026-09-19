@@ -8,7 +8,8 @@
  * Design: docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md Part 6. The host is
  * derived from the request exactly as the OAuth metadata controllers do
  * (X-Forwarded-Proto / X-Forwarded-Host, falling back to the request host), so
- * every surface agrees on the origin. No secrets are ever returned.
+ * every surface agrees on the origin. Secrets are withheld by default and may
+ * be returned only under CredentialSecretVisibility=always, with audit logging.
  */
 import { Controller, Get, NotFoundException, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';

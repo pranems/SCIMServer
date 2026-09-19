@@ -12548,6 +12548,14 @@ try {
     # INLINED in connection-info so it can be pasted into Entra in one place.
     Test-Result -Success ($awOauth.secretRevealed -eq $true -and $awOauth.entraFields.clientSecret -eq $awCred.clientSecret) -Message "9z-AW.T4: connection-info INLINES the clientSecret under visibility=always"
 
+    # T4b (disclosure boundary): every endpoint tab loads overview, so that
+    # broad BFF must withhold plaintext even when the dedicated, audited
+    # connection-info request above intentionally reveals it for Connect.
+    $awOverview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/overview" -Method GET -Headers $headers
+    $awOverviewOauth = $awOverview.connectionInfo.enabledMethods | Where-Object { $_.method -eq "oauth_client" }
+    $awOverviewJson = $awOverview | ConvertTo-Json -Depth 20 -Compress
+    Test-Result -Success ($awOverviewOauth.secretRevealed -ne $true -and $null -eq $awOverviewOauth.entraFields.clientSecret -and -not $awOverviewJson.Contains($awCred.clientSecret)) -Message "9z-AW.T4b: broad endpoint overview WITHHOLDS the retained clientSecret"
+
     # T5: the reveal endpoint returns the retained secret (this is what the Connect tab calls to always-show).
     $awReveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/credentials/$awCredId/reveal" -Method POST -Headers $headers
     Test-Result -Success ($awReveal.retained -eq $true -and $null -ne $awReveal.clientSecret) -Message "9z-AW.T5: reveal returns retained:true + the clientSecret for the Connect tab always-show"
@@ -14055,11 +14063,10 @@ Write-Host "TEST SECTION 9z-BV: PER-METHOD ENABLEMENT CO-LOCATION (W2.5)" -Foreg
 Write-Host "========================================" -ForegroundColor Yellow
 #
 # The resource guard + create-gate read ONE per-method enablement source:
-# profile.authentication.methods[].enabled wins, else the flat flags. A bearer
-# method explicitly disabled via the A1 API refuses a per-endpoint bearer that
-# the flat PerEndpointCredentialsEnabled flag would otherwise allow
-# (disabled-with-credential). Value-preserving: an endpoint with no method
-# entries resolves to exactly the flat-flag behavior.
+# profile.authentication.methods[].enabled wins, else the flat flags. Bearer
+# and WIF methods explicitly disabled via the A1 API refuse operations that
+# their flat flags would otherwise allow. Value-preserving: an endpoint with no
+# method entries resolves to exactly the flat-flag behavior.
 try {
     $bvEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
         name = "live-test-w2_5-$(Get-Random)"; profilePreset = "rfc-standard"
@@ -14093,6 +14100,28 @@ try {
         $bvInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/connection-info" -Method GET -Headers $headers
         $bvBearer = @($bvInfo.disabledMethods | Where-Object { $_.method -eq "bearer" })[0]
         Test-Result -Success ($null -ne $bvBearer -and $bvBearer.enablementSource -eq "authentication-method") -Message "9z-BV.T3: connection-info identifies the authentication-method entry as the authoritative bearer state"
+
+        # WIF uses the same precedence contract: a disabled method entry wins
+        # over WifCredentialsEnabled=True everywhere the method is surfaced.
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ WifCredentialsEnabled = "True" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/authentication/methods" -Method POST -Headers $headers -Body (@{
+            type = "wif-7523"; enabled = $false
+        } | ConvertTo-Json) | Out-Null
+
+        $bvWifInfo = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/connection-info" -Method GET -Headers $headers
+        $bvWif = @($bvWifInfo.disabledMethods | Where-Object { $_.method -eq "wif" })[0]
+        Test-Result -Success ($null -ne $bvWif -and $bvWif.enablementSource -eq "authentication-method") -Message "9z-BV.T4: connection-info identifies the authentication-method entry as the authoritative WIF state"
+
+        $bvWifCreate = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$bvId/credentials" -Method POST -Headers $headers -ContentType "application/json" -Body (@{
+            credentialType = "wif"
+        } | ConvertTo-Json) -SkipHttpErrorCheck
+        Test-Result -Success ($bvWifCreate.StatusCode -eq 403) -Message "9z-BV.T5: a disabled WIF method blocks trust creation despite WifCredentialsEnabled=True (HTTP $($bvWifCreate.StatusCode))"
+
+        $bvSpc = Invoke-RestMethod -Uri "$baseUrl/scim/v2/endpoints/$bvId/ServiceProviderConfig" -Method GET -Headers $headers
+        $bvWifSchemes = @($bvSpc.authenticationSchemes | Where-Object { $_.name -eq "Workload Identity Federation" })
+        Test-Result -Success ($bvWifSchemes.Count -eq 0) -Message "9z-BV.T6: discovery does not advertise a WIF method that is explicitly disabled"
     } finally {
         try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId" -Method DELETE -Headers $headers | Out-Null } catch {}
     }

@@ -15,7 +15,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { createEndpoint } from './helpers/request.helper';
+import { createEndpoint, createEndpointWithConfig } from './helpers/request.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
 describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
@@ -110,6 +110,40 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     // configFlags is always an object (even if empty).
     expect(typeof res.body.configFlags).toBe('object');
     expect(res.body.configFlags).not.toBeNull();
+  });
+
+  it('withholds retained secrets while the dedicated connection-info endpoint discloses them', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      OAuthClientCredentialsAuthEnabled: true,
+      CredentialSecretVisibility: 'always',
+    });
+    const created = await request(app.getHttpServer() as any)
+      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ credentialType: 'oauth_client', label: 'overview-boundary' })
+      .expect(201);
+    const plaintext = created.body.clientSecret as string;
+
+    const overview = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/overview`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const overviewOauth = overview.body.connectionInfo.enabledMethods.find(
+      (method: { method: string }) => method.method === 'oauth_client',
+    );
+    expect(overviewOauth.entraFields.clientSecret).toBeNull();
+    expect(overviewOauth.secretRevealed).toBe(false);
+    expect(JSON.stringify(overview.body)).not.toContain(plaintext);
+
+    const connectionInfo = await request(app.getHttpServer() as any)
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const connectionOauth = connectionInfo.body.enabledMethods.find(
+      (method: { method: string }) => method.method === 'oauth_client',
+    );
+    expect(connectionOauth.entraFields.clientSecret).toBe(plaintext);
+    expect(connectionOauth.secretRevealed).toBe(true);
   });
 
   it('exposes a created credential WITHOUT leaking the hash', async () => {

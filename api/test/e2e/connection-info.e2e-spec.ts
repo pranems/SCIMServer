@@ -85,6 +85,30 @@ describe('Connection-info API (E2E)', () => {
     expect(bearer.enablementSource).toBe('authentication-method');
   });
 
+  it('reports WIF disabled when its method entry overrides a true flat flag', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      WifCredentialsEnabled: true,
+    });
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'wif-7523', enabled: false })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const wif = res.body.disabledMethods.find((method: { method: string }) => method.method === 'wif');
+    expect(wif).toEqual(expect.objectContaining({
+      enablementSource: 'authentication-method',
+      reason: 'The WIF authentication method is disabled',
+    }));
+    expect(res.body.enabledMethods.some((method: { method: string }) => method.method === 'wif')).toBe(false);
+  });
+
   it('surfaces a U7 validity of "unverified" on a fresh, never-used method', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       OAuthClientCredentialsAuthEnabled: true,

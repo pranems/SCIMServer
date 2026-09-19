@@ -2,6 +2,8 @@
 
 > **Version:** 1.0 - **Source-verified against:** v0.40.0 - **Created:** April 14, 2026  
 > Every statement references the actual source file - nothing is assumed.
+>
+> **Historical snapshot:** This document predates the TanStack route cutover, current endpoint tabs, unified Connect experience, contextual Settings, Discovery Explorer, Operations, Workbench, and current global Settings. Use [UI_GUIDE.md](UI_GUIDE.md), [USABILITY_GUIDE.md](USABILITY_GUIDE.md), and [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for current behavior and target flows.
 
 ---
 
@@ -278,7 +280,7 @@ sequenceDiagram
 
 ## 8. Screen 3 - Raw Logs
 
-**Component:** Inline in `web/src/App.tsx` (lines 608–657)  
+**Component:** Inline in `web/src/App.tsx` (lines 608-657)
 **Sub-components:** `LogFilters.tsx` (52 lines), `LogList.tsx` (123 lines), `LogDetail.tsx` (213 lines)
 
 ### Layout

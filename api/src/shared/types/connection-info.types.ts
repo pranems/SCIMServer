@@ -5,8 +5,9 @@
  * and the web `ConnectionPanel` UI (via the `@scim/types` path alias).
  *
  * The shape is the authoritative connection-info contract documented in
- * docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md Part 6. NO secret value is ever
- * carried here (secrets remain one-time-at-create on the credential path).
+ * docs/auth/CONNECTION_INFO_AND_ENTRA_SETUP.md Part 6. Secret fields are null
+ * by default; the dedicated admin connection-info route may populate retained
+ * values under CredentialSecretVisibility=always and audit that disclosure.
  */
 
 /** The four SCIM auth methods a connection can use. */

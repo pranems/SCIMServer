@@ -3,6 +3,8 @@
 **Last verified:** 2026-08-19 against `feat/wif` (api + web **0.55.9**), SyncFabric `origin/master`
 `38c429b511`, canonical WIF guide revision 7 (6,503 lines, mirror byte-identical).
 
+> **Historical status snapshot:** Do not use this document as the current v0.55.24 authority without re-verifying each row. Use [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for the current endpoint/profile/authentication synthesis and this register for the dated backlog evidence.
+
 **How to read this.** Section 1 answers *"which authentication methods actually work?"*. Section 2 is
 everything remaining, grouped by **what it is for**, with the component it affects. Section 3 is what
 shipped. Appendix B records how each status was verified, and the three findings this register got

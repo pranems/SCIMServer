@@ -1,9 +1,9 @@
 # Schema Customization Guide - Operator Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
 
-> **Version**: 3.2 · **Date**: 2026-07-31 · **Status**: Complete (route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line source pass dates from v0.53.0)  
-> **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types  
+> **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
+> **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
 
 ---
@@ -13,8 +13,9 @@
 | Topic | Document |
 |-------|----------|
 | Profile architecture internals | [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) |
+| Profile portability and import boundary | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) |
 | One-click JSON examples (12 combos) | [examples/endpoint/create-endpoint-with-custom-extensions.json](examples/endpoint/create-endpoint-with-custom-extensions.json) |
-| Config flags (14 booleans + logLevel) | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) |
+| Complete endpoint settings inventory | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) |
 | RFC schema & extension deep dive | [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) |
 | Complete API reference | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
 | Multi-endpoint guide | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) |

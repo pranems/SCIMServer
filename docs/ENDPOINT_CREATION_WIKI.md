@@ -1,16 +1,18 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
 
-> **Version:** 0.55.24 - **Updated:** 2026-08-04
+> **Version:** 0.55.24 - **Updated:** 2026-09-18
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
 > **Source of truth:** [endpoint.controller.ts](../api/src/modules/endpoint/controllers/endpoint.controller.ts) - [built-in-presets.ts](../api/src/modules/scim/endpoint-profile/built-in-presets.ts)
 
 This is the "start here" page. For deeper reference see:
 [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) (CRUD recipes) -
 [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) (how profiles work) -
-[ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (all 16 flags) -
+[ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (complete settings inventory) -
 [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) (every route).
+
+An endpoint profile is portable configuration, not a complete running endpoint export. It includes schemas, ResourceTypes, capability inputs, endpoint settings, and non-secret authentication method declarations. Credentials, secrets, resources, logs, and server policy are configured separately. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
 ---
 

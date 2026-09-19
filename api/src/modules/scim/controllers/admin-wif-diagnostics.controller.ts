@@ -53,8 +53,8 @@ import type {
   WifDebugTrustResult,
 } from '../../../shared/types/wif-debug.types';
 import {
-  getConfigBoolean,
   ENDPOINT_CONFIG_FLAGS,
+  resolveEndpointAuthEnablement,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
@@ -237,7 +237,11 @@ export class AdminWifDiagnosticsController {
   private async requireWifEnabled(endpointId: string): Promise<void> {
     const endpoint = await this.endpointService.getEndpoint(endpointId);
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED)) {
+    const enabled = resolveEndpointAuthEnablement(
+      config,
+      endpoint.profile?.authentication?.methods,
+    ).workloadIdentityFederation;
+    if (!enabled) {
       throw new ForbiddenException(
         `WIF credentials are not enabled for endpoint "${endpointId}". ` +
         `Set "${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}" to "True" in the endpoint config.`,

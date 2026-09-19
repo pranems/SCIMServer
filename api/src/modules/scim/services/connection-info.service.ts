@@ -30,7 +30,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   ENDPOINT_CONFIG_FLAGS,
-  getOptionalConfigBoolean,
   resolveEndpointAuthEnablementDetails,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
@@ -154,9 +153,8 @@ export class ConnectionInfoService {
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const urls = this.buildUrls(baseUrl, endpointId);
     const effective = resolveEndpointAuthEnablementDetails(config, endpoint.profile?.authentication?.methods);
-    const wifExplicit = getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED);
-    const wifEnabled = wifExplicit ?? false;
-    const wifEnablementSource = wifExplicit === undefined ? 'default' : 'dedicated-setting';
+    const wifEnabled = effective.workloadIdentityFederation.enabled;
+    const wifEnablementSource = effective.workloadIdentityFederation.source;
 
     const activeCreds = credentials.filter((c) => c.active);
 
@@ -302,11 +300,16 @@ export class ConnectionInfoService {
         credentialId: wifCred?.id ?? null,
       });
     } else {
+      const methodManaged = wifEnablementSource === 'authentication-method';
       disabledMethods.push({
         method: 'wif',
         enablementSource: wifEnablementSource,
-        reason: `${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED} is not set`,
-        enableHint: `Set ${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}=True in endpoint Settings`,
+        reason: methodManaged
+          ? 'The WIF authentication method is disabled'
+          : `${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED} is not set`,
+        enableHint: methodManaged
+          ? 'Enable the WIF authentication method in Connect'
+          : `Set ${ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED}=True in endpoint Settings`,
       });
     }
 
