@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Plaintext disclosure is scoped to Connect.** The endpoint overview BFF is loaded by every endpoint tab and now always withholds secrets. Connect separately requests the existing `/connection-info` admin resource, whose `CredentialSecretVisibility=always` disclosure is explicit and AUTH-audited. API unit/E2E and live `9z-AW.T4b` prove overview withholding while the dedicated route still returns the retained value.
   - **Credential actions are organized by task.** Bearer/OAuth headers show Rotate plus More; WIF headers show Verify, Connect, and More. Edit, reveal, and reversible lifecycle actions are grouped under More. Credential/trust JSON and connection JSON remain in labeled export rows. The duplicate Deactivate/Revoke commands and false irreversible revoke dialog are removed because DELETE deactivates and POST activate reverses it.
   - **Responsive behavior is measured.** Endpoint and method tab strips contain horizontal overflow internally; credential summaries/actions stack below 900 px; connection fields stack below 700 px. Playwright measures main/card/action bounds at an 820 px viewport, closing the live v0.55.23 observation where 539 px of main content scrolled to 764 px.
-  - **TDD and consolidation validation.** RED-first tests proved the absent disclosure, duplicated User/Group ownership, flat-vs-authoritative auth mismatch, WIF precedence bypass, broad-overview secret disclosure, WIF target-client/subject conflation, crowded action regions, silent card failures, and pre-deploy browser layout. Expected post-review totals are API unit **4,932 across 173 suites**, API E2E **1,524 across 96 suites**, web Vitest **1,308 across 105 files**, changed web **111**, local live **1,491**, and focused local Playwright **31**; final consolidation reruns record the authoritative pass counts before merge.
-  - **Deployment status:** local implementation in progress. Customer prod and the canary remain untouched; this change targets dev only after reviewed PR merge.
+  - **Intended Schemas and Users visual baseline updates.** The endpoint baselines now record the approved collapsed `Schema behavior settings` and `User behavior settings` accordions instead of the former expanded/absent layouts. Expected, actual, and diff images were inspected before regenerating only these snapshots; no unrelated chrome, schema content, or user empty-state change was accepted.
+  - **TDD and consolidation validation.** RED-first tests proved the absent disclosure, duplicated User/Group ownership, flat-vs-authoritative auth mismatch, WIF precedence bypass, broad-overview secret disclosure, WIF target-client/subject conflation, crowded action regions, silent card failures, and pre-deploy browser layout. The full pipeline passed static, unit, Prisma E2E, web Vitest/coverage, six-mode, Docker/live, image identity, deploy, and data-integrity lanes. Dev live SCIM passed **1,491/1,491** and full Playwright passed **230 / 4 skipped** after the two inspected baseline updates. All nine reviewer-judgement audits are closed; performance and code review retain scheduled non-blocking follow-ups.
+  - **Deployment status:** merged master `0ecf4f2d` is live on dev as revision `scimserver-dev--v0ecf4f2d`, serving `ghcr.io/pranems/scimserver:0.55.24` at 100%. Endpoint integrity is **60 -> 60** with zero missing IDs; revision hygiene retains two active revisions including the v0.55.23 rollback target. Canary and customer prod remain untouched.
 - **v0.55.23 - W3.5: warm WIF token mints skip credential-table reads and unknown issuers stop before unrelated JWKS fetches.** A bounded per-endpoint cache loads only active `wif` rows through the new typed repository method, compiles an exact issuer map, coalesces concurrent cold reads, refreshes at credential expiry, and rejects an unknown decoded issuer with `wif_issuer_mismatch` before validator/network work.
   - **Invalidation is complete and race-safe.** Successful WIF create, metadata/label edit, revoke, reactivate, saved-trust verification, and endpoint deletion invalidate the cache. Per-endpoint generations prevent an older in-flight query from repopulating stale state after a mutation.
   - **Bounded and observable.** `WIF_TRUST_CACHE_TTL_MS` defaults to 30 seconds (1 second - 5 minute bounds); `WIF_TRUST_CACHE_MAX_ENDPOINTS` defaults to 256 (16 - 10,000 bounds). Both use the existing runtime-config registry and appear in `/admin/runtime-config`; LRU eviction bounds arbitrary endpoint-ID traffic.
@@ -4164,7 +4165,7 @@ No runtime cost - just hands the singleton to loaders.
 
 ### Azure Production Outage Fix - Connection Pool Exhaustion
 
-**Root cause:** Prisma connection pool (5 connections) fully exhausted by slow admin activity queries (87–129s each) on burstable B1ms PostgreSQL. Web UI auto-refresh polling every 10s generated 6+ queries per cycle. `resolveUserName`/`resolveGroupName` bypassed repository UUID guards and sent email-formatted test identifiers to `@db.Uuid` column, causing continuous errors.
+**Root cause:** Prisma connection pool (5 connections) fully exhausted by slow admin activity queries (87-129s each) on burstable B1ms PostgreSQL. Web UI auto-refresh polling every 10s generated 6+ queries per cycle. `resolveUserName`/`resolveGroupName` bypassed repository UUID guards and sent email-formatted test identifiers to `@db.Uuid` column, causing continuous errors.
 
 ### Error Handling Audit - wrapPrismaError + Safe Logging
 
@@ -4273,7 +4274,7 @@ No runtime cost - just hands the singleton to loaders.
 **6 docs rewritten from scratch** (source-verified against v0.34.0 codebase):
 
 - `LOGGING_AND_OBSERVABILITY.md` v4.0 - 21 sections, 3 Mermaid diagrams, 10 log troubleshooting scenarios, complete 55-file source reference
-- `LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md` v3.0 - 21 sections, 5 Mermaid diagrams, error catalog by status code (400–503), 5-layer error boundary architecture
+- `LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md` v3.0 - 21 sections, 5 Mermaid diagrams, error catalog by status code (400-503), 5-layer error boundary architecture
 - `LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md` v3.0 - 20-gap register (5 open, 14 resolved, 1 accepted), code evidence with exact line numbers
 - `REMOTE_DEBUGGING_AND_DIAGNOSIS.md` v3.0 - 16 sections (Section 0: copy-paste quick start), 20 troubleshooting scenarios with full request/response JSON, 4 diagnosis workflows, log file reference (local/Docker/Azure)
 - `PROMPT_LOGGING_VERIFICATION.md` v3.0 - 71-check, 12-section self-improving audit
@@ -4281,7 +4282,7 @@ No runtime cost - just hands the singleton to loaders.
 
 **Quick Start additions:**
 - README.md: New "Observability Quick Start" section - deployment table (Local/Docker/Azure URLs + tokens), 10 copy-paste PowerShell commands
-- REMOTE_DEBUGGING: New Section 0 - full A–J copy-paste script with inline URL/header/response JSON for every log access pattern
+- REMOTE_DEBUGGING: New Section 0 - full A-J copy-paste script with inline URL/header/response JSON for every log access pattern
 
 **Cross-doc freshness sweep** (13 stale items fixed across 9 files):
 - LOG_LEVEL values: NestJS-era `verbose` → custom `TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF` (README, ENDPOINT_CONFIG_FLAGS, COMPLETE_API_REFERENCE)
@@ -4576,7 +4577,7 @@ No runtime cost - just hands the singleton to loaders.
 ### Added - Precomputed Schema Characteristics Cache (2026-03-20)
 
 - **`SchemaCharacteristicsCache` interface** (`validation-types.ts`): 10 Parent→Children `Map<string, Set<string>>` maps for zero per-request schema tree recomputation
-- **`SchemaValidator.buildCharacteristicsCache()`**: Single tree walk produces all 10 maps (~25 µs). Eliminates 2–9 redundant tree walks per request (40–180 µs saved per request)
+- **`SchemaValidator.buildCharacteristicsCache()`**: Single tree walk produces all 10 maps (~25 µs). Eliminates 2-9 redundant tree walks per request (40-180 µs saved per request)
 - **`sanitizeBooleanStringsByParent()`**: Parent-context-aware boolean string coercion. Prevents name-collision false positives (e.g., core `active` boolean vs extension `active` string)
 - **`ScimSchemaHelpers` cache accessors**: `getBooleansByParent()`, `getNeverReturnedByParent()`, `getReadOnlyByParent()`, `getUniqueAttributesCached()`, `coerceBooleansByParentIfEnabled()`
 - **Lazy cache builder**: `getSchemaCache()` builds from schema definitions on first access per endpoint, attaches to profile for subsequent O(1) reads
@@ -4809,8 +4810,8 @@ Six P2 behavioral gap fixes from the RFC 7643 §2 attribute characteristics audi
 - **R-CASE-1**: caseExact-aware in-memory filter evaluation - `evaluateFilter()` now accepts an optional `caseExactAttrs` set and performs case-sensitive comparisons for attributes with `caseExact:true` (e.g., `id`, `externalId`, `meta.location`). Non-caseExact attributes remain case-insensitive per SCIM default.
 
 ### Bug Fixes - Live Test Script
-- **URL prefix fix**: 4 test base URLs in section 9t (tests 9t.5–9t.9) used `$baseUrl/endpoints/$id` instead of `$baseUrl/scim/endpoints/$id`, causing a 404 crash that silently skipped all subsequent tests. Fixed by adding the `/scim/` prefix.
-- **PowerShell escaping fix**: Nested `[Uri]::EscapeDataString()` inside double-quoted strings in section 9v (tests 9v.12–9v.13) caused parser errors. Refactored to use intermediate variables.
+- **URL prefix fix**: 4 test base URLs in section 9t (tests 9t.5-9t.9) used `$baseUrl/endpoints/$id` instead of `$baseUrl/scim/endpoints/$id`, causing a 404 crash that silently skipped all subsequent tests. Fixed by adding the `/scim/` prefix.
+- **PowerShell escaping fix**: Nested `[Uri]::EscapeDataString()` inside double-quoted strings in section 9v (tests 9v.12-9v.13) caused parser errors. Refactored to use intermediate variables.
 - **Live test count**: Corrected from 498 → **535** (37 tests were always in the script but never ran due to the 9t.5 crash).
 
 ### Test Coverage
@@ -4857,7 +4858,7 @@ All "living" reference docs updated to remove blob/backup content. Historical do
 - **`docs/LOGGING_AND_OBSERVABILITY.md`** - Removed `BackupService` from architecture diagram; removed `backup` category from log categories table; removed `"backup"` from all 4 `availableCategories` JSON examples; removed section "8.6 Backup Operation".
 - **`docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md`** - Removed Backup log category row; removed `"backup"` from both `availableCategories` JSON responses; removed backup workflow step.
 - **`docs/TECHNICAL_DESIGN_DOCUMENT.md`** - Version 1.1→1.2; removed backup from architecture diagram and module graph; removed BackupModule from module responsibilities table; removed section "5.5 BackupService" (renumbered 5.6→5.5, 5.7→5.6, 5.8→5.7); removed backup env vars; updated Azure Resource Architecture to replace blob storage with PostgreSQL Flexible Server; updated tech stack SQLite→PostgreSQL 17.
-- **`docs/TECHNICAL_REQUIREMENTS_DOCUMENT.md`** - Replaced FR-600–FR-607 (SQLite + blob snapshot requirements) with new FR-600–FR-604 (PostgreSQL persistence requirements); removed FR-707 (blob storage private endpoint); updated NFR-010 and NFR-012 backup descriptions.
+- **`docs/TECHNICAL_REQUIREMENTS_DOCUMENT.md`** - Replaced FR-600-FR-607 (SQLite + blob snapshot requirements) with new FR-600-FR-604 (PostgreSQL persistence requirements); removed FR-707 (blob storage private endpoint); updated NFR-010 and NFR-012 backup descriptions.
 - **`docs/DOCKER_GUIDE_AND_TEST_REPORT.md`** - Added "⚠️ PARTIAL HISTORICAL CONTENT" banner noting blob/backup/SQLite-era sections are historical.
 
 ### Intentionally Untouched (Historical Archives)
@@ -4916,7 +4917,7 @@ All "living" reference docs updated to remove blob/backup content. Historical do
 - **22 live integration tests** (section 9s) - Full lifecycle: create, list, auth, CRUD with per-endpoint token, OAuth fallback, reject invalid/revoked, flag-disabled rejection, expiry.
 
 ### Changed
-- Compliance score: ~99% → **100%** - All 27 migration gaps (G1–G20) now fully resolved.
+- Compliance score: ~99% → **100%** - All 27 migration gaps (G1-G20) now fully resolved.
 - Open gaps reduced from 1 (G11) → **0**.
 - Auth architecture: Single-secret → 3-tier fallback chain.
 

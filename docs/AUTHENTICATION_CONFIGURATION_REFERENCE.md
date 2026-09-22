@@ -1,8 +1,9 @@
 # Authentication configuration: what exists, where it lives, and how to change it
 
-**Last verified:** 2026-08-20
-**Applies to:** v0.55.13
+**Last verified:** 2026-09-21
+**Applies to:** v0.55.24
 **Source-derived.** Every path and field below was read from source; file references are given so you can check any claim.
+**Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines current versus target behavior, profile portability, and effective authentication provenance.
 
 ## 1. The shape of the problem
 
@@ -13,7 +14,7 @@ flowchart TD
   subgraph TokenPlane["Token plane - minting a token"]
     T1["POST /scim/endpoints/{id}/oauth/token"]
     T1 --> T2{"What did the caller present?"}
-    T2 -->|"client_id + client_secret"| T3["oauth_client credential<br/>bcrypt hash compare"]
+    T2 -->|"client_id + client_secret"| T3["oauth_client credential<br/>keyed HMAC; legacy bcrypt fallback"]
     T2 -->|"client_assertion (signed JWT)"| T4["WIF trust<br/>RFC 7523, JWKS signature"]
     T3 --> T5["endpoint-scoped access token"]
     T4 --> T5
@@ -22,7 +23,7 @@ flowchart TD
     R1["GET /scim/v2/endpoints/{id}/Users"]
     R1 --> R2{"Bearer token is..."}
     R2 -->|"a minted OAuth JWT"| R3["signature + endpoint_id claim"]
-    R2 -->|"a per-endpoint secret token"| R4["bearer credential<br/>bcrypt hash compare"]
+    R2 -->|"a per-endpoint secret token"| R4["bearer credential<br/>keyed HMAC; legacy bcrypt fallback"]
     R2 -->|"the global shared secret"| R5["SCIM_SHARED_SECRET<br/>env var"]
   end
   T5 -.->|"presented back as"| R1
@@ -36,7 +37,7 @@ There are **four** distinct stores. Knowing which one holds a given setting tell
 
 | Store | What lives there | Why there |
 |---|---|---|
-| **`EndpointCredential` table** ([schema.prisma L140-165](../api/prisma/schema.prisma)) | The credentials themselves: `credentialType`, `credentialHash` (bcrypt), `label`, `metadata` (JSONB), `secretEnvelope`, `active`, `expiresAt` | Secrets need row-level lifecycle (rotate, revoke, reactivate) that a JSON blob cannot give |
+| **`EndpointCredential` table** ([schema.prisma L140-165](../api/prisma/schema.prisma)) | The credentials themselves: `credentialType`, legacy `credentialHash`, keyed `lookupKey` / `secretHash` / `hashAlgo`, `label`, `metadata` (JSONB), `secretEnvelope`, `active`, `expiresAt` | Secrets need row-level lifecycle (rotate, deactivate, reactivate) that a JSON blob cannot give |
 | **`Endpoint.profile` JSONB** ([endpoint-profile.types.ts L186-205](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts)) | `profile.authentication` = `{schemaVersion, methods[], defaultMethodId, policy}` and the auth **flags** under `profile.settings` | Declares *which methods this endpoint offers* and how they are advertised. **No secret material ever rides here** |
 | **Server-global tables** | `ServerSetting` (the `CredentialSecretVisibility` ceiling), `CredentialDek` (the wrapped data-encryption key), `JwksHostAllowlistEntry` (SSRF allowlist) | Apply to the whole install, not one endpoint |
 | **Environment variables** | `SCIM_SHARED_SECRET`, `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`, `JWT_SECRET`, `OAUTH_JWT_PRIVATE_KEY`, `CREDENTIAL_KEK` | Bootstrap identity and key material. **Not** editable through the API by design |
@@ -49,7 +50,7 @@ Ten `type` values are accepted by the admin API ([admin-authentication-method.co
 
 `shared-secret`, `bearer`, `oauth-client`, `external-jwt`, `wif-7523`, `wif-8693`, `oauth-authcode`, `mtls`, `dpop`, `httpbasic`
 
-**Being accepted is not the same as being enforced.** Only `shared-secret`, `bearer`, `oauth-client` and the WIF pair have runtime providers. Declaring `mtls` or `dpop` records an intent and advertises it in discovery; nothing enforces it. That gap is tracked as **N8** in the auth work register - treat those two as documentation, not protection.
+**Being accepted is not the same as being enforced or advertised.** `mtls`, `dpop`, and `oauth-authcode` remain declarable for profile compatibility, but the discovery allowlist suppresses all three because no authenticator enforces them. `httpbasic` applies only at the token endpoint. RFC 8693 remains a declared method type without a token-exchange request handler; do not infer wire support from declaration alone.
 
 ## 4. How an operator changes each thing
 
@@ -157,7 +158,7 @@ WIF is the strongest option precisely because **there is no secret on our side t
 
 ## 8. Known gaps
 
-- **`mtls` and `dpop` are advertised but not enforced** (N8). Do not treat them as controls.
+- **`mtls`, `dpop`, and `oauth-authcode` are declarable but neither enforced nor advertised** (N8). Do not treat them as controls.
 - **RFC 8693 token exchange** is accepted as a `type` but has no runtime handler (Wave 4).
 - **The default KEK makes retention cosmetic** until an operator sets a real one.
 - **Nine config flags have no UI** (the JWKS numeric tuning knobs and `logFileEnabled`); they are API-only.

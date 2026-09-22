@@ -1,6 +1,6 @@
 # Contextual Endpoint Settings UI - Execution Issues and RCA
 
-> **Status:** Complete through the local v0.55.24 PR review and canonical design reconciliation - **Last verified:** 2026-09-18
+> **Status:** Complete through the v0.55.24 dev deployment review - **Last verified:** 2026-09-21
 >
 > **Scope:** Extraction of the shared endpoint-settings registry, the reusable related-settings panel, contextual placement across Users, Groups, Schemas, Resource types, Logs, and Connect, preservation of Settings as the complete 38-control inventory, authoritative auth-state hardening, and the endpoint-profile/discovery/authentication design reconciliation.
 >
@@ -313,6 +313,8 @@ The September 17 follow-up applied one ownership rule: a contextual tab shows on
 | UX-20 | Process / Git | Low | GitHub rejected the first push with `directory file conflict` | A remote branch named `analysis` prevents creation of any `analysis/*` ref | Renamed the local branch to `feat/endpoint-settings-ux-v0.55.24` and pushed the identical commit after the full hook was green. |
 | UX-21 | Process / docs | High | Multiple documents still called the live authentication model inert, omitted authentication from the profile, described discovery round-trip as lossless, or equated WIF target client identity with assertion subject | Point-in-time design and delivery documents remained indexed as current authority after later implementation waves changed the facts; no single cross-cutting document owned the profile/discovery/auth boundary | Added the canonical portable-profile/auth/discovery design; corrected or marked historical every high-risk authority; updated the index and source comments. Future cross-cutting changes must update the canonical design or explicitly state why it is unaffected. |
 | UX-22 | Tooling / docs | Low | The first Mermaid grammar run failed the new WIF sequence diagram at `participant Create` | `Create` is a Mermaid sequence-diagram keyword, so using it as an actor alias is ambiguous even though the visible label is ordinary prose | Renamed the internal actor token to `Wizard` while preserving the visible label. The existing grammar and Chromium render gates already detect this class, so no new gate is needed. |
+| UX-23 | Test correctness / visual gate | Medium | Dev Playwright first failed the Schemas visual baseline, then the complete rerun exposed the same stale state on Users | v0.55.24 intentionally changed contextual panels to collapsed accordions, but the Schemas and Users baselines were not both regenerated after that approved behavior landed | **Intended visual change because the collapsed `Schema behavior settings` and `User behavior settings` accordions are the shipped UX.** Inspected each expected, actual, and diff PNG set before regenerating only the two corresponding win32 snapshots; focused and full Playwright reruns own acceptance. |
+| UX-24 | Process / docs | High | The indexed authentication configuration reference still applied to v0.55.13 and claimed unenforced methods were advertised | The canonical design reconciliation updated broad architecture docs but missed one user-facing operator authority | Updated the reference to v0.55.24, corrected keyed credential storage and discovery suppression, and linked the canonical design. Reviewer audit now treats narrative docs as green only after this correction. |
 
 ### 8.3 Test and architecture dispositions
 
@@ -324,6 +326,8 @@ The September 17 follow-up applied one ownership rule: a contextual tab shows on
 - **Pattern promotion: applied.** UX-2 is now PF-2 in `ENGINEERING_LESSONS_AND_PATTERNS.md` and standing rule R11 in `.github/copilot-instructions.md`: a displayed layered control must consume the enforcement resolver, expose provenance and disable a non-authoritative write path.
 - **Documentation authority disposition: applied.** UX-21 now has one canonical cross-cutting owner plus explicit historical/current labels in older documents. This closes the contradiction without deleting their useful delivery evidence.
 - **Mermaid disposition: no new improvement required.** UX-22 was caught by the first grammar run and repaired before indexing the document; the existing gate already covers the failure class.
+- **Visual-gate disposition: applied.** UX-23 followed the required expected/actual/diff inspection and written intended-change classification before a single-baseline regeneration.
+- **Documentation-gate disposition: applied.** UX-24 closes the remaining indexed stale authority found by the post-deploy reviewer audit.
 
 ### 8.4 Provenance and completeness
 
