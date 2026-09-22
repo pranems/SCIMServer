@@ -2,8 +2,8 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.24
-> **Last Updated**: September 18, 2026
-> **Last verified:** 2026-09-18
+> **Last Updated**: September 21, 2026
+> **Last verified:** 2026-09-21
 
 ---
 
@@ -18,7 +18,14 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The active v0.55.24 UI change refines endpoint settings and Connect. Contextual
+The v0.55.24 UI change is merged and verified on dev at revision
+`scimserver-dev--v0ecf4f2d`, serving `ghcr.io/pranems/scimserver:0.55.24`.
+Dev evidence is live SCIM 1,491/1,491, Playwright 230 passed / 4 skipped,
+endpoint integrity 60 -> 60 with zero missing IDs, and two active revisions
+including the v0.55.23 rollback target. Canary and customer prod were not
+touched.
+
+The change refines endpoint settings and Connect. Contextual
 panes are collapsed; Users owns only its two lifecycle settings and Groups only
 its three membership/deletion settings, while common endpoint behavior remains
 in Settings. Connect presents four real methods in OAuth2/WIF/global-shared/
@@ -31,8 +38,6 @@ The broad endpoint overview always withholds plaintext credentials; Connect
 uses the dedicated, audit-logged connection-info route for any disclosure under
 `CredentialSecretVisibility=always`.
 Credential cards now separate summary, primary actions, More, and export rows.
-Deployment target is dev only after reviewed PR merge; canary and customer prod
-must remain unchanged.
 
 The canonical architecture for the next endpoint-profile/authentication work is
 [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
