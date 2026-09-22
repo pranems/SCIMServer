@@ -1,9 +1,10 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-15 - **Product version:** `0.55.23`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
 
-> **Status:** Active | **Last Updated:** 2026-09-15 | **Version:** 0.55.23
+> **Status:** Active | **Last Updated:** 2026-09-18 | **Version:** 0.55.24
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
+> **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
 >
 > ```powershell
@@ -207,17 +208,19 @@ Two details worth knowing:
 
 The cap is **1000 operations and a 1 MB payload**. Before submitting you get a preview of the first ten operations and a **Copy full envelope as JSON** button, so you can inspect exactly what will be sent. Afterwards, **failure rows are downloadable as CSV** carrying the per-operation `scimType` and `detail` - fix that file and re-submit it rather than re-deriving which rows failed.
 
-**Resource types** lists what this endpoint serves, creates custom ones beyond User and Group, and exposes the related discovery/enforcement settings above the inventory.
+**Resource types** lists what this endpoint serves, creates custom ones beyond User and Group, and exposes the related discovery/enforcement settings in a collapsed pane above the inventory.
 
 ![Resource types](screenshots/prod-12-endpoint-resource-types.png)
 
 Each row shows the type name, its endpoint path and its schema URN. **Create** asks for a name, an endpoint path (mounted under `/scim/endpoints/{id}`), a schema URN and an optional description. Delete asks for confirmation. The list renders whether or not custom types are currently enabled, so you can always see what a client would discover at `/ResourceTypes`.
 
-**Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`, with discovery and strict-validation controls in the same tab. One row per schema shows its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
+**Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`, with discovery and strict-validation controls in a collapsed pane. One row per schema shows its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
 
-**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md). The **Authentication methods** switches are on this tab, and the selected bearer/OAuth/WIF subtab shows its credential limit or WIF/JWKS controls. Each credential card renders its IdP connection values **without a click** (only the secret itself needs one), and **Rotate** is a button on the card rather than an overflow-menu item. Each card also carries a **Legacy (bcrypt)** or **Keyed** badge showing which verifier that credential still needs.
+**Users** and **Groups** each begin with a collapsed behavior pane. Users contains only its two lifecycle controls; Groups contains only its three membership/deletion controls. Common validation, coercion, primary-enforcement, general PATCH and ETag settings stay in the complete Endpoint Settings tab so one endpoint-wide value is never presented as two resource-specific settings.
 
-**Logs** is this endpoint's slice of the request log, including the per-row auth outcome chip and the decision trace behind it. Its request-persistence, file-output, and per-endpoint log-level controls appear above the rows. See [section 12](#12-logs).
+**Connect** is the authentication surface and has its own guide: [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md). Its collapsed **Authentication methods** pane shows four real methods in setup order (OAuth2, WIF, global shared secret, per-endpoint bearer); the legacy umbrella is kept out of this selector. The selected method shows a collapsed credential-limit or WIF/JWKS pane. Credential headers expose only the primary action plus **More**, while labeled export rows and IdP connection values remain visible below.
+
+**Logs** is this endpoint's slice of the request log, including the per-row auth outcome chip and the decision trace behind it. Its request-persistence, file-output, and per-endpoint log-level controls are in a collapsed pane above the rows. See [section 12](#12-logs).
 
 **Settings** remains the complete structured inventory of all 38 endpoint controls even though related subsets also appear in operational tabs. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md).
 

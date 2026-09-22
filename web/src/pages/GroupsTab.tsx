@@ -140,7 +140,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
           endpointId={endpointId}
           settingKeys={TAB_SETTING_KEYS.groups}
           title="Group behavior settings"
-          description="Membership PATCH, validation, concurrency, and deletion controls applied to Groups."
+          description="Group-specific membership and deletion controls. Common endpoint validation, PATCH, and ETag settings remain in Settings."
           data-testid="groups-related-settings"
         />
         <EmptyState
@@ -158,7 +158,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
         endpointId={endpointId}
         settingKeys={TAB_SETTING_KEYS.groups}
         title="Group behavior settings"
-        description="Membership PATCH, validation, concurrency, and deletion controls applied to Groups."
+        description="Group-specific membership and deletion controls. Common endpoint validation, PATCH, and ETag settings remain in Settings."
         data-testid="groups-related-settings"
       />
       <div className={classes.header}>

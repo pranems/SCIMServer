@@ -326,6 +326,8 @@ export interface EndpointOverviewCredential {
 export interface EndpointOverviewWifTrust {
   expectedIssuer?: string | null;
   expectedSubject?: string | null;
+  /** OAuth client identity minted into issued tokens; defaults to endpointId. */
+  targetClientId?: string | null;
   expectedAudience?: string | null;
   jwksUri?: string | null;
   allowedTenantId?: string | null;

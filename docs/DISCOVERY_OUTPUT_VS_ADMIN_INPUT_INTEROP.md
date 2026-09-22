@@ -5,6 +5,8 @@
 > **Created**: June 1, 2026
 > **Version**: current
 > **RFC References**: RFC 7643 §5 (SPC), §6 (ResourceTypes), §7 (Schemas), §2.2 (default characteristics); RFC 7644 §3.4.2 (ListResponse), §4 (Discovery)
+>
+> **2026-09-18 clarification:** Discovery can reconstruct the portable discovery contract after normalization, but it cannot reconstruct endpoint settings, authentication method declarations, credentials, server ceilings, or effective-state provenance. The authoritative portability and import design is [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
 ---
 
@@ -27,13 +29,13 @@
 | Question | Verdict |
 |---|---|
 | Can **another SCIM server's** `/Schemas` + `/ResourceTypes` + `/ServiceProviderConfig` output be used **as-is** for `POST`/`PATCH /admin/endpoints`? | **NO** - structurally incompatible **and** can be rejected by validation. |
-| Can **SCIMServer's own** discovery output be used **as-is** for `POST`/`PATCH /admin/endpoints`? | **NO (literally)** - same envelope/wrapper mismatch. **YES after a small mechanical re-assembly** - it then always passes validation. |
+| Can **SCIMServer's own** discovery output be used **as-is** for `POST`/`PATCH /admin/endpoints`? | **NO (literally)** - same envelope/wrapper mismatch. After mechanical reassembly it can reproduce the discovery contract, but not the complete portable profile or effective endpoint state. |
 | Are SCIMServer's discovery APIs **RFC compliant**? | **YES** - RFC 7643 §5-§7 + RFC 7644 §4 conformant (per [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md), all 6 historical gaps remediated). One cosmetic observation: `meta.location` is emitted as a relative path. |
 
 **Root cause of the "not as-is" verdict (both premises):** the admin API does **not** consume RFC discovery documents. It consumes a single proprietary **shorthand profile envelope**:
 
 ```jsonc
-{ "name": "...", "profile": { "schemas": [...], "resourceTypes": [...], "serviceProviderConfig": {...}, "settings": {...} } }
+{ "name": "...", "profile": { "schemas": [...], "resourceTypes": [...], "serviceProviderConfig": {...}, "settings": {...}, "authentication": {...} } }
 ```
 
 Discovery, by contrast, publishes **three separate documents at three URLs**, two of them wrapped in a SCIM `ListResponse`. The actual resource objects live in `Resources[]`, not at the top level. So even a perfect round-trip requires un-wrapping each `ListResponse`, dropping the `name`-less discovery envelopes, and re-nesting everything under a `profile` key with an operator-supplied `name`.
@@ -84,11 +86,11 @@ Note the trap: the top-level `schemas` key here is the **envelope URN array**, *
 
 ### 2.2 Admin INPUT contract (what create/update consumes)
 
-`CreateEndpointDto` / `UpdateEndpointDto` -> `validateAndExpandProfile`. Only **four** keys of `profile` are ever read - `schemas`, `resourceTypes`, `serviceProviderConfig`, `settings` (`ShorthandProfileInput`). Everything else is **silently ignored, never rejected**.
+`CreateEndpointDto` / `UpdateEndpointDto` -> `validateAndExpandProfile`. Five profile sections are recognized - `schemas`, `resourceTypes`, `serviceProviderConfig`, `settings`, and `authentication` (`ShorthandProfileInput`). Unknown fields are not part of the persisted contract.
 
 ```mermaid
 flowchart TD
-    POST["POST/PATCH body"] --> READ{"reads only<br/>name + profile.{schemas,<br/>resourceTypes, SPC, settings}"}
+    POST["POST/PATCH body"] --> READ{"reads name + profile.{schemas,<br/>resourceTypes, SPC, settings,<br/>authentication}"}
     READ -->|other keys| DROP["silently dropped<br/>(meta, totalResults, Resources,<br/>envelope schemas[])"]
     READ --> EXP["expandProfile()"]
     EXP --> INJ["auto-inject RFC-required attrs"]
@@ -127,7 +129,8 @@ Even after correct re-assembly, a foreign profile can be **rejected**:
 | A `resourceType` missing the `schemaExtensions` array entirely | structural loop dereferences it | TypeError -> 400 |
 
 ### 3.3 Semantic loss (silent)
-- **`settings`** (the 16 behavioral flags) is **not an RFC concept** and is absent from any foreign discovery doc - the new endpoint silently gets defaults.
+- **`settings`** is **not an RFC concept** and is absent from any foreign discovery doc - target defaults or explicit operator choices are required.
+- **`authentication.methods[]`** is absent from RFC discovery. `authenticationSchemes[]` is too coarse to activate a target method or create a credential safely.
 - Per-schema `meta`/`schemas` are **stripped** during expansion (the expander reconstructs each schema as only `{ id, name, description, attributes }`).
 - On `serviceProviderConfig`, the input's `meta`, `schemas`, and `authenticationSchemes` are **ignored** - the server overrides them with its own constants on output. So a foreign server's auth schemes never carry over.
 
@@ -144,7 +147,7 @@ The *structural* blockers from §3.1 apply identically - our own `/Schemas` and 
 - `changePassword.supported` is `false` and `filter.maxResults`/`bulk.maxOperations` are in range (SPC-truthful passes),
 - every `resourceType.schema` + extension URN resolves within the published `schemas[]`, and `schemaExtensions` is always present (structural passes).
 
-So once you **unwrap the two `ListResponse` envelopes** (take `.Resources`), **add a `name`**, and **nest under `profile`**, SCIMServer's own discovery output round-trips cleanly. The per-schema `meta`/`schemas` and the SPC `meta`/`schemas`/`authenticationSchemes` are dropped/overridden, but those are reconstructed identically on the next discovery read - so the round-trip is lossless for everything the admin contract actually governs. (`settings` is still absent from discovery and defaults on the new endpoint - the one true semantic gap even for self-round-trip.)
+Once you **unwrap the two `ListResponse` envelopes** (take `.Resources`), **add a `name`**, and **nest under `profile`**, SCIMServer's own discovery output can reconstruct a contract-equivalent schema, ResourceType, and SPC baseline. The per-schema `meta`/`schemas` and SPC `meta`/`schemas` are target-generated on the next discovery read. The operation is not a complete endpoint round-trip: `settings`, `authentication.methods[]`, credentials, server ceilings, and effective provenance are absent and must be defaulted or selected explicitly.
 
 ---
 

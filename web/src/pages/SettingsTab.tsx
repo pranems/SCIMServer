@@ -65,6 +65,7 @@ import {
   type EnumSettingDefinition as EnumSetting,
   type NumberSettingDefinition as NumberSetting,
 } from './endpoint-settings-definitions';
+import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 
 /*
  * Setting definitions live in endpoint-settings-definitions.ts. Settings is
@@ -351,8 +352,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
             <Card key={category} className={classes.card} data-testid={catTestId}>
               <Caption1>{category}</Caption1>
               {flagsInCategory.map((flag) => {
-                const checked = coerceFlag(flags[flag.key], flag.defaultValue);
-                const disabled = isPending && pendingKey === flag.key;
+                const authMethod = AUTH_METHOD_FLAGS.find((candidate) => candidate.key === flag.key);
+                const resolvedEnabled = authMethod
+                  ? overview.connectionInfo.enabledMethods.find((method) => method.method === authMethod.method)
+                  : undefined;
+                const resolvedDisabled = authMethod
+                  ? overview.connectionInfo.disabledMethods.find((method) => method.method === authMethod.method)
+                  : undefined;
+                const resolved = resolvedEnabled ?? resolvedDisabled;
+                const managedByMethod = resolved?.enablementSource === 'authentication-method';
+                const checked = resolved
+                  ? Boolean(resolvedEnabled)
+                  : coerceFlag(flags[flag.key], flag.defaultValue);
+                const disabled = (isPending && pendingKey === flag.key) || managedByMethod;
                 return (
                   <div key={flag.key} className={classes.flagRow} data-testid={`settings-flag-row-${flag.key}`}>
                     <div className={classes.flagHeader}>
@@ -368,6 +380,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                     <Caption1 className={classes.flagDescription} data-testid={`settings-flag-desc-${flag.key}`}>
                       {flag.description}
                     </Caption1>
+                    {managedByMethod && (
+                      <Caption1
+                        className={classes.flagDescription}
+                        data-testid={`settings-flag-source-${flag.key}`}
+                      >
+                        Managed by Authentication methods. Change it in Connect.
+                      </Caption1>
+                    )}
                   </div>
                 );
               })}

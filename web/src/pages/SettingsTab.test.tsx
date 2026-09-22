@@ -395,6 +395,33 @@ describe('SettingsTab', () => {
     expect(authCard.querySelector('[aria-label="WifCredentialsEnabled"]')).not.toBeNull();
   });
 
+  it('shows a method-managed effective value and blocks the shadow settings write', async () => {
+    const user = userEvent.setup();
+    const overview = overviewWith({ SecretTokenBearerAuthEnabled: true });
+    overview.connectionInfo.disabledMethods.push({
+      method: 'bearer',
+      enablementSource: 'authentication-method',
+      reason: 'Disabled by the authentication method entry',
+      enableHint: 'Change this method in Connect',
+    });
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overview,
+      isLoading: false,
+      error: null,
+    });
+
+    wrap(<SettingsTab endpointId={EP_ID} />);
+
+    const bearer = screen.getByTestId('settings-flag-SecretTokenBearerAuthEnabled');
+    expect(bearer).not.toBeChecked();
+    expect(bearer).toBeDisabled();
+    expect(screen.getByTestId('settings-flag-source-SecretTokenBearerAuthEnabled')).toHaveTextContent(
+      'Managed by Authentication methods. Change it in Connect.',
+    );
+    await user.click(bearer);
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('renders the PersistRequestSecrets switch under Logging & privacy (defaults ON)', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({}),

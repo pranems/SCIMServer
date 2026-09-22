@@ -201,7 +201,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
           endpointId={endpointId}
           settingKeys={TAB_SETTING_KEYS.users}
           title="User behavior settings"
-          description="Validation, concurrency, PATCH, and lifecycle controls applied to this endpoint's Users resource."
+          description="User-specific lifecycle controls. Common endpoint validation, PATCH, and ETag settings remain in Settings."
           data-testid="users-related-settings"
         />
         <EmptyState
@@ -219,7 +219,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
         endpointId={endpointId}
         settingKeys={TAB_SETTING_KEYS.users}
         title="User behavior settings"
-        description="Validation, concurrency, PATCH, and lifecycle controls applied to this endpoint's Users resource."
+        description="User-specific lifecycle controls. Common endpoint validation, PATCH, and ETag settings remain in Settings."
         data-testid="users-related-settings"
       />
       <div className={classes.header}>

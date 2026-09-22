@@ -32,6 +32,7 @@ const TRUST_A = {
   wif: {
     expectedIssuer: 'https://login.microsoftonline.com/contoso/v2.0',
     expectedSubject: 'sp-object-id-123',
+    targetClientId: 'target-client-id-123',
     expectedAudience: 'api://scim-app',
     jwksUri: 'https://login.microsoftonline.com/contoso/discovery/v2.0/keys',
     allowedTenantId: 'contoso-tenant-guid',
@@ -45,7 +46,10 @@ const TRUST_A = {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(
-    ({ key, value }) => window.localStorage.setItem(key, value),
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+      window.localStorage.setItem('scimserver.onboarding.completedAt', 'e2e-complete');
+    },
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
 });
@@ -145,6 +149,7 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
       'https://login.microsoftonline.com/contoso/v2.0',
     );
     await expect(page.getByTestId('wif-credential-wt-a-subject')).toContainText('sp-object-id-123');
+    await expect(page.getByTestId('wif-credential-wt-a-target-client')).toContainText('target-client-id-123');
     await expect(page.getByTestId('wif-credential-wt-a-audience')).toContainText('api://scim-app');
     await expect(page.getByTestId('wif-credential-wt-a-jwks')).toContainText(
       'https://login.microsoftonline.com/contoso/discovery/v2.0/keys',
@@ -155,6 +160,7 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
 
   test('item 4: Edit loads the saved trust into the form (edit mode)', async ({ page }) => {
     await openCredentials(page);
+    await page.getByTestId('wif-credential-more-wt-a').click();
     await page.getByTestId('wif-credential-edit-wt-a').click();
     // The in-card edit form (U4) opens below the trust, populated with values.
     await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeVisible();
@@ -180,12 +186,13 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
     await expect(page.getByTestId('wif-add-trust-form')).toBeHidden();
   });
 
-  test('U6: Connect reveals the per-trust connection params in-card (subject = client id)', async ({ page }) => {
+  test('U6: Connect distinguishes the target client id from the assertion subject', async ({ page }) => {
     await openCredentials(page);
     await expect(page.getByTestId('wif-credential-connect-panel-wt-a')).toBeHidden();
     await page.getByTestId('wif-credential-connect-wt-a').click();
     await expect(page.getByTestId('wif-credential-connect-panel-wt-a')).toBeVisible();
-    await expect(page.getByTestId('wif-connect-clientid-wt-a')).toContainText('sp-object-id-123');
+    await expect(page.getByTestId('wif-connect-clientid-wt-a')).toContainText('target-client-id-123');
+    await expect(page.getByTestId('wif-connect-assertion-subject-wt-a')).toContainText('sp-object-id-123');
     await expect(page.getByTestId('wif-connect-appurl-wt-a')).toBeVisible();
   });
 
@@ -220,8 +227,10 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
   test('V9: the WIF Edit button toggles the in-card edit form open and closed', async ({ page }) => {
     await openCredentials(page);
     await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeHidden();
+    await page.getByTestId('wif-credential-more-wt-a').click();
     await page.getByTestId('wif-credential-edit-wt-a').click();
     await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeVisible();
+    await page.getByTestId('wif-credential-more-wt-a').click();
     await page.getByTestId('wif-credential-edit-wt-a').click();
     await expect(page.getByTestId('wif-trust-edit-form-wt-a')).toBeHidden();
   });

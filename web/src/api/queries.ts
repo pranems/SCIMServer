@@ -1711,10 +1711,10 @@ export function useRemoveJwksHost() {
 
 /**
  * WI-2/WI-4 - fetch the assembled connection-info for an endpoint (absolute
- * URLs + per-method Entra field set; no secrets). The per-endpoint Overview
- * BFF already embeds this same shape (WI-3), so prefer `useEndpointOverview`
- * when the overview is already loaded; this dedicated hook is for surfaces that
- * only need the connection block.
+ * URLs + per-method Entra field set). Secrets are withheld by default; under
+ * CredentialSecretVisibility=always this explicit admin route may include
+ * retained values and audits the disclosure. The Overview BFF embeds only the
+ * non-secret shape, so Connect uses this dedicated hook.
  */
 export function useConnectionInfo(endpointId: string) {
   return useQuery<ConnectionInfo>({

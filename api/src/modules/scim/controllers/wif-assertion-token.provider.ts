@@ -20,7 +20,11 @@ import { isUnsafeObjectKey } from '../../../security/safe-object-key';
 import type { IAssertionTokenProvider, AssertionMintRequest } from './assertion-token-provider';
 import { WIF_PROFILE_RFC7523, resolveTrustProfiles, trustEnablesProfile } from './assertion-token-provider';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { resolveEndpointEgressOverrides } from '../../endpoint/endpoint-config.interface';
+import {
+  resolveEndpointAuthEnablement,
+  resolveEndpointEgressOverrides,
+  type EndpointConfig,
+} from '../../endpoint/endpoint-config.interface';
 import { WifTrustCacheService } from '../services/wif-trust-cache.service';
 
 /**
@@ -108,6 +112,19 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
     const endpoint = await this.endpointService
       .getEndpoint(endpointId)
       .catch(() => undefined);
+    const config = (endpoint?.profile?.settings ?? {}) as EndpointConfig;
+    const wifEnabled = resolveEndpointAuthEnablement(
+      config,
+      endpoint?.profile?.authentication?.methods,
+    ).workloadIdentityFederation;
+    if (!wifEnabled) {
+      this.logger.warn(
+        LogCategory.AUTH,
+        'WIF assertion ignored because the endpoint method is disabled',
+        { endpointId },
+      );
+      return null;
+    }
     const egressOverrides = resolveEndpointEgressOverrides(endpoint?.profile?.settings);
 
     // From here on the assertion is "mine": one configured WIF trust must

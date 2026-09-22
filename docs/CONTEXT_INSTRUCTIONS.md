@@ -1,9 +1,9 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.23
-> **Last Updated**: September 16, 2026
-> **Last verified:** 2026-09-16
+> **Version**: 0.55.24
+> **Last Updated**: September 18, 2026
+> **Last verified:** 2026-09-18
 
 ---
 
@@ -17,6 +17,33 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The active v0.55.24 UI change refines endpoint settings and Connect. Contextual
+panes are collapsed; Users owns only its two lifecycle settings and Groups only
+its three membership/deletion settings, while common endpoint behavior remains
+in Settings. Connect presents four real methods in OAuth2/WIF/global-shared/
+bearer order and keeps `PerEndpointCredentialsEnabled` under Legacy
+compatibility. Connection info carries `enablementSource`, so the UI follows
+the authoritative `profile.authentication.methods[]` override when present.
+That precedence now covers WIF creation, diagnostics, token minting, discovery,
+connection info, Connect, and Settings as well as bearer/OAuth/shared secret.
+The broad endpoint overview always withholds plaintext credentials; Connect
+uses the dedicated, audit-logged connection-info route for any disclosure under
+`CredentialSecretVisibility=always`.
+Credential cards now separate summary, primary actions, More, and export rows.
+Deployment target is dev only after reviewed PR merge; canary and customer prod
+must remain unchanged.
+
+The canonical architecture for the next endpoint-profile/authentication work is
+[PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
+It preserves one portable `EndpointProfile` for schemas, resource types, SPC
+inputs, endpoint settings, and non-secret method declarations. Credentials,
+secret envelopes, resources, logs, server policy, and effective-state
+provenance remain deployment-local. Discovery import is a normalized contract
+baseline with an explicit fidelity report, never an endpoint clone. The target
+implementation is intentionally outside PR #157 and is split into separate
+read-model, profile-v2/import, canonical-write, consumer-alignment, and legacy-
+migration rollback units.
 
 ---
 

@@ -1,6 +1,6 @@
 # Admin Authentication-Methods API + Orthogonal WIF Gate (A1)
 
-> Step **A1** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)). Adds the management surface for the A0 inert authentication model, plus the `WifCredentialsEnabled` flag and the orthogonal credential-create gate.
+> **Historical A1 delivery report.** Step **A1** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)) added the management surface and original WIF credential gate. The model is now live and enforced. Current precedence is explicit method entry, dedicated setting, legacy setting, then default. See [AUTHENTICATION_METHODS_MODEL.md](AUTHENTICATION_METHODS_MODEL.md) and [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
 ## What changed
 

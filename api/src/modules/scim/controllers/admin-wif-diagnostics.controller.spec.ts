@@ -101,6 +101,17 @@ describe('AdminWifDiagnosticsController', () => {
       await expect(call()).rejects.toBeInstanceOf(ForbiddenException);
     });
 
+    it.each(routes)('%s rejects with 403 when a WIF method entry disables a true flat flag', async (_name, call) => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: {
+          settings: { WifCredentialsEnabled: true },
+          authentication: { methods: [{ type: 'wif-7523', enabled: false }] },
+        },
+      });
+      await expect(call()).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
     // Order matters: an unknown endpoint must 404 and must NOT report on the
     // feature flags of an endpoint the caller cannot see.
     it.each(routes)('%s propagates the 404 for an unknown endpoint before any WIF gate', async (_name, call) => {

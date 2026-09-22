@@ -314,6 +314,20 @@ describe('AdminCredentialController', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('rejects a wif credential when a WIF method entry disables a true flat flag', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpoint,
+        profile: {
+          settings: { WifCredentialsEnabled: true },
+          authentication: { methods: [{ type: 'wif-7523', enabled: false }] },
+        },
+      });
+
+      await expect(
+        controller.createCredential(mockEndpoint.id, { credentialType: 'wif' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('still requires PerEndpointCredentialsEnabled for a bearer credential', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,

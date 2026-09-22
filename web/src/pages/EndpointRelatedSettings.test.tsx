@@ -77,6 +77,10 @@ function renderPanel(keys: readonly string[]) {
   );
 }
 
+function expandPanel() {
+  fireEvent.click(screen.getByRole('button', { name: /Related settings/i }));
+}
+
 describe('EndpointRelatedSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,6 +90,10 @@ describe('EndpointRelatedSettings', () => {
 
   it('renders boolean, enum and numeric controls from the shared registry', () => {
     renderPanel(['UserSoftDeleteEnabled', 'PrimaryEnforcement', 'MaxActiveBearerCredentials']);
+
+    expect(screen.getByText('3 settings')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: /User soft delete/i })).not.toBeInTheDocument();
+    expandPanel();
 
     expect(screen.getByRole('switch', { name: /User soft delete/i })).toBeChecked();
     expect(screen.getByRole('combobox', { name: /Primary enforcement/i })).toBeInTheDocument();
@@ -114,6 +122,7 @@ describe('EndpointRelatedSettings', () => {
 
   it('persists a boolean toggle through the standard endpoint-config mutation', async () => {
     renderPanel(['UserSoftDeleteEnabled']);
+    expandPanel();
     fireEvent.click(screen.getByRole('switch', { name: /User soft delete/i }));
 
     await waitFor(() =>
@@ -126,6 +135,7 @@ describe('EndpointRelatedSettings', () => {
   it('surfaces a mutation failure without changing the page contract', async () => {
     mockMutateAsync.mockRejectedValue(new Error('save failed'));
     renderPanel(['UserSoftDeleteEnabled']);
+    expandPanel();
     fireEvent.click(screen.getByRole('switch', { name: /User soft delete/i }));
 
     expect(await screen.findByTestId('related-settings-feedback')).toHaveTextContent(/save failed/i);
@@ -133,6 +143,7 @@ describe('EndpointRelatedSettings', () => {
 
   it('persists an enum selection through the same mutation path', async () => {
     renderPanel(['PrimaryEnforcement']);
+    expandPanel();
     fireEvent.click(screen.getByRole('combobox', { name: /Primary enforcement/i }));
     fireEvent.click(await screen.findByRole('option', { name: /normalize/i }));
 
@@ -145,6 +156,7 @@ describe('EndpointRelatedSettings', () => {
 
   it('persists a bounded numeric value through the same mutation path', async () => {
     renderPanel(['MaxActiveBearerCredentials']);
+    expandPanel();
     const input = screen.getByRole('spinbutton', { name: /Maximum active bearer credentials/i });
     fireEvent.change(input, { target: { value: '7' } });
     fireEvent.blur(input);
@@ -161,6 +173,7 @@ describe('EndpointRelatedSettings', () => {
     ['26', /between 1 and 25/i],
   ])('rejects invalid numeric input %s without persisting it', async (raw, message) => {
     renderPanel(['MaxActiveBearerCredentials']);
+    expandPanel();
     const input = screen.getByRole('spinbutton', { name: /Maximum active bearer credentials/i });
     fireEvent.change(input, { target: { value: raw } });
     fireEvent.blur(input);
@@ -170,12 +183,12 @@ describe('EndpointRelatedSettings', () => {
   });
 
   it('declares the intended ownership map for endpoint subtabs', () => {
-    expect(TAB_SETTING_KEYS.users).toEqual(
-      expect.arrayContaining(['UserSoftDeleteEnabled', 'UserHardDeleteEnabled', 'PrimaryEnforcement']),
-    );
-    expect(TAB_SETTING_KEYS.groups).toEqual(
-      expect.arrayContaining(['GroupHardDeleteEnabled', 'MultiMemberPatchOpForGroupEnabled', 'PatchOpAllowRemoveAllMembers']),
-    );
+    expect(TAB_SETTING_KEYS.users).toEqual(['UserSoftDeleteEnabled', 'UserHardDeleteEnabled']);
+    expect(TAB_SETTING_KEYS.groups).toEqual([
+      'GroupHardDeleteEnabled',
+      'MultiMemberPatchOpForGroupEnabled',
+      'PatchOpAllowRemoveAllMembers',
+    ]);
     expect(TAB_SETTING_KEYS.schemas).toEqual(
       expect.arrayContaining(['SchemaDiscoveryEnabled', 'StrictSchemaValidation', 'RfcCompliantSubAttributes']),
     );

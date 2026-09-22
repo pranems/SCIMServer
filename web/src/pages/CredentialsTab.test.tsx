@@ -13,7 +13,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { CredentialsTab } from './CredentialsTab';
@@ -21,6 +21,7 @@ import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 
 const mockUseEndpointOverview = vi.fn();
+const mockUseConnectionInfo = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockActivateMutate = vi.fn();
@@ -52,6 +53,7 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useEndpointOverview: (...args: unknown[]) => mockUseEndpointOverview(...args),
+    useConnectionInfo: (...args: unknown[]) => mockUseConnectionInfo(...args),
     useCreateCredential: () => ({
       mutate: mockCreateMutate,
       isPending: createMutationState.isPending,
@@ -136,6 +138,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('CredentialsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseConnectionInfo.mockReturnValue({ data: undefined, isLoading: false, error: null });
     createMutationState = { isPending: false };
     deleteMutationState = { isPending: false };
   });
@@ -146,6 +149,12 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: undefined, isLoading: true, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     expect(screen.getByTestId('credentials-skeleton')).toBeInTheDocument();
+  });
+
+  it('loads the dedicated audited connection-info resource for Connect', () => {
+    mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    expect(mockUseConnectionInfo).toHaveBeenCalledWith('ep-1');
   });
 
   it('shows error block on error', () => {
@@ -228,7 +237,7 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credential-row-cred-2')).toBeInTheDocument();
     // Active vs Revoked badges
     expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Revoked')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
     // Headline shows the count (P5 - the tab is now titled "Connect")
     expect(screen.getByText(/Connect \(2\)/)).toBeInTheDocument();
   });
@@ -360,11 +369,12 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credentials-oauth-copy-json')).toBeInTheDocument();
   });
 
-  it('R8: cross-links to Settings to enable/disable auth methods', () => {
+  it('R8: cross-links to Settings to enable/disable auth methods', async () => {
     mockUseEndpointOverview.mockReturnValue({ data: baseOverview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     mockNavigate.mockClear();
-    screen.getByTestId('connect-tab-link-settings').click();
+    fireEvent.click(screen.getByRole('button', { name: /Authentication methods/i }));
+    fireEvent.click(await screen.findByTestId('connect-tab-link-settings'));
     expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/endpoints/$endpointId/settings' }));
   });
 
@@ -382,9 +392,9 @@ describe('CredentialsTab', () => {
     expect(screen.getByText(/403 Forbidden/)).toBeInTheDocument();
   });
 
-  // ─── Delete flow ───────────────────────────────────────────────────
+  // ─── Reversible lifecycle ──────────────────────────────────────────
 
-  it('opens delete confirmation when delete icon clicked', () => {
+  it('offers one reversible Deactivate action and no duplicate Revoke action', () => {
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
       credentials: [
@@ -401,24 +411,57 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
+    mockDeactivateMutate.mockClear();
     fireEvent.click(screen.getByTestId('credential-more-cred-x'));
-    fireEvent.click(screen.getByTestId('credential-delete-cred-x'));
-    expect(screen.getByTestId('credentials-delete-dialog')).toBeInTheDocument();
-    // Title text is broken across nodes ("Revoke credential" + label)
-    // - assert via the dialog's textContent for resilience.
-    const dialog = screen.getByTestId('credentials-delete-dialog');
-    expect(dialog.textContent).toContain('Doomed');
+    const lifecycle = screen.getByTestId('credential-toggle-active-cred-x');
+    expect(lifecycle).toHaveTextContent('Deactivate');
+    expect(screen.queryByTestId('credential-delete-cred-x')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credentials-delete-dialog')).not.toBeInTheDocument();
+    fireEvent.click(lifecycle);
+    expect(mockDeactivateMutate).toHaveBeenCalledWith(
+      'cred-x',
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
-  it('calls useDeleteCredential mutate on Revoke confirm', () => {
+  it('surfaces a generic credential lifecycle failure', () => {
+    mockDeactivateMutate.mockImplementationOnce(
+      (_id: string, options?: { onError?: (error: Error) => void }) =>
+        options?.onError?.(new Error('deactivate failed')),
+    );
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        credentials: [
+          {
+            id: 'cred-error',
+            credentialType: 'bearer',
+            label: 'Failure case',
+            active: true,
+            createdAt: '2026-05-01T00:00:00Z',
+            expiresAt: null,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('credential-more-cred-error'));
+    fireEvent.click(screen.getByTestId('credential-toggle-active-cred-error'));
+    expect(screen.getByTestId('credential-action-error')).toHaveTextContent('deactivate failed');
+  });
+
+  it('offers Activate for an inactive credential', () => {
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
       credentials: [
         {
           id: 'cred-x',
           credentialType: 'bearer',
-          label: 'Doomed',
-          active: true,
+          label: 'Inactive credential',
+          active: false,
           createdAt: '2026-05-01T00:00:00Z',
           expiresAt: null,
         },
@@ -427,13 +470,15 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
+    mockActivateMutate.mockClear();
     fireEvent.click(screen.getByTestId('credential-more-cred-x'));
-    fireEvent.click(screen.getByTestId('credential-delete-cred-x'));
-    const dialog = screen.getByTestId('credentials-delete-dialog');
-    fireEvent.click(dialog.querySelector('button[type="submit"]')!);
-
-    expect(mockDeleteMutate).toHaveBeenCalledTimes(1);
-    expect(mockDeleteMutate.mock.calls[0][0]).toBe('cred-x');
+    const lifecycle = screen.getByTestId('credential-toggle-active-cred-x');
+    expect(lifecycle).toHaveTextContent('Activate');
+    fireEvent.click(lifecycle);
+    expect(mockActivateMutate).toHaveBeenCalledWith(
+      'cred-x',
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
   // ─── WI-8: reveal ──────────────────────────────────────────────────
@@ -518,6 +563,7 @@ describe('CredentialsTab', () => {
           createdAt: '2026-05-01T00:00:00Z',
           expiresAt: null,
           wif: {
+            targetClientId: 'target-client-id-456',
             expectedIssuer: 'https://login.microsoftonline.com/contoso/v2.0',
             expectedSubject: 'sp-object-id-123',
             expectedAudience: 'api://scim-app',
@@ -544,6 +590,9 @@ describe('CredentialsTab', () => {
     );
     expect(screen.getByTestId('wif-credential-cred-wif-subject').textContent).toContain(
       'sp-object-id-123',
+    );
+    expect(screen.getByTestId('wif-credential-cred-wif-target-client').textContent).toContain(
+      'target-client-id-456',
     );
     expect(screen.getByTestId('wif-credential-cred-wif-audience').textContent).toContain(
       'api://scim-app',
@@ -652,7 +701,7 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-add-trust-button')).toBeInTheDocument();
   });
 
-  it('U6: Connect reveals the per-trust connection params with the subject as the client id', () => {
+  it('U6: Connect distinguishes the target client id from the assertion subject', () => {
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
       configFlags: { WifCredentialsEnabled: true },
@@ -667,6 +716,7 @@ describe('CredentialsTab', () => {
           wif: {
             expectedIssuer: 'https://login.microsoftonline.com/t/v2.0',
             expectedSubject: 'sp-sub-xyz',
+            targetClientId: 'target-client-xyz',
             expectedAudience: 'api://x',
             jwksUri: 'https://login.microsoftonline.com/t/discovery/v2.0/keys',
             allowedTenantId: 'tid',
@@ -685,8 +735,8 @@ describe('CredentialsTab', () => {
     fireEvent.click(screen.getByTestId('wif-credential-connect-cred-conn'));
     const panel = screen.getByTestId('wif-credential-connect-panel-cred-conn');
     expect(panel).toBeInTheDocument();
-    // U6/U10 - the client identifier is the trust's subject; the app URL is shown.
-    expect(screen.getByTestId('wif-connect-clientid-cred-conn').textContent).toContain('sp-sub-xyz');
+    expect(screen.getByTestId('wif-connect-clientid-cred-conn')).toHaveTextContent('target-client-xyz');
+    expect(screen.getByTestId('wif-connect-assertion-subject-cred-conn')).toHaveTextContent('sp-sub-xyz');
     expect(screen.getByTestId('wif-connect-appurl-cred-conn')).toBeInTheDocument();
     expect(screen.getByTestId('wif-connect-tokenurl-cred-conn')).toBeInTheDocument();
   });
@@ -781,9 +831,11 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: wifTrustOverview('wt-9'), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     expect(screen.queryByTestId('wif-trust-edit-form-wt-9')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('wif-credential-more-wt-9'));
     fireEvent.click(screen.getByTestId('wif-credential-edit-wt-9'));
     expect(screen.getByTestId('wif-trust-edit-form-wt-9')).toBeInTheDocument();
     // A second click on Edit toggles the form closed (V9).
+    fireEvent.click(screen.getByTestId('wif-credential-more-wt-9'));
     fireEvent.click(screen.getByTestId('wif-credential-edit-wt-9'));
     expect(screen.queryByTestId('wif-trust-edit-form-wt-9')).not.toBeInTheDocument();
   });
@@ -822,17 +874,24 @@ describe('CredentialsTab', () => {
     mockDeactivateMutate.mockClear();
     mockActivateMutate.mockClear();
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
-    const { rerender } = renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    const { unmount } = renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     // W7 - the activate/deactivate toggle is in the card's overflow menu.
     fireEvent.click(screen.getByTestId('credential-more-bc-1'));
     fireEvent.click(screen.getByTestId('credential-toggle-active-bc-1'));
-    expect(mockDeactivateMutate).toHaveBeenCalledWith('bc-1');
+    expect(mockDeactivateMutate).toHaveBeenCalledWith(
+      'bc-1',
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
 
+    unmount();
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: false }), isLoading: false, error: null });
-    rerender(<CredentialsTab endpointId="ep-1" />);
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     fireEvent.click(screen.getByTestId('credential-more-bc-1'));
     fireEvent.click(screen.getByTestId('credential-toggle-active-bc-1'));
-    expect(mockActivateMutate).toHaveBeenCalledWith('bc-1');
+    expect(mockActivateMutate).toHaveBeenCalledWith(
+      'bc-1',
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
   it('P7: Rotate is a first-class card action, not buried in the overflow menu', () => {
@@ -854,17 +913,25 @@ describe('CredentialsTab', () => {
     // was promoted OUT of the overflow menu onto the card.
     expect(screen.queryByTestId('credential-connect-bc-1')).not.toBeInTheDocument();
     expect(screen.getByTestId('credential-rotate-bc-1')).toBeInTheDocument();
-    expect(screen.getByTestId('credential-edit-label-bc-1')).toBeInTheDocument();
-    expect(screen.getByTestId('credential-export-bc-1')).toBeInTheDocument();
+    const actions = screen.getByTestId('credential-actions-bc-1');
+    expect(within(actions).getByTestId('credential-rotate-bc-1')).toBeInTheDocument();
+    expect(within(actions).getByTestId('credential-more-bc-1')).toBeInTheDocument();
+    expect(within(actions).queryByTestId('credential-edit-label-bc-1')).not.toBeInTheDocument();
+    expect(within(actions).queryByTestId('credential-export-bc-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('credential-summary-bc-1')).toHaveTextContent(/Active/i);
+    expect(screen.getByTestId('credential-connect-panel-bc-1')).toContainElement(
+      screen.getByTestId('credential-export-bc-1'),
+    );
     // The overflow trigger is present; the secondary actions are hidden until opened.
     expect(screen.getByTestId('credential-more-bc-1')).toBeInTheDocument();
     expect(screen.queryByTestId('credential-delete-bc-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('credential-toggle-active-bc-1')).not.toBeInTheDocument();
-    // Opening the menu reveals Reveal / Deactivate / Revoke.
+    // Opening the menu reveals Edit, Reveal, and one reversible lifecycle action.
     fireEvent.click(screen.getByTestId('credential-more-bc-1'));
+    expect(screen.getByTestId('credential-edit-label-bc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-reveal-bc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-toggle-active-bc-1')).toBeInTheDocument();
-    expect(screen.getByTestId('credential-delete-bc-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('credential-delete-bc-1')).not.toBeInTheDocument();
   });
 
   it('V3: Edit reveals the label form and Save calls the edit-label mutation', () => {
@@ -872,6 +939,7 @@ describe('CredentialsTab', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ label: 'old' }), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     expect(screen.queryByTestId('credential-edit-label-form-bc-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('credential-more-bc-1'));
     fireEvent.click(screen.getByTestId('credential-edit-label-bc-1'));
     const input = screen.getByTestId('credential-edit-label-input-bc-1').querySelector('input')!;
     fireEvent.change(input, { target: { value: 'new name' } });
@@ -952,6 +1020,7 @@ describe('CredentialsTab', () => {
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
     // Click Edit on the saved trust row -> the edit form opens in-card (U4).
+    fireEvent.click(screen.getByTestId('wif-credential-more-cred-edit'));
     fireEvent.click(screen.getByTestId('wif-credential-edit-cred-edit'));
     // The in-card edit form is populated with the saved values (R10).
     expect(screen.getByTestId('wif-trust-edit-form-cred-edit')).toBeInTheDocument();
@@ -1006,6 +1075,7 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('wif-credential-description-cred-desc').textContent).toContain('Corp tenant WIF trust');
 
     // Edit loads the label + description into the new fields.
+    fireEvent.click(screen.getByTestId('wif-credential-more-cred-desc'));
     fireEvent.click(screen.getByTestId('wif-credential-edit-cred-desc'));
     expect((wifInput('wif-field-label') as HTMLInputElement).value).toBe('Corp Entra');
     expect((wifInput('wif-field-description') as HTMLInputElement).value).toBe('Corp tenant WIF trust');
@@ -1048,6 +1118,7 @@ describe('CredentialsTab', () => {
     };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('wif-credential-more-cred-cancel'));
     fireEvent.click(screen.getByTestId('wif-credential-edit-cred-cancel'));
     expect(screen.getByTestId('wif-trust-edit-form-cred-cancel')).toBeInTheDocument();
     expect((wifInput('wif-field-issuer') as HTMLInputElement).value).toBe('https://x.example/v2.0');
@@ -1498,7 +1569,7 @@ describe('CredentialsTab', () => {
     expect(result.textContent).toMatch(/JWKS URI is https/);
   });
 
-  it('lists existing wif credentials with a revoke control', () => {
+  it('lists existing wif credentials with one reversible lifecycle control', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
@@ -1513,10 +1584,45 @@ describe('CredentialsTab', () => {
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
 
     expect(screen.getByTestId('wif-credential-row-wif-1')).toBeInTheDocument();
-    // W7 - the Revoke control is in the trust card's overflow menu.
+    const actions = screen.getByTestId('wif-credential-actions-wif-1');
+    expect(within(actions).getByTestId('wif-credential-connect-wif-1')).toBeInTheDocument();
+    expect(within(actions).getByTestId('wif-credential-verify-wif-1')).toBeInTheDocument();
+    expect(within(actions).queryByTestId('wif-credential-edit-wif-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wif-credential-exports-wif-1')).toContainElement(
+      screen.getByTestId('wif-credential-export-wif-1'),
+    );
+    // W7 - Edit and lifecycle controls are in the trust card's overflow menu.
     fireEvent.click(screen.getByTestId('wif-credential-more-wif-1'));
+    expect(screen.getByTestId('wif-credential-edit-wif-1')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('wif-credential-delete-wif-1'));
-    expect(mockDeleteMutate).toHaveBeenCalledWith('wif-1');
+    expect(mockDeactivateMutate).toHaveBeenCalledWith(
+      'wif-1',
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+    expect(screen.queryByTestId('wif-credential-toggle-active-wif-1')).not.toBeInTheDocument();
+  });
+
+  it('surfaces a WIF lifecycle failure', () => {
+    mockDeactivateMutate.mockImplementationOnce(
+      (_id: string, options?: { onError?: (error: Error) => void }) =>
+        options?.onError?.(new Error('trust deactivate failed')),
+    );
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { WifCredentialsEnabled: true },
+        credentials: [
+          { id: 'wif-error', credentialType: 'wif', label: 'WIF failure', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('wif-credential-more-wif-error'));
+    fireEvent.click(screen.getByTestId('wif-credential-delete-wif-error'));
+    expect(screen.getByTestId('wif-credential-action-error')).toHaveTextContent('trust deactivate failed');
   });
 
   it('WI-16: shows a multi-trust header + guidance when several wif trusts exist', () => {
@@ -1580,7 +1686,94 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(screen.getByTestId('credentials-method-tab-wif')).toBeInTheDocument();
   });
 
-  it('X8: orders the method tabs oauth_client, wif, bearer, shared_secret and renames Shared secret -> Global Shared secret', () => {
+  it('shows four real method switches in setup order and separates the legacy umbrella', async () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: {
+          PerEndpointCredentialsEnabled: true,
+          SecretTokenBearerAuthEnabled: true,
+          OAuthClientCredentialsAuthEnabled: true,
+          WifCredentialsEnabled: true,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    expect(screen.getByTestId('connect-auth-methods-toggle')).toHaveTextContent('4 methods');
+    expect(screen.getByTestId('connect-auth-methods-toggle')).toHaveTextContent('4 enabled');
+    expect(within(screen.getByTestId('connect-auth-methods')).queryAllByRole('switch')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: /Authentication methods/i }));
+    const methodSwitches = (await within(screen.getByTestId('connect-auth-methods'))
+      .findAllByRole('switch'))
+      .map((control) => control.getAttribute('data-testid'));
+    expect(methodSwitches).toEqual([
+      'connect-auth-flag-OAuthClientCredentialsAuthEnabled',
+      'connect-auth-flag-WifCredentialsEnabled',
+      'connect-auth-flag-SharedSecretBearerAuthEnabled',
+      'connect-auth-flag-SecretTokenBearerAuthEnabled',
+    ]);
+    expect(screen.queryByTestId('connect-auth-flag-PerEndpointCredentialsEnabled')).not.toBeInTheDocument();
+    expect(screen.getByTestId('connect-auth-legacy-notice')).toHaveTextContent(/legacy compatibility/i);
+  });
+
+  it('uses server-resolved method state when an authentication method overrides flat flags', async () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: {
+          SecretTokenBearerAuthEnabled: false,
+          OAuthClientCredentialsAuthEnabled: true,
+        },
+        connectionInfo: {
+          ...baseOverview.connectionInfo!,
+          enabledMethods: [
+            {
+              method: 'bearer',
+              label: 'Per-endpoint bearer token',
+              entraAuthenticationMethod: 'Secret Token',
+              entraFields: { tenantUrl: 'https://x/scim/v2/endpoints/ep-1', secretToken: null },
+              clientSecretState: 'create-required',
+              enablementSource: 'authentication-method',
+            },
+            {
+              method: 'shared_secret',
+              label: 'Shared secret',
+              entraAuthenticationMethod: 'Secret Token',
+              entraFields: { tenantUrl: 'https://x/scim/v2/endpoints/ep-1', secretToken: null },
+              clientSecretState: 'none',
+              enablementSource: 'default',
+            },
+          ],
+          disabledMethods: [
+            {
+              method: 'oauth_client',
+              reason: 'method entry disabled',
+              enableHint: 'Use the authentication methods API',
+              enablementSource: 'authentication-method',
+            },
+            { method: 'wif', reason: 'WIF is off', enableHint: 'Enable WIF', enablementSource: 'default' },
+          ],
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Authentication methods/i }));
+    expect(await screen.findByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled')).toBeChecked();
+    expect(screen.getByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled')).toBeDisabled();
+    expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
+    expect(screen.queryByTestId('credentials-method-tab-oauth_client')).not.toBeInTheDocument();
+    expect(screen.getByTestId('connect-auth-managed-SecretTokenBearerAuthEnabled')).toHaveTextContent(
+      /authentication method entry/i,
+    );
+  });
+
+  it('orders method tabs OAuth2, WIF, global shared secret, then per-endpoint bearer', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
@@ -1594,8 +1787,8 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(order).toEqual([
       'credentials-method-tab-oauth_client',
       'credentials-method-tab-wif',
-      'credentials-method-tab-bearer',
       'credentials-method-tab-shared_secret',
+      'credentials-method-tab-bearer',
     ]);
     // Rename: "Shared secret" -> "Global Shared secret".
     expect(screen.getByTestId('credentials-method-tab-shared_secret').textContent).toContain('Global Shared secret');
@@ -1913,10 +2106,12 @@ describe('CredentialsTab - bcrypt to keyed migration surface (P7)', () => {
     expect(screen.queryByTestId('connect-legacy-banner')).not.toBeInTheDocument();
   });
 
-  it('renders every auth-method switch inline and persists a toggle without leaving the tab', () => {
+  it('renders every auth-method switch inline and persists a toggle without leaving the tab', async () => {
     mockUpdateConfigMutate.mockClear();
     mockUseEndpointOverview.mockReturnValue({ data: overviewWith(['hmac-sha256-v1']), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByRole('button', { name: /Authentication methods/i }));
+    await screen.findByTestId('connect-auth-flag-OAuthClientCredentialsAuthEnabled');
     for (const flag of AUTH_METHOD_FLAGS) {
       expect(screen.getByTestId(`connect-auth-flag-${flag.key}`)).toBeInTheDocument();
     }

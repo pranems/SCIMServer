@@ -27,8 +27,8 @@ describe('Connection-info API (E2E)', () => {
 
   const TOP_KEYS = ['endpointId', 'displayName', 'urls', 'enabledMethods', 'disabledMethods'];
   const URL_KEYS = ['scimBaseUrl', 'scimBaseUrlBare', 'tokenEndpoint', 'serviceProviderConfig', 'oauthMetadata'];
-  const ENABLED_KEYS = ['method', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'expectedAssertionSubject', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity'];
-  const DISABLED_KEYS = ['method', 'reason', 'enableHint'];
+  const ENABLED_KEYS = ['method', 'enablementSource', 'label', 'entraAuthenticationMethod', 'entraFields', 'clientSecretState', 'expectedAudience', 'expectedAssertionSubject', 'credentialId', 'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity'];
+  const DISABLED_KEYS = ['method', 'enablementSource', 'reason', 'enableHint'];
 
   it('assembles the connection-info shape with only documented top-level keys', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
@@ -53,10 +53,60 @@ describe('Connection-info API (E2E)', () => {
     }
     for (const m of res.body.enabledMethods) {
       for (const key of Object.keys(m)) expect(ENABLED_KEYS).toContain(key);
+      expect(['authentication-method', 'dedicated-setting', 'legacy-setting', 'default']).toContain(
+        m.enablementSource,
+      );
     }
     for (const m of res.body.disabledMethods) {
       for (const key of Object.keys(m)) expect(DISABLED_KEYS).toContain(key);
+      expect(['authentication-method', 'dedicated-setting', 'legacy-setting', 'default']).toContain(
+        m.enablementSource,
+      );
     }
+  });
+
+  it('reports an authentication-method override as the authoritative enablement source', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      SecretTokenBearerAuthEnabled: false,
+    });
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'bearer', enabled: true })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const bearer = res.body.enabledMethods.find((m: { method: string }) => m.method === 'bearer');
+    expect(bearer.enablementSource).toBe('authentication-method');
+  });
+
+  it('reports WIF disabled when its method entry overrides a true flat flag', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      WifCredentialsEnabled: true,
+    });
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/authentication/methods`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'wif-7523', enabled: false })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const wif = res.body.disabledMethods.find((method: { method: string }) => method.method === 'wif');
+    expect(wif).toEqual(expect.objectContaining({
+      enablementSource: 'authentication-method',
+      reason: 'The WIF authentication method is disabled',
+    }));
+    expect(res.body.enabledMethods.some((method: { method: string }) => method.method === 'wif')).toBe(false);
   });
 
   it('surfaces a U7 validity of "unverified" on a fresh, never-used method', async () => {
