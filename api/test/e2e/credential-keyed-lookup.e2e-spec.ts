@@ -12,6 +12,7 @@ import {
   HASH_ALGO_HMAC_V1,
   P1_KEYED_HASH_PLACEHOLDER,
   mintOAuthClientSecret,
+  parseCredentialToken,
 } from '../../src/security/credential-token';
 
 /**
@@ -74,7 +75,9 @@ describe('P1 keyed credential lookup (E2E)', () => {
     expect(row!.lookupKey).toBeTruthy();
     expect(row!.secretHash).toEqual(expect.stringMatching(/^[0-9a-f]{64}$/));
     // The secret must not be recoverable from the row.
-    expect(JSON.stringify(row)).not.toContain(issued.split('_').pop());
+    const parsed = parseCredentialToken(issued);
+    expect(parsed).not.toBeNull();
+    expect(JSON.stringify(row)).not.toContain(parsed!.secret);
   });
 
   it('P1-X3: a wrong secret under a REAL lookupKey is refused', async () => {
