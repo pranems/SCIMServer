@@ -8,7 +8,10 @@ const INTERNAL_LABEL = /\b(?:WI-[A-Z0-9.-]+|W\d+(?:\.\d+)+(?:[A-Z0-9.-]*)?|Phase
 function productionSourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return productionSourceFiles(entryPath);
+    if (entry.isDirectory()) {
+      if (entry.name === 'generated') return [];
+      return productionSourceFiles(entryPath);
+    }
     if (!entry.name.endsWith('.ts') || /\.(?:spec|test)\.ts$/.test(entry.name)) return [];
     return [entryPath];
   });
@@ -34,7 +37,13 @@ function stringLiterals(filePath: string): string[] {
 }
 
 describe('user-facing API copy', () => {
-  it.each(productionSourceFiles(SOURCE_ROOT))(
+  const sourceFiles = productionSourceFiles(SOURCE_ROOT);
+
+  it('excludes generated source artifacts', () => {
+    expect(sourceFiles.some((filePath) => filePath.includes(`${path.sep}generated${path.sep}`))).toBe(false);
+  });
+
+  it.each(sourceFiles)(
     'does not expose internal work-item or phase labels in %s',
     (filePath) => {
       const violations = stringLiterals(filePath).filter((value) => INTERNAL_LABEL.test(value));
