@@ -1,6 +1,6 @@
 # Profile-Driven Resource Forms Execution Issues and RCA
 
-> **Status:** Consolidated - **Last verified:** 2026-09-23 - **Product version:** `0.55.26`
+> **Status:** Consolidated and extended - **Last verified:** 2026-09-23 - **Product version:** `0.55.27`
 
 ## Dashboard
 
