@@ -67,6 +67,24 @@ describe('fetchWithAuth', () => {
     );
   });
 
+  it.each(['Authorization', 'authorization', ' Authorization '])('does not allow caller header %s to replace the stored token', async (key) => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ data: 'test' }),
+    });
+
+    await fetchWithAuth('/scim/admin/version', {
+      headers: { [key]: 'Bearer caller-value' },
+    });
+
+    const headers = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as
+      Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer test-token');
+    expect(Object.keys(headers).filter((header) => header.trim().toLowerCase() === 'authorization'))
+      .toEqual(['Authorization']);
+  });
+
   it('throws on non-ok response', async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,

@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.26`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.27`
 
 > **Version:** 4.2 - **Source-verified against:** v0.55.6 - **Updated:** 2026-07-31  
 > Route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  
@@ -210,7 +210,7 @@ Stack traces are included by default; controlled by `includeStackTraces` config 
 
 ## 5. Correlation Context & AsyncLocalStorage
 
-**Source:** `scim-logger.service.ts` lines 18–55, 104–106, 164–185
+**Source:** `scim-logger.service.ts` lines 18-55, 104-106, 164-185
 
 The `CorrelationContext` interface tracks request lifecycle metadata across async boundaries using Node.js `AsyncLocalStorage`. No `cls-hooked` or zone.js - pure Node.js.
 
@@ -249,7 +249,7 @@ sequenceDiagram
 
 | Layer | Fields Set | Source |
 |-------|-----------|--------|
-| **Interceptor** | `requestId`, `method`, `path`, `endpointId`, `startTime` | `request-logging.interceptor.ts` lines 30–37 |
+| **Interceptor** | `requestId`, `method`, `path`, `endpointId`, `startTime` | `request-logging.interceptor.ts` lines 30-37 |
 | **Guard** | `authType`, `authClientId`, `authCredentialId` | `shared-secret.guard.ts` lines 119, 137, 169 |
 | **Service** | `resourceType`, `resourceId`, `operation` | Service methods via `enrichContext()` |
 | **BulkProcessor** | `bulkOperationIndex`, `bulkId` | `bulk-processor.service.ts` |
@@ -270,7 +270,7 @@ This is used by `createScimError()` to auto-enrich SCIM error responses with `re
 
 ## 6. Output Modes: JSON vs Pretty
 
-Controlled by the `format` field in `LogConfig` (source: `log-levels.ts` lines 116–117):
+Controlled by the `format` field in `LogConfig` (source: `log-levels.ts` lines 116-117):
 
 | Mode | When | Behavior |
 |------|------|----------|
@@ -293,7 +293,7 @@ Can be overridden via:
 
 ## 7. Ring Buffer (In-Memory Recent Logs)
 
-**Source:** `scim-logger.service.ts` lines 125–128, 250–285
+**Source:** `scim-logger.service.ts` lines 125-128, 250-285
 
 The ScimLogger maintains a circular buffer of the most recent log entries for real-time debugging via the admin API.
 
@@ -349,7 +349,7 @@ When filtered by `requestId` and nothing is found, the response includes a hint:
 
 ## 8. SSE Live Stream
 
-**Source:** `log-config.controller.ts` lines 248–305, `log-query.service.ts` lines 70–118
+**Source:** `log-config.controller.ts` lines 248-305, `log-query.service.ts` lines 70-118
 
 Real-time log tailing via Server-Sent Events:
 
@@ -872,7 +872,7 @@ Every config change is logged at INFO level with before/after values:
 
 ## 14. Log Level Decision Matrix
 
-The system uses **tiered log levels** based on HTTP status codes and operation context. Source: `request-logging.interceptor.ts` lines 97–116, `scim-exception.filter.ts` lines 53–72.
+The system uses **tiered log levels** based on HTTP status codes and operation context. Source: `request-logging.interceptor.ts` lines 97-116, `scim-exception.filter.ts` lines 53-72.
 
 | Status / Event | Level | Rationale |
 |---------------|-------|-----------|
@@ -896,7 +896,7 @@ The system uses **tiered log levels** based on HTTP status codes and operation c
 
 ## 15. Sensitive Data Handling
 
-**Source:** `scim-logger.service.ts` lines 361–380 (`sanitizeData`)
+**Source:** `scim-logger.service.ts` lines 361-380 (`sanitizeData`)
 
 ### Automatic Redaction
 
@@ -924,7 +924,7 @@ Object values are serialized to JSON first, then truncated if needed:
 
 ## 16. Slow Request Detection
 
-**Source:** `request-logging.interceptor.ts` lines 87–91, `log-levels.ts` line 120
+**Source:** `request-logging.interceptor.ts` lines 87-91, `log-levels.ts` line 120
 
 Requests exceeding `slowRequestThresholdMs` (default 2,000 ms) emit a WARN log:
 
@@ -946,7 +946,7 @@ Configurable via:
 
 ## 17. Audit Trail
 
-**Source:** `log-config.controller.ts` lines 232–246
+**Source:** `log-config.controller.ts` lines 232-246
 
 The `GET /scim/admin/log-config/audit` endpoint returns audit trail entries - CONFIG, ENDPOINT, and AUTH category logs from the ring buffer:
 

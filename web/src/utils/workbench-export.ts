@@ -37,9 +37,20 @@ export interface WorkbenchRequestEnvelope {
 }
 
 function activeHeaders(env: WorkbenchRequestEnvelope): WorkbenchHeader[] {
-  return (env.headers ?? []).filter(
-    (h) => h.enabled !== false && h.key.trim().length > 0,
-  );
+  const seen = new Set<string>();
+  const result: WorkbenchHeader[] = [];
+  for (const header of env.headers ?? []) {
+    const key = header.key.trim();
+    const normalized = key.toLowerCase();
+    if (header.enabled === false || key.length === 0 || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push({ ...header, key });
+  }
+  return result;
+}
+
+function escapePosixSingleQuoted(value: string): string {
+  return value.replace(/'/g, `'"'"'`);
 }
 
 function bodyText(env: WorkbenchRequestEnvelope): string | undefined {
@@ -68,16 +79,16 @@ function fullUrl(env: WorkbenchRequestEnvelope): string {
 
 export function toCurl(env: WorkbenchRequestEnvelope): string {
   const lines: string[] = [`curl -X '${env.method}' \\`];
-  lines.push(`  '${fullUrl(env)}' \\`);
+  lines.push(`  '${escapePosixSingleQuoted(fullUrl(env))}' \\`);
   const heads = activeHeaders(env);
   heads.forEach((h, i) => {
     const isLast = i === heads.length - 1 && bodyText(env) === undefined;
-    lines.push(`  -H '${h.key}: ${h.value}'${isLast ? '' : ' \\'}`);
+    lines.push(`  -H '${escapePosixSingleQuoted(`${h.key}: ${h.value}`)}'${isLast ? '' : ' \\'}`);
   });
   const text = bodyText(env);
   if (text !== undefined) {
     // Escape single quotes for safe POSIX shell embedding.
-    const escaped = text.replace(/'/g, `'\\''`);
+    const escaped = escapePosixSingleQuoted(text);
     lines.push(`  -d '${escaped}'`);
   }
   return lines.join('\n');

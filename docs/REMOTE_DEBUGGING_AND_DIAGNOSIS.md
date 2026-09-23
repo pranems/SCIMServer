@@ -1,6 +1,6 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.26`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.27`
 
 > **Version:** 3.2 - **Source-verified against:** v0.55.6 - **Updated:** 2026-07-31  
 > Route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  
@@ -235,7 +235,7 @@ Authorization: Bearer changeme-scim
       "timestamp": "2026-04-13T09:45:00.000Z",
       "level": "WARN",
       "category": "auth",
-      "message": "Authentication failed – per-endpoint, OAuth, and legacy token all invalid",
+      "message": "Authentication failed - per-endpoint, OAuth, and legacy token all invalid",
       "requestId": "c3d4e5f6-..."
     }
   ]

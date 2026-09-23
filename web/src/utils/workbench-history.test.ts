@@ -36,6 +36,7 @@ function sample(overrides: Partial<WorkbenchHistoryEntry> = {}): WorkbenchHistor
     requestId: 'req-abc',
     timestamp: '2026-05-15T10:00:00.000Z',
     requestBody: undefined,
+    requestHeaders: [{ key: 'If-Match', value: 'W/"v3"', enabled: true }],
     responseBody: { totalResults: 0, Resources: [] },
     ...overrides,
   };
@@ -62,6 +63,9 @@ describe('Phase M1 - workbench-history (pure localStorage ring buffer)', () => {
     expect(loaded).toHaveLength(1);
     expect(loaded[0].id).toBe('wb-1');
     expect(loaded[0].method).toBe('POST');
+    expect(loaded[0].requestHeaders).toEqual([
+      { key: 'If-Match', value: 'W/"v3"', enabled: true },
+    ]);
   });
 
   it('newest entry lands at index 0 (newest-first ordering)', () => {

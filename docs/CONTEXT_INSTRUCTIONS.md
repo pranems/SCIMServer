@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.26
+> **Version**: 0.55.27
 > **Last Updated**: September 23, 2026
 > **Last verified:** 2026-09-23
 
@@ -25,16 +25,18 @@ endpoint integrity 60 -> 60 with zero missing IDs, and two active revisions
 including the v0.55.23 rollback target. Canary and customer prod were not
 touched.
 
-The current v0.55.26 rollback unit is implemented locally on
-`feat/profile-resource-forms-v0.55.26`. User, Group, Manual Provision, and
-custom ResourceType workflows share one discovery-driven form and payload
-engine. Custom types appear as dynamic endpoint tabs; Resource Types shows the
-effective combined core plus extension field shape. Generic resource responses
-now emit `W/"vN"`, matching shared `If-Match` enforcement. Local evidence is
-API unit 5,140/5,140, API E2E 1,524/1,524, web 1,481/1,481, focused web
-178/178, generic service 68/68, Playwright 1/1, and live SCIM 1,500/1,500.
-It is not merged or deployed. Workbench
-templates and the named dev fixture remain a separate rollback unit.
+The current v0.55.27 rollback unit is implemented locally on
+`feat/workbench-templates-v0.55.27`. Workbench offers static server/admin,
+selected endpoint, and discovery-derived ResourceType request examples. Apply
+loads an editable method/path/body/header draft; generated PATCH requests use a
+real resource id and returned ETag. Enabled headers now reach the executor while
+stored admin Authorization remains authoritative. The dev fixture script is
+staged but not run; it additively configures Device plus User/Group extensions
+on `PRTest-Auth-Methods-ISV-1` after the merged image reaches dev. Local evidence
+is web 1,504/1,504 with coverage ratchets, focused 37 plus serializer/security
+coverage, Playwright 1/1, exact
+local live 1,500/1,500, all builds/budgets, and fixture first/rerun 34/34. PR, merge, and
+deployment remain pending; canary and customer prod are untouched.
 
 The change refines endpoint settings and Connect. Contextual
 panes are collapsed; Users owns only its two lifecycle settings and Groups only

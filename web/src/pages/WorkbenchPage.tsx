@@ -93,6 +93,8 @@ import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle'
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { clickableProps } from '../utils/interactive';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
+import { WorkbenchExamplesPanel } from '../workbench/WorkbenchExamplesPanel';
+import type { WorkbenchRequestTemplate } from '../workbench/workbench-templates';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -107,6 +109,21 @@ const HEADER_QUICK_ADD: ReadonlyArray<{ key: string; value: string }> = [
   { key: 'Prefer', value: 'return=representation' },
   { key: 'X-Request-Id', value: '<uuid>' },
 ];
+
+const DEFAULT_HEADERS: WorkbenchHeader[] = [
+  { key: 'Content-Type', value: 'application/scim+json', enabled: true },
+  { key: 'Accept', value: 'application/scim+json', enabled: true },
+];
+
+function mergeTemplateHeaders(templateHeaders: WorkbenchHeader[] = []): WorkbenchHeader[] {
+  const overrides = new Set(templateHeaders.map((header) => header.key.toLowerCase()));
+  return [
+    ...DEFAULT_HEADERS
+      .filter((header) => !overrides.has(header.key.toLowerCase()))
+      .map((header) => ({ ...header })),
+    ...templateHeaders.map((header) => ({ ...header })),
+  ];
+}
 
 const useStyles = makeStyles({
   page: {
@@ -130,7 +147,7 @@ const useStyles = makeStyles({
   },
   toolbar: {
     display: 'grid',
-    gridTemplateColumns: '120px 1fr 220px auto',
+    gridTemplateColumns: '120px 1fr auto',
     gap: '8px',
     alignItems: 'end',
   },
@@ -310,10 +327,8 @@ export const WorkbenchPage: React.FC = () => {
   const [response, setResponse] = useState<ScimRequestOutcome | null>(null);
   const [bodyParseError, setBodyParseError] = useState<string | null>(null);
 
-  const [headers, setHeaders] = useState<WorkbenchHeader[]>([
-    { key: 'Content-Type', value: 'application/scim+json', enabled: true },
-    { key: 'Accept', value: 'application/scim+json', enabled: true },
-  ]);
+  const [headers, setHeaders] = useState<WorkbenchHeader[]>(() =>
+    DEFAULT_HEADERS.map((header) => ({ ...header })));
   const [headersOpen, setHeadersOpen] = useState(false);
 
   const [layoutMode, setLayoutMode] = useState<'vertical' | 'horizontal'>(() => {
@@ -378,6 +393,15 @@ export const WorkbenchPage: React.FC = () => {
     }
   };
 
+  const handleApplyTemplate = (template: WorkbenchRequestTemplate): void => {
+    setMethod(template.method);
+    setPath(template.path);
+    updateBody(template.body === undefined ? '' : JSON.stringify(template.body, null, 2));
+    setHeaders(mergeTemplateHeaders(template.headers));
+    setBodyParseError(null);
+    setResponse(null);
+  };
+
   const buildArgs = (): { body?: unknown; bodyError?: string } => {
     if (!showBody || bodyText.trim().length === 0) return { body: undefined };
     try {
@@ -397,7 +421,21 @@ export const WorkbenchPage: React.FC = () => {
       return;
     }
     try {
-      const outcome = await sendReq.mutateAsync({ method, path, body });
+      const sentHeaders = headers
+        .filter((header) =>
+          header.enabled !== false &&
+          header.key.trim().length > 0 &&
+          header.key.trim().toLowerCase() !== 'authorization')
+        .map((header) => ({ ...header, key: header.key.trim() }));
+      const enabledHeaders = Object.fromEntries(
+        sentHeaders.map((header) => [header.key, header.value]),
+      );
+      const outcome = await sendReq.mutateAsync({
+        method,
+        path,
+        body,
+        headers: enabledHeaders,
+      });
       setResponse(outcome);
       appendHistory({
         id: `wb-${Date.now()}`,
@@ -408,6 +446,7 @@ export const WorkbenchPage: React.FC = () => {
         requestId: outcome.requestId,
         timestamp: new Date().toISOString(),
         requestBody: body,
+        requestHeaders: sentHeaders,
         responseBody: outcome.body,
       });
       setHistoryTick((n) => n + 1);
@@ -426,16 +465,24 @@ export const WorkbenchPage: React.FC = () => {
     const next = entry.requestBody !== undefined ? JSON.stringify(entry.requestBody, null, 2) : '';
     pushBodyHistory(next);
     setBodyText(next);
+    setHeaders(entry.requestHeaders?.map((header) => ({ ...header }))
+      ?? DEFAULT_HEADERS.map((header) => ({ ...header })));
   };
 
   const buildEnvelope = (): WorkbenchRequestEnvelope => {
     const { body } = buildArgs();
+    const exportHeaders = [
+      { key: 'Authorization', value: 'Bearer <admin-token>', enabled: true },
+      ...headers
+        .filter((header) => header.key.trim().toLowerCase() !== 'authorization')
+        .map((header) => ({ ...header })),
+    ];
     return {
       method,
       url: path,
       baseUrl: typeof window !== 'undefined' ? window.location.origin : undefined,
       body,
-      headers,
+      headers: exportHeaders,
       name: `${method} ${path}`,
     };
   };
@@ -533,6 +580,13 @@ export const WorkbenchPage: React.FC = () => {
         the response. The last 50 requests are saved locally.
       </Caption1>
 
+      <WorkbenchExamplesPanel
+        endpoints={endpointList}
+        endpointId={pickedEp}
+        onEndpointChange={handleEndpointPick}
+        onApply={handleApplyTemplate}
+      />
+
       <Card className={classes.toolbarCard} data-testid="workbench-toolbar-card">
         <div className={classes.toolbar}>
           <Field label="Method">
@@ -566,22 +620,6 @@ export const WorkbenchPage: React.FC = () => {
                 <option key={`base-${ep.id}`} value={`/scim/endpoints/${ep.id}/Users`} />
               ))}
             </datalist>
-          </Field>
-          <Field label="Endpoint pre-fill">
-            <select
-              aria-label="Endpoint pre-fill"
-              data-testid="workbench-endpoint-picker"
-              value={pickedEp}
-              onChange={(e) => handleEndpointPick(e.target.value)}
-              style={{ height: '32px', padding: '0 8px' }}
-            >
-              <option value="">- Pick an endpoint -</option>
-              {endpointList.map((ep) => (
-                <option key={ep.id} value={ep.id}>
-                  {ep.displayName ?? ep.name}
-                </option>
-              ))}
-            </select>
           </Field>
           <Button
             appearance="primary"
@@ -1049,6 +1087,7 @@ export const WorkbenchPage: React.FC = () => {
                           method: entry.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
                           path: entry.path,
                           body: entry.requestBody,
+                          headers: entry.requestHeaders,
                           expectedStatus: entry.status,
                           label: `${entry.method} ${entry.path}`,
                         });

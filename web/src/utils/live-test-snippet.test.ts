@@ -63,10 +63,13 @@ describe('Phase M2 - emitLiveTestSnippet (PowerShell live-test snippet emitter)'
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         Operations: [{ op: 'replace', path: 'displayName', value: 'New' }],
       },
+      headers: [{ key: 'If-Match', value: 'W/"v3"', enabled: true }],
     });
     expect(s).toMatch(/-Method PATCH/);
     expect(s).toContain('PatchOp');
     expect(s).toContain('displayName');
+    expect(s).toContain("$requestHeaders['If-Match'] = 'W/\"v3\"'");
+    expect(s).toContain('-Headers $requestHeaders');
   });
 
   it('DELETE -> -Method DELETE, no -Body even when body args are missing', () => {
@@ -95,9 +98,8 @@ describe('Phase M2 - emitLiveTestSnippet (PowerShell live-test snippet emitter)'
 
   it('path is wrapped in $baseUrl variable form', () => {
     const s = emitLiveTestSnippet(baseArgs);
-    // The snippet uses "$baseUrl/scim/endpoints/ep-1/Users" so the
-    // operator can adjust between local/dev/prod by changing one var.
-    expect(s).toMatch(/\$baseUrl\/scim\/endpoints\/ep-1\/Users/);
+    // The path is a literal operand so `$()` and quotes cannot execute.
+    expect(s).toContain("($baseUrl + '/scim/endpoints/ep-1/Users')");
   });
 
   it('appends a Test-Result assertion line for the expected status round-trip', () => {
@@ -132,5 +134,27 @@ describe('Phase M2 - emitLiveTestSnippet (PowerShell live-test snippet emitter)'
   it('the assertion message includes the human-readable label', () => {
     const s = emitLiveTestSnippet({ ...baseArgs, label: 'List users on prod', expectedStatus: 200 });
     expect(s).toContain('List users on prod');
+  });
+
+  it('uses non-throwing HTTP handling so expected 4xx statuses reach the assertion', () => {
+    const s = emitLiveTestSnippet({ ...baseArgs, expectedStatus: 412 });
+    expect(s).toContain('-SkipHttpErrorCheck');
+    expect(s).not.toContain('-ErrorAction Stop');
+  });
+
+  it('preserves an enabled Content-Type header for a bodyless request', () => {
+    const s = emitLiveTestSnippet({
+      ...baseArgs,
+      headers: [{ key: 'Content-Type', value: 'application/json', enabled: true }],
+    });
+    expect(s).toContain("$requestHeaders['Content-Type'] = 'application/json'");
+  });
+
+  it('quotes a path so PowerShell expressions remain literal text', () => {
+    const s = emitLiveTestSnippet({
+      ...baseArgs,
+      path: "/scim/endpoints/$(Write-Host 'bad')/Users",
+    });
+    expect(s).toContain("($baseUrl + '/scim/endpoints/$(Write-Host ''bad'')/Users')");
   });
 });

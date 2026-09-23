@@ -73,6 +73,23 @@ function handleUnauthorized(path: string): void {
   notifyTokenInvalid();
 }
 
+function sanitizeAuthenticatedHeaders(headers?: HeadersInit): Record<string, string> {
+  if (!headers) return {};
+  const entries = headers instanceof Headers
+    ? Array.from(headers.entries())
+    : Array.isArray(headers)
+      ? headers
+      : Object.entries(headers);
+  return Object.fromEntries(
+    entries
+      .filter(([key]) => key.trim().toLowerCase() !== 'authorization')
+      .map(([key, value]) => [
+        key.trim().toLowerCase() === 'content-type' ? 'Content-Type' : key.trim(),
+        String(value),
+      ]),
+  );
+}
+
 /** Authenticated fetch wrapper with automatic 401 handling */
 export async function fetchWithAuth<T>(
   path: string,
@@ -92,8 +109,8 @@ export async function fetchWithAuth<T>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...sanitizeAuthenticatedHeaders(init?.headers),
     Authorization: `Bearer ${token}`,
-    ...(init?.headers as Record<string, string> ?? {}),
   };
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
@@ -1255,6 +1272,8 @@ export interface ScimRequestArgs {
   path: string;
   /** Optional request body. JSON-stringified when present. */
   body?: unknown;
+  /** Enabled header rows from the Workbench editor. */
+  headers?: Record<string, string>;
   /** Optional If-Match header value (for ETag-aware operations). */
   ifMatch?: string;
 }
@@ -1272,19 +1291,23 @@ export function useScimRequest() {
   return useMutation<ScimRequestOutcome, Error, ScimRequestArgs>({
     mutationFn: async (args) => {
       const token = getStoredToken();
-      const headers: Record<string, string> = {
+      const editableHeaders = Object.fromEntries(
+        Object.entries(args.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'authorization'),
+      );
+      const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/scim+json',
+        ...editableHeaders,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
       if (args.ifMatch) {
-        headers['If-Match'] = args.ifMatch;
+        requestHeaders['If-Match'] = args.ifMatch;
       }
       const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       let res: Response;
       try {
         res = await fetch(`${API_BASE}${args.path}`, {
           method: args.method,
-          headers,
+          headers: requestHeaders,
           body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
         });
       } catch (e) {

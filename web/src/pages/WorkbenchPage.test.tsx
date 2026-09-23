@@ -24,6 +24,9 @@ import { WorkbenchPage } from './WorkbenchPage';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 const mockUseEndpoints = vi.fn();
+const mockUseEndpointSchemas = vi.fn();
+const mockUseEndpointResourceTypes = vi.fn();
+const mockUseEndpointResources = vi.fn();
 const mockMutateAsync = vi.fn();
 let mutationPending = false;
 
@@ -32,6 +35,9 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useEndpoints: () => mockUseEndpoints(),
+    useEndpointSchemas: (...args: unknown[]) => mockUseEndpointSchemas(...args),
+    useEndpointResourceTypes: (...args: unknown[]) => mockUseEndpointResourceTypes(...args),
+    useEndpointResources: (...args: unknown[]) => mockUseEndpointResources(...args),
     useScimRequest: () => ({
       mutate: vi.fn(),
       mutateAsync: mockMutateAsync,
@@ -78,6 +84,9 @@ describe('WorkbenchPage (Phase M1)', () => {
     mutationPending = false;
     localStorage.clear();
     mockUseEndpoints.mockReturnValue({ data: sampleEndpoints, isLoading: false, isError: false, error: null });
+    mockUseEndpointSchemas.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    mockUseEndpointResourceTypes.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    mockUseEndpointResources.mockReturnValue({ data: undefined, isLoading: false, error: null });
     mockMutateAsync.mockResolvedValue({
       status: 200,
       durationMs: 42,
@@ -221,6 +230,7 @@ describe('WorkbenchPage (Phase M1)', () => {
     const arg = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(arg).toMatch(/^curl /);
     expect(arg).toContain("-X 'GET'");
+    expect(arg).toContain("Authorization: Bearer <admin-token>");
     expect(arg).toContain('/scim/endpoints/ep-1/Users');
   });
 
@@ -245,6 +255,69 @@ describe('WorkbenchPage (Phase M1)', () => {
     fireEvent.change(screen.getByTestId('workbench-endpoint-picker'), { target: { value: 'ep-1' } });
     const path = screen.getByTestId('workbench-path') as HTMLInputElement;
     expect(path.value).toBe('/scim/endpoints/ep-1/Users');
+  });
+
+  it('applies a ready-to-run admin create example to method, path, and body', () => {
+    renderWithProviders(<WorkbenchPage />);
+    fireEvent.change(screen.getByTestId('workbench-example-template'), {
+      target: { value: 'admin-create-endpoint' },
+    });
+    fireEvent.click(screen.getByTestId('workbench-example-apply'));
+
+    expect(screen.getByTestId('workbench-method')).toHaveValue('POST');
+    expect(screen.getByTestId('workbench-path')).toHaveValue('/scim/admin/endpoints');
+    const body = JSON.parse((screen.getByTestId('workbench-body') as HTMLTextAreaElement).value) as
+      Record<string, unknown>;
+    expect(body.profilePreset).toBe('rfc-standard');
+    fireEvent.click(screen.getByTestId('workbench-headers-toggle'));
+    expect(screen.getByTestId('workbench-header-key-0')).toHaveValue('Accept');
+    expect(screen.getByTestId('workbench-header-key-1')).toHaveValue('Content-Type');
+    expect(screen.getByTestId('workbench-header-value-1')).toHaveValue('application/json');
+    expect(screen.queryByTestId('workbench-header-key-2')).not.toBeInTheDocument();
+  });
+
+  it('sends an applied profile PATCH with the existing resource ETag', async () => {
+    const schema = 'urn:example:schemas:Device';
+    mockUseEndpointSchemas.mockReturnValue({
+      data: { Resources: [{ id: schema, attributes: [{ name: 'serialNumber', type: 'string' }] }] },
+      isLoading: false,
+      error: null,
+    });
+    mockUseEndpointResourceTypes.mockReturnValue({
+      data: { Resources: [{ id: 'Device', name: 'Device', endpoint: '/Devices', schema }] },
+      isLoading: false,
+      error: null,
+    });
+    mockUseEndpointResources.mockReturnValue({
+      data: {
+        Resources: [{ id: 'device-1', serialNumber: 'SN-100', meta: { version: 'W/"v4"' } }],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<WorkbenchPage />);
+    fireEvent.change(screen.getByTestId('workbench-endpoint-picker'), { target: { value: 'ep-1' } });
+    fireEvent.change(screen.getByTestId('workbench-example-template'), {
+      target: { value: 'resource-Device-patch' },
+    });
+    fireEvent.click(screen.getByTestId('workbench-example-apply'));
+    fireEvent.click(screen.getByTestId('workbench-send'));
+
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledTimes(1));
+    expect(mockMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      method: 'PATCH',
+      path: '/scim/endpoints/ep-1/Devices/device-1',
+      headers: expect.objectContaining({ 'If-Match': 'W/"v4"' }),
+    }));
+
+    fireEvent.change(screen.getByTestId('workbench-example-template'), {
+      target: { value: 'server-health' },
+    });
+    fireEvent.click(screen.getByTestId('workbench-example-apply'));
+    fireEvent.click(screen.getAllByTestId(/^workbench-history-row-/)[0]);
+    fireEvent.click(screen.getByTestId('workbench-headers-toggle'));
+    expect(screen.getByTestId('workbench-header-key-2')).toHaveValue('If-Match');
+    expect(screen.getByTestId('workbench-header-value-2')).toHaveValue('W/"v4"');
   });
 
   // ─── 10. URL prefill (used by L5 Open in Workbench) ────────────────

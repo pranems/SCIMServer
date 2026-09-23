@@ -45,6 +45,31 @@ describe('workbench-export', () => {
       expect(out).toContain("'https://other.host/scim/Users'");
       expect(out).not.toContain('scimserver-dev.example.com');
     });
+
+    it('escapes a single quote in the request URL', () => {
+      const out = toCurl({ ...baseEnv, url: "/scim/Users?filter=userName eq 'alice'" });
+      expect(out).toContain(`userName eq '"'"'alice'"'"'`);
+    });
+
+    it('escapes a single quote in a header value', () => {
+      const out = toCurl({
+        ...baseEnv,
+        headers: [{ key: 'X-Label', value: "O'Brien" }],
+      });
+      expect(out).toContain(`X-Label: O'"'"'Brien`);
+    });
+  });
+
+  it('normalizes and deduplicates padded header names case-insensitively', () => {
+    const out = toCurl({
+      ...baseEnv,
+      headers: [
+        { key: 'Authorization', value: 'Bearer <admin-token>' },
+        { key: ' Authorization ', value: 'Bearer entered-secret' },
+      ],
+    });
+    expect(out).toContain('Bearer <admin-token>');
+    expect(out).not.toContain('entered-secret');
   });
 
   describe('toFetchSnippet', () => {

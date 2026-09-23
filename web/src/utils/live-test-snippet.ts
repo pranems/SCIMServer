@@ -26,6 +26,8 @@ export interface LiveTestSnippetArgs {
   path: string;
   /** Optional request body (object or array). Omitted for GET / DELETE. */
   body?: unknown;
+  /** Enabled Workbench request headers. Authorization is intentionally omitted. */
+  headers?: Array<{ key: string; value: string; enabled?: boolean }>;
   /** Expected HTTP status code for the assertion line. */
   expectedStatus?: number;
   /** Human-readable label echoed in the section banner + assertion message. */
@@ -62,6 +64,14 @@ export function emitLiveTestSnippet(args: LiveTestSnippetArgs): string {
   const banner = `# ${section}.${step}: ${label}`;
 
   const includeBody = !METHODS_WITHOUT_BODY.has(args.method) && bodyHasContent(args.body);
+  const activeHeaders = (args.headers ?? []).filter((header) =>
+    header.enabled !== false &&
+    header.key.trim().length > 0 &&
+    header.key.trim().toLowerCase() !== 'authorization');
+  const contentType = activeHeaders.find((header) => header.key.toLowerCase() === 'content-type')?.value
+    ?? 'application/scim+json';
+  const additionalHeaders = activeHeaders.filter((header) =>
+    header.key.toLowerCase() !== 'content-type' || !includeBody);
 
   // Render the body as a single-quoted JSON literal piped through
   // ConvertTo-Json (round-trips via ConvertFrom-Json so deep nesting
@@ -81,19 +91,28 @@ export function emitLiveTestSnippet(args: LiveTestSnippetArgs): string {
     lines.push(`$body = '${escaped}' | ConvertFrom-Json | ConvertTo-Json -Depth 10`);
   }
 
+  if (additionalHeaders.length > 0) {
+    lines.push('$requestHeaders = @{} + $headers');
+    for (const header of additionalHeaders) {
+      lines.push(
+        `$requestHeaders['${escapePsSingleQuoted(header.key)}'] = '${escapePsSingleQuoted(header.value)}'`,
+      );
+    }
+  }
+
   // Use Invoke-WebRequest so we can assert the status code via
   // [int]$response.StatusCode (matches the pattern used by
   // 9z-AG / 9z-Q.7a / 9z-J.4 sections).
   const callParts = [
-    `$response = Invoke-WebRequest -Uri "$baseUrl${args.path}"`,
+    `$response = Invoke-WebRequest -Uri ($baseUrl + '${escapePsSingleQuoted(args.path)}')`,
     `-Method ${args.method}`,
-    '-Headers $headers',
+    additionalHeaders.length > 0 ? '-Headers $requestHeaders' : '-Headers $headers',
   ];
   if (includeBody) {
     callParts.push('-Body $body');
-    callParts.push("-ContentType 'application/scim+json'");
+    callParts.push(`-ContentType '${escapePsSingleQuoted(contentType)}'`);
   }
-  callParts.push('-ErrorAction Stop');
+  callParts.push('-SkipHttpErrorCheck');
   lines.push(callParts.join(' `\n  '));
 
   // Assertion line.

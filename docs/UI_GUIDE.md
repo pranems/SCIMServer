@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.26`
+> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.27`
 
-> **Status:** Active | **Last Updated:** 2026-09-23 | **Version:** 0.55.26
+> **Status:** Active | **Last Updated:** 2026-09-23 | **Version:** 0.55.27
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -299,16 +299,24 @@ A cross-endpoint operator view of users and groups across **every** endpoint on 
 
 ## 11. Workbench
 
-A free-form SCIM request builder. Compose a request once (method, path under `/scim/*`, headers, body), optionally pre-fill from an endpoint, then **Send** it and inspect the response. The same request can be copied/exported as **curl**, **TypeScript**, **Insomnia**, or **Postman**, or downloaded as a request `.json`. A **Side-by-side** toggle shows request and response together. The last 50 requests are saved locally as history.
+A SCIM request builder with executable examples and a free-form editor. Static examples cover server health and common admin operations. Selecting an endpoint adds endpoint-admin examples; selecting one of its published ResourceTypes adds a profile-valid create request and, when a resource exists, an ETag-aware PATCH against its real id. **Apply** loads the method, path, headers, and body into the editable draft but never sends automatically. **Send** executes the reviewed draft and displays the response.
+
+The same request can be copied/exported as **curl**, **TypeScript**, **Insomnia**, or **Postman**, or downloaded as a request `.json`. A **Side-by-side** toggle shows request and response together. The last 50 requests are saved locally as history.
 
 ![Workbench](screenshots/prod-05-workbench.png)
 
 | Capability | Detail |
 |------------|--------|
+| Examples | static Server/Admin plus selected Endpoint and discovery-derived SCIM ResourceType requests |
 | Methods | GET, POST, PUT, PATCH, DELETE |
 | Path | any `/scim/*` route (e.g. `/scim/endpoints/<id>/Users`) |
+| Profile POST | generated from the selected ResourceType's effective core plus extension schemas |
+| Existing-resource PATCH | concrete resource id, writable scalar operation, and returned `If-Match` when available |
+| Headers | enabled editor rows are sent; stored admin Authorization remains authoritative |
 | Export targets | curl, TypeScript fetch, Insomnia, Postman, raw `.json` |
 | History | last 50 requests, newest first, persisted locally |
+
+The canonical dev endpoint `PRTest-Auth-Methods-ISV-1` is the post-deployment demonstration surface: its User and Group extensions plus Device ResourceType make all profile-derived example classes visible in one endpoint.
 
 ---
 
