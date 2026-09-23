@@ -185,6 +185,20 @@ describe('fetchWithAuth', () => {
     const result = await fetchWithAuth('/scim/admin/version');
     expect(result).toEqual({ version: '0.41.0' });
   });
+
+  it('resolves a successful 204 response without parsing an empty body', async () => {
+    const json = vi.fn().mockRejectedValue(new SyntaxError('Unexpected end of JSON input'));
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 204,
+      json,
+    });
+
+    await expect(fetchWithAuth('/scim/endpoints/ep-1/Devices/device-1', {
+      method: 'DELETE',
+    })).resolves.toBeUndefined();
+    expect(json).not.toHaveBeenCalled();
+  });
 });
 
 describe('URL contract validation', () => {

@@ -1,15 +1,16 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.25`
+> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.26`
 
-> **Version:** 0.55.25 - **Updated:** 2026-09-17
-> 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - **9,469 checks** measured for v0.55.24 consolidation (4,924 API unit + 1,522 API E2E + 1,306 web vitest + 1,487 live SCIM + 230 Playwright)
+> **Version:** 0.55.26 - **Updated:** 2026-09-23
+> 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
 
 | If you want to... | Read |
 |---|---|
 | Understand the portable endpoint boundary, discovery translation, effective authentication state, APIs, DB mappings, and target UX | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) |
+| Create and edit User, Group, and custom resources from endpoint schemas | [PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md](PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md) |
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
 | Review contextual-settings execution issues and preventions | [ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md](ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md) |
 | Wire up authentication (4 methods), connect Entra ID, or diagnose an auth failure | [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
@@ -66,6 +67,8 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | Document | Description |
 |----------|-------------|
 | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) | **Canonical cross-cutting design** - portable profile boundary, discovery import/export translation, desired/effective/configured/ready/healthy auth vocabulary, provider registry, API ownership, database mappings, legacy migration, and operator UX. Clearly labels shipped behavior versus target design. |
+| [PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md](PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md) | **v0.55.26 resource management** - shared discovery-to-form architecture, generated examples, extension-aware create/PATCH payloads, custom ResourceType tabs and CRUD, Manual Provision reuse, effective schema inspection, ETag correction, and validation evidence. |
+| [PROFILE_DRIVEN_RESOURCE_FORMS_EXECUTION_RCA.md](PROFILE_DRIVEN_RESOURCE_FORMS_EXECUTION_RCA.md) | **v0.55.26 execution RCA** - six issues across test correctness, environment drift, and API correctness, including the generic ETag round-trip defect and its new unit/live preventions. |
 | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 118 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |

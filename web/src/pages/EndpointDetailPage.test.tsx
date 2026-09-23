@@ -232,5 +232,29 @@ describe('EndpointDetailPage', () => {
       expect(screen.getByRole('tab', { name: /users/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /groups/i })).toBeInTheDocument();
     });
+
+    it('shows each custom ResourceType as a first-class resource tab', async () => {
+      (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: {
+          ...mockEndpoint,
+          profile: {
+            resourceTypes: [
+              { id: 'User', name: 'User', endpoint: '/Users' },
+              {
+                id: 'Device',
+                name: 'Device',
+                endpoint: '/Devices',
+                schema: 'urn:example:schemas:Device',
+              },
+            ],
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+
+      renderDetail();
+      expect(await screen.findByTestId('endpoint-tab-resource-Device')).toHaveTextContent('Device');
+    });
   });
 });

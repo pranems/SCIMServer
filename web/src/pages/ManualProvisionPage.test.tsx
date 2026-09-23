@@ -14,7 +14,7 @@
  *      payload; failure state shows the error message.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
@@ -28,10 +28,20 @@ vi.mock('../api/queries', async () => {
     useEndpoints: vi.fn(),
     useCreateUser: vi.fn(),
     useCreateGroup: vi.fn(),
+    useEndpointSchemas: vi.fn(),
+    useEndpointResourceTypes: vi.fn(),
+    useCreateResource: vi.fn(),
   };
 });
 
-import { useEndpoints, useCreateUser, useCreateGroup } from '../api/queries';
+import {
+  useCreateGroup,
+  useCreateResource,
+  useCreateUser,
+  useEndpointResourceTypes,
+  useEndpointSchemas,
+  useEndpoints,
+} from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -61,16 +71,67 @@ const ENDPOINTS: EndpointListResponse = {
 describe('ManualProvisionPage', () => {
   let createUser: ReturnType<typeof vi.fn>;
   let createGroup: ReturnType<typeof vi.fn>;
+  let createResource: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     createUser = vi.fn().mockResolvedValue({ id: 'new-user-id', userName: 'alice@x.com' });
     createGroup = vi.fn().mockResolvedValue({ id: 'new-group-id', displayName: 'Engineering' });
+    createResource = vi.fn().mockResolvedValue({ id: 'device-1', serialNumber: 'serial-number-example' });
     (useCreateUser as ReturnType<typeof vi.fn>).mockReturnValue({
       mutateAsync: createUser, isPending: false, error: null,
     });
     (useCreateGroup as ReturnType<typeof vi.fn>).mockReturnValue({
       mutateAsync: createGroup, isPending: false, error: null,
+    });
+    (useCreateResource as ReturnType<typeof vi.fn>).mockReturnValue({
+      mutateAsync: createResource, isPending: false, error: null,
+    });
+    (useEndpointSchemas as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        Resources: [
+          {
+            id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+            attributes: [
+              { name: 'userName', type: 'string', required: true },
+              { name: 'active', type: 'boolean' },
+            ],
+          },
+          {
+            id: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+            attributes: [{ name: 'displayName', type: 'string', required: true }],
+          },
+          {
+            id: 'urn:example:schemas:Device',
+            attributes: [
+              { name: 'serialNumber', type: 'string', required: true },
+              { name: 'compliant', type: 'boolean' },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    (useEndpointResourceTypes as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        Resources: [
+          {
+            id: 'User', name: 'User', endpoint: '/Users',
+            schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+          },
+          {
+            id: 'Group', name: 'Group', endpoint: '/Groups',
+            schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+          },
+          {
+            id: 'Device', name: 'Device', endpoint: '/Devices',
+            schema: 'urn:example:schemas:Device',
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
     });
   });
 
@@ -124,8 +185,9 @@ describe('ManualProvisionPage', () => {
     await user.click(await screen.findByRole('option', { name: /Production/i }));
 
     // Fill user form.
-    const userNameInput = screen.getByLabelText(/userName/i);
-    await user.type(userNameInput, 'alice@x.com');
+    fireEvent.change(screen.getByTestId('manual-resource-form-userName-input'), {
+      target: { value: 'alice@x.com' },
+    });
 
     // Submit.
     await user.click(screen.getByRole('button', { name: /Create User/i }));
@@ -152,8 +214,9 @@ describe('ManualProvisionPage', () => {
     // Switch to Group tab.
     await user.click(screen.getByRole('tab', { name: /Group/i }));
 
-    const displayNameInput = screen.getByLabelText(/displayName/i);
-    await user.type(displayNameInput, 'Engineering');
+    fireEvent.change(screen.getByTestId('manual-resource-form-displayName-input'), {
+      target: { value: 'Engineering' },
+    });
 
     await user.click(screen.getByRole('button', { name: /Create Group/i }));
 
@@ -165,6 +228,64 @@ describe('ManualProvisionPage', () => {
     expect((body.schemas as string[])[0]).toContain('urn:ietf:params:scim:schemas:core:2.0:Group');
   });
 
+  it('renders and submits a discovered custom ResourceType with the shared profile form', async () => {
+    const user = userEvent.setup();
+    (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: ENDPOINTS, isLoading: false, error: null,
+    });
+    wrap(<ManualProvisionPage />);
+
+    await user.click(screen.getByRole('combobox', { name: /Target endpoint/i }));
+    await user.click(await screen.findByRole('option', { name: /Production/i }));
+    await user.click(await screen.findByRole('tab', { name: /Device/i }));
+
+    expect(screen.getByTestId('manual-resource-form-serialNumber-input')).toHaveValue(
+      'serial-number-example',
+    );
+    await user.click(screen.getByRole('button', { name: /Create Device/i }));
+
+    await waitFor(() => {
+      expect(useCreateResource).toHaveBeenCalledWith('ep-1', '/Devices');
+      expect(createResource).toHaveBeenCalledWith({
+        schemas: ['urn:example:schemas:Device'],
+        serialNumber: 'serial-number-example',
+        compliant: true,
+      });
+    });
+  });
+
+  it('switches to the newly selected endpoint resource types without retaining the old custom type', async () => {
+    const user = userEvent.setup();
+    (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: ENDPOINTS, isLoading: false, error: null,
+    });
+    (useEndpointResourceTypes as ReturnType<typeof vi.fn>).mockImplementation((endpointId: string) => ({
+      data: {
+        Resources: endpointId === 'ep-1'
+          ? [{ id: 'Device', name: 'Device', endpoint: '/Devices', schema: 'urn:example:schemas:Device' }]
+          : endpointId === 'ep-2'
+            ? [{
+                id: 'Group', name: 'Group', endpoint: '/Groups',
+                schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+              }]
+            : [],
+      },
+      isLoading: false,
+      error: null,
+    }));
+
+    wrap(<ManualProvisionPage />);
+    await user.click(screen.getByRole('combobox', { name: /Target endpoint/i }));
+    await user.click(await screen.findByRole('option', { name: /Production/i }));
+    expect(await screen.findByRole('tab', { name: 'Device' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('combobox', { name: /Target endpoint/i }));
+    await user.click(await screen.findByRole('option', { name: /Staging/i }));
+    expect(screen.queryByRole('tab', { name: 'Device' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Group' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('manual-resource-form-displayName-input')).toHaveValue('Group Example');
+  });
+
   it('shows ProvisionResult panel with returned id after a successful User create', async () => {
     const user = userEvent.setup();
     (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -173,7 +294,6 @@ describe('ManualProvisionPage', () => {
     wrap(<ManualProvisionPage />);
     await user.click(screen.getByRole('combobox', { name: /Target endpoint/i }));
     await user.click(await screen.findByRole('option', { name: /Production/i }));
-    await user.type(screen.getByLabelText(/userName/i), 'alice@x.com');
     await user.click(screen.getByRole('button', { name: /Create User/i }));
 
     await waitFor(() => {
@@ -192,7 +312,6 @@ describe('ManualProvisionPage', () => {
     wrap(<ManualProvisionPage />);
     await user.click(screen.getByRole('combobox', { name: /Target endpoint/i }));
     await user.click(await screen.findByRole('option', { name: /Production/i }));
-    await user.type(screen.getByLabelText(/userName/i), 'alice@x.com');
     await user.click(screen.getByRole('button', { name: /Create User/i }));
 
     await waitFor(() => {
@@ -201,7 +320,7 @@ describe('ManualProvisionPage', () => {
     expect(screen.getByText(/conflict/i)).toBeInTheDocument();
   });
 
-  it('refuses to submit when userName is empty (HTML5 required attribute)', async () => {
+  it('refuses to submit when the generated required userName field is empty', async () => {
     const user = userEvent.setup();
     (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
       data: ENDPOINTS, isLoading: false, error: null,
@@ -209,6 +328,9 @@ describe('ManualProvisionPage', () => {
     wrap(<ManualProvisionPage />);
     await user.click(screen.getByRole('combobox', { name: /Target endpoint/i }));
     await user.click(await screen.findByRole('option', { name: /Production/i }));
+    fireEvent.change(screen.getByTestId('manual-resource-form-userName-input'), {
+      target: { value: '' },
+    });
     await user.click(screen.getByRole('button', { name: /Create User/i }));
     expect(createUser).not.toHaveBeenCalled();
   });

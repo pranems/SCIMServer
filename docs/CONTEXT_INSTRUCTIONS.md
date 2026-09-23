@@ -1,9 +1,9 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.25
-> **Last Updated**: September 21, 2026
-> **Last verified:** 2026-09-21
+> **Version**: 0.55.26
+> **Last Updated**: September 23, 2026
+> **Last verified:** 2026-09-23
 
 ---
 
@@ -24,6 +24,17 @@ Dev evidence is live SCIM 1,491/1,491, Playwright 230 passed / 4 skipped,
 endpoint integrity 60 -> 60 with zero missing IDs, and two active revisions
 including the v0.55.23 rollback target. Canary and customer prod were not
 touched.
+
+The current v0.55.26 rollback unit is implemented locally on
+`feat/profile-resource-forms-v0.55.26`. User, Group, Manual Provision, and
+custom ResourceType workflows share one discovery-driven form and payload
+engine. Custom types appear as dynamic endpoint tabs; Resource Types shows the
+effective combined core plus extension field shape. Generic resource responses
+now emit `W/"vN"`, matching shared `If-Match` enforcement. Local evidence is
+API unit 5,140/5,140, API E2E 1,524/1,524, web 1,481/1,481, focused web
+178/178, generic service 68/68, Playwright 1/1, and live SCIM 1,500/1,500.
+It is not merged or deployed. Workbench
+templates and the named dev fixture remain a separate rollback unit.
 
 The change refines endpoint settings and Connect. Contextual
 panes are collapsed; Users owns only its two lifecycle settings and Groups only

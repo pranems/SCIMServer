@@ -144,6 +144,8 @@ export function computeInvalidations(
           keys.push(queryKeys.users.all(endpointId));
         } else if (channel === 'groups') {
           keys.push(queryKeys.groups.all(endpointId));
+        } else {
+          keys.push(queryKeys.resources.byEndpoint(endpointId));
         }
       }
       break;
@@ -293,6 +295,7 @@ const EVENT_TITLE: Record<SupportedEventType, string> = {
   'scim.endpoint.created': 'Endpoint created',
   'scim.endpoint.updated': 'Endpoint updated',
   'scim.endpoint.deleted': 'Endpoint deleted',
+  'scim.security.updated': 'Security settings updated',
 };
 
 function pushNotification(

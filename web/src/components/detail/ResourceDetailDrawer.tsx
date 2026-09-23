@@ -58,7 +58,16 @@ import {
   useDeleteUser,
   useUpdateGroup,
   useDeleteGroup,
+  useUpdateResource,
+  useDeleteResource,
 } from '../../api/queries';
+import { ProfileResourceForm } from '../../resources/ProfileResourceForm';
+import {
+  buildPatchOperations,
+  valueForField,
+  type EffectiveResourceShape,
+  type ScimPatchOperation,
+} from '../../resources/profile-resource-shape';
 
 const SCIM_PATCH_OP_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 
@@ -172,16 +181,19 @@ export interface ScimResource {
   meta?: {
     created?: string;
     lastModified?: string;
+    version?: string;
   };
   [key: string]: unknown;
 }
 
-export type ResourceKind = 'user' | 'group';
+export type ResourceKind = 'user' | 'group' | 'custom';
 
 export interface ResourceDetailDrawerProps {
   kind: ResourceKind;
   endpointId: string;
   resource: ScimResource;
+  shape?: EffectiveResourceShape;
+  resourceEndpoint?: string;
   open: boolean;
   onClose: () => void;
 }
@@ -238,6 +250,8 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   kind,
   endpointId,
   resource,
+  shape,
+  resourceEndpoint = '',
   open,
   onClose,
 }) => {
@@ -248,12 +262,18 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   const userDelete = useDeleteUser(endpointId);
   const groupUpdate = useUpdateGroup(endpointId);
   const groupDelete = useDeleteGroup(endpointId);
+  const customUpdate = useUpdateResource(endpointId, resourceEndpoint);
+  const customDelete = useDeleteResource(endpointId, resourceEndpoint);
 
   // Editable form state - re-seeded whenever `resource` changes.
   const [userName, setUserName] = React.useState(resource.userName ?? '');
   const [displayName, setDisplayName] = React.useState(resource.displayName ?? '');
   const [externalId, setExternalId] = React.useState(resource.externalId ?? '');
   const [active, setActive] = React.useState(resource.active ?? true);
+  const [profileValues, setProfileValues] = React.useState<Record<string, unknown>>(() =>
+    shape
+      ? Object.fromEntries(shape.fields.map((field) => [field.id, valueForField(field, resource)]))
+      : {});
   const [confirming, setConfirming] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
   // K5 - separate state for the 412/428 conflict dialog. We surface
@@ -268,10 +288,13 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     setDisplayName(resource.displayName ?? '');
     setExternalId(resource.externalId ?? '');
     setActive(resource.active ?? true);
+    setProfileValues(shape
+      ? Object.fromEntries(shape.fields.map((field) => [field.id, valueForField(field, resource)]))
+      : {});
     setConfirming(false);
     setError(null);
     setConflict(null);
-  }, [resource.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resource.id, shape]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function buildDiff(): Record<string, unknown> {
     const diff: Record<string, unknown> = {};
@@ -289,13 +312,16 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
   async function handleSave(overrideIfMatch?: string) {
     setError(null);
     const diff = buildDiff();
-    if (Object.keys(diff).length === 0) {
+    const operations: ScimPatchOperation[] = shape
+      ? buildPatchOperations(shape, resource, profileValues)
+      : buildOperations(diff);
+    if (operations.length === 0) {
       onClose();
       return;
     }
     const body = {
       schemas: [SCIM_PATCH_OP_SCHEMA],
-      Operations: buildOperations(diff),
+      Operations: operations,
     };
     // K5 - send the resource's current ETag as If-Match. Server uses
     // it to detect mid-air collisions (412 Precondition Failed when
@@ -305,8 +331,10 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     try {
       if (kind === 'user') {
         await userUpdate.mutateAsync({ userId: resource.id, body, ifMatch });
-      } else {
+      } else if (kind === 'group') {
         await groupUpdate.mutateAsync({ groupId: resource.id, body, ifMatch });
+      } else {
+        await customUpdate.mutateAsync({ resourceId: resource.id, body, ifMatch });
       }
       setConflict(null);
       onClose();
@@ -315,7 +343,9 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
       // the generic error banner. Everything else falls through to
       // <ScimErrorMessage /> via setError.
       if (err instanceof ScimApiError && (err.status === 412 || err.status === 428)) {
-        setConflict({ pending: diff });
+        setConflict({
+          pending: Object.fromEntries(operations.map((operation) => [operation.path, operation.value])),
+        });
         return;
       }
       // K3 - keep the raw error so ScimErrorMessage can map scimType
@@ -330,8 +360,10 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     try {
       if (kind === 'user') {
         await userDelete.mutateAsync(resource.id);
-      } else {
+      } else if (kind === 'group') {
         await groupDelete.mutateAsync(resource.id);
+      } else {
+        await customDelete.mutateAsync({ resourceId: resource.id });
       }
       onClose();
     } catch (err) {
@@ -339,12 +371,22 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     }
   }
 
-  const saving = kind === 'user' ? userUpdate.isPending : groupUpdate.isPending;
-  const deleting = kind === 'user' ? userDelete.isPending : groupDelete.isPending;
+  const saving = kind === 'user'
+    ? userUpdate.isPending
+    : kind === 'group'
+      ? groupUpdate.isPending
+      : customUpdate.isPending;
+  const deleting = kind === 'user'
+    ? userDelete.isPending
+    : kind === 'group'
+      ? groupDelete.isPending
+      : customDelete.isPending;
 
   const title = kind === 'user'
     ? `User - ${resource.userName ?? resource.id}`
-    : `Group - ${resource.displayName ?? resource.id}`;
+    : kind === 'group'
+      ? `Group - ${resource.displayName ?? resource.id}`
+      : `${shape?.resourceType.name ?? 'Resource'} - ${resource.id}`;
 
   const footer = (
     <>
@@ -446,7 +488,18 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
         {/* ── Editable fields ──────────────────────────────────── */}
         <Subtitle2>Attributes</Subtitle2>
 
-        {kind === 'user' ? (
+        {shape ? (
+          <ProfileResourceForm
+            shape={shape}
+            values={profileValues}
+            onChange={(fieldId, value) => setProfileValues((current) => ({
+              ...current,
+              [fieldId]: value,
+            }))}
+            disabled={saving || deleting}
+            data-testid="drawer-profile-form"
+          />
+        ) : kind === 'user' ? (
           <>
             <EditableField
               label="userName"
@@ -558,6 +611,9 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           setDisplayName(resource.displayName ?? '');
           setExternalId(resource.externalId ?? '');
           setActive(resource.active ?? true);
+          setProfileValues(shape
+            ? Object.fromEntries(shape.fields.map((field) => [field.id, valueForField(field, resource)]))
+            : {});
           setConflict(null);
         }}
         onForceOverwrite={() => {

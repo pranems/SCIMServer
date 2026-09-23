@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.55.25",
+  "version": "0.55.26",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -130,6 +130,13 @@
     {
       "name": "ResourceTypesTab",
       "path": "dist/assets/ResourceTypesTab-*.js",
+      "limit": "110 KB",
+      "gzip": true,
+      "running": false
+    },
+    {
+      "name": "GenericResourcesTab",
+      "path": "dist/assets/GenericResourcesTab-*.js",
       "limit": "110 KB",
       "gzip": true,
       "running": false

@@ -602,7 +602,7 @@ describe('EndpointScimGenericService', () => {
       );
 
       expect(result.meta).toBeDefined();
-      expect((result.meta as any).version).toBe('W/"5"');
+      expect((result.meta as any).version).toBe('W/"v5"');
     });
 
     it('should include schemas array with core schema URN', async () => {

@@ -116,6 +116,8 @@ export interface EditableFieldProps {
   rows?: number;
   /** Optional placeholder text. */
   placeholder?: string;
+  /** Native input type for single-line fields. */
+  inputType?: React.ComponentProps<typeof Input>['type'];
   /** Disable the input + all buttons. */
   disabled?: boolean;
   /** Optional `data-testid`. */
@@ -139,6 +141,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   multiline = false,
   rows = 3,
   placeholder,
+  inputType = 'text',
   disabled = false,
   'data-testid': testId,
   monospace = false,
@@ -153,21 +156,18 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   // Refresh whenever the controlled value changes via a route that
   // is NOT this component's onChange - e.g. parent re-fetches the
   // resource. We detect "external change" by comparing the incoming
-  // value to BOTH original and the last-recorded history tail.
+  // value to the last value emitted by this component.
   const originalRef = React.useRef<string>(value);
+  const lastEmittedRef = React.useRef<string>(value);
   const [history, setHistory] = React.useState<string[]>([value]);
   const [cursor, setCursor] = React.useState(0);
 
   React.useEffect(() => {
-    // External re-seed: parent fetched a fresh resource and the value
-    // changed without going through our onChange. Reset history.
-    const currentTail = history[cursor];
-    if (value !== currentTail) {
-      originalRef.current = value;
-      setHistory([value]);
-      setCursor(0);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (value === lastEmittedRef.current) return;
+    originalRef.current = value;
+    lastEmittedRef.current = value;
+    setHistory([value]);
+    setCursor(0);
   }, [value]);
 
   const pushHistory = (next: string): void => {
@@ -184,6 +184,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
 
   const handleChange = (next: string): void => {
     pushHistory(next);
+    lastEmittedRef.current = next;
     onChange(next);
   };
 
@@ -195,6 +196,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   const handleReset = (e: React.MouseEvent): void => {
     e.stopPropagation();
     pushHistory(originalRef.current);
+    lastEmittedRef.current = originalRef.current;
     onChange(originalRef.current);
   };
 
@@ -203,6 +205,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     if (cursor > 0) {
       const next = history[cursor - 1];
       setCursor(cursor - 1);
+      lastEmittedRef.current = next;
       onChange(next);
     }
   };
@@ -212,6 +215,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     if (cursor < history.length - 1) {
       const next = history[cursor + 1];
       setCursor(cursor + 1);
+      lastEmittedRef.current = next;
       onChange(next);
     }
   };
@@ -243,6 +247,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     />
   ) : (
     <Input
+      type={inputType}
       value={value}
       onChange={(_, d) => handleChange(d.value)}
       placeholder={placeholder}

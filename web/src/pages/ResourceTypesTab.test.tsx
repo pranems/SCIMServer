@@ -52,7 +52,33 @@ const SCHEMA_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCHEMA_GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 const SCHEMA_DEVICE = 'urn:ietf:params:scim:schemas:custom:Device';
 
-function endpointWithFlag(flagOn: boolean, customRts: Array<Record<string, unknown>> = []) {
+interface TestSchema {
+  id: string;
+  name: string;
+  attributes: Array<{ name: string; type: string; required?: boolean }>;
+}
+
+interface TestResourceType {
+  id: string;
+  name: string;
+  endpoint: string;
+  schema: string;
+  schemaExtensions: Array<{ schema: string; required?: boolean }>;
+}
+
+interface TestEndpoint {
+  id: string;
+  name: string;
+  displayName: string;
+  active: boolean;
+  profile: {
+    settings: { CustomResourceTypesEnabled: string };
+    schemas: TestSchema[];
+    resourceTypes: TestResourceType[];
+  };
+}
+
+function endpointWithFlag(flagOn: boolean, customRts: TestResourceType[] = []): TestEndpoint {
   return {
     id: 'ep-1',
     name: 'prod',
@@ -221,6 +247,36 @@ describe('ResourceTypesTab (Phase M3)', () => {
     expect(deviceRow.textContent).toContain(SCHEMA_DEVICE);
   });
 
+  it('shows the effective combined core and extension schema attributes', () => {
+    const enterpriseUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const endpoint = endpointWithFlag(true);
+    endpoint.profile.schemas = [
+      {
+        id: SCHEMA_USER,
+        name: 'User',
+        attributes: [{ name: 'userName', type: 'string', required: true }],
+      },
+      {
+        id: enterpriseUrn,
+        name: 'EnterpriseUser',
+        attributes: [{ name: 'employeeNumber', type: 'string' }],
+      },
+      { id: SCHEMA_GROUP, name: 'Group', attributes: [] },
+    ];
+    endpoint.profile.resourceTypes[0].schemaExtensions = [{ schema: enterpriseUrn, required: false }];
+    mockUseEndpoint.mockReturnValue({
+      data: endpoint,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    const effective = screen.getByTestId('resource-types-effective-User');
+    expect(effective).toHaveTextContent('userName');
+    expect(effective).toHaveTextContent(`${enterpriseUrn}:employeeNumber`);
+  });
+
   // ─── 6-7. Create dialog + submit ──────────────────────────────────
 
   it('Create dialog renders the 4 input fields', () => {
@@ -253,6 +309,33 @@ describe('ResourceTypesTab (Phase M3)', () => {
     const schemaIds = body.profile.schemas.map((s) => s.id);
     expect(schemaIds).toContain(SCHEMA_DEVICE);
     expect(schemaIds).toContain(SCHEMA_USER);
+  });
+
+  it('preserves implicit User and Group when registering the first custom type', async () => {
+    const endpoint = endpointWithFlag(true);
+    endpoint.profile.resourceTypes = [];
+    mockUseEndpoint.mockReturnValue({
+      data: endpoint,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderWithProviders(<ResourceTypesTab endpointId="ep-1" />);
+    fireEvent.click(screen.getByTestId('resource-types-create-button'));
+    fireEvent.change(screen.getByTestId('resource-types-create-name'), { target: { value: 'Device' } });
+    fireEvent.change(screen.getByTestId('resource-types-create-endpoint'), { target: { value: '/Devices' } });
+    fireEvent.change(screen.getByTestId('resource-types-create-schema'), { target: { value: SCHEMA_DEVICE } });
+    fireEvent.click(screen.getByTestId('resource-types-create-dialog-submit'));
+
+    await waitFor(() => expect(mockUpdateMutate).toHaveBeenCalledTimes(1));
+    const body = mockUpdateMutate.mock.calls[0][0] as {
+      profile: { resourceTypes: Array<{ name: string }> };
+    };
+    expect(body.profile.resourceTypes.map((resourceType) => resourceType.name)).toEqual([
+      'User',
+      'Group',
+      'Device',
+    ]);
   });
 
   // ─── C. Concurrent-edit conflict ──────────────────────────────────

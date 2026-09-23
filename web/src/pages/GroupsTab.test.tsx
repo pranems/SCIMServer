@@ -5,17 +5,28 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { GroupsTab } from './GroupsTab';
 import { renderWithRouter } from '../test/router-test-utils';
 import { groupsSearchSchema } from '../routes/search-schemas';
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
-  return { ...actual, useEndpointGroups: vi.fn() };
+  return {
+    ...actual,
+    useEndpointGroups: vi.fn(),
+    useEndpointSchemas: vi.fn(),
+    useEndpointResourceTypes: vi.fn(),
+    useCreateGroup: vi.fn(),
+  };
 });
 
-import { useEndpointGroups } from '../api/queries';
+import {
+  useCreateGroup,
+  useEndpointGroups,
+  useEndpointResourceTypes,
+  useEndpointSchemas,
+} from '../api/queries';
 import { ScimApiError } from '../api/scim-error';
 import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
@@ -42,8 +53,40 @@ const mockGroups = {
 };
 
 describe('GroupsTab', () => {
+  const createGroup = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    createGroup.mockResolvedValue({ id: 'new-group' });
+    (useCreateGroup as ReturnType<typeof vi.fn>).mockReturnValue({
+      mutateAsync: createGroup,
+      isPending: false,
+    });
+    (useEndpointSchemas as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        Resources: [{
+          id: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+          attributes: [
+            { name: 'displayName', type: 'string', required: true },
+            { name: 'members', type: 'complex', multiValued: true },
+          ],
+        }],
+      },
+      isLoading: false,
+      error: null,
+    });
+    (useEndpointResourceTypes as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        Resources: [{
+          id: 'Group',
+          name: 'Group',
+          endpoint: '/Groups',
+          schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+        }],
+      },
+      isLoading: false,
+      error: null,
+    });
     // Phase N4: each test starts from default preferences (pageSize=20).
     usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
     localStorage.clear();
@@ -107,6 +150,26 @@ describe('GroupsTab', () => {
     });
     wrap(<GroupsTab endpointId="ep-1" />);
     expect(await screen.findByText(/no groups/i)).toBeInTheDocument();
+  });
+
+  it('creates a Group from the empty state using its discovered profile fields', async () => {
+    (useEndpointGroups as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockGroups, totalResults: 0, Resources: [] },
+      isLoading: false,
+      error: null,
+    });
+    wrap(<GroupsTab endpointId="ep-1" />);
+
+    fireEvent.click(await screen.findByTestId('groups-empty-action'));
+    expect(screen.getByTestId('create-resource-form-displayName-input')).toHaveValue('Group Example');
+    fireEvent.click(screen.getByTestId('create-resource-dialog-submit'));
+
+    await waitFor(() => {
+      expect(createGroup).toHaveBeenCalledWith({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'Group Example',
+      });
+    });
   });
 
   it('reads page from URL search params (?page=2 -> startIndex=21)', async () => {

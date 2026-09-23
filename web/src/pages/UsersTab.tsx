@@ -25,8 +25,14 @@ import {
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
+import { Add24Regular } from '@fluentui/react-icons';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { useEndpointUsers } from '../api/queries';
+import {
+  useCreateUser,
+  useEndpointResourceTypes,
+  useEndpointSchemas,
+  useEndpointUsers,
+} from '../api/queries';
 import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { UsersSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer, type ScimResource } from '../components/detail/ResourceDetailDrawer';
@@ -37,6 +43,8 @@ import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 import { EndpointRelatedSettings } from './EndpointRelatedSettings';
 import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
+import { CreateProfileResourceDialog } from '../resources/CreateProfileResourceDialog';
+import { resolveEffectiveResourceShape } from '../resources/profile-resource-shape';
 
 const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
@@ -50,6 +58,11 @@ const useStyles = makeStyles({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   table: {
     width: '100%',
@@ -125,6 +138,20 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const schemasQuery = useEndpointSchemas(endpointId);
+  const resourceTypesQuery = useEndpointResourceTypes(endpointId);
+  const createUser = useCreateUser(endpointId);
+  const userShape = React.useMemo(() => {
+    const resourceType = resourceTypesQuery.data?.Resources.find((candidate) =>
+      candidate.name === 'User' || candidate.endpoint.replace(/^\//u, '') === 'Users');
+    if (!resourceType || !schemasQuery.data) return undefined;
+    try {
+      return resolveEffectiveResourceShape(resourceType, schemasQuery.data.Resources);
+    } catch {
+      return undefined;
+    }
+  }, [resourceTypesQuery.data, schemasQuery.data]);
 
   const goToPage = (nextPage: number): void => {
     navigate({
@@ -207,8 +234,18 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
         <EmptyState
           data-testid="users-empty"
           title="No users in this endpoint"
-          body="Users are provisioned to this endpoint via SCIM POST /Users from your identity provider, or manually from the Manual Provision page."
+          body="Create a user here or provision one through your identity provider."
+          actionLabel={userShape ? 'Create user' : undefined}
+          onAction={userShape ? () => setCreateOpen(true) : undefined}
         />
+        {userShape && (
+          <CreateProfileResourceDialog
+            open={createOpen}
+            shape={userShape}
+            onCreate={(payload) => createUser.mutateAsync(payload)}
+            onClose={() => setCreateOpen(false)}
+          />
+        )}
       </div>
     );
   }
@@ -224,18 +261,29 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
       />
       <div className={classes.header}>
         <Subtitle2>{total} users</Subtitle2>
-        <ExportSplitButton
-          rows={users.map((u: any) => ({
-            id: u.id,
-            userName: u.userName,
-            displayName: u.displayName ?? '',
-            active: u.active !== false,
-            created: u.meta?.created ?? '',
-            lastModified: u.meta?.lastModified ?? '',
-          }))}
-          filenameBase={`users-${endpointId}`}
-          columns={['id', 'userName', 'displayName', 'active', 'created', 'lastModified']}
-        />
+        <div className={classes.headerActions}>
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            onClick={() => setCreateOpen(true)}
+            disabled={!userShape}
+            data-testid="users-create"
+          >
+            Create user
+          </Button>
+          <ExportSplitButton
+            rows={users.map((u: any) => ({
+              id: u.id,
+              userName: u.userName,
+              displayName: u.displayName ?? '',
+              active: u.active !== false,
+              created: u.meta?.created ?? '',
+              lastModified: u.meta?.lastModified ?? '',
+            }))}
+            filenameBase={`users-${endpointId}`}
+            columns={['id', 'userName', 'displayName', 'active', 'created', 'lastModified']}
+          />
+        </div>
       </div>
 
       <table className={classes.table}>
@@ -322,8 +370,17 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
           kind="user"
           endpointId={endpointId}
           resource={selectedUser}
+          shape={userShape}
           open
           onClose={closeDetail}
+        />
+      )}
+      {userShape && (
+        <CreateProfileResourceDialog
+          open={createOpen}
+          shape={userShape}
+          onCreate={(payload) => createUser.mutateAsync(payload)}
+          onClose={() => setCreateOpen(false)}
         />
       )}
     </div>

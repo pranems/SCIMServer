@@ -15868,6 +15868,95 @@ try {
 Write-Host "`n--- 9z-CM: Credential Migration Status Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-CN: PROFILE-DRIVEN CUSTOM RESOURCE ETAG ROUND-TRIP
+$script:currentSection = "9z-CN: Custom Resource ETag Round-Trip"
+# ============================================
+Write-Host "`n=== TEST SECTION 9z-CN: PROFILE-DRIVEN CUSTOM RESOURCE ETAG ROUND-TRIP ===" -ForegroundColor Cyan
+
+$cnEndpointId = $null
+try {
+    $cnSchemaUrn = "urn:live:schemas:Device"
+    $cnProfile = @{
+        schemas = @(
+            @{
+                id = $cnSchemaUrn
+                name = "Device"
+                attributes = @(
+                    @{ name = "serialNumber"; type = "string"; required = $true; mutability = "readWrite" }
+                    @{ name = "compliant"; type = "boolean"; required = $false; mutability = "readWrite" }
+                )
+            }
+        )
+        resourceTypes = @(
+            @{
+                id = "Device"
+                name = "Device"
+                endpoint = "/Devices"
+                schema = $cnSchemaUrn
+                schemaExtensions = @()
+            }
+        )
+    }
+    $cnEndpointBody = @{
+        name = "live-cn-device-$(Get-Random)"
+        profile = $cnProfile
+    } | ConvertTo-Json -Depth 10
+    $cnEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers `
+        -Body $cnEndpointBody -ContentType "application/json"
+    $cnEndpointId = $cnEndpoint.id
+    Test-Result -Success ([string]::IsNullOrWhiteSpace($cnEndpointId) -eq $false) `
+        -Message "9z-CN.T1: profile-driven Device endpoint created"
+
+    $cnScimBase = "$baseUrl/scim/endpoints/$cnEndpointId"
+    $cnCreateBody = @{
+        schemas = @($cnSchemaUrn)
+        serialNumber = "SN-100"
+        compliant = $true
+    } | ConvertTo-Json -Depth 5
+    $cnCreated = Invoke-RestMethod -Uri "$cnScimBase/Devices" -Method POST -Headers $headers `
+        -Body $cnCreateBody -ContentType "application/scim+json"
+    Test-Result -Success ($cnCreated.serialNumber -eq "SN-100" -and $cnCreated.compliant -eq $true) `
+        -Message "9z-CN.T2: custom Device create payload round-trips"
+    Test-Result -Success ($cnCreated.meta.version -eq 'W/"v1"') `
+        -Message "9z-CN.T3: custom Device emits canonical ETag W/`"v1`""
+
+    $cnPatchHeaders = @{
+        Authorization = $headers['Authorization']
+        'Content-Type' = 'application/scim+json'
+        'If-Match' = $cnCreated.meta.version
+    }
+    $cnPatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(
+            @{ op = "replace"; path = "serialNumber"; value = "SN-200" }
+        )
+    } | ConvertTo-Json -Depth 5
+    $cnPatched = Invoke-RestMethod -Uri "$cnScimBase/Devices/$($cnCreated.id)" -Method PATCH `
+        -Headers $cnPatchHeaders -Body $cnPatchBody -ContentType "application/scim+json"
+    Test-Result -Success ($cnPatched.serialNumber -eq "SN-200") `
+        -Message "9z-CN.T4: returned ETag succeeds as If-Match for custom Device PATCH"
+    Test-Result -Success ($cnPatched.meta.version -eq 'W/"v2"') `
+        -Message "9z-CN.T5: successful custom Device PATCH increments the canonical ETag"
+
+    $cnFetched = Invoke-RestMethod -Uri "$cnScimBase/Devices/$($cnCreated.id)" -Method GET -Headers $headers
+    Test-Result -Success ($cnFetched.serialNumber -eq "SN-200" -and $cnFetched.meta.version -eq 'W/"v2"') `
+        -Message "9z-CN.T6: custom Device edit persists with its current ETag"
+} catch {
+    Test-Result -Success $false -Message "9z-CN: custom resource ETag round-trip section threw: $($_.Exception.Message)"
+} finally {
+    if ($cnEndpointId) {
+        try {
+            $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cnEndpointId" -Method DELETE -Headers $headers
+            Test-Result -Success $true -Message "9z-CN.cleanup: deleted custom Device endpoint"
+        } catch {
+            Test-Result -Success $false -Message "9z-CN.cleanup: failed to delete custom Device endpoint"
+        }
+    }
+}
+
+Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

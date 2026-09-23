@@ -83,7 +83,8 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'connect' | 'bulk' | 'resource-types';
+type StaticTabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'connect' | 'bulk' | 'resource-types';
+type TabValue = StaticTabValue | `resource:${string}`;
 
 interface EndpointDetailPageProps {
   endpointId: string;
@@ -98,6 +99,10 @@ function pathToTab(pathname: string, endpointId: string): TabValue {
   if (pathname.startsWith(`${base}/activity`)) return 'activity';
   if (pathname.startsWith(`${base}/bulk`)) return 'bulk';
   if (pathname.startsWith(`${base}/resource-types`)) return 'resource-types';
+  if (pathname.startsWith(`${base}/resources/`)) {
+    const resourceTypeId = pathname.slice(`${base}/resources/`.length).split('/')[0];
+    return `resource:${decodeURIComponent(resourceTypeId ?? '')}`;
+  }
   if (pathname.startsWith(`${base}/schemas`)) return 'schemas';
   if (pathname.startsWith(`${base}/credentials`)) return 'connect';
   if (pathname.startsWith(`${base}/connect`)) return 'connect';
@@ -149,8 +154,21 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
     name: 'Group',
     endpointPath: '/Groups',
   });
+  const declaredResourceTypes = (
+    endpoint.profile as { resourceTypes?: Array<{ id?: string; name?: string; endpoint?: string }> } | undefined
+  )?.resourceTypes ?? [];
+  const customResourceTypes = declaredResourceTypes.filter((resourceType) =>
+    resourceType.name !== 'User' && resourceType.name !== 'Group' &&
+    resourceType.id && resourceType.name && resourceType.endpoint);
 
   const handleTabSelect = (next: TabValue): void => {
+    if (next.startsWith('resource:')) {
+      navigate({
+        to: '/endpoints/$endpointId/resources/$resourceTypeId',
+        params: { endpointId, resourceTypeId: next.slice('resource:'.length) },
+      });
+      return;
+    }
     if (next === 'overview') {
       navigate({ to: '/endpoints/$endpointId', params: { endpointId } });
       return;
@@ -272,6 +290,15 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="overview">Overview</Tab>
         {supportsUsers && <Tab value="users" data-testid="endpoint-tab-users">Users</Tab>}
         {supportsGroups && <Tab value="groups" data-testid="endpoint-tab-groups">Groups</Tab>}
+        {customResourceTypes.map((resourceType) => (
+          <Tab
+            key={resourceType.id}
+            value={`resource:${resourceType.id}`}
+            data-testid={`endpoint-tab-resource-${resourceType.id}`}
+          >
+            {resourceType.name}
+          </Tab>
+        ))}
         <Tab value="activity">Activity</Tab>
         <Tab value="bulk">Bulk</Tab>
         <Tab value="resource-types">Resource types</Tab>

@@ -45,8 +45,13 @@ vi.mock('../api/queries', async () => {
     useEndpoint: vi.fn(),
     useEndpointUsers: vi.fn(),
     useEndpointGroups: vi.fn(),
+    useEndpointSchemas: vi.fn(),
+    useEndpointResourceTypes: vi.fn(),
     useEndpointOverview: vi.fn(),
     useUpdateEndpointConfig: vi.fn(),
+    useCreateUser: vi.fn(),
+    useCreateGroup: vi.fn(),
+    useCreateResource: vi.fn(),
     useVersion: vi.fn(),
     useHealth: vi.fn(),
   };
@@ -57,8 +62,13 @@ import {
   useEndpoint,
   useEndpointUsers,
   useEndpointGroups,
+  useEndpointSchemas,
+  useEndpointResourceTypes,
   useEndpointOverview,
   useUpdateEndpointConfig,
+  useCreateUser,
+  useCreateGroup,
+  useCreateResource,
   useVersion,
   useHealth,
 } from '../api/queries';
@@ -84,6 +94,11 @@ const noopMutation = {
 beforeEach(() => {
   vi.clearAllMocks();
   cleanup();
+  (useEndpointSchemas as ReturnType<typeof vi.fn>).mockReturnValue(loadingResult);
+  (useEndpointResourceTypes as ReturnType<typeof vi.fn>).mockReturnValue(loadingResult);
+  (useCreateUser as ReturnType<typeof vi.fn>).mockReturnValue(noopMutation);
+  (useCreateGroup as ReturnType<typeof vi.fn>).mockReturnValue(noopMutation);
+  (useCreateResource as ReturnType<typeof vi.fn>).mockReturnValue(noopMutation);
 });
 
 describe('Phase G1 - LoadingSkeleton replaces Spinner on every surface', () => {

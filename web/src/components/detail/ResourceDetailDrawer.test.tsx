@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { ResourceDetailDrawer } from './ResourceDetailDrawer';
+import { resolveEffectiveResourceShape } from '../../resources/profile-resource-shape';
 
 vi.mock('../../api/queries', async () => {
   const actual = await vi.importActual('../../api/queries');
@@ -116,6 +117,58 @@ describe('ResourceDetailDrawer (User)', () => {
     );
     expect((screen.getByLabelText(/userName/i) as HTMLInputElement).value).toBe(USER.userName);
     expect((screen.getByLabelText(/displayName/i) as HTMLInputElement).value).toBe(USER.displayName);
+  });
+
+  it('edits profile extension attributes with an extension-qualified PATCH path', async () => {
+    const user = userEvent.setup();
+    const enterpriseUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const shape = resolveEffectiveResourceShape(
+      {
+        id: 'User',
+        name: 'User',
+        endpoint: '/Users',
+        schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+        schemaExtensions: [{ schema: enterpriseUrn }],
+      },
+      [
+        {
+          id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+          attributes: [
+            { name: 'userName', type: 'string', required: true },
+            { name: 'active', type: 'boolean' },
+          ],
+        },
+        {
+          id: enterpriseUrn,
+          attributes: [{ name: 'employeeNumber', type: 'string' }],
+        },
+      ],
+    );
+    const resource = {
+      ...USER,
+      schemas: [shape.coreSchema.id, enterpriseUrn],
+      [enterpriseUrn]: { employeeNumber: '100' },
+    };
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={resource}
+        shape={shape}
+        open
+        onClose={() => undefined}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('drawer-profile-form-employeeNumber-input'), {
+      target: { value: '200' },
+    });
+    await user.click(screen.getByRole('button', { name: /Save/i }));
+
+    const args = updateUser.mock.calls[0][0] as { body: Record<string, unknown> };
+    expect(args.body.Operations).toEqual([
+      { op: 'replace', path: `${enterpriseUrn}:employeeNumber`, value: '200' },
+    ]);
   });
 
   // Finding-D follow-up (2026-05-29): operator caught that the drawer
