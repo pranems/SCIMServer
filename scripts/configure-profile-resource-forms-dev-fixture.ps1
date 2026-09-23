@@ -146,6 +146,16 @@ if ($SelfTest) {
         $conflictRejected = $_.Exception.Message -like "*name 'Device'*id 'LegacyDevice'*"
     }
     Test-Condition $conflictRejected 'same-name Device with a different id is rejected before mutation'
+
+    $reverseConflictRejected = $false
+    try {
+        Assert-OwnedResourceTypeIdentity `
+            -Existing @([ordered]@{ id = 'Device'; name = 'LegacyDevice'; endpoint = '/LegacyDevices' }) `
+            -Owned $canonical
+    } catch {
+        $reverseConflictRejected = $_.Exception.Message -like "*id 'Device'*named 'LegacyDevice'*"
+    }
+    Test-Condition $reverseConflictRejected 'Device id with a different name is rejected before mutation'
     Write-Host 'Fixture self-test complete.' -ForegroundColor Green
     return
 }

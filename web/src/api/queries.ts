@@ -1291,9 +1291,7 @@ export function useScimRequest() {
   return useMutation<ScimRequestOutcome, Error, ScimRequestArgs>({
     mutationFn: async (args) => {
       const token = getStoredToken();
-      const editableHeaders = Object.fromEntries(
-        Object.entries(args.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'authorization'),
-      );
+      const editableHeaders = sanitizeAuthenticatedHeaders(args.headers);
       const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/scim+json',
         ...editableHeaders,

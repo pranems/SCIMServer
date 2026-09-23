@@ -134,10 +134,10 @@
 ### WB-13 - Shared Authenticated Fetch Allowed Bearer Override
 
 - **Symptom:** Exact, lowercase, and whitespace-padded Authorization caller headers could replace or coexist with the stored admin bearer.
-- **Root cause:** `fetchWithAuth` spread caller headers after constructing Authorization and initially normalized case without trimming names.
-- **Fix:** Trim and normalize caller header names, remove every Authorization variant, canonicalize Content-Type, and apply the stored bearer last.
+- **Root cause:** `fetchWithAuth` and `useScimRequest` had separate header filters; both initially treated caller names as object keys, and Workbench's filter did not trim names.
+- **Fix:** Route both authenticated request paths through one sanitizer that trims and normalizes names, removes every Authorization variant, canonicalizes Content-Type, and applies the stored bearer last.
 - **Why it works:** Fetch receives one authenticated Authorization value owned by the session.
-- **Prevention:** Parameterized unit coverage attempts exact, lowercase, and padded override forms and asserts exactly one normalized Authorization header reaches fetch.
+- **Prevention:** Base-fetch and Workbench mutation coverage attempt exact, lowercase, and padded override forms and assert exactly one normalized Authorization header reaches fetch.
 - **Escape analysis:** Found by final security review before PR. Earliest capable gate was the base fetch unit suite. Escape delta: review to unit.
 
 ### WB-14 - Fixture Device Identity Was Inconsistent
@@ -146,7 +146,7 @@
 - **Root cause:** The owned ResourceType had no explicit preflight identity invariant. A pre-existing `name: Device` with another id would survive the merge, gain a second Device entry, and fail only after PATCH.
 - **Fix:** Reject same-name/different-id and same-id/different-name conflicts before mutation, then verify the owned type and public discovery by its canonical id.
 - **Why it works:** Ambiguous ownership cannot reach the whole-array replacement, while a canonical rerun still replaces one Device definition and preserves unrelated types.
-- **Prevention:** `-SelfTest` proves canonical replacement, unrelated preservation, exact convergence, and pre-mutation conflict rejection without requiring a live estate.
+- **Prevention:** `-SelfTest` proves canonical replacement, unrelated preservation, exact convergence, and both name-to-id and id-to-name conflict rejection without requiring a live estate.
 - **Escape analysis:** Found in final fixture review before dev execution. Earliest capable gate was a pure fixture merge self-test, now added. Escape delta: review to self-test.
 
 ## Self-Improvement Dispositions

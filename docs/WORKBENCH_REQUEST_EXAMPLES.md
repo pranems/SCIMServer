@@ -82,7 +82,7 @@ If no resource exists, the create example remains available and PATCH is omitted
 
 ## Header Contract
 
-Workbench header rows are now part of the actual request contract. Enabled rows with non-empty names are forwarded to `fetch`, stored in history, restored on replay, exported, and included in generated live-test snippets. Every case variant of `Authorization` is removed from editable rows before the stored authenticated admin bearer is applied, so an operator-entered value cannot replace or combine with the current admin session. Exports use the explicit non-secret placeholder `Bearer <admin-token>`. The legacy `ifMatch` argument remains a final compatibility override.
+Workbench header rows are now part of the actual request contract. Enabled rows with non-empty names are forwarded to `fetch`, stored in history, restored on replay, exported, and included in generated live-test snippets. One shared sanitizer trims header names and removes every case variant of `Authorization` before the stored authenticated admin bearer is applied, so an operator-entered value cannot replace or combine with the current admin session. Exports use the explicit non-secret placeholder `Bearer <admin-token>`. The legacy `ifMatch` argument remains a final compatibility override.
 
 ## Dev Reference Fixture
 
@@ -106,7 +106,7 @@ The script resolves the active dev estate, verifies the endpoint's canonical id,
 | PowerShell parser | Deployment-time fixture script has zero syntax errors |
 | Disposable fixture proof | First apply 17/17; idempotent rerun 17/17; cleanup passed |
 
-Final local evidence: web Vitest/coverage 1,504/1,504 across 112 files; exact v0.55.27 live SCIM 1,500/1,500; fixture identity/idempotency self-test 4/4; Workbench route 9.74 kB gzipped against a 110 kB budget.
+Final local evidence: web Vitest/coverage 1,504/1,504 across 112 files; exact v0.55.27 live SCIM 1,500/1,500; fixture identity/idempotency self-test 5/5; Workbench route 9.74 kB gzipped against a 110 kB budget.
 
 ## Scope
 

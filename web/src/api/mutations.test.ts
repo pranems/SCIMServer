@@ -1685,6 +1685,7 @@ describe('useScimRequest (Phase M1)', () => {
           'If-Match': 'W/"v3"',
           Prefer: 'return=representation',
           authorization: 'Bearer operator-entered-value',
+          ' Authorization ': 'Bearer padded-operator-value',
         },
       });
     });
@@ -1693,7 +1694,8 @@ describe('useScimRequest (Phase M1)', () => {
     expect(headers['If-Match']).toBe('W/"v3"');
     expect(headers.Prefer).toBe('return=representation');
     expect(headers.Authorization).toBe('Bearer test-token');
-    expect(headers.authorization).toBeUndefined();
+    expect(Object.keys(headers).filter((header) => header.trim().toLowerCase() === 'authorization'))
+      .toEqual(['Authorization']);
   });
 
   it('captures non-2xx responses as a successful mutation outcome (does NOT throw)', async () => {
