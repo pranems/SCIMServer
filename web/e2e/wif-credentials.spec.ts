@@ -443,7 +443,7 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
             { id: 'oc-1', credentialType: 'oauth_client', label: 'OAuth one', active: true, createdAt: '2026-06-02T00:00:00Z', expiresAt: null },
           ],
           recentActivity: [],
-          configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
+          configFlags: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
           connectionInfo: {
             endpointId: EP, displayName: 'R6 methods',
             urls: { scimBaseUrl: `https://dev.example/scim/v2/endpoints/${EP}`, scimBaseUrlBare: `https://dev.example/scim/endpoints/${EP}`, tokenEndpoint: `https://dev.example/scim/endpoints/${EP}/oauth/token`, serviceProviderConfig: `https://dev.example/scim/v2/endpoints/${EP}/ServiceProviderConfig`, oauthMetadata: `https://dev.example/scim/endpoints/${EP}/.well-known/oauth-authorization-server` },
@@ -541,7 +541,7 @@ test.describe('Credentials tab - per-method sub-tabs (R6)', () => {
             { id: 'br-1', credentialType: 'bearer', label: 'Bearer one', active: true, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
           ],
           recentActivity: [],
-          configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+          configFlags: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
           connectionInfo: { endpointId: EP, displayName: 'R6 methods', urls: { scimBaseUrl: `https://dev.example/scim/v2/endpoints/${EP}`, scimBaseUrlBare: `https://dev.example/scim/endpoints/${EP}`, tokenEndpoint: `https://dev.example/scim/endpoints/${EP}/oauth/token`, serviceProviderConfig: `https://dev.example/scim/v2/endpoints/${EP}/ServiceProviderConfig`, oauthMetadata: `https://dev.example/scim/endpoints/${EP}/.well-known/oauth-authorization-server` }, enabledMethods: [], disabledMethods: [] },
         }),
       });

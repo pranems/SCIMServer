@@ -6,7 +6,7 @@
  * HMAC; the plaintext is
  * returned only once at creation time.
  *
- * Gated behind the `PerEndpointCredentialsEnabled` per-endpoint config flag.
+ * Creation is gated by each credential type's dedicated endpoint setting.
  *
  * Routes:
  *   POST   /admin/endpoints/:endpointId/credentials              - Create new credential
@@ -316,22 +316,17 @@ export class AdminCredentialController {
       return this.createWifCredential(endpointId, dto);
     }
 
-    // WI-11 / W2.5 - per-method create gate resolved from the single source: an
-    // explicit `profile.authentication.methods[]` entry wins, else the flat flags
-    // (SecretTokenBearerAuthEnabled / OAuthClientCredentialsAuthEnabled, each
-    // falling back to the legacy PerEndpointCredentialsEnabled).
+    // An explicit authentication method entry wins over its dedicated setting.
     if (credentialType === 'bearer' && !effective.secretTokenBearer) {
       throw new ForbiddenException(
         `Per-endpoint bearer (Secret Token) auth is not enabled for endpoint "${endpointId}". ` +
-        `Set "${ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED}" to "True" in the endpoint config ` +
-        `(or the legacy "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}").`,
+        `Set "${ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED}" to "True" in the endpoint config.`,
       );
     }
     if (credentialType === 'oauth_client' && !effective.oauthClientCredentials) {
       throw new ForbiddenException(
         `Per-endpoint OAuth client-credentials auth is not enabled for endpoint "${endpointId}". ` +
-        `Set "${ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED}" to "True" in the endpoint config ` +
-        `(or the legacy "${ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED}").`,
+        `Set "${ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED}" to "True" in the endpoint config.`,
       );
     }
 

@@ -109,9 +109,7 @@ When `profile.authentication.methods[]` declares one of these methods, that entr
 | `SharedSecretBearerAuthEnabled` | Whether this endpoint accepts the **global** SCIM shared secret. Turn OFF to make the endpoint accept only its own credentials. Defaults to on. |
 | `SecretTokenBearerAuthEnabled` | Accept a per-endpoint bcrypt bearer token (Entra's "Secret Token" field). |
 
-`PerEndpointCredentialsEnabled` is a **legacy compatibility fallback**, not a fifth method. It appears only in the Endpoint Settings **Legacy compatibility** category. Bearer and OAuth2 inherit it when their dedicated setting is absent.
-
-An explicit `profile.authentication.methods[]` entry is authoritative over the flat setting. Connection info reports `enablementSource` (`authentication-method`, `dedicated-setting`, `legacy-setting`, or `default`). Connect disables a flat switch managed by an authentication-method entry instead of allowing a change that would look successful but have no effect.
+An explicit `profile.authentication.methods[]` entry is authoritative over the flat setting. Connection info reports `enablementSource` (`authentication-method`, `dedicated-setting`, or `default`). Connect disables a flat switch managed by an authentication-method entry instead of allowing a change that would look successful but have no effect.
 
 > **These govern the DATA plane only.** Disabling `SharedSecretBearerAuthEnabled` stops the global secret working on `/scim/v2/endpoints/{id}/...`, but the admin plane (`/scim/admin/...`) keeps answering the admin bearer, so you can always get back in and re-enable it. That separation was a real bug until 0.55.1 - see [Section 7](#7-known-behaviour-worth-knowing).
 

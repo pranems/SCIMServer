@@ -80,7 +80,7 @@ pie showData
 | DB-7 | Shadow-telemetry placement | Compute + log AFTER the token is minted, never before/inside | Structural | 481bd38 |
 | DB-8 | Dev signing key when none configured (Pre-Q.B) | Auto-generate an ephemeral key + warn; default `RS256` | Reversible | 7baa330 |
 | DB-9 | Signing-key `kid` derivation (Pre-Q.B) | Default to the RFC 7638 JWK thumbprint (stable), allow override | Sticky | 7baa330 |
-| DB-10 | `wif` credential-create gate (A1) | Orthogonal: WIF rides its own `WifCredentialsEnabled`, not `PerEndpointCredentialsEnabled` | Sticky | 4956cb8 |
+| DB-10 | `wif` credential-create gate (A1) | Orthogonal: WIF rides its own `WifCredentialsEnabled`, not `retired combined credential setting` | Sticky | 4956cb8 |
 | DC-1 | Make `JWKS_FETCH` overridable | Register a behavior-preserving default provider | Structural | 8fe8b9b (RCA I-01) |
 | DC-2 | E2E provider-override seam | Optional `customize(builder)` callback on `createTestApp` | Reversible | 8fe8b9b (RCA I-02) |
 | DC-3 | WIF E2E signature path | Mock the JWKS fetch with a local RSA key; run real `jose` verify | Reversible | 8fe8b9b |
@@ -243,8 +243,8 @@ Each entry: the **question** I would have asked -> the **options** -> the **choi
 
 #### DB-10 - `wif` credential-create gate (A1)
 
-- **Question.** "Should creating a `wif` credential require the existing `PerEndpointCredentialsEnabled` flag, or its own flag?"
-- **Options.** (a) Orthogonal - WIF rides a dedicated `WifCredentialsEnabled` flag, independent of the bcrypt-bearer gate; (b) reuse `PerEndpointCredentialsEnabled` for both.
+- **Question.** "Should creating a `wif` credential require the existing `retired combined credential setting` flag, or its own flag?"
+- **Options.** (a) Orthogonal - WIF rides a dedicated `WifCredentialsEnabled` flag, independent of the bcrypt-bearer gate; (b) reuse `retired combined credential setting` for both.
 - **Chose.** (a) - commit `4956cb8`.
 - **Why.** WIF and per-endpoint bcrypt bearers are **independent capabilities** an operator may want one of without the other (e.g. enable federated identity without opening generic per-endpoint bearer creation). Coupling them (b) would force an operator to enable bearer credentials just to use WIF, widening the surface unnecessarily. Two orthogonal flags express the two capabilities precisely; the RED test that proved it (a `wif` create rejected by the bearer gate before the fix) locks the orthogonality.
 - **Reversibility.** Sticky (the gating flag an operator configures is a behavior contract).

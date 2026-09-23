@@ -259,6 +259,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
     await page.waitForTimeout(4000);
+    await page.addStyleTag({ content: '.TanStackRouterDevtools { display: none !important; }' });
 
     await screenshot(page, '21-sidebar-expanded');
 
@@ -363,7 +364,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
         }
         await expect(tab).toBeVisible();
         await tab.click();
-        await page.waitForTimeout(3000);
+        await expect(tab).toHaveAttribute('aria-selected', 'true');
         await screenshot(page, `32-detail-tab-${tabName.toLowerCase()}`);
 
         // CRITICAL: Verify no "Failed to load" error appears in the tab content

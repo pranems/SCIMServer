@@ -110,7 +110,7 @@ describe('ClientSecretTokenProvider (W2.3)', () => {
       const { provider } = makeProvider([
         {
           credentialType: 'oauth_client',
-          credentialHash: 'p1-keyed-see-secretHash',
+          credentialHash: 'keyed-see-secretHash',
           hashAlgo: 'hmac-sha256-v1',
           lookupKey: minted.lookupKey,
           secretHash: minted.secretHash,
@@ -138,7 +138,7 @@ describe('ClientSecretTokenProvider (W2.3)', () => {
         { credentialType: 'oauth_client', credentialHash: legacyHash, metadata: { clientId: CID } },
         {
           credentialType: 'oauth_client',
-          credentialHash: 'p1-keyed-see-secretHash',
+          credentialHash: 'keyed-see-secretHash',
           hashAlgo: 'hmac-sha256-v1',
           lookupKey: minted.lookupKey,
           secretHash: minted.secretHash,
@@ -164,7 +164,7 @@ describe('ClientSecretTokenProvider (W2.3)', () => {
         { credentialType: 'oauth_client', credentialHash: await bcrypt.hash('two', 4), metadata: { clientId: CID } },
         {
           credentialType: 'oauth_client',
-          credentialHash: 'p1-keyed-see-secretHash',
+          credentialHash: 'keyed-see-secretHash',
           hashAlgo: 'hmac-sha256-v1',
           lookupKey: minted.lookupKey,
           secretHash: minted.secretHash,
@@ -187,7 +187,7 @@ describe('ClientSecretTokenProvider (W2.3)', () => {
       const b = mintOAuthClientSecret();
       const row = (m: { lookupKey: string; secretHash: string }) => ({
         credentialType: 'oauth_client',
-        credentialHash: 'p1-keyed-see-secretHash',
+          credentialHash: 'keyed-see-secretHash',
         hashAlgo: 'hmac-sha256-v1',
         lookupKey: m.lookupKey,
         secretHash: m.secretHash,

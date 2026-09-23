@@ -23,13 +23,15 @@ function makeController() {
     }),
   };
   const logger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  const eventEmitter = { emit: jest.fn() };
   const controller = new AdminSecuritySettingsController(
     credentialSecurity as any,
     credentialEncryption as any,
     secretResolver as any,
     logger as any,
+    eventEmitter as any,
   );
-  return { controller, credentialSecurity, credentialEncryption, secretResolver, logger };
+  return { controller, credentialSecurity, credentialEncryption, secretResolver, logger, eventEmitter };
 }
 
 describe('AdminSecuritySettingsController (WI-8)', () => {
@@ -53,6 +55,15 @@ describe('AdminSecuritySettingsController (WI-8)', () => {
     const { controller, credentialSecurity } = makeController();
     await controller.update({ credentialSecretVisibility: 'once' });
     expect(credentialSecurity.purgeAllRetainedSecrets).toHaveBeenCalledTimes(1);
+  });
+
+  it('PUT emits a security-settings event for cross-tab cache invalidation', async () => {
+    const { controller, eventEmitter } = makeController();
+    await controller.update({ credentialSecretVisibility: 'once' });
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'scim.security.updated',
+      { credentialSecretVisibility: 'once' },
+    );
   });
 
   it('PUT to "always" does NOT purge', async () => {

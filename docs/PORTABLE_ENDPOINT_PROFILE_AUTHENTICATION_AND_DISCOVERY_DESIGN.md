@@ -239,8 +239,7 @@ Discovery is a projection, not a byte copy. Target-generated fields include resp
 
 1. matching `profile.authentication.methods[]` entries;
 2. dedicated method setting;
-3. `PerEndpointCredentialsEnabled` for bearer and OAuth client only;
-4. product default.
+3. product default.
 
 The current profile model, resolver, credential records, connection-info assembler, and UI are real and partly enforced. Older documents that call the model wholly inert are stale.
 

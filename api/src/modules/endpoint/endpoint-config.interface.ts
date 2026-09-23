@@ -70,36 +70,22 @@ export const ENDPOINT_CONFIG_FLAGS = {
   ALLOW_AND_COERCE_BOOLEAN_STRINGS: 'AllowAndCoerceBooleanStrings',
 
   /**
-   * When true, enables per-endpoint credential validation for this endpoint.
-   * Incoming bearer tokens are validated against the EndpointCredential table
-   * (bcrypt-hashed per-endpoint tokens). If no matching credential is found
-   * AND this flag is true, the guard falls back to the global SCIM_SHARED_SECRET
-   * and OAuth JWT validation.
-   * When false (default), only the global SCIM_SHARED_SECRET and OAuth JWT are used.
-   * In practice: enable for multi-tenant deployments where each endpoint has its own secret.
-   */
-  PER_ENDPOINT_CREDENTIALS_ENABLED: 'PerEndpointCredentialsEnabled',
-
-  /**
-   * WI-11 - per-method auth-enablement flag family (splits the double-duty
-   * PerEndpointCredentialsEnabled). Each gates one auth method independently,
+   * Per-method auth-enablement flag family. Each gates one auth method independently,
    * at credential-create AND on the resource-plane validation path.
    *
    * `SecretTokenBearerAuthEnabled`: gates the per-endpoint `bearer` credential
-   * (Entra "Secret Token"). Effective value falls back to the legacy
-   * PerEndpointCredentialsEnabled when unset (value-preserving migration).
+   * (Entra "Secret Token").
    */
   SECRET_TOKEN_BEARER_AUTH_ENABLED: 'SecretTokenBearerAuthEnabled',
 
   /**
-   * WI-11 - gates the per-endpoint `oauth_client` credential (Entra "OAuth2
-   * client-credentials"). Effective value falls back to the legacy
-   * PerEndpointCredentialsEnabled when unset (value-preserving migration).
+  * Gates the per-endpoint `oauth_client` credential (Entra "OAuth2
+  * client-credentials").
    */
   OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED: 'OAuthClientCredentialsAuthEnabled',
 
   /**
-   * WI-11 - whether THIS endpoint accepts the global SCIM_SHARED_SECRET. New
+  * Whether THIS endpoint accepts the global SCIM_SHARED_SECRET. New
    * capability: an operator can make an endpoint refuse the global secret and
    * accept ONLY its own credentials. Effective value defaults to `true` when
    * unset (back-compat: every endpoint accepts the global secret today).
@@ -198,7 +184,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When true, enables Workload Identity Federation (WIF) for this endpoint:
    * a `wif` credential may be attached and the WIF token-mint path is offered.
    * When false (default), WIF is off and existing endpoints are untouched.
-   * Orthogonal to PerEndpointCredentialsEnabled (the bcrypt-bearer gate).
+  * Independent of bearer and OAuth client credential enablement.
    * @see docs/auth/WIF_JWT_BEARER_ASSERTION_FOR_SCIM.md section 8.6
    */
   WIF_CREDENTIALS_ENABLED: 'WifCredentialsEnabled',
@@ -470,42 +456,28 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'When false, string booleans are passed through as-is and rejected by strict schema if enabled. ' +
       'Keep true for Entra ID interoperability.',
   },
-  PER_ENDPOINT_CREDENTIALS_ENABLED: {
-    key: ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
-    type: 'boolean',
-    default: false,
-    description:
-      'When true, incoming bearer tokens are validated against the EndpointCredential table ' +
-      '(bcrypt-hashed per-endpoint tokens). Falls back to global SCIM_SHARED_SECRET and OAuth JWT. ' +
-      'When false (default), only global SCIM_SHARED_SECRET and OAuth JWT are used. ' +
-      'Enable for multi-tenant deployments where each endpoint has its own secret. ' +
-      'WI-11: superseded by SecretTokenBearerAuthEnabled + OAuthClientCredentialsAuthEnabled ' +
-      '(this flag is read as a one-release fallback for both).',
-  },
   SECRET_TOKEN_BEARER_AUTH_ENABLED: {
     key: ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
     type: 'boolean',
     default: false,
     description:
-      'WI-11. When true, this endpoint accepts a per-endpoint bcrypt bearer token (Entra "Secret Token"). ' +
-      'When unset, the effective value falls back to the legacy PerEndpointCredentialsEnabled ' +
-      '(value-preserving migration). Gates both credential-create and the resource-plane validation path.',
+      'When true, this endpoint accepts a per-endpoint bearer token (Entra "Secret Token"). ' +
+      'Gates both credential creation and the resource-plane validation path.',
   },
   OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED: {
     key: ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
     type: 'boolean',
     default: false,
     description:
-      'WI-11. When true, this endpoint accepts a per-endpoint oauth_client credential (Entra "OAuth2 ' +
-      'client-credentials"). When unset, the effective value falls back to the legacy ' +
-      'PerEndpointCredentialsEnabled (value-preserving migration). Gates both create and validation.',
+      'When true, this endpoint accepts a per-endpoint oauth_client credential (Entra "OAuth2 ' +
+      'client credentials"). Gates both credential creation and token-endpoint validation.',
   },
   SHARED_SECRET_BEARER_AUTH_ENABLED: {
     key: ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
     type: 'boolean',
     default: true,
     description:
-      'WI-11. When true (default), this endpoint accepts the global SCIM_SHARED_SECRET as a bearer token. ' +
+      'When true (default), this endpoint accepts the global SCIM_SHARED_SECRET as a bearer token. ' +
       'When false, the endpoint refuses the global secret and accepts ONLY its own per-endpoint ' +
       'credentials (or endpoint-scoped OAuth tokens). Back-compat: unset means true.',
   },
@@ -525,7 +497,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     default: false,
     description:
       'When true AND StrictSchemaValidation is ON, PATCH operations targeting readOnly attributes ' +
-      'are silently stripped instead of producing a 400 error (overrides G8c behavior). ' +
+      'are silently stripped instead of producing a 400 error. ' +
       'When false (default) with strict schema on, readOnly PATCH ops cause 400. ' +
       'Has no effect when StrictSchemaValidation is OFF (stripping always happens). ' +
       'Enable alongside StrictSchemaValidation for Entra ID which sends readOnly attrs in PATCH.',
@@ -605,7 +577,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     description:
       'When true, enables Workload Identity Federation (WIF) for this endpoint: a wif credential may be ' +
       'attached and the WIF token-mint path is offered. When false (default), WIF is off and existing ' +
-      'endpoints are untouched. Orthogonal to PerEndpointCredentialsEnabled.',
+      'endpoints are untouched. Independent of bearer and OAuth client credentials.',
   },
   CREDENTIAL_SECRET_VISIBILITY: {
     key: ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY,
@@ -678,7 +650,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 100,
     max: 120000,
     description:
-      'W1.5 safety envelope: TOTAL budget (ms) for a whole JWKS fetch - all attempts, backoff sleeps ' +
+      'Total budget (ms) for a whole JWKS fetch - all attempts, backoff sleeps ' +
       'and redirect hops combined. JwksFetchTimeoutMs bounds one attempt, not the operation. ' +
       'Overrides the server default (env JWKS_TOTAL_DEADLINE_MS, default 10000) when set. ' +
       'Bounds: 100 - 120000 ms.',
@@ -690,7 +662,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 1024,
     max: 10485760,
     description:
-      'W1.5 safety envelope: maximum JWKS response body size (bytes); a larger body is rejected before ' +
+      'Maximum JWKS response body size (bytes); a larger body is rejected before ' +
       'it is parsed. Overrides the server default (env JWKS_MAX_RESPONSE_BYTES, default 1048576) when set. ' +
       'Bounds: 1024 - 10485760 bytes.',
   },
@@ -701,7 +673,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 1,
     max: 1000,
     description:
-      'W1.5 safety envelope: maximum number of keys accepted in a JWKS. Deliberately generous - Microsoft ' +
+      'Maximum number of keys accepted in a JWKS. Deliberately generous - Microsoft ' +
       'states a key cache should hold 10-1000 keys across issuers. ' +
       'Overrides the server default (env JWKS_MAX_KEYS, default 100) when set. Bounds: 1 - 1000.',
   },
@@ -712,7 +684,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 1,
     max: 25,
     description:
-      'P2: maximum ACTIVE per-endpoint bearer credentials. Bounds the O(N) bcrypt loop on the resource ' +
+      'Maximum ACTIVE per-endpoint bearer credentials. Bounds the O(N) bcrypt loop on the resource ' +
       'plane (~293 ms per compare at cost 12, so 3 already exceed the 800 ms latency gate). Absence ' +
       'resolves to the default, never to unenforced. Bounds: 1 - 25.',
   },
@@ -723,7 +695,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 1,
     max: 25,
     description:
-      'P2: maximum ACTIVE per-endpoint oauth_client credentials. Counted separately from bearer so one ' +
+      'Maximum ACTIVE per-endpoint oauth_client credentials. Counted separately from bearer so one ' +
       'type cannot exhaust another type budget. Bounds: 1 - 25.',
   },
   MAX_ACTIVE_WIF_TRUSTS: {
@@ -733,7 +705,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 1,
     max: 25,
     description:
-      'P2: maximum ACTIVE WIF trusts. More generous than the secret-based caps because WIF trusts are ' +
+      'Maximum ACTIVE WIF trusts. More generous than the secret-based caps because WIF trusts are ' +
       'JWKS-verified and never enter the bcrypt loop - this bounds storage and config sprawl, not latency. ' +
       'Bounds: 1 - 25.',
   },
@@ -744,7 +716,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 1,
     max: 1000,
     description:
-      'W1.5 safety envelope: JWKS cache cardinality cap; past it the OLDEST entry is evicted. Without a cap ' +
+      'JWKS cache cardinality cap; past it the OLDEST entry is evicted. Without a cap ' +
       'the cache is an unbounded map keyed by a caller-influenced URI. ' +
       'Overrides the server default (env JWKS_MAX_CACHE_ENTRIES, default 50) when set. Bounds: 1 - 1000.',
   },
@@ -755,7 +727,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 60000,
     max: 86400000,
     description:
-      'W1.4 cache cadence: how old a cached JWKS may get before the BACKGROUND sweep refreshes it (ms). ' +
+      'How old a cached JWKS may get before the BACKGROUND sweep refreshes it (ms). ' +
       'Set below JwksCacheMaxAgeMs so the refresh lands while the entry is still fresh - that is what keeps ' +
       'the steady-state hot path a cache hit instead of paying a synchronous fetch at every TTL expiry. ' +
       'Overrides the server default (env JWKS_REFRESH_INTERVAL_MS, default 3600000 = 1h) when set. ' +
@@ -768,10 +740,10 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 0,
     max: 3600000,
     description:
-      'W1.4 cache cadence: minimum interval between SYNCHRONOUS JWKS refetches triggered by a token bearing ' +
+      'Minimum interval between SYNCHRONOUS JWKS refetches triggered by a token bearing ' +
       'an unknown kid (ms). Without a floor the caller controls our outbound request rate for free - every ' +
       'request with an unrecognised kid forces a fetch, an amplification vector against the IdP. 0 disables ' +
-      'the limit (pre-W1.4 behaviour). Overrides the server default ' +
+      'the limit. Overrides the server default ' +
       '(env JWKS_UNKNOWN_KID_MIN_INTERVAL_MS, default 300000 = 5 min) when set. Bounds: 0 - 3600000 ms.',
   },
   JWKS_STALE_IF_ERROR_MS: {
@@ -781,8 +753,8 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     min: 0,
     max: 604800000,
     description:
-      'W1.4 cache cadence: HARD ceiling on the age of cached keys that may be served when a refetch fails ' +
-      '(fail-to-stale). Before W1.4 that path had no age test, so a rotated-out key stayed acceptable for as ' +
+      'HARD ceiling on the age of cached keys that may be served when a refetch fails ' +
+      '(fail-to-stale). Without an age test, a rotated-out key could stay acceptable for as ' +
       'long as the IdP was unreachable. 0 disables fail-to-stale entirely (strictest posture). Overrides the ' +
       'server default (env JWKS_STALE_IF_ERROR_MS, default 172800000 = 48h) when set. Bounds: 0 - 604800000 ms.',
   },
@@ -828,7 +800,6 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]?: boolean | string;
-  [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED]?: boolean | string;
@@ -872,7 +843,7 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = Object.fromEntries(
  * Parse a boolean value from raw config input.
  * Handles native booleans and string values ("True", "true", "1", etc.).
  */
-function parseBooleanValue(value: unknown): boolean | undefined {
+export function parseBooleanValue(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
     const lower = value.toLowerCase();
@@ -1046,7 +1017,7 @@ export function getConfigStructured(
 /**
  * Read a boolean flag ONLY when it is explicitly set, returning `undefined`
  * when the key is absent (so a caller can distinguish "unset" from "false").
- * This is the primitive the WI-11 effective-flag fallback is built on.
+ * This is the primitive used by per-method enablement resolution.
  */
 export function getOptionalConfigBoolean(
   config: EndpointConfig | undefined,
@@ -1059,27 +1030,20 @@ export function getOptionalConfigBoolean(
 }
 
 /**
- * WI-11 - the effective per-method auth enablement for an endpoint.
+ * The effective per-method auth enablement for an endpoint.
  *
- * The single legacy `PerEndpointCredentialsEnabled` flag is split into a
- * per-method family. This helper computes the EFFECTIVE value of each new flag
- * with a value-preserving fallback, so existing endpoints (which have only the
- * legacy flag, or nothing) behave byte-for-byte as before:
- *
- *  - `secretTokenBearer`      = SecretTokenBearerAuthEnabled if set, else the
- *                               legacy PerEndpointCredentialsEnabled, else false.
- *  - `oauthClientCredentials` = OAuthClientCredentialsAuthEnabled if set, else the
- *                               legacy PerEndpointCredentialsEnabled, else false.
+ *  - `secretTokenBearer`      = SecretTokenBearerAuthEnabled if set, else false.
+ *  - `oauthClientCredentials` = OAuthClientCredentialsAuthEnabled if set, else false.
  *  - `workloadIdentityFederation` = WifCredentialsEnabled if set, else false.
  *  - `sharedSecretBearer`     = SharedSecretBearerAuthEnabled if set, else true
  *                               (back-compat: every endpoint accepts the global
  *                               secret today).
  *
- * The legacy flag is read as a one-release fallback; once every endpoint carries
- * the new flags explicitly it can be retired.
+ * Persisted legacy profiles are normalized to these dedicated settings at the
+ * endpoint profile boundary before this resolver runs.
  */
 export interface EffectiveAuthEnablement {
-  /** Per-endpoint bcrypt `bearer` credential (Entra Secret Token). */
+  /** Per-endpoint `bearer` credential (Entra Secret Token). */
   secretTokenBearer: boolean;
   /** Per-endpoint `oauth_client` credential (Entra OAuth2 client-credentials). */
   oauthClientCredentials: boolean;
@@ -1092,7 +1056,6 @@ export interface EffectiveAuthEnablement {
 export type AuthEnablementSource =
   | 'authentication-method'
   | 'dedicated-setting'
-  | 'legacy-setting'
   | 'default';
 
 export interface EffectiveAuthEnablementDetail {
@@ -1110,18 +1073,12 @@ export interface EffectiveAuthEnablementDetails {
 export function getEffectiveAuthEnablement(
   config: EndpointConfig | undefined,
 ): EffectiveAuthEnablement {
-  const legacy = getOptionalConfigBoolean(
-    config,
-    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
-  );
-  const legacyOrFalse = legacy ?? false;
-
   const secretTokenBearer =
     getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED) ??
-    legacyOrFalse;
+    false;
   const oauthClientCredentials =
     getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED) ??
-    legacyOrFalse;
+    false;
   const workloadIdentityFederation =
     getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED) ?? false;
   const sharedSecretBearer =
@@ -1169,8 +1126,8 @@ const AUTH_FACET_METHOD_TYPES: Record<keyof EffectiveAuthEnablement, readonly st
  * For each facet: if the endpoint carries an explicit `AuthenticationMethod`
  * entry of the corresponding `type`, that entry's `enabled` wins (`enabled !==
  * false`, matching the A2 discovery convention where `undefined` means enabled).
- * Otherwise the value falls back to the flat-flag {@link getEffectiveAuthEnablement}
- * (which itself preserves the legacy `PerEndpointCredentialsEnabled` fallback).
+ * Otherwise the value falls back to the dedicated flat settings resolved by
+ * {@link getEffectiveAuthEnablement}.
  *
  * **Value-preserving.** `profile.authentication.methods[]` is never auto-seeded
  * (see `expandAuthentication`), so every endpoint that has not been managed via
@@ -1200,19 +1157,12 @@ export function resolveEndpointAuthEnablementDetails(
   config: EndpointConfig | undefined,
   methods?: readonly AuthMethodEnablementEntry[],
 ): EffectiveAuthEnablementDetails {
-  const legacy = getOptionalConfigBoolean(
-    config,
-    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
-  );
-
   const flatDetail = (
     dedicatedKey: string,
     fallback: boolean,
-    usesLegacy: boolean,
   ): EffectiveAuthEnablementDetail => {
     const dedicated = getOptionalConfigBoolean(config, dedicatedKey);
     if (dedicated !== undefined) return { enabled: dedicated, source: 'dedicated-setting' };
-    if (usesLegacy && legacy !== undefined) return { enabled: legacy, source: 'legacy-setting' };
     return { enabled: fallback, source: 'default' };
   };
 
@@ -1220,22 +1170,18 @@ export function resolveEndpointAuthEnablementDetails(
     secretTokenBearer: flatDetail(
       ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
       false,
-      true,
     ),
     oauthClientCredentials: flatDetail(
       ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
       false,
-      true,
     ),
     workloadIdentityFederation: flatDetail(
       ENDPOINT_CONFIG_FLAGS.WIF_CREDENTIALS_ENABLED,
-      false,
       false,
     ),
     sharedSecretBearer: flatDetail(
       ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
       true,
-      false,
     ),
   };
   if (!methods || methods.length === 0) return flat;
@@ -1505,6 +1451,12 @@ export function validateEndpointConfig(
   definitions: Record<string, EndpointConfigFlagDefinition> = ENDPOINT_CONFIG_FLAGS_DEFINITIONS,
 ): void {
   if (!config) return;
+
+  if (Object.prototype.hasOwnProperty.call(config, 'PerEndpointCredentialsEnabled')) {
+    throw new Error(
+      'Unknown config flag "PerEndpointCredentialsEnabled". Use "SecretTokenBearerAuthEnabled" and "OAuthClientCredentialsAuthEnabled" instead.',
+    );
+  }
 
   for (const def of Object.values(definitions)) {
     if (def.type === 'boolean') {

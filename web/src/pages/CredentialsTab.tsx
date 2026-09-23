@@ -13,7 +13,7 @@
  * remove from cached overview, rollback on error).
  *
  * Backend already supports CRUD per docs/auth/G11_PER_ENDPOINT_CREDENTIALS.md.
- * Requires PerEndpointCredentialsEnabled=True on the endpoint - 403
+ * Requires the dedicated authentication method setting on the endpoint - 403
  * surfaces as a friendly explanation banner with link to settings.
  */
 import React from 'react';
@@ -1224,7 +1224,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
             <div data-testid="wif-add-trust-form">
             <div className={wif.resolveRow} data-testid="wif-resolve-row">
               <EditableField
-                label="Resolve from Entra tenant id (WI-14 discovery)"
+                label="Resolve from Entra tenant ID"
                 value={resolveTenantId}
                 onChange={setResolveTenantId}
                 placeholder="tenant guid - fills Issuer + JWKS URI automatically"
@@ -1823,11 +1823,10 @@ function coerceCredFlag(raw: unknown, fallback: boolean): boolean {
 }
 
 /**
- * Compute the enabled auth-method tabs from the endpoint config flags,
- * mirroring the backend getEffectiveAuthEnablement precedence: the two
- * per-endpoint flags fall back to the legacy PerEndpointCredentialsEnabled,
- * and the shared-secret flag defaults to on. W11 - there is no "All" tab; the
- * per-method tabs are the single method axis.
+ * Compute enabled auth-method tabs from the endpoint's authoritative method
+ * entries plus dedicated settings. During an optimistic settings mutation the
+ * dedicated flag overrides stale default-sourced connection info immediately;
+ * an authentication-method entry remains authoritative.
  */
 function enabledMethodTabs(
   flags: Record<string, unknown>,
@@ -1838,7 +1837,21 @@ function enabledMethodTabs(
     : [];
   const hasCompleteResolvedState = new Set(resolvedMethods.map((method) => method.method)).size === 4;
   if (hasCompleteResolvedState) {
-    const enabled = new Set(connectionInfo!.enabledMethods.map((method) => method.method));
+    const enabled = new Set<ConnectionMethod>();
+    for (const flag of AUTH_METHOD_FLAGS) {
+      const resolvedEnabled = connectionInfo!.enabledMethods.find((method) => method.method === flag.method);
+      const resolvedDisabled = connectionInfo!.disabledMethods.find((method) => method.method === flag.method);
+      const resolved = resolvedEnabled ?? resolvedDisabled;
+      const methodManaged = resolved?.enablementSource === 'authentication-method';
+      const rawDedicated = flags[flag.key];
+      const hasDedicatedValue = rawDedicated !== undefined && rawDedicated !== null && rawDedicated !== '';
+      const isEnabled = methodManaged
+        ? Boolean(resolvedEnabled)
+        : hasDedicatedValue
+          ? effectiveAuthFlag(flags, flag)
+          : Boolean(resolvedEnabled);
+      if (isEnabled) enabled.add(flag.method);
+    }
     const tabs: MethodTabDef[] = [];
     if (enabled.has('oauth_client')) tabs.push({ value: 'oauth_client', label: 'OAuth2 Client-Credential', credentialType: 'oauth_client' });
     if (enabled.has('wif')) tabs.push({ value: 'wif', label: 'WIF', credentialType: 'wif' });
@@ -1847,10 +1860,9 @@ function enabledMethodTabs(
     return tabs;
   }
 
-  const legacy = coerceCredFlag(flags.PerEndpointCredentialsEnabled, false);
   const sharedSecret = coerceCredFlag(flags.SharedSecretBearerAuthEnabled, true);
-  const secretTokenBearer = coerceCredFlag(flags.SecretTokenBearerAuthEnabled, legacy);
-  const oauthClient = coerceCredFlag(flags.OAuthClientCredentialsAuthEnabled, legacy);
+  const secretTokenBearer = coerceCredFlag(flags.SecretTokenBearerAuthEnabled, false);
+  const oauthClient = coerceCredFlag(flags.OAuthClientCredentialsAuthEnabled, false);
   const wif = coerceCredFlag(flags.WifCredentialsEnabled, false);
 
   const tabs: MethodTabDef[] = [];
@@ -1869,7 +1881,6 @@ function enabledMethodTabs(
  * secret VALUE - only the enablement/visibility flags.
  */
 const AUTH_CONFIG_FLAG_KEYS = [
-  'PerEndpointCredentialsEnabled',
   'SharedSecretBearerAuthEnabled',
   'SecretTokenBearerAuthEnabled',
   'OAuthClientCredentialsAuthEnabled',
@@ -2253,16 +2264,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
             );
           })}
               </div>
-              {configFlags.PerEndpointCredentialsEnabled !== undefined && (
-                <MessageBar intent="info" data-testid="connect-auth-legacy-notice">
-                  <MessageBarBody>
-                    <MessageBarTitle>Legacy compatibility</MessageBarTitle>
-                    <code>PerEndpointCredentialsEnabled</code> is a compatibility fallback, not a fifth
-                    authentication method. Bearer and OAuth2 inherit it only when their dedicated setting
-                    is unset. Manage the legacy value from All endpoint settings.
-                  </MessageBarBody>
-                </MessageBar>
-              )}
               <Link
                 data-testid="connect-tab-link-settings"
                 onClick={() => void navigate({ to: '/endpoints/$endpointId/settings', params: { endpointId } })}

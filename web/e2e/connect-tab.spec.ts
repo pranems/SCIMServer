@@ -308,7 +308,7 @@ test.describe('Connect tab - label + description fields (X3/X4)', () => {
     const overview = {
       endpoint: { id: ID, name: 'desc', displayName: 'Desc Connect', active: true },
       // Enable both bearer (per-endpoint create) and WIF (trust form).
-      configFlags: { SecretTokenBearerAuthEnabled: true, PerEndpointCredentialsEnabled: true, WifCredentialsEnabled: true },
+      configFlags: { SecretTokenBearerAuthEnabled: true, WifCredentialsEnabled: true },
       credentials: [],
       connectionInfo: {
         endpointId: ID,
@@ -353,6 +353,7 @@ test.describe('Connect tab - label + description fields (X3/X4)', () => {
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
 
     // X4 - the credential create dialog carries Label + Description.
+    await page.getByTestId('credentials-method-tab-bearer').click();
     await page.getByTestId('credentials-create-button').click();
     await expect(page.getByTestId('credentials-create-dialog')).toBeVisible();
     await expect(page.getByTestId('credentials-label-input')).toBeVisible();

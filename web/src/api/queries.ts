@@ -184,6 +184,10 @@ export const queryKeys = {
     detail: (id: string) => ['endpoints', id] as const,
     stats: (id: string) => ['endpoints', id, 'stats'] as const,
     overview: (id: string) => ['endpoints', id, 'overview'] as const,
+    connectionInfoAll: ['admin', 'endpoints'] as const,
+    connectionInfo: (id: string) => ['admin', 'endpoints', id, 'connection-info'] as const,
+    connectionRevealsAll: ['connection-reveal'] as const,
+    connectionReveals: (id: string) => ['connection-reveal', id] as const,
   },
   logs: {
     /**
@@ -1475,6 +1479,15 @@ function restoreListSnapshots(
 }
 
 /** Create a per-endpoint bearer credential. */
+function invalidateEndpointAuthReadModels(
+  qc: ReturnType<typeof useQueryClient>,
+  endpointId: string,
+): void {
+  void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+  void qc.invalidateQueries({ queryKey: queryKeys.endpoints.connectionInfo(endpointId) });
+  void qc.invalidateQueries({ queryKey: queryKeys.endpoints.connectionReveals(endpointId) });
+}
+
 export function useCreateCredential(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -1497,7 +1510,7 @@ export function useCreateCredential(endpointId: string) {
         body: JSON.stringify(body),
       }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -1530,7 +1543,7 @@ export function useUpdateWifCredential(endpointId: string) {
         body: JSON.stringify({ credentialType: 'wif', wif, ...(label !== undefined ? { label } : {}), ...(description !== undefined ? { description } : {}), ...(verify ? { verify: true } : {}) }),
       }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -1568,7 +1581,7 @@ export function useVerifyWifTrust(endpointId: string) {
       // V7 - when the verify targeted a SAVED trust and persisted lastVerifiedAt,
       // refresh the overview so the trust card flips Unverified -> Verified.
       if (body.credentialId && result?.lastVerifiedAt) {
-        void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+        invalidateEndpointAuthReadModels(qc, endpointId);
       }
     },
   });
@@ -1718,7 +1731,7 @@ export function useRemoveJwksHost() {
  */
 export function useConnectionInfo(endpointId: string) {
   return useQuery<ConnectionInfo>({
-    queryKey: ['admin', 'endpoints', endpointId, 'connection-info'],
+    queryKey: queryKeys.endpoints.connectionInfo(endpointId),
     queryFn: () =>
       fetchWithAuth<ConnectionInfo>(`/scim/admin/endpoints/${endpointId}/connection-info`),
     enabled: endpointId.length > 0,
@@ -1752,6 +1765,8 @@ export function useUpdateSecuritySettings() {
       }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: SECURITY_SETTINGS_KEY });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.connectionInfoAll });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.connectionRevealsAll });
     },
   });
 }
@@ -1804,7 +1819,7 @@ export function useConnectionRetainedSecrets(
   const retained = methods.filter((m) => m.secretRetained && m.credentialId);
   const results = useQueries({
     queries: retained.map((m) => ({
-      queryKey: ['connection-reveal', endpointId, m.credentialId] as const,
+      queryKey: [...queryKeys.endpoints.connectionReveals(endpointId), m.credentialId] as const,
       queryFn: () =>
         fetchWithAuth<RevealResult>(
           `/scim/admin/endpoints/${endpointId}/credentials/${m.credentialId}/reveal`,
@@ -1850,7 +1865,7 @@ export function useRotateCredential(endpointId: string) {
         { method: 'POST' },
       ),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -1885,7 +1900,7 @@ export function useDeleteCredential(endpointId: string) {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -1899,7 +1914,7 @@ export function useActivateCredential(endpointId: string) {
         method: 'POST',
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -1913,7 +1928,7 @@ export function useDeactivateCredential(endpointId: string) {
         method: 'DELETE',
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -1928,7 +1943,7 @@ export function useEditCredentialLabel(endpointId: string) {
         body: JSON.stringify({ label: vars.label }),
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }
@@ -2035,8 +2050,8 @@ export function useUpdateEndpointConfig(
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
+      invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
 }

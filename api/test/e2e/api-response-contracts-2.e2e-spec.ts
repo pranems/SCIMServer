@@ -344,7 +344,7 @@ describe('API Response Contract Verification - Part 2 (E2E)', () => {
 
     beforeAll(async () => {
       credEndpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: 'True',
+        SecretTokenBearerAuthEnabled: 'True',
       });
     });
 

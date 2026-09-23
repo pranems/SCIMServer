@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.25`
 
-> **Version:** 0.55.24 - **Updated:** September 18, 2026
+> **Version:** 0.55.25 - **Updated:** September 18, 2026
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)
 > 38 flags: 21 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 string-valued (`logLevel`, the tri-state `PrimaryEnforcement`, and the two-value `CredentialSecretVisibility`). Counted from `ENDPOINT_CONFIG_FLAGS_DEFINITIONS`, which is the single source of truth.
 > 6 value types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
@@ -132,76 +132,69 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 11 | [`IgnoreReadOnlyAttributesInPatch`](#ignorereadonlyattributesinpatch) | boolean | `false` | PATCH Behavior |
 | 12 | [`IncludeWarningAboutIgnoredReadOnlyAttribute`](#includewarningaboutignoredreadonlyattribute) | boolean | `false` | PATCH Behavior |
 | 13 | [`SchemaDiscoveryEnabled`](#schemadiscoveryenabled) | boolean | `true` | Discovery |
-| 14 | [`PerEndpointCredentialsEnabled`](#perendpointcredentialsenabled) | boolean | `false` | Authentication |
-| 15 | [`logLevel`](#loglevel) | string | (global) | Logging |
-| 16 | [`logFileEnabled`](#logfileenabled) | boolean | `true` | Logging |
-| 17 | [`WifCredentialsEnabled`](#wifcredentialsenabled) | boolean | `false` | Authentication |
-| 18 | [`SecretTokenBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
-| 19 | [`OAuthClientCredentialsAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `false`* | Authentication |
-| 20 | [`SharedSecretBearerAuthEnabled`](#wi-11-per-method-auth-enablement-flags) | boolean | `true` | Authentication |
-| 21 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | enum (`always`/`once`) | `always` | Authentication |
-| 22 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
-| 23 | [`JwksFetchTimeoutMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 5000) | Runtime egress |
-| 24 | [`JwksFetchRetries`](#runtime-egress-wif-jwks-fetch) | number | (server: 2) | Runtime egress |
-| 25 | [`JwksFetchRetryBackoffMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 200) | Runtime egress |
-| 26 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 600000) | Runtime egress |
-| 27 | [`JwksTotalDeadlineMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 10000) | Runtime egress |
-| 28 | [`JwksMaxResponseBytes`](#runtime-egress-wif-jwks-fetch) | number | (server: 1048576) | Runtime egress |
-| 29 | [`JwksMaxKeys`](#runtime-egress-wif-jwks-fetch) | number | (server: 100) | Runtime egress |
-| 30 | [`JwksMaxCacheEntries`](#runtime-egress-wif-jwks-fetch) | number | (server: 50) | Runtime egress |
-| 31 | [`JwksRefreshIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 3600000) | Runtime egress |
-| 32 | [`JwksUnknownKidMinIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 300000) | Runtime egress |
-| 33 | [`JwksStaleIfErrorMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 172800000) | Runtime egress |
-| 27 | [`PersistRequestSecrets`](#persistrequestsecrets) | boolean | (server: `true`) | Logging & privacy |
-| 28 | [`RfcCompliantSubAttributes`](#rfccompliantsubattributes) | boolean | `false` | Validation |
+| 14 | [`logLevel`](#loglevel) | string | (global) | Logging |
+| 15 | [`logFileEnabled`](#logfileenabled) | boolean | `true` | Logging |
+| 16 | [`WifCredentialsEnabled`](#wifcredentialsenabled) | boolean | `false` | Authentication |
+| 17 | [`SecretTokenBearerAuthEnabled`](#per-method-auth-enablement-flags) | boolean | `false` | Authentication |
+| 18 | [`OAuthClientCredentialsAuthEnabled`](#per-method-auth-enablement-flags) | boolean | `false` | Authentication |
+| 19 | [`SharedSecretBearerAuthEnabled`](#per-method-auth-enablement-flags) | boolean | `true` | Authentication |
+| 20 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | enum (`always`/`once`) | `always` | Authentication |
+| 21 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
+| 22 | [`JwksFetchTimeoutMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 5000) | Runtime egress |
+| 23 | [`JwksFetchRetries`](#runtime-egress-wif-jwks-fetch) | number | (server: 2) | Runtime egress |
+| 24 | [`JwksFetchRetryBackoffMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 200) | Runtime egress |
+| 25 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 600000) | Runtime egress |
+| 26 | [`JwksTotalDeadlineMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 10000) | Runtime egress |
+| 27 | [`JwksMaxResponseBytes`](#runtime-egress-wif-jwks-fetch) | number | (server: 1048576) | Runtime egress |
+| 28 | [`JwksMaxKeys`](#runtime-egress-wif-jwks-fetch) | number | (server: 100) | Runtime egress |
+| 29 | [`JwksMaxCacheEntries`](#runtime-egress-wif-jwks-fetch) | number | (server: 50) | Runtime egress |
+| 30 | [`JwksRefreshIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 3600000) | Runtime egress |
+| 31 | [`JwksUnknownKidMinIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 300000) | Runtime egress |
+| 32 | [`JwksStaleIfErrorMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 172800000) | Runtime egress |
+| 33 | [`PersistRequestSecrets`](#persistrequestsecrets) | boolean | (server: `true`) | Logging & privacy |
+| 34 | [`RfcCompliantSubAttributes`](#rfccompliantsubattributes) | boolean | `false` | Validation |
 
 ### CredentialSecretVisibility
 
-WI-7 (design section 6A). Controls whether a per-endpoint credential secret is
+Controls whether a per-endpoint credential secret is
 retained (encrypted at rest, re-viewable by an admin) or shown exactly once at
 creation. Enum `always` (default) or `once`. The **server-scope** setting is the
 ceiling: most-restrictive-wins, so a server value of `once` forces `once` on
 every endpoint regardless of the endpoint value. When the effective value is
-`always`, a freshly-created secret is encrypted via the WI-6 envelope scheme and
+`always`, a freshly-created secret is encrypted in its storage envelope and
 stored on the credential; when it is `once`, no ciphertext is retained (and a
 flip to `once` purges any retained ciphertext). The retained envelope is NEVER
 exposed on any response; reveal is a separate admin-only, audit-logged endpoint
-(WI-8). Pre-feature credentials are bcrypt-only and cannot be retro-revealed.
+Pre-feature credentials are bcrypt-only and cannot be retro-revealed.
 
 ### WifCredentialsEnabled
 
 When `true`, enables Workload Identity Federation (WIF) for the endpoint: a `wif`
 credential may be attached (via `POST /admin/endpoints/:id/credentials` with
 `credentialType:"wif"`) and the WIF token-mint path is offered. When `false`
-(default), WIF is off and existing endpoints are untouched. **Orthogonal** to
-`PerEndpointCredentialsEnabled` (the bcrypt-bearer gate): a `wif` credential is
-permitted when `WifCredentialsEnabled` is on, independent of the bearer gate,
-and a `bearer` credential still requires `PerEndpointCredentialsEnabled`.
+(default), WIF is off and existing endpoints are untouched. A `wif` credential
+is permitted when `WifCredentialsEnabled` is on, independently of bearer and
+OAuth client-credential settings.
 Added in A1 ([docs/auth/AUTHENTICATION_METHODS_ADMIN_API.md](auth/AUTHENTICATION_METHODS_ADMIN_API.md)).
 
-### WI-11 per-method auth-enablement flags
+### Per-method auth-enablement flags
 
-WI-11 splits the double-duty `PerEndpointCredentialsEnabled` into three flags,
-each gating one auth method independently (at credential-create AND on the
-resource-plane validation path):
+Three settings gate one authentication method each, both at credential creation
+and on the resource-plane validation path:
 
 | Flag | Gates | Effective default |
 |---|---|---|
-| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` (Entra "Secret Token") | falls back to `PerEndpointCredentialsEnabled` when unset |
-| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` (Entra "OAuth2 client-credentials") | falls back to `PerEndpointCredentialsEnabled` when unset |
+| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` (Entra "Secret Token") | `false` |
+| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` (Entra "OAuth2 client-credentials") | `false` |
 | `SharedSecretBearerAuthEnabled` | whether the endpoint accepts the global `SCIM_SHARED_SECRET` | `true` (unset means accept, back-compat) |
 
 The effective value is computed by `getEffectiveAuthEnablement()`
-([endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)). The
-migration is **value-preserving**: an endpoint that only has the legacy
-`PerEndpointCredentialsEnabled` behaves byte-for-byte as before (that flag is
-read as a one-release fallback for both per-endpoint methods). An explicit new
-flag always overrides the legacy fallback. The new capability is
+([endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)).
+An explicit `profile.authentication.methods[]` entry overrides its dedicated
+setting. `SharedSecretBearerAuthEnabled=false` makes an endpoint refuse the global
 `SharedSecretBearerAuthEnabled=false`, which makes an endpoint refuse the global
 shared secret on its resource routes and accept only its own credentials (or
-endpoint-scoped OAuth tokens). `*` The two per-endpoint flags show `false` as
-their registry default, but their EFFECTIVE value inherits the legacy flag when
-that is set.
+endpoint-scoped OAuth tokens).
 ### EnforceResourceTypes
 
 When `true` (**default**), a LIST/query on a resource type the endpoint profile
@@ -766,16 +759,6 @@ When enabled, endpoint-scoped discovery endpoints respond with the endpoint's sc
 - `GET /scim/endpoints/{id}/ServiceProviderConfig`
 
 When disabled, these endpoints return 404.
-
----
-
-### PerEndpointCredentialsEnabled
-
-**Type:** boolean | **Default:** `false` | **Category:** Authentication
-
-When enabled, activates the per-endpoint credential tier in the authentication chain. SCIM operations on this endpoint can be authenticated using endpoint-scoped bearer tokens created via the Admin Credential API.
-
-Requires credential creation via `POST /scim/admin/endpoints/{id}/credentials`.
 
 ---
 

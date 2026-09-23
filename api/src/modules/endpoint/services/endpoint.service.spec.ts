@@ -141,6 +141,59 @@ describe('EndpointService', () => {
     const p4MinSchema = { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' as const };
     const p4MinRT = { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] };
 
+    it('purges retained secrets when endpoint visibility changes to once', async () => {
+      const before = {
+        ...mockEndpoint,
+        profile: {
+          settings: { CredentialSecretVisibility: 'always' },
+          schemas: [p4MinSchema],
+          resourceTypes: [p4MinRT],
+          serviceProviderConfig: {},
+        },
+      };
+      const purge = jest.fn().mockResolvedValue(2);
+      service.setCredentialSecretPurgeListener(purge);
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) =>
+        Promise.resolve({ ...before, profile: args.data.profile }),
+      );
+
+      await service.updateEndpoint('test-endpoint-id', {
+        profile: { settings: { CredentialSecretVisibility: 'once' } },
+      });
+
+      expect(purge).toHaveBeenCalledWith('test-endpoint-id');
+    });
+
+    it('persists normalized dedicated auth settings during a Prisma profile update', async () => {
+      const before = {
+        ...mockEndpoint,
+        profile: {
+          settings: { PerEndpointCredentialsEnabled: 'True' },
+          schemas: [p4MinSchema],
+          resourceTypes: [p4MinRT],
+          serviceProviderConfig: {},
+        },
+      };
+      let persisted: any;
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) => {
+        persisted = structuredClone(args.data.profile);
+        return Promise.resolve({ ...before, profile: structuredClone(args.data.profile) });
+      });
+
+      await service.updateEndpoint('test-endpoint-id', {
+        profile: { settings: { StrictSchemaValidation: false } },
+      });
+
+      expect(persisted.settings).toEqual(expect.objectContaining({
+        SecretTokenBearerAuthEnabled: 'True',
+        OAuthClientCredentialsAuthEnabled: 'True',
+        StrictSchemaValidation: false,
+      }));
+      expect(persisted.settings).not.toHaveProperty('PerEndpointCredentialsEnabled');
+    });
+
     /**
      * A10 - the `authentication` block is replaced WHOLESALE, and
      * `expandAuthentication` turns a missing `methods` key into `[]`. Together
@@ -369,6 +422,52 @@ describe('EndpointService', () => {
       expect(result.profile?.settings).not.toHaveProperty('MultiOpPatchRequestAddMultipleMembersToGroup');
       expect(result.profile?.settings).not.toHaveProperty('SoftDeleteEnabled');
       expect(result.profile?.settings).not.toHaveProperty('MultiOpPatchRequestRemoveMultipleMembersFromGroup');
+    });
+
+    it('should migrate the retired credential umbrella to dedicated auth settings', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: {
+          settings: {
+            PerEndpointCredentialsEnabled: 'True',
+            OAuthClientCredentialsAuthEnabled: false,
+          },
+          schemas: [],
+          resourceTypes: [],
+          serviceProviderConfig: {},
+        },
+      });
+
+      const result = await service.getEndpoint('test-endpoint-id');
+
+      expect(result.profile?.settings).toEqual(expect.objectContaining({
+        SecretTokenBearerAuthEnabled: 'True',
+        OAuthClientCredentialsAuthEnabled: false,
+      }));
+      expect(result.profile?.settings).not.toHaveProperty('PerEndpointCredentialsEnabled');
+    });
+
+    it('should replace an invalid dedicated value from a valid retired credential umbrella', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: {
+          settings: {
+            PerEndpointCredentialsEnabled: 'True',
+            SecretTokenBearerAuthEnabled: null,
+            OAuthClientCredentialsAuthEnabled: false,
+          },
+          schemas: [],
+          resourceTypes: [],
+          serviceProviderConfig: {},
+        },
+      });
+
+      const result = await service.getEndpoint('test-endpoint-id');
+
+      expect(result.profile?.settings).toEqual(expect.objectContaining({
+        SecretTokenBearerAuthEnabled: 'True',
+        OAuthClientCredentialsAuthEnabled: false,
+      }));
     });
   });
 

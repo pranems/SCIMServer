@@ -32,6 +32,7 @@ export const SCIM_EVENTS = {
   ENDPOINT_CREATED: 'scim.endpoint.created',
   ENDPOINT_UPDATED: 'scim.endpoint.updated',
   ENDPOINT_DELETED: 'scim.endpoint.deleted',
+  SECURITY_SETTINGS_UPDATED: 'scim.security.updated',
 } as const;
 
 // ---- Payload types -------------------------------------------------------
@@ -77,6 +78,10 @@ export interface ScimCredentialEventPayload {
 export interface ScimEndpointEventPayload {
   endpointId: string;
   name?: string;
+}
+
+export interface ScimSecuritySettingsEventPayload {
+  credentialSecretVisibility: 'always' | 'once';
 }
 
 // ---- Snapshot types (returned by StatsProjectionService) ------------------

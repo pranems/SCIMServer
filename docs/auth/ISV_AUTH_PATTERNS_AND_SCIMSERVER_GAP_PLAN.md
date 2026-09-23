@@ -111,7 +111,7 @@ One global client_id/secret pair (`OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` env 
 GET /scim/endpoints/{endpointId}/Users HTTP/1.1
 Authorization: Bearer <one-time-issued plaintext token>
 ```
-Requires `PerEndpointCredentialsEnabled=True` on the endpoint config. Token is bcrypt-hashed at admin-create time; plaintext returned exactly once ([G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) §"Authentication Flow"). UI for managing these is in [web/src/pages/CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx).
+Requires `retired combined credential setting=True` on the endpoint config. Token is bcrypt-hashed at admin-create time; plaintext returned exactly once ([G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) §"Authentication Flow"). UI for managing these is in [web/src/pages/CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx).
 
 ### 1.3 What the in-repo code explicitly forbids
 
@@ -303,7 +303,7 @@ flowchart TD
 |---|---|---|
 | Legacy global bearer (Pattern 1) | `SCIM_SHARED_SECRET` env (present = on) | `oauthbearertoken` |
 | OAuth issuer-mode JWT (Pattern 2) | global client always present | `oauth2` |
-| Per-endpoint bcrypt bearer (Pattern 3) | `PerEndpointCredentialsEnabled` flag | `oauthbearertoken` |
+| Per-endpoint bcrypt bearer (Pattern 3) | `retired combined credential setting` flag | `oauthbearertoken` |
 | Per-endpoint OAuth client_id/secret (Pattern 5, Q1) | `oauth_client` credential on the endpoint | `oauth2` |
 | External JWKS-validated JWT (Pattern 4, Q2) | per-endpoint `externalAuth` config | `oauth2` |
 | WIF token exchange (Pattern 8, Q6) | `wif` credential / per-endpoint WIF flag (+ `assertionProfile`: `jwt-bearer` for RFC 7523 or `token-exchange` for RFC 8693) | `oauth2` |
@@ -673,7 +673,7 @@ The following entries from [.github/copilot-instructions.md](../../.github/copil
 - [api/src/modules/auth/shared-secret.guard.ts](../../api/src/modules/auth/shared-secret.guard.ts) - the live auth fallback chain
 - [api/src/oauth/oauth.service.ts](../../api/src/oauth/oauth.service.ts) - the OAuth issuer; HS256, one global client
 - [api/src/oauth/oauth.controller.ts](../../api/src/oauth/oauth.controller.ts) - `/oauth/token` endpoint; rejects non-`client_credentials` grants
-- [api/src/modules/endpoint/endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts) - the 14-flag + logLevel registry; only `PerEndpointCredentialsEnabled` is auth-related today
+- [api/src/modules/endpoint/endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts) - the 14-flag + logLevel registry; only `retired combined credential setting` is auth-related today
 - [api/test/e2e/per-endpoint-credentials.e2e-spec.ts](../../api/test/e2e/per-endpoint-credentials.e2e-spec.ts) - the contract for G11 admin API
 - [web/src/pages/CredentialsTab.tsx](../../web/src/pages/CredentialsTab.tsx) - the UI surface to extend for Q1 + Q2
 - [docs/G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) - the shipped per-endpoint-bearer architecture

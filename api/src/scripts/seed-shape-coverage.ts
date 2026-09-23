@@ -25,7 +25,7 @@
  *                             custom extension attrs incl writeOnly + never)
  *   shape-soft-delete-only    entra-id-minimal preset; UserSoftDeleteEnabled=true,
  *                             UserHardDeleteEnabled=false, GroupHardDeleteEnabled=false
- *   shape-per-endpoint-creds  entra-id preset; PerEndpointCredentialsEnabled=true,
+ *   shape-per-endpoint-creds  entra-id preset; dedicated bearer and OAuth enabled,
  *                             plus 1 EndpointCredential row (bcrypt of "shape-secret")
  *   shape-custom-resource     INLINE custom profile: User + Group + custom Device
  *                             resourceType with its own URN + custom extension on User.
@@ -176,7 +176,8 @@ function buildShapes(): ShapeDef[] {
   const perEndpointCreds: EndpointProfile = expand({
     ...getBuiltInPreset(PRESET_ENTRA_ID).profile,
     settings: {
-      [F.PER_ENDPOINT_CREDENTIALS_ENABLED]: true,
+      [F.SECRET_TOKEN_BEARER_AUTH_ENABLED]: true,
+      [F.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED]: true,
       [F.STRICT_SCHEMA_VALIDATION]: true,
     },
   });

@@ -32,7 +32,7 @@ This document captures the current implementation reality after reading core rep
 
 All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`) with a 3-tier fallback chain:
 
-1. **Tier 1 - Per-endpoint bcrypt credentials**: If `PerEndpointCredentialsEnabled` is `true` on the endpoint and the endpoint has active, non-expired credentials, the bearer token is verified via `bcrypt.compare()`. Admin CRUD at `/scim/admin/endpoints/:id/credentials`.
+1. **Tier 1 - Per-endpoint bcrypt credentials**: If `retired combined credential setting` is `true` on the endpoint and the endpoint has active, non-expired credentials, the bearer token is verified via `bcrypt.compare()`. Admin CRUD at `/scim/admin/endpoints/:id/credentials`.
 2. **Tier 2 - OAuth 2.0 JWT**: Token is decoded/verified via `OAuthService.validateAccessToken()`. OAuth token endpoint: `POST /scim/oauth/token` (`grant_type=client_credentials`).
 3. **Tier 3 - Global shared secret**: Direct comparison with `SCIM_SHARED_SECRET` env var.
 

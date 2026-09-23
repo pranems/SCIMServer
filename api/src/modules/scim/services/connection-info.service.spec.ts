@@ -91,9 +91,12 @@ describe('ConnectionInfoService', () => {
       expect(info.enabledMethods.some((m) => m.method === 'shared_secret')).toBe(true);
     });
 
-    it('per-endpoint bearer falls back to the legacy PerEndpointCredentialsEnabled', () => {
+    it('dedicated settings enable per-endpoint bearer and OAuth independently', () => {
       const info = service.assemble(
-        endpoint({ PerEndpointCredentialsEnabled: 'True' }),
+        endpoint({
+          SecretTokenBearerAuthEnabled: 'True',
+          OAuthClientCredentialsAuthEnabled: 'True',
+        }),
         [],
         'https://scim.example.com',
       );
@@ -105,13 +108,11 @@ describe('ConnectionInfoService', () => {
       const info = service.assemble(
         endpoint(
           {
-            PerEndpointCredentialsEnabled: true,
             OAuthClientCredentialsAuthEnabled: false,
           },
           {
             profile: {
               settings: {
-                PerEndpointCredentialsEnabled: true,
                 OAuthClientCredentialsAuthEnabled: false,
               },
               authentication: {

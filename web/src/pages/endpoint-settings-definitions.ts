@@ -1,4 +1,4 @@
-import { AUTH_METHOD_FLAGS, LEGACY_AUTH_METHOD_FLAG } from './endpoint-auth-flags';
+import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 
 export type SettingCategory =
   | 'Validation & schema'
@@ -7,8 +7,7 @@ export type SettingCategory =
   | 'PATCH semantics'
   | 'Discovery'
   | 'Logging & privacy'
-  | 'Authentication methods'
-  | 'Legacy compatibility';
+  | 'Authentication methods';
 
 interface SettingBase {
   key: string;
@@ -49,7 +48,6 @@ export const CATEGORY_ORDER: readonly SettingCategory[] = [
   'Concurrency & ETags',
   'Discovery',
   'Logging & privacy',
-  'Legacy compatibility',
 ];
 
 export const BOOLEAN_FLAGS: ReadonlyArray<BooleanSettingDefinition> = [
@@ -188,15 +186,6 @@ export const BOOLEAN_FLAGS: ReadonlyArray<BooleanSettingDefinition> = [
     defaultValue: flag.defaultValue,
     category: 'Authentication methods',
   })),
-  {
-    kind: 'boolean',
-    key: LEGACY_AUTH_METHOD_FLAG.key,
-    label: LEGACY_AUTH_METHOD_FLAG.label,
-    displayLabel: LEGACY_AUTH_METHOD_FLAG.shortLabel,
-    description: LEGACY_AUTH_METHOD_FLAG.description,
-    defaultValue: LEGACY_AUTH_METHOD_FLAG.defaultValue,
-    category: 'Legacy compatibility',
-  },
   {
     kind: 'boolean',
     key: 'PersistRequestSecrets',

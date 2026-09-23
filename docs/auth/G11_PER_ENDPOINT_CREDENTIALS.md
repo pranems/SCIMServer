@@ -1,5 +1,7 @@
 # G11: Per-Endpoint Credentials (Phase 11)
 
+> **Historical delivery report.** This document records the original bcrypt-era implementation. Current credentials use dedicated bearer/OAuth settings and keyed HMAC lookup, while pre-migration bcrypt credentials remain verifiable. See [AUTHENTICATION_GUIDE.md](../AUTHENTICATION_GUIDE.md) for current behavior.
+
 ## Overview
 
 Phase 11 implements per-endpoint credential management, enabling each SCIM endpoint to have its own isolated bearer tokens for authentication. This addresses RFC 7644 §2 (authentication) and RFC 7643 §7 (security considerations) requirements for multi-tenant authentication isolation.
@@ -11,7 +13,7 @@ Phase 11 implements per-endpoint credential management, enabling each SCIM endpo
 ```mermaid
 flowchart TD
     A[Incoming Request] --> B{Extract endpointId from URL}
-    B -->|Found| C{PerEndpointCredentialsEnabled?}
+    B -->|Found| C{retired combined credential setting?}
     B -->|Not found| F
     C -->|true| D{Active credentials exist?}
     C -->|false| F
@@ -59,7 +61,7 @@ erDiagram
 
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
-| `PerEndpointCredentialsEnabled` | `True` / `False` | `False` | Enables per-endpoint credential management and auth for this endpoint |
+| `retired combined credential setting` | `True` / `False` | `False` | Enables per-endpoint credential management and auth for this endpoint |
 
 ## Admin API
 
@@ -113,7 +115,7 @@ Authorization: Bearer {admin-token}
 
 1. Client sends `Authorization: Bearer {per-endpoint-token}` to any SCIM endpoint URL (e.g., `/scim/endpoints/{id}/Users`)
 2. Guard extracts `endpointId` from URL via regex
-3. Guard checks if `PerEndpointCredentialsEnabled` is true for the endpoint
+3. Guard checks if `retired combined credential setting` is true for the endpoint
 4. Guard loads active, non-expired credentials from the database
 5. Guard bcrypt-compares the token against each stored hash
 6. On match: request is authenticated as `authType: 'endpoint_credential'`
@@ -137,7 +139,7 @@ Authorization: Bearer {admin-token}
 | File | Changes |
 |------|---------|
 | `api/prisma/schema.prisma` | Added `EndpointCredential` model + relation |
-| `api/src/modules/endpoint/endpoint-config.interface.ts` | Added `PerEndpointCredentialsEnabled` flag |
+| `api/src/modules/endpoint/endpoint-config.interface.ts` | Added `retired combined credential setting` flag |
 | `api/src/domain/repositories/repository.tokens.ts` | Added `ENDPOINT_CREDENTIAL_REPOSITORY` token |
 | `api/src/infrastructure/repositories/repository.module.ts` | Registered credential repo |
 | `api/src/modules/auth/shared-secret.guard.ts` | Per-endpoint check + fallback chain |

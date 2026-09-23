@@ -205,9 +205,11 @@ describe('computeInvalidations (Phase B3)', () => {
     expect(keys).not.toContain(k(['users', 'ep-1']));
   });
 
-  it('credential events invalidate the per-endpoint overview but NOT the resource lists', () => {
+  it('credential events invalidate every auth read model but NOT the resource lists', () => {
     const keys = computeInvalidations('scim.credential.created', 'ep-1').map(k);
     expect(keys).toContain(k(queryKeys.endpoints.overview('ep-1')));
+    expect(keys).toContain(k(queryKeys.endpoints.connectionInfo('ep-1')));
+    expect(keys).toContain(k(queryKeys.endpoints.connectionReveals('ep-1')));
     // Credentials don't change user / group counts.
     expect(keys).not.toContain(k(['users', 'ep-1']));
     expect(keys).not.toContain(k(['groups', 'ep-1']));
@@ -219,6 +221,14 @@ describe('computeInvalidations (Phase B3)', () => {
     expect(keys).toContain(k(queryKeys.endpoints.detail('ep-1')));
     expect(keys).toContain(k(queryKeys.endpoints.overview('ep-1')));
     expect(keys).toContain(k(queryKeys.endpoints.stats('ep-1')));
+    expect(keys).toContain(k(queryKeys.endpoints.connectionInfo('ep-1')));
+    expect(keys).toContain(k(queryKeys.endpoints.connectionReveals('ep-1')));
+  });
+
+  it('server security events invalidate every connection-info and reveal cache', () => {
+    const keys = computeInvalidations('scim.security.updated', undefined).map(k);
+    expect(keys).toContain(k(queryKeys.endpoints.connectionInfoAll));
+    expect(keys).toContain(k(queryKeys.endpoints.connectionRevealsAll));
   });
 
   it('skips endpoint-scoped keys when no endpointId is present', () => {

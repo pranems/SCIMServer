@@ -1005,13 +1005,13 @@ describe('Test Gaps Audit #6 - Comprehensive gap closure (E2E)', () => {
   });
 
   // =========================================================================
-  // 11. Deeper PerEndpointCredentials + RequireIfMatch combo test
+  // 11. Deeper bearer credentials + RequireIfMatch combo test
   // =========================================================================
 
-  describe('PerEndpointCredentials + RequireIfMatch deeper combo', () => {
+  describe('Bearer credentials + RequireIfMatch deeper combo', () => {
     it('should require both per-endpoint credential AND If-Match for PATCH', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: 'True',
+        SecretTokenBearerAuthEnabled: 'True',
         RequireIfMatch: 'True',
       });
       const basePath = scimBasePath(endpointId);

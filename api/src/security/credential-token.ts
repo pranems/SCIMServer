@@ -60,7 +60,7 @@ export const DEFAULT_CREDENTIAL_PEPPER = 'changeme-credential-pepper';
  * material, and it is not a valid bcrypt hash, so even a mis-routed compare
  * cannot match.
  */
-export const P1_KEYED_HASH_PLACEHOLDER = 'p1-keyed-see-secretHash';
+export const P1_KEYED_HASH_PLACEHOLDER = 'keyed-see-secretHash';
 
 const LOOKUP_KEY_BYTES = 12;
 const SECRET_BYTES = 32;

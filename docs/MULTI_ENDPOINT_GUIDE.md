@@ -1,8 +1,8 @@
 # Multi-Endpoint Architecture Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.25`
 
-> **Version:** 0.55.24 - **Updated:** June 3, 2026
+> **Version:** 0.55.25 - **Updated:** June 3, 2026
 > **Source of truth:** [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 
 ---
@@ -303,11 +303,24 @@ These controllers participate in multi-endpoint routing:
 ```bash
 # Create production endpoint with strict settings
 curl -X POST /scim/admin/endpoints \
-  -d '{"name":"prod","profilePreset":"entra-id","profile":{"settings":{"RequireIfMatch":true,"PerEndpointCredentialsEnabled":true}}}'
+  -d '{
+    "name": "prod",
+    "profilePreset": "entra-id",
+    "profile": {
+      "settings": {
+        "RequireIfMatch": true,
+        "SecretTokenBearerAuthEnabled": true,
+        "OAuthClientCredentialsAuthEnabled": true
+      }
+    }
+  }'
 
 # Create dev endpoint with relaxed settings
 curl -X POST /scim/admin/endpoints \
-  -d '{"name":"dev","profilePreset":"entra-id-minimal"}'
+  -d '{
+    "name": "dev",
+    "profilePreset": "entra-id-minimal"
+  }'
 ```
 
 ### Scenario 2: ISV Testing

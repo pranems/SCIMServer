@@ -55,6 +55,7 @@ test.beforeEach(async ({ page }) => {
     { key: 'scimserver.authToken', value: token },
   );
   await page.goto('/');
+  await page.addStyleTag({ content: '.TanStackRouterDevtools { display: none !important; }' });
   // Stuff the bearer into localStorage so TokenGate doesn't show its
   // prompt in the screenshot. Same pattern as the existing specs.
   await page.evaluate((t) => localStorage.setItem('scim_token', t), token);
@@ -270,9 +271,10 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Command Palette (Cmd+K open state)', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await page.getByTestId('app-shell').click({ position: { x: 5, y: 5 } });
     // Open the palette via keyboard shortcut so the screenshot exercises
     // the same code path as the user.
-    await page.keyboard.press('Control+KeyK');
+    await page.keyboard.press('Control+k');
     // Wait for the dialog to be in the DOM and visible.
     await page.locator('[data-testid="command-palette"]').waitFor({ state: 'visible' });
     await expect(page).toHaveScreenshot('command-palette.png', {
@@ -284,9 +286,9 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Keyboard Shortcuts Help (? open state)', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    // ? is shift+/ on US layout. Pressing the literal key is the most
-    // robust cross-platform incantation.
-    await page.keyboard.press('Shift+Slash');
+    await page.getByTestId('app-shell').click({ position: { x: 5, y: 5 } });
+    // Playwright's Shift+/ emits key='/' with shiftKey rather than key='?'.
+    await page.keyboard.press('?');
     await page.locator('[data-testid="shortcuts-help"]').waitFor({ state: 'visible' });
     await expect(page).toHaveScreenshot('keyboard-shortcuts-help.png', {
       ...SNAPSHOT_OPTIONS,

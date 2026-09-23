@@ -644,7 +644,7 @@ Complete reference of every HTTP error status the server can return, with exact 
 |--------|---------|
 | Endpoint "..." is inactive. SCIM operations are not allowed. | `isActive=false` on endpoint (all controllers) |
 | Bulk operations are not enabled for this endpoint. | `bulk.supported=false` in SPC |
-| Per-endpoint credentials are not enabled for endpoint "...". | `PerEndpointCredentialsEnabled=false` |
+| Per-endpoint credentials are not enabled for endpoint "...". | `retired combined credential setting=false` |
 
 ### 404 Not Found
 

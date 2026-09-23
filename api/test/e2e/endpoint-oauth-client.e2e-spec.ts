@@ -37,11 +37,11 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     // here (rather than lowering the default) keeps the suite's premise intact
     // and matches how the 9z-BQ latency gate opts in.
     endpointA = await createEndpointWithConfig(app, adminToken, {
-      PerEndpointCredentialsEnabled: 'True',
+      OAuthClientCredentialsAuthEnabled: 'True',
       MaxActiveOAuthClientCredentials: 25,
     });
     endpointB = await createEndpointWithConfig(app, adminToken, {
-      PerEndpointCredentialsEnabled: 'True',
+      OAuthClientCredentialsAuthEnabled: 'True',
       MaxActiveOAuthClientCredentials: 25,
     });
   });

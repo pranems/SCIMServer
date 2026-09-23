@@ -147,4 +147,9 @@ export class ScimEventSseBridge {
   onEndpointDeleted(payload: unknown): void {
     this.forward(SCIM_EVENTS.ENDPOINT_DELETED, payload);
   }
+
+  @OnEvent(SCIM_EVENTS.SECURITY_SETTINGS_UPDATED)
+  onSecuritySettingsUpdated(payload: unknown): void {
+    this.forward(SCIM_EVENTS.SECURITY_SETTINGS_UPDATED, payload);
+  }
 }

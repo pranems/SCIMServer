@@ -361,9 +361,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                   : undefined;
                 const resolved = resolvedEnabled ?? resolvedDisabled;
                 const managedByMethod = resolved?.enablementSource === 'authentication-method';
-                const checked = resolved
+                const rawDedicated = flags[flag.key];
+                const hasDedicatedValue = rawDedicated !== undefined && rawDedicated !== null && rawDedicated !== '';
+                const checked = managedByMethod
                   ? Boolean(resolvedEnabled)
-                  : coerceFlag(flags[flag.key], flag.defaultValue);
+                  : hasDedicatedValue
+                    ? coerceFlag(rawDedicated, flag.defaultValue)
+                    : resolved
+                      ? Boolean(resolvedEnabled)
+                      : flag.defaultValue;
                 const disabled = (isPending && pendingKey === flag.key) || managedByMethod;
                 return (
                   <div key={flag.key} className={classes.flagRow} data-testid={`settings-flag-row-${flag.key}`}>
@@ -410,10 +416,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
               <Radio value="once" label="once (show at create only)" data-testid="credential-visibility-once" />
             </RadioGroup>
             <Caption1 className={classes.flagDescription}>
-              WI-7: whether a per-endpoint credential secret is retained (encrypted at rest) and
-              re-viewable by an admin, or shown exactly once at creation. The server-scope setting
-              is the ceiling - if the server is set to &quot;once&quot; this endpoint is forced to
-              &quot;once&quot; regardless of the value here.
+              Choose whether a per-endpoint credential secret is retained (encrypted at rest) and
+              re-viewable by an admin, or shown exactly once at creation. The server setting is the
+              ceiling - if the server is set to &quot;once&quot; this endpoint is forced to &quot;once&quot;
+              regardless of the value here.
             </Caption1>
           </div>
         </Card>

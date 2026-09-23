@@ -399,7 +399,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: false } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: false, OAuthClientCredentialsAuthEnabled: false } },
         active: true,
       });
 
@@ -418,7 +418,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
@@ -445,7 +445,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
@@ -471,7 +471,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([]);
@@ -486,7 +486,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([]);
@@ -504,7 +504,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true } },
         active: true,
       });
       // Even with active secret credentials present, a JWT must NOT be
@@ -538,7 +538,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true } },
         active: true,
       });
       // Active secret credentials are present, but the global shared secret can

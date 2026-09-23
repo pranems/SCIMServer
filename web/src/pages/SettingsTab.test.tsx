@@ -126,8 +126,7 @@ describe('SettingsTab', () => {
     wrap(<SettingsTab endpointId={EP_ID} />);
     expect(screen.getByRole('switch', { name: /StrictSchemaValidation/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /RequireIfMatch/i })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: /PerEndpointCredentialsEnabled/i })).toBeInTheDocument();
-    // WI-11: the per-method auth-enablement flag family.
+    expect(screen.queryByRole('switch', { name: /PerEndpointCredentialsEnabled/i })).not.toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /SecretTokenBearerAuthEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /OAuthClientCredentialsAuthEnabled/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /SharedSecretBearerAuthEnabled/i })).toBeInTheDocument();
@@ -184,9 +183,10 @@ describe('SettingsTab', () => {
     // AllowAndCoerceBooleanStrings defaults to true per ProfileSettings docs.
     const allow = screen.getByRole('switch', { name: /AllowAndCoerceBooleanStrings/i }) as HTMLInputElement;
     expect(allow.checked).toBe(true);
-    // PerEndpointCredentialsEnabled defaults to false (security-default).
-    const creds = screen.getByRole('switch', { name: /PerEndpointCredentialsEnabled/i }) as HTMLInputElement;
-    expect(creds.checked).toBe(false);
+    const bearer = screen.getByRole('switch', { name: /SecretTokenBearerAuthEnabled/i }) as HTMLInputElement;
+    const oauth = screen.getByRole('switch', { name: /OAuthClientCredentialsAuthEnabled/i }) as HTMLInputElement;
+    expect(bearer.checked).toBe(false);
+    expect(oauth.checked).toBe(false);
   });
 
   it('toggling a Switch fires useUpdateEndpointConfig with profile.settings shape', async () => {

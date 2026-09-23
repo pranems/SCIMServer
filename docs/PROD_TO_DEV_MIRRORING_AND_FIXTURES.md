@@ -1,8 +1,8 @@
 # Prod -> Dev mirroring + synthetic shape-coverage fixtures
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.25`
 
-> **Version:** 0.55.24  -  **Date:** May 6, 2026
+> **Version:** 0.55.25  -  **Date:** May 6, 2026
 > **Scope:** dev-tooling, no API surface change
 > **Affects:** [api/src/scripts/mirror-prod-to-dev.ts](../api/src/scripts/mirror-prod-to-dev.ts), [api/src/scripts/seed-shape-coverage.ts](../api/src/scripts/seed-shape-coverage.ts), [scripts/mirror-prod-to-dev.ps1](../scripts/mirror-prod-to-dev.ps1)
 
@@ -152,7 +152,7 @@ the UI and easy to drop with one SQL `DELETE` if needed.
 | `shape-entra-lenient` | `entra-id` | `StrictSchemaValidation=false`, `IgnoreReadOnlyAttributesInPatch=true`, `IncludeWarningAboutIgnoredReadOnlyAttribute=true`, `VerbosePatchSupported=false`, `PrimaryEnforcement=normalize` | Mirrors how Microsoft Entra ID actually talks to us (flat keys, readOnly in PATCH, boolean coercion). |
 | `shape-custom-ext-user` | `user-only-with-custom-ext` | `MultiMemberPatchOpForGroupEnabled=false`, `VerbosePatchSupported=true` | Tests `writeOnly` and `returned:never` attributes inside an extension on a User-only schema. No Group resourceType. |
 | `shape-soft-delete-only` | `entra-id-minimal` | `UserSoftDeleteEnabled=true`, `UserHardDeleteEnabled=false`, `GroupHardDeleteEnabled=false` | All deletes must be reversible. Verifies the hard-delete-disabled error path. |
-| `shape-per-endpoint-creds` | `entra-id` | `PerEndpointCredentialsEnabled=true` | Plus one `EndpointCredential` row (bcrypt hash of `shape-dev-secret`, label `shape-dev-bearer`). Verifies the per-endpoint bearer guard path. |
+| `shape-per-endpoint-creds` | `entra-id` | `SecretTokenBearerAuthEnabled=true` | Plus one `EndpointCredential` row (bcrypt hash of `shape-dev-secret`, label `shape-dev-bearer`). Verifies the per-endpoint bearer guard path. |
 | `shape-custom-resource` | inline custom profile | `StrictSchemaValidation=true`, `VerbosePatchSupported=true`, `MultiMemberPatchOpForGroupEnabled=true` | Adds a custom `Device` resource type at `urn:scimserver:devshapes:device:1.0` plus a custom HR extension on User at `urn:scimserver:devshapes:user:hr-extras:1.0`. End-to-end custom-resource test bed. |
 
 ### 5.2 Per-endpoint resources (3 users, 2 groups)

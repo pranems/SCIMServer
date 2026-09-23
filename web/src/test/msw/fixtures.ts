@@ -178,7 +178,8 @@ export const FIXTURE_ENDPOINT_OVERVIEW: EndpointOverviewResponse = {
   configFlags: {
     StrictSchemaValidation: false,
     AllowAndCoerceBooleanStrings: true,
-    PerEndpointCredentialsEnabled: true,
+    SecretTokenBearerAuthEnabled: true,
+    OAuthClientCredentialsAuthEnabled: true,
     SchemaDiscoveryEnabled: true,
   },
   credentials: [
@@ -246,7 +247,7 @@ export const FIXTURE_VERSION: VersionInfo = {
     resourceGroup: 'msw',
     containerApp: 'msw',
     registry: 'msw',
-    migratePhase: 'Phase H1',
+    migratePhase: 'Complete',
   },
 };
 

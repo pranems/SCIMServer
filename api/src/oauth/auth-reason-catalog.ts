@@ -194,7 +194,7 @@ export const AUTH_REASON_CATALOG: readonly AuthReasonEntry[] = [
     tier: 'T3',
     actorDescription: 'Client authentication failed.',
     remediation:
-      'Deliberately merged (P2): client-not-found and secret-mismatch are indistinguishable on the wire; the log records credentialFound.',
+      'Client-not-found and secret-mismatch are deliberately indistinguishable on the wire; the log records credentialFound.',
   },
   {
     reasonCode: 'grant_type_unsupported',

@@ -27,7 +27,7 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
     'secretRetained', 'secretRevealed', 'authHealth', 'lastVerifiedAt', 'lastUsedAt', 'validity',
   ];
   const disabledMethodKeys = ['method', 'enablementSource', 'reason', 'enableHint'];
-  const enablementSources = ['authentication-method', 'dedicated-setting', 'legacy-setting', 'default'];
+  const enablementSources = ['authentication-method', 'dedicated-setting', 'default'];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -147,8 +147,7 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
   });
 
   it('exposes a created credential WITHOUT leaking the hash', async () => {
-    // Create an endpoint with PerEndpointCredentialsEnabled=True so the
-    // credentials POST is permitted.
+    // Create an endpoint and enable bearer credentials so the POST is permitted.
     const wk = process.env.JEST_WORKER_ID ?? '0';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     const endpointRes = await request(app.getHttpServer() as any)
@@ -168,7 +167,7 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
       .patch(`/scim/admin/endpoints/${endpointId}`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ profile: { settings: { PerEndpointCredentialsEnabled: 'True' } } })
+      .send({ profile: { settings: { SecretTokenBearerAuthEnabled: 'True' } } })
       .expect(200);
 
     // Mint a new credential.
@@ -301,7 +300,7 @@ describe('Endpoint Overview BFF (E2E) - Phase B1', () => {
       .patch(`/scim/admin/endpoints/${endpointId}`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ profile: { settings: { PerEndpointCredentialsEnabled: 'True' } } })
+      .send({ profile: { settings: { SecretTokenBearerAuthEnabled: 'True' } } })
       .expect(200);
 
     // Create a bearer credential carrying an operator description.

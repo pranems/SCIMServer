@@ -10,7 +10,7 @@ explicit `enabled` per `AuthenticationMethod`, both planes read one source, valu
 Auth enablement was resolved from a family of overlapping flat flags
 (`getEffectiveAuthEnablement`: `SecretTokenBearerAuthEnabled` /
 `OAuthClientCredentialsAuthEnabled` / `SharedSecretBearerAuthEnabled`, each falling back to
-the legacy umbrella `PerEndpointCredentialsEnabled`), while the discovery layer (A2) read a
+the legacy umbrella `retired combined credential setting`), while the discovery layer (A2) read a
 DIFFERENT source - the co-located `profile.authentication.methods[]` A0 model. Two sources
 for one fact means "advertised" and "enforced" can drift. Worse, the token-**mint** plane
 consulted NEITHER: any endpoint with an `oauth_client` credential minted regardless of
@@ -103,14 +103,14 @@ endpoint with no method entries still authenticates via the flat flag (value-pre
 | Open/Closed | A new method's enablement is a new `type` in the facet map + a method entry, not scattered flag edits | **Applied** |
 | Simplicity (YAGNI) | 3 facets only; NO `wif` facet added (WIF stays credential-presence-based); NO enforcement flip; NO flag deletion | **Applied** (scope held to value-preserving core) |
 | Mint behavior change | Shipped SHADOW (non-blocking) per design 7.4 | **Applied** (shadow) + **scheduled** (flip) |
-| Legacy flag retirement | `PerEndpointCredentialsEnabled` reduced to a single read site (inside `getEffectiveAuthEnablement`, the resolver's fallback); not deleted | **Scheduled** (see 7) |
+| Legacy flag retirement | `retired combined credential setting` reduced to a single read site (inside `getEffectiveAuthEnablement`, the resolver's fallback); not deleted | **Scheduled** (see 7) |
 
 ## 7. Scheduled follow-up (DA-gate disposition (b))
 
 The genuinely destructive / behavior-changing remainder of the design is deferred as ONE
 cohesive follow-up so it can be shadow-verified first:
 
-- **Materialize + retire `PerEndpointCredentialsEnabled`** - a value-preserving data
+- **Materialize + retire `retired combined credential setting`** - a value-preserving data
   migration that writes each endpoint's effective per-method value into explicit method
   entries, then removes the legacy umbrella read entirely. Requires a Prisma migration +
   InMemory parity + shadow verification against prod data.
