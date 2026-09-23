@@ -1665,6 +1665,41 @@ describe('useScimRequest (Phase M1)', () => {
     expect(JSON.parse(opts.body as string)).toEqual(body);
   });
 
+  it('forwards enabled Workbench headers while preserving stored-token Authorization', async () => {
+    const { useScimRequest } = await import('./queries');
+    const { wrapper } = createWrapper();
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: () => Promise.resolve('{}'),
+    });
+
+    const { result } = renderHook(() => useScimRequest(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({
+        method: 'PATCH',
+        path: '/scim/endpoints/ep-1/Devices/device-1',
+        body: { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [] },
+        headers: {
+          'If-Match': 'W/"v3"',
+          Prefer: 'return=representation',
+          authorization: 'Bearer operator-entered-value',
+          ' Authorization ': 'Bearer padded-operator-value',
+          '   ': 'discarded',
+        },
+      });
+    });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBe('W/"v3"');
+    expect(headers.Prefer).toBe('return=representation');
+    expect(headers.Authorization).toBe('Bearer test-token');
+    expect(Object.keys(headers).filter((header) => header.trim().toLowerCase() === 'authorization'))
+      .toEqual(['Authorization']);
+    expect(headers['']).toBeUndefined();
+  });
+
   it('captures non-2xx responses as a successful mutation outcome (does NOT throw)', async () => {
     // Workbench needs to surface 4xx/5xx errors as part of the response
     // viewer rather than the mutation-error path; otherwise the operator

@@ -5,6 +5,7 @@ export interface ProfileResourceAttribute {
   multiValued?: boolean;
   mutability?: 'readOnly' | 'readWrite' | 'immutable' | 'writeOnly';
   returned?: 'always' | 'default' | 'never' | 'request';
+  uniqueness?: 'none' | 'server' | 'global';
   canonicalValues?: string[];
   referenceTypes?: string[];
   description?: string;
@@ -41,6 +42,7 @@ export interface ResourceFieldDescriptor {
   required: boolean;
   multiValued: boolean;
   immutable: boolean;
+  uniqueness: 'none' | 'server' | 'global';
   description?: string;
   canonicalValues: string[];
   referenceTypes: string[];
@@ -157,6 +159,7 @@ function fieldDescriptor(
     required: attribute.required === true,
     multiValued: attribute.multiValued === true,
     immutable: attribute.mutability === 'immutable',
+    uniqueness: attribute.uniqueness ?? 'none',
     description: attribute.description,
     canonicalValues: attribute.canonicalValues ?? [],
     referenceTypes: attribute.referenceTypes ?? [],

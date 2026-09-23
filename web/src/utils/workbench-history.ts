@@ -14,6 +14,7 @@
  * @see web/src/utils/workbench-history.test.ts (TDD spec)
  * @see docs/PHASE_M1_SCIM_WORKBENCH.md
  */
+import type { WorkbenchHeader } from './workbench-export';
 
 export const WORKBENCH_HISTORY_KEY = 'scimserver.workbench.history.v1';
 export const MAX_HISTORY = 50;
@@ -31,6 +32,8 @@ export interface WorkbenchHistoryEntry {
   timestamp: string;
   /** The body the operator sent. May be undefined for GET / DELETE. */
   requestBody?: unknown;
+  /** Enabled request headers, excluding the authenticated bearer value. */
+  requestHeaders?: WorkbenchHeader[];
   /** The body the server returned. May be undefined on 204. */
   responseBody?: unknown;
 }

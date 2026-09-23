@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.26`
+> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.27`
 
 > Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
 
