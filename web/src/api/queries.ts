@@ -82,10 +82,11 @@ function sanitizeAuthenticatedHeaders(headers?: HeadersInit): Record<string, str
       : Object.entries(headers);
   return Object.fromEntries(
     entries
-      .filter(([key]) => key.trim().toLowerCase() !== 'authorization')
+      .map(([key, value]) => [key.trim(), String(value)] as const)
+      .filter(([key]) => key.length > 0 && key.toLowerCase() !== 'authorization')
       .map(([key, value]) => [
-        key.trim().toLowerCase() === 'content-type' ? 'Content-Type' : key.trim(),
-        String(value),
+        key.toLowerCase() === 'content-type' ? 'Content-Type' : key,
+        value,
       ]),
   );
 }

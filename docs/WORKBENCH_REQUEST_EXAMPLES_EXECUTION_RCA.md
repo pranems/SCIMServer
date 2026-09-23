@@ -20,6 +20,7 @@
 | WB-12 | Environment drift | Low | Reused port 3000 had unknown OAuth credentials and port 6000 was occupied. | Live bootstrap/startup | Run exact v0.55.27 on free port 6001 with explicit test secrets. |
 | WB-13 | Security | High | Shared `fetchWithAuth` let caller headers override or accompany the stored bearer, including lowercase and padded duplicates. | Final security review | Trim names, remove Authorization case-insensitively, and apply stored bearer last. |
 | WB-14 | Fixture safety | Medium | Device merge keyed by id while verification keyed by name, so a same-name/different-id definition could be mutated before the ambiguity failed. | Final fixture review | Reject conflicting identity before PATCH and merge/verify the owned Device consistently by id. |
+| WB-15 | API robustness | Medium | A whitespace-only caller header became an empty header name and could make browser `fetch` reject before Workbench produced an outcome. | Corrected-tip review | Trim first and discard empty names in the shared sanitizer. |
 
 ## Issue Details
 
@@ -149,6 +150,15 @@
 - **Prevention:** `-SelfTest` proves canonical replacement, unrelated preservation, exact convergence, and both name-to-id and id-to-name conflict rejection without requiring a live estate.
 - **Escape analysis:** Found in final fixture review before dev execution. Earliest capable gate was a pure fixture merge self-test, now added. Escape delta: review to self-test.
 
+### WB-15 - Blank Header Names Escaped the Shared Boundary
+
+- **Symptom:** A direct caller could pass a whitespace-only header name that normalized to `""` and reached `fetch`.
+- **Root cause:** The shared sanitizer trimmed names only while filtering Authorization and canonicalizing Content-Type; it never rejected an empty normalized name.
+- **Fix:** Normalize each entry first, discard zero-length names, then apply protected-header filtering and canonicalization.
+- **Why it works:** Both authenticated request paths now pass only valid non-empty names to browser `fetch` while preserving valid custom headers.
+- **Prevention:** Base-fetch and Workbench mutation tests inject whitespace-only plus valid custom headers, proving the blank entry is removed without dropping the valid one.
+- **Escape analysis:** Found by corrected-tip review after the first PR push. Earliest capable gate was the shared sanitizer unit suite. Escape delta: review to unit.
+
 ## Self-Improvement Dispositions
 
 - **Test/gate:** Applied. Workbench mutation coverage proves arbitrary header transmission, browser coverage proves a generated ETag PATCH persists a real value, and fixture `-SelfTest` proves identity-safe idempotent merge behavior.
@@ -158,4 +168,4 @@
 
 ## Provenance and Completeness
 
-Issues were recorded as their fixes were confirmed and reconciled against the full unit-3 interval of the session transcript. The direct scan began at the `feat/workbench-templates-v0.55.27` marker and used error/signal plus diagnosis-phrase passes. Expected missing-module RED failures, matcher-only failures, repeated command output, the known Mermaid built-in `0.0.0` metadata warning, repository TypeScript baseline errors outside changed files, and an unrelated older-auth review response were inspected and dismissed. Every diagnosed unit-3 issue maps to WB-1 through WB-14.
+Issues were recorded as their fixes were confirmed and reconciled against the full unit-3 interval of the session transcript. The direct scan began at the `feat/workbench-templates-v0.55.27` marker and used error/signal plus diagnosis-phrase passes. Expected missing-module RED failures, matcher-only failures, repeated command output, the known Mermaid built-in `0.0.0` metadata warning, repository TypeScript baseline errors outside changed files, and an unrelated older-auth review response were inspected and dismissed. Every diagnosed unit-3 issue maps to WB-1 through WB-15.

@@ -33,7 +33,7 @@ real resource id and returned ETag. Enabled headers now reach the executor while
 stored admin Authorization remains authoritative. The dev fixture script is
 staged but not run; it additively configures Device plus User/Group extensions
 on `PRTest-Auth-Methods-ISV-1` after the merged image reaches dev. Local evidence
-is web 1,504/1,504 with coverage ratchets, focused 37 plus serializer/security
+is web 1,505/1,505 with coverage ratchets, focused 37 plus serializer/security
 coverage, Playwright 1/1, exact
 local live 1,500/1,500, all builds/budgets, and fixture first/rerun 34/34. PR, merge, and
 deployment remain pending; canary and customer prod are untouched.
