@@ -53,13 +53,13 @@ describe('Connection-info API (E2E)', () => {
     }
     for (const m of res.body.enabledMethods) {
       for (const key of Object.keys(m)) expect(ENABLED_KEYS).toContain(key);
-      expect(['authentication-method', 'dedicated-setting', 'legacy-setting', 'default']).toContain(
+      expect(['authentication-method', 'dedicated-setting', 'default']).toContain(
         m.enablementSource,
       );
     }
     for (const m of res.body.disabledMethods) {
       for (const key of Object.keys(m)) expect(DISABLED_KEYS).toContain(key);
-      expect(['authentication-method', 'dedicated-setting', 'legacy-setting', 'default']).toContain(
+      expect(['authentication-method', 'dedicated-setting', 'default']).toContain(
         m.enablementSource,
       );
     }

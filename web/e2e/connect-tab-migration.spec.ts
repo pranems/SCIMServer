@@ -79,6 +79,33 @@ test.describe('Connect tab - migration surface (P7)', () => {
     });
   });
 
+  test('enabling bearer shows its method tab before the PATCH response returns', async ({ page }) => {
+    await openConnect(page);
+    await page.getByTestId('connect-auth-methods').getByRole('button').click();
+    const bearer = page.getByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled');
+    await expect(bearer).not.toBeChecked();
+    await expect(page.getByTestId('credentials-method-tab-bearer')).toHaveCount(0);
+
+    let releasePatch = (): void => undefined;
+    const patchGate = new Promise<void>((resolve) => {
+      releasePatch = resolve;
+    });
+    await page.route(`**/scim/admin/endpoints/${fixtureEndpointId}`, async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await patchGate;
+      }
+      await route.continue();
+    });
+
+    await bearer.click();
+    try {
+      await expect(page.getByTestId('credentials-method-tab-bearer')).toBeVisible();
+    } finally {
+      releasePatch();
+    }
+    await expect(bearer).toBeChecked();
+  });
+
   test('Settings shows method-managed effective state instead of the writable shadow flag', async ({ page }) => {
     fixtureEndpointId = await createFixtureEndpoint(page, {
       namePrefix: 'e2e-authoritative-settings',

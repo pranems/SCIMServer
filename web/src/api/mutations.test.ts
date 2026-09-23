@@ -26,6 +26,7 @@ import {
   useDeleteUser,
   useUpdateGroup,
   useDeleteGroup,
+  useUpdateSecuritySettings,
   queryKeys,
   type ScimListResponse,
 } from './queries';
@@ -111,7 +112,7 @@ function seedGroupList(qc: QueryClient, id: string, extra: Record<string, unknow
 // ─── useCreateCredential ─────────────────────────────────────────────
 
 describe('useCreateCredential', () => {
-  it('success: POSTs to the credential endpoint and invalidates overview', async () => {
+  it('success: POSTs to the credential endpoint and invalidates auth read models', async () => {
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useCreateCredential(EP_ID), { wrapper });
@@ -128,6 +129,25 @@ describe('useCreateCredential', () => {
     await waitFor(() => {
       const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
       expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.connectionInfo(EP_ID)));
+    });
+  });
+});
+
+describe('useUpdateSecuritySettings', () => {
+  it('invalidates all cached connection info and retained secrets', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateSecuritySettings(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ credentialSecretVisibility: 'once' });
+    });
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((call) => JSON.stringify(call[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.connectionInfoAll));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.connectionRevealsAll));
     });
   });
 });
@@ -202,7 +222,7 @@ describe('useDeleteCredential', () => {
 // ─── useUpdateEndpointConfig (optimistic) ────────────────────────────
 
 describe('useUpdateEndpointConfig', () => {
-  it('success: PATCHes and invalidates detail + overview', async () => {
+  it('success: PATCHes and invalidates detail, overview, and connection info', async () => {
     const { wrapper, queryClient } = createWrapper();
     queryClient.setQueryData<Partial<EndpointResponse>>(
       queryKeys.endpoints.detail(EP_ID),
@@ -221,6 +241,7 @@ describe('useUpdateEndpointConfig', () => {
       const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
       expect(keys).toContain(JSON.stringify(queryKeys.endpoints.detail(EP_ID)));
       expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.connectionInfo(EP_ID)));
     });
   });
 
@@ -281,7 +302,7 @@ describe('useUpdateEndpointConfig', () => {
         resourceTypes: [{ name: 'User' }],
         settings: {
           StrictSchemaValidation: true,
-          PerEndpointCredentialsEnabled: false,
+          SecretTokenBearerAuthEnabled: false,
           AllowAndCoerceBooleanStrings: true,
         },
       } as unknown as Record<string, unknown>,
@@ -309,7 +330,7 @@ describe('useUpdateEndpointConfig', () => {
         | Record<string, unknown>
         | undefined;
       expect(settings?.StrictSchemaValidation).toBe(false);
-      expect(settings?.PerEndpointCredentialsEnabled).toBe(false);
+      expect(settings?.SecretTokenBearerAuthEnabled).toBe(false);
       expect(settings?.AllowAndCoerceBooleanStrings).toBe(true);
     });
 
@@ -335,7 +356,7 @@ describe('useUpdateEndpointConfig', () => {
       recentActivity: [],
       configFlags: {
         StrictSchemaValidation: true,
-        PerEndpointCredentialsEnabled: false,
+        SecretTokenBearerAuthEnabled: false,
       },
       connectionInfo: SEED_CONNECTION_INFO,
     };
@@ -347,7 +368,7 @@ describe('useUpdateEndpointConfig', () => {
     let pending: Promise<unknown> | undefined;
     act(() => {
       pending = result.current.mutateAsync({
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: true } },
       });
     });
 
@@ -355,7 +376,7 @@ describe('useUpdateEndpointConfig', () => {
       const cached = queryClient.getQueryData<EndpointOverviewResponse>(
         queryKeys.endpoints.overview(EP_ID),
       );
-      expect(cached?.configFlags.PerEndpointCredentialsEnabled).toBe(true);
+      expect(cached?.configFlags.SecretTokenBearerAuthEnabled).toBe(true);
       expect(cached?.configFlags.StrictSchemaValidation).toBe(true);
     });
 

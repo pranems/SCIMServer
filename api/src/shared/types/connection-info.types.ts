@@ -16,7 +16,6 @@ export type ConnectionMethod = 'shared_secret' | 'bearer' | 'oauth_client' | 'wi
 export type ConnectionEnablementSource =
   | 'authentication-method'
   | 'dedicated-setting'
-  | 'legacy-setting'
   | 'default';
 
 /** How the UI should present the method's secret. */

@@ -1,8 +1,8 @@
 # Endpoint Lifecycle & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.25`
 
-> **Version:** 0.55.24 - **Updated:** June 3, 2026
+> **Version:** 0.55.25 - **Updated:** June 3, 2026
 > Quick-start recipes for common SCIMServer operations
 
 ---
@@ -39,7 +39,15 @@ curl -X POST http://localhost:8080/scim/admin/endpoints \
 curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"profile":{"settings":{"RequireIfMatch":true,"PerEndpointCredentialsEnabled":true}}}'
+  -d '{
+    "profile": {
+      "settings": {
+        "RequireIfMatch": true,
+        "SecretTokenBearerAuthEnabled": true,
+        "OAuthClientCredentialsAuthEnabled": true
+      }
+    }
+  }'
 ```
 
 ### 3. Use
@@ -49,7 +57,12 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 curl -X POST http://localhost:8080/scim/endpoints/{id}/Users \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/scim+json" \
-  -d '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"user@example.com"}'
+  -d '{
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:User"
+    ],
+    "userName": "user@example.com"
+  }'
 ```
 
 ### 4. Monitor
@@ -304,13 +317,19 @@ curl -X POST http://localhost:8080/scim/endpoints/{id}/Users/.search \
 
 ## Credential Management
 
-### Enable Per-Endpoint Credentials
+### Enable Per-Endpoint Bearer Credentials
 
 ```bash
 curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"profile":{"settings":{"PerEndpointCredentialsEnabled":true}}}'
+  -d '{
+    "profile": {
+      "settings": {
+        "SecretTokenBearerAuthEnabled": true
+      }
+    }
+  }'
 ```
 
 ### Create Credential

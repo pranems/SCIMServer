@@ -421,7 +421,7 @@ flowchart TD
     B -->|No| FAIL[401 Unauthorized]
     B -->|Yes| C{URL contains /endpoints/:uuid/?}
 
-    C -->|Yes| D{PerEndpointCredentialsEnabled?}
+    C -->|Yes| D{retired combined credential setting?}
     C -->|No| G
 
     D -->|Yes| E["Compare token vs bcrypt hashes<br/>(lazy-loaded, cached)"]

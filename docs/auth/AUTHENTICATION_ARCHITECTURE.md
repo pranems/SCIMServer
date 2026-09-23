@@ -85,7 +85,7 @@ So: **`provider` (code) -> `AuthenticationMethod` (activated config) -> holds a 
 |---|---|---|
 | JSON keys / API field names / TS fields | **`authenticationMethods`** (camelCase) | SCIM is camelCase (`authenticationSchemes`); repo JSON + `ProfileSettings` are camelCase ([endpoint-profile.types.ts](../../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) line 67) |
 | URL path segment | **`authentication/methods`** (kebab/lowercase) | REST convention |
-| TS type / class names | **`AuthenticationMethod`**, **`AuthenticationProvider`** (PascalCase) | repo style is spelled-out (`PerEndpointCredentialsEnabled`, not `...CredsEnabled`) |
+| TS type / class names | **`AuthenticationMethod`**, **`AuthenticationProvider`** (PascalCase) | repo style is spelled-out (`retired combined credential setting`, not `...CredsEnabled`) |
 | Prisma model (if promoted to a table) | **`AuthenticationMethod`** | repo Prisma is PascalCase |
 | Local variables, folder shorthand, prose | `auth` is fine | non-contractual; brevity helps |
 
@@ -301,7 +301,7 @@ flowchart TD
     A[Incoming request<br/>Authorization Bearer XYZ] --> B{Route is &#64;Public?}
     B -- yes --> Z[200 - skip auth]
     B -- no --> C{URL has /endpoints/uuid/ segment?}
-    C -- yes --> D{PerEndpointCredentialsEnabled<br/>flag on endpoint?}
+    C -- yes --> D{retired combined credential setting<br/>flag on endpoint?}
     C -- no --> F
     D -- true --> E[bcrypt.compare token vs<br/>active EndpointCredential hashes]
     D -- false --> F
@@ -341,7 +341,7 @@ Verified facts:
 
 | Fact | Source |
 |---|---|
-| `POST /admin/endpoints/:endpointId/credentials`, gated by `PerEndpointCredentialsEnabled` (ForbiddenException otherwise) | [admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts) `createCredential` |
+| `POST /admin/endpoints/:endpointId/credentials`, gated by `retired combined credential setting` (ForbiddenException otherwise) | [admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts) `createCredential` |
 | `credentialType` allowlist is `['bearer', 'oauth_client']`; DTO is `{label, credentialType, expiresAt}` only; the create path **always mints a bcrypt token** regardless of type (so `oauth_client` is *reserved but not implemented*) | same |
 | Plaintext token returned exactly once as `token` in the 201 body; only the bcrypt hash is stored | same |
 
@@ -423,7 +423,7 @@ The non-secret method config rides the endpoint **profile** (the existing JSONB 
 
 | Option | Pros | Cons | Verdict |
 |---|---|---|---|
-| **`endpoint.profile.authentication`** (inside) | inherits the profile's **snapshot isolation** (editing a preset never silently re-authorizes a live endpoint); **travels on export/import** (the PROD->DEV mirroring story); **preset-seedable**; matches where `PerEndpointCredentialsEnabled` already lives | profile object grows | **Recommended** |
+| **`endpoint.profile.authentication`** (inside) | inherits the profile's **snapshot isolation** (editing a preset never silently re-authorizes a live endpoint); **travels on export/import** (the PROD->DEV mirroring story); **preset-seedable**; matches where `retired combined credential setting` already lives | profile object grows | **Recommended** |
 | `endpoint.authentication` (sibling) | smaller profile | **breaks the snapshot guarantee** (two lifecycles to reason about); export/import must carry a second thing (portability regression); preset-seeding no longer covers auth | Avoid |
 
 Storage location and management surface are **independent decisions**: profile-embedded storage + a dedicated sub-resource management API (see [section 7.3](#73-c-admin-authentication-method-api)) is the combination. The PROPOSED shape:
@@ -448,16 +448,16 @@ The small `authentication` wrapper (vs a flat `authenticationMethods` array) is 
 
 > **Status.** DESIGN, operator-confirmed 2026-07-06 (naming Option B). Not yet implemented. Tracked as WI-11 in [CONNECTION_INFO_AND_ENTRA_SETUP.md section 3A](CONNECTION_INFO_AND_ENTRA_SETUP.md#3a-auth-method-enablement-flags-proposed-flag-split-family).
 
-Today one flag, `PerEndpointCredentialsEnabled`, gates BOTH the `bearer` and `oauth_client` credential types - at creation ([admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts)) AND on the resource-plane validation path ([endpoint-credential.authenticator.ts](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts), the W2.1 `EndpointCredentialAuthenticator`: flag off -> per-endpoint credentials are skipped and go inert). And there is no per-endpoint way to refuse the global `SCIM_SHARED_SECRET`. Both are addressed by splitting into one flag per method (which maps cleanly onto the per-method `AuthenticationProvider` model - one enable flag per active method type):
+Today one flag, `retired combined credential setting`, gates BOTH the `bearer` and `oauth_client` credential types - at creation ([admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts)) AND on the resource-plane validation path ([endpoint-credential.authenticator.ts](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts), the W2.1 `EndpointCredentialAuthenticator`: flag off -> per-endpoint credentials are skipped and go inert). And there is no per-endpoint way to refuse the global `SCIM_SHARED_SECRET`. Both are addressed by splitting into one flag per method (which maps cleanly onto the per-method `AuthenticationProvider` model - one enable flag per active method type):
 
 | Flag | Gates (create + validate) | Method / provider | Default (migration) |
 |---|---|---|---|
-| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` | `bearer` provider (Entra Secret Token) | = old `PerEndpointCredentialsEnabled` |
-| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` | `oauth-client` provider (Entra OAuth2 CC) | = old `PerEndpointCredentialsEnabled` |
+| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` | `bearer` provider (Entra Secret Token) | = old `retired combined credential setting` |
+| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` | `oauth-client` provider (Entra OAuth2 CC) | = old `retired combined credential setting` |
 | `WifCredentialsEnabled` (unchanged) | `wif` trust | `wif-7523` provider | unchanged |
 | `SharedSecretBearerAuthEnabled` (new) | whether this endpoint accepts the global `SCIM_SHARED_SECRET` (guard Tier-3) | `shared-secret` provider | `true` (back-compat) |
 
-Migration is value-preserving: for every endpoint set `SecretTokenBearerAuthEnabled` = `OAuthClientCredentialsAuthEnabled` = the old `PerEndpointCredentialsEnabled` value and `SharedSecretBearerAuthEnabled` = `true`; the guard reads the old flag as a one-release fallback, then it is retired. Each new flag lands with the full 10-cell config-flag matrix (`endpointConfigFlagAudit`). The operator chose Option B (retain `Auth` in the name) for explicitness, accepting the mild inconsistency with the existing `WifCredentialsEnabled`.
+Migration is value-preserving: for every endpoint set `SecretTokenBearerAuthEnabled` = `OAuthClientCredentialsAuthEnabled` = the old `retired combined credential setting` value and `SharedSecretBearerAuthEnabled` = `true`; the guard reads the old flag as a one-release fallback, then it is retired. Each new flag lands with the full 10-cell config-flag matrix (`endpointConfigFlagAudit`). The operator chose Option B (retain `Auth` in the name) for explicitness, accepting the mild inconsistency with the existing `WifCredentialsEnabled`.
 
 ### 5.4 WIF trust ergonomics (config-time discovery resolver + smart defaults)
 

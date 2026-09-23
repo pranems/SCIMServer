@@ -1,6 +1,6 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.25`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
@@ -86,7 +86,7 @@ The RFC 2.0 path variant `{baseUrl}/scim/v2/endpoints/{endpointId}/...` is also 
 
 | Header | Required | Notes |
 |--------|----------|-------|
-| `Authorization: Bearer <token>` | Yes | OAuth2 client-credentials JWT, global `SCIM_SHARED_SECRET`, or a per-endpoint bcrypt token when `PerEndpointCredentialsEnabled` is on |
+| `Authorization: Bearer <token>` | Yes | OAuth2 client-credentials JWT, global `SCIM_SHARED_SECRET`, or a per-endpoint token when `SecretTokenBearerAuthEnabled` is on |
 | `Content-Type: application/scim+json` | Recommended | `application/json` is also accepted |
 | `If-Match: W/"vN"` | Conditional | Optional by default; **required** when `RequireIfMatch` is on (missing -> 428). When present it is always validated (mismatch -> 412) |
 

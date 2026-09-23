@@ -31,7 +31,12 @@ describe('AdminCredentialController', () => {
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'test-endpoint',
-    profile: { settings: { PerEndpointCredentialsEnabled: true } },
+    profile: {
+      settings: {
+        SecretTokenBearerAuthEnabled: true,
+        OAuthClientCredentialsAuthEnabled: true,
+      },
+    },
     active: true,
     scimBasePath: '/scim/endpoints/11111111-1111-1111-1111-111111111111',
     createdAt: new Date().toISOString(),
@@ -145,10 +150,10 @@ describe('AdminCredentialController', () => {
       );
     });
 
-    it('should reject when PerEndpointCredentialsEnabled is false', async () => {
+    it('should reject when SecretTokenBearerAuthEnabled is false', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        profile: { settings: { PerEndpointCredentialsEnabled: false } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: false } },
       });
 
       await expect(
@@ -280,7 +285,7 @@ describe('AdminCredentialController', () => {
     it('allows a wif credential when only WifCredentialsEnabled is on', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        profile: { settings: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: false } },
+        profile: { settings: { WifCredentialsEnabled: true } },
       });
       mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
 
@@ -306,7 +311,7 @@ describe('AdminCredentialController', () => {
     it('rejects a wif credential when WifCredentialsEnabled is off', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        profile: { settings: { WifCredentialsEnabled: false, PerEndpointCredentialsEnabled: true } },
+        profile: { settings: { WifCredentialsEnabled: false } },
       });
 
       await expect(
@@ -328,10 +333,10 @@ describe('AdminCredentialController', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('still requires PerEndpointCredentialsEnabled for a bearer credential', async () => {
+    it('still requires SecretTokenBearerAuthEnabled for a bearer credential', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        profile: { settings: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: false } },
+        profile: { settings: { WifCredentialsEnabled: true, SecretTokenBearerAuthEnabled: false } },
       });
 
       await expect(
@@ -339,8 +344,8 @@ describe('AdminCredentialController', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    // ── WI-11 - per-method create gate ──────────────────────────────────────
-    it('WI-11: allows a bearer credential when SecretTokenBearerAuthEnabled is on (no legacy flag)', async () => {
+    // Per-method create gate.
+    it('allows a bearer credential when SecretTokenBearerAuthEnabled is on', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
         profile: { settings: { SecretTokenBearerAuthEnabled: true } },
@@ -350,7 +355,7 @@ describe('AdminCredentialController', () => {
       expect(result.credentialType).toBe('bearer');
     });
 
-    it('WI-11: allows an oauth_client credential when OAuthClientCredentialsAuthEnabled is on (no legacy flag)', async () => {
+    it('allows an oauth_client credential when OAuthClientCredentialsAuthEnabled is on', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
         profile: { settings: { OAuthClientCredentialsAuthEnabled: true } },
@@ -358,17 +363,6 @@ describe('AdminCredentialController', () => {
       mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: 'epc_x' } });
       const result = await controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' });
       expect(result.credentialType).toBe('oauth_client');
-    });
-
-    it('WI-11: value-preserving - legacy PerEndpointCredentialsEnabled=true still allows bearer + oauth_client', async () => {
-      mockEndpointService.getEndpoint.mockResolvedValue({
-        ...mockEndpoint,
-        profile: { settings: { PerEndpointCredentialsEnabled: true } },
-      });
-      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'bearer' });
-      await expect(controller.createCredential(mockEndpoint.id, { credentialType: 'bearer' })).resolves.toBeDefined();
-      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'oauth_client', metadata: { clientId: 'epc_y' } });
-      await expect(controller.createCredential(mockEndpoint.id, { credentialType: 'oauth_client' })).resolves.toBeDefined();
     });
 
     // P2 - per-type active-credential caps.
@@ -387,7 +381,13 @@ describe('AdminCredentialController', () => {
     describe('P2 - per-type active credential caps', () => {
       const settingsWith = (extra: Record<string, unknown>) => ({
         ...mockEndpoint,
-        profile: { settings: { PerEndpointCredentialsEnabled: true, ...extra } },
+        profile: {
+          settings: {
+            SecretTokenBearerAuthEnabled: true,
+            OAuthClientCredentialsAuthEnabled: true,
+            ...extra,
+          },
+        },
       });
       const activeOfType = (type: string, n: number) =>
         Array.from({ length: n }, (_, i) => ({ ...mockCredential, id: `c-${i}`, credentialType: type, active: true }));
@@ -1076,7 +1076,7 @@ describe('AdminCredentialController', () => {
     it('does NOT emit CREDENTIAL_CREATED when the endpoint config rejects the operation', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        profile: { settings: { PerEndpointCredentialsEnabled: false } },
+        profile: { settings: { SecretTokenBearerAuthEnabled: false } },
       });
 
       await expect(

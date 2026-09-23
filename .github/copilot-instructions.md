@@ -163,6 +163,8 @@ When working on development projects:
 - NEVER use em-dash (`-`, U+2014) anywhere in the codebase - not in code, comments, strings, docs, commit messages, changelogs, or any generated/edited file
 - Always use a single hyphen (`-`) where an em-dash would otherwise appear
 - This applies to ALL file types: `.ts`, `.js`, `.json`, `.md`, `.ps1`, `.yml`, `.html`, `.css`, `.mjs`, etc.
+- NEVER expose internal work-item, wave, or implementation-phase labels such as `WI-11`, `W2.5`, or `Phase E2` in user-facing UI copy, API messages, exported examples, or operator documentation. Describe the capability in product language instead. Internal labels may remain in code comments, test names, and historical engineering records.
+- `web/src/test/user-facing-copy.test.ts` and `api/src/security/user-facing-copy.spec.ts` enforce this rule for production UI/API string literals. Extend the gates when another user-facing surface is added.
 
 ## Doc Code-Block Formatting Rule (CRITICAL - added 2026-06-23)
 

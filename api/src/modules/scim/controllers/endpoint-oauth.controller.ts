@@ -203,7 +203,7 @@ export class EndpointOAuthController {
         if (!enabled) {
           this.logger.warn(
             LogCategory.OAUTH,
-            'W2.5 shadow: oauth_client method is disabled for this endpoint - minting anyway (shadow mode, not yet enforced)',
+            'oauth_client method is disabled for this endpoint - minting anyway because enforcement is currently observation-only',
             { endpointId, clientId },
           );
         }

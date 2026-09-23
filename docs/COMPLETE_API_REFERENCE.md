@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.25`
 
-> **Version:** 0.55.24 - **Updated:** 2026-09-18
+> **Version:** 0.55.25 - **Updated:** 2026-09-18
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **118 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 >
@@ -49,7 +49,7 @@ All requests (except public routes) are evaluated against 3 tiers in order:
 
 | Tier | Mechanism | Header | Details |
 |------|-----------|--------|---------|
-| 1 | Per-endpoint credential | `Authorization: Bearer scim_ep_...` | Bcrypt-hashed, scoped to endpoint. Requires `PerEndpointCredentialsEnabled: true` |
+| 1 | Per-endpoint credential | `Authorization: Bearer scim_ep_...` | Scoped to one endpoint. Requires `SecretTokenBearerAuthEnabled: true` for bearer tokens or `OAuthClientCredentialsAuthEnabled: true` for OAuth clients |
 | 2 | OAuth 2.0 JWT | `Authorization: Bearer eyJhbGci...` | JWT from `/scim/oauth/token`. Required for `/Me` |
 | 3 | Global shared secret | `Authorization: Bearer {SCIM_SHARED_SECRET}` | Set via env var. Required in production |
 
@@ -578,7 +578,7 @@ Authorization: Bearer changeme-scim
 > one (`DELETE`) frees a slot without deleting history. The caps bound the per-request bcrypt
 > comparison loop on the resource plane, which is why they are deliberately small.
 
-Requires `PerEndpointCredentialsEnabled: true` in endpoint settings.
+Requires the setting for the credential type: `SecretTokenBearerAuthEnabled: true`, `OAuthClientCredentialsAuthEnabled: true`, or `WifCredentialsEnabled: true`.
 
 ### POST /scim/admin/endpoints/:endpointId/credentials
 

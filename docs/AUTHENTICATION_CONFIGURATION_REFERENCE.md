@@ -117,10 +117,9 @@ The JWKS allowlist is an **SSRF control**: WIF verification fetches remote URLs,
 | `OAuthClientCredentialsAuthEnabled` | Creating and using `oauth_client` credentials |
 | `SharedSecretBearerAuthEnabled` | Whether this endpoint accepts the **global** `SCIM_SHARED_SECRET`. Defaults **true** for backward compatibility |
 | `WifCredentialsEnabled` | WIF trust creation and all three diagnostic routes |
-| `PerEndpointCredentialsEnabled` | Legacy combined switch, superseded by the two split flags above |
 | `CredentialSecretVisibility` | `always` or `once` - see section 6 |
 
-Resolution order for the per-method enablement is explicit ([endpoint-config.interface.ts L1040-1052](../api/src/modules/endpoint/endpoint-config.interface.ts)): an explicit entry in `profile.authentication.methods[]` wins, then the specific flag, then the legacy combined flag, then the default.
+Resolution order for per-method enablement is explicit: an entry in `profile.authentication.methods[]` wins, then the dedicated setting, then the default.
 
 **A practical consequence:** turning off every auth method on an endpoint makes its **data plane** return `401`, which is correct and configured. Its **admin** routes keep working, so you can always undo it.
 

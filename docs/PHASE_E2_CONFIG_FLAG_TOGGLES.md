@@ -100,7 +100,7 @@ Thirteen flags from [ProfileSettings](../api/src/modules/scim/endpoint-profile/e
 | PATCH semantics | `IncludeWarningAboutIgnoredReadOnlyAttribute` | false |
 | PATCH semantics | `IgnoreReadOnlyAttributesInPatch` | false |
 | Discovery / auth | `SchemaDiscoveryEnabled` | true |
-| Discovery / auth | `PerEndpointCredentialsEnabled` | false |
+| Discovery / auth | `retired combined credential setting` | false |
 
 Defaults mirror the documented behavior in [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) so the Switch state matches what the server actually does when the flag is absent.
 
@@ -122,7 +122,7 @@ Pre-E2 the optimistic update was a single shallow spread:
 qc.setQueryData(detailKey, { ...prev, ...body });
 ```
 
-For the displayName / description / active fields this works because they are top-level `EndpointResponse` properties. For `{ profile: { settings: { ... } } }` it is destructive: the entire `profile` object is replaced with a stub `{ settings: { <single-flag>: x } }`, losing schemas, resourceTypes, serviceProviderConfig, preset, and every sibling flag. The server-side response that lands on the next refetch corrects the cache, but in the interim every component reading `profile.schemas` (Schemas tab) or `profile.settings.PerEndpointCredentialsEnabled` (Credentials tab 403 banner) would see an empty / undefined value and visually break.
+For the displayName / description / active fields this works because they are top-level `EndpointResponse` properties. For `{ profile: { settings: { ... } } }` it is destructive: the entire `profile` object is replaced with a stub `{ settings: { <single-flag>: x } }`, losing schemas, resourceTypes, serviceProviderConfig, preset, and every sibling flag. The server-side response that lands on the next refetch corrects the cache, but in the interim every component reading `profile.schemas` (Schemas tab) or `profile.settings.retired combined credential setting` (Credentials tab 403 banner) would see an empty / undefined value and visually break.
 
 E2 replaces the spread with a focused two-cache deep-merge:
 

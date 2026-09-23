@@ -347,7 +347,8 @@ describe('Profile Configuration Combinations (E2E)', () => {
         RequireIfMatch: 'True',
         AllowAndCoerceBooleanStrings: 'True',
         ReprovisionOnConflictForSoftDeletedResource: 'True',
-        PerEndpointCredentialsEnabled: 'True',
+        SecretTokenBearerAuthEnabled: 'True',
+        OAuthClientCredentialsAuthEnabled: 'True',
       });
       const ep = await request(app.getHttpServer())
         .get(`/scim/admin/endpoints/${epId}`)

@@ -143,8 +143,8 @@ describe('SCIM Event SSE Bridge (E2E - Phase J v0.48.1)', () => {
     let endpointId: string;
 
     beforeAll(async () => {
-      // Create an endpoint with the rfc-standard preset, then PATCH
-      // PerEndpointCredentialsEnabled=True. This mirrors the
+      // Create an endpoint with the rfc-standard preset, then enable bearer
+      // credentials. This mirrors the
       // dashboard-overview E2E pattern; the create-time `profile`
       // path requires a fully-formed schemas/resourceTypes block, the
       // PATCH path can do a settings-only delta.
@@ -160,7 +160,7 @@ describe('SCIM Event SSE Bridge (E2E - Phase J v0.48.1)', () => {
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${endpointId}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ profile: { settings: { PerEndpointCredentialsEnabled: 'True' } } })
+        .send({ profile: { settings: { SecretTokenBearerAuthEnabled: 'True' } } })
         .expect(200);
     });
 

@@ -71,6 +71,7 @@ describe('ScimEventSseBridge - Phase J SSE forwarder', () => {
       { name: 'ENDPOINT_CREATED', payload: { endpointId: 'ep-new', name: 'tenantA' } },
       { name: 'ENDPOINT_UPDATED', payload: { endpointId: 'ep-1', name: 'tenantA' } },
       { name: 'ENDPOINT_DELETED', payload: { endpointId: 'ep-1', name: 'tenantA' } },
+      { name: 'SECURITY_SETTINGS_UPDATED', payload: { credentialSecretVisibility: 'once' } },
     ];
 
     test.each(cases)(

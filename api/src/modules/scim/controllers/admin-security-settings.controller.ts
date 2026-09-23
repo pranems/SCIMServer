@@ -12,6 +12,7 @@
  * (defense-in-depth; reveal already gates on the effective value).
  */
 import { BadRequestException, Body, Controller, Get, Put } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CredentialSecurityService } from '../../../security/credential-security.service';
 import { CredentialEncryptionService } from '../../../security/credential-encryption.service';
 import { ConnectionSecretResolverService } from '../services/connection-secret-resolver.service';
@@ -21,6 +22,7 @@ import {
   normalizeCredentialSecretVisibility,
   type CredentialSecretVisibility,
 } from '../../endpoint/endpoint-config.interface';
+import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface SecuritySettingsResponse {
   credentialSecretVisibility: CredentialSecretVisibility;
@@ -53,6 +55,7 @@ export class AdminSecuritySettingsController {
     private readonly credentialEncryption: CredentialEncryptionService,
     private readonly secretResolver: ConnectionSecretResolverService,
     private readonly logger: ScimLogger,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Get()
@@ -109,6 +112,9 @@ export class AdminSecuritySettingsController {
         `Purged ${cleared} retained credential secret(s) after server flip to "once".`,
       );
     }
+    this.eventEmitter.emit(SCIM_EVENTS.SECURITY_SETTINGS_UPDATED, {
+      credentialSecretVisibility: next,
+    });
     return {
       credentialSecretVisibility: next,
       kek: this.credentialEncryption.getKekStatus(),

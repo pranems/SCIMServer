@@ -3,7 +3,7 @@
  * extracted verbatim from the old `SharedSecretGuard.tryEndpointCredential`.
  *
  * Matches an opaque per-endpoint `bearer` / `oauth_client` secret (bcrypt at
- * rest) against the presented token, gated by the WI-11 per-method enablement
+ * rest) against the presented token, gated by the per-method enablement
  * flags. It NEVER reject-stops: a non-match is always `not-applicable` so the
  * guard falls through to OAuth/legacy. The X9 perf short-circuits (a JWT, or the
  * global shared secret, can never be a per-endpoint opaque secret) return
@@ -65,10 +65,7 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
     }
 
     try {
-      // WI-11 / W2.5 - per-method enablement resolved from the single source:
-      // an explicit `profile.authentication.methods[]` entry wins, else the flat
-      // flags (`SecretTokenBearerAuthEnabled` / `OAuthClientCredentialsAuthEnabled`,
-      // each falling back to the legacy `PerEndpointCredentialsEnabled`).
+      // An explicit authentication method entry wins over its dedicated setting.
       const endpoint = await this.endpointService.getEndpoint(endpointId);
       const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
       const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
@@ -106,7 +103,7 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
         // lookupKey is globally unique, so the row must be re-checked against the
         // endpoint being addressed - otherwise a token would authenticate anywhere.
         if (cred.endpointId !== endpointId) return na('keyed credential belongs to another endpoint');
-        if (cred.hashAlgo !== HASH_ALGO_HMAC_V1 || !cred.secretHash) return na('keyed credential has no P1 hash');
+        if (cred.hashAlgo !== HASH_ALGO_HMAC_V1 || !cred.secretHash) return na('keyed credential has no compatible hash');
         if (cred.credentialType === 'bearer' && !effective.secretTokenBearer) return na('bearer method not enabled');
         if (cred.credentialType === 'oauth_client' && !effective.oauthClientCredentials) return na('oauth_client method not enabled');
         if (!verifySecretHash(parsed.secret, cred.secretHash)) return na('keyed credential secret mismatch', 'fail');

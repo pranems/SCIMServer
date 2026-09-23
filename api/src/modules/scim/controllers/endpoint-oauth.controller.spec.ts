@@ -230,7 +230,7 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     expect(res.access_token).toBe('secret-path-token');
     // A shadow warning was logged (message is the 2nd arg to logger.warn).
     expect(
-      logger.warn.mock.calls.some((c: unknown[]) => String(c[1]).includes('W2.5 shadow')),
+      logger.warn.mock.calls.some((c: unknown[]) => String(c[1]).includes('enforcement is currently observation-only')),
     ).toBe(true);
     expect(endpointService.getEndpoint).toHaveBeenCalledWith(ENDPOINT_ID);
   });

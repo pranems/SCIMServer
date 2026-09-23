@@ -51,12 +51,13 @@ export const SUPPORTED_EVENT_TYPES = [
   'scim.endpoint.created',
   'scim.endpoint.updated',
   'scim.endpoint.deleted',
+  'scim.security.updated',
 ] as const;
 
 export type SupportedEventType = (typeof SUPPORTED_EVENT_TYPES)[number];
 
 /** Channel buckets the events feed into. */
-type Channel = 'users' | 'groups' | 'resources' | 'credentials' | 'endpoints';
+type Channel = 'users' | 'groups' | 'resources' | 'credentials' | 'endpoints' | 'security';
 
 /** Map every supported event type to its channel. */
 const EVENT_CHANNEL: Record<SupportedEventType, Channel> = {
@@ -73,6 +74,7 @@ const EVENT_CHANNEL: Record<SupportedEventType, Channel> = {
   'scim.endpoint.created': 'endpoints',
   'scim.endpoint.updated': 'endpoints',
   'scim.endpoint.deleted': 'endpoints',
+  'scim.security.updated': 'security',
 };
 
 /**
@@ -150,6 +152,8 @@ export function computeInvalidations(
       // the credential KPI card and the Credentials tab refetch.
       if (endpointId) {
         keys.push(queryKeys.endpoints.overview(endpointId));
+        keys.push(queryKeys.endpoints.connectionInfo(endpointId));
+        keys.push(queryKeys.endpoints.connectionReveals(endpointId));
       }
       break;
     case 'endpoints':
@@ -160,7 +164,13 @@ export function computeInvalidations(
         keys.push(queryKeys.endpoints.detail(endpointId));
         keys.push(queryKeys.endpoints.overview(endpointId));
         keys.push(queryKeys.endpoints.stats(endpointId));
+        keys.push(queryKeys.endpoints.connectionInfo(endpointId));
+        keys.push(queryKeys.endpoints.connectionReveals(endpointId));
       }
+      break;
+    case 'security':
+      keys.push(queryKeys.endpoints.connectionInfoAll);
+      keys.push(queryKeys.endpoints.connectionRevealsAll);
       break;
   }
 

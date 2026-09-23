@@ -220,7 +220,7 @@ test.describe('Credentials tab - OAuth2 client create (R7)', () => {
           stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
           credentials: [],
           recentActivity: [],
-          configFlags: { OAuthClientCredentialsAuthEnabled: true, PerEndpointCredentialsEnabled: true },
+          configFlags: { OAuthClientCredentialsAuthEnabled: true },
           connectionInfo: { endpointId: ID, displayName: 'R7 OAuth', urls: { scimBaseUrl: '', scimBaseUrlBare: '', tokenEndpoint: '', serviceProviderConfig: '', oauthMetadata: '' }, enabledMethods: [], disabledMethods: [] },
         }),
       });

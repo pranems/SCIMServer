@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
-import { ENDPOINT_CONFIG_FLAGS, validateEndpointConfig } from '../endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, normalizeCredentialSecretVisibility, parseBooleanValue, validateEndpointConfig } from '../endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
@@ -24,6 +24,7 @@ import {
 
 /** Callback type for profile change notifications (registry hydration) */
 export type ProfileChangeListener = (endpointId: string, profile: EndpointProfile | null) => void;
+export type CredentialSecretPurgeListener = (endpointId: string) => Promise<number>;
 
 // ─── Profile Summary Types ────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ export class EndpointService implements OnModuleInit {
 
   /** Callback for registry hydration on profile changes */
   private profileChangeListener?: ProfileChangeListener;
+  private credentialSecretPurgeListener?: CredentialSecretPurgeListener;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -187,6 +189,28 @@ export class EndpointService implements OnModuleInit {
    */
   setProfileChangeListener(listener: ProfileChangeListener): void {
     this.profileChangeListener = listener;
+  }
+
+  setCredentialSecretPurgeListener(listener: CredentialSecretPurgeListener): void {
+    this.credentialSecretPurgeListener = listener;
+  }
+
+  private async purgeRetainedSecretsIfRequested(
+    endpointId: string,
+    settings: Record<string, unknown> | undefined,
+  ): Promise<void> {
+    if (
+      normalizeCredentialSecretVisibility(settings?.CredentialSecretVisibility) !== 'once' ||
+      !this.credentialSecretPurgeListener
+    ) {
+      return;
+    }
+    const cleared = await this.credentialSecretPurgeListener(endpointId);
+    this.scimLogger.info(
+      LogCategory.AUTH,
+      `Purged ${cleared} retained credential secret(s) after endpoint flip to "once".`,
+      { endpointId },
+    );
   }
 
   /**
@@ -624,6 +648,10 @@ export class EndpointService implements OnModuleInit {
           updated.profile?.settings,
         );
       }
+      await this.purgeRetainedSecretsIfRequested(
+        endpointId,
+        dto.profile?.settings as Record<string, unknown> | undefined,
+      );
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
         endpointId, name: updated.name,
@@ -658,6 +686,7 @@ export class EndpointService implements OnModuleInit {
     if (dto.profile) {
       const currentProfile = (endpoint.profile as EndpointProfile | null) ?? undefined;
       profileUpdate = this.mergeProfilePartial(currentProfile, dto.profile);
+      this.normalizeStaleSettingsKeys(profileUpdate);
     }
 
     const dbUpdated = await this.prisma.endpoint.update({
@@ -685,6 +714,10 @@ export class EndpointService implements OnModuleInit {
         cached.profile?.settings,
       );
     }
+    await this.purgeRetainedSecretsIfRequested(
+      endpointId,
+      dto.profile?.settings as Record<string, unknown> | undefined,
+    );
     this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
@@ -705,7 +738,6 @@ export class EndpointService implements OnModuleInit {
    * a config-time auth event (mirroring the credential-lifecycle AUTH events).
    */
   private static readonly AUTH_AFFECTING_FLAGS: readonly string[] = [
-    ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
     ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
     ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_CREDENTIALS_AUTH_ENABLED,
     ENDPOINT_CONFIG_FLAGS.SHARED_SECRET_BEARER_AUTH_ENABLED,
@@ -1008,6 +1040,18 @@ export class EndpointService implements OnModuleInit {
       MultiOpPatchRequestAddMultipleMembersToGroup: 'MultiMemberPatchOpForGroupEnabled',
       MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'MultiMemberPatchOpForGroupEnabled',
     };
+    const legacyCredentialsEnabled = s.PerEndpointCredentialsEnabled;
+    if (legacyCredentialsEnabled !== undefined) {
+      const migratedValue = parseBooleanValue(legacyCredentialsEnabled) === undefined
+        ? false
+        : legacyCredentialsEnabled;
+      for (const key of ['SecretTokenBearerAuthEnabled', 'OAuthClientCredentialsAuthEnabled']) {
+        if (parseBooleanValue(s[key]) === undefined) {
+          s[key] = migratedValue;
+        }
+      }
+      delete s.PerEndpointCredentialsEnabled;
+    }
     // Retired with NO successor because the capability is derived, so there is
     // nothing to rename them to (settings-v8). Carrying a rename here would
     // recreate the two-sources-of-truth problem the derivation removed.

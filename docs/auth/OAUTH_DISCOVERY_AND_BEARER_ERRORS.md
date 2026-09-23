@@ -8,7 +8,7 @@ Every SCIM call is authorized by [shared-secret.guard.ts](../../api/src/modules/
 
 ```mermaid
 flowchart TD
-    A[SCIM request with Bearer token] --> B{URL has /endpoints/uuid/ AND<br/>PerEndpointCredentialsEnabled?}
+    A[SCIM request with Bearer token] --> B{URL has /endpoints/uuid/ AND<br/>retired combined credential setting?}
     B -- yes --> C[Tier 1: bcrypt.compare vs active EndpointCredential hashes]
     B -- no --> D
     C -- match --> OK1[200 authType=endpoint_credential]

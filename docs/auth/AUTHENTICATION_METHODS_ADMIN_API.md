@@ -1,6 +1,6 @@
 # Admin Authentication-Methods API + Orthogonal WIF Gate (A1)
 
-> **Historical A1 delivery report.** Step **A1** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)) added the management surface and original WIF credential gate. The model is now live and enforced. Current precedence is explicit method entry, dedicated setting, legacy setting, then default. See [AUTHENTICATION_METHODS_MODEL.md](AUTHENTICATION_METHODS_MODEL.md) and [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
+> **Historical A1 delivery report.** Step **A1** of the authentication build ([AUTHENTICATION_ARCHITECTURE.md section 13](AUTHENTICATION_ARCHITECTURE.md#13-step-by-step-execution-plan--estimates--dependencies), tracked in [EXECUTION_LEDGER.md](EXECUTION_LEDGER.md)) added the management surface and original WIF credential gate. The model is now live and enforced. Current precedence is explicit method entry, dedicated setting, then default. See [AUTHENTICATION_METHODS_MODEL.md](AUTHENTICATION_METHODS_MODEL.md) and [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
 ## What changed
 
@@ -26,7 +26,7 @@ A0 added the `profile.authentication.methods[]` data model but no way to manage 
 
 ## 2. `WifCredentialsEnabled` flag
 
-The 17th endpoint config flag ([endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts)), boolean, default `false`. It is the per-endpoint enabling switch for WIF, exactly like `PerEndpointCredentialsEnabled` is for the bcrypt bearer. Default-false means existing endpoints are untouched until an operator opts in. Documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](../ENDPOINT_CONFIG_FLAGS_REFERENCE.md#wifcredentialsenabled).
+The 17th endpoint config flag ([endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts)), boolean, default `false`. It is the per-endpoint enabling switch for WIF, exactly like `retired combined credential setting` is for the bcrypt bearer. Default-false means existing endpoints are untouched until an operator opts in. Documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](../ENDPOINT_CONFIG_FLAGS_REFERENCE.md#wifcredentialsenabled).
 
 > **10-cell matrix status.** A1 completes the backend cells (registry + default + validator + enforcement via the orthogonal gate + unit + E2E + live + doc). The two UI cells (a Switch in the endpoint config UI + its vitest) land with the Q6 CredentialsTab WIF section, since that is where the WIF UI lives.
 
@@ -40,13 +40,13 @@ flowchart TD
     T -->|wif| W{WifCredentialsEnabled?}
     W -->|yes| WOK[create wif credential - NO secret stored]
     W -->|no| F403a[403 Forbidden]
-    T -->|bearer / oauth_client| P{PerEndpointCredentialsEnabled?}
+    T -->|bearer / oauth_client| P{retired combined credential setting?}
     P -->|yes| POK[create - secret returned once]
     P -->|no| F403b[403 Forbidden]
 ```
 
-- `wif` is allowed when `WifCredentialsEnabled` is on, **independent** of `PerEndpointCredentialsEnabled`.
-- `bearer` / `oauth_client` still require `PerEndpointCredentialsEnabled`.
+- `wif` is allowed when `WifCredentialsEnabled` is on, **independent** of `retired combined credential setting`.
+- `bearer` / `oauth_client` still require `retired combined credential setting`.
 - The `wif` credential stores **only public trust values** (issuer/subject/audience/jwksUri/allowedTenantId/...) in `EndpointCredential.metadata`, with an empty `credentialHash`. The response carries no `token`/`clientSecret`/`credentialHash`/`secret` (asserted at every layer).
 
 ## Test coverage
@@ -54,6 +54,6 @@ flowchart TD
 | Layer | Test | Covers |
 |---|---|---|
 | Unit | [endpoint-config.interface.spec.ts](../../api/src/modules/endpoint/endpoint-config.interface.spec.ts) | `WifCredentialsEnabled` registered, default false, reads true |
-| Unit | [admin-credential.controller.spec.ts](../../api/src/modules/scim/controllers/admin-credential.controller.spec.ts) | orthogonal gate (wif allowed when only WifCredentialsEnabled; bearer still needs PerEndpointCredentialsEnabled); wif response no-secret |
+| Unit | [admin-credential.controller.spec.ts](../../api/src/modules/scim/controllers/admin-credential.controller.spec.ts) | orthogonal gate (wif allowed when only WifCredentialsEnabled; bearer still needs retired combined credential setting); wif response no-secret |
 | E2E | [admin-authentication-methods.e2e-spec.ts](../../api/test/e2e/admin-authentication-methods.e2e-spec.ts) | CRUD slice: empty -> add (secret-stripped) -> list -> unknown-type 400 -> delete -> 404 -> profile persistence |
 | Live | `scripts/live-test.ps1` section **9z-AQ** | CRUD + orthogonal gate (403 when off, allowed + no-secret when on) across all 3 form factors |

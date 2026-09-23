@@ -462,17 +462,17 @@ describe('Test Gap Audit #2 (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 7. PerEndpointCredentials + RequireIfMatch combo
+  // 7. Bearer credentials + RequireIfMatch combo
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('PerEndpointCredentials + RequireIfMatch combo', () => {
+  describe('Bearer credentials + RequireIfMatch combo', () => {
     let endpointId: string;
     let basePath: string;
     let credentialSecret: string;
 
     beforeAll(async () => {
       endpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: 'True',
+        SecretTokenBearerAuthEnabled: 'True',
         RequireIfMatch: 'True',
       });
       basePath = scimBasePath(endpointId);

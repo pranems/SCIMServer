@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.25`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -376,21 +376,21 @@ SCIMServer implements a 3-tier authentication chain. Each request is evaluated a
 
 ```mermaid
 flowchart TD
-    A[Incoming Request] --> B{Public route?}
+  A["Incoming request"] --> B{"Public route?"}
     B -->|Yes| Z[Allow]
-    B -->|No| C{URL has /endpoints/uuid/?}
-    C -->|Yes| D{PerEndpointCredentialsEnabled?}
-    D -->|Yes| E[Compare Bearer token<br>against bcrypt hashes]
+  B -->|No| C{"URL has /endpoints/uuid/?"}
+  C -->|Yes| D{"Bearer or OAuth method enabled?"}
+  D -->|Yes| E["Verify keyed token or legacy bcrypt hash"]
     E -->|Match| Z
     E -->|No match| F
     D -->|No| F
     C -->|No| F
-    F{Token != shared secret?} -->|Yes| G[Validate as OAuth JWT]
+    F{"Token != shared secret?"} -->|Yes| G["Validate as OAuth JWT"]
     G -->|Valid| Z
     G -->|Invalid| H
     F -->|No| H
-    H{Token == SCIM_SHARED_SECRET?} -->|Yes| Z
-    H -->|No| I[401 Unauthorized<br>WWW-Authenticate: Bearer]
+    H{"Token == SCIM_SHARED_SECRET?"} -->|Yes| Z
+    H -->|No| I["401 Unauthorized<br/>WWW-Authenticate: Bearer"]
 ```
 
 ### Tier 1 - Per-Endpoint Credentials (Scoped)
@@ -400,7 +400,10 @@ flowchart TD
 curl -X POST http://localhost:8080/scim/admin/endpoints/{id}/credentials \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"label": "entra-prod", "credentialType": "bearer"}'
+  -d '{
+    "label": "entra-prod",
+    "credentialType": "bearer"
+  }'
 
 # Response includes one-time plaintext token
 # {"id":"...","token":"scim_ep_a1b2c3...","credentialType":"bearer",...}
@@ -410,8 +413,8 @@ curl http://localhost:8080/scim/endpoints/{id}/Users \
   -H "Authorization: Bearer scim_ep_a1b2c3..."
 ```
 
-- Tokens are bcrypt-hashed at rest (plaintext returned only at creation)
-- Requires `PerEndpointCredentialsEnabled: true` in endpoint settings
+- Current tokens use keyed HMAC verification; pre-migration bcrypt tokens remain valid
+- Requires `SecretTokenBearerAuthEnabled: true` in endpoint settings
 - Supports optional `expiresAt` for time-limited tokens
 
 ### Tier 2 - OAuth 2.0 Client Credentials
@@ -659,7 +662,10 @@ Each endpoint has behavioral settings configured via `profile.settings`:
 | `VerbosePatchSupported` | boolean | `false` | Enable dot-notation PATCH paths (e.g., `name.givenName`) |
 | `SchemaDiscoveryEnabled` | boolean | `true` | Endpoint-scoped discovery endpoints respond (vs 404) |
 | `RequireIfMatch` | boolean | `false` | Mandate ETag `If-Match` on PUT/PATCH/DELETE |
-| `PerEndpointCredentialsEnabled` | boolean | `false` | Enable per-endpoint bcrypt bearer tokens |
+| `SecretTokenBearerAuthEnabled` | boolean | `false` | Enable per-endpoint bearer tokens |
+| `OAuthClientCredentialsAuthEnabled` | boolean | `false` | Enable per-endpoint OAuth clients |
+| `WifCredentialsEnabled` | boolean | `false` | Enable workload identity federation |
+| `SharedSecretBearerAuthEnabled` | boolean | `true` | Accept the server-global shared secret on this endpoint |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | boolean | `false` | Emit warning when stripping readOnly attributes |
 | `IgnoreReadOnlyAttributesInPatch` | boolean | `false` | Strip readOnly PATCH ops silently instead of 400 |
 | `PrimaryEnforcement` | string | `passthrough` | Primary sub-attribute handling: `normalize`, `reject`, or `passthrough` |

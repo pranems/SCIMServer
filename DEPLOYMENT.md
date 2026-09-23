@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.25`
 
 > Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
 
@@ -334,7 +334,7 @@ SCIMServer uses a **3-tier authentication fallback chain** via `SharedSecretGuar
 
 | Tier | Method | Env / Config Requirement | `req.authType` |
 |------|--------|--------------------------|----------------|
-| 1 | **Per-endpoint bcrypt credential** | `PerEndpointCredentialsEnabled` = `true` on endpoint + active credential created via Admin API | `endpoint_credential` |
+| 1 | **Per-endpoint credential** | Credential type's dedicated setting is enabled + active credential created via Admin API | `endpoint_credential` |
 | 2 | **OAuth 2.0 JWT** | `JWT_SECRET`, `OAUTH_CLIENT_SECRET`, `OAUTH_CLIENT_ID` | `oauth` |
 | 3 | **Global shared secret** | `SCIM_SHARED_SECRET` | `legacy` |
 
@@ -343,7 +343,7 @@ SCIMServer uses a **3-tier authentication fallback chain** via `SharedSecretGuar
 
 #### Per-Endpoint Credential Management (optional)
 
-Enable the `PerEndpointCredentialsEnabled` flag on an endpoint to allow credential CRUD:
+Enable `SecretTokenBearerAuthEnabled` for bearer credentials or `OAuthClientCredentialsAuthEnabled` for OAuth clients before creating credentials:
 
 ```powershell
 # Create credential (returns plaintext token ONCE - store it securely)

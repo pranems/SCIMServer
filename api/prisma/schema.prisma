@@ -142,7 +142,7 @@ model ResourceMember {
 // Phase 11 - Per-endpoint credentials
 //
 // Stores bcrypt-hashed bearer tokens or OAuth client credentials scoped to a
-// specific endpoint. When the `PerEndpointCredentialsEnabled` config flag is
+  // specific endpoint. When the dedicated bearer or OAuth config flag is
 // true for an endpoint, the SharedSecretGuard will validate incoming tokens
 // against this table instead of (or in addition to) the global shared secret.
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -114,9 +114,9 @@ This pattern mirrors GitHub PAT, Stripe API key, and Azure SAS URL UX - users ar
 
 ## 5. 403 Handling
 
-The backend rejects credential creation with **403 Forbidden** when `PerEndpointCredentialsEnabled=False` on the endpoint's profile settings. The tab surfaces this proactively:
+The backend rejects credential creation with **403 Forbidden** when `retired combined credential setting=False` on the endpoint's profile settings. The tab surfaces this proactively:
 
-- The flag value is read from `data.configFlags.PerEndpointCredentialsEnabled` (already in the BFF response)
+- The flag value is read from `data.configFlags.retired combined credential setting` (already in the BFF response)
 - When `false` or missing, a `MessageBar` warning explains the requirement and links to the Settings tab
 - The Add button is **disabled** so users don't waste a round trip
 
@@ -189,4 +189,4 @@ Backend: zero changes. The credential controller and mutation hooks already ship
 - [PHASE_B_BFF_OVERVIEW_AND_SSE.md](PHASE_B_BFF_OVERVIEW_AND_SSE.md) - BFF endpoint that returns credentials
 - [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) - Backend credential model + 3-tier auth
 - [UI_REDESIGN_REMAINING_GAPS_PLAN.md](UI_REDESIGN_REMAINING_GAPS_PLAN.md) S8.1 - parent spec
-- [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - PerEndpointCredentialsEnabled flag reference
+- [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - retired combined credential setting flag reference

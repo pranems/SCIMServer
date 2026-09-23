@@ -175,7 +175,7 @@ For every flag in [endpoint-config.interface.ts](../api/src/modules/endpoint/end
 | `IgnoreReadOnlyAttributesInPatch` | No | No | Yes | PATCH a known readOnly attr. |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | No | Partial | Yes | Warning extension URN may appear in read-after-write. |
 | `SchemaDiscoveryEnabled` | Yes | n/a | n/a | 404 on `/Schemas`. |
-| `PerEndpointCredentialsEnabled` | No | No | No | Server-internal; not externally observable. |
+| `retired combined credential setting` | No | No | No | Server-internal; not externally observable. |
 | `logLevel`, `logFileEnabled` | No | No | No | Server-internal; not externally observable. |
 | ETag scheme (timestamp vs `W/"vN"`) | Partial | Yes | n/a | Header sniff on any GET. |
 | Filter operator support beyond `filter.supported` | No (RFC says boolean only) | Yes | n/a | Try each operator; observe `invalidFilter`. |

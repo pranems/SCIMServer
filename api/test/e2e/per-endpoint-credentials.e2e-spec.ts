@@ -41,7 +41,7 @@ describe('Per-Endpoint Credentials (E2E)', () => {
 
     beforeAll(async () => {
       endpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: true,
+        SecretTokenBearerAuthEnabled: true,
       });
     });
 
@@ -109,7 +109,7 @@ describe('Per-Endpoint Credentials (E2E)', () => {
 
     it('should reject credential creation when flag is disabled', async () => {
       const disabledEndpoint = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: false,
+        SecretTokenBearerAuthEnabled: false,
       });
 
       await request(app.getHttpServer())
@@ -146,9 +146,9 @@ describe('Per-Endpoint Credentials (E2E)', () => {
     let perEndpointToken: string;
 
     beforeAll(async () => {
-      // Create endpoint with per-endpoint credentials enabled
+      // Create endpoint with per-endpoint bearer credentials enabled.
       endpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: true,
+        SecretTokenBearerAuthEnabled: true,
       });
 
       // Create a per-endpoint credential
@@ -328,7 +328,7 @@ describe('Per-Endpoint Credentials (E2E)', () => {
 
     beforeAll(async () => {
       disabledEndpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: false,
+        SecretTokenBearerAuthEnabled: false,
       });
     });
 
@@ -360,7 +360,7 @@ describe('Per-Endpoint Credentials (E2E)', () => {
 
     beforeAll(async () => {
       endpointId = await createEndpointWithConfig(app, token, {
-        PerEndpointCredentialsEnabled: true,
+        SecretTokenBearerAuthEnabled: true,
       });
     });
 
@@ -421,14 +421,18 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(403);
     });
 
-    it('value-preserving: legacy PerEndpointCredentialsEnabled=true still allows bearer create', async () => {
-      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+    it('rejects new writes using the retired umbrella setting', async () => {
+      const ep = await createEndpointWithConfig(app, token, {});
       await request(app.getHttpServer())
-        .post(`/scim/admin/endpoints/${ep}/credentials`)
+        .patch(`/scim/admin/endpoints/${ep}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ credentialType: 'bearer', label: 'wi11-legacy' })
-        .expect(201);
+        .send({ profile: { settings: { PerEndpointCredentialsEnabled: true } } })
+        .expect(400)
+        .expect((response) => {
+          expect(response.body.detail).toContain('SecretTokenBearerAuthEnabled');
+          expect(response.body.detail).toContain('OAuthClientCredentialsAuthEnabled');
+        });
     });
 
     it('an endpoint with SharedSecretBearerAuthEnabled=false REFUSES the global shared secret', async () => {
@@ -504,8 +508,8 @@ describe('Per-Endpoint Credentials (E2E)', () => {
   // ───────── W2.5 - per-method enablement co-location (profile.authentication.methods[]) ─────────
   describe('W2.5 - per-method enablement co-location', () => {
     it('resource-guard honors a bearer method enabled:false even though the flat flag enables it (disabled-with-credential)', async () => {
-      // Flat flag ON -> bearer creds allowed + authenticate today.
-      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+      // Dedicated flag ON -> bearer creds are allowed and authenticate.
+      const ep = await createEndpointWithConfig(app, token, { SecretTokenBearerAuthEnabled: true });
       const credRes = await request(app.getHttpServer())
         .post(`/scim/admin/endpoints/${ep}/credentials`)
         .set('Authorization', `Bearer ${token}`)
@@ -537,8 +541,8 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(401);
     });
 
-    it('value-preserving: an endpoint with NO method entries still authenticates via the flat flag', async () => {
-      const ep = await createEndpointWithConfig(app, token, { PerEndpointCredentialsEnabled: true });
+    it('an endpoint with no method entries still authenticates via the dedicated setting', async () => {
+      const ep = await createEndpointWithConfig(app, token, { SecretTokenBearerAuthEnabled: true });
       const credRes = await request(app.getHttpServer())
         .post(`/scim/admin/endpoints/${ep}/credentials`)
         .set('Authorization', `Bearer ${token}`)

@@ -254,8 +254,8 @@ flowchart LR
 
 | Effective flag | Source (first wins) | Default |
 |---|---|---|
-| `secretTokenBearer` | `SecretTokenBearerAuthEnabled` -> legacy `PerEndpointCredentialsEnabled` | false |
-| `oauthClientCredentials` | `OAuthClientCredentialsAuthEnabled` -> legacy `PerEndpointCredentialsEnabled` | false |
+| `secretTokenBearer` | `SecretTokenBearerAuthEnabled` -> legacy `retired combined credential setting` | false |
+| `oauthClientCredentials` | `OAuthClientCredentialsAuthEnabled` -> legacy `retired combined credential setting` | false |
 | `sharedSecretBearer` | `SharedSecretBearerAuthEnabled` | **true** (back-compat) |
 
 Plus: **WIF has no enablement flag at all** - a WIF trust is "active" iff an active
@@ -287,7 +287,7 @@ ACTIVE     = ENABLED AND HAS_CRED   (the method actually works)
 - **Both planes consult it** (fixes 7.1's asymmetry): the resource-plane authenticator's
   `isEnabled()` AND the mint-plane provider's eligibility read the SAME per-method
   `enabled` + `HAS_CRED`. Metadata (W0.3) reads it too. Advertised == enforced == minted.
-- **Retire `PerEndpointCredentialsEnabled`** after a value-preserving migration that
+- **Retire `retired combined credential setting`** after a value-preserving migration that
   materializes each endpoint's effective per-method value.
 
 ### 7.3 How settings/configurability work for the operator after

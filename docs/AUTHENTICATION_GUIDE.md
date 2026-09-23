@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.24`
+> **Status:** Living reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.25`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -75,7 +75,7 @@ flowchart TD
 | **OAuth client credentials** | `OAuthClientCredentialsAuthEnabled` | exchange client id + secret for an `access_token` | token 1 hour, secret until rotated |
 | **Workload Identity Federation** | `WifCredentialsEnabled` | RFC 7523 `jwt-bearer` assertion | assertion about 1 hour, **no stored secret** |
 
-> `PerEndpointCredentialsEnabled` is a legacy compatibility fallback, not a fifth method. Bearer and OAuth2 fall back to it when their dedicated setting is absent. It is shown under Endpoint Settings -> Legacy compatibility, not in the Connect method selector.
+The bearer and OAuth2 methods are enabled independently. Both dedicated settings default to off.
 
 An explicit `profile.authentication.methods[]` entry is authoritative for all four methods, including WIF. When such an entry exists, Connect and Endpoint Settings show its effective state and disable the lower-precedence flat switch. Change the method entry from Connect instead. For WIF, any enabled `wif-7523` or `wif-8693` entry enables the method; WIF is disabled only when all declared WIF entries are disabled.
 
@@ -877,9 +877,8 @@ one.
 | Setting | Default | Governs |
 |---|---|---|
 | `SharedSecretBearerAuthEnabled` | on | the global shared secret on this endpoint |
-| `SecretTokenBearerAuthEnabled` | falls back to `PerEndpointCredentialsEnabled` | per-endpoint bearer tokens |
-| `OAuthClientCredentialsAuthEnabled` | falls back to `PerEndpointCredentialsEnabled` | `oauth_client` credentials |
-| `PerEndpointCredentialsEnabled` | off | legacy master switch for the two above |
+| `SecretTokenBearerAuthEnabled` | off | per-endpoint bearer tokens |
+| `OAuthClientCredentialsAuthEnabled` | off | `oauth_client` credentials |
 | `WifCredentialsEnabled` | off | federated assertions and WIF scheme advertisement |
 | `CredentialSecretVisibility` | `once` | whether the UI keeps a secret on screen |
 | `PersistRequestSecrets` | on | whether request logs retain secret-bearing values |

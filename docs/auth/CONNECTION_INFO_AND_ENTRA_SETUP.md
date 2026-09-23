@@ -182,43 +182,38 @@ The per-endpoint metadata body (note: `jwks_uri` points at the SHARED global key
 | # | Combination | SCIMServer feature | Secret lives where | Entra auth method |
 |---|---|---|---|---|
 | 1 | Global shared-secret bearer | `SCIM_SHARED_SECRET` env | server env (one global value) | Secret Token |
-| 2 | Per-endpoint bearer | `bearer` credential ([G11](G11_PER_ENDPOINT_CREDENTIALS.md)) gated by `PerEndpointCredentialsEnabled` | bcrypt hash; plaintext shown once | Secret Token |
-| 3 | Per-endpoint OAuth client-credentials | `oauth_client` credential ([Q1](PER_ENDPOINT_OAUTH_CLIENT.md)) gated by `PerEndpointCredentialsEnabled` | bcrypt hash of secret; `clientId` public | OAuth2 client-credentials |
+| 2 | Per-endpoint bearer | `bearer` credential ([G11](G11_PER_ENDPOINT_CREDENTIALS.md)) gated by `SecretTokenBearerAuthEnabled` | keyed HMAC; plaintext shown once | Secret Token |
+| 3 | Per-endpoint OAuth client-credentials | `oauth_client` credential ([Q1](PER_ENDPOINT_OAUTH_CLIENT.md)) gated by `OAuthClientCredentialsAuthEnabled` | keyed HMAC of secret; `clientId` public | OAuth2 client-credentials |
 | 4 | Workload Identity Federation (WIF) | `wif` trust ([Q6](WIF_Q6_VALIDATE_ISSUE_UI.md)) gated by `WifCredentialsEnabled` | no secret stored (public trust only) | OAuth2 client-credentials (assertion) |
 
 Combinations 1 and 2 use Entra's Secret Token field. Combinations 3 and 4 use Entra's OAuth2 client-credentials flow (Tenant URL + Token Endpoint + Client Id + Client Secret), but combination 4 replaces the static client secret with a freshly-signed JWT assertion that SCIMServer validates and exchanges for its own token.
 
-> **Flag note.** Today a single `PerEndpointCredentialsEnabled` flag gates BOTH combination 2 (bearer) and combination 3 (oauth_client), for creation AND the resource-plane validation path. A proposed split into clearer per-method flags is [3A](#3a-auth-method-enablement-flags-proposed-flag-split-family) ([WI-11](#11a-work-items-delivery-backlog)). The flag names in the combination tables below reflect the CURRENT shipped gate.
-
 ---
 
-## 3A. Auth-method enablement flags (proposed flag-split family)
+## 3A. Auth-method enablement flags
 
-> **Status.** DONE (2026-07-06, [endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts) `getEffectiveAuthEnablement`). Shipped as the three flags below with a value-preserving fallback to the legacy `PerEndpointCredentialsEnabled`. - [WI-11](#11a-work-items-delivery-backlog).
+> **Status.** Shipped. [endpoint-config.interface.ts](../../api/src/modules/endpoint/endpoint-config.interface.ts) resolves each method from its method entry, dedicated setting, or default.
 
 ### 3A.1 The problem with today's single flag
 
-Verified against the shipped code: `PerEndpointCredentialsEnabled` is doing double duty and there is a gap.
+Bearer, OAuth client credentials, WIF, and the global shared secret are independent methods. Each needs an independent enablement source so creation, validation, discovery, and UI state cannot drift.
 
-- It gates **both** the `bearer` and the `oauth_client` credential type - at **creation** ([admin-credential.controller.ts](../../api/src/modules/scim/controllers/admin-credential.controller.ts)) AND on the **resource-plane validation path** ([endpoint-credential.authenticator.ts](../../api/src/modules/auth/authenticators/endpoint-credential.authenticator.ts), the W2.1 `EndpointCredentialAuthenticator`: if the flag is off, existing per-endpoint credentials are skipped entirely and go inert).
-- There is **no per-endpoint way to refuse the global `SCIM_SHARED_SECRET`** - every endpoint always accepts it via the guard's Tier-3 legacy branch. That is a real gap for an operator who wants an endpoint to accept ONLY its own credentials.
-
-### 3A.2 The proposed four-flag family
+### 3A.2 The four-setting family
 
 One flag per auth method, so each can be toggled independently (create + validate). All are per-endpoint `profile.settings` booleans, same mechanism as `WifCredentialsEnabled`.
 
 | Flag | Gates (create + validate) | Entra method | Default (migration) |
 |---|---|---|---|
-| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` | Secret Token | = old `PerEndpointCredentialsEnabled` |
-| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` | OAuth2 client-credentials | = old `PerEndpointCredentialsEnabled` |
+| `SecretTokenBearerAuthEnabled` | per-endpoint `bearer` | Secret Token | `false` |
+| `OAuthClientCredentialsAuthEnabled` | per-endpoint `oauth_client` | OAuth2 client-credentials | `false` |
 | `WifCredentialsEnabled` (unchanged) | `wif` trust | OAuth2 client-credentials (assertion) | unchanged |
 | `SharedSecretBearerAuthEnabled` (new) | whether this endpoint accepts the global `SCIM_SHARED_SECRET` | Secret Token (global) | `true` (back-compat) |
 
-> **Naming note (operator decision).** The operator chose **Option B** - keep `Auth` in the name (`SecretTokenBearerAuthEnabled`). This is slightly inconsistent with the existing `WifCredentialsEnabled` / `PerEndpointCredentialsEnabled` (which have no `Auth`), and that mild inconsistency was accepted deliberately for the explicitness of `...BearerAuthEnabled`. `SecretTokenBearer` bridges both vocabularies: `Secret Token` is Entra's exact UI field label, `Bearer` is the RFC 6750 type, and pairing them disambiguates from the OAuth *client* secret (which is not a bearer - it is exchanged at the token endpoint).
+`SecretTokenBearer` bridges both vocabularies: `Secret Token` is Entra's UI field label and `Bearer` is the RFC 6750 type, which disambiguates it from the OAuth client secret.
 
 ### 3A.3 Value-preserving migration
 
-For every existing endpoint: set `SecretTokenBearerAuthEnabled` = `OAuthClientCredentialsAuthEnabled` = the old `PerEndpointCredentialsEnabled` value, and `SharedSecretBearerAuthEnabled` = `true`. The guard reads the OLD flag as a fallback for ONE release, then it is retired. This keeps every current endpoint's behavior byte-for-byte identical. Each new flag lands with the full 10-cell config-flag matrix (`endpointConfigFlagAudit`): registry + default + validator + enforcement + unit/E2E/live tests + doc + UI Switch + UI test.
+The persisted-profile migration copies the former combined value into each missing dedicated bearer/OAuth setting, preserves any explicit dedicated value, and removes the combined setting. This keeps existing endpoint behavior unchanged while leaving one setting per method.
 
 ---
 
@@ -295,13 +290,13 @@ Content-Type: application/scim+json
 
 ### 5.2 Combination 2 - per-endpoint bearer
 
-A per-endpoint bcrypt-hashed bearer token. Each endpoint gets its own token without sharing the global secret. Requires `PerEndpointCredentialsEnabled=True`.
+A per-endpoint bearer token. Each endpoint gets its own token without sharing the global secret. Requires `SecretTokenBearerAuthEnabled=True`.
 
 **Endpoint config (in `endpoint.profile.settings`):**
 
 ```json
 {
-  "PerEndpointCredentialsEnabled": "True"
+  "SecretTokenBearerAuthEnabled": "True"
 }
 ```
 
@@ -359,7 +354,7 @@ Accept: application/scim+json
 
 ### 5.3 Combination 3 - per-endpoint OAuth client-credentials
 
-A per-endpoint `client_id` + `client_secret` pair. Entra exchanges them at the per-endpoint token endpoint for a short-lived, endpoint-scoped access token, then uses that token as a bearer on SCIM calls. This is the Entra-gallery-required model and the exact four-field example from the request. Requires `PerEndpointCredentialsEnabled=True`.
+A per-endpoint `client_id` + `client_secret` pair. Entra exchanges them at the per-endpoint token endpoint for a short-lived, endpoint-scoped access token, then uses that token as a bearer on SCIM calls. This is the Entra-gallery-required model and the exact four-field example from the request. Requires `OAuthClientCredentialsAuthEnabled=True`.
 
 > **Smart defaults ([WI-14](#11a-work-items-delivery-backlog)).** The create body below may OMIT the id/secret: the default `client_id` is the **endpointId** (public, predictable, no lookup needed) and the default `client_secret` is a server-generated value shown once. The caller MAY still provide either. See [5C.4](#5c4-oauth-client-smart-defaults). The example below shows the explicit form.
 
@@ -1172,8 +1167,8 @@ Accept: application/json
   "disabledMethods": [
     {
       "method": "bearer",
-      "reason": "PerEndpointCredentialsEnabled is not set",
-      "enableHint": "Set PerEndpointCredentialsEnabled=True in endpoint Settings"
+      "reason": "SecretTokenBearerAuthEnabled is not set",
+      "enableHint": "Enable per-endpoint bearer authentication in endpoint Settings"
     }
   ]
 }
@@ -1596,7 +1591,7 @@ One epic, sequenced into independently-shippable items. Sizes are relative (S/M/
 | WI-8 | Reveal endpoint + audit log | M | WI-6, WI-7 | **DONE (2026-07-07).** `POST .../reveal` admin-only, gated by the effective setting, `LogCategory.AUTH` audit each attempt; old/once credentials return non-error `{retained:false, reason}`. New `AdminSecuritySettingsController` `GET/PUT /admin/settings/security` (server ceiling + KEK status). UI: CredentialsTab reveal button + dialog + SettingsPage security card. See [6A.7](#6a7-api-surface-proposed). |
 | WI-9 | One-click rotate | M | WI-2 (WI-6 optional) | **DONE (2026-07-07).** `POST .../rotate` mints a new secret (shown once, retained if allowed), deactivates the old; `oauth_client` keeps its `client_id`; `wif` rejected; the lost-secret recovery path. UI: CredentialsTab rotate button + dialog. |
 | WI-10 | Docs / INDEX / CHANGELOG / session + KEK deployment docs | S | ships with each item | Fold KEK operator guide into DEPLOYMENT.md + README env table + docker-compose when WI-6 lands. |
-| WI-11 | Split `PerEndpointCredentialsEnabled` into the per-method flag family | M | none | **DONE (2026-07-06).** `SecretTokenBearerAuthEnabled` + `OAuthClientCredentialsAuthEnabled` + new `SharedSecretBearerAuthEnabled`; `getEffectiveAuthEnablement` value-preserving fallback to the legacy flag; wired into create-gate + guard; 3 SettingsTab Switches. See [3A](#3a-auth-method-enablement-flags-proposed-flag-split-family). |
+| Auth setting split | Use one setting per authentication method | M | none | **DONE.** `SecretTokenBearerAuthEnabled`, `OAuthClientCredentialsAuthEnabled`, and `SharedSecretBearerAuthEnabled` are wired into the create gate, guard, Settings, and Connect. See [3A](#3a-auth-method-enablement-flags). |
 | WI-12 | Per-endpoint OAuth AS metadata (RFC 8414) | S | none | **DONE (2026-07-06).** `GET /scim/endpoints/{id}/.well-known/oauth-authorization-server` (append form, Option B) advertising the per-endpoint `token_endpoint` + shared `jwks_uri`; `issuer` equals the bare per-endpoint identifier. UI: return-box metadata URL row. See [2.4](#24-per-endpoint-oauth-as-metadata-url-options-norm-decision). |
 | WI-13 | WIF trust field claim-name aliases + per-field examples/hints | S | none | **DONE (2026-07-06).** Accepts `iss`/`sub`/`aud`/`tid`/`roles` as INPUT aliases + `expectedTenantId` (alias of `allowedTenantId`); normalized before validation; canonical wins; aliases not persisted. UI alias hint + tenant field relabel. See [5B](#5b-wif-trust-field-reference-examples-provenance-usage-validation). |
 | WI-14 | WIF trust discovery resolver + smart defaults | M | none | **DONE (2026-07-06).** Config-time `POST /admin/endpoints/{id}/wif/resolve` with full-`discoveryUrl` OR `preset`+`tenantId` modes (host-allowlist gated, config-time only); fills `expectedIssuer`+`jwksUri`; defaults `expectedAudience` to the endpointId; `oauth_client` first `client_id`=endpointId + generated `client_secret`. See [5C](#5c-simplifying-wif-trust-setup-discovery-resolver--smart-defaults). |

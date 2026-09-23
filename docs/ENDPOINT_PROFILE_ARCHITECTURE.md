@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.24`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.25`
 
 > **Updated:** 2026-09-18
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -604,7 +604,8 @@ curl -X POST http://localhost:8080/scim/admin/endpoints \
       "settings": {
         "RequireIfMatch": true,
         "PrimaryEnforcement": "reject",
-        "PerEndpointCredentialsEnabled": true
+        "SecretTokenBearerAuthEnabled": true,
+        "OAuthClientCredentialsAuthEnabled": true
       }
     }
   }'

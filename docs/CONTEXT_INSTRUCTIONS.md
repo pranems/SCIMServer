@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.24
+> **Version**: 0.55.25
 > **Last Updated**: September 21, 2026
 > **Last verified:** 2026-09-21
 
@@ -29,8 +29,8 @@ The change refines endpoint settings and Connect. Contextual
 panes are collapsed; Users owns only its two lifecycle settings and Groups only
 its three membership/deletion settings, while common endpoint behavior remains
 in Settings. Connect presents four real methods in OAuth2/WIF/global-shared/
-bearer order and keeps `PerEndpointCredentialsEnabled` under Legacy
-compatibility. Connection info carries `enablementSource`, so the UI follows
+bearer order, each backed by its dedicated setting. Connection info carries
+`enablementSource`, so the UI follows
 the authoritative `profile.authentication.methods[]` override when present.
 That precedence now covers WIF creation, diagnostics, token minting, discovery,
 connection info, Connect, and Settings as well as bearer/OAuth/shared secret.
@@ -274,12 +274,12 @@ All SCIM resources are scoped to an `endpointId`:
 ### 5.5 Authentication Pattern
 
 **3-tier fallback auth** via global `SharedSecretGuard` (v0.21.0, G11):
-1. **Per-endpoint bcrypt credentials** (if `PerEndpointCredentialsEnabled` + endpoint has active credentials) - `IEndpointCredentialRepository.findActive()` + bcrypt verify → `req.authType = 'endpoint_credential'`
+1. **Per-endpoint credentials** (if the credential type's dedicated setting is enabled and the endpoint has an active credential) - keyed HMAC verification for current tokens, with bcrypt verification for pre-migration tokens, then `req.authType = 'endpoint_credential'`
 2. **OAuth 2.0 JWT** - `OAuthService.validateAccessToken()` (Bearer JWT) → `req.authType = 'oauth'`
 3. **Global shared secret** - direct string comparison with `SCIM_SHARED_SECRET` → `req.authType = 'legacy'`
 4. Public routes exempted via `@Public()` decorator
 
-**Credential Admin API** (requires `PerEndpointCredentialsEnabled` flag):
+**Credential Admin API** (requires the dedicated setting for the requested credential type):
 - `POST /scim/admin/endpoints/:id/credentials` - Generate 32-byte base64url token, store bcrypt hash (12 rounds), return plaintext once
 - `GET /scim/admin/endpoints/:id/credentials` - List credentials (hash never returned)
 - `DELETE /scim/admin/endpoints/:id/credentials/:credentialId` - Revoke (deactivate)
@@ -374,7 +374,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 | ✅ Sorting (`sortBy`, `sortOrder`) | Complete (v0.20.0, `sort.supported=true`) |
 | ✅ Bulk operations (`/Bulk`) | Complete (v0.19.0, RFC 7644 §3.7, `BulkOperationsEnabled` flag) |
 | ✅ `/Me` endpoint | Complete (v0.20.0, JWT sub → userName identity resolution) |
-| ✅ Per-endpoint credentials | Complete (v0.21.0, `PerEndpointCredentialsEnabled` flag, bcrypt tokens, 3-tier fallback) |
+| ✅ Per-endpoint credentials | Complete (dedicated bearer/OAuth/WIF settings, keyed tokens, legacy bcrypt verification, 3-tier fallback) |
 | ✅ ReadOnly attribute stripping | Complete (v0.22.0, RFC 7643 §2.2, `IncludeWarningAboutIgnoredReadOnlyAttribute` + `IgnoreReadOnlyAttributesInPatch` flags, warning URN extension) |
 | ✅ P2 attribute characteristic enforcement | Complete (v0.24.0, 6 behavioral fixes: R-RET-1 schema-driven always-returned, R-RET-2 Group active always, R-RET-3 sub-attr always, R-MUT-1 writeOnly→never, R-MUT-2 readOnly sub-attr stripping, R-CASE-1 caseExact filter) |
 
@@ -480,7 +480,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 6. Update [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - flag summary table (§2), defaults matrix (§2.1), and true/false behavior (§2.2)
 7. Add the Switch to [SettingsTab.tsx](../web/src/pages/SettingsTab.tsx) `BOOLEAN_FLAGS` (it carries a `data-testid` of `settings-flag-<Key>` automatically) plus a vitest case, a Playwright spec asserting a measured OUTCOME (not just that the Switch renders), and a `live-test.ps1` section
 
-> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `StrictSchemaValidation`, `EnforceResourceTypes`, and `logFileEnabled` default to `true`. `PatchOpAllowRemoveAllMembers`, `VerbosePatchSupported`, `RequireIfMatch`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, and `RfcCompliantSubAttributes` default to `false`. `PrimaryEnforcement` defaults to `passthrough`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets several flags, PrimaryEnforcement to `normalize`).
+> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `StrictSchemaValidation`, `EnforceResourceTypes`, and `logFileEnabled` default to `true`. `PatchOpAllowRemoveAllMembers`, `VerbosePatchSupported`, `RequireIfMatch`, `SecretTokenBearerAuthEnabled`, `OAuthClientCredentialsAuthEnabled`, `WifCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, and `RfcCompliantSubAttributes` default to `false`. `SharedSecretBearerAuthEnabled` defaults to `true`. `PrimaryEnforcement` defaults to `passthrough`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets several flags, PrimaryEnforcement to `normalize`).
 >
 > **`RfcCompliantSubAttributes` is standalone, and only ever TIGHTENS.** It is NOT gated on `StrictSchemaValidation` - the two answer different questions (how carefully do I police this payload vs is this schema shape legal at all). Enforce it in exactly one place per service (`enforceSubAttributeNesting`), BEFORE the strict branch, so the rejection is attributed to the flag that caused it. It governs ONE rule: RFC 7643 2.3.8 complex sub-attributes. A multi-valued SIMPLE sub-attribute (2.3.8 does not forbid it; 1.2 + erratum 5607 permit it) is honoured by `StrictSchemaValidation` itself at any flag setting - that was a validator defect, not a policy, so do NOT re-gate it on the flag. See [RFC_COMPLIANT_SUBATTRIBUTES.md](RFC_COMPLIANT_SUBATTRIBUTES.md).
 

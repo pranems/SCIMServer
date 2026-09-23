@@ -1,5 +1,6 @@
 import {
   ENDPOINT_CONFIG_FLAGS,
+  ENDPOINT_CONFIG_FLAGS_DEFINITIONS,
   getConfigBoolean,
   getConfigBooleanWithDefault,
   getConfigString,
@@ -22,6 +23,17 @@ import {
 
 describe('endpoint-config.interface', () => {
   describe('ENDPOINT_CONFIG_FLAGS', () => {
+    it('does not expose the retired per-endpoint credentials umbrella', () => {
+      expect(ENDPOINT_CONFIG_FLAGS).not.toHaveProperty('PER_ENDPOINT_CREDENTIALS_ENABLED');
+      expect(ENDPOINT_CONFIG_FLAGS_DEFINITIONS).not.toHaveProperty('PerEndpointCredentialsEnabled');
+    });
+
+    it('rejects new writes using the retired umbrella flag', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: true })).toThrow(
+        /Use "SecretTokenBearerAuthEnabled" and "OAuthClientCredentialsAuthEnabled"/,
+      );
+    });
+
     it('should have all expected config flag keys', () => {
       expect(ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS).toBe(
         'PatchOpAllowRemoveAllMembers'
@@ -31,7 +43,6 @@ describe('endpoint-config.interface', () => {
       expect(ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION).toBe('StrictSchemaValidation');
       expect(ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH).toBe('RequireIfMatch');
       expect(ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS).toBe('AllowAndCoerceBooleanStrings');
-      expect(ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED).toBe('PerEndpointCredentialsEnabled');
       expect(ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE).toBe('IncludeWarningAboutIgnoredReadOnlyAttribute');
       expect(ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH).toBe('IgnoreReadOnlyAttributesInPatch');
     });
@@ -748,74 +759,6 @@ describe('endpoint-config.interface', () => {
     });
   });
 
-  describe('PerEndpointCredentialsEnabled validation', () => {
-    it('should accept boolean true', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: true })).not.toThrow();
-    });
-
-    it('should accept boolean false', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: false })).not.toThrow();
-    });
-
-    it('should accept string "True"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'True' })).not.toThrow();
-    });
-
-    it('should accept string "true"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'true' })).not.toThrow();
-    });
-
-    it('should accept string "False"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'False' })).not.toThrow();
-    });
-
-    it('should accept string "false"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'false' })).not.toThrow();
-    });
-
-    it('should accept string "1"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: '1' })).not.toThrow();
-    });
-
-    it('should accept string "0"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: '0' })).not.toThrow();
-    });
-
-    it('should throw for invalid string "Yes"', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'Yes' })).toThrow(/Invalid value/);
-    });
-
-    it('should throw for number value', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 123 })).toThrow(/Invalid type/);
-    });
-
-    it('should throw for object value', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: { key: true } })).toThrow(/Invalid type/);
-    });
-
-    it('should throw for array value', () => {
-      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: ['true'] })).toThrow(/Invalid type/);
-    });
-
-    it('should include flag name in error message', () => {
-      try {
-        validateEndpointConfig({ PerEndpointCredentialsEnabled: 'invalid' });
-        fail('Expected error');
-      } catch (e) {
-        expect((e as Error).message).toContain('PerEndpointCredentialsEnabled');
-      }
-    });
-
-    it('should include allowed values in error message', () => {
-      try {
-        validateEndpointConfig({ PerEndpointCredentialsEnabled: 'invalid' });
-        fail('Expected error');
-      } catch (e) {
-        expect((e as Error).message).toContain('Allowed values');
-      }
-    });
-  });
-
   describe('IncludeWarningAboutIgnoredReadOnlyAttribute validation', () => {
     it('should accept boolean true', () => {
       expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: true })).not.toThrow();
@@ -961,7 +904,8 @@ describe('endpoint-config.interface', () => {
           StrictSchemaValidation: 'True',
           RequireIfMatch: 'True',
           AllowAndCoerceBooleanStrings: 'False',
-          PerEndpointCredentialsEnabled: 'True',
+          SecretTokenBearerAuthEnabled: 'True',
+          OAuthClientCredentialsAuthEnabled: 'True',
           IncludeWarningAboutIgnoredReadOnlyAttribute: true,
           IgnoreReadOnlyAttributesInPatch: 'True',
           logLevel: 'DEBUG',
@@ -995,7 +939,8 @@ describe('endpoint-config.interface', () => {
       expect(DEFAULT_ENDPOINT_CONFIG.VerbosePatchSupported).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.RequireIfMatch).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.AllowAndCoerceBooleanStrings).toBe(true);
-      expect(DEFAULT_ENDPOINT_CONFIG.PerEndpointCredentialsEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.SecretTokenBearerAuthEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.OAuthClientCredentialsAuthEnabled).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.IncludeWarningAboutIgnoredReadOnlyAttribute).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.IgnoreReadOnlyAttributesInPatch).toBe(false);
     });
@@ -1058,7 +1003,8 @@ describe('endpoint-config.interface', () => {
         VerbosePatchSupported: 'True',
         AllowAndCoerceBooleanStrings: 'True',
         RequireIfMatch: 'False',
-        PerEndpointCredentialsEnabled: 'False',
+        SecretTokenBearerAuthEnabled: 'False',
+        OAuthClientCredentialsAuthEnabled: 'False',
         IncludeWarningAboutIgnoredReadOnlyAttribute: 'False',
         IgnoreReadOnlyAttributesInPatch: 'False',
         logLevel: 'INFO',
@@ -1361,20 +1307,22 @@ describe('endpoint-config.interface', () => {
         });
       });
 
-      it('value-preserving: legacy PerEndpointCredentialsEnabled=true enables BOTH new per-endpoint methods', () => {
+      it('ignores the retired umbrella at runtime after profile migration', () => {
         const eff = getEffectiveAuthEnablement({ PerEndpointCredentialsEnabled: true });
-        expect(eff.secretTokenBearer).toBe(true);
-        expect(eff.oauthClientCredentials).toBe(true);
-        // Shared secret still accepted (unset -> true).
-        expect(eff.sharedSecretBearer).toBe(true);
+        expect(eff).toEqual({
+          secretTokenBearer: false,
+          oauthClientCredentials: false,
+          workloadIdentityFederation: false,
+          sharedSecretBearer: true,
+        });
       });
 
-      it('an explicit new flag OVERRIDES the legacy fallback', () => {
+      it('dedicated flags are the only flat per-endpoint bearer and OAuth sources', () => {
         const eff = getEffectiveAuthEnablement({
           PerEndpointCredentialsEnabled: true,
+          SecretTokenBearerAuthEnabled: true,
           OAuthClientCredentialsAuthEnabled: false,
         });
-        // bearer inherits legacy true; oauth_client explicitly off.
         expect(eff.secretTokenBearer).toBe(true);
         expect(eff.oauthClientCredentials).toBe(false);
       });
@@ -1394,10 +1342,10 @@ describe('endpoint-config.interface', () => {
       });
     });
 
-    // W2.5 - the single per-method enablement source (co-location + value-preserving).
+    // W2.5 - the single per-method enablement source.
     describe('resolveEndpointAuthEnablement', () => {
-      it('value-preserving: with NO method entries it returns exactly getEffectiveAuthEnablement', () => {
-        const config: EndpointConfig = { PerEndpointCredentialsEnabled: true, SharedSecretBearerAuthEnabled: false };
+      it('with NO method entries it returns exactly getEffectiveAuthEnablement', () => {
+        const config: EndpointConfig = { SecretTokenBearerAuthEnabled: true, SharedSecretBearerAuthEnabled: false };
         expect(resolveEndpointAuthEnablement(config, undefined)).toEqual(getEffectiveAuthEnablement(config));
         expect(resolveEndpointAuthEnablement(config, [])).toEqual(getEffectiveAuthEnablement(config));
       });
@@ -1420,13 +1368,15 @@ describe('endpoint-config.interface', () => {
         expect(eff.sharedSecretBearer).toBe(true);
       });
 
-      it('honors disabled-with-credential: a bearer method enabled:false overrides a legacy-enabling flag', () => {
-        // Legacy flag enables both methods; the explicit method entry disables bearer.
-        const eff = resolveEndpointAuthEnablement({ PerEndpointCredentialsEnabled: true }, [
+      it('honors disabled-with-credential: a bearer method enabled:false overrides its dedicated flag', () => {
+        const eff = resolveEndpointAuthEnablement({
+          SecretTokenBearerAuthEnabled: true,
+          OAuthClientCredentialsAuthEnabled: true,
+        }, [
           { type: 'bearer', enabled: false },
         ]);
         expect(eff.secretTokenBearer).toBe(false);
-        // oauth_client has no method entry -> still inherits the legacy flag.
+        // oauth_client has no method entry -> dedicated setting remains authoritative.
         expect(eff.oauthClientCredentials).toBe(true);
       });
 
@@ -1470,11 +1420,10 @@ describe('endpoint-config.interface', () => {
         }));
       });
 
-      it('reports whether each effective value came from a method, dedicated setting, legacy fallback, or default', () => {
+      it('reports only method, dedicated-setting, or default provenance', () => {
         expect(
           resolveEndpointAuthEnablementDetails(
             {
-              PerEndpointCredentialsEnabled: true,
               OAuthClientCredentialsAuthEnabled: false,
             },
             [{ type: 'bearer', enabled: false }],
@@ -1487,8 +1436,8 @@ describe('endpoint-config.interface', () => {
         });
 
         expect(resolveEndpointAuthEnablementDetails({ PerEndpointCredentialsEnabled: true })).toEqual({
-          secretTokenBearer: { enabled: true, source: 'legacy-setting' },
-          oauthClientCredentials: { enabled: true, source: 'legacy-setting' },
+          secretTokenBearer: { enabled: false, source: 'default' },
+          oauthClientCredentials: { enabled: false, source: 'default' },
           workloadIdentityFederation: { enabled: false, source: 'default' },
           sharedSecretBearer: { enabled: true, source: 'default' },
         });

@@ -273,7 +273,7 @@ would not appear.
 | **W5.1** | Finite auth-persona catalog, so parser + metadata + UI derive from one definition | cross-cutting | Med | W2-W4. YAGNI risk: presets only, no DSL |
 | **N10** | `GlobalAuthPolicy` - the runtime-tunable global ceiling | global policy | Med | - . Designed, **unbuilt**, and has no wave number |
 | **W6.1** | Remove legacy fallbacks once telemetry proves zero use | cross-cutting | Low | W3-W5 + telemetry |
-| **W2.5 tail** | Retire the `PerEndpointCredentialsEnabled` umbrella | enablement flags | Low | - . Core shipped |
+| **W2.5 tail** | Retire the `retired combined credential setting` umbrella | enablement flags | Low | - . Core shipped |
 | **W3.1 tail** | Versioned `WifTrustV2` aggregate + migration state machine | trust storage | Low | - . May never be needed |
 
 ### 2.5 Operability

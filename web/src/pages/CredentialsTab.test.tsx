@@ -7,7 +7,7 @@
  *   - Add credential button opens FormDialog
  *   - On create success: shows plaintext token EXACTLY ONCE with copy button
  *   - Delete row -> confirm dialog -> useDeleteCredential
- *   - 403 (PerEndpointCredentialsEnabled=False) -> warning banner +
+ *   - 403 (selected authentication method disabled) -> warning banner +
  *     disabled create button
  *   - Mutation error -> errorMessage in dialog (no silent failure)
  */
@@ -179,9 +179,15 @@ describe('CredentialsTab', () => {
 
   // ─── Per-endpoint method availability (W11 - no "All" tab) ──────────
 
-  it('does not offer a bearer/oauth method tab when PerEndpointCredentialsEnabled is off', () => {
+  it('does not offer a bearer/oauth method tab when both dedicated settings are off', () => {
     mockUseEndpointOverview.mockReturnValue({
-      data: { ...baseOverview, configFlags: { PerEndpointCredentialsEnabled: false } },
+      data: {
+        ...baseOverview,
+        configFlags: {
+          SecretTokenBearerAuthEnabled: false,
+          OAuthClientCredentialsAuthEnabled: false,
+        },
+      },
       isLoading: false,
       error: null,
     });
@@ -1670,7 +1676,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
+        configFlags: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
         credentials: twoMethodCreds,
       },
       isLoading: false,
@@ -1686,12 +1692,11 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     expect(screen.getByTestId('credentials-method-tab-wif')).toBeInTheDocument();
   });
 
-  it('shows four real method switches in setup order and separates the legacy umbrella', async () => {
+  it('shows four real method switches in setup order without legacy or internal labels', async () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
         configFlags: {
-          PerEndpointCredentialsEnabled: true,
           SecretTokenBearerAuthEnabled: true,
           OAuthClientCredentialsAuthEnabled: true,
           WifCredentialsEnabled: true,
@@ -1716,7 +1721,42 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
       'connect-auth-flag-SecretTokenBearerAuthEnabled',
     ]);
     expect(screen.queryByTestId('connect-auth-flag-PerEndpointCredentialsEnabled')).not.toBeInTheDocument();
-    expect(screen.getByTestId('connect-auth-legacy-notice')).toHaveTextContent(/legacy compatibility/i);
+    expect(screen.queryByTestId('connect-auth-legacy-notice')).not.toBeInTheDocument();
+    for (const method of AUTH_METHOD_FLAGS) {
+      expect(method.description).not.toMatch(/\bWI-\d+\b/i);
+      expect(method.description).not.toMatch(/\bPhase\s+[A-Z0-9.-]+\b/i);
+    }
+  });
+
+  it('shows a newly enabled method tab immediately while connection-info still has default state', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { SecretTokenBearerAuthEnabled: true },
+        connectionInfo: {
+          ...baseOverview.connectionInfo!,
+          enabledMethods: [{
+            method: 'shared_secret',
+            label: 'Shared secret',
+            entraAuthenticationMethod: 'Secret Token',
+            entraFields: { tenantUrl: 'https://x/scim/v2/endpoints/ep-1', secretToken: null },
+            clientSecretState: 'none',
+            enablementSource: 'default',
+          }],
+          disabledMethods: [
+            { method: 'bearer', reason: 'off', enableHint: 'Enable bearer', enablementSource: 'default' },
+            { method: 'oauth_client', reason: 'off', enableHint: 'Enable OAuth', enablementSource: 'default' },
+            { method: 'wif', reason: 'off', enableHint: 'Enable WIF', enablementSource: 'default' },
+          ],
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    expect(screen.getByTestId('credentials-method-tab-bearer')).toBeInTheDocument();
   });
 
   it('uses server-resolved method state when an authentication method overrides flat flags', async () => {
@@ -1777,7 +1817,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
+        configFlags: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true, WifCredentialsEnabled: true },
       },
       isLoading: false,
       error: null,
@@ -1810,7 +1850,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, WifCredentialsEnabled: false, SharedSecretBearerAuthEnabled: false },
+        configFlags: { SecretTokenBearerAuthEnabled: true, WifCredentialsEnabled: false, SharedSecretBearerAuthEnabled: false },
         credentials: twoMethodCreds,
       },
       isLoading: false,
@@ -1826,7 +1866,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+        configFlags: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
         credentials: twoMethodCreds,
       },
       isLoading: false,
@@ -1844,7 +1884,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { PerEndpointCredentialsEnabled: true, SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+        configFlags: { SecretTokenBearerAuthEnabled: true, OAuthClientCredentialsAuthEnabled: true },
         credentials: twoMethodCreds,
       },
       isLoading: false,
@@ -1861,7 +1901,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { PerEndpointCredentialsEnabled: true, OAuthClientCredentialsAuthEnabled: true },
+        configFlags: { OAuthClientCredentialsAuthEnabled: true },
         credentials: [],
       },
       isLoading: false,
@@ -1879,7 +1919,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { SharedSecretBearerAuthEnabled: true, PerEndpointCredentialsEnabled: true },
+        configFlags: { SharedSecretBearerAuthEnabled: true },
         credentials: [],
       },
       isLoading: false,
@@ -1896,7 +1936,7 @@ describe('CredentialsTab - per-method sub-tabs (R6)', () => {
     mockUseEndpointOverview.mockReturnValue({
       data: {
         ...baseOverview,
-        configFlags: { WifCredentialsEnabled: true, PerEndpointCredentialsEnabled: true },
+        configFlags: { WifCredentialsEnabled: true },
         credentials: twoMethodCreds,
       },
       isLoading: false,

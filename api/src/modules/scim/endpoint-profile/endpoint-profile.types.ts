@@ -90,8 +90,6 @@ export interface ProfileSettings {
   RequireIfMatch?: boolean | string;
   /** Coerce "True"/"False" strings to booleans (default true) */
   AllowAndCoerceBooleanStrings?: boolean | string;
-  /** Enable per-endpoint bearer token validation */
-  PerEndpointCredentialsEnabled?: boolean | string;
   /** Warn on readOnly attribute stripping */
   IncludeWarningAboutIgnoredReadOnlyAttribute?: boolean | string;
   /** Strip (don't reject) readOnly PATCH ops */

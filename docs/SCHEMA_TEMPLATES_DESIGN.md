@@ -1278,7 +1278,7 @@ These settings live in `profile.settings` and are persisted as part of the endpo
 | `StrictSchemaValidation` | boolean | `false` | Require extension URNs in `schemas[]` |
 | `RequireIfMatch` | boolean | `false` | Mandatory ETag on PUT/PATCH/DELETE |
 | `AllowAndCoerceBooleanStrings` | boolean | `true` | Coerce `"True"`/`"False"` strings to booleans |
-| `PerEndpointCredentialsEnabled` | boolean | `false` | Enable per-endpoint bearer token validation |
+| `retired combined credential setting` | boolean | `false` | Enable per-endpoint bearer token validation |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | boolean | `false` | Warn on readOnly attribute stripping |
 | `IgnoreReadOnlyAttributesInPatch` | boolean | `false` | Strip (don't reject) readOnly PATCH ops |
 
@@ -1309,7 +1309,7 @@ flowchart TB
             ABC["AllowAndCoerceBooleanStrings"]
             RIM["RequireIfMatch"]
             LL["logLevel"]
-            PEC["PerEndpointCredentialsEnabled"]
+            PEC["retired combined credential setting"]
             OTHER["...8 more flags"]
         end
         subgraph RTypes["resourceTypes[]"]

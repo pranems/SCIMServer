@@ -220,7 +220,7 @@
 - **ENDPOINT_CONFIG_FLAGS**: all expected keys
 - **getConfigBoolean**: undefined/non-existent/boolean true/false/strings "true"/"True"/"TRUE"/"false"/"False"/"1"/"0"/other/number/object, MultiOpPatch flag
 - **getConfigString**: undefined/non-existent/string/boolean/number/object/custom flags
-- **validateEndpointConfig**: undefined/empty config; validation for each of 14+ flags (MultiOpPatchAdd/Remove, PatchOpAllowRemoveAllMembers, VerbosePatchSupported, logLevel, UserSoftDeleteEnabled, StrictSchemaValidation, AllowAndCoerceBooleanStrings, RequireIfMatch, ReprovisionOnConflict, CustomResourceTypesEnabled, BulkOperationsEnabled, PerEndpointCredentialsEnabled, IncludeWarningAboutIgnoredReadOnlyAttribute, IgnoreReadOnlyAttributesInPatch) - each with boolean/string/invalid/error message tests
+- **validateEndpointConfig**: undefined/empty config; validation for each of 14+ flags (MultiOpPatchAdd/Remove, PatchOpAllowRemoveAllMembers, VerbosePatchSupported, logLevel, UserSoftDeleteEnabled, StrictSchemaValidation, AllowAndCoerceBooleanStrings, RequireIfMatch, ReprovisionOnConflict, CustomResourceTypesEnabled, BulkOperationsEnabled, retired combined credential setting, IncludeWarningAboutIgnoredReadOnlyAttribute, IgnoreReadOnlyAttributesInPatch) - each with boolean/string/invalid/error message tests
 - **DEFAULT_ENDPOINT_CONFIG**: expected defaults, logLevel undefined
 - **getConfigBooleanWithDefault**: undefined/missing/actual/parse strings/default for AllowAndCoerceBooleanStrings
 

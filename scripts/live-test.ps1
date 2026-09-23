@@ -5422,7 +5422,7 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 9s: PER-ENDPOINT CREDENTIALS (Phase 11 / G11)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# Create an endpoint with PerEndpointCredentialsEnabled=True
+# Create an endpoint with per-endpoint bearer authentication enabled.
 Write-Host "`n--- Setup: Create Cred-Enabled Endpoint ---" -ForegroundColor Cyan
 $credEpBody = @{
     name = "per-cred-test-$(Get-Date -Format 'HHmmss')"
@@ -5430,7 +5430,7 @@ $credEpBody = @{
 } | ConvertTo-Json -Depth 4
 $credEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $credEpBody
 $credEpId = $credEp.id
-$patchBody = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 4
+$patchBody = @{ profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } } } | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $credScimBase = "$baseUrl/scim/endpoints/$credEpId"
 Write-Host "  Created endpoint: $credEpId"
@@ -5526,7 +5526,7 @@ $disabledEpBody = @{
 } | ConvertTo-Json -Depth 4
 $disabledEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $disabledEpBody
 $disabledEpId = $disabledEp.id
-$patchBody = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "False" } } } | ConvertTo-Json -Depth 4
+$patchBody = @{ profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "False" } } } | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 try {
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId/credentials" -Method POST -Headers $headers -Body $credCreateBody
@@ -5536,8 +5536,21 @@ try {
     Test-Result -Success ($code -eq 403) -Message "9s.8: cred creation blocked → 403 (flag disabled)"
 }
 
-# Test 9s.9: Credential with future expiry
-Write-Host "`n--- Test 9s.9: Credential with expiry ---" -ForegroundColor Cyan
+# Test 9s.9: Retired umbrella setting is rejected with dedicated-setting guidance
+Write-Host "`n--- Test 9s.9: Reject retired umbrella setting ---" -ForegroundColor Cyan
+$retiredSettingBody = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 4
+$retiredSettingResponse = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId" -Method PATCH -Headers $headers -Body $retiredSettingBody -ContentType "application/json" -SkipHttpErrorCheck
+Test-Result -Success ($retiredSettingResponse.StatusCode -eq 400) -Message "9s.9: retired umbrella setting rejected → 400"
+$retiredSettingContent = if ($retiredSettingResponse.Content -is [byte[]]) {
+    [System.Text.Encoding]::UTF8.GetString($retiredSettingResponse.Content)
+} else {
+    [string]$retiredSettingResponse.Content
+}
+$retiredSettingError = $retiredSettingContent | ConvertFrom-Json
+Test-Result -Success ($retiredSettingError.detail -match 'SecretTokenBearerAuthEnabled' -and $retiredSettingError.detail -match 'OAuthClientCredentialsAuthEnabled') -Message "9s.9: rejection names both dedicated replacement settings"
+
+# Test 9s.10: Credential with future expiry
+Write-Host "`n--- Test 9s.10: Credential with expiry ---" -ForegroundColor Cyan
 $futureDate = (Get-Date).AddDays(1).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $expiringCredBody = @{
     credentialType = "bearer"
@@ -5545,13 +5558,13 @@ $expiringCredBody = @{
     expiresAt = $futureDate
 } | ConvertTo-Json
 $expiringCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId/credentials" -Method POST -Headers $headers -Body $expiringCredBody
-Test-Result -Success ($null -ne $expiringCred.expiresAt) -Message "9s.9: credential created with expiresAt"
-Test-Result -Success ($null -ne $expiringCred.token) -Message "9s.9: token returned for expiring credential"
+Test-Result -Success ($null -ne $expiringCred.expiresAt) -Message "9s.10: credential created with expiresAt"
+Test-Result -Success ($null -ne $expiringCred.token) -Message "9s.10: token returned for expiring credential"
 
 # Verify the expiring credential works for auth
 $expiringHeaders = @{Authorization="Bearer $($expiringCred.token)"; 'Accept'='application/scim+json'}
 $expiringAuthResult = Invoke-RestMethod -Uri "$credScimBase/Users" -Method GET -Headers $expiringHeaders
-Test-Result -Success ($expiringAuthResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:ListResponse") -Message "9s.9: expiring credential authenticates successfully"
+Test-Result -Success ($expiringAuthResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:ListResponse") -Message "9s.10: expiring credential authenticates successfully"
 
 # Cleanup: delete the test endpoints
 Write-Host "`n--- 9s: Cleanup ---" -ForegroundColor Cyan
@@ -9414,7 +9427,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 # profilePreset and profile are mutually exclusive on POST. Create with
 # the preset first, then PATCH the settings we need (StrictSchemaValidation
 # off so test users / groups can be created without strict-mode rejection,
-# PerEndpointCredentialsEnabled on so we can mint a credential below).
+# bearer authentication on so we can mint a credential below).
 $ovEndpointBody = @{
     name          = "live-9z-V-overview-$([DateTime]::Now.Ticks)"
     profilePreset = "rfc-standard"
@@ -9427,7 +9440,7 @@ $ovSettingsBody = @{
     profile = @{
         settings = @{
             StrictSchemaValidation        = "False"
-            PerEndpointCredentialsEnabled = "True"
+            SecretTokenBearerAuthEnabled  = "True"
         }
     }
 } | ConvertTo-Json -Depth 6
@@ -9826,7 +9839,7 @@ try {
     Test-Result -Success ($null -ne $e2Ep.id) -Message "9z-Z.setup: created endpoint $e2EpName (id=$($e2Ep.id))"
 
     # Seed baseline settings via a PATCH so we know the starting state.
-    $seed = @{ profile = @{ settings = @{ StrictSchemaValidation = $false; AllowAndCoerceBooleanStrings = $true; PerEndpointCredentialsEnabled = $false } } } | ConvertTo-Json -Depth 5
+    $seed = @{ profile = @{ settings = @{ StrictSchemaValidation = $false; AllowAndCoerceBooleanStrings = $true; SecretTokenBearerAuthEnabled = $false } } } | ConvertTo-Json -Depth 5
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($e2Ep.id)" -Method PATCH -Headers $headers -Body $seed -ContentType 'application/json' | Out-Null
     Test-Result -Success $true -Message "9z-Z.setup: seeded baseline flags via PATCH"
 
@@ -9840,8 +9853,8 @@ try {
     # ─── Test 9z-Z.2: sibling settings preserved (deep merge) ─────
     $allow = $afterOn.profile.settings.AllowAndCoerceBooleanStrings
     Test-Result -Success ($allow -eq $true -or $allow -eq 'True') -Message "9z-Z.2: sibling AllowAndCoerceBooleanStrings preserved (got '$allow')"
-    $perEp = $afterOn.profile.settings.PerEndpointCredentialsEnabled
-    Test-Result -Success ($perEp -eq $false -or $perEp -eq 'False' -or $null -eq $perEp) -Message "9z-Z.3: sibling PerEndpointCredentialsEnabled preserved as false (got '$perEp')"
+    $bearerEnabled = $afterOn.profile.settings.SecretTokenBearerAuthEnabled
+    Test-Result -Success ($bearerEnabled -eq $false -or $bearerEnabled -eq 'False') -Message "9z-Z.3: sibling SecretTokenBearerAuthEnabled preserved as false (got '$bearerEnabled')"
 
     # ─── Test 9z-Z.4: PATCH flips it back off ─────────────────────
     $patchOff = @{ profile = @{ settings = @{ StrictSchemaValidation = $false } } } | ConvertTo-Json -Depth 10
@@ -11255,7 +11268,7 @@ try {
     $apIdA = $apEpA.id; $apIdB = $apEpB.id
     foreach ($id in @($apIdA, $apIdB)) {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$id" -Method PATCH -Headers $headers -Body (@{
-            profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+            profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
         } | ConvertTo-Json -Depth 6) | Out-Null
     }
     Test-Result -Success ($null -ne $apIdA -and $null -ne $apIdB) -Message "9z-AP.T1: created two per-endpoint-credential endpoints"
@@ -11617,7 +11630,7 @@ try {
     } | ConvertTo-Json)
     $asId = $asEp.id
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$asId" -Method PATCH -Headers $headers -Body (@{
-        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
     } | ConvertTo-Json -Depth 6) | Out-Null
     $asCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$asId/credentials" -Method POST -Headers $headers -Body (@{
         credentialType = "oauth_client"; label = "a3-live"
@@ -12145,7 +12158,7 @@ try {
 
     # T5: every method reports the source of its effective enablement.
     $at8Methods = @($at8Info.enabledMethods) + @($at8Info.disabledMethods)
-    $at8AllowedSources = @("authentication-method", "dedicated-setting", "legacy-setting", "default")
+    $at8AllowedSources = @("authentication-method", "dedicated-setting", "default")
     $at8SourcesValid = ($at8Methods.Count -eq 4) -and `
         (@($at8Methods | Where-Object { $at8AllowedSources -notcontains $_.enablementSource }).Count -eq 0) -and `
         (($at8Methods | Where-Object { $_.method -eq "oauth_client" }).enablementSource -eq "dedicated-setting") -and `
@@ -13560,7 +13573,7 @@ try {
     } | ConvertTo-Json)
     $bmId = $bmEp.id
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId" -Method PATCH -Headers $headers -Body (@{
-        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
     } | ConvertTo-Json -Depth 6) | Out-Null
 
     $bmCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "oauth_client"; label = "v10" } | ConvertTo-Json)
@@ -13694,7 +13707,7 @@ try {
     } | ConvertTo-Json)
     $boId = $boEp.id
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boId" -Method PATCH -Headers $headers -Body (@{
-        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
     } | ConvertTo-Json -Depth 6) | Out-Null
     $boCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boId/credentials" -Method POST -Headers $headers -Body (@{ credentialType = "oauth_client"; label = "w1" } | ConvertTo-Json)
 
@@ -13814,7 +13827,6 @@ try {
     # credentials that a reintroduced bcrypt loop would be obvious) while proving
     # the cap is a configurable bound rather than a hard ceiling.
     $perfPatch = @{ profile = @{ settings = @{
-        PerEndpointCredentialsEnabled = "True"
         SecretTokenBearerAuthEnabled  = "True"
         MaxActiveBearerCredentials    = $perfSeedCredCount
     } } } | ConvertTo-Json -Depth 5
@@ -13867,7 +13879,7 @@ try {
     $brEpBody = @{ name = "desc-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json -Depth 4
     $brEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $brEpBody
     $brEpId = $brEp.id
-    $brPatch = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 5
+    $brPatch = @{ profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } } } | ConvertTo-Json -Depth 5
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$brEpId" -Method PATCH -Headers $headers -Body $brPatch -ContentType "application/json" | Out-Null
 
     # X4 - create a bearer credential with a description; the create echoes it.
@@ -14023,7 +14035,7 @@ try {
     } | ConvertTo-Json)
     $buId = $buEp.id
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$buId" -Method PATCH -Headers $headers -Body (@{
-        profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
     } | ConvertTo-Json -Depth 6) | Out-Null
     $buCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$buId/credentials" -Method POST -Headers $headers -Body (@{
         credentialType = "oauth_client"; label = "w02-live"
@@ -14075,7 +14087,7 @@ try {
     try {
         # Flat flag ON -> bearer creds allowed + authenticate.
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId" -Method PATCH -Headers $headers -Body (@{
-            profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } }
+            profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } }
         } | ConvertTo-Json -Depth 6) | Out-Null
         $bvCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bvId/credentials" -Method POST -Headers $headers -Body (@{
             credentialType = "bearer"; label = "w2.5-coloc"
@@ -15787,7 +15799,7 @@ try {
         name = "live-cm-migration-$(Get-Random)"
     } | ConvertTo-Json)
     $cmId = $cmEp.id
-    $cmPatch = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 4
+    $cmPatch = @{ profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } } } | ConvertTo-Json -Depth 4
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId" -Method PATCH -Headers $headers -Body $cmPatch -ContentType 'application/json'
     $cmBefore = Invoke-RestMethod -Uri "$baseUrl/scim/admin/credentials/migration-status" -Headers $headers
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cmId/credentials" -Method POST -Headers $headers `

@@ -26,7 +26,7 @@ describe('AdminWifDiagnosticsController', () => {
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'test-endpoint',
-    profile: { settings: { PerEndpointCredentialsEnabled: true } },
+    profile: { settings: { SecretTokenBearerAuthEnabled: true } },
     active: true,
   };
 
