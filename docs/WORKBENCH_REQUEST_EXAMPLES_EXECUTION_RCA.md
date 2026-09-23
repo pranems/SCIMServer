@@ -166,7 +166,7 @@
 - **Root cause:** Expected definitions were ordered hashtables while the admin GET returned PSCustomObjects in server property order. `Get-ValueHash` hashed raw serialized order, so equivalent JSON objects produced different digests.
 - **Fix:** Parse the JSON and recursively write canonical object keys before SHA-256 hashing; preserve array order and scalar representation.
 - **Why it works:** Object member order is not semantically significant, while schema and attribute array order remains part of the compared contract.
-- **Prevention:** Fixture `-SelfTest` constructs nested equivalent objects in opposite property order. The named dev apply and immediate rerun both pass 17/17 assertions after the fix.
+- **Prevention:** Fixture `-SelfTest` covers nested opposite-order objects, null and scalar tokens, changed scalar values, and significant array order. Clean committed script `565aa19776fe03333c7df5a4940c84bd513b2f26` passed 8/8 self-tests plus named dev apply and immediate rerun at 17/17 assertions each.
 - **Escape analysis:** The first shared-estate execution caught the false negative after mutation. The earliest capable gate was the pure hash self-test, now added. Escape delta: named dev to self-test.
 
 ## Self-Improvement Dispositions
