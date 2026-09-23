@@ -15,10 +15,21 @@ import { usersSearchSchema } from '../routes/search-schemas';
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
-  return { ...actual, useEndpointUsers: vi.fn() };
+  return {
+    ...actual,
+    useEndpointUsers: vi.fn(),
+    useEndpointSchemas: vi.fn(),
+    useEndpointResourceTypes: vi.fn(),
+    useCreateUser: vi.fn(),
+  };
 });
 
-import { useEndpointUsers } from '../api/queries';
+import {
+  useCreateUser,
+  useEndpointResourceTypes,
+  useEndpointSchemas,
+  useEndpointUsers,
+} from '../api/queries';
 import { usePreferencesStore, PREFERENCES_DEFAULTS } from '../store/preferences-store';
 
 function wrap(
@@ -45,8 +56,40 @@ const mockUsers = {
 };
 
 describe('UsersTab', () => {
+  const createUser = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    createUser.mockResolvedValue({ id: 'new-user' });
+    (useCreateUser as ReturnType<typeof vi.fn>).mockReturnValue({
+      mutateAsync: createUser,
+      isPending: false,
+    });
+    (useEndpointSchemas as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        Resources: [{
+          id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+          attributes: [
+            { name: 'userName', type: 'string', required: true },
+            { name: 'active', type: 'boolean' },
+          ],
+        }],
+      },
+      isLoading: false,
+      error: null,
+    });
+    (useEndpointResourceTypes as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        Resources: [{
+          id: 'User',
+          name: 'User',
+          endpoint: '/Users',
+          schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+        }],
+      },
+      isLoading: false,
+      error: null,
+    });
     // Phase N4: each test starts from default preferences (pageSize=20).
     usePreferencesStore.setState({ ...PREFERENCES_DEFAULTS });
     localStorage.clear();
@@ -97,6 +140,29 @@ describe('UsersTab', () => {
     });
     wrap(<UsersTab endpointId="ep-1" />);
     expect(await screen.findByText(/no users/i)).toBeInTheDocument();
+  });
+
+  it('creates a User from the empty state using its discovered profile fields', async () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockUsers, totalResults: 0, Resources: [] },
+      isLoading: false,
+      error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+
+    fireEvent.click(await screen.findByTestId('users-empty-action'));
+    expect(screen.getByTestId('create-resource-form-userName-input')).toHaveValue(
+      'alex.taylor@example.com',
+    );
+    fireEvent.click(screen.getByTestId('create-resource-dialog-submit'));
+
+    await waitFor(() => {
+      expect(createUser).toHaveBeenCalledWith({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'alex.taylor@example.com',
+        active: true,
+      });
+    });
   });
 
   it('shows pagination controls when totalResults > pageSize', async () => {

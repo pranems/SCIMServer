@@ -56,6 +56,7 @@ import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { ConflictDialog } from '../components/primitives/ConflictDialog';
 import { ScimApiError } from '../api/scim-error';
 import { getEndpointVersion, forgetEndpointVersion } from '../api/endpoint-version';
+import type { ProfileResourceAttribute } from '../resources/profile-resource-shape';
 
 const RESERVED_NAMES = new Set(['User', 'Group']);
 const RESERVED_ENDPOINTS = new Set([
@@ -75,6 +76,12 @@ interface ResourceType {
   description?: string;
   schema: string;
   schemaExtensions?: Array<{ schema: string; required?: boolean }>;
+}
+
+interface ProfileSchema {
+  id: string;
+  name?: string;
+  attributes?: ProfileResourceAttribute[];
 }
 
 const useStyles = makeStyles({
@@ -106,7 +113,62 @@ const useStyles = makeStyles({
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
   },
+  effectiveSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  effectiveType: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    padding: '12px 0',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  effectiveHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  attributeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(220px, 2fr) minmax(120px, 1fr)',
+    gap: '4px 12px',
+    minWidth: 0,
+  },
+  attributePath: {
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase200,
+    overflowWrap: 'anywhere',
+  },
   });
+
+function flattenAttributePaths(
+  schema: ProfileSchema,
+  extension: boolean,
+): Array<{ path: string; characteristic: string }> {
+  const flattened: Array<{ path: string; characteristic: string }> = [];
+  const visit = (attributes: ProfileResourceAttribute[], parentPath?: string): void => {
+    for (const attribute of attributes) {
+      const path = parentPath
+        ? `${parentPath}.${attribute.name}`
+        : extension
+          ? `${schema.id}:${attribute.name}`
+          : attribute.name;
+      const characteristics = [
+        attribute.type,
+        attribute.required ? 'required' : undefined,
+        attribute.multiValued ? 'multi-valued' : undefined,
+        attribute.mutability,
+      ].filter(Boolean).join(', ');
+      flattened.push({ path, characteristic: characteristics });
+      if (attribute.subAttributes?.length) visit(attribute.subAttributes, path);
+    }
+  };
+  visit(schema.attributes ?? []);
+  return flattened;
+}
 
 function isCustomRt(rt: { name?: string }): boolean {
   return !!rt.name && !RESERVED_NAMES.has(rt.name);
@@ -163,7 +225,7 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
   const profile = ep.data?.profile as
     | {
         settings?: Record<string, unknown>;
-        schemas?: Array<Record<string, unknown>>;
+        schemas?: ProfileSchema[];
         resourceTypes?: ResourceType[];
       }
     | undefined;
@@ -238,7 +300,7 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
     const mergedSchemas = schemaAlreadyPresent
       ? existingSchemas
       : [...existingSchemas, newSchema];
-    const mergedRts = [...allRts, newRt as unknown as Record<string, unknown>] as unknown as ResourceType[];
+    const mergedRts = [...inventory, newRt];
 
     await saveProfile({ resourceTypes: mergedRts, schemas: mergedSchemas }, () => setCreateOpen(false));
   };
@@ -364,6 +426,57 @@ export const ResourceTypesTab: React.FC<ResourceTypesTabProps> = ({ endpointId }
           );
         })}
       </Card>
+
+      <section className={classes.effectiveSection} data-testid="resource-types-effective-schemas">
+        <Subtitle1>Effective combined schemas</Subtitle1>
+        <Caption1>
+          Core and extension attributes exposed by each ResourceType. These same writable fields
+          drive create and edit forms.
+        </Caption1>
+        {inventory.map((resourceType) => {
+          const core = profile?.schemas?.find((schema) => schema.id === resourceType.schema);
+          const extensions = (resourceType.schemaExtensions ?? [])
+            .map((binding) => ({
+              binding,
+              schema: profile?.schemas?.find((schema) => schema.id === binding.schema),
+            }))
+            .filter((entry): entry is { binding: { schema: string; required?: boolean }; schema: ProfileSchema } =>
+              entry.schema !== undefined);
+          const attributes = [
+            ...(core ? flattenAttributePaths(core, false) : []),
+            ...extensions.flatMap(({ schema }) => flattenAttributePaths(schema, true)),
+          ];
+          return (
+            <div
+              key={resourceType.id}
+              className={classes.effectiveType}
+              data-testid={`resource-types-effective-${resourceType.name}`}
+            >
+              <div className={classes.effectiveHeader}>
+                <Text weight="semibold">{resourceType.name}</Text>
+                <Badge appearance="outline">core: {resourceType.schema}</Badge>
+                {extensions.map(({ binding }) => (
+                  <Badge key={binding.schema} appearance="outline" color="informative">
+                    extension: {binding.schema}{binding.required ? ' (required)' : ''}
+                  </Badge>
+                ))}
+              </div>
+              {attributes.length > 0 ? (
+                <div className={classes.attributeGrid}>
+                  {attributes.map((attribute) => (
+                    <React.Fragment key={attribute.path}>
+                      <code className={classes.attributePath}>{attribute.path}</code>
+                      <Caption1>{attribute.characteristic}</Caption1>
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <Caption1>No attributes are declared for this schema.</Caption1>
+              )}
+            </div>
+          );
+        })}
+      </section>
 
       {customRts.length === 0 && (
         <Caption1 className={classes.flagHint} data-testid="resource-types-empty">

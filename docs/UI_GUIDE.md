@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.25`
+> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.26`
 
-> **Status:** Active | **Last Updated:** 2026-09-18 | **Version:** 0.55.25
+> **Status:** Active | **Last Updated:** 2026-09-23 | **Version:** 0.55.26
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -110,7 +110,7 @@ After authentication the app shell renders: a brand bar, a collapsible sidebar w
 |------|-------|---------|
 | Dashboard | `/` | KPIs, request volume, activity analytics, endpoint grid |
 | Endpoints | `/endpoints` | Endpoint card grid, create, drill into detail |
-| Manual Provision | `/manual-provision` | Create a User/Group through the admin path |
+| Manual Provision | `/manual-provision` | Create any ResourceType declared by an endpoint profile |
 | My profile | `/me` | SCIM `/Me` self-service (per-endpoint OAuth) |
 | Discovery | `/discovery` | Read-only RFC 7644 §4-§5 discovery, side-by-side diff |
 | Operations | `/operations` | Cross-endpoint operator view of all users/groups |
@@ -168,7 +168,7 @@ Clicking a card opens the endpoint detail page.
 
 The header carries the display name, an Active badge, the copyable endpoint id and SCIM base path, the creation date, and **Edit** / **Delete**. **Overview** shows Resource Statistics (users, groups, generic resources, credentials, config flags) and a Recent Activity list where every row carries an **auth outcome chip** such as `auth ok - OAuth JWT` or `JWT - WIF`.
 
-Ten tabs:
+Ten standard tabs, plus one tab for each custom ResourceType:
 
 | Tab | Route | What it is for |
 |---|---|---|
@@ -182,15 +182,16 @@ Ten tabs:
 | **Connect** | `/endpoints/{id}/connect` | Authentication: set up, connect, and monitor. See [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | **Logs** | `/endpoints/{id}/logs` | This endpoint's request log, with auth decision detail |
 | **Settings** | `/endpoints/{id}/settings` | Complete structured inventory of all 38 endpoint settings. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+| **Custom type** | `/endpoints/{id}/resources/{id}` | List, create, inspect, edit, and delete that custom resource type; the second id is the ResourceType id |
 
 Two details worth knowing:
 
-- **Users and Groups are conditional.** They render only when the endpoint's profile actually serves that resource type, so a user-only endpoint shows no Groups tab at all. The other eight always render.
+- **Resource tabs follow the profile.** Users and Groups render only when declared, and every custom ResourceType gets its own tab. The eight non-resource tabs always render.
 - **There is no Credentials tab.** It was merged into **Connect**; `/endpoints/{id}/credentials` still resolves but redirects there.
 
 ### 6.3 What each tab does
 
-**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Each tab starts with its related validation, concurrency, PATCH, and lifecycle settings; Groups also includes the member-PATCH controls. Selecting a row opens a detail drawer where you can edit the resource and save it back over SCIM, with ETag concurrency applied when `RequireIfMatch` is on. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
+**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Each has a visible Create action, including in the empty state. The form is generated from that endpoint's `/Schemas` and `/ResourceTypes`, starts with a working example, and previews the exact request JSON. Selecting a row opens the same profile-driven field set in a detail drawer. Save emits only changed writable attributes, including extension-qualified paths, and carries the current ETag as `If-Match`. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
 
 **Activity** is the provisioning story rather than the raw request log: the server parses requests into human events, each with a severity badge. Filter by **type** (`user`, `group`, `system`), by **severity** (`info`, `success`, `warning`, `error`), or by free text. The filters live **in the URL**, so a filtered view is a shareable link - useful when handing an investigation to someone else. Use Activity to answer "what did this provisioning job actually do?"; use **Logs** when you need the wire detail behind one of those events.
 
@@ -208,11 +209,11 @@ Two details worth knowing:
 
 The cap is **1000 operations and a 1 MB payload**. Before submitting you get a preview of the first ten operations and a **Copy full envelope as JSON** button, so you can inspect exactly what will be sent. Afterwards, **failure rows are downloadable as CSV** carrying the per-operation `scimType` and `detail` - fix that file and re-submit it rather than re-deriving which rows failed.
 
-**Resource types** lists what this endpoint serves, creates custom ones beyond User and Group, and exposes the related discovery/enforcement settings in a collapsed pane above the inventory.
+**Resource types** lists what this endpoint serves, creates custom ones beyond User and Group, and exposes the related discovery/enforcement settings in a collapsed pane above the inventory. An **Effective combined schemas** section flattens each type's core and extension attribute paths with their type, required, cardinality, and mutability characteristics.
 
 ![Resource types](screenshots/prod-12-endpoint-resource-types.png)
 
-Each row shows the type name, its endpoint path and its schema URN. **Create** asks for a name, an endpoint path (mounted under `/scim/endpoints/{id}`), a schema URN and an optional description. Delete asks for confirmation. The list renders whether or not custom types are currently enabled, so you can always see what a client would discover at `/ResourceTypes`.
+Each row shows the type name, its endpoint path and its schema URN. **Create** asks for a name, an endpoint path (mounted under `/scim/endpoints/{id}`), a schema URN and an optional description. Delete asks for confirmation. The list renders whether or not custom types are currently enabled, so you can always see what a client would discover at `/ResourceTypes`. Once registered, the custom type also appears beside Users and Groups as a first-class tab with list, create, edit, and delete workflows generated from its effective schema.
 
 **Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`, with discovery and strict-validation controls in a collapsed pane. One row per schema shows its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
 
@@ -240,7 +241,7 @@ Each row shows the type name, its endpoint path and its schema URN. **Create** a
 
 ## 7. Manual Provisioning
 
-Provision a SCIM User or Group through the admin path without an external IdP. Pick a target endpoint, choose the **User** or **Group** tab, fill the form (User: `userName*`, `externalId`, `displayName`, `givenName`, `familyName`, `email`, `active`), and submit. The created resource appears in the **Result** panel as copyable JSON.
+Provision any SCIM resource declared by an endpoint profile without an external IdP. Pick a target endpoint, select one of its discovered ResourceType tabs, review or edit the generated working example, and submit. Text, numeric, boolean, canonical-value, complex, and multi-valued attributes receive type-appropriate controls. Extension values are nested under their schema URN. The exact request body and the created resource are both copyable JSON.
 
 ![Manual Provisioning](screenshots/prod-07-manual-provision.png)
 
@@ -248,6 +249,7 @@ Provision a SCIM User or Group through the admin path without an external IdP. P
 |--------|----------|
 | Create user | `POST /scim/endpoints/{id}/Users` |
 | Create group | `POST /scim/endpoints/{id}/Groups` |
+| Create custom resource | `POST /scim/endpoints/{id}/{resourceTypeEndpoint}` |
 
 ---
 

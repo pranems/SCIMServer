@@ -19,8 +19,14 @@ import {
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
+import { Add24Regular } from '@fluentui/react-icons';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { useEndpointGroups } from '../api/queries';
+import {
+  useCreateGroup,
+  useEndpointGroups,
+  useEndpointResourceTypes,
+  useEndpointSchemas,
+} from '../api/queries';
 import { isResourceTypeUnsupportedError } from '../api/endpoint-capabilities';
 import type { GroupsSearch } from '../routes/search-schemas';
 import { ResourceDetailDrawer, type ScimResource } from '../components/detail/ResourceDetailDrawer';
@@ -31,12 +37,15 @@ import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 import { EndpointRelatedSettings } from './EndpointRelatedSettings';
 import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
+import { CreateProfileResourceDialog } from '../resources/CreateProfileResourceDialog';
+import { resolveEffectiveResourceShape } from '../resources/profile-resource-shape';
 
 const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  headerActions: { display: 'flex', alignItems: 'center', gap: '8px' },
   table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' },
   th: { textAlign: 'left', padding: '10px 12px', borderBottom: `2px solid ${tokens.colorNeutralStroke1}`, fontWeight: 600, fontSize: '13px', color: tokens.colorNeutralForeground3 },
   thDisplayName: { width: '320px' },
@@ -65,6 +74,20 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const detailId = search.detail;
   const navigate = useNavigate();
   const startIndex = (page - 1) * pageSize + 1;
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const schemasQuery = useEndpointSchemas(endpointId);
+  const resourceTypesQuery = useEndpointResourceTypes(endpointId);
+  const createGroup = useCreateGroup(endpointId);
+  const groupShape = React.useMemo(() => {
+    const resourceType = resourceTypesQuery.data?.Resources.find((candidate) =>
+      candidate.name === 'Group' || candidate.endpoint.replace(/^\//u, '') === 'Groups');
+    if (!resourceType || !schemasQuery.data) return undefined;
+    try {
+      return resolveEffectiveResourceShape(resourceType, schemasQuery.data.Resources);
+    } catch {
+      return undefined;
+    }
+  }, [resourceTypesQuery.data, schemasQuery.data]);
 
   const goToPage = (nextPage: number): void => {
     navigate({
@@ -146,8 +169,18 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
         <EmptyState
           data-testid="groups-empty"
           title="No groups in this endpoint"
-          body="Groups are provisioned to this endpoint via SCIM POST /Groups from your identity provider."
+          body="Create a group here or provision one through your identity provider."
+          actionLabel={groupShape ? 'Create group' : undefined}
+          onAction={groupShape ? () => setCreateOpen(true) : undefined}
         />
+        {groupShape && (
+          <CreateProfileResourceDialog
+            open={createOpen}
+            shape={groupShape}
+            onCreate={(payload) => createGroup.mutateAsync(payload)}
+            onClose={() => setCreateOpen(false)}
+          />
+        )}
       </div>
     );
   }
@@ -163,16 +196,27 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
       />
       <div className={classes.header}>
         <Subtitle2>{total} groups</Subtitle2>
-        <ExportSplitButton
-          rows={groups.map((g: any) => ({
-            id: g.id,
-            displayName: g.displayName ?? '',
-            memberCount: Array.isArray(g.members) ? g.members.length : 0,
-            created: g.meta?.created ?? '',
-          }))}
-          filenameBase={`groups-${endpointId}`}
-          columns={['id', 'displayName', 'memberCount', 'created']}
-        />
+        <div className={classes.headerActions}>
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            onClick={() => setCreateOpen(true)}
+            disabled={!groupShape}
+            data-testid="groups-create"
+          >
+            Create group
+          </Button>
+          <ExportSplitButton
+            rows={groups.map((g: any) => ({
+              id: g.id,
+              displayName: g.displayName ?? '',
+              memberCount: Array.isArray(g.members) ? g.members.length : 0,
+              created: g.meta?.created ?? '',
+            }))}
+            filenameBase={`groups-${endpointId}`}
+            columns={['id', 'displayName', 'memberCount', 'created']}
+          />
+        </div>
       </div>
       <table className={classes.table}>
         <thead>
@@ -227,8 +271,17 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
           kind="group"
           endpointId={endpointId}
           resource={selectedGroupResource}
+          shape={groupShape}
           open
           onClose={closeDetail}
+        />
+      )}
+      {groupShape && (
+        <CreateProfileResourceDialog
+          open={createOpen}
+          shape={groupShape}
+          onCreate={(payload) => createGroup.mutateAsync(payload)}
+          onClose={() => setCreateOpen(false)}
         />
       )}
     </div>

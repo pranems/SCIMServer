@@ -26,9 +26,13 @@ import {
   useDeleteUser,
   useUpdateGroup,
   useDeleteGroup,
+  useCreateResource,
+  useUpdateResource,
+  useDeleteResource,
   useUpdateSecuritySettings,
   queryKeys,
   type ScimListResponse,
+  type LogConfigResponse,
 } from './queries';
 import type { EndpointOverviewResponse, EndpointResponse } from '@scim/types/dashboard.types';
 import type { ConnectionInfo } from '@scim/types/connection-info.types';
@@ -753,6 +757,63 @@ describe('useDeleteGroup', () => {
   });
 });
 
+describe('generic resource mutations', () => {
+  const resourceEndpoint = '/Devices';
+
+  it('creates an arbitrary resource and invalidates its list', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateResource(EP_ID, resourceEndpoint), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        schemas: ['urn:example:schemas:Device'],
+        serialNumber: 'SN-100',
+      });
+    });
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(`/scim/endpoints/${EP_ID}/Devices`);
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('POST');
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((call) => JSON.stringify(call[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(queryKeys.resources.all(EP_ID, resourceEndpoint)));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
+    });
+  });
+
+  it('PATCHes an arbitrary resource with If-Match', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateResource(EP_ID, resourceEndpoint), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        resourceId: 'device-1',
+        body: { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [] },
+        ifMatch: 'W/"v4"',
+      });
+    });
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(`/scim/endpoints/${EP_ID}/Devices/device-1`);
+    const options = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(options.method).toBe('PATCH');
+    expect((options.headers as Record<string, string>)['If-Match']).toBe('W/"v4"');
+  });
+
+  it('deletes an arbitrary resource with If-Match', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useDeleteResource(EP_ID, resourceEndpoint), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ resourceId: 'device-1', ifMatch: '*' });
+    });
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(`/scim/endpoints/${EP_ID}/Devices/device-1`);
+    const options = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(options.method).toBe('DELETE');
+    expect((options.headers as Record<string, string>)['If-Match']).toBe('*');
+  });
+});
+
 // ─── Phase L1: useCreateEndpoint ─────────────────────────────────────
 //
 // L1 wires the already-shipped POST /admin/endpoints surface (v0.30.0)
@@ -1146,7 +1207,7 @@ describe('useActivitySummary (Phase L3)', () => {
 //   useUpdateLogConfig()        - optimistic merge + rollback (mirrors L1
 //                                 useUpdateEndpointConfig pattern)
 
-const sampleLogConfig = {
+const sampleLogConfig: LogConfigResponse = {
   globalLevel: 'DEBUG',
   categoryLevels: { auth: 'WARN', 'scim.patch': 'TRACE' },
   endpointLevels: {},

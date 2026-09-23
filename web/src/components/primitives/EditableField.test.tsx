@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { EditableField } from './EditableField';
 import React from 'react';
@@ -23,13 +24,27 @@ describe('EditableField', () => {
   const writeText = vi.fn();
   beforeEach(() => {
     writeText.mockReset();
-    Object.assign(navigator, { clipboard: { writeText, readText: vi.fn() } });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText, readText: vi.fn() },
+      configurable: true,
+    });
   });
 
   it('renders an Input with the seeded value', () => {
     renderWithFluent(<Harness initial="alice@corp.com" />);
     const input = screen.getByTestId('ef-input') as HTMLInputElement;
     expect(input.value).toBe('alice@corp.com');
+  });
+
+  it('preserves character-by-character controlled input', async () => {
+    const user = userEvent.setup();
+    renderWithFluent(<Harness initial="example" />);
+    const input = screen.getByTestId('ef-input') as HTMLInputElement;
+
+    await user.clear(input);
+    await user.type(input, 'SN-200');
+
+    expect(input.value).toBe('SN-200');
   });
 
   it('renders a Textarea when multiline=true', () => {

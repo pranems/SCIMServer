@@ -205,6 +205,11 @@ describe('computeInvalidations (Phase B3)', () => {
     expect(keys).not.toContain(k(['users', 'ep-1']));
   });
 
+  it('generic resource events invalidate every custom resource list for the endpoint', () => {
+    const keys = computeInvalidations('scim.resource.created', 'ep-1').map(k);
+    expect(keys).toContain(k(['resources', 'ep-1']));
+  });
+
   it('credential events invalidate every auth read model but NOT the resource lists', () => {
     const keys = computeInvalidations('scim.credential.created', 'ep-1').map(k);
     expect(keys).toContain(k(queryKeys.endpoints.overview('ep-1')));

@@ -800,7 +800,7 @@ export class EndpointScimGenericService {
     }
 
     // Ensure version is current
-    meta.version = `W/"${record.version}"`;
+    meta.version = `W/"v${record.version}"`;
 
     // GEN-04: Parent-context-aware boolean sanitization on output
     const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);

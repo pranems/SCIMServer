@@ -24,15 +24,11 @@ import {
   Combobox,
   Option,
   Field,
-  Input,
-  Switch,
   Button,
   Card,
   TabList,
   Tab,
-  type TabValue,
   Subtitle1,
-  Subtitle2,
   Caption1,
   Text,
   MessageBar,
@@ -40,8 +36,21 @@ import {
   MessageBarTitle,
 } from '@fluentui/react-components';
 import { Add24Regular, Person24Regular, People24Regular } from '@fluentui/react-icons';
-import { useEndpoints, useCreateUser, useCreateGroup } from '../api/queries';
+import {
+  useCreateGroup,
+  useCreateResource,
+  useCreateUser,
+  useEndpointResourceTypes,
+  useEndpointSchemas,
+  useEndpoints,
+} from '../api/queries';
 import { LoadingSkeleton, ScimErrorMessage, CopyableField, CopyableJsonBlock } from '../components/primitives';
+import { ProfileResourceForm } from '../resources/ProfileResourceForm';
+import {
+  buildCreatePayload,
+  resolveEffectiveResourceShape,
+  type EffectiveResourceShape,
+} from '../resources/profile-resource-shape';
 
 // ─── Styles ───────────────────────────────────────────────────────────
 
@@ -55,170 +64,71 @@ const useStyles = makeStyles({
   },
   formCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' },
   resultCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' },
-  switchRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: '4px',
-  },
-  pre: {
-    fontFamily: 'monospace',
-    fontSize: '12px',
-    backgroundColor: tokens.colorNeutralBackground3,
-    padding: '8px',
-    borderRadius: tokens.borderRadiusMedium,
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
-    maxHeight: '480px',
-    overflow: 'auto',
-  },
   center: {
     display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '180px',
   },
   actions: { display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px' },
 });
 
-// ─── User schema URN ──────────────────────────────────────────────────
-
-const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
-const GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
-
 // ─── Form sub-components ──────────────────────────────────────────────
 
-interface CreateUserFormProps {
+interface ManualResourceFormProps {
   endpointId: string;
+  shape: EffectiveResourceShape;
   isPending: boolean;
   onSubmit: (body: Record<string, unknown>) => void;
 }
 
-const CreateUserForm: React.FC<CreateUserFormProps> = ({ endpointId, isPending, onSubmit }) => {
+const ManualResourceForm: React.FC<ManualResourceFormProps> = ({
+  endpointId,
+  shape,
+  isPending,
+  onSubmit,
+}) => {
   const classes = useStyles();
-  const [userName, setUserName] = React.useState('');
-  const [externalId, setExternalId] = React.useState('');
-  const [displayName, setDisplayName] = React.useState('');
-  const [givenName, setGivenName] = React.useState('');
-  const [familyName, setFamilyName] = React.useState('');
-  const [email, setEmail] = React.useState('');
-  const [active, setActive] = React.useState(true);
+  const [values, setValues] = React.useState<Record<string, unknown>>({});
+  const [valid, setValid] = React.useState(true);
 
-  const formId = React.useId();
+  React.useEffect(() => {
+    setValues(Object.fromEntries(shape.fields.map((field) => [field.id, field.example])));
+    setValid(true);
+  }, [shape]);
+
+  const payload = buildCreatePayload(shape, values);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!userName.trim()) return;
-    const body: Record<string, unknown> = {
-      schemas: [USER_SCHEMA],
-      userName: userName.trim(),
-      active,
-    };
-    if (externalId.trim()) body.externalId = externalId.trim();
-    if (displayName.trim()) body.displayName = displayName.trim();
-    if (givenName.trim() || familyName.trim()) {
-      body.name = {
-        ...(givenName.trim() ? { givenName: givenName.trim() } : {}),
-        ...(familyName.trim() ? { familyName: familyName.trim() } : {}),
-      };
-    }
-    if (email.trim()) {
-      body.emails = [{ value: email.trim(), primary: true, type: 'work' }];
-    }
-    onSubmit(body);
+    if (!endpointId || isPending || !valid) return;
+    onSubmit(payload);
   }
 
-  const disabled = !endpointId || isPending;
   return (
-    <form id={formId} onSubmit={handleSubmit} className={classes.formCard} data-testid="create-user-form">
-      <Field label="userName" required>
-        <Input value={userName} onChange={(_, d) => setUserName(d.value)} disabled={disabled} required />
-      </Field>
-      <Field label="externalId">
-        <Input value={externalId} onChange={(_, d) => setExternalId(d.value)} disabled={disabled} />
-      </Field>
-      <Field label="displayName">
-        <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} disabled={disabled} />
-      </Field>
-      <Field label="givenName">
-        <Input value={givenName} onChange={(_, d) => setGivenName(d.value)} disabled={disabled} />
-      </Field>
-      <Field label="familyName">
-        <Input value={familyName} onChange={(_, d) => setFamilyName(d.value)} disabled={disabled} />
-      </Field>
-      <Field label="email">
-        <Input value={email} onChange={(_, d) => setEmail(d.value)} type="email" disabled={disabled} />
-      </Field>
-      <div className={classes.switchRow}>
-        <Text>active</Text>
-        <Switch
-          aria-label="active"
-          checked={active}
-          onChange={(_, d) => setActive(d.checked)}
-          disabled={disabled}
-        />
-      </div>
+    <form onSubmit={handleSubmit} className={classes.formCard} data-testid="manual-resource-create-form">
+      <ProfileResourceForm
+        shape={shape}
+        values={values}
+        onChange={(fieldId, value) => setValues((current) => ({
+          ...current,
+          [fieldId]: value,
+        }))}
+        onValidityChange={setValid}
+        disabled={!endpointId || isPending}
+        data-testid="manual-resource-form"
+      />
+      <CopyableJsonBlock
+        value={payload}
+        label="Request body"
+        maxHeight="220px"
+        data-testid="manual-resource-preview"
+      />
       <div className={classes.actions}>
         <Button
           appearance="primary"
           icon={<Add24Regular />}
           type="submit"
-          disabled={disabled}
+          disabled={!endpointId || isPending || !valid}
         >
-          Create User
-        </Button>
-      </div>
-    </form>
-  );
-};
-
-interface CreateGroupFormProps {
-  endpointId: string;
-  isPending: boolean;
-  onSubmit: (body: Record<string, unknown>) => void;
-}
-
-const CreateGroupForm: React.FC<CreateGroupFormProps> = ({ endpointId, isPending, onSubmit }) => {
-  const classes = useStyles();
-  const [displayName, setDisplayName] = React.useState('');
-  const [externalId, setExternalId] = React.useState('');
-  const [memberText, setMemberText] = React.useState('');
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!displayName.trim()) return;
-    const body: Record<string, unknown> = {
-      schemas: [GROUP_SCHEMA],
-      displayName: displayName.trim(),
-    };
-    if (externalId.trim()) body.externalId = externalId.trim();
-    const memberIds = memberText
-      .split(/[\s,]+/u)
-      .map((v) => v.trim())
-      .filter((v) => v.length > 0);
-    if (memberIds.length > 0) {
-      body.members = memberIds.map((value) => ({ value }));
-    }
-    onSubmit(body);
-  }
-
-  const disabled = !endpointId || isPending;
-  return (
-    <form onSubmit={handleSubmit} className={classes.formCard} data-testid="create-group-form">
-      <Field label="displayName" required>
-        <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} disabled={disabled} required />
-      </Field>
-      <Field label="externalId">
-        <Input value={externalId} onChange={(_, d) => setExternalId(d.value)} disabled={disabled} />
-      </Field>
-      <Field label="members (comma-separated user ids)" hint="Optional. Each token becomes a {value} entry on members[].">
-        <Input value={memberText} onChange={(_, d) => setMemberText(d.value)} disabled={disabled} />
-      </Field>
-      <div className={classes.actions}>
-        <Button
-          appearance="primary"
-          icon={<Add24Regular />}
-          type="submit"
-          disabled={disabled}
-        >
-          Create Group
+          Create {shape.resourceType.name}
         </Button>
       </div>
     </form>
@@ -272,13 +182,11 @@ const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
 
 // ─── Main page ───────────────────────────────────────────────────────
 
-type Tab = 'user' | 'group';
-
 export const ManualProvisionPage: React.FC = () => {
   const classes = useStyles();
   const { data, isLoading, error } = useEndpoints();
   const [endpointId, setEndpointId] = React.useState('');
-  const [tab, setTab] = React.useState<Tab>('user');
+  const [resourceTypeId, setResourceTypeId] = React.useState('User');
   const [result, setResult] = React.useState<
     { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; error: unknown } | null
   >(null);
@@ -287,6 +195,27 @@ export const ManualProvisionPage: React.FC = () => {
   // accept '' but we only invoke mutateAsync when endpointId is set.
   const createUser = useCreateUser(endpointId);
   const createGroup = useCreateGroup(endpointId);
+  const schemasQuery = useEndpointSchemas(endpointId);
+  const resourceTypesQuery = useEndpointResourceTypes(endpointId);
+  const resourceTypes = resourceTypesQuery.data?.Resources ?? [];
+  const activeResourceType = resourceTypes.find((resourceType) =>
+    resourceType.id === resourceTypeId || resourceType.name === resourceTypeId);
+  const createResource = useCreateResource(endpointId, activeResourceType?.endpoint ?? '');
+  const shape = React.useMemo(() => {
+    if (!activeResourceType || !schemasQuery.data) return undefined;
+    try {
+      return resolveEffectiveResourceShape(activeResourceType, schemasQuery.data.Resources);
+    } catch {
+      return undefined;
+    }
+  }, [activeResourceType, schemasQuery.data]);
+
+  React.useEffect(() => {
+    if (resourceTypes.length === 0) return;
+    if (!resourceTypes.some((resourceType) => resourceType.id === resourceTypeId)) {
+      setResourceTypeId(resourceTypes[0].id);
+    }
+  }, [resourceTypeId, resourceTypes]);
 
   if (isLoading) {
     // G1 - skeleton mirrors the page (header + endpoint picker + tabs +
@@ -314,14 +243,19 @@ export const ManualProvisionPage: React.FC = () => {
   function selectEndpoint(_e: unknown, d: { optionValue?: string }) {
     if (d.optionValue) {
       setEndpointId(d.optionValue);
+      setResourceTypeId('');
       setResult(null);
     }
   }
 
-  async function submitUser(body: Record<string, unknown>) {
+  async function submitResource(body: Record<string, unknown>) {
     setResult(null);
     try {
-      const resource = (await createUser.mutateAsync(body)) as Record<string, unknown>;
+      const resource = (activeResourceType?.name === 'User'
+        ? await createUser.mutateAsync(body)
+        : activeResourceType?.name === 'Group'
+          ? await createGroup.mutateAsync(body)
+          : await createResource.mutateAsync(body)) as Record<string, unknown>;
       setResult({ kind: 'success', resource });
     } catch (err) {
       // Pass the raw error so <ScimErrorMessage /> can map scimType +
@@ -330,22 +264,17 @@ export const ManualProvisionPage: React.FC = () => {
     }
   }
 
-  async function submitGroup(body: Record<string, unknown>) {
-    setResult(null);
-    try {
-      const resource = (await createGroup.mutateAsync(body)) as Record<string, unknown>;
-      setResult({ kind: 'success', resource });
-    } catch (err) {
-      setResult({ kind: 'error', error: err });
-    }
-  }
+  const pending = activeResourceType?.name === 'User'
+    ? createUser.isPending
+    : activeResourceType?.name === 'Group'
+      ? createGroup.isPending
+      : createResource.isPending;
 
   return (
     <div className={classes.root} data-testid="manual-provision-page">
       <Subtitle1>Manual Provisioning</Subtitle1>
       <Caption1>
-        Provision a SCIM User or Group through the admin path. Select a target endpoint
-        and resource type to begin.
+        Create any SCIM resource declared by the selected endpoint profile.
       </Caption1>
 
       <Card className={classes.pickerCard}>
@@ -366,27 +295,41 @@ export const ManualProvisionPage: React.FC = () => {
           </Combobox>
         </Field>
         <TabList
-          selectedValue={tab}
-          onTabSelect={(_, d) => { setTab(d.value as Tab); setResult(null); }}
+          selectedValue={resourceTypeId}
+          onTabSelect={(_, d) => { setResourceTypeId(String(d.value)); setResult(null); }}
         >
-          <Tab value="user" icon={<Person24Regular />}>User</Tab>
-          <Tab value="group" icon={<People24Regular />}>Group</Tab>
+          {resourceTypes.map((resourceType) => (
+            <Tab
+              key={resourceType.id}
+              value={resourceType.id}
+              icon={resourceType.name === 'User'
+                ? <Person24Regular />
+                : resourceType.name === 'Group'
+                  ? <People24Regular />
+                  : undefined}
+            >
+              {resourceType.name}
+            </Tab>
+          ))}
         </TabList>
       </Card>
 
       <div className={classes.body}>
-        {tab === 'user' ? (
-          <CreateUserForm
+        {shape ? (
+          <ManualResourceForm
             endpointId={endpointId}
-            isPending={createUser.isPending}
-            onSubmit={submitUser}
+            shape={shape}
+            isPending={pending}
+            onSubmit={(body) => void submitResource(body)}
           />
         ) : (
-          <CreateGroupForm
-            endpointId={endpointId}
-            isPending={createGroup.isPending}
-            onSubmit={submitGroup}
-          />
+          <Card className={classes.formCard} data-testid="manual-resource-profile-state">
+            <Text>
+              {endpointId
+                ? 'Loading the selected endpoint profile...'
+                : 'Select a target endpoint to load its resource forms.'}
+            </Text>
+          </Card>
         )}
         <ProvisionResult result={result} />
       </div>

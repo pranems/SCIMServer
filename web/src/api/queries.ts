@@ -164,6 +164,7 @@ export async function fetchWithAuth<T>(
     });
   }
 
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -228,6 +229,16 @@ export const queryKeys = {
     all: (endpointId: string) => ['groups', endpointId] as const,
     byEndpoint: (endpointId: string, params?: Record<string, unknown>) =>
       ['groups', endpointId, params] as const,
+  },
+  resources: {
+    byEndpoint: (endpointId: string) => ['resources', endpointId] as const,
+    all: (endpointId: string, resourceEndpoint: string) =>
+      ['resources', endpointId, resourceEndpoint] as const,
+    list: (
+      endpointId: string,
+      resourceEndpoint: string,
+      params?: Record<string, unknown>,
+    ) => ['resources', endpointId, resourceEndpoint, params] as const,
   },
   activity: {
     /**
@@ -521,6 +532,14 @@ function buildScimListQs(params?: ScimListParams): string {
   return qs ? `?${qs}` : '';
 }
 
+function resourceEndpointPath(resourceEndpoint: string): string {
+  return resourceEndpoint
+    .split('/')
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join('/');
+}
+
 export const endpointUsersQueryOptions = (endpointId: string, params?: ScimListParams) => ({
   queryKey: queryKeys.users.byEndpoint(endpointId, params as Record<string, unknown> | undefined),
   queryFn: () =>
@@ -532,6 +551,22 @@ export const endpointGroupsQueryOptions = (endpointId: string, params?: ScimList
   queryKey: queryKeys.groups.byEndpoint(endpointId, params as Record<string, unknown> | undefined),
   queryFn: () =>
     fetchWithAuth<ScimListResponse>(`/scim/endpoints/${endpointId}/Groups${buildScimListQs(params)}`),
+  staleTime: 15_000,
+});
+
+export const endpointResourcesQueryOptions = (
+  endpointId: string,
+  resourceEndpoint: string,
+  params?: ScimListParams,
+) => ({
+  queryKey: queryKeys.resources.list(
+    endpointId,
+    resourceEndpoint,
+    params as Record<string, unknown> | undefined,
+  ),
+  queryFn: () => fetchWithAuth<ScimListResponse>(
+    `/scim/endpoints/${endpointId}/${resourceEndpointPath(resourceEndpoint)}${buildScimListQs(params)}`,
+  ),
   staleTime: 15_000,
 });
 
@@ -975,6 +1010,17 @@ export function useEndpointGroups(endpointId: string, params?: ScimListParams) {
   return useQuery<ScimListResponse>({
     ...endpointGroupsQueryOptions(endpointId, params),
     enabled: !!endpointId,
+  });
+}
+
+export function useEndpointResources(
+  endpointId: string,
+  resourceEndpoint: string,
+  params?: ScimListParams,
+) {
+  return useQuery<ScimListResponse>({
+    ...endpointResourcesQueryOptions(endpointId, resourceEndpoint, params),
+    enabled: !!endpointId && resourceEndpointPath(resourceEndpoint).length > 0,
   });
 }
 
@@ -2084,6 +2130,68 @@ export function useCreateGroup(endpointId: string) {
       }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+export function useCreateResource(endpointId: string, resourceEndpoint: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/${resourceEndpointPath(resourceEndpoint)}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.resources.all(endpointId, resourceEndpoint) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+export function useUpdateResource(endpointId: string, resourceEndpoint: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { resourceId: string; body: Record<string, unknown>; ifMatch?: string }
+  >({
+    mutationFn: ({ resourceId, body, ifMatch }) =>
+      fetchWithAuth(
+        `/scim/endpoints/${endpointId}/${resourceEndpointPath(resourceEndpoint)}/${encodeURIComponent(resourceId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+          headers: ifMatchHeaders(ifMatch),
+        },
+      ),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.resources.all(endpointId, resourceEndpoint) });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+export function useDeleteResource(endpointId: string, resourceEndpoint: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { resourceId: string; ifMatch?: string }
+  >({
+    mutationFn: ({ resourceId, ifMatch }) =>
+      fetchWithAuth(
+        `/scim/endpoints/${endpointId}/${resourceEndpointPath(resourceEndpoint)}/${encodeURIComponent(resourceId)}`,
+        {
+          method: 'DELETE',
+          headers: ifMatchHeaders(ifMatch),
+        },
+      ),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.resources.all(endpointId, resourceEndpoint) });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
