@@ -101,12 +101,58 @@ function Test-Condition {
     Write-Host "  PASS  $Message" -ForegroundColor Green
 }
 
+function Write-CanonicalJsonElement {
+    param(
+        [Parameter(Mandatory)][System.Text.Json.JsonElement]$Element,
+        [Parameter(Mandatory)][System.Text.Json.Utf8JsonWriter]$Writer
+    )
+
+    switch ($Element.ValueKind) {
+        ([System.Text.Json.JsonValueKind]::Object) {
+            $Writer.WriteStartObject()
+            $propertyNames = [Collections.Generic.List[string]]::new()
+            foreach ($property in $Element.EnumerateObject()) {
+                $propertyNames.Add($property.Name)
+            }
+            $propertyNames.Sort([StringComparer]::Ordinal)
+            foreach ($propertyName in $propertyNames) {
+                $Writer.WritePropertyName($propertyName)
+                Write-CanonicalJsonElement -Element $Element.GetProperty($propertyName) -Writer $Writer
+            }
+            $Writer.WriteEndObject()
+            break
+        }
+        ([System.Text.Json.JsonValueKind]::Array) {
+            $Writer.WriteStartArray()
+            foreach ($item in $Element.EnumerateArray()) {
+                Write-CanonicalJsonElement -Element $item -Writer $Writer
+            }
+            $Writer.WriteEndArray()
+            break
+        }
+        default {
+            $Element.WriteTo($Writer)
+        }
+    }
+}
+
 function Get-ValueHash {
     param([AllowNull()]$Value)
 
     $json = ConvertTo-Json -InputObject $Value -Depth 100 -Compress
     if ([string]::IsNullOrEmpty($json)) { $json = 'null' }
-    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+    $document = [System.Text.Json.JsonDocument]::Parse($json)
+    $stream = [IO.MemoryStream]::new()
+    $writer = [System.Text.Json.Utf8JsonWriter]::new($stream)
+    try {
+        Write-CanonicalJsonElement -Element $document.RootElement -Writer $writer
+        $writer.Flush()
+        $bytes = $stream.ToArray()
+    } finally {
+        $writer.Dispose()
+        $stream.Dispose()
+        $document.Dispose()
+    }
     return ([BitConverter]::ToString(
         [Security.Cryptography.SHA256]::HashData($bytes)
     )).Replace('-', '').ToLowerInvariant()
@@ -156,6 +202,53 @@ if ($SelfTest) {
         $reverseConflictRejected = $_.Exception.Message -like "*id 'Device'*named 'LegacyDevice'*"
     }
     Test-Condition $reverseConflictRejected 'Device id with a different name is rejected before mutation'
+
+    $orderedOne = [ordered]@{
+        id         = 'Device'
+        enabled    = $true
+        count      = 7
+        ratio      = 1.25
+        optional   = $null
+        attributes = @(
+            [ordered]@{ name = 'serialNumber'; required = $true }
+            [ordered]@{ name = 'riskScore'; required = $false }
+        )
+    }
+    $orderedTwo = [ordered]@{
+        attributes = @(
+            [ordered]@{ required = $true; name = 'serialNumber' }
+            [ordered]@{ required = $false; name = 'riskScore' }
+        )
+        optional = $null
+        ratio    = 1.25
+        count    = 7
+        enabled  = $true
+        id       = 'Device'
+    }
+    Test-Condition ((Get-ValueHash $orderedOne) -eq (Get-ValueHash $orderedTwo)) 'semantic hashes ignore object property order'
+
+    $reorderedArray = [ordered]@{
+        id         = 'Device'
+        enabled    = $true
+        count      = 7
+        ratio      = 1.25
+        optional   = $null
+        attributes = @(
+            [ordered]@{ name = 'riskScore'; required = $false }
+            [ordered]@{ name = 'serialNumber'; required = $true }
+        )
+    }
+    Test-Condition ((Get-ValueHash $orderedOne) -ne (Get-ValueHash $reorderedArray)) 'semantic hashes preserve array order'
+
+    $changedScalar = [ordered]@{
+        id         = 'Device'
+        enabled    = $false
+        count      = 7
+        ratio      = 1.25
+        optional   = $null
+        attributes = $orderedOne.attributes
+    }
+    Test-Condition ((Get-ValueHash $orderedOne) -ne (Get-ValueHash $changedScalar)) 'semantic hashes preserve scalar values'
     Write-Host 'Fixture self-test complete.' -ForegroundColor Green
     return
 }

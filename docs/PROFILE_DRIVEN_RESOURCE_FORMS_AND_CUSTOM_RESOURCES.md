@@ -1,6 +1,6 @@
 # Profile-Driven Resource Forms and Custom Resources
 
-> **Status:** Implemented - **Last verified:** 2026-09-23 - **Product version:** `0.55.26`
+> **Status:** Implemented and extended - **Last verified:** 2026-09-23 - **Product version:** `0.55.27`
 
 ## Purpose
 
@@ -122,4 +122,4 @@ The Playwright workflow creates a disposable endpoint, adds a User extension and
 
 ## Scope
 
-This rollback unit does not add Workbench request templates, seed the named dev fixture, change the portable profile format, or deploy to dev. Those remain separate rollback units.
+The original v0.55.26 rollback unit did not add Workbench request templates, seed the named dev fixture, change the portable profile format, or deploy to dev. The separate v0.55.27 rollback unit added the Workbench examples, deployed the combined UI to dev, and configured `PRTest-Auth-Methods-ISV-1` with Device plus User and Group provisioning extensions. The portable profile format remains unchanged.

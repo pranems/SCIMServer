@@ -21,6 +21,7 @@
 | WB-13 | Security | High | Shared `fetchWithAuth` let caller headers override or accompany the stored bearer, including lowercase and padded duplicates. | Final security review | Trim names, remove Authorization case-insensitively, and apply stored bearer last. |
 | WB-14 | Fixture safety | Medium | Device merge keyed by id while verification keyed by name, so a same-name/different-id definition could be mutated before the ambiguity failed. | Final fixture review | Reject conflicting identity before PATCH and merge/verify the owned Device consistently by id. |
 | WB-15 | API robustness | Medium | A whitespace-only caller header became an empty header name and could make browser `fetch` reject before Workbench produced an outcome. | Corrected-tip review | Trim first and discard empty names in the shared sanitizer. |
+| WB-16 | Test correctness | Medium | Named dev apply published and preserved everything but exact owned-schema verification failed because equivalent objects had different property order. | Named dev fixture gate | Canonicalize object keys before hashing while preserving array order. |
 
 ## Issue Details
 
@@ -159,13 +160,24 @@
 - **Prevention:** Base-fetch and Workbench mutation tests inject whitespace-only plus valid custom headers, proving the blank entry is removed without dropping the valid one.
 - **Escape analysis:** Found by corrected-tip review after the first PR push. Earliest capable gate was the shared sanitizer unit suite. Escape delta: review to unit.
 
+### WB-16 - Semantic Equality Depended on JSON Property Order
+
+- **Symptom:** The named dev apply published Device plus both extensions and passed every non-owned preservation assertion, then failed `owned schemas converged`.
+- **Root cause:** Expected definitions were ordered hashtables while the admin GET returned PSCustomObjects in server property order. `Get-ValueHash` hashed raw serialized order, so equivalent JSON objects produced different digests.
+- **Fix:** Parse the JSON and recursively write canonical object keys before SHA-256 hashing; preserve array order and scalar representation.
+- **Why it works:** Object member order is not semantically significant, while schema and attribute array order remains part of the compared contract.
+- **Prevention:** Fixture `-SelfTest` constructs nested equivalent objects in opposite property order. The named dev apply and immediate rerun both pass 17/17 assertions after the fix.
+- **Escape analysis:** The first shared-estate execution caught the false negative after mutation. The earliest capable gate was the pure hash self-test, now added. Escape delta: named dev to self-test.
+
 ## Self-Improvement Dispositions
 
 - **Test/gate:** Applied. Workbench mutation coverage proves arbitrary header transmission, browser coverage proves a generated ETag PATCH persists a real value, and fixture `-SelfTest` proves identity-safe idempotent merge behavior.
 - **Design/architecture:** Accepted. One pure template module plus one discovery panel keeps request algebra separate from the existing executor. A registry abstraction beyond the current four categories would be speculative.
 - **Security:** Applied. Editable Authorization cannot override the stored authenticated bearer.
 - **Performance:** Accepted. Discovery uses existing five-minute caches and fetches only one existing resource for PATCH generation.
+- **Final test/gate disposition:** Applied. The live property-order false negative produced WB-16 plus a pure canonical-hash regression test; full post-fixture live and Playwright gates are green.
+- **Final design/architecture disposition:** Accepted. Canonical JSON belongs inside the existing fixture verifier; extracting a separate module for one script and one caller would be speculative.
 
 ## Provenance and Completeness
 
-Issues were recorded as their fixes were confirmed and reconciled against the full unit-3 interval of the session transcript. The direct scan began at the `feat/workbench-templates-v0.55.27` marker and used error/signal plus diagnosis-phrase passes. Expected missing-module RED failures, matcher-only failures, repeated command output, the known Mermaid built-in `0.0.0` metadata warning, repository TypeScript baseline errors outside changed files, and an unrelated older-auth review response were inspected and dismissed. Every diagnosed unit-3 issue maps to WB-1 through WB-15.
+Issues were recorded as their fixes were confirmed and reconciled against the full unit-3 interval of the session transcript. The direct scan began at the `feat/workbench-templates-v0.55.27` marker and used error/signal plus diagnosis-phrase passes. Expected missing-module RED failures, matcher-only failures, repeated command output, the known Mermaid built-in `0.0.0` metadata warning, repository TypeScript baseline errors outside changed files, and an unrelated older-auth review response were inspected and dismissed. Every diagnosed unit-3 issue maps to WB-1 through WB-16.
