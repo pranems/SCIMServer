@@ -106,7 +106,7 @@ The script resolves the active dev estate, verifies the endpoint's canonical id,
 | PowerShell parser | Deployment-time fixture script has zero syntax errors |
 | Disposable fixture proof | First apply 17/17; idempotent rerun 17/17; cleanup passed |
 
-Final local evidence: web Vitest/coverage 1,505/1,505 across 112 files; exact v0.55.27 live SCIM 1,500/1,500; fixture identity/idempotency self-test 5/5; Workbench route 9.74 kB gzipped against a 110 kB budget.
+Final evidence: web Vitest/coverage 1,505/1,505 across 112 files; exact v0.55.27 local and post-fixture dev live SCIM 1,500/1,500 each; fixture identity/idempotency/canonical-hash self-test 8/8; named dev fixture apply plus rerun 34/34 from clean committed script `565aa19776fe03333c7df5a4940c84bd513b2f26`; final dev Playwright 233 passed, 4 intentionally skipped, 0 failed; Workbench route 9.74 kB gzipped against a 110 kB budget.
 
 ## Scope
 

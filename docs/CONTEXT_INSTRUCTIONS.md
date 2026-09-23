@@ -25,18 +25,18 @@ endpoint integrity 60 -> 60 with zero missing IDs, and two active revisions
 including the v0.55.23 rollback target. Canary and customer prod were not
 touched.
 
-The current v0.55.27 rollback unit is implemented locally on
-`feat/workbench-templates-v0.55.27`. Workbench offers static server/admin,
-selected endpoint, and discovery-derived ResourceType request examples. Apply
-loads an editable method/path/body/header draft; generated PATCH requests use a
-real resource id and returned ETag. Enabled headers now reach the executor while
-stored admin Authorization remains authoritative. The dev fixture script is
-staged but not run; it additively configures Device plus User/Group extensions
-on `PRTest-Auth-Methods-ISV-1` after the merged image reaches dev. Local evidence
-is web 1,505/1,505 with coverage ratchets, focused 37 plus serializer/security
-coverage, Playwright 1/1, exact
-local live 1,500/1,500, all builds/budgets, and fixture first/rerun 34/34. PR, merge, and
-deployment remain pending; canary and customer prod are untouched.
+The v0.55.27 Workbench rollback unit is merged through PR #162 and deployed to
+dev. Workbench offers static server/admin, selected endpoint, and
+discovery-derived ResourceType request examples. Apply loads an editable
+method/path/body/header draft; generated PATCH requests use a real resource id
+and returned ETag. Enabled headers reach the executor while stored admin
+Authorization remains authoritative. `PRTest-Auth-Methods-ISV-1` now publishes
+Device plus User/Group provisioning extensions. Clean committed fixture script
+`565aa19776fe03333c7df5a4940c84bd513b2f26` passed 8/8 self-tests and named dev
+apply/rerun 34/34. Final evidence is web 1,505/1,505 with coverage ratchets,
+local and dev live 1,500/1,500, Playwright 233 passed / 4 skipped / 0 failed,
+all builds/budgets, and Mermaid 709/709. PR #163 merged the inspected intended
+Manual Provision visual baseline. Canary and customer prod are untouched.
 
 The change refines endpoint settings and Connect. Contextual
 panes are collapsed; Users owns only its two lifecycle settings and Groups only
