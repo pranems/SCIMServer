@@ -23,7 +23,12 @@ const mockUseEndpoints = vi.fn();
 const mockUseEndpointSchemas = vi.fn();
 const mockUseEndpointResourceTypes = vi.fn();
 const mockUseEndpointServiceProviderConfig = vi.fn();
-const mockNavigate = vi.fn();
+const routerMock = vi.hoisted(() => ({
+  initialSearch: {} as Record<string, unknown>,
+  setSearch: undefined as React.Dispatch<React.SetStateAction<Record<string, unknown>>> | undefined,
+  navigate: vi.fn(),
+}));
+const mockNavigate = routerMock.navigate;
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -43,9 +48,21 @@ vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
     '@tanstack/react-router',
   );
+  const react = await vi.importActual<typeof import('react')>('react');
   return {
     ...actual,
-    useNavigate: () => mockNavigate,
+    useSearch: () => {
+      const [search, setSearch] = react.useState(routerMock.initialSearch);
+      routerMock.setSearch = setSearch;
+      return search;
+    },
+    useNavigate: () => (options: { search?: Record<string, unknown> | ((previous: Record<string, unknown>) => Record<string, unknown>) }) => {
+      mockNavigate(options);
+      if (!options.search) return;
+      routerMock.setSearch?.((previous) =>
+        typeof options.search === 'function' ? options.search(previous) : options.search ?? previous,
+      );
+    },
   };
 });
 
@@ -149,6 +166,7 @@ function defaultHookReturn<T>(data: T | undefined = undefined): {
 describe('DiscoveryExplorerPage (Phase L5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerMock.initialSearch = {};
     mockUseEndpoints.mockReturnValue(defaultHookReturn(sampleEndpoints));
     mockUseEndpointSchemas.mockImplementation((id: string) =>
       id ? defaultHookReturn(sampleSchemas) : defaultHookReturn(undefined),
@@ -327,6 +345,7 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
     fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
     const btn = screen.getByTestId('discovery-open-in-workbench');
     expect(btn).not.toBeDisabled();
+    mockNavigate.mockClear();
     fireEvent.click(btn);
     // Default tab is ServiceProviderConfig -> path uses that surface.
     expect(mockNavigate).toHaveBeenCalledTimes(1);

@@ -36,11 +36,31 @@ const mockUpdateWif = vi.fn();
 const mockVerifyWif = vi.fn();
 const mockDebugWif = vi.fn();
 const mockUpdateConfigMutate = vi.fn();
-const mockNavigate = vi.fn();
+const routerMock = vi.hoisted(() => ({
+  initialSearch: {} as Record<string, unknown>,
+  setSearch: undefined as React.Dispatch<React.SetStateAction<Record<string, unknown>>> | undefined,
+  navigate: vi.fn(),
+}));
+const mockNavigate = routerMock.navigate;
 let mockRetainedSecrets: Record<string, string> = {};
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router');
-  return { ...actual, useNavigate: () => mockNavigate };
+  const react = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    useSearch: () => {
+      const [search, setSearch] = react.useState(routerMock.initialSearch);
+      routerMock.setSearch = setSearch;
+      return search;
+    },
+    useNavigate: () => (options: { search?: Record<string, unknown> | ((previous: Record<string, unknown>) => Record<string, unknown>) }) => {
+      mockNavigate(options);
+      if (!options.search) return;
+      routerMock.setSearch?.((previous) =>
+        typeof options.search === 'function' ? options.search(previous) : options.search ?? previous,
+      );
+    },
+  };
 });
 let createMutationState = { isPending: false };
 let deleteMutationState = { isPending: false };
@@ -140,6 +160,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('CredentialsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerMock.initialSearch = {};
     mockUseConnectionInfo.mockReturnValue({ data: undefined, isLoading: false, error: null });
     createMutationState = { isPending: false };
     deleteMutationState = { isPending: false };

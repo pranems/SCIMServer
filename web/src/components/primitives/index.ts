@@ -62,3 +62,6 @@ export type { ConflictDialogProps } from './ConflictDialog';
 
 export { ExportSplitButton } from './ExportSplitButton';
 export type { ExportSplitButtonProps } from './ExportSplitButton';
+
+export { ContextBackButton, useContextBack } from './ContextBackButton';
+export type { ContextBackButtonProps } from './ContextBackButton';

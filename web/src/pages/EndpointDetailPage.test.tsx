@@ -151,15 +151,15 @@ describe('EndpointDetailPage', () => {
     await waitFor(() => expect(tab).toHaveAttribute('aria-selected', 'true'));
   });
 
-  it('renders the back-to-endpoints Link', async () => {
+  it('renders the context-preserving Back command', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockEndpoint, isLoading: false, error: null,
     });
 
     renderDetail();
     const back = await screen.findByTestId('back-to-endpoints');
-    // The Link should resolve to /endpoints in its href.
-    expect(back).toHaveAttribute('href', '/endpoints');
+    expect(back).toHaveRole('button');
+    expect(back).toHaveAccessibleName('Back');
   });
 
   it('clicking the Users tab triggers navigation (handler invoked)', async () => {

@@ -19,7 +19,7 @@ import {
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
 import { useEndpoint, useUpdateEndpointConfig } from '../api/queries';
-import { LoadingSkeleton, EditableField, CopyableField } from '../components/primitives';
+import { LoadingSkeleton, EditableField, CopyableField, useContextBack } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 
 const useStyles = makeStyles({
@@ -47,6 +47,9 @@ export const EditEndpointPage: React.FC<EditEndpointPageProps> = ({ endpointId }
   const navigate = useNavigate();
   const { data: endpoint, isLoading, error } = useEndpoint(endpointId);
   const updateMutation = useUpdateEndpointConfig(endpointId);
+  const returnToContext = useContextBack(() => {
+    void navigate({ to: '/endpoints/$endpointId', params: { endpointId } });
+  });
 
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
@@ -85,13 +88,12 @@ export const EditEndpointPage: React.FC<EditEndpointPageProps> = ({ endpointId }
     }
     if (active !== endpoint.active) body.active = active;
     if (Object.keys(body).length === 0) {
-      // No-op save - just go back.
-      void navigate({ to: '/endpoints/$endpointId', params: { endpointId } });
+      returnToContext();
       return;
     }
     try {
       await updateMutation.mutateAsync(body);
-      void navigate({ to: '/endpoints/$endpointId', params: { endpointId } });
+      returnToContext();
     } catch (err) {
       setSubmitError(err);
     }
@@ -136,7 +138,7 @@ export const EditEndpointPage: React.FC<EditEndpointPageProps> = ({ endpointId }
       <div className={classes.buttonRow}>
         <Button
           appearance="subtle"
-          onClick={() => void navigate({ to: '/endpoints/$endpointId', params: { endpointId } })}
+          onClick={returnToContext}
           disabled={updateMutation.isPending}
           data-testid="edit-endpoint-cancel-button"
         >

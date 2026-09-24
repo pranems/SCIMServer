@@ -11,6 +11,7 @@ import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
 import { endpointsQueryOptions } from '../api/queries';
+import { discoverySearchSchema } from './search-schemas';
 
 // Phase K1 - lazy-load DiscoveryExplorerPage into its own chunk.
 const DiscoveryExplorerPage = React.lazy(() =>
@@ -23,5 +24,6 @@ export const discoveryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/discovery',
   component: DiscoveryExplorerPage,
+  validateSearch: discoverySearchSchema,
   loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
 });

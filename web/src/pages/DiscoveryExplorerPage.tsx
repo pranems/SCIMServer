@@ -49,7 +49,7 @@ import {
   Open24Regular,
   ArrowSync20Regular,
 } from '@fluentui/react-icons';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   useEndpoints,
   useEndpointSchemas,
@@ -63,6 +63,7 @@ import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../c
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
+import type { DiscoverySearch } from '../routes/search-schemas';
 import {
   compareSchemas,
   type ScimSchemaForDiff,
@@ -109,7 +110,7 @@ const useStyles = makeStyles({
     },
   },
   pickerCardSelected: {
-    borderColor: tokens.colorBrandStroke1,
+    border: `1px solid ${tokens.colorBrandStroke1}`,
     boxShadow: tokens.shadow4Brand,
   },
   toolbar: {
@@ -197,13 +198,20 @@ const useStyles = makeStyles({
 export const DiscoveryExplorerPage: React.FC = () => {
   const classes = useStyles();
   const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as Partial<DiscoverySearch>;
 
   const endpoints = useEndpoints();
 
-  const [primaryId, setPrimaryId] = useState<string>('');
-  const [compareEnabled, setCompareEnabled] = useState(false);
-  const [secondaryId, setSecondaryId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<DiscoveryTabKey>('serviceProviderConfig');
+  const primaryId = search.primaryId ?? '';
+  const compareEnabled = search.compare ?? false;
+  const secondaryId = search.secondaryId ?? '';
+  const activeTab = search.tab ?? 'serviceProviderConfig';
+  const updateSearch = (patch: Partial<DiscoverySearch>): void => {
+    void navigate({
+      to: '/discovery',
+      search: (previous) => ({ ...previous, ...patch }),
+    });
+  };
 
   // Hook fan-out: 2 endpoints x 3 surfaces = 6 hooks. Each surface
   // has its own staleTime so the cache tier is correct per resource.
@@ -299,7 +307,7 @@ export const DiscoveryExplorerPage: React.FC = () => {
                 <Card
                   key={ep.id}
                   className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                  onClick={() => setPrimaryId(ep.id)}
+                  onClick={() => updateSearch({ primaryId: ep.id })}
                   role="button"
                   aria-pressed={selected}
                   data-testid={`discovery-primary-option-${ep.id}`}
@@ -318,8 +326,10 @@ export const DiscoveryExplorerPage: React.FC = () => {
             appearance="subtle"
             icon={<ArrowSwap20Regular />}
             onClick={() => {
-              setCompareEnabled((v) => !v);
-              if (compareEnabled) setSecondaryId('');
+              updateSearch({
+                compare: compareEnabled ? undefined : true,
+                secondaryId: compareEnabled ? undefined : secondaryId || undefined,
+              });
             }}
             data-testid="discovery-toggle-compare"
           >
@@ -340,7 +350,7 @@ export const DiscoveryExplorerPage: React.FC = () => {
                   <Card
                     key={ep.id}
                     className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                    onClick={() => setSecondaryId(ep.id)}
+                    onClick={() => updateSearch({ secondaryId: ep.id })}
                     role="button"
                     aria-pressed={selected}
                     data-testid={`discovery-secondary-option-${ep.id}`}
@@ -358,7 +368,7 @@ export const DiscoveryExplorerPage: React.FC = () => {
       {/* Sub-tabs */}
       <TabList
         selectedValue={activeTab}
-        onTabSelect={(_e, d) => setActiveTab(d.value as DiscoveryTabKey)}
+        onTabSelect={(_e, d) => updateSearch({ tab: d.value as DiscoveryTabKey })}
         data-testid="discovery-subtabs"
       >
         <Tab
@@ -686,11 +696,11 @@ const SchemasDiffView: React.FC<{
         // Either side may be missing the schema entirely.
         const aForDiff: ScimSchemaForDiff = {
           id: urn,
-          attributes: a?.attributes ?? [],
+          attributes: (a?.attributes ?? []).map((attribute) => ({ ...attribute })),
         };
         const bForDiff: ScimSchemaForDiff = {
           id: urn,
-          attributes: b?.attributes ?? [],
+          attributes: (b?.attributes ?? []).map((attribute) => ({ ...attribute })),
         };
         const diff = compareSchemas(aForDiff, bForDiff);
         return (

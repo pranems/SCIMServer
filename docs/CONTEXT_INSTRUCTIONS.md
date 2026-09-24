@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.30
+> **Version**: 0.55.31
 > **Last Updated**: September 24, 2026
 > **Last verified:** 2026-09-24
 
@@ -17,6 +17,16 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The v0.55.31 context-preserving navigation rollback unit is consolidated
+locally on `feat/back-navigation-v05531`. Back uses in-app router history with
+safe direct-link fallbacks. Connect method, Operations filters/pages, Discovery
+comparison state, and existing list/drawer search state are URL-owned, so Back
+and refresh restore the complete workflow. Evidence so far is focused Vitest
+155/155, web coverage 1,534/1,534 across 115 files, search schemas 23/23,
+Playwright 3/3, live 1,516/1,516, the web production build and route budgets,
+zero touched-file diagnostics, docs, and Mermaid 713/713. PR, merge, and dev
+deployment remain pending. Canary and customer prod are unchanged.
 
 The v0.55.30 credential lifecycle rollback unit is merged and verified on dev.
 Repository-owned atomic rotation prevents

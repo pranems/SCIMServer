@@ -13,9 +13,9 @@
  *   /endpoints/$endpointId/logs     -> LogsTab
  *   /endpoints/$endpointId/settings -> SettingsTab
  *
- * Tab clicks call useNavigate() to push the new URL; the back button uses
- * <Link to="/endpoints">. The legacy useState<TabValue> + Zustand navigate
- * have been removed.
+ * Tab clicks call useNavigate() to push the new URL. Back uses in-app router
+ * history so list filters and prior route state are restored; a direct deep
+ * link falls back to /endpoints.
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.3
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
@@ -33,10 +33,10 @@ import {
   Caption1,
 } from '@fluentui/react-components';
 import { Edit24Regular, Delete24Regular } from '@fluentui/react-icons';
-import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEndpoint } from '../api/queries';
 import { endpointSupportsResourceType } from '../api/endpoint-capabilities';
-import { CopyableField, LoadingSkeleton } from '../components/primitives';
+import { ContextBackButton, CopyableField, LoadingSkeleton } from '../components/primitives';
 import { DeleteEndpointDialog } from '../components/endpoint/DeleteEndpointDialog';
 
 const useStyles = makeStyles({
@@ -235,14 +235,12 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
 
   return (
     <div className={classes.page} data-testid="endpoint-detail-page">
-      {/* Back button - real <Link> so middle-click / right-click work */}
-      <Link
-        to="/endpoints"
-        style={{ alignSelf: 'flex-start', marginBottom: '8px', textDecoration: 'none' }}
-        data-testid="back-to-endpoints"
-      >
-        <Button appearance="subtle">← Back to Endpoints</Button>
-      </Link>
+      <div style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>
+        <ContextBackButton
+          onFallback={() => { void navigate({ to: '/endpoints' }); }}
+          data-testid="back-to-endpoints"
+        />
+      </div>
 
       {/* Header: Name + Status */}
       <div className={classes.header}>

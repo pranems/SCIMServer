@@ -48,7 +48,7 @@ import {
   AccordionPanel,
   Switch,
 } from '@fluentui/react-components';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   Add24Regular,
   Delete24Regular,
@@ -89,6 +89,7 @@ import { EndpointRelatedSettings } from './EndpointRelatedSettings';
 import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import type { ConnectionInfo, ConnectionMethod } from '@scim/types/connection-info.types';
+import type { ConnectSearch } from '../routes/search-schemas';
 import {
   EmptyState,
   FormDialog,
@@ -2001,6 +2002,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const revealMutation = useRevealCredential(endpointId);
   const rotateMutation = useRotateCredential(endpointId);
   const configMutation = useUpdateEndpointConfig(endpointId);
+  const routeSearch = useSearch({ strict: false }) as Partial<ConnectSearch>;
 
   // V3 - which credential's label is being edited inline, + its draft value.
   const [editLabelId, setEditLabelId] = React.useState<string | null>(null);
@@ -2014,8 +2016,8 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const [clientIdInput, setClientIdInput] = React.useState('');
   // R7 - which credential type the create dialog will mint.
   const [createType, setCreateType] = React.useState<'bearer' | 'oauth_client'>('bearer');
-  // R6 - the selected per-method sub-tab.
-  const [methodTab, setMethodTab] = React.useState<MethodTab>('all');
+  // R6 / Unit 4A - the selected method lives in the URL so Back/refresh restores it.
+  const methodTab = routeSearch.method;
   const [createError, setCreateError] = React.useState<unknown>(null);
   // Plaintext token returned ONCE on create - keep around so the user
   // can copy it. Cleared when the modal closes after acknowledgement.
@@ -2161,7 +2163,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
     methodTabs.find((t) => t.value !== 'shared_secret')?.value ??
     methodTabs[0]?.value ??
     'shared_secret';
-  const activeTab: MethodTab = methodTabs.some((t) => t.value === methodTab)
+  const activeTab: MethodTab = methodTab !== undefined && methodTabs.some((t) => t.value === methodTab)
     ? methodTab
     : defaultTabValue;
   const activeDef = methodTabs.find((t) => t.value === activeTab) ?? methodTabs[0] ?? null;
@@ -2317,7 +2319,13 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
       <TabList
         className={classes.methodTabs}
         selectedValue={activeTab}
-        onTabSelect={(_, d) => setMethodTab(d.value as MethodTab)}
+        onTabSelect={(_, d) => {
+          void navigate({
+            to: '/endpoints/$endpointId/connect',
+            params: { endpointId },
+            search: (previous) => ({ ...previous, method: d.value as ConnectSearch['method'] }),
+          });
+        }}
         data-testid="credentials-method-tabs"
       >
         {methodTabs.map((t) => (

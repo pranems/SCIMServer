@@ -11,6 +11,7 @@ import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';
 import { endpointOverviewQueryOptions } from '../api/queries';
+import { connectSearchSchema } from './search-schemas';
 
 // Lazy-load the unified tab (CredentialsTab is the merged Connect surface).
 const CredentialsTab = React.lazy(() =>
@@ -26,6 +27,7 @@ export const connectTabRoute = createRoute({
   getParentRoute: () => endpointDetailRoute,
   path: 'connect',
   component: ConnectTabRouteComponent,
+  validateSearch: connectSearchSchema,
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(endpointOverviewQueryOptions(params.endpointId)),
 });
