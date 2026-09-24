@@ -126,7 +126,8 @@
 - **Escape delta:** None; all failures occurred before conclusions or commits.
 - **Fix:** Review the target through absolute file reads and terminal Git diff, replace unavailable `rg` with `Select-String`, narrow multi-file patches after local reads, locate moved types/modules by symbol search, and cast only the test-double boundary for Prisma-generated signatures.
 - **Why it works:** Every conclusion and edit is grounded in the actual target worktree while production types remain strict.
-- **Prevention:** Do not delegate sibling-worktree review to a workspace-scoped index unless that worktree is open; prefer one local edit slice per patch.
+- **Additional tooling incident:** A reversible `.dockerignore` negative control and its restoration check were mistakenly launched in parallel against the same file. The check raced the restore and left a BOM/line-ending-only worktree delta. The committed blob was never changed; the file was restored to a matching normalized Git blob before proceeding.
+- **Prevention:** Do not parallelize any tool calls that read and mutate the same path. Do not use PowerShell object-pipeline output to restore a Git blob; use `apply_patch` and verify with `git hash-object --path`.
 
 ### CRO-18 - Correct derived totals introduced an unbounded query
 
