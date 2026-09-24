@@ -1,10 +1,10 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.29`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.30`
 
-> **Version:** 0.55.29 - **Updated:** 2026-09-18
+> **Version:** 0.55.30 - **Updated:** 2026-09-18
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
-> **118 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
+> **120 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 >
 > **Cross-cutting contract:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) explains which existing route owns each profile, method, credential, server-policy, discovery, and connection-info operation. Proposed profile-import/provider-catalogue routes in that design are not part of this current API reference.
 
@@ -675,7 +675,7 @@ Authorization: Bearer changeme-scim
 | `legacy` | Credentials that still carry a bcrypt secret. **This is the tail.** |
 | `keyed` | Migrated to `hmac-sha256-v1` (issued at create or by rotation). |
 | `secretless` | Rows with no secret at all (`wif`) - verified as a JWT against a JWKS, never bcrypt. Counted separately so they cannot hold the gate shut forever. |
-| `readyToRetireLegacyPath` | `legacy.active === 0`. **Not** total-based: nothing can ever clear an inactive row (rotation and DELETE both *create* them), so a total-based gate could never open. |
+| `readyToRetireLegacyPath` | `legacy.active === 0`. **Not** total-based: inactive rows do not authenticate and may now be removed deliberately through the inactive-only purge route. |
 | `endpoints[]` | Only endpoints that still hold legacy rows - the array IS the work queue, and empty means done. |
 
 **Rotation is the migration path:** `POST .../credentials/:id/rotate` reissues
@@ -685,17 +685,25 @@ still need rotating rather than only how many.
 
 ---
 
-### DELETE /scim/admin/endpoints/:endpointId/credentials/:credentialId
+### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/deactivate
 
-Revoke a credential.
+Explicitly deactivate a credential or WIF trust. The row is retained for audit and can be reactivated.
 
 ```http
-DELETE /scim/admin/endpoints/a1b2c3d4-.../credentials/cred-uuid-... HTTP/1.1
+POST /scim/admin/endpoints/a1b2c3d4-.../credentials/cred-uuid-.../deactivate HTTP/1.1
 Host: localhost:8080
 Authorization: Bearer changeme-scim
 ```
 
-**Response:** 204 No Content
+**Response:** 200 with the public credential projection and `active:false`. The response never carries a hash or secret.
+
+`DELETE /scim/admin/endpoints/:endpointId/credentials/:credentialId` remains backward compatible and performs the same soft deactivation with a `204` response.
+
+---
+
+### DELETE /scim/admin/endpoints/:endpointId/credentials/:credentialId/purge
+
+Permanently delete an inactive credential or WIF trust. The inactive predicate is enforced in the storage operation, so an active row or concurrent activation returns `409`; an unknown or cross-endpoint id returns `404`; one removed row returns `204`. Purged rows cannot be reactivated.
 
 ---
 
@@ -815,7 +823,7 @@ Content-Type: application/json
 
 ### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/rotate
 
-Issues a new secret for an existing credential, keeping its id and label. The new secret is returned **once**.
+Atomically deactivates one active bearer or OAuth credential and creates its replacement. The replacement has a new id, keeps the label, and preserves an OAuth credential's public `client_id`. The new secret is returned **once**. A failed replacement creation rolls back the deactivation. Returns `409` for an inactive or concurrently changed source and `400` for WIF, which has no secret to rotate.
 
 ### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/reveal
 
@@ -823,7 +831,7 @@ Re-displays a credential secret when the endpoint's `CredentialSecretVisibility`
 
 ### POST /scim/admin/endpoints/:endpointId/credentials/:credentialId/activate
 
-Re-activates a deactivated credential (the inverse of `DELETE`, which deactivates rather than destroying).
+Re-activates a deactivated credential (the inverse of explicit or compatible deactivation).
 
 Returns **`400`** when the endpoint has already reached its active-credential cap
 for that credential type (`MaxActiveBearerCredentials`,

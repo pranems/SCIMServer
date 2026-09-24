@@ -547,7 +547,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(fetchCountBeforeMint);
   });
 
-  it('W3.5: invalidates cached trusts across create, revoke, reactivate, and edit routes', async () => {
+  it('W3.5: invalidates cached trusts across create, deactivate, reactivate, edit, and purge routes', async () => {
     const cacheEndpoint = await createEndpointWithConfig(app, adminToken, {
       WifCredentialsEnabled: 'True',
     });
@@ -576,9 +576,9 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     await postAssertion(secondAssertion, cacheEndpoint).expect(200);
 
     await request(app.getHttpServer())
-      .delete(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}`)
+      .post(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}/deactivate`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .expect(204);
+      .expect(200);
     await postAssertion(secondAssertion, cacheEndpoint).expect(401);
 
     await request(app.getHttpServer())
@@ -595,6 +595,20 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .expect(200);
     await postAssertion(secondAssertion, cacheEndpoint).expect(401);
     await postAssertion(await signAssertion({ iss: editedIssuer }), cacheEndpoint).expect(200);
+
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}/deactivate`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}/purge`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${cacheEndpoint}/credentials/${second.body.id}/activate`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+    await postAssertion(await signAssertion({ iss: editedIssuer }), cacheEndpoint).expect(401);
   });
 
   it('rejects a wrong issuer with invalid_client', async () => {

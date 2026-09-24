@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.29`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.30`
 
-> **Version:** 0.55.29 - **Updated:** 2026-09-23
+> **Version:** 0.55.30 - **Updated:** 2026-09-24
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -13,6 +13,7 @@
 | Create and edit User, Group, and custom resources from endpoint schemas | [PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md](PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md) |
 | Understand synchronized profile forms, runtime tabs, endpoint SPC, and the AI agent example | [PROFILE_AUTHORITATIVE_RESOURCE_UI.md](PROFILE_AUTHORITATIVE_RESOURCE_UI.md) |
 | Trace custom ResourceTypes through Activity and shared Logs filters | [CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md](CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md) |
+| Operate bearer, OAuth, and WIF credential lifecycle safely | [CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md](CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md) |
 | Run ready-to-use server, admin, endpoint, and profile-aware SCIM requests | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) |
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
 | Review contextual-settings execution issues and preventions | [ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md](ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md) |
@@ -75,10 +76,12 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [PROFILE_AUTHORITATIVE_RESOURCE_UI_EXECUTION_RCA.md](PROFILE_AUTHORITATIVE_RESOURCE_UI_EXECUTION_RCA.md) | **v0.55.28 execution RCA** - read-only previews, incomplete profile-cache invalidation, stale terminology, and browser test-harness findings. |
 | [CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md](CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md) | **v0.55.29 observability parity** - dynamic custom-resource Activity, update SSE events, and one global/endpoint Logs filter model. |
 | [CUSTOM_RESOURCE_OBSERVABILITY_EXECUTION_RCA.md](CUSTOM_RESOURCE_OBSERVABILITY_EXECUTION_RCA.md) | **v0.55.29 execution RCA** - User/Group-only query boundaries, missing update events, duplicated filters, and exact-branch proxy routing. |
+| [CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md](CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md) | **v0.55.30 credential lifecycle** - atomic rotation, explicit reversible deactivate/activate, inactive-only permanent purge, and Connect UI parity for bearer, OAuth, and WIF. |
+| [auth/CREDENTIAL_LIFECYCLE_EXECUTION_RCA.md](auth/CREDENTIAL_LIFECYCLE_EXECUTION_RCA.md) | **v0.55.30 execution RCA** - split-write rotation, false-success purge, worktree harness friction, and prevention. |
 | [PROFILE_DRIVEN_RESOURCE_FORMS_EXECUTION_RCA.md](PROFILE_DRIVEN_RESOURCE_FORMS_EXECUTION_RCA.md) | **v0.55.26 execution RCA** - twelve issues across test correctness, environment drift, API/profile/cache/UI correctness, HTTP contract, and tooling, including the generic ETag round-trip and 204-response defects. |
 | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) | **v0.55.27 Workbench examples** - static server/admin catalog, endpoint context, profile-derived ResourceType POST/PATCH, real ETag headers, and the deployment-time dev fixture. |
 | [WORKBENCH_REQUEST_EXAMPLES_EXECUTION_RCA.md](WORKBENCH_REQUEST_EXAMPLES_EXECUTION_RCA.md) | **v0.55.27 execution RCA** - request header contract, browser assertion semantics, and prevention coverage. |
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 118 route handlers, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 120 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) | **Concurrent config edits (B/C/D)** - which profile sections can actually lose data and which merge safely, the `ETag` on endpoint reads, opt-in `If-Match` with `412 versionMismatch`, the conflict dialog flow, and the per-endpoint lock that fixed the silent auth-method race |

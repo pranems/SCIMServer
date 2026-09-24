@@ -75,6 +75,12 @@ export interface IEndpointCredentialRepository {
   reactivate(id: string): Promise<EndpointCredentialModel | null>;
 
   /**
+   * Atomically deactivate one active credential and create its replacement.
+   * Returns null when the source is missing or already inactive.
+   */
+  rotate(id: string, replacement: EndpointCredentialCreateInput): Promise<EndpointCredentialModel | null>;
+
+  /**
    * WI-7: purge the retained secret envelope for every credential of an
    * endpoint (used when CredentialSecretVisibility flips to `once`). Returns
    * the number of rows cleared.
@@ -88,8 +94,8 @@ export interface IEndpointCredentialRepository {
    */
   clearAllSecretEnvelopes(): Promise<number>;
 
-  /** Hard delete a credential. */
-  delete(id: string): Promise<void>;
+  /** Hard delete an inactive credential and report whether one row was removed. */
+  delete(id: string): Promise<boolean>;
 
   /**
    * Item 4: replace a credential's public metadata (used to EDIT a saved WIF

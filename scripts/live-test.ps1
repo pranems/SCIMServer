@@ -6036,7 +6036,7 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 9w: HTTP ERROR CODES, IMMUTABLE ENFORCEMENT, RETURNED CHARACTERISTICS (P3)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# ─────────────── 9w.1–9w.4: HTTP 415 Unsupported Media Type ───────────────
+# ─────────────── 9w.1-9w.4: HTTP 415 Unsupported Media Type ───────────────
 Write-Host "`n--- 9w: HTTP 415 Unsupported Media Type ---" -ForegroundColor Cyan
 
 # 9w.1: POST /Users with text/xml should fail
@@ -6086,7 +6086,7 @@ try {
     Test-Result -Success $false -Message "9w.4: POST /Users with application/scim+json should succeed"
 }
 
-# ─────────────── 9w.5–9w.8: HTTP 405 Method Not Allowed ───────────────
+# ─────────────── 9w.5-9w.8: HTTP 405 Method Not Allowed ───────────────
 Write-Host "`n--- 9w: HTTP 405 Method Not Allowed ---" -ForegroundColor Cyan
 
 # 9w.5: PUT /Users (collection) should return 404 or 405
@@ -6129,7 +6129,7 @@ try {
     Test-Result -Success ($statusCode -eq 404 -or $statusCode -eq 405) -Message "9w.8: DELETE /Groups (collection) returns $statusCode"
 }
 
-# ─────────────── 9w.9–9w.14: Immutable Attribute Enforcement ───────────────
+# ─────────────── 9w.9-9w.14: Immutable Attribute Enforcement ───────────────
 Write-Host "`n--- 9w: Immutable Attribute Enforcement ---" -ForegroundColor Cyan
 
 # NOTE: RFC 7643 §4.3 defines employeeNumber as 'readWrite' (NOT immutable).
@@ -6259,7 +6259,7 @@ $w9PatchMutableResp = Invoke-RestMethod -Uri "$w9ScimBase/Users/$($w9User.id)" -
 $w9PatchExt = $w9PatchMutableResp."urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 Test-Result -Success ($w9PatchExt.department -eq "Marketing") -Message "9w.14: PATCH mutable department succeeds while employeeNumber preserved"
 
-# ─────────────── 9w.15–9w.18: returned:request & returned:default ───────────────
+# ─────────────── 9w.15-9w.18: returned:request & returned:default ───────────────
 Write-Host "`n--- 9w: returned:request and returned:default ---" -ForegroundColor Cyan
 
 # Verify schema definitions for returned characteristics
@@ -6318,7 +6318,7 @@ $x9UserBodyB = @{
 $x9UserB = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $x9UserBodyB -ContentType "application/scim+json"
 Test-Result -Success ($null -ne $x9UserA.id -and $null -ne $x9UserB.id) -Message "9x.0: Created two users for uniqueness collision tests"
 
-# ─────────────── 9x.1–9x.4: uniqueness:server - User PUT 409 ───────────────
+# ─────────────── 9x.1-9x.4: uniqueness:server - User PUT 409 ───────────────
 Write-Host "`n--- 9x: uniqueness:server - User PUT ---" -ForegroundColor Cyan
 
 # 9x.1: PUT User B with User A's userName → 409
@@ -6380,7 +6380,7 @@ try {
     Test-Result -Success ($statusCode -eq 409) -Message "9x.4: PUT case-insensitive userName collision returns 409"
 }
 
-# ─────────────── 9x.5–9x.7: uniqueness:server - User PATCH 409 ───────────────
+# ─────────────── 9x.5-9x.7: uniqueness:server - User PATCH 409 ───────────────
 Write-Host "`n--- 9x: uniqueness:server - User PATCH ---" -ForegroundColor Cyan
 
 # 9x.5: PATCH User B replace userName → User A's userName → 409
@@ -6436,7 +6436,7 @@ $x9PatchOkBody = @{
 $x9PatchOk = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH -Headers $headers -Body $x9PatchOkBody -ContentType "application/scim+json"
 Test-Result -Success ($x9PatchOk.displayName -eq "9x Patched OK") -Message "9x.7: PATCH non-unique field succeeds (200)"
 
-# ─────────────── 9x.8–9x.9: required:true - PUT enforcement ───────────────
+# ─────────────── 9x.8-9x.9: required:true - PUT enforcement ───────────────
 Write-Host "`n--- 9x: required:true - PUT enforcement ---" -ForegroundColor Cyan
 
 # 9x.8: PUT missing required userName → 400
@@ -6464,7 +6464,7 @@ $x9PutWithReqBody = @{
 $x9PutWithReq = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method PUT -Headers $headers -Body $x9PutWithReqBody -ContentType "application/scim+json"
 Test-Result -Success ($x9PutWithReq.userName -eq $x9UserNameA) -Message "9x.9: PUT with all required fields succeeds (200)"
 
-# ─────────────── 9x.10–9x.11: returned:never on PATCH response ───────────────
+# ─────────────── 9x.10-9x.11: returned:never on PATCH response ───────────────
 Write-Host "`n--- 9x: returned:never on PATCH response ---" -ForegroundColor Cyan
 
 # 9x.10: PATCH response should not contain password (returned:never)
@@ -6482,7 +6482,7 @@ $x9PatchRet = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method PA
 Test-Result -Success ($null -eq $x9PatchRet.password) -Message "9x.10: PATCH response does not include password (returned:never)"
 Test-Result -Success ($null -ne $x9PatchRet.id -and $null -ne $x9PatchRet.userName) -Message "9x.11: PATCH response includes id + userName (returned:always)"
 
-# ─────────────── 9x.12–9x.15: returned characteristics on .search ───────────────
+# ─────────────── 9x.12-9x.15: returned characteristics on .search ───────────────
 Write-Host "`n--- 9x: returned characteristics on .search ---" -ForegroundColor Cyan
 
 # 9x.12: .search should not return password (returned:never)
@@ -6786,8 +6786,8 @@ Test-Result -Success ($null -ne $inlineEp.id) -Message "9z.15: Inline profile en
 $inlineSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($inlineEp.id)/Schemas" -Headers $headers
 Test-Result -Success ($inlineSchemas.totalResults -eq 1) -Message "9z.16: Inline profile has 1 schema"
 
-# --- Test 9z.17–9z.33: Partial PATCH profile settings & combinations ---
-Write-Host "`n--- Test 9z.17–9z.33: Partial PATCH Profile Settings & Combinations ---" -ForegroundColor Cyan
+# --- Test 9z.17-9z.33: Partial PATCH profile settings & combinations ---
+Write-Host "`n--- Test 9z.17-9z.33: Partial PATCH Profile Settings & Combinations ---" -ForegroundColor Cyan
 
 # Create a dedicated rfc-standard endpoint for PATCH tests
 $patchEpBody = @{ name = "live-patch-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
@@ -7334,7 +7334,7 @@ if ($dpEpId) {
         Test-Result -Success $schemasHasDp -Message "9z-E.7: schemas[] includes extension with visible attrs"
     }
 
-    # --- 9z-E.8–10: PATCH boolean coercion in operation values ---
+    # --- 9z-E.8-10: PATCH boolean coercion in operation values ---
     Write-Host "`n--- PATCH Operation Value Boolean Coercion ---" -ForegroundColor Cyan
     if ($dpUserId) {
         # 9z-E.8: PATCH replace with no-path object value - active="False" coerced
@@ -7370,7 +7370,7 @@ if ($dpEpId) {
         }
     }
 
-    # --- 9z-E.11–12: GET/LIST verify stripping persists ---
+    # --- 9z-E.11-12: GET/LIST verify stripping persists ---
     Write-Host "`n--- GET/LIST Verify Stripping ---" -ForegroundColor Cyan
     if ($dpUserId) {
         try {
@@ -7383,7 +7383,7 @@ if ($dpEpId) {
         }
     }
 
-    # --- 9z-E.13–14: Write-response projection + returned:never interaction ---
+    # --- 9z-E.13-14: Write-response projection + returned:never interaction ---
     Write-Host "`n--- Write-Response Projection ---" -ForegroundColor Cyan
     $projUserBody = @{
         schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $dpExtUrn, $dpSecretUrn)
@@ -12351,6 +12351,52 @@ try {
     # T4: the rotated secret is revealable (endpoint retains under always).
     $at11Reveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/reveal" -Method POST -Headers $headers
     Test-Result -Success (($at11Reveal.retained -eq $true) -and ($at11Reveal.clientSecret -eq $at11Rot.clientSecret)) -Message "9z-AT11.T4: rotated secret is revealable and matches"
+
+    # T5: rotation switches OAuth authentication atomically: old secret rejects, replacement mints.
+    $at11OldRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at11Id/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_id = $at11Cred.clientId; client_secret = $at11Cred.clientSecret
+        } | Out-Null
+    } catch { $at11OldRejected = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $at11OldRejected -Message "9z-AT11.T5: pre-rotation OAuth secret is rejected"
+    $at11Mint = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at11Id/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+        grant_type = "client_credentials"; client_id = $at11Rot.clientId; client_secret = $at11Rot.clientSecret
+    }
+    Test-Result -Success ($null -ne $at11Mint.access_token) -Message "9z-AT11.T6: rotated OAuth secret mints an access token"
+
+    # T7-T9: explicit deactivate changes runtime auth and blocks rotate while inactive.
+    $at11Deactivated = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/deactivate" -Method POST -Headers $headers
+    Test-Result -Success ($at11Deactivated.active -eq $false) -Message "9z-AT11.T7: explicit deactivate returns active=false"
+    $at11InactiveRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at11Id/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body @{
+            grant_type = "client_credentials"; client_id = $at11Rot.clientId; client_secret = $at11Rot.clientSecret
+        } | Out-Null
+    } catch { $at11InactiveRejected = ($_.Exception.Response.StatusCode.value__ -eq 401) }
+    Test-Result -Success $at11InactiveRejected -Message "9z-AT11.T8: inactive OAuth credential cannot mint"
+    $at11RotateInactive = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/rotate" -Method POST -Headers $headers | Out-Null
+    } catch { $at11RotateInactive = ($_.Exception.Response.StatusCode.value__ -eq 409) }
+    Test-Result -Success $at11RotateInactive -Message "9z-AT11.T9: rotate rejects an inactive credential -> 409"
+
+    # T10-T11: activation restores authentication; active records cannot be purged.
+    $at11Activated = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/activate" -Method POST -Headers $headers
+    Test-Result -Success ($at11Activated.active -eq $true) -Message "9z-AT11.T10: activate restores active=true"
+    $at11ActivePurgeRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/purge" -Method DELETE -Headers $headers | Out-Null
+    } catch { $at11ActivePurgeRejected = ($_.Exception.Response.StatusCode.value__ -eq 409) }
+    Test-Result -Success $at11ActivePurgeRejected -Message "9z-AT11.T11: purge rejects an active credential -> 409"
+
+    # T12-T13: deactivate then permanently purge; the row is absent afterwards.
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/deactivate" -Method POST -Headers $headers | Out-Null
+    $at11Purge = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials/$($at11Rot.id)/purge" -Method DELETE -Headers $headers
+    Test-Result -Success ($at11Purge.StatusCode -eq 204) -Message "9z-AT11.T12: inactive credential is permanently purged -> 204"
+    $at11AfterPurge = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id/credentials" -Method GET -Headers $headers
+    $at11PurgedRow = $at11AfterPurge | Where-Object { $_.id -eq $at11Rot.id }
+    Test-Result -Success ($null -eq $at11PurgedRow) -Message "9z-AT11.T13: purged credential is absent from the management list"
 
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at11Id" -Method DELETE -Headers $headers | Out-Null } catch {}

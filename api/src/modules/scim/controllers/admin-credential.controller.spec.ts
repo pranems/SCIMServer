@@ -9,7 +9,7 @@
  *     emit-after-commit (call ordering relative to the persisted
  *     write).
  */
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AdminCredentialController } from './admin-credential.controller';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -71,7 +71,8 @@ describe('AdminCredentialController', () => {
       findActiveByEndpoint: jest.fn().mockResolvedValue([mockCredential]),
       deactivate: jest.fn().mockResolvedValue({ ...mockCredential, active: false }),
       reactivate: jest.fn().mockResolvedValue({ ...mockCredential, active: true }),
-      delete: jest.fn().mockResolvedValue(undefined),
+      rotate: jest.fn().mockResolvedValue({ ...mockCredential, id: 'rotated-credential' }),
+      delete: jest.fn().mockResolvedValue(true),
       updateMetadata: jest.fn().mockImplementation((id: string, metadata: Record<string, unknown>) =>
         Promise.resolve({ ...mockCredential, id, metadata }),
       ),
@@ -812,6 +813,43 @@ describe('AdminCredentialController', () => {
     });
   });
 
+  describe('explicit deactivate and permanent purge', () => {
+    it('deactivates through the explicit route and returns the public inactive projection', async () => {
+      const result = await controller.deactivateCredential(mockEndpoint.id, mockCredential.id);
+
+      expect(mockCredentialRepo.deactivate).toHaveBeenCalledWith(mockCredential.id);
+      expect(result).toEqual(expect.objectContaining({ id: mockCredential.id, active: false }));
+      expect(result).not.toHaveProperty('credentialHash');
+    });
+
+    it('refuses to purge an active credential', async () => {
+      await expect(controller.purgeCredential(mockEndpoint.id, mockCredential.id)).rejects.toThrow(ConflictException);
+      expect(mockCredentialRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('permanently deletes an inactive WIF trust and invalidates its cache', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({
+        ...mockCredential,
+        credentialType: 'wif',
+        active: false,
+      });
+
+      await controller.purgeCredential(mockEndpoint.id, mockCredential.id);
+
+      expect(mockCredentialRepo.delete).toHaveBeenCalledWith(mockCredential.id);
+      expect(mockWifTrustCache.invalidate).toHaveBeenCalledWith(mockEndpoint.id);
+    });
+
+    it('reports a state-change race instead of deleting a newly active row', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, active: false });
+      mockCredentialRepo.delete.mockResolvedValue(false);
+
+      await expect(controller.purgeCredential(mockEndpoint.id, mockCredential.id)).rejects.toThrow(ConflictException);
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+  });
+
   describe('V2 - activateCredential (reactivate)', () => {
     it('reactivates a revoked credential and returns active=true', async () => {
       mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, active: false });
@@ -1127,14 +1165,14 @@ describe('AdminCredentialController', () => {
   });
 
   describe('rotateCredential (WI-9)', () => {
-    it('mints a new oauth_client secret, preserves the client_id, and deactivates the old', async () => {
+    it('mints a new oauth_client secret, preserves the client_id, and atomically replaces the old', async () => {
       mockCredentialRepo.findById.mockResolvedValue({
         ...mockCredential,
         id: 'old-cred',
         credentialType: 'oauth_client',
-        metadata: { clientId: 'epc_keep' },
+        metadata: { clientId: 'epc_keep', description: 'Keep this operator note' },
       });
-      mockCredentialRepo.create.mockResolvedValue({
+      mockCredentialRepo.rotate.mockResolvedValue({
         ...mockCredential,
         id: 'new-cred',
         credentialType: 'oauth_client',
@@ -1148,18 +1186,31 @@ describe('AdminCredentialController', () => {
       expect(res.clientId).toBe('epc_keep');
       expect(res.clientSecret).toBeDefined();
       // The new credential keeps the client_id.
-      const createArg = mockCredentialRepo.create.mock.calls.at(-1)?.[0] as { metadata?: { clientId?: string } };
+      const createArg = mockCredentialRepo.rotate.mock.calls.at(-1)?.[1] as { metadata?: { clientId?: string } };
       expect(createArg.metadata?.clientId).toBe('epc_keep');
-      // The old credential is deactivated.
-      expect(mockCredentialRepo.deactivate).toHaveBeenCalledWith('old-cred');
+      expect(createArg.metadata).toEqual({
+        clientId: 'epc_keep',
+        description: 'Keep this operator note',
+      });
+      expect(mockCredentialRepo.rotate).toHaveBeenCalledWith('old-cred', expect.any(Object));
+      expect(mockCredentialRepo.create).not.toHaveBeenCalled();
+      expect(mockCredentialRepo.deactivate).not.toHaveBeenCalled();
     });
 
     it('returns the token field for a bearer credential', async () => {
       mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'old-b', credentialType: 'bearer' });
-      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, id: 'new-b', credentialType: 'bearer' });
+      mockCredentialRepo.rotate.mockResolvedValue({ ...mockCredential, id: 'new-b', credentialType: 'bearer' });
       const res = await controller.rotateCredential(mockEndpoint.id, 'old-b');
       expect(res.token).toBeDefined();
       expect(res.clientSecret).toBeUndefined();
+    });
+
+    it('rejects rotating an inactive credential without minting a replacement', async () => {
+      mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'old-inactive', active: false });
+
+      await expect(controller.rotateCredential(mockEndpoint.id, 'old-inactive')).rejects.toThrow(ConflictException);
+
+      expect(mockCredentialRepo.rotate).not.toHaveBeenCalled();
     });
 
     it('rejects rotating a wif credential', async () => {
@@ -1174,7 +1225,7 @@ describe('AdminCredentialController', () => {
 
     it('emits a create + a revoke event and never leaks the hash', async () => {
       mockCredentialRepo.findById.mockResolvedValue({ ...mockCredential, id: 'old-e', credentialType: 'oauth_client', metadata: { clientId: 'epc_e' } });
-      mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, id: 'new-e', credentialType: 'oauth_client', metadata: { clientId: 'epc_e' } });
+      mockCredentialRepo.rotate.mockResolvedValue({ ...mockCredential, id: 'new-e', credentialType: 'oauth_client', metadata: { clientId: 'epc_e' } });
       await controller.rotateCredential(mockEndpoint.id, 'old-e');
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(SCIM_EVENTS.CREDENTIAL_CREATED, expect.objectContaining({ credentialId: 'new-e' }));
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(SCIM_EVENTS.CREDENTIAL_REVOKED, expect.objectContaining({ credentialId: 'old-e' }));

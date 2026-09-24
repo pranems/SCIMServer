@@ -64,12 +64,16 @@ All under `/scim/admin/endpoints/{endpointId}/credentials`, all requiring admin 
 | `GET` | `/credentials` | List. Never returns hashes or secrets |
 | `PATCH` | `/credentials/{id}` | Edit the label only |
 | `PUT` | `/credentials/{id}` | WIF only: replace the trust config in place |
-| `DELETE` | `/credentials/{id}` | Deactivate (`active=false`); the row is retained |
+| `POST` | `/credentials/{id}/deactivate` | Explicitly deactivate (`active=false`); the row is retained |
+| `DELETE` | `/credentials/{id}` | Backward-compatible soft deactivate (`204`) |
 | `POST` | `/credentials/{id}/activate` | Reactivate a deactivated credential |
-| `POST` | `/credentials/{id}/rotate` | Mint a new secret, deactivate the old one, keep the `client_id` |
+| `POST` | `/credentials/{id}/rotate` | Atomically mint a replacement secret, deactivate the old row, keep the `client_id` |
 | `POST` | `/credentials/{id}/reveal` | Return the retained secret, if retention is on |
+| `DELETE` | `/credentials/{id}/purge` | Permanently delete an inactive row; active rows return `409` |
 
 **Recovering a lost secret is `rotate`, not `reveal`** - unless the install retains secrets (section 6). `reveal` answers `{retained:false, reason}` rather than erroring when it cannot help, so a client can tell "not allowed" from "broken".
+
+Connect exposes Deactivate/Activate as the reversible lifecycle. Permanently delete appears only for an inactive credential or trust and requires confirmation. WIF trusts have no Rotate action because all trust values are public configuration.
 
 ### 4.2 Declaring authentication methods
 

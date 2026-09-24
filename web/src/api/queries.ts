@@ -2027,7 +2027,21 @@ export function useDeactivateCredential(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (credentialId: string) =>
-      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/deactivate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      invalidateEndpointAuthReadModels(qc, endpointId);
+    },
+  });
+}
+
+/** Permanently remove an inactive credential or WIF trust. */
+export function usePurgeCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/purge`, {
         method: 'DELETE',
       }),
     onSuccess: () => {

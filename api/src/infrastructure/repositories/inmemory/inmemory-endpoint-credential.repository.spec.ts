@@ -67,6 +67,34 @@ describe('InMemoryEndpointCredentialRepository - findAllActiveByType (W1.2)', ()
     await expect(repo.findAllActiveByType('wif')).resolves.toEqual([]);
   });
 
+  it('atomically replaces one active credential and refuses an inactive source', async () => {
+    const source = await seed({ credentialType: 'bearer' });
+    const replacement = await repo.rotate(source.id, {
+      endpointId: source.endpointId,
+      credentialType: source.credentialType,
+      credentialHash: 'replacement-hash',
+    });
+
+    expect(replacement).toEqual(expect.objectContaining({ active: true, credentialHash: 'replacement-hash' }));
+    expect((await repo.findById(source.id))?.active).toBe(false);
+    await expect(repo.rotate(source.id, {
+      endpointId: source.endpointId,
+      credentialType: source.credentialType,
+      credentialHash: 'second-replacement',
+    })).resolves.toBeNull();
+    expect(await repo.findByEndpoint(source.endpointId)).toHaveLength(2);
+  });
+
+  it('hard-deletes only inactive credentials', async () => {
+    const credential = await seed({ credentialType: 'bearer' });
+
+    await expect(repo.delete(credential.id)).resolves.toBe(false);
+    expect(await repo.findById(credential.id)).not.toBeNull();
+    await repo.deactivate(credential.id);
+    await expect(repo.delete(credential.id)).resolves.toBe(true);
+    expect(await repo.findById(credential.id)).toBeNull();
+  });
+
   it('W3.5: filters active credentials by endpoint and type', async () => {
     await seed({ endpointId: 'ep-1', credentialType: 'wif' });
     await seed({ endpointId: 'ep-1', credentialType: 'oauth_client' });
