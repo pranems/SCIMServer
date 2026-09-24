@@ -26,15 +26,10 @@ import {
   Badge,
   Subtitle1,
   Caption1,
-  SearchBox,
-  Combobox,
-  Option,
   Button,
   Tooltip,
-  Field,
 } from '@fluentui/react-components';
 import {
-  ArrowReset24Regular,
   DocumentSearch24Regular,
   Open24Regular,
   Open16Regular,
@@ -48,28 +43,17 @@ import {
   type GlobalLogsParams,
 } from '../api/queries';
 import type { GlobalLogsSearch, TimeRange } from '../routes/search-schemas';
-import { TIME_RANGE_VALUES } from '../routes/search-schemas';
 import { CopyableField, CopyableJsonBlock, DetailDrawer, EmptyState, LoadingSkeleton, AuthDecisionForRequest } from '../components/primitives';
+import { LogFiltersToolbar, timeRangeToSince } from '../components/logs/LogFiltersToolbar';
 import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
-import { clickableProps, toggleChipProps } from '../utils/interactive';
+import { clickableProps } from '../utils/interactive';
 
 const LOGS_ROUTE_PATH = '/logs' as const;
 
 // Closed-set status codes the picker offers - matches the spec's
 // allowlist + the actual HTTP statuses the server emits.
-const STATUS_OPTIONS = [200, 201, 400, 401, 403, 404, 409, 500] as const;
-
-// Human labels for the time-range chips. Keep aligned with TIME_RANGE_VALUES.
-const TIME_RANGE_LABEL: Record<TimeRange, string> = {
-  '1h': 'Last 1 hour',
-  '24h': 'Last 24 hours',
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  custom: 'Custom',
-};
-
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1400px' },
   header: {
@@ -78,27 +62,6 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '16px',
     flexWrap: 'wrap',
-  },
-  toolbar: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '12px',
-    alignItems: 'flex-end',
-    padding: '12px',
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusMedium,
-  },
-  toolbarItem: {
-    minWidth: '180px',
-  },
-  chipRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px',
-    alignItems: 'center',
-  },
-  chip: {
-    cursor: 'pointer',
   },
   // R5: horizontal-scroll wrapper so a narrow window scrolls instead of
   // clipping; the table stays >= minWidth for readability and expands to
@@ -156,18 +119,6 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     gap: '8px',
   },
-  pre: {
-    backgroundColor: tokens.colorNeutralBackground3,
-    padding: '8px 12px',
-    borderRadius: tokens.borderRadiusMedium,
-    fontFamily: 'monospace',
-    fontSize: '12px',
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-all',
-    margin: 0,
-    maxHeight: '320px',
-    overflowY: 'auto',
-  },
   errorBlock: {
     padding: '24px',
     color: tokens.colorPaletteRedForeground1,
@@ -191,23 +142,6 @@ function statusColor(s: number | undefined): 'success' | 'warning' | 'danger' | 
   if (s >= 400) return 'warning';
   if (s >= 300) return 'informative';
   return 'success';
-}
-
-/**
- * Convert a TimeRange enum to an ISO 'since' timestamp. 'custom' is a
- * placeholder for a future date-picker; for now it falls back to no
- * filter so the UI doesn't lock the user into an empty result.
- */
-function timeRangeToSince(range: TimeRange | undefined): string | undefined {
-  if (!range || range === 'custom') return undefined;
-  const now = Date.now();
-  const ms = {
-    '1h': 60 * 60 * 1000,
-    '24h': 24 * 60 * 60 * 1000,
-    '7d': 7 * 24 * 60 * 60 * 1000,
-    '30d': 30 * 24 * 60 * 60 * 1000,
-  }[range];
-  return new Date(now - ms).toISOString();
 }
 
 /** Row shape of GET /scim/admin/logs items. AdminLogsResponse uses
@@ -243,6 +177,10 @@ export const LogsPage: React.FC = () => {
   const timeRange = search.timeRange;
   const detailId = search.detail;
   const requestId = search.requestId;
+  const method = search.method;
+  const hasError = search.hasError;
+  const minDurationMs = search.minDurationMs;
+  const since = React.useMemo(() => timeRangeToSince(timeRange), [timeRange]);
 
   // Endpoint dropdown source. Loads in parallel; harmless if it 404s
   // (just renders an empty Combobox).
@@ -265,8 +203,11 @@ export const LogsPage: React.FC = () => {
     urlContains: urlContains || undefined,
     endpointId,
     status,
-    since: timeRangeToSince(timeRange),
+    since,
     requestId,
+    method,
+    hasError,
+    minDurationMs,
   };
   const { data, isLoading, error } = useGlobalLogs(params);
   const detailQuery = useGlobalLog(detailId);
@@ -327,7 +268,7 @@ export const LogsPage: React.FC = () => {
     });
   };
 
-  const hasFilters = Boolean(urlContains || endpointId || status || timeRange || requestId);
+  const hasFilters = Boolean(urlContains || endpointId || status || timeRange || requestId || method || hasError || minDurationMs !== undefined);
 
   if (error) {
     return (
@@ -341,16 +282,6 @@ export const LogsPage: React.FC = () => {
     <div className={classes.page} data-testid="global-logs-page">
       <div className={classes.header}>
         <Subtitle1>Request Logs ({data?.total ?? 0})</Subtitle1>
-        {hasFilters && (
-          <Button
-            appearance="subtle"
-            icon={<ArrowReset24Regular />}
-            onClick={resetFilters}
-            data-testid="logs-reset-filters"
-          >
-            Reset filters
-          </Button>
-        )}
       </div>
 
       {/* U12 - the standalone auth-diagnostics panel is re-scoped to the
@@ -358,72 +289,19 @@ export const LogsPage: React.FC = () => {
           the request's own DetailDrawer (U11). The logs surface shows an auth
           chip per row + the full decision inline in the drawer. */}
 
-      {/* Phase D5 toolbar: endpoint + status + time range + free-text */}
-      <div className={classes.toolbar} data-testid="logs-toolbar">
-        <Field label="URL contains" className={classes.toolbarItem}>
-          <SearchBox
-            placeholder="Filter by URL..."
-            value={urlContains}
-            onChange={(_, d) => updateFilter({ urlContains: d.value })}
-            data-testid="logs-search"
-          />
-        </Field>
-
-        <Field label="Endpoint" className={classes.toolbarItem}>
-          <Combobox
-            placeholder="All endpoints"
-            value={
-              endpointId
-                ? endpointOptions.find((e) => e.id === endpointId)?.name ?? endpointId
-                : ''
-            }
-            selectedOptions={endpointId ? [endpointId] : []}
-            onOptionSelect={(_, d) => updateFilter({ endpointId: d.optionValue || undefined })}
-            data-testid="logs-endpoint-select"
-            clearable
-          >
-            {endpointOptions.map((ep) => (
-              <Option key={ep.id} value={ep.id} text={ep.displayName ?? ep.name}>
-                {ep.displayName ?? ep.name}
-              </Option>
-            ))}
-          </Combobox>
-        </Field>
-
-        <Field label="Status" className={classes.toolbarItem}>
-          <div className={classes.chipRow} data-testid="logs-status-chips">
-            {STATUS_OPTIONS.map((s) => (
-              <Badge
-                key={s}
-                appearance={status === s ? 'filled' : 'outline'}
-                color={statusColor(s)}
-                className={classes.chip}
-                {...toggleChipProps(() => updateFilter({ status: status === s ? undefined : s }), status === s)}
-                data-testid={`logs-status-chip-${s}`}
-              >
-                {s}
-              </Badge>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="Time range" className={classes.toolbarItem}>
-          <div className={classes.chipRow} data-testid="logs-time-chips">
-            {TIME_RANGE_VALUES.filter((v) => v !== 'custom').map((tr) => (
-              <Badge
-                key={tr}
-                appearance={timeRange === tr ? 'filled' : 'outline'}
-                color="brand"
-                className={classes.chip}
-                {...toggleChipProps(() => updateFilter({ timeRange: timeRange === tr ? undefined : tr }), timeRange === tr)}
-                data-testid={`logs-time-chip-${tr}`}
-              >
-                {TIME_RANGE_LABEL[tr]}
-              </Badge>
-            ))}
-          </div>
-        </Field>
-      </div>
+      <LogFiltersToolbar
+        values={{ urlContains, endpointId, status, timeRange, requestId, method, hasError, minDurationMs }}
+        endpoints={endpointOptions}
+        onChange={(patch) => updateFilter(patch as Partial<GlobalLogsSearch>)}
+        onReset={resetFilters}
+        legacyTestIds={{
+          url: 'logs-search',
+          endpoint: 'logs-endpoint-select',
+          status: 'logs-status-chips',
+          time: 'logs-time-chips',
+        }}
+        data-testid="logs-toolbar"
+      />
 
       {/* Body: skeleton -> table -> empty state */}
       {isLoading ? (

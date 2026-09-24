@@ -16,6 +16,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { ActivityTab } from './ActivityTab';
 import type { ActivityResponse } from '../api/queries';
+import type { ActivitySearch } from '../routes/search-schemas';
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -61,12 +62,12 @@ const mockResponse: ActivityResponse = {
   ],
   pagination: { page: 1, limit: 20, total: 2, pages: 1 },
   filters: {
-    types: ['user', 'group', 'system'],
+    types: ['user', 'group', 'resource', 'system'],
     severities: ['info', 'success', 'warning', 'error'],
   },
 };
 
-const baseSearch = { page: 1, pageSize: 20 };
+const baseSearch: ActivitySearch = { page: 1, pageSize: 20 };
 
 describe('ActivityTab', () => {
   let onSearchChange: ReturnType<typeof vi.fn>;
@@ -76,8 +77,8 @@ describe('ActivityTab', () => {
   // refuses to assign to that narrower signature. Cast the mock to
   // the prop type when passing it through; tests still inspect
   // onSearchChange.mock.calls so we lose nothing.
-  const onChangeProp = (): ((partial: Partial<{ page: number; pageSize: number; type?: 'user' | 'group' | 'system'; severity?: 'success' | 'info' | 'warning' | 'error'; search?: string }>) => void) =>
-    onSearchChange as unknown as (partial: Partial<{ page: number; pageSize: number; type?: 'user' | 'group' | 'system'; severity?: 'success' | 'info' | 'warning' | 'error'; search?: string }>) => void;
+  const onChangeProp = (): ((partial: Partial<ActivitySearch>) => void) =>
+    onSearchChange as unknown as (partial: Partial<ActivitySearch>) => void;
 
   beforeEach(() => {
     vi.clearAllMocks();

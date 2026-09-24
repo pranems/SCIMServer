@@ -1,6 +1,11 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.28`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.29`
+
+Global and endpoint Logs share filters for URL, HTTP method, status, time range,
+errors-only, minimum duration, and request ID. Custom ResourceType URLs remain
+visible in both surfaces. Endpoint Logs fixes endpoint scope; global Logs adds
+an endpoint selector.
 
 > **Version:** 4.2 - **Source-verified against:** v0.55.6 - **Updated:** 2026-07-31  
 > Route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  

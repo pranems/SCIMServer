@@ -47,6 +47,10 @@ describe('SCIM_EVENTS - wire contract', () => {
       expect(SCIM_EVENTS.RESOURCE_CREATED).toBe('scim.resource.created');
     });
 
+    it('RESOURCE_UPDATED matches the wire string', () => {
+      expect(SCIM_EVENTS.RESOURCE_UPDATED).toBe('scim.resource.updated');
+    });
+
     it('RESOURCE_DELETED matches the wire string', () => {
       expect(SCIM_EVENTS.RESOURCE_DELETED).toBe('scim.resource.deleted');
     });

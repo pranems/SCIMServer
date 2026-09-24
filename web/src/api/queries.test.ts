@@ -2,7 +2,13 @@
  * Query key factory and fetchWithAuth tests.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { queryKeys, fetchWithAuth, isScimDataPlanePath } from './queries';
+import {
+  queryKeys,
+  fetchWithAuth,
+  isScimDataPlanePath,
+  endpointLogsQueryOptions,
+  globalLogsQueryOptions,
+} from './queries';
 
 // Mock the token module
 vi.mock('../auth/token', () => ({
@@ -34,6 +40,54 @@ describe('queryKeys', () => {
 
   it('logs.all is a stable prefix used for SSE invalidation (Phase F3)', () => {
     expect(queryKeys.logs.all).toEqual(['logs']);
+  });
+});
+
+describe('shared log query filters', () => {
+  it('serializes advanced endpoint filters while enforcing endpoint scope', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ items: [], total: 0 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const options = endpointLogsQueryOptions({
+      endpointId: 'ep-1',
+      page: 2,
+      pageSize: 25,
+      urlContains: 'Devices',
+      method: 'PATCH',
+      status: 412,
+      since: '2026-09-24T00:00:00.000Z',
+      hasError: true,
+      minDurationMs: 250,
+      requestId: '11111111-1111-1111-1111-111111111111',
+    });
+    expect(options.queryKey[0]).toBe('endpoint-logs');
+    await options.queryFn();
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('endpointId=ep-1');
+    expect(url).toContain('urlContains=Devices');
+    expect(url).toContain('method=PATCH');
+    expect(url).toContain('status=412');
+    expect(url).toContain('hasError=true');
+    expect(url).toContain('minDurationMs=250');
+    expect(url).toContain('requestId=11111111-1111-1111-1111-111111111111');
+  });
+
+  it('includes every filter dimension in the global cache key', () => {
+    const options = globalLogsQueryOptions({
+      endpointId: 'ep-1',
+      urlContains: 'Devices',
+      method: 'PATCH',
+      status: 412,
+      hasError: true,
+      minDurationMs: 250,
+      requestId: '11111111-1111-1111-1111-111111111111',
+    });
+    expect(options.queryKey).toEqual(expect.arrayContaining([
+      'global-logs', 'Devices', 'ep-1', 412, '11111111-1111-1111-1111-111111111111', 'PATCH', true, 250,
+    ]));
   });
 });
 

@@ -18,7 +18,6 @@ import {
   Text,
   Badge,
   Button,
-  SearchBox,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
@@ -34,6 +33,7 @@ import { clickableProps } from '../utils/interactive';
 import { usePreferencesStore } from '../store/preferences-store';
 import { EndpointRelatedSettings } from './EndpointRelatedSettings';
 import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
+import { LogFiltersToolbar, timeRangeToSince } from '../components/logs/LogFiltersToolbar';
 
 const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -72,13 +72,20 @@ interface LogsTabProps {
 }
 
 /** Hook to fetch logs for an endpoint - delegates to the shared queryOptions. */
-export function useEndpointLogs(endpointId: string, page: number, search: string, pageSize: number = DEFAULT_PAGE_SIZE) {
+export function useEndpointLogs(endpointId: string, page: number, filters: Partial<LogsSearch>, pageSize: number = DEFAULT_PAGE_SIZE) {
+  const since = React.useMemo(() => timeRangeToSince(filters.timeRange), [filters.timeRange]);
   return useQuery(
     endpointLogsQueryOptions({
       endpointId,
       page,
       pageSize,
-      urlContains: search || undefined,
+      urlContains: filters.urlContains || undefined,
+      method: filters.method,
+      status: filters.status,
+      since,
+      hasError: filters.hasError,
+      minDurationMs: filters.minDurationMs,
+      requestId: filters.requestId,
     }),
   );
 }
@@ -94,7 +101,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const pageSize = search.pageSize ?? defaultPageSize;
   const urlContains = search.urlContains ?? '';
   const navigate = useNavigate();
-  const { data, isLoading, error } = useEndpointLogs(endpointId, page, urlContains, pageSize);
+  const { data, isLoading, error } = useEndpointLogs(endpointId, page, search, pageSize);
 
   // Clickable log detail (mirrors the SCIMServer-level Logs page).
   const [detailId, setDetailId] = React.useState<string | undefined>(undefined);
@@ -123,7 +130,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     />
   );
 
-  const updateSearch = (next: { page?: number; urlContains?: string }): void => {
+  const updateSearch = (next: Partial<LogsSearch>): void => {
     navigate({
       to: LOGS_ROUTE_PATH,
       params: (prev) => ({ ...prev, endpointId }),
@@ -131,6 +138,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
         const previous = prev as LogsSearch;
         return {
           ...previous,
+          ...next,
           // Always normalize empty filter -> undefined so URLs stay clean.
           urlContains:
             next.urlContains !== undefined
@@ -139,9 +147,17 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
                 : next.urlContains
               : previous.urlContains,
           // When the filter changes, snap pagination back to page 1.
-          page: next.page ?? (next.urlContains !== undefined ? 1 : previous.page),
+          page: next.page ?? 1,
         };
       },
+    });
+  };
+
+  const resetFilters = (): void => {
+    navigate({
+      to: LOGS_ROUTE_PATH,
+      params: { endpointId },
+      search: { page: 1 },
     });
   };
 
@@ -167,25 +183,45 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   }
 
   const logs = data?.items ?? [];
+  const hasFilters = Boolean(
+    urlContains ||
+    search.method ||
+    search.status ||
+    search.timeRange ||
+    search.hasError ||
+    search.minDurationMs !== undefined ||
+    search.requestId,
+  );
+  const filtersToolbar = (
+    <LogFiltersToolbar
+      values={search}
+      onChange={updateSearch}
+      onReset={resetFilters}
+      legacyTestIds={{ url: 'logs-tab-search' }}
+      data-testid="logs-tab-filters"
+    />
+  );
 
   if (logs.length === 0) {
     // G2 - EmptyState replaces plain Text. CTA appears only when a
     // filter is active (so the user can recover from over-narrow
     // input).
-    return urlContains ? (
+    return hasFilters ? (
       <div className={classes.container} data-testid="logs-tab-empty-filtered-wrap">
         {relatedSettings}
+        {filtersToolbar}
         <EmptyState
           data-testid="logs-tab-empty-filtered"
           title="No logs match these filters"
-          body={`No request logs contain "${urlContains}".`}
-          actionLabel="Reset filter"
-          onAction={() => updateSearch({ urlContains: '' })}
+          body="Try widening the time range or clearing one or more filters."
+          actionLabel="Reset filters"
+          onAction={resetFilters}
         />
       </div>
     ) : (
       <div className={classes.container} data-testid="logs-tab-empty-wrap">
         {relatedSettings}
+        {filtersToolbar}
         <EmptyState
           data-testid="logs-tab-empty"
           title="No request logs yet"
@@ -215,14 +251,8 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
           filenameBase={`logs-${endpointId}`}
           columns={['id', 'method', 'url', 'status', 'durationMs', 'createdAt']}
         />
-        <SearchBox
-          placeholder="Filter by URL..."
-          value={urlContains}
-          onChange={(_, d) => updateSearch({ urlContains: d.value })}
-          data-testid="logs-tab-search"
-          style={{ minWidth: '200px' }}
-        />
       </div>
+      {filtersToolbar}
       <div className={classes.tableScroll}>
       <table className={classes.table}>
         <thead>

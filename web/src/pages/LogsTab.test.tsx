@@ -69,8 +69,8 @@ describe('LogsTab', () => {
     wrap(<LogsTab endpointId="ep-1" />);
     expect(await screen.findByText('POST')).toBeInTheDocument();
     expect(screen.getByText('GET')).toBeInTheDocument();
-    expect(screen.getByText('201')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-row-l1')).toHaveTextContent('201');
+    expect(screen.getByTestId('logs-tab-row-l2')).toHaveTextContent('200');
     expect(screen.getByText('2 logs')).toBeInTheDocument();
   });
 
@@ -81,6 +81,7 @@ describe('LogsTab', () => {
     });
     wrap(<LogsTab endpointId="ep-1" />);
     expect(await screen.findByText(/no request logs/i)).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-filters')).toBeInTheDocument();
   });
 
   it('reads urlContains and page from URL search params', async () => {
@@ -92,7 +93,7 @@ describe('LogsTab', () => {
       <LogsTab endpointId="ep-1" />,
       '/endpoints/ep-1/logs?page=3&urlContains=Users',
     );
-    await screen.findByText(/no request logs/i);
+    await screen.findByTestId('logs-tab-empty-filtered');
     // The hook is called with (endpointId, page, urlContains, pageSize) -
     // assert via the queryKey that mockUseQuery received. (WI-D6 added an
     // AuthDiagnosticsPanel that also calls useQuery, so target the logs call.)

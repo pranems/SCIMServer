@@ -65,6 +65,7 @@ describe('ScimEventSseBridge - Phase J SSE forwarder', () => {
       { name: 'GROUP_DELETED', payload: { endpointId: 'ep-1', scimId: 'g-1', active: true } },
       { name: 'GROUP_STATUS_CHANGED', payload: { endpointId: 'ep-1', scimId: 'g-1', previousActive: true, newActive: false } },
       { name: 'RESOURCE_CREATED', payload: { endpointId: 'ep-1', scimId: 'r-1', resourceType: 'Device' } },
+      { name: 'RESOURCE_UPDATED', payload: { endpointId: 'ep-1', scimId: 'r-1', resourceType: 'Device' } },
       { name: 'RESOURCE_DELETED', payload: { endpointId: 'ep-1', scimId: 'r-1', resourceType: 'Device' } },
       { name: 'CREDENTIAL_CREATED', payload: { endpointId: 'ep-1', credentialId: 'c-1', credentialType: 'bearer' } },
       { name: 'CREDENTIAL_REVOKED', payload: { endpointId: 'ep-1', credentialId: 'c-1' } },

@@ -68,6 +68,13 @@ export type GroupsSearch = z.infer<typeof groupsSearchSchema>;
  */
 export const logsSearchSchema = paginationSchema.extend({
   urlContains: z.preprocess(emptyToUndef, z.string().optional()),
+  method: z.preprocess(emptyToUndef, z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional()),
+  status: z.preprocess(emptyToUndef, z.coerce.number().int().min(100).max(599).optional()),
+  timeRange: z.preprocess(emptyToUndef, z.enum(TIME_RANGE_VALUES).optional()),
+  hasError: z.preprocess(emptyToUndef, z.enum(['true', 'false']).transform((value) => value === 'true').optional()),
+  minDurationMs: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()),
+  requestId: z.preprocess(emptyToUndef, z.string().optional()),
+  detail: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type LogsSearch = z.infer<typeof logsSearchSchema>;
 
@@ -96,6 +103,9 @@ export const globalLogsSearchSchema = paginationSchema.extend({
    * request that produced the decision.
    */
   requestId: z.preprocess(emptyToUndef, z.string().optional()),
+  method: z.preprocess(emptyToUndef, z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional()),
+  hasError: z.preprocess(emptyToUndef, z.enum(['true', 'false']).transform((value) => value === 'true').optional()),
+  minDurationMs: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()),
 });
 export type GlobalLogsSearch = z.infer<typeof globalLogsSearchSchema>;
 
@@ -112,13 +122,13 @@ export type EndpointsSearch = z.infer<typeof endpointsSearchSchema>;
 /**
  * Per-endpoint Activity tab (Phase D2): pagination + optional
  * type/severity/search filters. The activity controller's `type` is
- * limited to the ActivitySummary union (`user` | `group` | `system`)
+ * limited to the ActivitySummary union (`user` | `group` | `resource` | `system`)
  * and `severity` to (`info` | `success` | `warning` | `error`); we
  * preserve those server-side enums here as a closed set so the UI
  * cannot construct a request the controller will silently filter to
  * zero results.
  */
-export const ACTIVITY_TYPE_VALUES = ['user', 'group', 'system'] as const;
+export const ACTIVITY_TYPE_VALUES = ['user', 'group', 'resource', 'system'] as const;
 export type ActivityType = (typeof ACTIVITY_TYPE_VALUES)[number];
 export const ACTIVITY_SEVERITY_VALUES = ['info', 'success', 'warning', 'error'] as const;
 export type ActivitySeverity = (typeof ACTIVITY_SEVERITY_VALUES)[number];

@@ -1,9 +1,9 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.28
-> **Last Updated**: September 23, 2026
-> **Last verified:** 2026-09-23
+> **Version**: 0.55.29
+> **Last Updated**: September 24, 2026
+> **Last verified:** 2026-09-24
 
 ---
 
@@ -17,6 +17,15 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The v0.55.29 custom-resource observability rollback unit is consolidated locally
+on `feat/custom-resource-observability-v0.55.29`. Activity classifies dynamic
+ResourceTypes from profile metadata, derived filters paginate correctly in both
+backends, and generic updates emit SSE events. Global and endpoint Logs use one
+URL-driven filter toolbar. Evidence is API unit 5,150/5,150 across 174 suites,
+API E2E 1,525/1,525 across 96 suites, web 1,521/1,521 across 114 files,
+affected API 144/144, affected web 103/103, browser 1/1, and local live
+1,507/1,507. PR, merge, and deployment remain pending.
 
 The v0.55.28 profile-authoritative resource UI is implemented locally on
 `feat/profile-authoritative-resource-ui-v0.55.28`. Create dialogs and Manual

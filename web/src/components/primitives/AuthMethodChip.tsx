@@ -18,7 +18,26 @@
  * assert presence + text without coupling to the exact label.
  */
 import * as React from 'react';
-import { Badge, Caption1 } from '@fluentui/react-components';
+import { Badge, Caption1, makeStyles } from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  chip: {
+    display: 'inline-flex',
+    maxWidth: '100%',
+    minWidth: 0,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    verticalAlign: 'middle',
+    justifyContent: 'flex-start',
+  },
+  label: {
+    display: 'block',
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+});
 
 export type AuthChipOutcome = 'accept' | 'reject';
 
@@ -60,6 +79,7 @@ export const AuthMethodChip: React.FC<AuthMethodChipProps> = ({
   url,
   'data-testid': dataTestId,
 }) => {
+  const classes = useStyles();
   if (!outcome) {
     return <Caption1 data-testid={dataTestId}>-</Caption1>;
   }
@@ -84,8 +104,9 @@ export const AuthMethodChip: React.FC<AuthMethodChipProps> = ({
           : (reason ?? outcome)
       }
       data-testid={dataTestId}
+      className={classes.chip}
     >
-      {label}
+      <span className={classes.label}>{label}</span>
     </Badge>
   );
 };
