@@ -1,6 +1,6 @@
 # Custom Resource Observability and Shared Logs
 
-> **Status:** Consolidated locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.29`
+> **Status:** Merged and verified on dev - **Last verified:** 2026-09-24 - **Product version:** `0.55.29`
 
 ## Outcome
 
@@ -79,4 +79,4 @@ Relative time bounds are memoized by the selected URL range, so unrelated render
 - Documentation: content/freshness and 711 Mermaid blocks parse/render in both themes.
 - Docker context: source-shadow audit passes and a registry-free scratch build copies `LogFiltersToolbar.tsx` from the actual context.
 
-PR, merge, and dev deployment remain pending. No estate has been changed by this rollback unit.
+PRs #167, #168, and #169 are merged. Dev revision `scimserver-dev--v5ccafc7c` serves v0.55.29 at 100% traffic. Dev live passed 1,507/1,507 and Playwright passed 238 with 2 intentional skips. Endpoint integrity is 60 -> 60 with no missing IDs; revision hygiene retains two active revisions. Canary and customer prod are unchanged.

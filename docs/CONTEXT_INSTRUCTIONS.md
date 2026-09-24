@@ -18,14 +18,17 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The v0.55.29 custom-resource observability rollback unit is consolidated locally
-on `feat/custom-resource-observability-v0.55.29`. Activity classifies dynamic
+The v0.55.29 custom-resource observability rollback unit is merged and verified
+on dev. Activity classifies dynamic
 ResourceTypes from profile metadata, derived filters paginate correctly in both
 backends, and generic updates emit SSE events. Global and endpoint Logs use one
 URL-driven filter toolbar. Evidence is API unit 5,150/5,150 across 174 suites,
 API E2E 1,525/1,525 across 96 suites, web 1,521/1,521 across 114 files,
 affected API 144/144, affected web 103/103, browser 1/1, and local live
-1,507/1,507. PR, merge, and deployment remain pending.
+1,507/1,507. Dev live is also 1,507/1,507 and final dev Playwright is 238 passed
+/ 2 intentionally skipped / 0 failed. PRs #167/#168/#169 are merged; revision
+`scimserver-dev--v5ccafc7c` serves v0.55.29 at 100%, with 60 endpoints and IDs
+preserved. Canary and customer prod are unchanged.
 
 The v0.55.28 profile-authoritative resource UI is implemented locally on
 `feat/profile-authoritative-resource-ui-v0.55.28`. Create dialogs and Manual
