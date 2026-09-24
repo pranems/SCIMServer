@@ -1,10 +1,10 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.31`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.32`
 
-> **Version:** 0.55.31 - **Updated:** 2026-09-18
+> **Version:** 0.55.32 - **Updated:** 2026-09-18
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
-> **120 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
+> **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 >
 > **Cross-cutting contract:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) explains which existing route owns each profile, method, credential, server-policy, discovery, and connection-info operation. Proposed profile-import/provider-catalogue routes in that design are not part of this current API reference.
 
@@ -284,6 +284,34 @@ idempotent retry matches rather than conflicting.
 
 ---
 
+### GET /scim/admin/endpoints/:endpointId/egress-policy
+
+Return the 11 effective WIF/JWKS outbound-policy values for one endpoint. Each field contains the runtime `effective` value, endpoint `configured` override or `null`, `source` (`endpoint`, `server-env`, or `default`), `unit`, inclusive `min`/`max`, and `clamped`; a changed request also carries `requested`.
+
+```http
+GET /scim/admin/endpoints/a1b2c3d4-e5f6-7890-abcd-ef1234567890/egress-policy HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer changeme-scim
+```
+
+```json
+{
+  "timeoutMs": {
+    "effective": 1200,
+    "configured": 1200,
+    "source": "endpoint",
+    "unit": "ms",
+    "min": 100,
+    "max": 60000,
+    "clamped": false
+  }
+}
+```
+
+The complete response also includes retries, backoff, cache age, total deadline, response/key/cache caps, refresh cadence, unknown-kid refetch interval, and stale-if-error window. The closed projection excludes secrets, database URLs, and host allowlists.
+
+---
+
 ### GET /scim/admin/endpoints/by-name/:name
 
 Get endpoint by name.
@@ -317,6 +345,9 @@ It matters most when you replace a whole profile section. `settings` and
 `serviceProviderConfig` merge **per key** server-side, so two callers changing different keys
 already both survive and do not need this. `schemas`, `resourceTypes` and `authentication` are
 replaced **wholesale**, so a read-modify-write of those is where an edit can be silently lost.
+
+For `profile.settings`, omission means no change and an explicit `null` removes only that key,
+allowing the endpoint to inherit the server/default value while preserving every sibling setting.
 
 ```http
 PATCH /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1

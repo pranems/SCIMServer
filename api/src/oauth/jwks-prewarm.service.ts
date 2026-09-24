@@ -4,6 +4,9 @@ import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../domain/repositories/endpoint-credential.repository.interface';
+import { EndpointService } from '../modules/endpoint/services/endpoint.service';
+import { resolveEndpointEgressOverrides } from '../modules/endpoint/endpoint-config.interface';
+import type { EgressPolicyOverrides } from './egress-policy';
 
 /**
  * W1.2 - fetch every registered trust's JWKS at boot.
@@ -22,12 +25,13 @@ export class JwksPrewarmService implements OnModuleInit {
   constructor(
     private readonly validator: ExternalJwksValidatorService,
     private readonly logger: ScimLogger,
+    private readonly endpointService: EndpointService,
     @Optional()
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo?: IEndpointCredentialRepository,
   ) {}
 
-  /** Returns the number of distinct JWKS URIs attempted, for tests and logs. */
+  /** Returns the number of distinct URI + effective-policy partitions attempted. */
   async onModuleInit(): Promise<number> {
     const repo = this.credentialRepo;
     if (!repo || typeof repo.findAllActiveByType !== 'function') return 0;
@@ -43,15 +47,33 @@ export class JwksPrewarmService implements OnModuleInit {
       return 0;
     }
 
-    const uris = new Set<string>();
+    const distinctUris = new Set<string>();
+    const partitions = new Map<string, { uri: string; overrides: EgressPolicyOverrides }>();
     for (const t of trusts) {
       const uri = t.metadata?.jwksUri;
-      if (typeof uri === 'string' && uri.length > 0) uris.add(uri);
+      if (typeof uri !== 'string' || uri.length === 0) continue;
+      distinctUris.add(uri);
+      let overrides: EgressPolicyOverrides = {};
+      try {
+        const endpoint = await this.endpointService.getEndpoint(t.endpointId);
+        overrides = resolveEndpointEgressOverrides(endpoint.profile?.settings);
+      } catch (err) {
+        this.logger.warn(LogCategory.AUTH, 'JWKS prewarm using server policy (endpoint lookup failed)', {
+          endpointId: t.endpointId,
+          reason: (err as Error)?.message,
+        });
+      }
+      const policyIdentity = JSON.stringify(
+        Object.entries(overrides).sort(([left], [right]) => left.localeCompare(right)),
+      );
+      partitions.set(JSON.stringify([uri, policyIdentity]), { uri, overrides });
     }
 
     // allSettled, not all: `prewarm` already promises never to reject, but this
     // runs at boot and must not depend on a collaborator keeping that promise.
-    await Promise.allSettled([...uris].map((uri) => this.validator.prewarm(uri)));
+    await Promise.allSettled(
+      [...partitions.values()].map(({ uri, overrides }) => this.validator.prewarm(uri, overrides)),
+    );
 
     // Logged even when nothing was warmed. A boot-time action leaves no other
     // trace, so without an unconditional line there is no way to tell "ran and
@@ -59,8 +81,9 @@ export class JwksPrewarmService implements OnModuleInit {
     // observable evidence this feature works at all.
     this.logger.info(LogCategory.AUTH, 'JWKS prewarm complete', {
       trusts: trusts.length,
-      distinctJwksUris: uris.size,
+      distinctJwksUris: distinctUris.size,
+      policyPartitions: partitions.size,
     });
-    return uris.size;
+    return partitions.size;
   }
 }

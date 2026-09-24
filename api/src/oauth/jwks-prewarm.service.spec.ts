@@ -3,6 +3,7 @@ import { JwksPrewarmService } from './jwks-prewarm.service';
 import { ExternalJwksValidatorService } from './external-jwks-validator.service';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../domain/repositories/repository.tokens';
+import { EndpointService } from '../modules/endpoint/services/endpoint.service';
 
 /**
  * W1.2 - the last Wave 1 item. Without a boot prefetch the FIRST WIF mint after
@@ -13,6 +14,7 @@ describe('JwksPrewarmService (W1.2)', () => {
   let service: JwksPrewarmService;
   let validator: { prewarm: jest.Mock };
   let repo: { findAllActiveByType: jest.Mock };
+  let endpointService: { getEndpoint: jest.Mock };
   let logger: { info: jest.Mock; warn: jest.Mock; debug: jest.Mock };
 
   const wif = (id: string, jwksUri: unknown) => ({
@@ -26,6 +28,9 @@ describe('JwksPrewarmService (W1.2)', () => {
   beforeEach(async () => {
     validator = { prewarm: jest.fn().mockResolvedValue(undefined) };
     repo = { findAllActiveByType: jest.fn().mockResolvedValue([]) };
+    endpointService = {
+      getEndpoint: jest.fn().mockResolvedValue({ profile: { settings: {} } }),
+    };
     logger = { info: jest.fn(), warn: jest.fn(), debug: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -34,6 +39,7 @@ describe('JwksPrewarmService (W1.2)', () => {
         { provide: ExternalJwksValidatorService, useValue: validator },
         { provide: ScimLogger, useValue: logger },
         { provide: ENDPOINT_CREDENTIAL_REPOSITORY, useValue: repo },
+        { provide: EndpointService, useValue: endpointService },
       ],
     }).compile();
 
@@ -75,6 +81,25 @@ describe('JwksPrewarmService (W1.2)', () => {
 
     expect(validator.prewarm).toHaveBeenCalledTimes(1);
     expect(warmed).toBe(1);
+  });
+
+  it('W1.2-T3b: the same URI is prewarmed once per distinct endpoint policy', async () => {
+    const shared = 'https://login.microsoftonline.com/t1/discovery/v2.0/keys';
+    repo.findAllActiveByType.mockResolvedValue([wif('a', shared), wif('b', shared)]);
+    endpointService.getEndpoint.mockImplementation(async (endpointId: string) => ({
+      profile: {
+        settings: {
+          JwksCacheMaxAgeMs: endpointId === 'ep-a' ? 60_000 : 120_000,
+        },
+      },
+    }));
+
+    const warmed = await service.onModuleInit();
+
+    expect(warmed).toBe(2);
+    expect(validator.prewarm).toHaveBeenCalledTimes(2);
+    expect(validator.prewarm).toHaveBeenCalledWith(shared, { cacheMaxAgeMs: 60_000 });
+    expect(validator.prewarm).toHaveBeenCalledWith(shared, { cacheMaxAgeMs: 120_000 });
   });
 
   it('W1.2-T4: a repository failure never breaks startup', async () => {

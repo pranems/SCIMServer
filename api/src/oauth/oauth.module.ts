@@ -16,6 +16,7 @@ import { WifDiscoveryResolverService } from './wif-discovery-resolver.service';
 import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
 import { AuthDecisionRecordStore } from './auth-decision-record.store';
 import { OAUTH_ISSUER } from './oauth.constants';
+import { EndpointModule } from '../modules/endpoint/endpoint.module';
 
 /**
  * Build the JwtModule options from the active asymmetric signing key (Pre-Q.B).
@@ -52,6 +53,7 @@ export function buildJwtModuleOptions(keys: OAuthSigningKeyService): JwtModuleOp
     // registered trusts. Without this import the optional token resolves to
     // undefined and the prewarm silently never runs.
     RepositoryModule.register(),
+    EndpointModule,
     JwtModule.registerAsync({
       imports: [OAuthSigningModule],
       inject: [OAuthSigningKeyService],

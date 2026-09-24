@@ -76,6 +76,24 @@ export interface EgressPolicy {
 /** A partial policy (e.g. endpoint-level overrides); unset fields fall through. */
 export type EgressPolicyOverrides = Partial<EgressPolicy>;
 
+export type EgressPolicySource = 'endpoint' | 'server-env' | 'default';
+export type EgressPolicyUnit = 'ms' | 'bytes' | 'count';
+
+export interface EffectiveEgressPolicyField {
+  effective: number;
+  configured: number | null;
+  source: EgressPolicySource;
+  unit: EgressPolicyUnit;
+  min: number;
+  max: number;
+  clamped: boolean;
+  requested?: number;
+}
+
+export type EffectiveEgressPolicy = {
+  [Key in keyof EgressPolicy]: EffectiveEgressPolicyField;
+};
+
 /** Hardcoded floor defaults when neither endpoint nor server config is present. */
 export const EGRESS_POLICY_DEFAULTS: EgressPolicy = {
   timeoutMs: 5_000,
@@ -119,6 +137,26 @@ export const EGRESS_POLICY_BOUNDS = {
   // any failed refetch fails closed).
   staleIfErrorMs: { min: 0, max: 7 * 24 * 60 * 60 * 1000 },
 } as const;
+
+const EGRESS_POLICY_SPECS: {
+  [Key in keyof EgressPolicy]: {
+    env: string;
+    unit: EgressPolicyUnit;
+    truncate?: boolean;
+  };
+} = {
+  timeoutMs: { env: 'JWKS_FETCH_TIMEOUT_MS', unit: 'ms' },
+  retries: { env: 'JWKS_FETCH_RETRIES', unit: 'count', truncate: true },
+  retryBackoffMs: { env: 'JWKS_FETCH_RETRY_BACKOFF_MS', unit: 'ms' },
+  cacheMaxAgeMs: { env: 'JWKS_CACHE_MAX_AGE_MS', unit: 'ms' },
+  totalDeadlineMs: { env: 'JWKS_TOTAL_DEADLINE_MS', unit: 'ms' },
+  maxResponseBytes: { env: 'JWKS_MAX_RESPONSE_BYTES', unit: 'bytes', truncate: true },
+  maxKeys: { env: 'JWKS_MAX_KEYS', unit: 'count', truncate: true },
+  maxCacheEntries: { env: 'JWKS_MAX_CACHE_ENTRIES', unit: 'count', truncate: true },
+  refreshIntervalMs: { env: 'JWKS_REFRESH_INTERVAL_MS', unit: 'ms' },
+  unknownKidMinIntervalMs: { env: 'JWKS_UNKNOWN_KID_MIN_INTERVAL_MS', unit: 'ms' },
+  staleIfErrorMs: { env: 'JWKS_STALE_IF_ERROR_MS', unit: 'ms' },
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -190,4 +228,51 @@ export function mergeEgressPolicy(server: EgressPolicy, overrides?: EgressPolicy
     unknownKidMinIntervalMs: pick(overrides.unknownKidMinIntervalMs, server.unknownKidMinIntervalMs, EGRESS_POLICY_BOUNDS.unknownKidMinIntervalMs.min, EGRESS_POLICY_BOUNDS.unknownKidMinIntervalMs.max),
     staleIfErrorMs: pick(overrides.staleIfErrorMs, server.staleIfErrorMs, EGRESS_POLICY_BOUNDS.staleIfErrorMs.min, EGRESS_POLICY_BOUNDS.staleIfErrorMs.max),
   };
+}
+
+/**
+ * Resolve the exact runtime policy together with the operator-facing source of
+ * each value. `configured` is the endpoint override, while `requested` is
+ * emitted only when truncation or bounds changed a supplied value.
+ */
+export function resolveEffectiveEgressPolicy(
+  get: (key: string) => string | undefined,
+  overrides?: EgressPolicyOverrides,
+): EffectiveEgressPolicy {
+  const server = resolveServerEgressDefaults(get);
+  const effective = mergeEgressPolicy(server, overrides);
+  const result = {} as EffectiveEgressPolicy;
+
+  for (const key of Object.keys(EGRESS_POLICY_SPECS) as Array<keyof EgressPolicy>) {
+    const spec = EGRESS_POLICY_SPECS[key];
+    const bounds = EGRESS_POLICY_BOUNDS[key];
+    const endpointRequested = overrides?.[key];
+    const hasEndpoint = typeof endpointRequested === 'number' && Number.isFinite(endpointRequested);
+    const serverRequested = readNumber(get(spec.env));
+    const requested = hasEndpoint ? endpointRequested : serverRequested;
+    const normalizedRequested = requested === undefined
+      ? undefined
+      : spec.truncate
+        ? Math.trunc(requested)
+        : requested;
+    const source: EgressPolicySource = hasEndpoint
+      ? 'endpoint'
+      : serverRequested !== undefined
+        ? 'server-env'
+        : 'default';
+    const wasAdjusted = normalizedRequested !== undefined && effective[key] !== requested;
+
+    result[key] = {
+      effective: effective[key],
+      configured: hasEndpoint ? endpointRequested : null,
+      source,
+      unit: spec.unit,
+      min: bounds.min,
+      max: bounds.max,
+      clamped: wasAdjusted,
+      ...(wasAdjusted && requested !== undefined ? { requested } : {}),
+    };
+  }
+
+  return result;
 }

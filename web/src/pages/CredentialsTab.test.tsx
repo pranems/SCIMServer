@@ -74,6 +74,7 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useEndpointOverview: (...args: unknown[]) => mockUseEndpointOverview(...args),
+    useEndpointEgressPolicy: () => ({ data: undefined, isLoading: false, error: null }),
     useConnectionInfo: (...args: unknown[]) => mockUseConnectionInfo(...args),
     useCreateCredential: () => ({
       mutate: mockCreateMutate,

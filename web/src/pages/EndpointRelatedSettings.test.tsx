@@ -7,6 +7,7 @@ import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 
 const mockUseEndpointOverview = vi.fn();
+const mockUseEndpointEgressPolicy = vi.fn();
 const mockMutateAsync = vi.fn();
 
 vi.mock('../api/queries', async () => {
@@ -14,6 +15,7 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useEndpointOverview: (...args: unknown[]) => mockUseEndpointOverview(...args),
+    useEndpointEgressPolicy: (...args: unknown[]) => mockUseEndpointEgressPolicy(...args),
     useUpdateEndpointConfig: () => ({
       mutateAsync: mockMutateAsync,
       isPending: false,
@@ -61,6 +63,30 @@ const overview: EndpointOverviewResponse = {
   },
 };
 
+const egressField = (
+  effective: number,
+  configured: number | null,
+  source: 'endpoint' | 'server-env' | 'default',
+  unit: 'ms' | 'bytes' | 'count',
+  min: number,
+  max: number,
+  extra: Record<string, unknown> = {},
+) => ({ effective, configured, source, unit, min, max, clamped: false, ...extra });
+
+const egressPolicy = {
+  timeoutMs: egressField(1200, 1200, 'endpoint', 'ms', 100, 60000),
+  retries: egressField(4, null, 'server-env', 'count', 0, 10),
+  retryBackoffMs: egressField(200, null, 'default', 'ms', 0, 10000),
+  cacheMaxAgeMs: egressField(60000, null, 'server-env', 'ms', 0, 86400000, { clamped: true, requested: 90000000 }),
+  totalDeadlineMs: egressField(10000, null, 'default', 'ms', 100, 120000),
+  maxResponseBytes: egressField(1048576, null, 'default', 'bytes', 1024, 10485760),
+  maxKeys: egressField(100, null, 'default', 'count', 1, 1000),
+  maxCacheEntries: egressField(50, null, 'default', 'count', 1, 1000),
+  refreshIntervalMs: egressField(3600000, null, 'default', 'ms', 60000, 86400000),
+  unknownKidMinIntervalMs: egressField(300000, null, 'default', 'ms', 0, 3600000),
+  staleIfErrorMs: egressField(172800000, null, 'default', 'ms', 0, 604800000),
+};
+
 function renderPanel(keys: readonly string[]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -86,6 +112,7 @@ describe('EndpointRelatedSettings', () => {
     vi.clearAllMocks();
     mockMutateAsync.mockResolvedValue({});
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    mockUseEndpointEgressPolicy.mockReturnValue({ data: egressPolicy, isLoading: false, error: null });
   });
 
   it('renders boolean, enum and numeric controls from the shared registry', () => {
@@ -180,6 +207,59 @@ describe('EndpointRelatedSettings', () => {
 
     expect(await screen.findByTestId('related-settings-feedback')).toHaveTextContent(message);
     expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows effective values, units, bounds, provenance, and clamping in view mode', () => {
+    renderPanel(['JwksFetchTimeoutMs', 'JwksFetchRetries', 'JwksCacheMaxAgeMs']);
+    expandPanel();
+
+    expect(screen.getByTestId('related-settings-effective-JwksFetchTimeoutMs')).toHaveTextContent('1200 ms');
+    expect(screen.getByTestId('related-settings-source-JwksFetchTimeoutMs')).toHaveTextContent('Endpoint override');
+    expect(screen.getByTestId('related-settings-bounds-JwksFetchTimeoutMs')).toHaveTextContent('100 - 60000 ms');
+    expect(screen.getByTestId('related-settings-source-JwksFetchRetries')).toHaveTextContent('Server environment');
+    expect(screen.getByTestId('related-settings-clamped-JwksCacheMaxAgeMs')).toHaveTextContent('90000000');
+    expect(screen.getByTestId('related-settings-clamped-JwksCacheMaxAgeMs')).toHaveTextContent('60000');
+  });
+
+  it('edits and saves only changed egress overrides', async () => {
+    renderPanel(['JwksFetchTimeoutMs', 'JwksFetchRetries']);
+    expandPanel();
+    fireEvent.click(screen.getByTestId('related-settings-egress-edit'));
+    fireEvent.change(screen.getByTestId('related-settings-JwksFetchTimeoutMs-draft'), {
+      target: { value: '1400' },
+    });
+    fireEvent.click(screen.getByTestId('related-settings-egress-save'));
+
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { JwksFetchTimeoutMs: 1400 } },
+    }));
+  });
+
+  it('Cancel discards egress drafts without persisting', () => {
+    renderPanel(['JwksFetchTimeoutMs']);
+    expandPanel();
+    fireEvent.click(screen.getByTestId('related-settings-egress-edit'));
+    fireEvent.change(screen.getByTestId('related-settings-JwksFetchTimeoutMs-draft'), {
+      target: { value: '1500' },
+    });
+    fireEvent.click(screen.getByTestId('related-settings-egress-cancel'));
+    fireEvent.click(screen.getByTestId('related-settings-egress-edit'));
+
+    expect(screen.getByTestId('related-settings-JwksFetchTimeoutMs-draft')).toHaveValue(1200);
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('Reset to inherit sends null only after Save', async () => {
+    renderPanel(['JwksFetchTimeoutMs']);
+    expandPanel();
+    fireEvent.click(screen.getByTestId('related-settings-egress-edit'));
+    fireEvent.click(screen.getByTestId('related-settings-JwksFetchTimeoutMs-reset'));
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('related-settings-egress-save'));
+
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { JwksFetchTimeoutMs: null } },
+    }));
   });
 
   it('declares the intended ownership map for endpoint subtabs', () => {

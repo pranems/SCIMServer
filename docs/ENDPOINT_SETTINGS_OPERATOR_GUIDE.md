@@ -123,14 +123,14 @@ An explicit `profile.authentication.methods[]` entry is authoritative over the f
 
 ### 2.8 Runtime egress (WIF JWKS fetch)
 
-Fourteen numeric controls cover how the server fetches and caches signing keys plus the active-credential limits for each authentication method. Leave a numeric override blank to inherit the server default.
+Fourteen numeric controls cover how the server fetches and caches signing keys plus the active-credential limits for each authentication method. The Connect WIF panel shows the effective runtime value, configured endpoint override, source, unit, inclusive bounds, and any clamping. Use Edit to open a draft, Save to persist changed overrides, Cancel to discard the draft, and Reset to inherit to remove a stored endpoint override on Save.
 
 | Setting | Bounds | Server default |
 |---|---|---|
 | `JwksFetchTimeoutMs` | 100 - 60000 | 5000 |
 | `JwksFetchRetries` | 0 - 10 | 2 |
 | `JwksFetchRetryBackoffMs` | 0 - 10000 | 200 |
-| `JwksCacheMaxAgeMs` | 0 - 86400000 (0 = always refetch) | 600000 |
+| `JwksCacheMaxAgeMs` | 0 - 86400000 (0 = always refetch) | 86400000 |
 | `JwksTotalDeadlineMs` | 100 - 120000 | 10000 |
 | `JwksMaxResponseBytes` | 1024 - 10485760 | 1048576 |
 | `JwksMaxKeys` | 1 - 1000 | 100 |
@@ -138,6 +138,8 @@ Fourteen numeric controls cover how the server fetches and caches signing keys p
 | `JwksRefreshIntervalMs` | 60000 - 86400000 | 3600000 |
 | `JwksUnknownKidMinIntervalMs` | 0 - 3600000 | 300000 |
 | `JwksStaleIfErrorMs` | 0 - 604800000 | 172800000 |
+
+`GET /scim/admin/endpoints/{endpointId}/egress-policy` returns these 11 JWKS values with their effective/configured/source/unit/bounds/clamped shape. Endpoint PATCH with a setting value of `null` removes that per-key override while preserving sibling settings; omission still means no change.
 
 ### Active-credential caps
 

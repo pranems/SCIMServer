@@ -1054,6 +1054,32 @@ describe('EndpointService', () => {
       expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('False');
     });
 
+    it('removes only a setting whose PATCH value is null (reset to inherit)', async () => {
+      const withEgressOverride = {
+        ...profileEndpoint,
+        profile: {
+          ...profileEndpoint.profile,
+          settings: {
+            ...profileEndpoint.profile.settings,
+            JwksFetchTimeoutMs: 1200,
+            JwksFetchRetries: 4,
+          },
+        },
+      };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(withEgressOverride);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) =>
+        Promise.resolve({ ...withEgressOverride, profile: _args.data.profile }),
+      );
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { JwksFetchTimeoutMs: null } as any },
+      });
+
+      expect(result.profile?.settings).not.toHaveProperty('JwksFetchTimeoutMs');
+      expect(result.profile?.settings?.JwksFetchRetries).toBe(4);
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
+    });
+
     it('should replace SPC when provided in partial profile', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
       (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {

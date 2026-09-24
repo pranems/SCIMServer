@@ -804,9 +804,17 @@ export class EndpointService implements OnModuleInit {
     current: EndpointProfile | undefined,
     partial: Partial<import('../../scim/endpoint-profile/endpoint-profile.types').ShorthandProfileInput>,
   ): EndpointProfile | undefined {
+    const rawSettings = partial.settings as Record<string, unknown> | undefined;
+    const settingsToSet = rawSettings === undefined
+      ? undefined
+      : Object.fromEntries(Object.entries(rawSettings).filter(([, value]) => value !== null));
+    const normalizedPartial = rawSettings === undefined
+      ? partial
+      : { ...partial, settings: settingsToSet as any };
+
     if (!current) {
       // No existing profile - validate the partial as a full profile
-      const result = validateAndExpandProfile(partial);
+      const result = validateAndExpandProfile(normalizedPartial);
       if (!result.valid) {
         throw new BadRequestException(`Profile validation failed: ${result.errors.map((e: any) => e.detail).join('; ')}`);
       }
@@ -832,11 +840,18 @@ export class EndpointService implements OnModuleInit {
     if (partial.settings !== undefined) {
       // Validate individual settings values before merging
       try {
-        validateEndpointConfig(partial.settings as Record<string, any>);
+        validateEndpointConfig(settingsToSet as Record<string, any>);
       } catch (error) {
         throw new BadRequestException((error as Error).message);
       }
-      merged.settings = { ...current.settings, ...partial.settings };
+      const mergedSettings: Record<string, unknown> = {
+        ...(current.settings ?? {}),
+        ...(settingsToSet ?? {}),
+      };
+      for (const [key, value] of Object.entries(rawSettings ?? {})) {
+        if (value === null) delete mergedSettings[key];
+      }
+      merged.settings = mergedSettings;
     }
     // A1 - replace the authentication block wholesale when provided (the admin
     // authentication-methods API computes the full block and submits it).

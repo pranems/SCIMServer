@@ -1050,6 +1050,46 @@ export function useEndpointOverview(id: string) {
   });
 }
 
+export type EgressPolicyFieldName =
+  | 'timeoutMs'
+  | 'retries'
+  | 'retryBackoffMs'
+  | 'cacheMaxAgeMs'
+  | 'totalDeadlineMs'
+  | 'maxResponseBytes'
+  | 'maxKeys'
+  | 'maxCacheEntries'
+  | 'refreshIntervalMs'
+  | 'unknownKidMinIntervalMs'
+  | 'staleIfErrorMs';
+
+export interface EffectiveEgressPolicyField {
+  effective: number;
+  configured: number | null;
+  source: 'endpoint' | 'server-env' | 'default';
+  unit: 'ms' | 'bytes' | 'count';
+  min: number;
+  max: number;
+  clamped: boolean;
+  requested?: number;
+}
+
+export type EndpointEgressPolicy = Record<EgressPolicyFieldName, EffectiveEgressPolicyField>;
+
+export const endpointEgressPolicyQueryKey = (endpointId: string) =>
+  ['endpoint-egress-policy', endpointId] as const;
+
+export function useEndpointEgressPolicy(endpointId: string, enabled = true) {
+  return useQuery<EndpointEgressPolicy>({
+    queryKey: endpointEgressPolicyQueryKey(endpointId),
+    queryFn: () => fetchWithAuth<EndpointEgressPolicy>(
+      `/scim/admin/endpoints/${endpointId}/egress-policy`,
+    ),
+    enabled: enabled && endpointId.length > 0,
+    staleTime: 30_000,
+  });
+}
+
 /** Fetch SCIM users for an endpoint */
 export function useEndpointUsers(endpointId: string, params?: ScimListParams) {
   return useQuery<ScimListResponse>({
@@ -2168,6 +2208,7 @@ export function useUpdateEndpointConfig(
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
+      void qc.invalidateQueries({ queryKey: endpointEgressPolicyQueryKey(endpointId) });
       void qc.invalidateQueries({ queryKey: ['endpoint-schemas', endpointId] });
       void qc.invalidateQueries({ queryKey: ['discovery', endpointId] });
       void qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) });

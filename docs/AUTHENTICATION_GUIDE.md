@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.31`
+> **Status:** Living reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.32`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -507,7 +507,7 @@ Content-Type: application/json
 
 `GET /scim/admin/settings/jwks-hosts` returns `seed`, `env`, `persisted` and `effective` so you can see where each host came from.
 
-Fetch behaviour is tuned by `JwksFetchTimeoutMs`, `JwksFetchRetries`, `JwksFetchRetryBackoffMs` and `JwksCacheMaxAgeMs`. The fetch **fails closed**: an unreachable JWKS rejects with `jwks_unreachable` rather than skipping signature verification.
+Fetch behaviour is tuned by the 11 WIF/JWKS egress settings shown in the endpoint Connect panel. Cache, single-flight, stale fallback, refresh, unknown-kid state, and startup prewarm are isolated by JWKS URI plus the complete effective endpoint policy. Endpoints may share an IdP URI without a lenient endpoint weakening another endpoint's TTL, response/key cap, retry, refresh, or stale posture. Redirect memory is bounded, and a zero cache TTL expires immediately. The fetch **fails closed**: an unreachable JWKS rejects with `jwks_unreachable` rather than skipping signature verification.
 
 ---
 

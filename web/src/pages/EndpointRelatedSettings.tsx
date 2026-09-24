@@ -4,6 +4,7 @@ import {
   AccordionHeader,
   AccordionItem,
   AccordionPanel,
+  Button,
   Caption1,
   Card,
   Dropdown,
@@ -18,7 +19,12 @@ import {
   Switch,
   tokens,
 } from '@fluentui/react-components';
-import { useEndpointOverview, useUpdateEndpointConfig } from '../api/queries';
+import {
+  useEndpointEgressPolicy,
+  useEndpointOverview,
+  useUpdateEndpointConfig,
+  type EgressPolicyFieldName,
+} from '../api/queries';
 import {
   ALL_ENDPOINT_SETTINGS,
   effectiveBooleanSetting,
@@ -57,7 +63,52 @@ const useStyles = makeStyles({
   description: {
     color: tokens.colorNeutralForeground3,
   },
+  egressSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    paddingTop: tokens.spacingVerticalM,
+  },
+  egressHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalM,
+    flexWrap: 'wrap',
+  },
+  egressRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+  },
+  egressActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+  },
 });
+
+const EGRESS_FIELD_BY_SETTING: Record<string, EgressPolicyFieldName | undefined> = {
+  JwksFetchTimeoutMs: 'timeoutMs',
+  JwksFetchRetries: 'retries',
+  JwksFetchRetryBackoffMs: 'retryBackoffMs',
+  JwksCacheMaxAgeMs: 'cacheMaxAgeMs',
+  JwksTotalDeadlineMs: 'totalDeadlineMs',
+  JwksMaxResponseBytes: 'maxResponseBytes',
+  JwksMaxKeys: 'maxKeys',
+  JwksMaxCacheEntries: 'maxCacheEntries',
+  JwksRefreshIntervalMs: 'refreshIntervalMs',
+  JwksUnknownKidMinIntervalMs: 'unknownKidMinIntervalMs',
+  JwksStaleIfErrorMs: 'staleIfErrorMs',
+};
+
+const SOURCE_LABEL = {
+  endpoint: 'Endpoint override',
+  'server-env': 'Server environment',
+  default: 'Built-in default',
+} as const;
 
 export interface EndpointRelatedSettingsProps {
   endpointId: string;
@@ -93,6 +144,10 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
   const overview = useEndpointOverview(endpointId);
   const update = useUpdateEndpointConfig(endpointId);
   const [feedback, setFeedback] = React.useState<{ intent: 'success' | 'error'; text: string } | null>(null);
+  const [egressEditing, setEgressEditing] = React.useState(false);
+  const [egressDraft, setEgressDraft] = React.useState<Record<string, string>>({});
+  const [egressInitialDraft, setEgressInitialDraft] = React.useState<Record<string, string>>({});
+  const [egressResets, setEgressResets] = React.useState<Set<string>>(new Set());
   React.useEffect(() => {
     if (!feedback) return undefined;
     const timer = window.setTimeout(() => setFeedback(null), 4_000);
@@ -101,6 +156,14 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
   const definitions = settingKeys
     .map((key) => ALL_ENDPOINT_SETTINGS.get(key))
     .filter((setting): setting is EndpointSettingDefinition => setting !== undefined);
+  const egressDefinitions = definitions.filter(
+    (setting): setting is NumberSettingDefinition =>
+      setting.kind === 'number' && EGRESS_FIELD_BY_SETTING[setting.key] !== undefined,
+  );
+  const standardDefinitions = definitions.filter(
+    (setting) => EGRESS_FIELD_BY_SETTING[setting.key] === undefined,
+  );
+  const egressPolicy = useEndpointEgressPolicy(endpointId, egressDefinitions.length > 0);
 
   if (overview.isLoading) {
     return <Spinner size="tiny" label={`Loading ${title.toLowerCase()}`} data-testid={`${testId}-loading`} />;
@@ -127,6 +190,57 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
     }
   }
 
+  function beginEgressEdit(): void {
+    const draft: Record<string, string> = {};
+    for (const definition of egressDefinitions) {
+      const fieldName = EGRESS_FIELD_BY_SETTING[definition.key];
+      const field = fieldName ? egressPolicy.data?.[fieldName] : undefined;
+      if (field) draft[definition.key] = String(field.configured ?? field.effective);
+    }
+    setEgressDraft(draft);
+    setEgressInitialDraft(draft);
+    setEgressResets(new Set());
+    setFeedback(null);
+    setEgressEditing(true);
+  }
+
+  function cancelEgressEdit(): void {
+    setEgressDraft({});
+    setEgressInitialDraft({});
+    setEgressResets(new Set());
+    setEgressEditing(false);
+  }
+
+  async function saveEgressDraft(): Promise<void> {
+    const patch: Record<string, number | null> = {};
+    for (const definition of egressDefinitions) {
+      if (egressResets.has(definition.key)) {
+        patch[definition.key] = null;
+        continue;
+      }
+      if (egressDraft[definition.key] === egressInitialDraft[definition.key]) continue;
+      const result = validateNumber(definition, egressDraft[definition.key] ?? '');
+      if (typeof result === 'string') {
+        setFeedback({ intent: 'error', text: result });
+        return;
+      }
+      patch[definition.key] = result;
+    }
+    if (Object.keys(patch).length === 0) {
+      cancelEgressEdit();
+      return;
+    }
+    setFeedback(null);
+    try {
+      await update.mutateAsync({ profile: { settings: patch } });
+      setFeedback({ intent: 'success', text: 'WIF/JWKS runtime overrides saved.' });
+      cancelEgressEdit();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Update failed.';
+      setFeedback({ intent: 'error', text: `WIF/JWKS runtime overrides: ${detail}` });
+    }
+  }
+
   return (
     <Card className={classes.card} data-testid={testId}>
       <Accordion collapsible>
@@ -147,7 +261,7 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
               </MessageBar>
             )}
             <div className={classes.grid}>
-        {definitions.map((definition) => {
+        {standardDefinitions.map((definition) => {
           const disabled = update.isPending && pendingKey === definition.key;
           if (definition.kind === 'boolean') {
             const descriptionId = `${testId}-${definition.key}-description`;
@@ -220,6 +334,112 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
           );
         })}
             </div>
+            {egressDefinitions.length > 0 && (
+              <div className={classes.egressSection} data-testid={`${testId}-egress-policy`}>
+                <div className={classes.egressHeader}>
+                  <div>
+                    <Subtitle2>Effective WIF/JWKS runtime values</Subtitle2>
+                    <Caption1 className={classes.description}>
+                      Endpoint overrides win; otherwise the value inherits the server environment or built-in default.
+                    </Caption1>
+                  </div>
+                  {!egressEditing && (
+                    <Button
+                      appearance="secondary"
+                      onClick={beginEgressEdit}
+                      disabled={egressPolicy.isLoading || Boolean(egressPolicy.error)}
+                      data-testid={`${testId}-egress-edit`}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </div>
+                {egressPolicy.isLoading && <Spinner size="tiny" label="Loading effective WIF/JWKS values" />}
+                {egressPolicy.error && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>Could not load effective WIF/JWKS values.</MessageBarBody>
+                  </MessageBar>
+                )}
+                {egressPolicy.data && (
+                  <div className={classes.grid}>
+                    {egressDefinitions.map((definition) => {
+                      const fieldName = EGRESS_FIELD_BY_SETTING[definition.key]!;
+                      const field = egressPolicy.data[fieldName];
+                      const resetPending = egressResets.has(definition.key);
+                      return (
+                        <div key={definition.key} className={classes.egressRow} data-testid={`${testId}-egress-${definition.key}`}>
+                          <Caption1><strong>{definition.displayLabel}</strong></Caption1>
+                          {!egressEditing ? (
+                            <>
+                              <Caption1 data-testid={`${testId}-effective-${definition.key}`}>
+                                Effective: {field.effective} {field.unit}
+                              </Caption1>
+                              <Caption1 data-testid={`${testId}-source-${definition.key}`}>
+                                Source: {SOURCE_LABEL[field.source]}
+                                {field.configured !== null ? ` (${field.configured} ${field.unit})` : ''}
+                              </Caption1>
+                              <Caption1 data-testid={`${testId}-bounds-${definition.key}`}>
+                                Bounds: {field.min} - {field.max} {field.unit}
+                              </Caption1>
+                              {field.clamped && field.requested !== undefined && (
+                                <Caption1 data-testid={`${testId}-clamped-${definition.key}`}>
+                                  Requested {field.requested} {field.unit}; clamped to {field.effective} {field.unit}.
+                                </Caption1>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <Input
+                                type="number"
+                                aria-label={definition.displayLabel}
+                                value={resetPending ? '' : (egressDraft[definition.key] ?? '')}
+                                placeholder={resetPending ? 'Will inherit after Save' : undefined}
+                                min={field.min}
+                                max={field.max}
+                                disabled={resetPending || update.isPending}
+                                onChange={(_, data) => setEgressDraft((current) => ({
+                                  ...current,
+                                  [definition.key]: data.value,
+                                }))}
+                                data-testid={`${testId}-${definition.key}-draft`}
+                              />
+                              <Button
+                                appearance="subtle"
+                                disabled={field.configured === null || resetPending || update.isPending}
+                                onClick={() => setEgressResets((current) => new Set(current).add(definition.key))}
+                                data-testid={`${testId}-${definition.key}-reset`}
+                              >
+                                Reset to inherit
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {egressEditing && (
+                  <div className={classes.egressActions}>
+                    <Button
+                      appearance="primary"
+                      onClick={() => { void saveEgressDraft(); }}
+                      disabled={update.isPending}
+                      data-testid={`${testId}-egress-save`}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      appearance="secondary"
+                      onClick={cancelEgressEdit}
+                      disabled={update.isPending}
+                      data-testid={`${testId}-egress-cancel`}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </AccordionPanel>
         </AccordionItem>
       </Accordion>
