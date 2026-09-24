@@ -26,6 +26,8 @@
 | CRO-18 | Performance | Medium | Correct derived Activity totals required reading every candidate log in one unbounded Prisma query. | Parse-derived severity/system semantics cannot be expressed entirely in the current request-log columns. | Read ordered candidates in 200-row Prisma batches, then parse/filter/page; direct predicates retain SQL pagination. |
 | CRO-19 | Test harness | Medium | Three green full-unit Jest processes remained alive and held their shells open after summaries were written. | Existing asynchronous handles prevent Jest from exiting naturally in this repository. | Trust only completed summary artifacts, terminate verified orphan Jest PIDs, and use `--forceExit` for final long-suite consolidation. |
 | CRO-20 | CI/Docker context | High | Local and pre-push web builds passed, but both GitHub image builds failed to resolve the new shared toolbar. | `.dockerignore` excluded every `**/logs` directory, including the intentional production source directory. | Re-include the source path and run a generalized Docker source-shadow audit in Fast pre-push. |
+| CRO-21 | Test correctness | High | The full Prisma E2E suite returned zero custom lifecycle Logs while InMemory and all focused local checks passed. | The new E2E queried buffered RequestLog rows immediately after DELETE instead of using the repository's durable-log helper. | Use `waitForLogRow()` for POST/PATCH/DELETE; it force-flushes and polls to a deadline. |
+| CRO-22 | Deployment tooling | High | The GHCR workflow succeeded, but Stage 4.3 reported JSON conversion failure and immediately cascaded into pull/import/deploy failures. | `gh run list --json` emitted ANSI cursor-control bytes before JSON in this console. | Normalize ANSI/BOM in `ConvertFrom-GithubCliJson()` before exact-SHA run selection; contract test uses real control bytes. |
 
 ## Detailed Findings
 
@@ -155,6 +157,24 @@
 - **Fix:** Add `!web/src/components/logs` and `!web/src/components/logs/**` after `**/logs`. Add `audit-docker-source-context.ps1` and invoke it from Fast pre-push.
 - **Why it works:** Docker includes the directory and descendants while runtime `logs` artifacts remain excluded. The audit discovers populated directories under `api/src` and `web/src` whose names match broad `**/<name>` rules and requires both exceptions.
 - **Prevention:** The audit failed RED on both missing exceptions, passed GREEN after the fix, and a registry-free `FROM scratch` build copied the exact toolbar from the real Docker context.
+
+### CRO-21 - Prisma log readback raced the buffered writer
+
+- **Detection:** Full dev pipeline Stage 2.2 against Prisma.
+- **Earliest capable gate:** Focused E2E against Prisma when the test was authored.
+- **Escape delta:** Consolidation passed against InMemory; the first direct Prisma read returned `items: []` before the asynchronous buffer enqueue/flush completed.
+- **Fix:** Replace the immediate list assertion with the existing `waitForLogRow()` helper for each expected method.
+- **Why it works:** The helper repeatedly force-flushes, queries, and checks the structural row predicate until the row is durable or the bounded deadline expires.
+- **Prevention:** Any E2E assertion over a just-produced RequestLog row must use the shared durable-log helper, never a fixed sleep or immediate list request.
+
+### CRO-22 - ANSI control bytes broke machine-readable GitHub CLI output
+
+- **Detection:** Full dev pipeline Stage 4.3; GitHub later showed the dispatched `publish-ghcr.yml` run succeeded for exact merged-master SHA `59278a59`.
+- **Earliest capable gate:** Workflow-run selector contract with ANSI-prefixed JSON.
+- **Escape delta:** Publish-run selection failed locally after successful dispatch; anonymous pull/import ran too early and deployment was correctly blocked.
+- **Fix:** Add `ConvertFrom-GithubCliJson()` in the workflow-run helper, strip ANSI CSI sequences and a leading BOM, then parse. Route Stage 4.3 through that adapter.
+- **Why it works:** The selector receives pure JSON while retaining exact SHA and dispatch-time discrimination.
+- **Prevention:** The workflow selector contract includes real cursor-hide/show bytes and passes 10/10.
 
 ## Self-Improvement Dispositions
 

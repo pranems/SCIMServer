@@ -520,7 +520,7 @@ if (-not $SkipDeploy) {
         for ($attempt = 1; $attempt -le 15 -and $null -eq $selectedRun; $attempt++) {
             $runJson = gh run list --workflow=publish-ghcr.yml --branch $publishRef --event workflow_dispatch --limit 20 --json databaseId,headSha,createdAt,status,conclusion
             if ($LASTEXITCODE -eq 0) {
-                $runs = @($runJson | ConvertFrom-Json)
+                $runs = @(ConvertFrom-GithubCliJson -InputObject $runJson)
                 $selectedRun = Select-GithubWorkflowRun -Runs $runs -ExpectedHeadSha $expectedHeadSha -DispatchedAfter $dispatchedAfter
             }
             if ($null -eq $selectedRun) {

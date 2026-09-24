@@ -1,3 +1,19 @@
+function ConvertFrom-GithubCliJson {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [object]$InputObject
+    )
+
+    $text = if ($InputObject -is [array]) {
+        (@($InputObject | ForEach-Object { [string]$_ }) -join [Environment]::NewLine)
+    } else {
+        [string]$InputObject
+    }
+    $text = [regex]::Replace($text, "`e\[[0-?]*[ -/]*[@-~]", '')
+    $text = $text.TrimStart([char]0xFEFF)
+    return $text | ConvertFrom-Json
+}
+
 function Select-GithubWorkflowRun {
     [CmdletBinding()]
     param(
