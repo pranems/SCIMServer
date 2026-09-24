@@ -177,7 +177,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ endpointId }) => {
         />
         <KpiCard
           icon={<PeopleCommunity24Regular />}
-          label="Generic Resources"
+          label="Custom Resources"
           value={stats.genericResourceCount}
         />
         <KpiCard

@@ -249,6 +249,29 @@ describe('useUpdateEndpointConfig', () => {
     });
   });
 
+  it('profile replacement invalidates every endpoint discovery and custom-resource cache', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateEndpointConfig(EP_ID), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        profile: {
+          resourceTypes: [{ id: 'Device', name: 'Device', endpoint: '/Devices' }],
+        },
+      });
+    });
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((call) => JSON.stringify(call[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(['endpoint-schemas', EP_ID]));
+      expect(keys).toContain(JSON.stringify(['discovery', EP_ID]));
+      expect(keys).toContain(JSON.stringify(queryKeys.users.all(EP_ID)));
+      expect(keys).toContain(JSON.stringify(queryKeys.groups.all(EP_ID)));
+      expect(keys).toContain(JSON.stringify(queryKeys.resources.byEndpoint(EP_ID)));
+    });
+  });
+
   it('rollback: restores the original detail on server error', async () => {
     const { wrapper, queryClient } = createWrapper();
     const original: EndpointResponse = {

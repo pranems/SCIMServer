@@ -1,6 +1,6 @@
 # Profile-Driven Resource Forms and Custom Resources
 
-> **Status:** Implemented and extended - **Last verified:** 2026-09-23 - **Product version:** `0.55.27`
+> **Status:** Implemented and extended - **Last verified:** 2026-09-23 - **Product version:** `0.55.28`
 
 ## Purpose
 
@@ -12,7 +12,9 @@ SCIM resource create and edit workflows now derive their fields from each endpoi
 - Existing User and Group drawers edit every writable core and extension attribute declared by the endpoint profile.
 - Each custom ResourceType appears as a first-class endpoint tab with list, create, edit, and delete workflows.
 - Manual Provision renders one tab per endpoint ResourceType and reuses the same generated form.
+- Create dialogs and Manual Provision expose an editable request body synchronized with the generated controls in both directions.
 - Resource Types shows each type's effective core plus extension schema paths and characteristics.
+- Endpoint detail includes the endpoint-scoped Service Provider Config and updates ResourceType tabs when the profile changes.
 - Forms begin with working examples. The adjacent request preview is the exact JSON submitted.
 
 ## Architecture
@@ -36,6 +38,7 @@ The owning modules are:
 |---|---|
 | `web/src/resources/profile-resource-shape.ts` | Combine core and extension schemas, exclude read-only fields from forms, generate examples, build create payloads, and build changed-field PATCH operations. |
 | `web/src/resources/ProfileResourceForm.tsx` | Render text, number, boolean, canonical-value, complex, and multi-valued controls from field descriptors. |
+| `web/src/resources/ProfileResourceBodyEditor.tsx` | Keep the editable JSON request and profile-generated controls synchronized without dropping operator-added members. |
 | `web/src/resources/CreateProfileResourceDialog.tsx` | Provide a reusable create flow with a copyable live request preview. |
 | `web/src/pages/GenericResourcesTab.tsx` | List and manage instances of an arbitrary custom ResourceType. |
 | `web/src/components/detail/ResourceDetailDrawer.tsx` | Edit and delete built-in or custom resources with ETag-aware PATCH. |
@@ -118,7 +121,7 @@ sequenceDiagram
 | Route size budgets | Passed; GenericResourcesTab 1.6 kB gzipped / 110 kB |
 | Touched-file TypeScript check | Zero errors |
 
-The Playwright workflow creates a disposable endpoint, adds a User extension and Device ResourceType, creates and edits both resource kinds in the browser, checks the rendered values after refetch, and deletes the endpoint in `afterEach`.
+The Playwright workflow creates a disposable endpoint, adds a User extension and Device ResourceType, synchronizes JSON and controls in both directions, proves an unconstrained string renders as text, creates and edits both resource kinds, removes Device, verifies the runtime tab disappears, and deletes the endpoint in `afterEach`.
 
 ## Scope
 

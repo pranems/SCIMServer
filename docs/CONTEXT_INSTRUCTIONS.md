@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.27
+> **Version**: 0.55.28
 > **Last Updated**: September 23, 2026
 > **Last verified:** 2026-09-23
 
@@ -17,6 +17,16 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The v0.55.28 profile-authoritative resource UI is implemented locally on
+`feat/profile-authoritative-resource-ui-v0.55.28`. Create dialogs and Manual
+Provision share a bidirectional editable JSON/form surface; controls derive
+from the live endpoint schema. Endpoint detail adds Service Provider Config,
+and profile mutation invalidates every discovery/resource cache with safe
+fallback for removed selected types. The dev fixture adds AIAgent and removes
+the accidental Device platform enum. Evidence is full web 1,514/1,514, profile
+Playwright 1/1, SPC Playwright 2/2, fixture self-test 16/16, production build,
+and 25/25 route budgets. Full consolidation and deployment remain pending.
 
 The v0.55.24 UI change is merged and verified on dev at revision
 `scimserver-dev--v0ecf4f2d`, serving `ghcr.io/pranems/scimserver:0.55.24`.

@@ -230,6 +230,58 @@ export function valueForField(
     : undefined;
 }
 
+export function valuesForResource(
+  shape: EffectiveResourceShape,
+  resource: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(shape.fields.map((field) => [
+    field.id,
+    valueForField(field, resource),
+  ]));
+}
+
+export function updateResourceField(
+  shape: EffectiveResourceShape,
+  resource: Record<string, unknown>,
+  fieldId: string,
+  value: unknown,
+): Record<string, unknown> {
+  const field = shape.fields.find((candidate) => candidate.id === fieldId);
+  if (!field) return resource;
+
+  const next = structuredClone(resource);
+  const schemas = Array.isArray(next.schemas)
+    ? next.schemas.filter((schema): schema is string => typeof schema === 'string')
+    : [shape.coreSchema.id];
+  if (!schemas.includes(shape.coreSchema.id)) schemas.unshift(shape.coreSchema.id);
+
+  if (!field.extension) {
+    if (hasValue(value)) next[field.name] = value;
+    else delete next[field.name];
+    next.schemas = schemas;
+    return next;
+  }
+
+  const extension = next[field.schemaUrn] && typeof next[field.schemaUrn] === 'object'
+    && !Array.isArray(next[field.schemaUrn])
+    ? { ...(next[field.schemaUrn] as Record<string, unknown>) }
+    : {};
+  if (hasValue(value)) extension[field.name] = value;
+  else delete extension[field.name];
+
+  const binding = shape.extensionSchemas.find(({ schema }) => schema.id === field.schemaUrn)?.binding;
+  if (Object.keys(extension).length > 0 || binding?.required) {
+    next[field.schemaUrn] = extension;
+    if (!schemas.includes(field.schemaUrn)) schemas.push(field.schemaUrn);
+  } else {
+    delete next[field.schemaUrn];
+    const index = schemas.indexOf(field.schemaUrn);
+    if (index >= 0) schemas.splice(index, 1);
+  }
+  next.schemas = schemas;
+  return next;
+}
+
 export function buildCreatePayload(
   shape: EffectiveResourceShape,
   values: Record<string, unknown>,

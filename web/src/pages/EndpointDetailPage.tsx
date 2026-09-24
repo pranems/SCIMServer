@@ -83,7 +83,7 @@ const useStyles = makeStyles({
   },
 });
 
-type StaticTabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'connect' | 'bulk' | 'resource-types';
+type StaticTabValue = 'overview' | 'users' | 'groups' | 'logs' | 'settings' | 'activity' | 'schemas' | 'credentials' | 'connect' | 'bulk' | 'resource-types' | 'service-provider-config';
 type TabValue = StaticTabValue | `resource:${string}`;
 
 interface EndpointDetailPageProps {
@@ -99,6 +99,7 @@ function pathToTab(pathname: string, endpointId: string): TabValue {
   if (pathname.startsWith(`${base}/activity`)) return 'activity';
   if (pathname.startsWith(`${base}/bulk`)) return 'bulk';
   if (pathname.startsWith(`${base}/resource-types`)) return 'resource-types';
+  if (pathname.startsWith(`${base}/service-provider-config`)) return 'service-provider-config';
   if (pathname.startsWith(`${base}/resources/`)) {
     const resourceTypeId = pathname.slice(`${base}/resources/`.length).split('/')[0];
     return `resource:${decodeURIComponent(resourceTypeId ?? '')}`;
@@ -120,6 +121,39 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
   const { data: endpoint, isLoading: loadingEndpoint, error: endpointError } = useEndpoint(endpointId);
   // Phase L1 - delete confirmation modal mounted in the header.
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+
+  const supportsUsers = endpointSupportsResourceType(endpoint?.profile, {
+    name: 'User',
+    endpointPath: '/Users',
+  });
+  const supportsGroups = endpointSupportsResourceType(endpoint?.profile, {
+    name: 'Group',
+    endpointPath: '/Groups',
+  });
+  const declaredResourceTypes = (
+    endpoint?.profile as { resourceTypes?: Array<{ id?: string; name?: string; endpoint?: string }> } | undefined
+  )?.resourceTypes ?? [];
+  const customResourceTypes = declaredResourceTypes.filter((resourceType) =>
+    resourceType.name !== 'User' && resourceType.name !== 'Group' &&
+    resourceType.id && resourceType.name && resourceType.endpoint);
+
+  React.useEffect(() => {
+    if (!endpoint) return;
+    const selectedCustomId = activeTab.startsWith('resource:')
+      ? activeTab.slice('resource:'.length)
+      : undefined;
+    const selectedTypeRemoved = selectedCustomId !== undefined
+      && !customResourceTypes.some((resourceType) => resourceType.id === selectedCustomId);
+    if ((activeTab === 'users' && !supportsUsers)
+      || (activeTab === 'groups' && !supportsGroups)
+      || selectedTypeRemoved) {
+      void navigate({
+        to: '/endpoints/$endpointId/resource-types',
+        params: { endpointId },
+        replace: true,
+      });
+    }
+  }, [activeTab, customResourceTypes, endpoint, endpointId, navigate, supportsGroups, supportsUsers]);
 
   if (loadingEndpoint) {
     // G1 - skeleton mirrors header (title row) + tablist row + an
@@ -146,21 +180,6 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
   // the operator never navigates into a tab that would fatally error.
   // Fail-open mirrors the server resolver - absent/empty resourceTypes
   // means "serves everything", so legacy endpoints show all tabs.
-  const supportsUsers = endpointSupportsResourceType(endpoint.profile, {
-    name: 'User',
-    endpointPath: '/Users',
-  });
-  const supportsGroups = endpointSupportsResourceType(endpoint.profile, {
-    name: 'Group',
-    endpointPath: '/Groups',
-  });
-  const declaredResourceTypes = (
-    endpoint.profile as { resourceTypes?: Array<{ id?: string; name?: string; endpoint?: string }> } | undefined
-  )?.resourceTypes ?? [];
-  const customResourceTypes = declaredResourceTypes.filter((resourceType) =>
-    resourceType.name !== 'User' && resourceType.name !== 'Group' &&
-    resourceType.id && resourceType.name && resourceType.endpoint);
-
   const handleTabSelect = (next: TabValue): void => {
     if (next.startsWith('resource:')) {
       navigate({
@@ -191,6 +210,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
     }
     if (next === 'resource-types') {
       navigate({ to: '/endpoints/$endpointId/resource-types', params: { endpointId } });
+      return;
+    }
+    if (next === 'service-provider-config') {
+      navigate({ to: '/endpoints/$endpointId/service-provider-config', params: { endpointId } });
       return;
     }
     if (next === 'schemas') {
@@ -302,6 +325,7 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
         <Tab value="activity">Activity</Tab>
         <Tab value="bulk">Bulk</Tab>
         <Tab value="resource-types">Resource types</Tab>
+        <Tab value="service-provider-config">Service Provider Config</Tab>
         <Tab value="schemas">Schemas</Tab>
         <Tab value="connect" data-testid="endpoint-tab-connect">Connect</Tab>
         <Tab value="logs">Logs</Tab>

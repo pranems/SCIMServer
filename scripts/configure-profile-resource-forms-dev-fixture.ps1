@@ -40,6 +40,7 @@ $ProgressPreference = 'SilentlyContinue'
 . "$PSScriptRoot/scim-estates.ps1"
 
 $deviceSchemaUrn = 'urn:scimserver:schemas:core:2.0:Device'
+$aiAgentSchemaUrn = 'urn:scimserver:schemas:core:2.0:AIAgent'
 $userExtensionUrn = 'urn:scimserver:schemas:extension:provisioning:2.0:User'
 $groupExtensionUrn = 'urn:scimserver:schemas:extension:provisioning:2.0:Group'
 
@@ -171,17 +172,109 @@ function Copy-WithoutProperty {
     return $copy
 }
 
+function Get-OwnedFixtureSchemas {
+    return @(
+        [ordered]@{
+            id          = $deviceSchemaUrn
+            name        = 'Device'
+            description = 'Device resources used by profile-driven form and Workbench examples.'
+            attributes  = @(
+                [ordered]@{ name = 'serialNumber'; type = 'string'; required = $true; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'server' },
+                [ordered]@{ name = 'displayName'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'compliant'; type = 'boolean'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default' },
+                [ordered]@{ name = 'platform'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'riskScore'; type = 'decimal'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default' }
+            )
+        },
+        [ordered]@{
+            id          = $aiAgentSchemaUrn
+            name        = 'AIAgent'
+            description = 'AI agent inventory records for identity and governance workflows.'
+            attributes  = @(
+                [ordered]@{ name = 'agentId'; type = 'string'; required = $true; multiValued = $false; caseExact = $true; mutability = 'immutable'; returned = 'default'; uniqueness = 'server' },
+                [ordered]@{ name = 'displayName'; type = 'string'; required = $true; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'description'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'status'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none'; canonicalValues = @('active', 'paused', 'retired') },
+                [ordered]@{ name = 'riskTier'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none'; canonicalValues = @('low', 'moderate', 'high', 'critical') },
+                [ordered]@{ name = 'provider'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'model'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'purpose'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'capabilities'; type = 'string'; required = $false; multiValued = $true; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'owner'; type = 'reference'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none'; referenceTypes = @('external') },
+                [ordered]@{ name = 'active'; type = 'boolean'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default' },
+                [ordered]@{ name = 'lastReviewAt'; type = 'dateTime'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' }
+            )
+        },
+        [ordered]@{
+            id          = $userExtensionUrn
+            name        = 'ProvisioningUser'
+            description = 'Additive User attributes used by profile-driven forms examples.'
+            attributes  = @(
+                [ordered]@{ name = 'employeeNumber'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'department'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'costCenter'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' }
+            )
+        },
+        [ordered]@{
+            id          = $groupExtensionUrn
+            name        = 'ProvisioningGroup'
+            description = 'Additive Group attributes used by profile-driven forms examples.'
+            attributes  = @(
+                [ordered]@{ name = 'owner'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'costCenter'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
+                [ordered]@{ name = 'lifecycleState'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; canonicalValues = @('Active', 'Archived') }
+            )
+        }
+    )
+}
+
+function Get-OwnedFixtureResourceTypes {
+    return @(
+        [ordered]@{
+            id               = 'Device'
+            name             = 'Device'
+            endpoint         = '/Devices'
+            description      = 'Device resources used by profile-driven Workbench examples.'
+            schema           = $deviceSchemaUrn
+            schemaExtensions = @()
+        },
+        [ordered]@{
+            id               = 'AIAgent'
+            name             = 'AIAgent'
+            endpoint         = '/AIAgents'
+            description      = 'AI agent inventory records for identity and governance workflows.'
+            schema           = $aiAgentSchemaUrn
+            schemaExtensions = @()
+        }
+    )
+}
+
 if ($SelfTest) {
     Write-Host "`n=== Profile resource forms fixture self-test ===" -ForegroundColor Cyan
-    $canonical = [ordered]@{ id = 'Device'; name = 'Device'; endpoint = '/Devices' }
+    $fixtureSchemas = @(Get-OwnedFixtureSchemas)
+    $fixtureResourceTypes = @(Get-OwnedFixtureResourceTypes)
+    $deviceFixtureSchema = $fixtureSchemas | Where-Object id -eq $deviceSchemaUrn
+    $aiAgentFixtureSchema = $fixtureSchemas | Where-Object id -eq $aiAgentSchemaUrn
+    Test-Condition ($fixtureSchemas.Count -eq 4) 'fixture owns Device, AIAgent, User extension, and Group extension schemas'
+    Test-Condition ($fixtureResourceTypes.Count -eq 2) 'fixture owns Device and AIAgent ResourceTypes'
+    Test-Condition (($deviceFixtureSchema.attributes | Where-Object name -eq 'platform').canonicalValues.Count -eq 0) 'Device platform remains an unconstrained string'
+    Test-Condition (($aiAgentFixtureSchema.attributes | Where-Object name -eq 'status').canonicalValues.Count -eq 3) 'AIAgent status publishes three canonical values'
+    Test-Condition (($aiAgentFixtureSchema.attributes | Where-Object name -eq 'capabilities').multiValued -eq $true) 'AIAgent capabilities is multi-valued'
+    Test-Condition (($aiAgentFixtureSchema.attributes | Where-Object name -eq 'owner').type -eq 'reference') 'AIAgent owner is a reference'
+    Test-Condition (($aiAgentFixtureSchema.attributes | Where-Object name -eq 'lastReviewAt').type -eq 'dateTime') 'AIAgent last review is dateTime'
+
+    $canonical = $fixtureResourceTypes | Where-Object id -eq 'Device'
+    $aiCanonical = $fixtureResourceTypes | Where-Object id -eq 'AIAgent'
     $unrelated = [ordered]@{ id = 'Printer'; name = 'Printer'; endpoint = '/Printers' }
     $priorCanonical = [ordered]@{ id = 'Device'; name = 'Device'; endpoint = '/OldDevices' }
 
     Assert-OwnedResourceTypeIdentity -Existing @($unrelated, $priorCanonical) -Owned $canonical
-    $merged = @(Merge-OwnedDefinitions -Existing @($unrelated, $priorCanonical) -Owned @($canonical))
-    Test-Condition ($merged.Count -eq 2) 'canonical rerun replaces rather than duplicates Device'
+    Assert-OwnedResourceTypeIdentity -Existing @($unrelated, $priorCanonical) -Owned $aiCanonical
+    $merged = @(Merge-OwnedDefinitions -Existing @($unrelated, $priorCanonical) -Owned @($canonical, $aiCanonical))
+    Test-Condition ($merged.Count -eq 3) 'canonical rerun replaces Device and adds AIAgent without duplicates'
     Test-Condition (($merged | Where-Object id -eq 'Printer').endpoint -eq '/Printers') 'canonical rerun preserves unrelated ResourceTypes'
     Test-Condition (($merged | Where-Object id -eq 'Device').endpoint -eq '/Devices') 'canonical rerun converges Device to the declared definition'
+    Test-Condition (($merged | Where-Object id -eq 'AIAgent').endpoint -eq '/AIAgents') 'canonical rerun converges AIAgent to the declared definition'
 
     $conflictRejected = $false
     try {
@@ -307,40 +400,8 @@ if ([string]::IsNullOrWhiteSpace($etag)) {
     throw "Endpoint GET by id returned no ETag; refusing an unconditional profile-array replacement."
 }
 
-$ownedSchemas = @(
-    [ordered]@{
-        id          = $deviceSchemaUrn
-        name        = 'Device'
-        description = 'Device resources used by profile-driven form and Workbench examples.'
-        attributes  = @(
-            [ordered]@{ name = 'serialNumber'; type = 'string'; required = $true; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'server' },
-            [ordered]@{ name = 'displayName'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
-            [ordered]@{ name = 'compliant'; type = 'boolean'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default' },
-            [ordered]@{ name = 'platform'; type = 'string'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default'; canonicalValues = @('Windows', 'macOS', 'Linux', 'iOS', 'Android') },
-            [ordered]@{ name = 'riskScore'; type = 'decimal'; required = $false; multiValued = $false; mutability = 'readWrite'; returned = 'default' }
-        )
-    },
-    [ordered]@{
-        id          = $userExtensionUrn
-        name        = 'ProvisioningUser'
-        description = 'Additive User attributes used by profile-driven forms examples.'
-        attributes  = @(
-            [ordered]@{ name = 'employeeNumber'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
-            [ordered]@{ name = 'department'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
-            [ordered]@{ name = 'costCenter'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' }
-        )
-    },
-    [ordered]@{
-        id          = $groupExtensionUrn
-        name        = 'ProvisioningGroup'
-        description = 'Additive Group attributes used by profile-driven forms examples.'
-        attributes  = @(
-            [ordered]@{ name = 'owner'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
-            [ordered]@{ name = 'costCenter'; type = 'string'; required = $false; multiValued = $false; caseExact = $true; mutability = 'readWrite'; returned = 'default'; uniqueness = 'none' },
-            [ordered]@{ name = 'lifecycleState'; type = 'string'; required = $false; multiValued = $false; caseExact = $false; mutability = 'readWrite'; returned = 'default'; canonicalValues = @('Active', 'Archived') }
-        )
-    }
-)
+$ownedSchemas = @(Get-OwnedFixtureSchemas)
+$ownedResourceTypes = @(Get-OwnedFixtureResourceTypes)
 
 $existingResourceTypes = @($endpoint.profile.resourceTypes)
 $userType = $existingResourceTypes | Where-Object { $_.name -eq 'User' } | Select-Object -First 1
@@ -348,13 +409,14 @@ $groupType = $existingResourceTypes | Where-Object { $_.name -eq 'Group' } | Sel
 if (-not $userType -or -not $groupType) {
     throw "Endpoint '$EndpointName' must declare both User and Group ResourceTypes."
 }
-$ownedSchemaIds = @($deviceSchemaUrn, $userExtensionUrn, $groupExtensionUrn)
+$ownedSchemaIds = @($ownedSchemas | ForEach-Object { $_.id })
+$ownedResourceTypeIds = @($ownedResourceTypes | ForEach-Object { $_.id })
 $preservedBefore = [ordered]@{
     settings                 = Get-ValueHash $endpoint.profile.settings
     authentication           = Get-ValueHash $endpoint.profile.authentication
     serviceProviderConfig    = Get-ValueHash $endpoint.profile.serviceProviderConfig
     nonOwnedSchemas          = Get-ValueHash @($endpoint.profile.schemas | Where-Object { $ownedSchemaIds -notcontains $_.id })
-    nonOwnedResourceTypes    = Get-ValueHash @($existingResourceTypes | Where-Object { $_.name -notin @('User', 'Group', 'Device') })
+    nonOwnedResourceTypes    = Get-ValueHash @($existingResourceTypes | Where-Object { $_.name -notin @('User', 'Group') -and $ownedResourceTypeIds -notcontains $_.id })
     userDefinition           = Get-ValueHash (Copy-WithoutProperty $userType @('schemaExtensions'))
     groupDefinition          = Get-ValueHash (Copy-WithoutProperty $groupType @('schemaExtensions'))
     userExtensionBindings    = Get-ValueHash @($userType.schemaExtensions | Where-Object { $_.schema -ne $userExtensionUrn })
@@ -363,17 +425,11 @@ $preservedBefore = [ordered]@{
 $userType.schemaExtensions = @(Merge-SchemaBinding -Existing @($userType.schemaExtensions) -Schema $userExtensionUrn)
 $groupType.schemaExtensions = @(Merge-SchemaBinding -Existing @($groupType.schemaExtensions) -Schema $groupExtensionUrn)
 
-$deviceResourceType = [ordered]@{
-    id               = 'Device'
-    name             = 'Device'
-    endpoint         = '/Devices'
-    description      = 'Device resources used by profile-driven Workbench examples.'
-    schema           = $deviceSchemaUrn
-    schemaExtensions = @()
+foreach ($ownedResourceType in $ownedResourceTypes) {
+    Assert-OwnedResourceTypeIdentity -Existing $existingResourceTypes -Owned $ownedResourceType
 }
-Assert-OwnedResourceTypeIdentity -Existing $existingResourceTypes -Owned $deviceResourceType
 $mergedSchemas = Merge-OwnedDefinitions -Existing @($endpoint.profile.schemas) -Owned $ownedSchemas
-$mergedResourceTypes = Merge-OwnedDefinitions -Existing $existingResourceTypes -Owned @($deviceResourceType)
+$mergedResourceTypes = Merge-OwnedDefinitions -Existing $existingResourceTypes -Owned $ownedResourceTypes
 $patch = [ordered]@{
     profile = [ordered]@{
         schemas       = $mergedSchemas
@@ -389,7 +445,7 @@ Write-Host "  types    : $($existingResourceTypes.Count) -> $($mergedResourceTyp
 
 if (-not $PSCmdlet.ShouldProcess(
     "$BaseUrl/scim/admin/endpoints/$($endpoint.id)",
-    'Add Device ResourceType and User/Group provisioning extensions'
+    'Add Device and AIAgent ResourceTypes plus User/Group provisioning extensions'
 )) {
     Write-Host 'No mutation performed.' -ForegroundColor Yellow
     return
@@ -431,7 +487,7 @@ $preservedAfter = [ordered]@{
     authentication           = Get-ValueHash $verified.profile.authentication
     serviceProviderConfig    = Get-ValueHash $verified.profile.serviceProviderConfig
     nonOwnedSchemas          = Get-ValueHash @($verified.profile.schemas | Where-Object { $ownedSchemaIds -notcontains $_.id })
-    nonOwnedResourceTypes    = Get-ValueHash @($verified.profile.resourceTypes | Where-Object { $_.name -notin @('User', 'Group') -and $_.id -ne $deviceResourceType.id })
+    nonOwnedResourceTypes    = Get-ValueHash @($verified.profile.resourceTypes | Where-Object { $_.name -notin @('User', 'Group') -and $ownedResourceTypeIds -notcontains $_.id })
     userDefinition           = Get-ValueHash (Copy-WithoutProperty $verifiedUser @('schemaExtensions'))
     groupDefinition          = Get-ValueHash (Copy-WithoutProperty $verifiedGroup @('schemaExtensions'))
     userExtensionBindings    = Get-ValueHash @($verifiedUser.schemaExtensions | Where-Object { $_.schema -ne $userExtensionUrn })
@@ -439,16 +495,18 @@ $preservedAfter = [ordered]@{
 }
 $ownedAfter = [ordered]@{
     schemas      = Get-ValueHash @($verified.profile.schemas | Where-Object { $ownedSchemaIds -contains $_.id })
-    resourceType = Get-ValueHash ($verified.profile.resourceTypes | Where-Object id -eq $deviceResourceType.id)
+    resourceTypes = Get-ValueHash @($verified.profile.resourceTypes | Where-Object { $ownedResourceTypeIds -contains $_.id })
 }
 $ownedExpected = [ordered]@{
     schemas      = Get-ValueHash $ownedSchemas
-    resourceType = Get-ValueHash $deviceResourceType
+    resourceTypes = Get-ValueHash $ownedResourceTypes
 }
 Test-Condition (($publicSchemas.Resources.id -contains $deviceSchemaUrn)) 'Device schema is published'
+Test-Condition (($publicSchemas.Resources.id -contains $aiAgentSchemaUrn)) 'AIAgent schema is published'
 Test-Condition (($publicSchemas.Resources.id -contains $userExtensionUrn)) 'User extension schema is published'
 Test-Condition (($publicSchemas.Resources.id -contains $groupExtensionUrn)) 'Group extension schema is published'
-Test-Condition (($publicTypes.Resources.id -contains $deviceResourceType.id)) 'Device ResourceType is published'
+Test-Condition (($publicTypes.Resources.id -contains 'Device')) 'Device ResourceType is published'
+Test-Condition (($publicTypes.Resources.id -contains 'AIAgent')) 'AIAgent ResourceType is published'
 Test-Condition (($verifiedUser.schemaExtensions.schema -contains $userExtensionUrn)) 'User binds the provisioning extension'
 Test-Condition (($verifiedGroup.schemaExtensions.schema -contains $groupExtensionUrn)) 'Group binds the provisioning extension'
 foreach ($key in $preservedBefore.Keys) {

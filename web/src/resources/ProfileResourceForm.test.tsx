@@ -26,6 +26,7 @@ const schemas: ProfileResourceSchema[] = [{
     { name: 'active', type: 'boolean' },
     { name: 'rank', type: 'integer' },
     { name: 'category', type: 'string', canonicalValues: ['employee', 'contractor'] },
+    { name: 'platform', type: 'string' },
     {
       name: 'emails',
       type: 'complex',
@@ -65,6 +66,8 @@ describe('ProfileResourceForm', () => {
     expect(screen.getByTestId('profile-form-rank-input')).toHaveValue(1);
     expect(screen.getByTestId('profile-form-rank-input')).toHaveAttribute('type', 'number');
     expect(screen.getByTestId('profile-form-category')).toHaveTextContent('employee');
+    expect(screen.getByTestId('profile-form-platform-input')).toHaveAttribute('type', 'text');
+    expect(screen.queryByRole('combobox', { name: 'Platform' })).not.toBeInTheDocument();
     expect(screen.getByTestId('profile-form-emails-input')).toHaveValue(
       JSON.stringify([{ value: 'alex.taylor@example.com' }], null, 2),
     );

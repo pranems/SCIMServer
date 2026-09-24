@@ -112,6 +112,7 @@ test.describe('EndpointDetailPage - tab matrix', () => {
     { key: 'activity', label: /^Activity$/i, panelTestId: 'tab-activity' },
     { key: 'bulk', label: /^Bulk$/i, panelTestId: 'bulk-page' },
     { key: 'resource-types', label: /Resource Types/i, panelTestId: 'resource-types-tab' },
+    { key: 'service-provider-config', label: /Service Provider Config/i, panelTestId: 'service-provider-config-tab' },
     { key: 'schemas', label: /^Schemas$/i, panelTestId: 'tab-schemas' },
     { key: 'connect', label: /^Connect$/i, panelTestId: 'tab-credentials' },
     { key: 'settings', label: /^Settings$/i, panelTestId: 'settings-tab' },

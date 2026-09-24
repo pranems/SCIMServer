@@ -274,6 +274,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     shape
       ? Object.fromEntries(shape.fields.map((field) => [field.id, valueForField(field, resource)]))
       : {});
+  const [profileValid, setProfileValid] = React.useState(true);
   const [confirming, setConfirming] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
   // K5 - separate state for the 412/428 conflict dialog. We surface
@@ -291,6 +292,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
     setProfileValues(shape
       ? Object.fromEntries(shape.fields.map((field) => [field.id, valueForField(field, resource)]))
       : {});
+    setProfileValid(true);
     setConfirming(false);
     setError(null);
     setConflict(null);
@@ -426,7 +428,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
           appearance="primary"
           icon={<Save24Regular />}
           onClick={() => void handleSave()}
-          disabled={saving || deleting}
+          disabled={saving || deleting || (shape !== undefined && !profileValid)}
         >
           Save
         </Button>
@@ -496,6 +498,7 @@ export const ResourceDetailDrawer: React.FC<ResourceDetailDrawerProps> = ({
               ...current,
               [fieldId]: value,
             }))}
+            onValidityChange={setProfileValid}
             disabled={saving || deleting}
             data-testid="drawer-profile-form"
           />

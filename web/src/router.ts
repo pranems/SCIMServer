@@ -40,6 +40,7 @@ import { credentialsTabRoute } from './routes/endpoints.$endpointId.credentials'
 import { connectTabRoute } from './routes/endpoints.$endpointId.connect';
 import { bulkTabRoute } from './routes/endpoints.$endpointId.bulk';
 import { resourceTypesTabRoute } from './routes/endpoints.$endpointId.resource-types';
+import { serviceProviderConfigTabRoute } from './routes/endpoints.$endpointId.service-provider-config';
 import { genericResourcesTabRoute } from './routes/endpoints.$endpointId.resources.$resourceTypeId';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
@@ -68,6 +69,7 @@ const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   bulkTabRoute,
   // Phase M3 - Custom Resource Types UI
   resourceTypesTabRoute,
+  serviceProviderConfigTabRoute,
   genericResourcesTabRoute,
 ]);
 
