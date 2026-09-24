@@ -15,8 +15,8 @@
  *   1. EndpointDetailPage hides the Groups tab for a user-only endpoint
  *      (and the Users tab for a group-only endpoint) - fail-open mirror
  *      of the server resolver.
- *   2. Unsupported deep-links are canonicalized back to the endpoint
- *      Overview route, so stale /groups or /users URLs on incompatible
+ *   2. Unsupported deep-links are canonicalized to the endpoint
+ *      Resource types route, so stale resource URLs on incompatible
  *      profiles never hit a failing child route.
  *
  * STRATEGY
@@ -94,14 +94,13 @@ test.describe('v0.53.4 - profile-enforcement UI does not fatally error', () => {
       ).toHaveCount(0);
 
       // 4. Deep-link / refresh directly onto the unsupported /groups URL
-      //    must NOT trip the fatal route boundary. The Groups route loader
-      //    swallows the 404 (best-effort prefetch) and GroupsTab renders the
-      //    contained "groups-unsupported" empty state in place - a graceful
-      //    degradation, not a redirect and not a crash. The endpoint detail
-      //    chrome (tabs) stays mounted and the Groups tab remains hidden.
+      //    must NOT trip the fatal route boundary. The endpoint layout owns
+      //    profile validity and canonicalizes the stale route to Resource
+      //    types, where the operator can inspect what this endpoint serves.
       await page.goto(`/endpoints/${endpointId}/groups?page=1`);
       await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByTestId('groups-unsupported')).toBeVisible({ timeout: 15_000 });
+      await expect(page).toHaveURL(new RegExp(`/endpoints/${endpointId}/resource-types$`));
+      await expect(page.getByTestId('resource-types-tab')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByTestId('endpoint-tab-groups')).toHaveCount(0);
       await expect(page.getByText('Something went wrong')).toHaveCount(0);
     } finally {
