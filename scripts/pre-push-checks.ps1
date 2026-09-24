@@ -12,6 +12,7 @@
         - api npm run lint
         - web npx tsc --noEmit
         - web npm run build
+        - Docker production-source context audit
         - docs/infra/supply-chain static gates (mermaid, LTS, doc
           freshness, doc claims, lockfile provenance, RFC corpus)
         - api npm test (unit)              ~93s / 4,824 tests
@@ -186,6 +187,10 @@ Invoke-Gate -Name 'web: tsc --noEmit' -WorkingDir (Join-Path $repoRoot 'web') -A
 
 Invoke-Gate -Name 'web: vite production build' -WorkingDir (Join-Path $repoRoot 'web') -Action {
     npm run build 2>&1 | Out-Host
+}
+
+Invoke-Gate -Name 'docker: production source included' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/audit-docker-source-context.ps1') 2>&1 | Out-Host
 }
 
 # Docs: every ```mermaid block must RENDER in a real browser - which is exactly

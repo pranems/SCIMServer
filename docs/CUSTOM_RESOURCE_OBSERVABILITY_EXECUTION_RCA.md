@@ -25,6 +25,7 @@
 | CRO-17 | Tooling friction | Low | The read-only review agent could not see the sibling worktree; `rg` was unavailable; several broad patch/read guesses missed local paths; generated Prisma signatures rejected simple Promise mocks. | Workspace indexing, shell tooling, patch breadth, path assumptions, and generated mock types differed from the local target. | Use absolute target reads, PowerShell `Select-String`, smaller anchored patches, symbol search, and narrow test-double casts. |
 | CRO-18 | Performance | Medium | Correct derived Activity totals required reading every candidate log in one unbounded Prisma query. | Parse-derived severity/system semantics cannot be expressed entirely in the current request-log columns. | Read ordered candidates in 200-row Prisma batches, then parse/filter/page; direct predicates retain SQL pagination. |
 | CRO-19 | Test harness | Medium | Three green full-unit Jest processes remained alive and held their shells open after summaries were written. | Existing asynchronous handles prevent Jest from exiting naturally in this repository. | Trust only completed summary artifacts, terminate verified orphan Jest PIDs, and use `--forceExit` for final long-suite consolidation. |
+| CRO-20 | CI/Docker context | High | Local and pre-push web builds passed, but both GitHub image builds failed to resolve the new shared toolbar. | `.dockerignore` excluded every `**/logs` directory, including the intentional production source directory. | Re-include the source path and run a generalized Docker source-shadow audit in Fast pre-push. |
 
 ## Detailed Findings
 
@@ -144,6 +145,15 @@
 - **Fix:** Verify each process command line belongs to this worktree and completed `jest --runInBand`, then terminate only those exact PIDs. Final E2E and pre-push test invocations use their existing force-exit path.
 - **Why it works:** Completed test evidence remains intact while stale handles no longer contend with subsequent gates.
 - **Prevention:** A long-suite result is complete only when its summary artifact is present and matching Jest processes have exited or been explicitly classified and cleaned up.
+
+### CRO-20 - Docker artifact ignore rule removed production source
+
+- **Detection:** PR #167 and push Build Test Image workflows.
+- **Earliest capable gate:** Fast pre-push Docker source-context audit.
+- **Escape delta:** CI image build; local Vite and TypeScript read the filesystem directly, so neither exercised `.dockerignore`.
+- **Fix:** Add `!web/src/components/logs` and `!web/src/components/logs/**` after `**/logs`. Add `audit-docker-source-context.ps1` and invoke it from Fast pre-push.
+- **Why it works:** Docker includes the directory and descendants while runtime `logs` artifacts remain excluded. The audit discovers populated directories under `api/src` and `web/src` whose names match broad `**/<name>` rules and requires both exceptions.
+- **Prevention:** The audit failed RED on both missing exceptions, passed GREEN after the fix, and a registry-free `FROM scratch` build copied the exact toolbar from the real Docker context.
 
 ## Self-Improvement Dispositions
 

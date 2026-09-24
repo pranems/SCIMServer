@@ -77,5 +77,6 @@ Relative time bounds are memoized by the selected URL range, so unrelated render
 - API/web builds, API lint with zero errors, unit-2 TypeScript diagnostics, and 25 route budgets pass.
 - Populated 1002 px visual review: no page overflow; one Reset command; Auth chip height 20/20 px with bounded right edge and full tooltip.
 - Documentation: content/freshness and 711 Mermaid blocks parse/render in both themes.
+- Docker context: source-shadow audit passes and a registry-free scratch build copies `LogFiltersToolbar.tsx` from the actual context.
 
 PR, merge, and dev deployment remain pending. No estate has been changed by this rollback unit.
