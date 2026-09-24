@@ -16,6 +16,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -506,18 +507,13 @@ export class AdminCredentialController {
     }));
   }
 
-  /**
-   * DELETE /admin/endpoints/:endpointId/credentials/:credentialId
-   *
-   * Revoke (deactivate) a credential. The hash remains in the database
-   * but is marked inactive and will no longer match during auth.
-   */
-  @Delete(':endpointId/credentials/:credentialId')
-  @HttpCode(204)
-  async revokeCredential(
+  /** Explicitly deactivate a credential while retaining its audit record. */
+  @Post(':endpointId/credentials/:credentialId/deactivate')
+  @HttpCode(200)
+  async deactivateCredential(
     @Param('endpointId') endpointId: string,
     @Param('credentialId') credentialId: string,
-  ) {
+  ): Promise<{ id: string; endpointId: string; credentialType: string; label: string | null; active: boolean }> {
     await this.requireEndpoint(endpointId);
 
     const credential = await this.credentialRepo.findById(credentialId);
@@ -525,13 +521,15 @@ export class AdminCredentialController {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
     }
 
-    await this.credentialRepo.deactivate(credentialId);
+    const updated = await this.credentialRepo.deactivate(credentialId);
+    if (!updated) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
     if (credential.credentialType === 'wif') {
       this.wifTrustCache.invalidate(endpointId);
     }
-    this.logger.info(LogCategory.AUTH, `Revoked credential "${credentialId}" for endpoint "${endpointId}"`);
+    this.logger.info(LogCategory.AUTH, `Deactivated credential "${credentialId}" for endpoint "${endpointId}"`);
 
-    // Phase J (v0.48.1): emit-after-commit; symmetrical with create.
     const credentialEventPayload: ScimCredentialEventPayload = {
       endpointId,
       credentialId,
@@ -539,6 +537,67 @@ export class AdminCredentialController {
       label: credential.label ?? undefined,
     };
     this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, credentialEventPayload);
+
+    return {
+      id: updated.id,
+      endpointId: updated.endpointId,
+      credentialType: updated.credentialType,
+      label: updated.label,
+      active: updated.active,
+    };
+  }
+
+  /**
+   * Backward-compatible soft revoke. DELETE historically meant deactivate;
+   * retain that contract while the explicit route removes the ambiguity.
+   */
+  @Delete(':endpointId/credentials/:credentialId')
+  @HttpCode(204)
+  async revokeCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+  ): Promise<void> {
+    await this.deactivateCredential(endpointId, credentialId);
+  }
+
+  /** Permanently remove an already-inactive credential or WIF trust. */
+  @Delete(':endpointId/credentials/:credentialId/purge')
+  @HttpCode(204)
+  async purgeCredential(
+    @Param('endpointId') endpointId: string,
+    @Param('credentialId') credentialId: string,
+  ): Promise<void> {
+    await this.requireEndpoint(endpointId);
+
+    const credential = await this.credentialRepo.findById(credentialId);
+    if (!credential || credential.endpointId !== endpointId) {
+      throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
+    }
+    if (credential.active) {
+      throw new ConflictException(
+        `Credential "${credentialId}" is active. Deactivate it before permanently deleting it.`,
+      );
+    }
+
+    const deleted = await this.credentialRepo.delete(credentialId);
+    if (!deleted) {
+      throw new ConflictException(
+        `Credential "${credentialId}" changed state before deletion. Refresh and deactivate it again.`,
+      );
+    }
+    if (credential.credentialType === 'wif') {
+      this.wifTrustCache.invalidate(endpointId);
+    }
+    this.logger.warn(
+      LogCategory.AUTH,
+      `Permanently deleted credential "${credentialId}" for endpoint "${endpointId}"`,
+    );
+    this.eventEmitter.emit(SCIM_EVENTS.CREDENTIAL_REVOKED, {
+      endpointId,
+      credentialId,
+      credentialType: credential.credentialType,
+      label: credential.label ?? undefined,
+    } as ScimCredentialEventPayload);
   }
 
   /**
@@ -832,6 +891,11 @@ export class AdminCredentialController {
     if (!old || old.endpointId !== endpointId) {
       throw new NotFoundException(`Credential "${credentialId}" not found for endpoint "${endpointId}".`);
     }
+    if (!old.active) {
+      throw new ConflictException(
+        `Credential "${credentialId}" is inactive. Activate it before rotating its secret.`,
+      );
+    }
     if (old.credentialType === 'wif') {
       throw new BadRequestException('A "wif" credential has no secret to rotate.');
     }
@@ -860,19 +924,21 @@ export class AdminCredentialController {
     // oauth_client keeps its public client_id so only the secret changes.
     const clientId = isOauth && typeof old.metadata?.clientId === 'string' ? old.metadata.clientId : null;
 
-    const created = await this.credentialRepo.create({
+    const created = await this.credentialRepo.rotate(credentialId, {
       endpointId,
       credentialType: old.credentialType,
       credentialHash: hash,
       label: old.label ?? null,
-      metadata: clientId ? { clientId } : old.metadata ?? null,
+      metadata: clientId ? { ...(old.metadata ?? {}), clientId } : old.metadata ?? null,
       secretEnvelope,
       expiresAt: old.expiresAt,
       ...(keyed ?? {}),
     });
-
-    // Deactivate the old credential AFTER the new one is persisted.
-    await this.credentialRepo.deactivate(credentialId);
+    if (!created) {
+      throw new ConflictException(
+        `Credential "${credentialId}" is no longer active. Refresh the credential list before rotating.`,
+      );
+    }
 
     this.logger.info(
       LogCategory.AUTH,

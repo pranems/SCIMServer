@@ -156,15 +156,40 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     }
   }
 
-  async delete(id: string): Promise<void> {
-    try {
-      await this.prisma.endpointCredential.delete({ where: { id } });
-    } catch (err) {
-      // Already deleted or invalid ID - no-op, but log for observability
-      if (process.env.NODE_ENV !== 'test') {
-        console.debug?.('[credential-repo] delete error:', (err as Error).message);
-      }
-    }
+  async rotate(
+    id: string,
+    replacement: EndpointCredentialCreateInput,
+  ): Promise<EndpointCredentialModel | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const deactivated = await tx.endpointCredential.updateMany({
+        where: { id, active: true },
+        data: { active: false },
+      });
+      if (deactivated.count !== 1) return null;
+
+      const row = await tx.endpointCredential.create({
+        data: {
+          endpointId: replacement.endpointId,
+          credentialType: replacement.credentialType,
+          credentialHash: replacement.credentialHash,
+          label: replacement.label ?? null,
+          metadata: replacement.metadata ? (replacement.metadata as any) : undefined,
+          secretEnvelope: replacement.secretEnvelope ?? null,
+          expiresAt: replacement.expiresAt ?? null,
+          lookupKey: replacement.lookupKey ?? null,
+          secretHash: replacement.secretHash ?? null,
+          hashAlgo: replacement.hashAlgo ?? 'bcrypt',
+        },
+      });
+      return this.toModel(row);
+    });
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.prisma.endpointCredential.deleteMany({
+      where: { id, active: false },
+    });
+    return result.count === 1;
   }
 
   async updateMetadata(

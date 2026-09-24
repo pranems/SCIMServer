@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.29`
+> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.30`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -693,7 +693,7 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 
 ## API Reference (Summary)
 
-**118 route handlers** across 33 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
+**120 route handlers** across 33 controllers. Full reference with request/response examples: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md)
 
 ### Health & Version
 
@@ -1478,7 +1478,7 @@ Full documentation: [docs/INDEX.md](docs/INDEX.md)
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 118 route handlers, full request/response examples |
+| [COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | All 120 route handlers, full request/response examples |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Quick start - endpoint lifecycle recipes |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](docs/ENDPOINT_PROFILE_ARCHITECTURE.md) | Profile system - presets, expansion, validation |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | All 16 configuration flags |

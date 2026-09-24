@@ -33,6 +33,12 @@ describe('Credential rotate (E2E)', () => {
       .expect(201);
   }
 
+  const mintOauthToken = (endpointId: string, clientId: string, clientSecret: string) =>
+    request(app.getHttpServer())
+      .post(`/scim/endpoints/${endpointId}/oauth/token`)
+      .type('form')
+      .send({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret });
+
   it('rotates an oauth_client: new secret, same client_id, old credential deactivated', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       OAuthClientCredentialsAuthEnabled: true,
@@ -106,6 +112,38 @@ describe('Credential rotate (E2E)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(revealed.body.retained).toBe(false);
+  });
+
+  it('rejects inactive rotation and atomically switches OAuth authentication to the replacement', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {
+      OAuthClientCredentialsAuthEnabled: true,
+    });
+    const created = await createOauthCred(endpointId, 'oauth-lifecycle');
+    const oldId = created.body.id as string;
+    const clientId = created.body.clientId as string;
+    const oldSecret = created.body.clientSecret as string;
+
+    await mintOauthToken(endpointId, clientId, oldSecret).expect(200);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${oldId}/deactivate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    await mintOauthToken(endpointId, clientId, oldSecret).expect(401);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${oldId}/rotate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${oldId}/activate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const rotated = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${endpointId}/credentials/${oldId}/rotate`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+    await mintOauthToken(endpointId, clientId, oldSecret).expect(401);
+    await mintOauthToken(endpointId, clientId, rotated.body.clientSecret as string).expect(200);
   });
 
   it('rejects rotating a wif credential (no secret)', async () => {

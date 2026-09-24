@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.29`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.30`
 
 > **Updated:** 2026-09-18
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)

@@ -132,6 +132,33 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     return cred;
   }
 
+  async rotate(
+    id: string,
+    replacement: EndpointCredentialCreateInput,
+  ): Promise<EndpointCredentialModel | null> {
+    const source = this.store.get(id);
+    if (!source?.active) return null;
+
+    const created: EndpointCredentialModel = {
+      id: randomUUID(),
+      endpointId: replacement.endpointId,
+      credentialType: replacement.credentialType,
+      credentialHash: replacement.credentialHash,
+      label: replacement.label ?? null,
+      metadata: replacement.metadata ?? null,
+      secretEnvelope: replacement.secretEnvelope ?? null,
+      active: true,
+      createdAt: new Date(),
+      expiresAt: replacement.expiresAt ?? null,
+      lookupKey: replacement.lookupKey ?? null,
+      secretHash: replacement.secretHash ?? null,
+      hashAlgo: replacement.hashAlgo ?? 'bcrypt',
+    };
+    source.active = false;
+    this.store.set(created.id, created);
+    return created;
+  }
+
   async clearSecretEnvelopesForEndpoint(endpointId: string): Promise<number> {
     let cleared = 0;
     for (const cred of this.store.values()) {
@@ -154,8 +181,9 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
     return cleared;
   }
 
-  async delete(id: string): Promise<void> {
-    this.store.delete(id);
+  async delete(id: string): Promise<boolean> {
+    if (this.store.get(id)?.active !== false) return false;
+    return this.store.delete(id);
   }
 
   async updateMetadata(

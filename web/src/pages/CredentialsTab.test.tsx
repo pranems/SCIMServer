@@ -26,6 +26,7 @@ const mockCreateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockActivateMutate = vi.fn();
 const mockDeactivateMutate = vi.fn();
+const mockPurgeMutate = vi.fn();
 const mockEditLabelMutate = vi.fn();
 const mockResolveMutate = vi.fn();
 const mockRevealMutate = vi.fn();
@@ -64,6 +65,7 @@ vi.mock('../api/queries', async () => {
     }),
     useActivateCredential: () => ({ mutate: mockActivateMutate, isPending: false }),
     useDeactivateCredential: () => ({ mutate: mockDeactivateMutate, isPending: false }),
+    usePurgeCredential: () => ({ mutate: mockPurgeMutate, isPending: false }),
     useEditCredentialLabel: () => ({ mutate: mockEditLabelMutate, isPending: false }),
     useResolveWifDiscovery: () => ({
       mutate: mockResolveMutate,
@@ -422,6 +424,7 @@ describe('CredentialsTab', () => {
     const lifecycle = screen.getByTestId('credential-toggle-active-cred-x');
     expect(lifecycle).toHaveTextContent('Deactivate');
     expect(screen.queryByTestId('credential-delete-cred-x')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credential-purge-cred-x')).not.toBeInTheDocument();
     expect(screen.queryByTestId('credentials-delete-dialog')).not.toBeInTheDocument();
     fireEvent.click(lifecycle);
     expect(mockDeactivateMutate).toHaveBeenCalledWith(
@@ -484,6 +487,36 @@ describe('CredentialsTab', () => {
     expect(mockActivateMutate).toHaveBeenCalledWith(
       'cred-x',
       expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('offers permanent deletion only for an inactive credential and confirms before purging', () => {
+    const overview: EndpointOverviewResponse = {
+      ...baseOverview,
+      credentials: [
+        {
+          id: 'cred-purge',
+          credentialType: 'bearer',
+          label: 'Inactive cleanup',
+          active: false,
+          createdAt: '2026-05-01T00:00:00Z',
+          expiresAt: null,
+        },
+      ],
+    };
+    mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('credential-more-cred-purge'));
+    fireEvent.click(screen.getByTestId('credential-purge-cred-purge'));
+    const dialog = screen.getByTestId('credentials-purge-dialog');
+    expect(dialog).toHaveTextContent(/permanently delete/i);
+    expect(dialog).toHaveTextContent(/cannot be undone/i);
+    fireEvent.click(dialog.querySelector('button[type="submit"]')!);
+
+    expect(mockPurgeMutate).toHaveBeenCalledWith(
+      'cred-purge',
+      expect.objectContaining({ onError: expect.any(Function), onSuccess: expect.any(Function) }),
     );
   });
 
@@ -1606,6 +1639,33 @@ describe('CredentialsTab', () => {
       expect.objectContaining({ onError: expect.any(Function) }),
     );
     expect(screen.queryByTestId('wif-credential-toggle-active-wif-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wif-credential-purge-wif-1')).not.toBeInTheDocument();
+  });
+
+  it('offers the same confirmed permanent cleanup for an inactive WIF trust', () => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: {
+        ...baseOverview,
+        configFlags: { WifCredentialsEnabled: true },
+        credentials: [
+          { id: 'wif-purge', credentialType: 'wif', label: 'Old WIF trust', active: false, createdAt: '2026-06-01T00:00:00Z', expiresAt: null },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('wif-credential-more-wif-purge'));
+    fireEvent.click(screen.getByTestId('wif-credential-purge-wif-purge'));
+    const dialog = screen.getByTestId('credentials-purge-dialog');
+    expect(dialog).toHaveTextContent('Old WIF trust');
+    fireEvent.click(dialog.querySelector('button[type="submit"]')!);
+
+    expect(mockPurgeMutate).toHaveBeenCalledWith(
+      'wif-purge',
+      expect.objectContaining({ onError: expect.any(Function), onSuccess: expect.any(Function) }),
+    );
   });
 
   it('surfaces a WIF lifecycle failure', () => {

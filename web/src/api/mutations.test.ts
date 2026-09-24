@@ -19,6 +19,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useCreateCredential,
   useDeleteCredential,
+  useDeactivateCredential,
+  usePurgeCredential,
   useUpdateEndpointConfig,
   useCreateUser,
   useCreateGroup,
@@ -220,6 +222,32 @@ describe('useDeleteCredential', () => {
     );
     expect(cached?.credentials).toHaveLength(1);
     expect(cached?.credentials[0].id).toBe('c1');
+  });
+});
+
+describe('credential lifecycle mutations', () => {
+  it('uses the explicit POST deactivate route', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useDeactivateCredential(EP_ID), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync('c1');
+    });
+
+    expect(fetchSpy.mock.calls[0][0]).toContain(`/credentials/c1/deactivate`);
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('POST');
+  });
+
+  it('uses the inactive-only permanent purge route', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => usePurgeCredential(EP_ID), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync('c1');
+    });
+
+    expect(fetchSpy.mock.calls[0][0]).toContain(`/credentials/c1/purge`);
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
   });
 });
 

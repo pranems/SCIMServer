@@ -67,6 +67,7 @@ import {
   useCreateCredential,
   useActivateCredential,
   useDeactivateCredential,
+  usePurgeCredential,
   useEditCredentialLabel,
   useResolveWifDiscovery,
   useRevealCredential,
@@ -749,6 +750,7 @@ interface WifCredentialsSectionProps {
   credentials: EndpointOverviewCredential[];
   createMutation: ReturnType<typeof useCreateCredential>;
   deactivateMutation: ReturnType<typeof useDeactivateCredential>;
+  onRequestPurge: (credential: EndpointOverviewCredential) => void;
 }
 
 /**
@@ -897,6 +899,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
   credentials,
   createMutation,
   deactivateMutation,
+  onRequestPurge,
 }) => {
   const classes = useStyles();
   const wif = useWifStyles();
@@ -1553,7 +1556,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                             {cred.description}
                           </Caption1>
                         )}
-                        <div className={classes.cardSummary}>
+                        <div className={classes.cardSummary} data-testid={`wif-credential-summary-${cred.id}`}>
                           <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                             {cred.active ? 'Active' : 'Inactive'}
                           </Badge>
@@ -1612,18 +1615,27 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                                   Deactivate trust
                                 </MenuItem>
                               ) : (
-                                <MenuItem
-                                  onClick={() => {
-                                    setActionError(null);
-                                    activateMutation.mutate(cred.id, {
-                                      onError: (error) => setActionError(actionErrorText(error)),
-                                    });
-                                  }}
-                                  disabled={activateMutation.isPending}
-                                  data-testid={`wif-credential-toggle-active-${cred.id}`}
-                                >
-                                  Activate trust
-                                </MenuItem>
+                                <>
+                                  <MenuItem
+                                    onClick={() => {
+                                      setActionError(null);
+                                      activateMutation.mutate(cred.id, {
+                                        onError: (error) => setActionError(actionErrorText(error)),
+                                      });
+                                    }}
+                                    disabled={activateMutation.isPending}
+                                    data-testid={`wif-credential-toggle-active-${cred.id}`}
+                                  >
+                                    Activate trust
+                                  </MenuItem>
+                                  <MenuItem
+                                    icon={<Delete24Regular />}
+                                    onClick={() => onRequestPurge(cred)}
+                                    data-testid={`wif-credential-purge-${cred.id}`}
+                                  >
+                                    Permanently delete trust
+                                  </MenuItem>
+                                </>
                               )}
                         </OverflowMenu>
                       </div>
@@ -1984,6 +1996,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const createMutation = useCreateCredential(endpointId);
   const activateMutation = useActivateCredential(endpointId);
   const deactivateMutation = useDeactivateCredential(endpointId);
+  const purgeMutation = usePurgeCredential(endpointId);
   const editLabelMutation = useEditCredentialLabel(endpointId);
   const revealMutation = useRevealCredential(endpointId);
   const rotateMutation = useRotateCredential(endpointId);
@@ -2014,6 +2027,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   // WI-9: rotate result (the one-time new secret).
   const [rotateResult, setRotateResult] = React.useState<RotateResult | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
+  const [purgeTarget, setPurgeTarget] = React.useState<EndpointOverviewCredential | null>(null);
 
   // U2 - which oauth_client credential's Connect-to-Entra params are expanded.
   const [connectCredId, setConnectCredId] = React.useState<string | null>(null);
@@ -2476,6 +2490,15 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       >
                         {cred.active ? 'Deactivate' : 'Activate'}
                       </MenuItem>
+                      {!cred.active && (
+                        <MenuItem
+                          icon={<Delete24Regular />}
+                          onClick={() => setPurgeTarget(cred)}
+                          data-testid={`credential-purge-${cred.id}`}
+                        >
+                          Permanently delete
+                        </MenuItem>
+                      )}
                 </OverflowMenu>
                 </div>
               </div>
@@ -2675,6 +2698,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           credentials={credentials}
           createMutation={createMutation}
           deactivateMutation={deactivateMutation}
+          onRequestPurge={setPurgeTarget}
         />
       )}
 
@@ -2889,6 +2913,28 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
             />
           </div>
         )}
+      </FormDialog>
+
+      <FormDialog
+        open={Boolean(purgeTarget)}
+        onCancel={() => setPurgeTarget(null)}
+        onSubmit={() => {
+          if (!purgeTarget) return;
+          setActionError(null);
+          purgeMutation.mutate(purgeTarget.id, {
+            onSuccess: () => setPurgeTarget(null),
+            onError: (error) => setActionError(actionErrorText(error)),
+          });
+        }}
+        title={`Permanently delete ${purgeTarget?.credentialType === 'wif' ? 'trust' : 'credential'}${purgeTarget?.label ? ` "${purgeTarget.label}"` : ''}?`}
+        submitLabel="Permanently delete"
+        cancelLabel="Cancel"
+        busy={purgeMutation.isPending}
+        data-testid="credentials-purge-dialog"
+      >
+        <Body1>
+          This permanently removes the inactive record, including retained secret material and audit metadata. This action cannot be undone.
+        </Body1>
       </FormDialog>
     </div>
   );
