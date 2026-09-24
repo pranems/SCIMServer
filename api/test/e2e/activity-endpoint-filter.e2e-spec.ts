@@ -20,6 +20,7 @@ import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
+import { waitForLogRow } from './helpers/log-wait.helper';
 
 describe('Activity endpointId filter (E2E) - Phase D2', () => {
   let app: INestApplication;
@@ -167,11 +168,18 @@ describe('Activity endpointId filter (E2E) - Phase D2', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(204);
 
-      const logs = await request(server)
-        .get(`/scim/admin/logs?endpointId=${endpointId}&urlContains=ObservedDevices&pageSize=100`)
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-      expect(logs.body.items.map((item: { method: string }) => item.method)).toEqual(
+      const query = `endpointId=${endpointId}&urlContains=ObservedDevices&pageSize=100`;
+      const durableLogs: Array<Record<string, unknown>> = [];
+      for (const method of ['POST', 'PATCH', 'DELETE']) {
+        const row = await waitForLogRow(
+          app,
+          token,
+          query,
+          (candidate) => candidate.method === method,
+        );
+        if (row) durableLogs.push(row);
+      }
+      expect(durableLogs.map((item) => item.method)).toEqual(
         expect.arrayContaining(['POST', 'PATCH', 'DELETE']),
       );
 

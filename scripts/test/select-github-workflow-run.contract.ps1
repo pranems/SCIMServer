@@ -10,6 +10,12 @@ if (-not (Test-Path $helperPath)) {
 
 . $helperPath
 
+$ansiJson = "`e[?25l`n[{`"databaseId`":35041241622,`"headSha`":`"43386dbedacc4364cc78d06a20ac0039dd6ac7dc`",`"createdAt`":`"2026-09-16T00:44:20Z`"}]`e[?25h"
+$parsedAnsiJson = @(ConvertFrom-GithubCliJson -InputObject $ansiJson)
+if ($parsedAnsiJson.Count -ne 1 -or $parsedAnsiJson[0].databaseId -ne 35041241622) {
+    throw 'ANSI-prefixed GitHub CLI JSON must parse to the original run object.'
+}
+
 $expectedSha = '43386dbedacc4364cc78d06a20ac0039dd6ac7dc'
 $dispatchTime = [DateTimeOffset]'2026-09-16T00:44:15Z'
 $runs = @(
@@ -66,4 +72,4 @@ if (-not $prePush.Contains('select-github-workflow-run.contract.ps1')) {
     throw 'The default pre-push gate does not execute the workflow-run selector contract.'
 }
 
-Write-Output 'select-github-workflow-run contract: 8/8 passed'
+Write-Output 'select-github-workflow-run contract: 10/10 passed'
