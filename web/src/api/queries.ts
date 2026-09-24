@@ -2119,6 +2119,11 @@ export function useUpdateEndpointConfig(
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
+      void qc.invalidateQueries({ queryKey: ['endpoint-schemas', endpointId] });
+      void qc.invalidateQueries({ queryKey: ['discovery', endpointId] });
+      void qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.resources.byEndpoint(endpointId) });
       invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });

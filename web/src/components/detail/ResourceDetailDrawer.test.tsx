@@ -171,6 +171,29 @@ describe('ResourceDetailDrawer (User)', () => {
     ]);
   });
 
+  it('blocks profile-aware Save while a required field is empty', () => {
+    const shape = resolveEffectiveResourceShape(
+      { id: 'User', name: 'User', endpoint: '/Users', schema: 'urn:user' },
+      [{ id: 'urn:user', attributes: [{ name: 'userName', type: 'string', required: true }] }],
+    );
+    wrap(
+      <ResourceDetailDrawer
+        kind="user"
+        endpointId="ep-1"
+        resource={{ ...USER, schemas: ['urn:user'] }}
+        shape={shape}
+        open
+        onClose={() => undefined}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('drawer-profile-form-userName-input'), {
+      target: { value: '' },
+    });
+
+    expect(screen.getByRole('button', { name: /Save/i })).toBeDisabled();
+  });
+
   // Finding-D follow-up (2026-05-29): operator caught that the drawer
   // rendered ONLY userName + displayName + active even when the SCIM
   // resource carried name.familyName, emails[0].value, externalId, and

@@ -168,6 +168,11 @@ export function computeInvalidations(
         keys.push(queryKeys.endpoints.stats(endpointId));
         keys.push(queryKeys.endpoints.connectionInfo(endpointId));
         keys.push(queryKeys.endpoints.connectionReveals(endpointId));
+        keys.push(['endpoint-schemas', endpointId]);
+        keys.push(['discovery', endpointId]);
+        keys.push(queryKeys.users.all(endpointId));
+        keys.push(queryKeys.groups.all(endpointId));
+        keys.push(queryKeys.resources.byEndpoint(endpointId));
       }
       break;
     case 'security':

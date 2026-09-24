@@ -96,6 +96,7 @@ describe('EndpointDetailPage', () => {
     expect(screen.getByRole('tab', { name: /users/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /groups/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /logs/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /service provider config/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /settings/i })).toBeInTheDocument();
   });
 
@@ -138,6 +139,16 @@ describe('EndpointDetailPage', () => {
     renderDetail('/endpoints/ep-1/users');
     const usersTab = await screen.findByRole('tab', { name: /users/i });
     await waitFor(() => expect(usersTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
+  it('marks Service Provider Config selected on its endpoint route', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
+    });
+
+    renderDetail('/endpoints/ep-1/service-provider-config');
+    const tab = await screen.findByRole('tab', { name: /service provider config/i });
+    await waitFor(() => expect(tab).toHaveAttribute('aria-selected', 'true'));
   });
 
   it('renders the back-to-endpoints Link', async () => {

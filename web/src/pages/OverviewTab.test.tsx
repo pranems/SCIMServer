@@ -120,6 +120,8 @@ describe('OverviewTab', () => {
     expect(screen.getByText('30')).toBeInTheDocument(); // userCount
     expect(screen.getByText('5')).toBeInTheDocument(); // groupCount
     expect(screen.getByText('7')).toBeInTheDocument(); // genericResourceCount
+    expect(screen.getByText('Custom Resources')).toBeInTheDocument();
+    expect(screen.queryByText('Generic Resources')).not.toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // credentials.length
   });
 

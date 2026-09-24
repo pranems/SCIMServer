@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.27`
+> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.28`
 
-> **Status:** Active | **Last Updated:** 2026-09-23 | **Version:** 0.55.27
+> **Status:** Active | **Last Updated:** 2026-09-23 | **Version:** 0.55.28
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -166,9 +166,9 @@ Clicking a card opens the endpoint detail page.
 
 ![Endpoint detail](screenshots/prod-10-endpoint-detail.png)
 
-The header carries the display name, an Active badge, the copyable endpoint id and SCIM base path, the creation date, and **Edit** / **Delete**. **Overview** shows Resource Statistics (users, groups, generic resources, credentials, config flags) and a Recent Activity list where every row carries an **auth outcome chip** such as `auth ok - OAuth JWT` or `JWT - WIF`.
+The header carries the display name, an Active badge, the copyable endpoint id and SCIM base path, the creation date, and **Edit** / **Delete**. **Overview** shows Resource Statistics (users, groups, custom resources, credentials, config flags) and a Recent Activity list where every row carries an **auth outcome chip** such as `auth ok - OAuth JWT` or `JWT - WIF`.
 
-Ten standard tabs, plus one tab for each custom ResourceType:
+Eleven standard tabs, plus one tab for each custom ResourceType:
 
 | Tab | Route | What it is for |
 |---|---|---|
@@ -178,6 +178,7 @@ Ten standard tabs, plus one tab for each custom ResourceType:
 | **Activity** | `/endpoints/{id}/activity` | Provisioning activity parsed into human events |
 | **Bulk** | `/endpoints/{id}/bulk` | Compose and send a SCIM Bulk envelope |
 | **Resource types** | `/endpoints/{id}/resource-types` | The `/ResourceTypes` this endpoint serves |
+| **Service Provider Config** | `/endpoints/{id}/service-provider-config` | Effective endpoint capabilities, limits, and authentication schemes |
 | **Schemas** | `/endpoints/{id}/schemas` | The `/Schemas` this endpoint publishes |
 | **Connect** | `/endpoints/{id}/connect` | Authentication: set up, connect, and monitor. See [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | **Logs** | `/endpoints/{id}/logs` | This endpoint's request log, with auth decision detail |
@@ -186,12 +187,12 @@ Ten standard tabs, plus one tab for each custom ResourceType:
 
 Two details worth knowing:
 
-- **Resource tabs follow the profile.** Users and Groups render only when declared, and every custom ResourceType gets its own tab. The eight non-resource tabs always render.
+- **Resource tabs follow the profile.** Users and Groups render only when declared, and every custom ResourceType gets its own tab. A profile update invalidates endpoint discovery immediately; a removed active type redirects to Resource types instead of leaving a stale page mounted.
 - **There is no Credentials tab.** It was merged into **Connect**; `/endpoints/{id}/credentials` still resolves but redirects there.
 
 ### 6.3 What each tab does
 
-**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Each has a visible Create action, including in the empty state. The form is generated from that endpoint's `/Schemas` and `/ResourceTypes`, starts with a working example, and previews the exact request JSON. Selecting a row opens the same profile-driven field set in a detail drawer. Save emits only changed writable attributes, including extension-qualified paths, and carries the current ETag as `If-Match`. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
+**Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Each has a visible Create action, including in the empty state. The form is generated from that endpoint's `/Schemas` and `/ResourceTypes` and starts with a working example. Its request JSON is fully editable: changing a known JSON member updates the corresponding control, and changing a control updates the JSON without dropping unrelated members. Selecting a row opens the same profile-driven field set in a detail drawer. Save emits only changed writable attributes, including extension-qualified paths, and carries the current ETag as `If-Match`. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
 
 **Activity** is the provisioning story rather than the raw request log: the server parses requests into human events, each with a severity badge. Filter by **type** (`user`, `group`, `system`), by **severity** (`info`, `success`, `warning`, `error`), or by free text. The filters live **in the URL**, so a filtered view is a shareable link - useful when handing an investigation to someone else. Use Activity to answer "what did this provisioning job actually do?"; use **Logs** when you need the wire detail behind one of those events.
 
@@ -214,6 +215,8 @@ The cap is **1000 operations and a 1 MB payload**. Before submitting you get a p
 ![Resource types](screenshots/prod-12-endpoint-resource-types.png)
 
 Each row shows the type name, its endpoint path and its schema URN. **Create** asks for a name, an endpoint path (mounted under `/scim/endpoints/{id}`), a schema URN and an optional description. Delete asks for confirmation. The list renders whether or not custom types are currently enabled, so you can always see what a client would discover at `/ResourceTypes`. Once registered, the custom type also appears beside Users and Groups as a first-class tab with list, create, edit, and delete workflows generated from its effective schema.
+
+**Service Provider Config** renders the endpoint's `/ServiceProviderConfig` document as a compact capability inventory. PATCH, filtering, ETags, bulk, sorting, and password-change support show explicit status and limits; authentication schemes identify the primary scheme and link to provider documentation. The complete published JSON remains copyable.
 
 **Schemas** is a read-only tree of what this endpoint publishes at `/Schemas`, with discovery and strict-validation controls in a collapsed pane. One row per schema shows its name, URN, attribute count and a Copy URN button; expand a schema to see its attributes, each with characteristic badges (type, mutability, returned, uniqueness); expand a complex attribute again for its sub-attributes. This is the fastest way to answer "does this endpoint actually advertise the attribute my client is sending?"
 
@@ -241,7 +244,7 @@ Each row shows the type name, its endpoint path and its schema URN. **Create** a
 
 ## 7. Manual Provisioning
 
-Provision any SCIM resource declared by an endpoint profile without an external IdP. Pick a target endpoint, select one of its discovered ResourceType tabs, review or edit the generated working example, and submit. Text, numeric, boolean, canonical-value, complex, and multi-valued attributes receive type-appropriate controls. Extension values are nested under their schema URN. The exact request body and the created resource are both copyable JSON.
+Provision any SCIM resource declared by an endpoint profile without an external IdP. Pick a target endpoint, select one of its discovered ResourceType tabs, review or edit the generated working example, and submit. Text, numeric, boolean, canonical-value, complex, and multi-valued attributes receive type-appropriate controls. A dropdown appears only when the schema publishes non-empty `canonicalValues`; an unconstrained string remains a text field. Extension values are nested under their schema URN. The request body is fully editable and synchronized with the controls in both directions; malformed or non-object JSON blocks submission. The created resource is copyable JSON.
 
 ![Manual Provisioning](screenshots/prod-07-manual-provision.png)
 

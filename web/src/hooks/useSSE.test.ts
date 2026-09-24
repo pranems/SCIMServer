@@ -228,6 +228,11 @@ describe('computeInvalidations (Phase B3)', () => {
     expect(keys).toContain(k(queryKeys.endpoints.stats('ep-1')));
     expect(keys).toContain(k(queryKeys.endpoints.connectionInfo('ep-1')));
     expect(keys).toContain(k(queryKeys.endpoints.connectionReveals('ep-1')));
+    expect(keys).toContain(k(['endpoint-schemas', 'ep-1']));
+    expect(keys).toContain(k(['discovery', 'ep-1']));
+    expect(keys).toContain(k(queryKeys.users.all('ep-1')));
+    expect(keys).toContain(k(queryKeys.groups.all('ep-1')));
+    expect(keys).toContain(k(queryKeys.resources.byEndpoint('ep-1')));
   });
 
   it('server security events invalidate every connection-info and reveal cache', () => {

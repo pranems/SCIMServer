@@ -45,7 +45,7 @@ import {
   useEndpoints,
 } from '../api/queries';
 import { LoadingSkeleton, ScimErrorMessage, CopyableField, CopyableJsonBlock } from '../components/primitives';
-import { ProfileResourceForm } from '../resources/ProfileResourceForm';
+import { ProfileResourceBodyEditor } from '../resources/ProfileResourceBodyEditor';
 import {
   buildCreatePayload,
   resolveEffectiveResourceShape,
@@ -86,15 +86,16 @@ const ManualResourceForm: React.FC<ManualResourceFormProps> = ({
   onSubmit,
 }) => {
   const classes = useStyles();
-  const [values, setValues] = React.useState<Record<string, unknown>>({});
+  const [payload, setPayload] = React.useState<Record<string, unknown>>({});
   const [valid, setValid] = React.useState(true);
 
   React.useEffect(() => {
-    setValues(Object.fromEntries(shape.fields.map((field) => [field.id, field.example])));
+    setPayload(buildCreatePayload(
+      shape,
+      Object.fromEntries(shape.fields.map((field) => [field.id, field.example])),
+    ));
     setValid(true);
   }, [shape]);
-
-  const payload = buildCreatePayload(shape, values);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,22 +105,14 @@ const ManualResourceForm: React.FC<ManualResourceFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className={classes.formCard} data-testid="manual-resource-create-form">
-      <ProfileResourceForm
+      <ProfileResourceBodyEditor
+        key={shape.resourceType.id}
         shape={shape}
-        values={values}
-        onChange={(fieldId, value) => setValues((current) => ({
-          ...current,
-          [fieldId]: value,
-        }))}
+        body={payload}
+        onChange={setPayload}
         onValidityChange={setValid}
         disabled={!endpointId || isPending}
-        data-testid="manual-resource-form"
-      />
-      <CopyableJsonBlock
-        value={payload}
-        label="Request body"
-        maxHeight="220px"
-        data-testid="manual-resource-preview"
+        data-testid="manual-resource"
       />
       <div className={classes.actions}>
         <Button
