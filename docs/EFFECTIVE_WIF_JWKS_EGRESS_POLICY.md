@@ -90,3 +90,5 @@ The panel remains within the page at a measured 900 px viewport.
 | Builds | API and web production builds pass |
 
 PR #175 merged as `566ebd45`; v0.55.32 is verified on dev with live 1,524/1,524 and Playwright 242 passed / 4 intentionally skipped / 0 failed. Canary and customer prod are unchanged.
+
+The authoritative pipeline report at `test-results/dev-deploy-2026-09-24-124446.md` records the initial Stage 5 failure: 242 browser tests passed and one existing contextual-settings smoke test still targeted the retired raw `JwksMaxKeys` input. The product surface was present and correct. After the smoke test was updated to target the named WIF accordion and assert the effective `JwksMaxKeys` value, the focused test passed 1/1 and the complete dev rerun passed 242/242 executed tests with 4 intentional skips. The closeout commit is test/docs-only, so the deployed `566ebd45` image and its digest are unchanged.

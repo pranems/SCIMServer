@@ -146,6 +146,35 @@ await run(
   '[C13]',
 );
 
+await run(
+  'C13 missing README version badge',
+  { 'README.md': '# Product\n\nNo badge here.' },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
+await run(
+  'C13 malformed README version badge',
+  { 'README.md': '[![Version](https://img.shields.io/badge/version-latest-blue)]()' },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
+await run(
+  'C13 duplicate README version badges',
+  {
+    'README.md': [
+      '[![Version](https://img.shields.io/badge/version-0.55.32-blue)]()',
+      '[![Version](https://img.shields.io/badge/version-0.55.32-green)]()',
+    ].join('\n'),
+  },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
 console.log('\n=== positive controls: each check must NOT fire ===');
 
 await run(

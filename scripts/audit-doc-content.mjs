@@ -320,9 +320,13 @@ export function audit(truth) {
   // 0.55.31 after 0.55.32 deployed while both docs gates were green.
   const readme = p('README.md');
   if (existsSync(readme)) {
-    const badge = read(readme).match(/shields\.io\/badge\/version-(\d+\.\d+\.\d+)-/i);
-    if (badge && badge[1] !== truth.productVersion) {
-      failures.push(`[C13] README.md: version badge claims ${badge[1]}, product is ${truth.productVersion}`);
+    const badges = [...read(readme).matchAll(/shields\.io\/badge\/version-([^-\s)]+)-/gi)];
+    if (badges.length !== 1) {
+      failures.push(`[C13] README.md: expected exactly one version badge, found ${badges.length}`);
+    } else if (!/^\d+\.\d+\.\d+$/.test(badges[0][1])) {
+      failures.push(`[C13] README.md: version badge is malformed: ${badges[0][1]}`);
+    } else if (badges[0][1] !== truth.productVersion) {
+      failures.push(`[C13] README.md: version badge claims ${badges[0][1]}, product is ${truth.productVersion}`);
     }
   }
 
