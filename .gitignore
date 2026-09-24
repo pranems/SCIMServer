@@ -55,6 +55,8 @@ Thumbs.db
 
 # Logs
 logs/
+!web/src/components/logs/
+!web/src/components/logs/**
 *.log
 
 # Test results (generated per run)

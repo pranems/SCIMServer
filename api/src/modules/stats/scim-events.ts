@@ -20,6 +20,7 @@ export const SCIM_EVENTS = {
   GROUP_UPDATED: 'scim.group.updated',
   GROUP_DELETED: 'scim.group.deleted',
   RESOURCE_CREATED: 'scim.resource.created',
+  RESOURCE_UPDATED: 'scim.resource.updated',
   RESOURCE_DELETED: 'scim.resource.deleted',
   /** Fired on user active status change (PATCH active=false/true) */
   USER_STATUS_CHANGED: 'scim.user.statusChanged',

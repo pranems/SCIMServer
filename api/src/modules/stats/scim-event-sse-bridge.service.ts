@@ -114,6 +114,11 @@ export class ScimEventSseBridge {
     this.forward(SCIM_EVENTS.RESOURCE_CREATED, payload);
   }
 
+  @OnEvent(SCIM_EVENTS.RESOURCE_UPDATED)
+  onResourceUpdated(payload: unknown): void {
+    this.forward(SCIM_EVENTS.RESOURCE_UPDATED, payload);
+  }
+
   @OnEvent(SCIM_EVENTS.RESOURCE_DELETED)
   onResourceDeleted(payload: unknown): void {
     this.forward(SCIM_EVENTS.RESOURCE_DELETED, payload);

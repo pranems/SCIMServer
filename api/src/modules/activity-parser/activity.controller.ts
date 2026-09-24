@@ -41,6 +41,7 @@ export class ActivityController {
           OR: [
             { url: { contains: '/Users' } },
             { url: { contains: '/Groups' } },
+            { url: { contains: '/endpoints/' } },
           ],
         },
         {
@@ -104,28 +105,98 @@ export class ActivityController {
       whereConditions.push({ endpointId });
     }
 
+    if (type === 'user') {
+      whereConditions.push({ url: { contains: '/Users' } });
+    } else if (type === 'group') {
+      whereConditions.push({ url: { contains: '/Groups' } });
+    } else if (type === 'resource') {
+      whereConditions.push({
+        AND: [
+          { url: { contains: '/endpoints/' } },
+          {
+            NOT: {
+              OR: [
+                { url: { contains: '/Users' } },
+                { url: { contains: '/Groups' } },
+                { url: { contains: '/Schemas' } },
+                { url: { contains: '/ResourceTypes' } },
+                { url: { contains: '/ServiceProviderConfig' } },
+                { url: { contains: '/Bulk' } },
+                { url: { contains: '/Me' } },
+                { url: { contains: '/oauth/' } },
+                { url: { contains: '/.well-known/' } },
+              ],
+            },
+          },
+        ],
+      });
+    }
+
+    if (severity === 'error') {
+      whereConditions.push({ status: { gte: 400 } });
+    } else if (severity) {
+      whereConditions.push({
+        OR: [
+          { status: { lt: 400 } },
+          { status: null },
+        ],
+      });
+    }
+
     const where: any = { AND: whereConditions };
+    const requiresParsedPagination = type === 'system' || (severity !== undefined && severity !== 'error');
+    const logSelect = {
+      id: true,
+      method: true,
+      url: true,
+      status: true,
+      requestBody: true,
+      responseBody: true,
+      createdAt: true,
+      identifier: true,
+    } as const;
 
     // Fetch logs from database
-    const [logs, total] = await Promise.all([
-      this.prisma.requestLog.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          method: true,
-          url: true,
-          status: true,
-          requestBody: true,
-          responseBody: true,
-          createdAt: true,
-          identifier: true,
-        },
-      }),
-      this.prisma.requestLog.count({ where }),
-    ]);
+    let logs: Array<{
+      id: string;
+      method: string;
+      url: string;
+      status: number | null;
+      requestBody: string | null;
+      responseBody: string | null;
+      createdAt: Date;
+      identifier: string | null;
+    }>;
+    let total: number;
+    if (requiresParsedPagination) {
+      const candidatePageSize = 200;
+      logs = [];
+      let candidateSkip = 0;
+      while (true) {
+        const batch = await this.prisma.requestLog.findMany({
+          where,
+          skip: candidateSkip,
+          take: candidatePageSize,
+          orderBy: { createdAt: 'desc' },
+          select: logSelect,
+        });
+        logs.push(...batch);
+        if (batch.length < candidatePageSize) break;
+        candidateSkip += candidatePageSize;
+      }
+      total = 0;
+    } else {
+      [logs, total] = await Promise.all([
+        this.prisma.requestLog.findMany({
+          where,
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: 'desc' },
+          select: logSelect,
+        }),
+        this.prisma.requestLog.count({ where }),
+      ]);
+    }
 
     // Parse each log into an activity summary
     // Parse each log into an activity summary.
@@ -157,16 +228,21 @@ export class ActivityController {
       activities = activities.filter(activity => activity.severity === severity);
     }
 
+    const filteredTotal = requiresParsedPagination ? activities.length : total;
+    if (requiresParsedPagination) {
+      activities = activities.slice(skip, skip + limitNum);
+    }
+
     return {
       activities,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum),
+        total: filteredTotal,
+        pages: Math.ceil(filteredTotal / limitNum),
       },
       filters: {
-        types: ['user', 'group', 'system'],
+        types: ['user', 'group', 'resource', 'system'],
         severities: ['info', 'success', 'warning', 'error'],
       },
     };
@@ -267,16 +343,34 @@ export class ActivityController {
     type?: string, severity?: string, search?: string, hideKeepalive?: boolean,
     endpointId?: string,
   ) {
-    // Use LoggingService.listLogs which already has inmemory support
-    const logResult = await this.loggingService.listLogs({
-      page,
-      pageSize: limit,
+    const listFilters = {
       urlContains: search || undefined,
       hideKeepalive,
       endpointId: endpointId || undefined,
-    });
+    };
+    const requiresParsedPagination = type !== undefined || severity !== undefined;
+    let sourceTotal: number;
+    let logs: any[];
 
-    const logs = logResult.items ?? [];
+    if (requiresParsedPagination) {
+      const pageSize = 200;
+      const first = await this.loggingService.listLogs({ ...listFilters, page: 1, pageSize });
+      const pageCount = Math.ceil(first.total / pageSize);
+      const remaining = pageCount > 1
+        ? await Promise.all(
+          Array.from({ length: pageCount - 1 }, (_, index) =>
+            this.loggingService.listLogs({ ...listFilters, page: index + 2, pageSize })
+          )
+        )
+        : [];
+      logs = [first, ...remaining].flatMap(result => result.items ?? []);
+      sourceTotal = first.total;
+    } else {
+      const result = await this.loggingService.listLogs({ ...listFilters, page, pageSize: limit });
+      logs = result.items ?? [];
+      sourceTotal = result.total ?? logs.length;
+    }
+
     let activities: ActivitySummary[] = await Promise.all(
       logs.map(async (log: any) =>
         await this.activityParser.parseActivity({
@@ -294,17 +388,22 @@ export class ActivityController {
 
     if (type) activities = activities.filter(a => a.type === type);
     if (severity) activities = activities.filter(a => a.severity === severity);
+    const filteredTotal = requiresParsedPagination ? activities.length : sourceTotal;
+    if (requiresParsedPagination) {
+      const skip = (page - 1) * limit;
+      activities = activities.slice(skip, skip + limit);
+    }
 
     return {
       activities,
       pagination: {
         page,
         limit,
-        total: logResult.total ?? logs.length,
-        pages: Math.ceil((logResult.total ?? logs.length) / limit),
+        total: filteredTotal,
+        pages: Math.ceil(filteredTotal / limit),
       },
       filters: {
-        types: ['user', 'group', 'system'],
+        types: ['user', 'group', 'resource', 'system'],
         severities: ['info', 'success', 'warning', 'error'],
       },
     };

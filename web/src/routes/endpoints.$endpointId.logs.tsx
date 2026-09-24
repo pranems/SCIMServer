@@ -11,6 +11,7 @@ import { endpointDetailRoute } from './endpoints.$endpointId';
 import { logsSearchSchema } from './search-schemas';
 import { endpointLogsQueryOptions } from '../api/queries';
 import { usePreferencesStore } from '../store/preferences-store';
+import { timeRangeToSince } from '../components/logs/LogFiltersToolbar';
 
 // Phase K1 - lazy-load LogsTab into its own chunk.
 const LogsTab = React.lazy(() =>
@@ -31,6 +32,12 @@ export const logsTabRoute = createRoute({
     page: search.page,
     pageSize: search.pageSize,
     urlContains: search.urlContains,
+    method: search.method,
+    status: search.status,
+    timeRange: search.timeRange,
+    hasError: search.hasError,
+    minDurationMs: search.minDurationMs,
+    requestId: search.requestId,
   }),
   loader: ({ context, params, deps }) => {
     // Phase N4: fall back to the persisted user preference when the URL
@@ -42,6 +49,12 @@ export const logsTabRoute = createRoute({
         page: deps.page,
         pageSize,
         urlContains: deps.urlContains,
+        method: deps.method,
+        status: deps.status,
+        since: timeRangeToSince(deps.timeRange),
+        hasError: deps.hasError,
+        minDurationMs: deps.minDurationMs,
+        requestId: deps.requestId,
       }),
     );
   },

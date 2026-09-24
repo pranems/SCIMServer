@@ -11,9 +11,11 @@ import type { GenericResourceRecord } from '../../../domain/models/generic-resou
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
+import { SCIM_EVENTS } from '../../stats/scim-events';
 
 describe('EndpointScimGenericService', () => {
   let service: EndpointScimGenericService;
+  let eventEmitter: EventEmitter2;
 
   const endpointId = 'ep-gen-1';
   const baseUrl = 'http://localhost:6000/scim';
@@ -112,6 +114,7 @@ describe('EndpointScimGenericService', () => {
     }).compile();
 
     service = module.get<EndpointScimGenericService>(EndpointScimGenericService);
+    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
   });
 
   afterEach(() => {
@@ -293,6 +296,11 @@ describe('EndpointScimGenericService', () => {
 
       expect(result.id).toBe('scim-dev-001');
       expect(mockGenericRepo.update).toHaveBeenCalledTimes(1);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(SCIM_EVENTS.RESOURCE_UPDATED, {
+        endpointId,
+        scimId: 'scim-dev-001',
+        resourceType: 'Device',
+      });
     });
 
     it('should throw 404 for non-existent resource on replace', async () => {
@@ -345,6 +353,11 @@ describe('EndpointScimGenericService', () => {
 
       expect(result.id).toBe('scim-dev-001');
       expect(mockGenericRepo.update).toHaveBeenCalledTimes(1);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(SCIM_EVENTS.RESOURCE_UPDATED, {
+        endpointId,
+        scimId: 'scim-dev-001',
+        resourceType: 'Device',
+      });
     });
 
     it('should throw 400 for missing PatchOp schema', async () => {

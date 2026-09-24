@@ -30,6 +30,8 @@ coverage/
 test-results/
 standalone/
 **/logs
+!web/src/components/logs
+!web/src/components/logs/**
 **/test-artifacts
 playwright-report/
 

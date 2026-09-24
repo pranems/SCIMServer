@@ -610,6 +610,12 @@ export interface EndpointLogsParams {
   page: number;
   pageSize: number;
   urlContains?: string;
+  method?: string;
+  status?: number;
+  since?: string;
+  hasError?: boolean;
+  minDurationMs?: number;
+  requestId?: string;
 }
 
 export const endpointLogsQueryOptions = (params: EndpointLogsParams) => {
@@ -619,8 +625,25 @@ export const endpointLogsQueryOptions = (params: EndpointLogsParams) => {
     pageSize: String(params.pageSize),
   });
   if (params.urlContains) qs.set('urlContains', params.urlContains);
+  if (params.method) qs.set('method', params.method);
+  if (typeof params.status === 'number') qs.set('status', String(params.status));
+  if (params.since) qs.set('since', params.since);
+  if (typeof params.hasError === 'boolean') qs.set('hasError', String(params.hasError));
+  if (typeof params.minDurationMs === 'number') qs.set('minDurationMs', String(params.minDurationMs));
+  if (params.requestId) qs.set('requestId', params.requestId);
+  const advancedFilters = {
+    method: params.method,
+    status: params.status,
+    since: params.since,
+    hasError: params.hasError,
+    minDurationMs: params.minDurationMs,
+    requestId: params.requestId,
+  };
+  const hasAdvancedFilters = Object.values(advancedFilters).some((value) => value !== undefined);
   return {
-    queryKey: ['endpoint-logs', params.endpointId, params.page, params.pageSize, params.urlContains ?? ''] as const,
+    queryKey: hasAdvancedFilters
+      ? ['endpoint-logs', params.endpointId, params.page, params.pageSize, params.urlContains ?? '', advancedFilters] as const
+      : ['endpoint-logs', params.endpointId, params.page, params.pageSize, params.urlContains ?? ''] as const,
     queryFn: () => fetchWithAuth<AdminLogsResponse>(`/scim/admin/logs?${qs.toString()}`),
     staleTime: 10_000,
   };
@@ -666,6 +689,9 @@ export interface GlobalLogsParams {
    * auth decision to its originating request.
    */
   requestId?: string;
+  method?: string;
+  hasError?: boolean;
+  minDurationMs?: number;
 }
 
 export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
@@ -677,6 +703,9 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
   if (params.since) qs.set('since', params.since);
   if (params.until) qs.set('until', params.until);
   if (params.requestId) qs.set('requestId', params.requestId);
+  if (params.method) qs.set('method', params.method);
+  if (typeof params.hasError === 'boolean') qs.set('hasError', String(params.hasError));
+  if (typeof params.minDurationMs === 'number') qs.set('minDurationMs', String(params.minDurationMs));
   return {
     // Cache key includes every filter dimension so changing one of
     // them yields a distinct cache entry (no accidental stale-data
@@ -689,6 +718,9 @@ export const globalLogsQueryOptions = (params: GlobalLogsParams = {}) => {
       params.since ?? '',
       params.until ?? '',
       params.requestId ?? '',
+      params.method ?? '',
+      params.hasError ?? '',
+      params.minDurationMs ?? '',
       pageSize,
     ] as const,
     queryFn: () => fetchWithAuth<AdminLogsResponse>(`/scim/admin/logs?${qs.toString()}`),
@@ -771,13 +803,16 @@ export const useGlobalLog = (id: string | undefined) =>
 
 export interface ActivitySummaryItem {
   id: string;
-  type: 'user' | 'group' | 'system';
+  type: 'user' | 'group' | 'resource' | 'system';
   severity: 'info' | 'success' | 'warning' | 'error';
   timestamp: string | Date;
   icon: string;
   message: string;
   details: string;
   isKeepalive?: boolean;
+  resourceType?: string;
+  resourceEndpoint?: string;
+  resourceIdentifier?: string;
   // Activity parser may include extra fields per type; keep loose so
   // future server additions don't break the type-check.
   [key: string]: unknown;

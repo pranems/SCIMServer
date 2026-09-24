@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
 import { isValidUuid } from '../../infrastructure/repositories/prisma/uuid-guard';
+import { EndpointService } from '../endpoint/services/endpoint.service';
 
 export interface ActivitySummary {
   id: string;
@@ -10,10 +11,13 @@ export interface ActivitySummary {
   icon: string;
   message: string;
   details?: string;
-  type: 'user' | 'group' | 'system' | 'error';
+  type: 'user' | 'group' | 'resource' | 'system' | 'error';
   severity: 'info' | 'success' | 'warning' | 'error';
   userIdentifier?: string;
   groupIdentifier?: string;
+  resourceType?: string;
+  resourceEndpoint?: string;
+  resourceIdentifier?: string;
   // Structured membership change data (optional; present for group membership PATCH operations)
   addedMembers?: { id: string; name: string }[];
   removedMembers?: { id: string; name: string }[];
@@ -31,6 +35,7 @@ export class ActivityParserService {
   constructor(
     private prisma: PrismaService,
     @Optional() @Inject(ScimLogger) private readonly logger?: ScimLogger,
+    @Optional() private readonly endpointService?: EndpointService,
   ) {}
 
   /**
@@ -85,6 +90,7 @@ export class ActivityParserService {
     // Determine if this is a Users or Groups operation
     const isUsersOperation = url.includes('/Users');
     const isGroupsOperation = url.includes('/Groups');
+    const customResource = await this.extractCustomResource(url);
     const isListOperation = method === 'GET' && !url.match(/\/[^/]+$/);
     const isGetOperation = method === 'GET' && !!url.match(/\/[^/]+$/);
 
@@ -120,6 +126,18 @@ export class ActivityParserService {
         isListOperation,
         isGetOperation,
       });
+    } else if (customResource) {
+      return this.parseResourceActivity({
+        id: log.id,
+        timestamp,
+        method,
+        status,
+        resourceType: customResource.resourceType,
+        resourceEndpoint: customResource.resourceEndpoint,
+        resourceIdentifier: log.identifier || this.extractResourceIdFromUrl(url, customResource.resourceEndpoint),
+        isListOperation,
+        isGetOperation,
+      });
     } else {
       return this.parseSystemActivity({
         id: log.id,
@@ -129,6 +147,107 @@ export class ActivityParserService {
         status,
       });
     }
+  }
+
+  private parseResourceActivity(params: {
+    id: string;
+    timestamp: string;
+    method: string;
+    status: number;
+    resourceType: string;
+    resourceEndpoint: string;
+    resourceIdentifier?: string;
+    isListOperation: boolean;
+    isGetOperation: boolean;
+  }): ActivitySummary {
+    const {
+      id,
+      timestamp,
+      method,
+      status,
+      resourceType,
+      resourceEndpoint,
+      resourceIdentifier,
+      isListOperation,
+      isGetOperation,
+    } = params;
+    const target = resourceIdentifier ? `: ${resourceIdentifier}` : '';
+    const base = {
+      id,
+      timestamp,
+      type: 'resource' as const,
+      resourceType,
+      resourceEndpoint,
+      resourceIdentifier,
+      isKeepalive: false,
+    };
+
+    if (status >= 400) {
+      return {
+        ...base,
+        icon: '❌',
+        message: `Failed to ${method.toLowerCase()} ${resourceType}${target}`,
+        details: `HTTP ${status}`,
+        severity: 'error',
+      };
+    }
+
+    if (method === 'POST') {
+      return { ...base, icon: '➕', message: `${resourceType} created${target}`, severity: 'success' };
+    }
+    if (method === 'PUT' || method === 'PATCH') {
+      return { ...base, icon: '✏️', message: `${resourceType} updated${target}`, severity: 'info' };
+    }
+    if (method === 'DELETE') {
+      return { ...base, icon: '🗑️', message: `${resourceType} deleted${target}`, severity: 'warning' };
+    }
+    if (method === 'GET' && isListOperation) {
+      return { ...base, icon: '📋', message: `${resourceType} list retrieved`, severity: 'info' };
+    }
+    if (method === 'GET' && isGetOperation) {
+      return { ...base, icon: '👁️', message: `${resourceType} details retrieved${target}`, severity: 'info' };
+    }
+    return { ...base, icon: '🔧', message: `${resourceType} operation: ${method}${target}`, severity: 'info' };
+  }
+
+  private async extractCustomResource(
+    url: string,
+  ): Promise<{ resourceType: string; resourceEndpoint: string } | undefined> {
+    const match = url.match(/\/endpoints\/([^/?]+)\/([^/?]+)/i);
+    const endpointId = match?.[1];
+    const segment = match?.[2];
+    if (!endpointId || !segment) return undefined;
+    const reserved = new Set([
+      'Users',
+      'Groups',
+      'Schemas',
+      'ResourceTypes',
+      'ServiceProviderConfig',
+      'Bulk',
+      'Me',
+      'oauth',
+      '.well-known',
+    ]);
+    if (reserved.has(segment)) return undefined;
+    const resourceEndpoint = `/${segment}`;
+    try {
+      const endpoint = await this.endpointService?.getEndpoint(endpointId);
+      const resourceType = endpoint?.profile?.resourceTypes?.find(
+        candidate => candidate.endpoint.toLowerCase() === resourceEndpoint.toLowerCase(),
+      );
+      if (resourceType) {
+        return { resourceType: resourceType.name, resourceEndpoint: resourceType.endpoint };
+      }
+    } catch {
+      // Historical logs remain readable after their endpoint is deleted.
+    }
+    return { resourceType: segment, resourceEndpoint };
+  }
+
+  private extractResourceIdFromUrl(url: string, resourceEndpoint: string): string | undefined {
+    const escaped = resourceEndpoint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = url.match(new RegExp(`${escaped}/([^/?]+)`, 'i'));
+    return match?.[1];
   }
 
   private async parseUserActivity(params: {

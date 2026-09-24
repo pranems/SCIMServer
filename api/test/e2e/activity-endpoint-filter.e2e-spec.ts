@@ -112,4 +112,82 @@ describe('Activity endpointId filter (E2E) - Phase D2', () => {
       .expect(200);
     expect(Array.isArray(scopedB.body.activities)).toBe(true);
   });
+
+  it('surfaces custom ResourceType create, update, and delete in Logs and Activity', async () => {
+    const server = app.getHttpServer() as any;
+    const stamp = `${Date.now()}-${process.env.JEST_WORKER_ID ?? '0'}`;
+    const schemaUrn = 'urn:e2e:schemas:ObservedDevice';
+    const createdEndpoint = await request(server)
+      .post('/scim/admin/endpoints')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: `e2e-activity-device-${stamp}`,
+        profile: {
+          schemas: [{
+            id: schemaUrn,
+            name: 'ObservedDevice',
+            attributes: [
+              { name: 'serialNumber', type: 'string', required: true },
+              { name: 'displayName', type: 'string' },
+            ],
+          }],
+          resourceTypes: [{
+            id: 'ObservedDevice',
+            name: 'ObservedDevice',
+            endpoint: '/ObservedDevices',
+            schema: schemaUrn,
+            schemaExtensions: [],
+          }],
+        },
+      })
+      .expect(201);
+    const endpointId = createdEndpoint.body.id as string;
+
+    try {
+      const created = await request(server)
+        .post(`/scim/endpoints/${endpointId}/ObservedDevices`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({ schemas: [schemaUrn], serialNumber: 'E2E-100', displayName: 'Observed' })
+        .expect(201);
+      const resourceId = created.body.id as string;
+
+      await request(server)
+        .patch(`/scim/endpoints/${endpointId}/ObservedDevices/${resourceId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'Updated' }],
+        })
+        .expect(200);
+
+      await request(server)
+        .delete(`/scim/endpoints/${endpointId}/ObservedDevices/${resourceId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+
+      const logs = await request(server)
+        .get(`/scim/admin/logs?endpointId=${endpointId}&urlContains=ObservedDevices&pageSize=100`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(logs.body.items.map((item: { method: string }) => item.method)).toEqual(
+        expect.arrayContaining(['POST', 'PATCH', 'DELETE']),
+      );
+
+      const activity = await request(server)
+        .get(`/scim/admin/activity?endpointId=${endpointId}&type=resource&search=ObservedDevices&limit=100`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(activity.body.filters.types).toContain('resource');
+      expect(activity.body.activities).toEqual(expect.arrayContaining([
+        expect.objectContaining({ resourceType: 'ObservedDevice', resourceEndpoint: '/ObservedDevices' }),
+      ]));
+      expect(activity.body.pagination.total).toBe(activity.body.activities.length);
+    } finally {
+      await request(server)
+        .delete(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`);
+    }
+  });
 });

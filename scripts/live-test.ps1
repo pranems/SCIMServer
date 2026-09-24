@@ -15941,6 +15941,36 @@ try {
     $cnFetched = Invoke-RestMethod -Uri "$cnScimBase/Devices/$($cnCreated.id)" -Method GET -Headers $headers
     Test-Result -Success ($cnFetched.serialNumber -eq "SN-200" -and $cnFetched.meta.version -eq 'W/"v2"') `
         -Message "9z-CN.T6: custom Device edit persists with its current ETag"
+
+    $cnDeleteHeaders = @{
+        Authorization = $headers['Authorization']
+        'If-Match' = $cnFetched.meta.version
+    }
+    $cnDeleted = Invoke-WebRequest -Uri "$cnScimBase/Devices/$($cnCreated.id)" -Method DELETE -Headers $cnDeleteHeaders
+    Test-Result -Success ($cnDeleted.StatusCode -eq 204) `
+        -Message "9z-CN.T7: custom Device delete succeeds with the current ETag"
+
+    $cnLogs = $null
+    $cnActivity = $null
+    $cnDeadline = [DateTime]::UtcNow.AddSeconds(12)
+    do {
+        $cnLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?endpointId=$cnEndpointId&urlContains=Devices&pageSize=100" -Headers $headers
+        $cnActivity = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?endpointId=$cnEndpointId&type=resource&search=Devices&limit=100" -Headers $headers
+    } while ((@($cnLogs.items).Count -lt 3 -or @($cnActivity.activities).Count -lt 3) -and [DateTime]::UtcNow -lt $cnDeadline)
+
+    $cnMethods = @($cnLogs.items | ForEach-Object method | Sort-Object -Unique)
+    Test-Result -Success ($cnMethods -contains 'POST' -and $cnMethods -contains 'PATCH' -and $cnMethods -contains 'DELETE') `
+        -Message "9z-CN.T8: endpoint Logs contains custom POST, PATCH, and DELETE"
+    Test-Result -Success (@($cnLogs.items | Where-Object { $_.url -like '*/Devices*' }).Count -ge 3) `
+        -Message "9z-CN.T9: custom Device URLs remain visible in Logs"
+    Test-Result -Success (@($cnActivity.activities | Where-Object resourceType -eq 'Device').Count -ge 3) `
+        -Message "9z-CN.T10: Activity classifies custom operations as Device resources"
+    Test-Result -Success (@($cnActivity.activities | Where-Object resourceEndpoint -eq '/Devices').Count -ge 3) `
+        -Message "9z-CN.T11: Activity publishes the custom resource endpoint"
+    Test-Result -Success ($cnActivity.filters.types -contains 'resource') `
+        -Message "9z-CN.T12: Activity advertises the resource filter type"
+    Test-Result -Success ($cnActivity.pagination.total -eq @($cnActivity.activities).Count) `
+        -Message "9z-CN.T13: resource-filtered Activity total matches the filtered result set"
 } catch {
     Test-Result -Success $false -Message "9z-CN: custom resource ETag round-trip section threw: $($_.Exception.Message)"
 } finally {

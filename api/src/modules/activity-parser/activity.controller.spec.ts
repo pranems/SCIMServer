@@ -8,6 +8,7 @@ describe('ActivityController', () => {
   let controller: ActivityController;
   let prismaService: PrismaService;
   let activityParserService: ActivityParserService;
+  let loggingService: LoggingService;
 
   // Mock data helpers
   const createMockLog = (overrides: any = {}) => ({
@@ -121,6 +122,7 @@ describe('ActivityController', () => {
     controller = module.get<ActivityController>(ActivityController);
     prismaService = module.get<PrismaService>(PrismaService);
     activityParserService = module.get<ActivityParserService>(ActivityParserService);
+    loggingService = module.get<LoggingService>(LoggingService);
   });
 
   describe('getActivities - hideKeepalive parameter', () => {
@@ -170,7 +172,11 @@ describe('ActivityController', () => {
             where: expect.objectContaining({
               AND: expect.arrayContaining([
                 expect.objectContaining({
-                  OR: expect.any(Array), // Base conditions for /Users or /Groups
+                  OR: expect.arrayContaining([
+                    { url: { contains: '/Users' } },
+                    { url: { contains: '/Groups' } },
+                    { url: { contains: '/endpoints/' } },
+                  ]),
                 }),
               ]),
             }),
@@ -343,6 +349,101 @@ describe('ActivityController', () => {
         );
       });
     });
+  });
+
+  it('applies custom resource type and error filters before Prisma pagination/count', async () => {
+    jest.spyOn(prismaService.requestLog, 'findMany').mockResolvedValue([]);
+    jest.spyOn(prismaService.requestLog, 'count').mockResolvedValue(0);
+
+    await controller.getActivities('2', '25', 'resource', 'error', undefined, 'false', 'ep-1');
+
+    expect(prismaService.requestLog.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      skip: 25,
+      take: 25,
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([
+          { endpointId: 'ep-1' },
+          { status: { gte: 400 } },
+          expect.objectContaining({
+            AND: expect.arrayContaining([{ url: { contains: '/endpoints/' } }]),
+          }),
+        ]),
+      }),
+    }));
+    expect(prismaService.requestLog.count).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ AND: expect.arrayContaining([{ endpointId: 'ep-1' }]) }),
+    }));
+  });
+
+  it('filters parsed non-error severities before pagination and reports filtered totals', async () => {
+    const logs = [
+      createMockLog({ id: 'success-1', method: 'POST', status: 201 }),
+      ...Array.from({ length: 199 }, (_, index) =>
+        createMockLog({ id: `info-${index + 1}`, method: 'PATCH', status: 200 }),
+      ),
+      createMockLog({ id: 'success-2', method: 'POST', status: 201 }),
+    ];
+    jest.spyOn(prismaService.requestLog, 'findMany').mockImplementation(((args: any) => {
+      const skip = args.skip ?? 0;
+      return Promise.resolve(args.take === undefined ? logs : logs.slice(skip, skip + args.take));
+    }) as any);
+    jest.spyOn(prismaService.requestLog, 'count').mockResolvedValue(logs.length);
+    jest.spyOn(activityParserService, 'parseActivity').mockImplementation(async (log: any) => ({
+      ...mockActivitySummary(log),
+      severity: log.id.startsWith('success') ? 'success' as const : 'info' as const,
+    }));
+
+    const result = await controller.getActivities('2', '1', undefined, 'success');
+
+    expect(result.activities.map((activity) => activity.id)).toEqual(['success-2']);
+    expect(result.pagination).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
+    expect(prismaService.requestLog.findMany).toHaveBeenCalledTimes(2);
+    expect(prismaService.requestLog.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      skip: 0,
+      take: 200,
+    }));
+    expect(prismaService.requestLog.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      skip: 200,
+      take: 200,
+    }));
+  });
+
+  it('filters InMemory activity types and severities before pagination', async () => {
+    const logs = [
+      createMockLog({ id: 'success-1', method: 'POST', status: 201 }),
+      createMockLog({ id: 'info-1', method: 'PATCH', status: 200 }),
+      createMockLog({ id: 'success-2', method: 'POST', status: 201 }),
+    ];
+    jest.spyOn(loggingService, 'listLogs').mockImplementation((async ({ page = 1, pageSize = 50 }: any) => {
+      const skip = (page - 1) * pageSize;
+      const items = logs.slice(skip, skip + pageSize);
+      return {
+        items,
+        total: logs.length,
+        page,
+        pageSize,
+        count: items.length,
+        hasNext: skip + items.length < logs.length,
+        hasPrev: page > 1,
+      };
+    }) as any);
+    jest.spyOn(activityParserService, 'parseActivity').mockImplementation(async (log: any) => ({
+      ...mockActivitySummary(log),
+      severity: log.id.startsWith('success') ? 'success' as const : 'info' as const,
+    }));
+
+    const result = await (controller as any).getActivitiesInMemory(
+      2,
+      1,
+      undefined,
+      'success',
+      undefined,
+      false,
+      'ep-1',
+    );
+
+    expect(result.activities.map((activity: { id: string }) => activity.id)).toEqual(['success-2']);
+    expect(result.pagination).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
   });
 
   describe('Prisma WHERE clause structure validation', () => {

@@ -11,6 +11,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ActivityParserService } from './activity-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from '../logging/scim-logger.service';
+import { EndpointService } from '../endpoint/services/endpoint.service';
 
 describe('ActivityParserService', () => {
   let service: ActivityParserService;
@@ -19,6 +20,7 @@ describe('ActivityParserService', () => {
       findFirst: jest.Mock;
     };
   };
+  let endpointService: { getEndpoint: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -26,12 +28,22 @@ describe('ActivityParserService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
     };
+    endpointService = {
+      getEndpoint: jest.fn().mockResolvedValue({
+        profile: {
+          resourceTypes: [
+            { id: 'Device', name: 'Device', endpoint: '/Devices' },
+          ],
+        },
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ActivityParserService,
         { provide: PrismaService, useValue: prisma },
         { provide: ScimLogger, useValue: null },
+        { provide: EndpointService, useValue: endpointService },
       ],
     }).compile();
 
@@ -174,6 +186,70 @@ describe('ActivityParserService', () => {
       });
 
       expect(activity).toHaveProperty('type', 'group');
+    });
+
+    it.each([
+      ['POST', '/scim/endpoints/ep1/Devices', 201, 'created'],
+      ['PATCH', '/scim/endpoints/ep1/Devices/device-1', 200, 'updated'],
+      ['DELETE', '/scim/endpoints/ep1/Devices/device-1', 204, 'deleted'],
+    ])('parses %s custom ResourceType activity', async (method, url, status, verb) => {
+      const activity = await service.parseActivity({
+        id: `device-${method}`,
+        method,
+        url,
+        status,
+        requestBody: JSON.stringify({ serialNumber: 'SN-100' }),
+        responseBody: JSON.stringify({ id: 'device-1', serialNumber: 'SN-100' }),
+        createdAt: '2026-09-24T00:00:00Z',
+        identifier: 'device-1',
+      });
+
+      expect(activity).toMatchObject({
+        type: 'resource',
+        resourceType: 'Device',
+        resourceEndpoint: '/Devices',
+        resourceIdentifier: 'device-1',
+      });
+      expect(activity.message.toLowerCase()).toContain(verb);
+    });
+
+    it('uses the profile-declared ResourceType name instead of singularizing the endpoint', async () => {
+      endpointService.getEndpoint.mockResolvedValue({
+        profile: {
+          resourceTypes: [
+            { id: 'AIAgent', name: 'AIAgent', endpoint: '/News' },
+          ],
+        },
+      });
+
+      const activity = await service.parseActivity({
+        id: 'ai-agent-1',
+        method: 'PATCH',
+        url: '/scim/endpoints/ep1/News/agent-1',
+        status: 200,
+        createdAt: '2026-09-24T00:00:00Z',
+        identifier: 'agent-1',
+      });
+
+      expect(activity).toMatchObject({
+        type: 'resource',
+        resourceType: 'AIAgent',
+        resourceEndpoint: '/News',
+      });
+      expect(endpointService.getEndpoint).toHaveBeenCalledWith('ep1');
+    });
+
+    it('keeps discovery endpoints as system activity', async () => {
+      const activity = await service.parseActivity({
+        id: 'discovery-1',
+        method: 'GET',
+        url: '/scim/endpoints/ep1/ResourceTypes',
+        status: 200,
+        createdAt: '2026-09-24T00:00:00Z',
+      });
+
+      expect(activity.type).toBe('system');
+      expect(activity.resourceType).toBeUndefined();
     });
 
     it('should not crash when identifier is a non-UUID string', async () => {

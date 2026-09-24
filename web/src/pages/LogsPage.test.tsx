@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithRouter } from '../test/router-test-utils';
 import { globalLogsSearchSchema } from '../routes/search-schemas';
 
@@ -156,10 +156,27 @@ describe('LogsPage', () => {
       expect(Math.abs(sinceMs - expected)).toBeLessThan(5000);
     });
 
+    it('keeps the derived time lower bound stable across unrelated renders', async () => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-24T12:00:00.000Z'));
+      mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
+      wrap(<LogsPage />, '/logs?timeRange=24h');
+      await screen.findByTestId('global-logs-page');
+      const firstSince = mockUseGlobalLogs.mock.calls.at(-1)?.[0]?.since;
+      const callCount = mockUseGlobalLogs.mock.calls.length;
+
+      now.mockReturnValue(Date.parse('2026-09-24T12:05:00.000Z'));
+      fireEvent.click(screen.getByText('400'));
+      await waitFor(() => expect(mockUseGlobalLogs.mock.calls.length).toBeGreaterThan(callCount));
+      const secondSince = mockUseGlobalLogs.mock.calls.at(-1)?.[0]?.since;
+
+      expect(secondSince).toBe(firstSince);
+      now.mockRestore();
+    });
+
     it('shows reset-filters button only when filters are active', async () => {
       mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
       const { unmount } = wrap(<LogsPage />, '/logs?status=400');
-      expect(await screen.findByTestId('logs-reset-filters')).toBeInTheDocument();
+      expect(await screen.findByTestId('logs-toolbar-reset')).toBeInTheDocument();
       unmount();
 
       vi.clearAllMocks();
@@ -168,7 +185,7 @@ describe('LogsPage', () => {
       mockUseGlobalLogs.mockReturnValue({ data: sampleLogs, isLoading: false, error: null });
       wrap(<LogsPage />);
       await screen.findByTestId('global-logs-page');
-      expect(screen.queryByTestId('logs-reset-filters')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('logs-toolbar-reset')).not.toBeInTheDocument();
     });
   });
 

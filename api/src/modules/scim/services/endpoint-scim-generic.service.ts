@@ -470,6 +470,7 @@ export class EndpointScimGenericService {
       scimId,
       endpointId,
     });
+    this.eventEmitter.emit(SCIM_EVENTS.RESOURCE_UPDATED, { endpointId, scimId, resourceType: resourceType.name });
 
     return this.toScimResponse(updated, resourceType);
   }
@@ -707,6 +708,7 @@ export class EndpointScimGenericService {
       endpointId,
       operations: patchDto.Operations.length,
     });
+    this.eventEmitter.emit(SCIM_EVENTS.RESOURCE_UPDATED, { endpointId, scimId, resourceType: resourceType.name });
 
     return this.toScimResponse(updated, resourceType);
   }
