@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.31`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.32`
 
 > **Updated:** 2026-09-18
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -345,7 +345,7 @@ and the **merged** document is then re-validated as a whole by `validateAndExpan
 | `schemas` | **Replace whole array** | Preserved unchanged | 785-787 | Schema definitions are structural - a positional merge would be ambiguous |
 | `resourceTypes` | **Replace whole array** | Preserved unchanged | 789-791 | Resource types are structural and reference schemas by URN |
 | `serviceProviderConfig` | **Per-key merge** - `{ ...current, ...partial }`. A top-level key you send (`patch`, `bulk`, `filter`, `sort`, `etag`, `changePassword`) is replaced **wholesale**; a top-level key you omit is kept | Preserved unchanged | 793-795 | Each capability is an independent sub-object |
-| `settings` | **Per-key merge** - validated by `validateEndpointConfig()` first, then `{ ...current, ...partial }`. `ProfileSettings` is a flat map of scalars, so the effect is per-flag | Preserved unchanged | 797-805 | Individual flags can be toggled without re-specifying all |
+| `settings` | **Per-key merge** - non-null values are validated and overwrite that key; an explicit `null` removes that key (reset to inherit). `ProfileSettings` is a flat map of scalars | Preserved unchanged | `mergeProfilePartial()` | Individual flags can be toggled or reset without re-specifying all; omission is never removal |
 | `authentication` | **Replace wholesale** | Preserved unchanged | 807-809 | The admin authentication-methods API computes the full block and submits it |
 
 > **Correction (2026-08-04):** earlier revisions of this table listed

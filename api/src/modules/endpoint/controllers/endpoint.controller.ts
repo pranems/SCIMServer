@@ -11,6 +11,7 @@ import {
   Headers,
   Res
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import {
   EndpointService,
@@ -22,6 +23,14 @@ import {
 import { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import { UpdateEndpointDto } from '../dto/update-endpoint.dto';
 import { endpointETag, assertEndpointIfMatch } from './endpoint-etag';
+import {
+  resolveEndpointEgressOverrides,
+  type EndpointConfig,
+} from '../endpoint-config.interface';
+import {
+  resolveEffectiveEgressPolicy,
+  type EffectiveEgressPolicy,
+} from '../../../oauth/egress-policy';
 
 /**
  * Endpoint Management API Controller
@@ -34,7 +43,10 @@ import { endpointETag, assertEndpointIfMatch } from './endpoint-etag';
  */
 @Controller('admin/endpoints')
 export class EndpointController {
-  constructor(private readonly endpointService: EndpointService) {}
+  constructor(
+    private readonly endpointService: EndpointService,
+    private readonly config: ConfigService,
+  ) {}
 
   /**
    * Create a new endpoint
@@ -96,6 +108,19 @@ export class EndpointController {
     // A9 - the token a caller echoes back in If-Match to detect a lost update.
     res?.setHeader('ETag', endpointETag(endpoint));
     return endpoint;
+  }
+
+  /** Effective endpoint WIF/JWKS egress values with source, units and bounds. */
+  @Get(':endpointId/egress-policy')
+  async getEndpointEgressPolicy(
+    @Param('endpointId') endpointId: string,
+  ): Promise<EffectiveEgressPolicy> {
+    const endpoint = await this.endpointService.getEndpoint(endpointId, 'full');
+    const settings = endpoint.profile?.settings as EndpointConfig | undefined;
+    return resolveEffectiveEgressPolicy(
+      (key) => this.config.get<string>(key),
+      resolveEndpointEgressOverrides(settings),
+    );
   }
 
   /**

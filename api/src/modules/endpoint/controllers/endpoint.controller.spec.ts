@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EndpointController } from './endpoint.controller';
 import { EndpointService } from '../services/endpoint.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 describe('EndpointController', () => {
   let controller: EndpointController;
@@ -36,6 +37,9 @@ describe('EndpointController', () => {
     listPresets: jest.fn(),
     getPreset: jest.fn(),
   };
+  const mockConfigService = {
+    get: jest.fn((key: string) => key === 'JWKS_FETCH_RETRIES' ? '4' : undefined),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -44,6 +48,10 @@ describe('EndpointController', () => {
         {
           provide: EndpointService,
           useValue: mockEndpointService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();
@@ -170,6 +178,44 @@ describe('EndpointController', () => {
       );
 
       await expect(controller.getEndpoint('non-existent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getEndpointEgressPolicy', () => {
+    it('returns exactly the 11 effective egress fields with provenance', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        ...mockEndpointResponse,
+        profile: { ...mockEndpointResponse.profile, settings: { JwksFetchTimeoutMs: 1200 } },
+      });
+
+      const result = await controller.getEndpointEgressPolicy('endpoint-1');
+
+      expect(Object.keys(result).sort()).toEqual([
+        'cacheMaxAgeMs',
+        'maxCacheEntries',
+        'maxKeys',
+        'maxResponseBytes',
+        'refreshIntervalMs',
+        'retries',
+        'retryBackoffMs',
+        'staleIfErrorMs',
+        'timeoutMs',
+        'totalDeadlineMs',
+        'unknownKidMinIntervalMs',
+      ]);
+      expect(result.timeoutMs).toEqual(expect.objectContaining({
+        effective: 1200,
+        configured: 1200,
+        source: 'endpoint',
+        unit: 'ms',
+      }));
+      expect(result.retries).toEqual(expect.objectContaining({
+        effective: 4,
+        configured: null,
+        source: 'server-env',
+        unit: 'count',
+      }));
+      expect(JSON.stringify(result)).not.toMatch(/secret|databaseUrl|allowlist/i);
     });
   });
 

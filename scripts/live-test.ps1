@@ -12407,6 +12407,72 @@ try {
 Write-Host "`n--- 9z-AT11: WI-9 rotate Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-AT12: endpoint effective WIF/JWKS egress policy
+$script:currentSection = "9z-AT12: effective egress policy"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-AT12: endpoint effective WIF/JWKS egress policy" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+try {
+    $at12Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-egress-$(Get-Random)"; profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $at12Id = $at12Ep.id
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at12Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{
+            WifCredentialsEnabled = "True"
+            JwksFetchTimeoutMs = 1200
+            JwksFetchRetries = 4
+        } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+
+    $at12Policy = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at12Id/egress-policy" -Method GET -Headers $headers
+    $at12Keys = @($at12Policy.PSObject.Properties.Name)
+    Test-Result -Success ($at12Keys.Count -eq 11) -Message "9z-AT12.T1: effective policy returns all 11 bounded fields"
+    Test-Result -Success (
+        $at12Policy.timeoutMs.effective -eq 1200 -and
+        $at12Policy.timeoutMs.configured -eq 1200 -and
+        $at12Policy.timeoutMs.source -eq "endpoint" -and
+        $at12Policy.timeoutMs.unit -eq "ms"
+    ) -Message "9z-AT12.T2: timeout reports endpoint value, provenance, and unit"
+    Test-Result -Success (
+        $at12Policy.timeoutMs.min -eq 100 -and $at12Policy.timeoutMs.max -eq 60000
+    ) -Message "9z-AT12.T3: timeout publishes runtime bounds"
+    Test-Result -Success (
+        $at12Policy.retries.effective -eq 4 -and $at12Policy.retries.source -eq "endpoint"
+    ) -Message "9z-AT12.T4: retries reports its endpoint override"
+    $at12Json = $at12Policy | ConvertTo-Json -Depth 6
+    Test-Result -Success (-not ($at12Json -match '"(secret|databaseUrl|allowlist)"')) -Message "9z-AT12.T5: effective policy exposes no secret-bearing runtime config"
+
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at12Id" -Method PATCH -Headers $headers -Body (@{
+        profile = @{ settings = @{ JwksFetchTimeoutMs = $null } }
+    } | ConvertTo-Json -Depth 6) | Out-Null
+    $at12Endpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at12Id" -Method GET -Headers $headers
+    $at12Stored = $at12Endpoint.profile.settings
+    Test-Result -Success (
+        -not ($at12Stored.PSObject.Properties.Name -contains 'JwksFetchTimeoutMs') -and
+        $at12Stored.JwksFetchRetries -eq 4
+    ) -Message "9z-AT12.T6: null removes only the requested override"
+
+    $at12Inherited = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at12Id/egress-policy" -Method GET -Headers $headers
+    Test-Result -Success (
+        $null -eq $at12Inherited.timeoutMs.configured -and $at12Inherited.timeoutMs.source -ne "endpoint"
+    ) -Message "9z-AT12.T7: reset-to-inherit removes endpoint provenance"
+    $at12EveryFieldBounded = @($at12Inherited.PSObject.Properties | Where-Object {
+        $null -ne $_.Value.effective -and $null -ne $_.Value.min -and
+        $null -ne $_.Value.max -and $null -ne $_.Value.unit -and $null -ne $_.Value.source
+    }).Count -eq 11
+    Test-Result -Success $at12EveryFieldBounded -Message "9z-AT12.T8: every field carries effective value, unit, bounds, and source"
+
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at12Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9z-AT12: effective egress policy section threw: $($_.Exception.Message)"
+}
+
+Write-Host "`n--- 9z-AT12: Effective Egress Policy Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 9z-AU: WIF A4 authZ seams (inert) + shadow telemetry
 $script:currentSection = "9z-AU: WIF A4 seams (inert)"
 # ============================================

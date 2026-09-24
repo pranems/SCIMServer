@@ -3,6 +3,7 @@ import {
   mergeEgressPolicy,
   EGRESS_POLICY_DEFAULTS,
   EGRESS_POLICY_BOUNDS,
+  resolveEffectiveEgressPolicy,
   type EgressPolicy,
 } from './egress-policy';
 
@@ -105,6 +106,63 @@ describe('egress-policy', () => {
       const merged = mergeEgressPolicy(server, { timeoutMs: Number.NaN, retries: Infinity });
       expect(merged.timeoutMs).toBe(server.timeoutMs);
       expect(merged.retries).toBe(server.retries);
+    });
+  });
+
+  describe('effective policy read model', () => {
+    it('preserves endpoint and server-env provenance, units, bounds, and clamping', () => {
+      const get = getFrom({
+        JWKS_FETCH_TIMEOUT_MS: '75000',
+        JWKS_FETCH_RETRIES: '4',
+      });
+      const resolved = resolveEffectiveEgressPolicy(get, {
+        timeoutMs: 1200,
+      });
+
+      expect(resolved.timeoutMs).toEqual({
+        effective: 1200,
+        configured: 1200,
+        source: 'endpoint',
+        unit: 'ms',
+        min: 100,
+        max: 60000,
+        clamped: false,
+      });
+      expect(resolved.retries).toEqual({
+        effective: 4,
+        configured: null,
+        source: 'server-env',
+        unit: 'count',
+        min: 0,
+        max: 10,
+        clamped: false,
+      });
+      expect(resolved.retryBackoffMs.source).toBe('default');
+      expect(resolved.timeoutMs.effective).toBe(
+        mergeEgressPolicy(resolveServerEgressDefaults(get), { timeoutMs: 1200 }).timeoutMs,
+      );
+    });
+
+    it('reports server and endpoint requested values when clamping occurs', () => {
+      const serverClamped = resolveEffectiveEgressPolicy(
+        getFrom({ JWKS_FETCH_TIMEOUT_MS: '75000' }),
+      );
+      expect(serverClamped.timeoutMs).toEqual(expect.objectContaining({
+        effective: 60000,
+        source: 'server-env',
+        clamped: true,
+        requested: 75000,
+      }));
+
+      const endpointClamped = resolveEffectiveEgressPolicy(emptyGet, { maxKeys: 2000 });
+      expect(endpointClamped.maxKeys).toEqual(expect.objectContaining({
+        effective: 1000,
+        configured: 2000,
+        source: 'endpoint',
+        unit: 'count',
+        clamped: true,
+        requested: 2000,
+      }));
     });
   });
 
