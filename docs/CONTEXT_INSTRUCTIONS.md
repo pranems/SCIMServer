@@ -18,15 +18,17 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The v0.55.31 context-preserving navigation rollback unit is consolidated
-locally on `feat/back-navigation-v05531`. Back uses in-app router history with
-safe direct-link fallbacks. Connect method, Operations filters/pages, Discovery
-comparison state, and existing list/drawer search state are URL-owned, so Back
-and refresh restore the complete workflow. Evidence so far is focused Vitest
-155/155, web coverage 1,534/1,534 across 115 files, search schemas 23/23,
-Playwright 3/3, live 1,516/1,516, the web production build and route budgets,
-zero touched-file diagnostics, docs, and Mermaid 713/713. PR, merge, and dev
-deployment remain pending. Canary and customer prod are unchanged.
+The v0.55.31 context-preserving navigation rollback unit is merged and verified
+on dev. Back uses in-app router history with safe direct-link fallbacks. Connect
+method, Operations filters/pages, Discovery comparison state, and existing
+list/drawer search state are URL-owned, so Back and refresh restore the complete
+workflow. Evidence is focused Vitest 155/155, web coverage 1,534/1,534 across
+115 files, search schemas 23/23, live 1,516/1,516, and final dev Playwright
+241 passed / 4 skipped / 0 failed. The intended Users-tab baseline was inspected;
+semantic masks and explicit surface-readiness assertions now reject positional
+or shell-only false signals. PR #173 merged as `574d9135`; dev revision
+`scimserver-dev--v574d9135` serves v0.55.31 at 100% with all 60 endpoint IDs
+preserved and two revisions retained. Canary and customer prod are unchanged.
 
 The v0.55.30 credential lifecycle rollback unit is merged and verified on dev.
 Repository-owned atomic rotation prevents
