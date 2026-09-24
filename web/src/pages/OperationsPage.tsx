@@ -25,7 +25,7 @@
  * @see docs/PHASE_L6_OPERATIONS_VIEW.md
  * @see web/src/utils/csv-export.ts (the serializer)
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   makeStyles,
   mergeClasses,
@@ -49,7 +49,7 @@ import {
   Group24Regular,
   Pulse24Regular,
 } from '@fluentui/react-icons';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   useDatabaseUsers,
   useDatabaseGroups,
@@ -62,6 +62,7 @@ import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle'
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
+import type { OperationsSearch } from '../routes/search-schemas';
 
 type OperationsTabKey = 'users' | 'groups' | 'statistics';
 
@@ -174,15 +175,21 @@ const useStyles = makeStyles({
 
 export const OperationsPage: React.FC = () => {
   const classes = useStyles();
-  const [activeTab, setActiveTab] = useState<OperationsTabKey>('users');
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as Partial<OperationsSearch>;
+  const activeTab = search.tab ?? 'users';
+  const userSearch = search.userSearch ?? '';
+  const userActiveOnly = search.userActiveOnly ?? false;
+  const userPage = search.userPage ?? 1;
+  const groupSearch = search.groupSearch ?? '';
+  const groupPage = search.groupPage ?? 1;
 
-  // Per-tab params (independent so switching tabs doesn't reset filters).
-  const [userSearch, setUserSearch] = useState('');
-  const [userActiveOnly, setUserActiveOnly] = useState(false);
-  const [userPage, setUserPage] = useState(1);
-
-  const [groupSearch, setGroupSearch] = useState('');
-  const [groupPage, setGroupPage] = useState(1);
+  const updateSearch = (patch: Partial<OperationsSearch>): void => {
+    void navigate({
+      to: '/operations',
+      search: (previous) => ({ ...previous, ...patch }),
+    });
+  };
 
   const users = useDatabaseUsers({
     page: userPage,
@@ -210,7 +217,7 @@ export const OperationsPage: React.FC = () => {
 
       <TabList
         selectedValue={activeTab}
-        onTabSelect={(_e, d) => setActiveTab(d.value as OperationsTabKey)}
+        onTabSelect={(_e, d) => updateSearch({ tab: d.value as OperationsTabKey })}
         data-testid="operations-subtabs"
       >
         <Tab value="users" data-testid="operations-tab-users" icon={<People24Regular />}>
@@ -233,14 +240,12 @@ export const OperationsPage: React.FC = () => {
           activeOnly={userActiveOnly}
           page={userPage}
           onSearch={(v) => {
-            setUserSearch(v);
-            setUserPage(1);
+            updateSearch({ userSearch: v || undefined, userPage: 1 });
           }}
           onActiveOnly={(v) => {
-            setUserActiveOnly(v);
-            setUserPage(1);
+            updateSearch({ userActiveOnly: v || undefined, userPage: 1 });
           }}
-          onPage={setUserPage}
+          onPage={(page) => updateSearch({ userPage: page })}
         />
       )}
 
@@ -252,10 +257,9 @@ export const OperationsPage: React.FC = () => {
           search={groupSearch}
           page={groupPage}
           onSearch={(v) => {
-            setGroupSearch(v);
-            setGroupPage(1);
+            updateSearch({ groupSearch: v || undefined, groupPage: 1 });
           }}
-          onPage={setGroupPage}
+          onPage={(page) => updateSearch({ groupPage: page })}
         />
       )}
 

@@ -29,6 +29,11 @@ export type TimeRange = (typeof TIME_RANGE_VALUES)[number];
 const emptyToUndef = (v: unknown) =>
   typeof v === 'string' && v.trim() === '' ? undefined : v;
 
+const explicitBoolean = z.union([
+  z.boolean(),
+  z.enum(['true', 'false']).transform((value) => value === 'true'),
+]);
+
 /**
  * Base pagination schema used by every list view.
  * page is 1-indexed; pageSize is capped to align with the server-side
@@ -118,6 +123,41 @@ export const endpointsSearchSchema = z.object({
   q: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type EndpointsSearch = z.infer<typeof endpointsSearchSchema>;
+
+/** Per-endpoint Connect method sub-tab. */
+export const CONNECT_METHOD_VALUES = ['shared_secret', 'bearer', 'oauth_client', 'wif'] as const;
+export const connectSearchSchema = z.object({
+  method: z.preprocess(emptyToUndef, z.enum(CONNECT_METHOD_VALUES).optional()),
+});
+export type ConnectSearch = z.infer<typeof connectSearchSchema>;
+
+/** Cross-endpoint Operations sub-tab and independent per-tab filters/pages. */
+export const OPERATIONS_TAB_VALUES = ['users', 'groups', 'statistics'] as const;
+export const operationsSearchSchema = z.object({
+  tab: z.preprocess(emptyToUndef, z.enum(OPERATIONS_TAB_VALUES).default('users')),
+  userSearch: z.preprocess(emptyToUndef, z.string().optional()),
+  userActiveOnly: z.preprocess(
+    emptyToUndef,
+    explicitBoolean.optional(),
+  ),
+  userPage: z.coerce.number().int().min(1).default(1),
+  groupSearch: z.preprocess(emptyToUndef, z.string().optional()),
+  groupPage: z.coerce.number().int().min(1).default(1),
+});
+export type OperationsSearch = z.infer<typeof operationsSearchSchema>;
+
+/** Discovery endpoint selection, comparison mode, and active sub-tab. */
+export const DISCOVERY_TAB_VALUES = ['serviceProviderConfig', 'resourceTypes', 'schemas'] as const;
+export const discoverySearchSchema = z.object({
+  primaryId: z.preprocess(emptyToUndef, z.string().optional()),
+  compare: z.preprocess(
+    emptyToUndef,
+    explicitBoolean.optional(),
+  ),
+  secondaryId: z.preprocess(emptyToUndef, z.string().optional()),
+  tab: z.preprocess(emptyToUndef, z.enum(DISCOVERY_TAB_VALUES).default('serviceProviderConfig')),
+});
+export type DiscoverySearch = z.infer<typeof discoverySearchSchema>;
 
 /**
  * Per-endpoint Activity tab (Phase D2): pagination + optional

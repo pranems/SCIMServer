@@ -10,6 +10,7 @@
 import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
+import { operationsSearchSchema } from './search-schemas';
 
 // Phase K1 - lazy-load OperationsPage into its own chunk.
 const OperationsPage = React.lazy(() =>
@@ -22,4 +23,5 @@ export const operationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/operations',
   component: OperationsPage,
+  validateSearch: operationsSearchSchema,
 });

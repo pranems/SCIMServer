@@ -25,6 +25,11 @@ const mockUseDatabaseUsers = vi.fn();
 const mockUseDatabaseGroups = vi.fn();
 const mockUseDatabaseStatistics = vi.fn();
 const mockTriggerCsvDownload = vi.fn();
+const routerMock = vi.hoisted(() => ({
+  initialSearch: {} as Record<string, unknown>,
+  setSearch: undefined as React.Dispatch<React.SetStateAction<Record<string, unknown>>> | undefined,
+  navigate: vi.fn(),
+}));
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -99,9 +104,21 @@ vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
     '@tanstack/react-router',
   );
+  const react = await vi.importActual<typeof import('react')>('react');
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useSearch: () => {
+      const [search, setSearch] = react.useState(routerMock.initialSearch);
+      routerMock.setSearch = setSearch;
+      return search;
+    },
+    useNavigate: () => (options: { search?: Record<string, unknown> | ((previous: Record<string, unknown>) => Record<string, unknown>) }) => {
+      routerMock.navigate(options);
+      if (!options.search) return;
+      routerMock.setSearch?.((previous) =>
+        typeof options.search === 'function' ? options.search(previous) : options.search ?? previous,
+      );
+    },
   };
 });
 
@@ -119,6 +136,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('OperationsPage (Phase L6)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerMock.initialSearch = {};
     mockUseDatabaseUsers.mockReturnValue(defaultHookReturn(sampleUsers));
     mockUseDatabaseGroups.mockReturnValue(defaultHookReturn(sampleGroups));
     mockUseDatabaseStatistics.mockReturnValue(defaultHookReturn(sampleStats));

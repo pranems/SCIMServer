@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.30`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.31`
 
-> **Version:** 0.55.30 - **Updated:** 2026-09-24
+> **Version:** 0.55.31 - **Updated:** 2026-09-24
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -14,6 +14,7 @@
 | Understand synchronized profile forms, runtime tabs, endpoint SPC, and the AI agent example | [PROFILE_AUTHORITATIVE_RESOURCE_UI.md](PROFILE_AUTHORITATIVE_RESOURCE_UI.md) |
 | Trace custom ResourceTypes through Activity and shared Logs filters | [CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md](CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md) |
 | Operate bearer, OAuth, and WIF credential lifecycle safely | [CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md](CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md) |
+| Preserve page, tab, filter, pagination, comparison, and drawer state through Back | [CONTEXT_PRESERVING_NAVIGATION.md](CONTEXT_PRESERVING_NAVIGATION.md) |
 | Run ready-to-use server, admin, endpoint, and profile-aware SCIM requests | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) |
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
 | Review contextual-settings execution issues and preventions | [ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md](ENDPOINT_SETTINGS_CONTEXTUAL_UI_EXECUTION_RCA.md) |
@@ -78,6 +79,8 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [CUSTOM_RESOURCE_OBSERVABILITY_EXECUTION_RCA.md](CUSTOM_RESOURCE_OBSERVABILITY_EXECUTION_RCA.md) | **v0.55.29 execution RCA** - User/Group-only query boundaries, missing update events, duplicated filters, and exact-branch proxy routing. |
 | [CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md](CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md) | **v0.55.30 credential lifecycle** - atomic rotation, explicit reversible deactivate/activate, inactive-only permanent purge, and Connect UI parity for bearer, OAuth, and WIF. |
 | [auth/CREDENTIAL_LIFECYCLE_EXECUTION_RCA.md](auth/CREDENTIAL_LIFECYCLE_EXECUTION_RCA.md) | **v0.55.30 execution RCA** - split-write rotation, false-success purge, worktree harness friction, and prevention. |
+| [CONTEXT_PRESERVING_NAVIGATION.md](CONTEXT_PRESERVING_NAVIGATION.md) | **v0.55.31 navigation contract** - history-first Back, direct-link fallbacks, and URL-owned workflow state. |
+| [CONTEXT_PRESERVING_NAVIGATION_EXECUTION_RCA.md](CONTEXT_PRESERVING_NAVIGATION_EXECUTION_RCA.md) | **v0.55.31 execution RCA** - modal locality, SPA history, router value types, canonical URLs, and test-harness prevention. |
 | [PROFILE_DRIVEN_RESOURCE_FORMS_EXECUTION_RCA.md](PROFILE_DRIVEN_RESOURCE_FORMS_EXECUTION_RCA.md) | **v0.55.26 execution RCA** - twelve issues across test correctness, environment drift, API/profile/cache/UI correctness, HTTP contract, and tooling, including the generic ETag round-trip and 204-response defects. |
 | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) | **v0.55.27 Workbench examples** - static server/admin catalog, endpoint context, profile-derived ResourceType POST/PATCH, real ETag headers, and the deployment-time dev fixture. |
 | [WORKBENCH_REQUEST_EXAMPLES_EXECUTION_RCA.md](WORKBENCH_REQUEST_EXAMPLES_EXECUTION_RCA.md) | **v0.55.27 execution RCA** - request header contract, browser assertion semantics, and prevention coverage. |

@@ -23,6 +23,9 @@ import {
   logsSearchSchema,
   globalLogsSearchSchema,
   endpointsSearchSchema,
+  connectSearchSchema,
+  operationsSearchSchema,
+  discoverySearchSchema,
   TIME_RANGE_VALUES,
   type PaginationSearch,
   type LogsSearch,
@@ -143,6 +146,47 @@ describe('endpointsSearchSchema', () => {
   it('accepts search query string', () => {
     const result = endpointsSearchSchema.parse({ q: 'production' });
     expect(result.q).toBe('production');
+  });
+});
+
+describe('restorable workflow search schemas', () => {
+  it('parses a Connect method sub-tab and rejects unknown methods', () => {
+    expect(connectSearchSchema.parse({ method: 'wif' })).toEqual({ method: 'wif' });
+    expect(() => connectSearchSchema.parse({ method: 'unknown' })).toThrow();
+  });
+
+  it('parses Operations tabs, independent filters, pages, and explicit false', () => {
+    expect(operationsSearchSchema.parse({
+      tab: 'groups',
+      userSearch: 'alice',
+      userActiveOnly: 'false',
+      userPage: '3',
+      groupSearch: 'engineering',
+      groupPage: '2',
+    })).toEqual({
+      tab: 'groups',
+      userSearch: 'alice',
+      userActiveOnly: false,
+      userPage: 3,
+      groupSearch: 'engineering',
+      groupPage: 2,
+    });
+  });
+
+  it('parses Discovery selection, comparison, and sub-tab state', () => {
+    expect(discoverySearchSchema.parse({
+      primaryId: 'ep-1',
+      compare: 'true',
+      secondaryId: 'ep-2',
+      tab: 'schemas',
+    })).toEqual({
+      primaryId: 'ep-1',
+      compare: true,
+      secondaryId: 'ep-2',
+      tab: 'schemas',
+    });
+    expect(discoverySearchSchema.parse({ compare: true }).compare).toBe(true);
+    expect(operationsSearchSchema.parse({ userActiveOnly: false }).userActiveOnly).toBe(false);
   });
 });
 

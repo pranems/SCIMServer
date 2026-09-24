@@ -13,6 +13,8 @@ import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { EditEndpointPage } from './EditEndpointPage';
 
 const mockNavigate = vi.fn();
+const mockHistoryBack = vi.fn();
+let mockCanGoBack = true;
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual<Record<string, unknown>>(
     '@tanstack/react-router',
@@ -20,6 +22,8 @@ vi.mock('@tanstack/react-router', async () => {
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    useCanGoBack: () => mockCanGoBack,
+    useRouter: () => ({ history: { back: mockHistoryBack } }),
   };
 });
 
@@ -53,6 +57,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('EditEndpointPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCanGoBack = true;
     mockUseEndpoint.mockReturnValue({
       data: {
         id: 'ep-1',
@@ -91,19 +96,37 @@ describe('EditEndpointPage', () => {
     expect(body.displayName).toBe('Production v2');
   });
 
-  it('navigates back to the endpoint detail on save success', async () => {
+  it('restores the previous context on save success', async () => {
     renderWithProviders(<EditEndpointPage endpointId="ep-1" />);
     fireEvent.change(screen.getByTestId('edit-endpoint-displayname-input'), {
       target: { value: 'New Name' },
     });
     fireEvent.click(screen.getByTestId('edit-endpoint-save-button'));
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: '/endpoints/$endpointId',
-          params: { endpointId: 'ep-1' },
-        }),
-      );
+      expect(mockHistoryBack).toHaveBeenCalledTimes(1);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('restores the previous context on cancel', () => {
+    renderWithProviders(<EditEndpointPage endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('edit-endpoint-cancel-button'));
+
+    expect(mockHistoryBack).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('falls back to endpoint overview when edit is opened as a direct deep link', () => {
+    mockCanGoBack = false;
+    renderWithProviders(<EditEndpointPage endpointId="ep-1" />);
+
+    fireEvent.click(screen.getByTestId('edit-endpoint-cancel-button'));
+
+    expect(mockHistoryBack).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: '/endpoints/$endpointId',
+      params: { endpointId: 'ep-1' },
     });
   });
 });
