@@ -18,15 +18,17 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The v0.55.30 credential lifecycle rollback unit is consolidated locally on
-`feat/credential-lifecycle-v05530`. Repository-owned atomic rotation prevents
+The v0.55.30 credential lifecycle rollback unit is merged and verified on dev.
+Repository-owned atomic rotation prevents
 partial replacement, explicit deactivate/activate remains reversible, and
 inactive-only purge permanently removes bearer, OAuth, or WIF rows after
 confirmation, with the inactive predicate enforced at the storage sink. Evidence
 is API unit 5,159/5,159, API E2E 1,528/1,528, focused repository/controller
-98/98, web 1,525/1,525, Playwright 2/2, full local live 1,516/1,516, all six
-modes, both production builds, docs, and Mermaid 712/712. PR, merge, and dev
-deployment remain pending. Canary and customer prod are unchanged.
+98/98, web 1,525/1,525, local/dev live 1,516/1,516, final dev Playwright
+238 passed / 4 skipped / 0 failed, all six modes, both production builds, docs,
+and Mermaid 712/712. PR #171 merged as `524906d0`; dev revision
+`scimserver-dev--v524906d0` serves v0.55.30 at 100% with 60 endpoint IDs
+preserved. Canary and customer prod are unchanged.
 
 The v0.55.29 custom-resource observability rollback unit is merged and verified
 on dev. Activity classifies dynamic
