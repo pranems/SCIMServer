@@ -64,6 +64,8 @@ export class JwksHostNotPermittedError extends Error {
  * been folded in (W1.4); it is always <= fetchedAt + policy.cacheMaxAgeMs.
  */
 interface JwksCacheEntry {
+  jwksUri: string;
+  policy: EgressPolicy;
   keys: unknown;
   fetchedAt: number;
   kids: Set<string>;
@@ -98,7 +100,7 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
   /** SERVER-level egress defaults (env-driven); endpoint overrides layer on top. */
   private readonly serverEgress: EgressPolicy;
   private readonly cache = new Map<string, JwksCacheEntry>();
-  /** G3 single-flight: coalesce concurrent fetches for the same jwksUri. */
+  /** G3 single-flight: coalesce concurrent fetches for the same URI + policy. */
   private readonly inflight = new Map<string, Promise<unknown>>();
   /**
    * W1.1 - memoized `jose` module. The import is kicked off at boot by
@@ -171,11 +173,11 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
 
   private startRefreshTimer(): void {
     if (this.refreshTimer) return;
-    // Sweep more often than the refresh interval so an entry is refreshed
-    // promptly after it crosses the threshold rather than up to a full
-    // interval later. The sweep itself is cheap - it only fetches entries that
-    // are actually due.
-    const sweepMs = Math.max(60_000, Math.floor(this.serverEgress.refreshIntervalMs / 4));
+    // Endpoint policies may use the published 60-second floor even when the
+    // server default is much longer. Sweep at that floor so every configured
+    // refresh interval is schedulable; the scan is bounded by maxCacheEntries
+    // and fetches only entries that are due under their own policy.
+    const sweepMs = 60_000;
     this.refreshTimer = setInterval(() => {
       void this.refreshCachedJwksNow();
     }, sweepMs);
@@ -203,22 +205,22 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
    */
   async refreshCachedJwksNow(): Promise<void> {
     const now = Date.now();
-    const due: string[] = [];
-    for (const [uri, entry] of this.cache.entries()) {
-      if (now - entry.fetchedAt >= this.serverEgress.refreshIntervalMs) due.push(uri);
+    const due: JwksCacheEntry[] = [];
+    for (const entry of this.cache.values()) {
+      if (now - entry.fetchedAt >= entry.policy.refreshIntervalMs) due.push(entry);
     }
     if (due.length === 0) return;
 
     await Promise.all(
-      due.map(async (uri) => {
+      due.map(async (entry) => {
         try {
           // Goes through fetchJwks so single-flight coalescing still applies and
           // the cache swap stays atomic (cacheKeys replaces the entry wholesale).
-          await this.fetchJwks(uri, this.serverEgress);
-          this.logger.debug(LogCategory.AUTH, 'JWKS background refresh succeeded', { jwksUri: uri });
+          await this.fetchJwks(entry.jwksUri, entry.policy);
+          this.logger.debug(LogCategory.AUTH, 'JWKS background refresh succeeded', { jwksUri: entry.jwksUri });
         } catch (err) {
           this.logger.warn(LogCategory.AUTH, 'JWKS background refresh failed (cached keys retained)', {
-            jwksUri: uri,
+            jwksUri: entry.jwksUri,
             reason: (err as Error)?.message,
           });
         }
@@ -281,26 +283,28 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
   ): Promise<ExternalJwksVerifyResult> {
     this.assertJwksUriAllowed(jwksUri);
     const policy = mergeEgressPolicy(this.serverEgress, egressOverrides);
+    const cacheKey = this.policyCacheKey(jwksUri, policy);
+    this.enforceCacheCapacity(policy.maxCacheEntries, cacheKey);
 
     const jose = await this.loadJose();
     const kid = this.peekKid(token);
 
     // W1.4 - the cached set is fresh when it is inside BOTH the configured TTL
     // and whatever shorter lifetime the IdP asked for via Cache-Control.
-    let keys = this.getFreshCached(jwksUri);
+    let keys = this.getFreshCached(cacheKey);
     let triedRefetch = false;
 
     if (!keys) {
       // Nothing usable cached - a fetch is unavoidable.
       keys = await this.fetchJwks(jwksUri, policy);
       triedRefetch = true;
-    } else if (kid && !this.cacheHasKid(jwksUri, keys, kid)) {
+    } else if (kid && !this.cacheHasKid(cacheKey, keys, kid)) {
       // W1.4 - the cached set is fresh but does not contain this kid. That is
       // the key-rotation signal, so a refetch is warranted; it is also fully
       // caller-controlled, so it is rate-limited. Inside the window we fall
       // through with the cached keys and let verification fail normally rather
       // than issuing an outbound request per inbound request.
-      if (this.mayRefetchForUnknownKid(jwksUri, policy)) {
+      if (this.mayRefetchForUnknownKid(cacheKey, policy)) {
         keys = await this.fetchJwks(jwksUri, policy);
         triedRefetch = true;
       } else {
@@ -380,14 +384,19 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
    * exists (fail-to-stale) - it NEVER skips the signature check.
    */
   private async fetchJwks(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
-    const existing = this.inflight.get(jwksUri);
+    const cacheKey = this.policyCacheKey(jwksUri, policy);
+    const existing = this.inflight.get(cacheKey);
     if (existing) return existing;
-    const p = this.fetchJwksWithRetry(jwksUri, policy).finally(() => this.inflight.delete(jwksUri));
-    this.inflight.set(jwksUri, p);
+    const p = this.fetchJwksWithRetry(jwksUri, policy, cacheKey).finally(() => this.inflight.delete(cacheKey));
+    this.inflight.set(cacheKey, p);
     return p;
   }
 
-  private async fetchJwksWithRetry(jwksUri: string, policy: EgressPolicy): Promise<unknown> {
+  private async fetchJwksWithRetry(
+    jwksUri: string,
+    policy: EgressPolicy,
+    cacheKey: string,
+  ): Promise<unknown> {
     let lastErr: unknown;
     // W1.5 - one budget for the WHOLE operation. `policy.timeoutMs` bounds a
     // single attempt, which is not a bound on the work: retries + exponential
@@ -413,7 +422,7 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
         // The attempt may not outlive the total budget either.
         const attemptTimeoutMs = Math.min(policy.timeoutMs, remaining);
         const fetched = await this.fetchJwksOnce(jwksUri, policy, attemptTimeoutMs);
-        this.cacheKeys(jwksUri, fetched.keys, policy, fetched.cacheControlMaxAgeMs);
+        this.cacheKeys(cacheKey, jwksUri, fetched.keys, policy, fetched.cacheControlMaxAgeMs);
         return fetched.keys;
       } catch (err) {
         lastErr = err;
@@ -436,7 +445,7 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
     // cached keys with NO age test, so a revoked or rotated-out key stayed
     // acceptable for as long as the IdP was unreachable - unbounded, and made
     // 144x worse by the 10-min -> 24h TTL raise that ships alongside this.
-    const cached = this.cache.get(jwksUri);
+    const cached = this.cache.get(cacheKey);
     if (cached) {
       const age = Date.now() - cached.fetchedAt;
       if (age <= policy.staleIfErrorMs) {
@@ -480,27 +489,14 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
    * hostile one) grows process memory without limit. Evicts the oldest entry.
    */
   private cacheKeys(
+    cacheKey: string,
     jwksUri: string,
     keys: unknown,
     policy: EgressPolicy,
     cacheControlMaxAgeMs?: number,
   ): void {
-    if (!this.cache.has(jwksUri) && this.cache.size >= policy.maxCacheEntries) {
-      let oldestUri: string | undefined;
-      let oldestAt = Number.POSITIVE_INFINITY;
-      for (const [uri, entry] of this.cache.entries()) {
-        if (entry.fetchedAt < oldestAt) {
-          oldestAt = entry.fetchedAt;
-          oldestUri = uri;
-        }
-      }
-      if (oldestUri !== undefined) {
-        this.cache.delete(oldestUri);
-        this.logger.debug(LogCategory.AUTH, 'JWKS cache at capacity; evicted oldest entry', {
-          evicted: oldestUri,
-          maxCacheEntries: policy.maxCacheEntries,
-        });
-      }
+    if (!this.cache.has(cacheKey)) {
+      this.enforceCacheCapacity(policy.maxCacheEntries - 1, undefined, policy.maxCacheEntries);
     }
     // W1.4 - the IdP may ask us to cache for LESS than our configured TTL, but
     // never for more: an IdP must not be able to pin keys in our cache beyond
@@ -513,7 +509,9 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
 
     // Atomic swap: the entry is replaced wholesale, so a concurrent reader sees
     // either the whole old set or the whole new one, never a half-updated one.
-    this.cache.set(jwksUri, {
+    this.cache.set(cacheKey, {
+      jwksUri,
+      policy: { ...policy },
       keys,
       fetchedAt: now,
       kids: this.indexKids(keys),
@@ -653,8 +651,8 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
    * W1.4 - a cached entry is fresh until `expiresAt`, which already folds the
    * configured TTL together with any shorter `Cache-Control` the IdP asked for.
    */
-  private getFreshCached(jwksUri: string): unknown {
-    const cached = this.cache.get(jwksUri);
+  private getFreshCached(cacheKey: string): unknown {
+    const cached = this.cache.get(cacheKey);
     if (!cached) return undefined;
     if (Date.now() > cached.expiresAt) return undefined;
     return cached.keys;
@@ -664,21 +662,63 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
    * W1.4 - may this URI issue a synchronous refetch for an unknown kid right
    * now? Records the decision so the window starts at the allowed fetch.
    */
-  private mayRefetchForUnknownKid(jwksUri: string, policy: EgressPolicy): boolean {
+  private mayRefetchForUnknownKid(cacheKey: string, policy: EgressPolicy): boolean {
     const now = Date.now();
-    const last = this.lastUnknownKidFetchAt.get(jwksUri);
+    const last = this.lastUnknownKidFetchAt.get(cacheKey);
     if (last !== undefined && now - last < policy.unknownKidMinIntervalMs) return false;
-    this.lastUnknownKidFetchAt.set(jwksUri, now);
+    this.lastUnknownKidFetchAt.set(cacheKey, now);
     return true;
   }
 
-  private cacheHasKid(jwksUri: string, keys: unknown, kid: string): boolean {
-    const entry = this.cache.get(jwksUri);
+  private cacheHasKid(cacheKey: string, keys: unknown, kid: string): boolean {
+    const entry = this.cache.get(cacheKey);
     // Prefer the prebuilt index; fall back to a scan when the key set did not
     // come from the cache (e.g. straight off a fetch).
     if (entry && entry.keys === keys) return entry.kids.has(kid);
     const arr = (keys as { keys?: Array<{ kid?: string }> })?.keys;
     return Array.isArray(arr) && arr.some((k) => k.kid === kid);
+  }
+
+  private policyCacheKey(jwksUri: string, policy: EgressPolicy): string {
+    return JSON.stringify([
+      jwksUri,
+      policy.timeoutMs,
+      policy.retries,
+      policy.retryBackoffMs,
+      policy.cacheMaxAgeMs,
+      policy.totalDeadlineMs,
+      policy.maxResponseBytes,
+      policy.maxKeys,
+      policy.maxCacheEntries,
+      policy.refreshIntervalMs,
+      policy.unknownKidMinIntervalMs,
+      policy.staleIfErrorMs,
+    ]);
+  }
+
+  private enforceCacheCapacity(
+    targetSize: number,
+    preserveKey?: string,
+    configuredMaxEntries = targetSize,
+  ): void {
+    while (this.cache.size > Math.max(0, targetSize)) {
+      let oldestKey: string | undefined;
+      let oldestAt = Number.POSITIVE_INFINITY;
+      for (const [key, entry] of this.cache.entries()) {
+        if (key !== preserveKey && entry.fetchedAt < oldestAt) {
+          oldestAt = entry.fetchedAt;
+          oldestKey = key;
+        }
+      }
+      if (oldestKey === undefined) return;
+      const evicted = this.cache.get(oldestKey);
+      this.cache.delete(oldestKey);
+      this.lastUnknownKidFetchAt.delete(oldestKey);
+      this.logger.debug(LogCategory.AUTH, 'JWKS cache at capacity; evicted oldest entry', {
+        evicted: evicted?.jwksUri,
+        maxCacheEntries: configuredMaxEntries,
+      });
+    }
   }
 
   /** Decode the JOSE header without verifying, to read the `kid`. */

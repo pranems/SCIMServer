@@ -14,6 +14,8 @@
 | EP-06 | Test harness | Low | Mermaid grammar could not resolve `jsdom` and render skipped because the fresh worktree lacked root `node_modules`. | Worktrees do not contain ignored dependencies. | Linked the validated master root dependency tree and reran 714/714 parse/render in both themes. | Docs gate | Worktree setup check |
 | EP-07 | Documentation coupling | Medium | The docs gate reported four stale `120 route handlers` claims and one undocumented endpoint. | Adding `GET .../egress-policy` changed the source-derived route inventory. | Updated route count to 121 and added the canonical API entry; content audit passed. | Docs content gate | Same gate immediately after route creation |
 | EP-08 | Documentation drift | Medium | The operator guide advertised `JwksCacheMaxAgeMs` server default as 600000 while runtime has enforced 86400000. | A historical default was copied into prose and was not generated from the policy source. | Corrected the guide to 86400000 and documented that the effective API/runtime is authoritative. | Narrative docs audit | Source-derived default table |
+| EP-09 | Runtime security/parity | High | Two endpoints sharing one JWKS URI could display different effective policies while the stricter endpoint reused keys cached under the lenient endpoint's TTL and key-count cap. | Cache, single-flight, stale fallback, refresh, and unknown-kid state were keyed only by URI, although all 11 controls are endpoint-specific. | Partitioned all cache behavior by URI plus the complete effective policy fingerprint; redirect resolution remains safely shared by URI. Cross-endpoint RED tests proved the stricter TTL skipped its refetch and `maxKeys:1` accepted two keys before the fix; both pass after. | Independent pre-PR review + focused RED | Two-policy shared-URI unit test |
+| EP-10 | Tooling friction | Low | `npm run docs:patterns` failed because no such package script exists. | The pre-push gate invokes `node scripts/check-patterns-pie.mjs` directly; its display name was mistaken for an npm alias. | Ran the actual checker, which correctly required the Category F and total-count updates. | Docs consolidation | Read the pre-push gate command before invoking it |
 
 ## Prevention
 
@@ -24,15 +26,16 @@
 - Inspect the owning merge/write boundary before creating a second management route.
 - Run content audits after adding any controller route, and derive operator default tables from the policy source where practical.
 - Review plain-source file creation for accidental diff markers before compiling.
+- Any endpoint-specific policy applied to shared runtime state must participate in that state's identity; a URI alone is not a sufficient cache or single-flight key.
 
 ## Design and architecture disposition
 
-Applied: one egress specification drives the read model, and the existing endpoint PATCH remains the sole settings write surface. No policy DSL or separate persistence abstraction was added.
+Applied: one egress specification drives the read model, and the existing endpoint PATCH remains the sole settings write surface. The cache key includes the complete effective policy because two real policy variants can share one URI; redirect resolution stays URI-owned. No policy DSL or separate persistence abstraction was added.
 
 ## Self-improvement disposition
 
-Applied: unit, E2E, live, and browser tests assert effective values, response key allowlists, persisted removal, inherited source, clamping, and measured viewport bounds.
+Applied: unit, E2E, live, and browser tests assert effective values, response key allowlists, persisted removal, inherited source, clamping, and measured viewport bounds. Cross-endpoint shared-URI tests now prove a lenient endpoint cannot weaken a stricter endpoint's cache policy.
 
 ## Provenance and completeness
 
-Reconciled against the full uncompacted session transcript from Unit 4B start through consolidation. The scan covered RED failures, route/reset design changes, test-harness errors, accidental source markers, stale documentation claims, Mermaid dependency setup, full-suite outcomes, and live/browser results. Search echoes and deliberate negative-control failures were discarded. Verified non-issues: all touched files report zero diagnostics; the visual snapshot blob is byte-identical to the index; reset parity passes the six-mode matrix including Prisma E2E; the public read model contains only closed numeric egress fields.
+Reconciled against the full uncompacted session transcript from Unit 4B start through independent pre-PR review. The scan covered RED failures, route/reset design changes, test-harness errors, accidental source markers, stale documentation claims, Mermaid dependency setup, full-suite outcomes, live/browser results, and shared-cache policy identity. Search echoes and deliberate negative-control failures were discarded. Verified non-issues: the committed query module exports the egress hook and invalidates it after endpoint writes; all touched files report zero diagnostics; the visual snapshot blob is byte-identical to the index; reset parity passes the six-mode matrix including Prisma E2E; the public read model contains only closed numeric egress fields.

@@ -21,6 +21,8 @@ flowchart LR
 
 The numerical result is derived from the same `resolveServerEgressDefaults()` and `mergeEgressPolicy()` functions used by `ExternalJwksValidatorService`. The read model cannot advertise a value different from enforcement.
 
+Cache, single-flight, stale fallback, background refresh, and unknown-kid throttling are partitioned by JWKS URI plus the complete effective policy. Two endpoints may trust the same URI without the stricter endpoint inheriting keys fetched under the other endpoint's looser TTL, size, key-count, retry, refresh, or stale limits. Redirect resolution remains shared by URI because it changes only the already-allowlisted network destination, not policy enforcement.
+
 ## API
 
 `GET /scim/admin/endpoints/{endpointId}/egress-policy` returns exactly 11 fields:
@@ -80,7 +82,7 @@ The panel remains within the page at a measured 900 px viewport.
 
 | Layer | Evidence |
 |---|---|
-| Resolver/service/controller unit | 154 focused tests pass |
+| Resolver/service/controller/cache unit | 160 focused API tests plus 80 JWKS/provider tests pass; shared-URI strict-TTL, strict-key-cap, and per-policy refresh negative controls are locked |
 | API E2E | Endpoint override, reset, inherited clamping, and response allowlist pass |
 | Web Vitest | 99 focused settings and Connect tests; 1,538 full coverage tests pass |
 | Playwright | 1/1 real Edit/Save/Cancel/Reset journey with 900 px bounds |

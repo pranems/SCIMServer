@@ -439,6 +439,18 @@ Origin: v0.55.24 endpoint auth UX review. Connect rendered and mutated flat `pro
 
 This is the configuration-control form of R10: persistence success is not effective-behavior correctness.
 
+### R12. Policy-sensitive shared state must include policy in its identity (CRITICAL - added 2026-09-24)
+
+Origin: v0.55.32 effective WIF/JWKS policy review. The JWKS cache, single-flight map, stale fallback, background refresh, and unknown-kid throttle were keyed only by `jwksUri`, while 11 endpoint-level settings changed whether cached/fetched state was admissible. Two endpoints could share one URI; a lenient endpoint could cache two keys for 24 hours, then a stricter endpoint configured for one key or a 60-second TTL would reuse that state and silently bypass its own displayed policy.
+
+1. If tenant-, endpoint-, user-, or request-scoped policy changes the admissibility, lifetime, capacity, retry, refresh, stale, or security behavior of shared state, every such policy dimension MUST participate in cache, memoization, single-flight, throttle, and stale-fallback identity.
+2. Sharing a resource identifier such as URL, issuer, file path, or database key is not enough to share derived state when callers have different effective policies.
+3. State that is genuinely policy-independent may remain shared, but the code and tests must name why. Example: a revalidated JWKS redirect target is URI-owned; fetched key acceptance is policy-owned.
+4. Tests MUST use at least two callers with the same resource identity and conflicting policies. Include one strict-after-lenient case; same-policy tests cannot detect cross-policy leakage.
+5. A displayed effective policy is not authoritative until runtime tests prove another caller cannot weaken it through pre-populated shared state.
+
+Reference pattern: PF-3 in [docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md).
+
 ## Design & Architecture Self-Improvement Gate (CRITICAL - added 2026-07-23)
 
 Origin: 2026-07-23 operator request during the X12 auth-source refactoring analysis - "with all changes have a self improving step check gate for design and architecture as well remember this." This is the design/architecture sibling of the R7 self-improvement step (which is scoped to tests/gates) and the operationalized, mandatory-per-change form of the Stage 3c.1 `codeReviewSelfAudit` prompt. It exists because the class of drift it catches - a thin orchestrator (guard/controller/service) silently accreting per-method or per-case logic until it is a god-class - does NOT surface in a correctness-only gate and is only found by an explicit structural look. Reference analysis + the full gate definition with Mermaid: [docs/auth/AUTH_SOURCE_REFACTORING_ANALYSIS.md](docs/auth/AUTH_SOURCE_REFACTORING_ANALYSIS.md) Section 7; the generalizable pattern lives in [docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md](docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md).
