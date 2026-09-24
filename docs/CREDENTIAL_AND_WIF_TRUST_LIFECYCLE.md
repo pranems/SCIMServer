@@ -1,6 +1,6 @@
 # Credential and WIF trust lifecycle
 
-> **Status:** Consolidated locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.30`
+> **Status:** Merged and verified on dev - **Last verified:** 2026-09-24 - **Product version:** `0.55.30`
 
 ## Purpose
 
@@ -72,4 +72,4 @@ The UI calls the explicit deactivate route. The historical DELETE-deactivate rou
 | Local live | 1,516/1,516 pass; lifecycle section T1-T13 passes |
 | Parity and static | All six modes, API/web builds, lint, route budgets, docs, and 712 Mermaid renders pass |
 
-Full consolidation, PR, merge, and dev deployment remain pending. Canary and customer prod are unchanged.
+PR #171 merged as `524906d0`. Dev revision `scimserver-dev--v524906d0` serves v0.55.30 at 100% traffic. Dev live passed 1,516/1,516 and Playwright passed 238 with 4 intentional skips. Endpoint integrity is 60 -> 60 with no missing IDs; revision hygiene retains two active revisions. Canary and customer prod are unchanged.
