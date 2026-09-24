@@ -95,6 +95,20 @@ test('custom ResourceType lifecycle appears in Activity and shared Logs filters'
     return body.activities?.map((activity) => activity.resourceType) ?? [];
   }, { token: E2E_TOKEN, id: endpointId }), { timeout: 30_000 }).toContain('Device');
 
+  await expect.poll(async () => page.evaluate(async ({ token, id }) => {
+    const headers = { Authorization: `Bearer ${token}` };
+    await fetch('/scim/admin/logs/flush', { method: 'POST', headers });
+    const response = await fetch(
+      `/scim/admin/logs?endpointId=${id}&urlContains=Devices&method=PATCH&status=200&pageSize=100`,
+      { headers },
+    );
+    if (!response.ok) return false;
+    const body = await response.json() as { items?: Array<{ method?: string; url?: string; status?: number }> };
+    return (body.items ?? []).some((row) =>
+      row.method === 'PATCH' && row.status === 200 && row.url?.includes('/Devices/'),
+    );
+  }, { token: E2E_TOKEN, id: endpointId }), { timeout: 30_000 }).toBe(true);
+
   await page.goto(`/endpoints/${endpointId}/activity?type=resource&search=Devices&page=1`);
   await expect(page.getByTestId('activity-list')).toContainText('Device');
   await expect(page.getByTestId('activity-filter-type')).toContainText('resource');

@@ -28,6 +28,9 @@
 | CRO-20 | CI/Docker context | High | Local and pre-push web builds passed, but both GitHub image builds failed to resolve the new shared toolbar. | `.dockerignore` excluded every `**/logs` directory, including the intentional production source directory. | Re-include the source path and run a generalized Docker source-shadow audit in Fast pre-push. |
 | CRO-21 | Test correctness | High | The full Prisma E2E suite returned zero custom lifecycle Logs while InMemory and all focused local checks passed. | The new E2E queried buffered RequestLog rows immediately after DELETE instead of using the repository's durable-log helper. | Use `waitForLogRow()` for POST/PATCH/DELETE; it force-flushes and polls to a deadline. |
 | CRO-22 | Deployment tooling | High | The GHCR workflow succeeded, but Stage 4.3 reported JSON conversion failure and immediately cascaded into pull/import/deploy failures. | `gh run list --json` emitted ANSI cursor-control bytes before JSON in this console. | Normalize ANSI/BOM in `ConvertFrom-GithubCliJson()` before exact-SHA run selection; contract test uses real control bytes. |
+| CRO-23 | Test correctness | Medium | Dev Playwright had 236 passes but failed the Logs refresh contract because no element matched `Filter by URL...`. | The shared toolbar changed placeholder copy while the old router spec remained coupled to it. | Select the accessible `URL contains` searchbox; screenshot proves `Users` persisted after refresh. |
+| CRO-24 | Test correctness | Medium | The first corrected full Playwright run had 237 passes but could not find `logs-status-chip-200`. | The status toggle retained role/name/pressed semantics but the shared toolbar retired its page-specific test ID. | Select the unique accessible button named `200` and assert `aria-pressed`. |
+| CRO-25 | Test correctness | High | The next full Playwright run reached endpoint Logs before the custom PATCH row was durable and rendered the correct filtered empty state. | The browser fixture asserted Activity durability, then assumed RequestLog durability without force-flushing/polling the exact row. | Poll the admin Logs API with force-flush until the endpoint/method/status/path row exists before opening Logs. |
 
 ## Detailed Findings
 
@@ -175,6 +178,33 @@
 - **Fix:** Add `ConvertFrom-GithubCliJson()` in the workflow-run helper, strip ANSI CSI sequences and a leading BOM, then parse. Route Stage 4.3 through that adapter.
 - **Why it works:** The selector receives pure JSON while retaining exact SHA and dispatch-time discrimination.
 - **Prevention:** The workflow selector contract includes real cursor-hide/show bytes and passes 10/10.
+
+### CRO-23 - Router test coupled behavior to placeholder copy
+
+- **Detection:** Dev pipeline Stage 5.3 and inspected failure screenshot.
+- **Earliest capable gate:** Focused Playwright against the exact shared toolbar.
+- **Escape delta:** Dev Playwright; the feature browser spec used stable test IDs, but the older router contract still searched obsolete text.
+- **Fix:** Resolve the searchbox by role and accessible name `URL contains` before and after hard reload.
+- **Why it works:** The assertion proves URL-to-control state restoration through the user-facing accessibility contract while placeholder copy and Fluent internals can change independently.
+- **Prevention:** Interaction and state-restoration specs prefer stable accessible roles/names; placeholder queries are reserved for tests whose outcome is the placeholder wording itself.
+
+### CRO-24 - Filter affordance test coupled semantics to an internal ID
+
+- **Detection:** Full Playwright rerun after CRO-23 was fixed, plus inspected screenshot.
+- **Earliest capable gate:** Focused shared-toolbar Playwright after extraction.
+- **Escape delta:** The status toggle visibly rendered and remained keyboard/ARIA-correct; only its old page-specific test ID disappeared.
+- **Fix:** Resolve the exact accessible button name `200`, then retain the original role and `aria-pressed` assertions.
+- **Why it works:** The test proves the actual operator/a11y affordance without coupling to component ownership or DOM-specific IDs.
+- **Prevention:** Accessibility-behavior tests select by role/name first and assert the semantic attribute; IDs are for otherwise ambiguous application identity, not familiar controls.
+
+### CRO-25 - Browser lifecycle assumed RequestLog durability
+
+- **Detection:** Full dev Playwright rerun and inspected filtered-empty-state screenshot.
+- **Earliest capable gate:** The custom-resource browser spec against a Prisma-backed deployment.
+- **Escape delta:** Local InMemory browser proof passed because its log writes are synchronous; dev correctly exposed the asynchronous buffer.
+- **Fix:** Before navigating to Logs, repeatedly call the admin force-flush endpoint and query the exact endpoint, URL, PATCH method, and 200 status until the row exists or the 30-second deadline expires.
+- **Why it works:** Both endpoint and global Logs open only after their shared backend query can return the asserted lifecycle row.
+- **Prevention:** Browser journeys that depend on newly written request logs use the same force-flush/poll discipline as API E2E, proving the exact row rather than waiting a fixed time.
 
 ## Self-Improvement Dispositions
 
