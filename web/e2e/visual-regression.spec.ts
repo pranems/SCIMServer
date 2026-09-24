@@ -108,8 +108,8 @@ const SETTINGS_LIVE_SELECTORS = [
 
 const ENDPOINT_DETAIL_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
-  '[data-testid="endpoint-detail-page"] > div:nth-of-type(1)',
-  '[data-testid="endpoint-detail-page"] > div:nth-of-type(2)',
+  '[data-testid="endpoint-detail-page"] > div:has([data-testid="endpoint-edit-button"])',
+  '[data-testid="endpoint-detail-page"] > div:has([data-testid="endpoint-scim-base-path"])',
   // The OverviewTab renders live, per-request-drifting content that a fullPage
   // snapshot against a real dev server can never match byte-for-byte: the KPI
   // stat cards show live user/group/credential/flag counts, and the Recent
@@ -340,6 +340,10 @@ test.describe('Phase H3 - Visual regression baselines', () => {
       await page.waitForLoadState('networkidle');
       await page.getByRole('tab', { name: /users/i }).click();
       await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('endpoint-detail-page')).toBeVisible();
+      await expect(page.getByTestId('endpoint-edit-button')).toBeVisible();
+      await expect(page.getByRole('tab', { name: /users/i })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByTestId('users-tab')).toBeVisible();
       await expect(page).toHaveScreenshot('endpoint-detail-users.png', {
         ...SNAPSHOT_OPTIONS,
         mask: locatorsFor(page, [
