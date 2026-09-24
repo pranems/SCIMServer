@@ -100,9 +100,14 @@ test.describe('Endpoint contextual settings', () => {
 
     await page.getByTestId('credentials-method-tab-wif').click();
     await expect(page.getByTestId('connect-related-settings-wif')).toBeVisible();
-    await page.getByTestId('connect-related-settings-wif').getByRole('button').click();
+    await page
+      .getByTestId('connect-related-settings-wif')
+      .getByRole('button', { name: /WIF trust and JWKS settings/i })
+      .click();
     await expect(page.getByTestId('connect-related-settings-wif-MaxActiveWifTrusts')).toBeVisible();
-    await expect(page.getByTestId('connect-related-settings-wif-JwksMaxKeys')).toBeVisible();
+    await expect(
+      page.getByTestId('connect-related-settings-wif-effective-JwksMaxKeys'),
+    ).toContainText('Effective:');
   });
 
   test('Connect follows an authoritative authentication-method entry and disables the flat switch', async ({ page }) => {

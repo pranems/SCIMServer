@@ -36,11 +36,11 @@ function scratch(docs, manifestDocs) {
   const root = mkdtempSync(join(tmpdir(), 'doccontent-'));
   mkdirSync(join(root, 'docs'), { recursive: true });
   for (const [name, body] of Object.entries(docs)) {
-    writeFileSync(join(root, 'docs', name), body, 'utf8');
+    writeFileSync(name === 'README.md' ? join(root, name) : join(root, 'docs', name), body, 'utf8');
   }
   writeFileSync(
     join(root, 'docs', '.doc-manifest.json'),
-    JSON.stringify({ docs: manifestDocs.map((d) => ({ path: `docs/${d}`, sources: [], maxAgeDays: 90 })) }, null, 2),
+    JSON.stringify({ docs: manifestDocs.map((d) => ({ path: d === 'README.md' ? d : `docs/${d}`, sources: [], maxAgeDays: 90 })) }, null, 2),
   );
   return root;
 }
@@ -67,6 +67,7 @@ const BASE_TRUTH = {
   reasonCodes: ['bearer_invalid'],
   webPages: [],
   webRoutePaths: [],
+  productVersion: '0.55.32',
 };
 
 const roots = [];
@@ -137,6 +138,43 @@ await run(
   '[C11]',
 );
 
+await run(
+  'C13 stale README version badge',
+  { 'README.md': '[![Version](https://img.shields.io/badge/version-0.55.31-blue)]()' },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
+await run(
+  'C13 missing README version badge',
+  { 'README.md': '# Product\n\nNo badge here.' },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
+await run(
+  'C13 malformed README version badge',
+  { 'README.md': '[![Version](https://img.shields.io/badge/version-latest-blue)]()' },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
+await run(
+  'C13 duplicate README version badges',
+  {
+    'README.md': [
+      '[![Version](https://img.shields.io/badge/version-0.55.32-blue)]()',
+      '[![Version](https://img.shields.io/badge/version-0.55.32-green)]()',
+    ].join('\n'),
+  },
+  ['README.md'],
+  {},
+  '[C13]',
+);
+
 console.log('\n=== positive controls: each check must NOT fire ===');
 
 await run(
@@ -154,6 +192,15 @@ await run(
   ['A.md'],
   {},
   '[C11]',
+  false,
+);
+
+await run(
+  'C13 matching README version badge',
+  { 'README.md': '[![Version](https://img.shields.io/badge/version-0.55.32-blue)]()' },
+  ['README.md'],
+  {},
+  '[C13]',
   false,
 );
 

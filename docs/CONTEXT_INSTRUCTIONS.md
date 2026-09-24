@@ -18,17 +18,19 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The v0.55.32 effective WIF/JWKS egress rollback unit is consolidated locally on
-`feat/effective-egress-v05532`. An endpoint admin GET and the Connect WIF panel
+The v0.55.32 effective WIF/JWKS egress rollback unit is merged and verified on
+dev. An endpoint admin GET and the Connect WIF panel
 publish all 11 runtime values with configured override, source, units, bounds,
 and clamping. Edit/Save/Cancel/Reset-to-inherit use endpoint PATCH with explicit
 null-as-unset semantics while preserving sibling settings. Evidence so far is
 API unit 5,170/5,170, API E2E 1,529/1,529, web 1,538/1,538, focused API 160/160,
-JWKS/provider/wiring 90/90, focused web 99/99, Playwright 1/1, live 1,524/1,524,
-and all six modes. Shared JWKS cache and prewarm state are partitioned by URI
+JWKS/provider/wiring 90/90, focused web 99/99, dev live 1,524/1,524, final dev
+Playwright 242 passed / 4 skipped / 0 failed, and all six modes. Shared JWKS cache and prewarm state are partitioned by URI
 plus the complete effective policy so a lenient endpoint cannot weaken a
-stricter endpoint; redirect memory is bounded and zero TTL is exact. PR,
-merge, and dev deployment remain pending. Canary and customer prod are unchanged.
+stricter endpoint; redirect memory is bounded and zero TTL is exact. PR #175
+merged as `566ebd45`; dev revision `scimserver-dev--v566ebd45` serves v0.55.32
+at 100% with all 60 endpoint IDs preserved and two revisions retained. Canary
+and customer prod are unchanged.
 
 The v0.55.31 context-preserving navigation rollback unit is merged and verified
 on dev. Back uses in-app router history with safe direct-link fallbacks. Connect
