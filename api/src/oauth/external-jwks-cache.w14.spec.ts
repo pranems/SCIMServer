@@ -239,6 +239,18 @@ describe('W1.4 - Entra-aligned JWKS cache', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('W1.4-T7a: zero TTL never reuses a same-millisecond cache entry', async () => {
+    const key = await makeRsaKey('kid-1');
+    const state = { jwks: { keys: [key.jwk] } };
+    const fetchMock = makeFetch(state);
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+    const token = await signRs256(key.privateKey, 'kid-1', { iss: 'x' });
+
+    await svc.verify(token, URI, { cacheMaxAgeMs: 0 });
+    await svc.verify(token, URI, { cacheMaxAgeMs: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('W1.4-T7b: a stricter endpoint TTL refetches a shared URI cached by a lenient endpoint', async () => {
     const key = await makeRsaKey('kid-1');
     const state = { jwks: { keys: [key.jwk] } };

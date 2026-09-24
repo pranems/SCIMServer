@@ -4,6 +4,7 @@ import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 import { JwksHostAllowlistService } from './jwks-host-allowlist.service';
 import {
+  EGRESS_POLICY_BOUNDS,
   resolveServerEgressDefaults,
   mergeEgressPolicy,
   type EgressPolicy,
@@ -240,9 +241,13 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
    * at boot, and an IdP that is unreachable at that moment must not prevent the
    * process from starting. The URI is simply left cold and fetched on first use.
    */
-  async prewarm(jwksUri: string): Promise<boolean> {
+  async prewarm(
+    jwksUri: string,
+    egressOverrides?: EgressPolicyOverrides,
+  ): Promise<boolean> {
     try {
-      await this.fetchJwks(jwksUri, this.serverEgress);
+      const policy = mergeEgressPolicy(this.serverEgress, egressOverrides);
+      await this.fetchJwks(jwksUri, policy);
       this.logger.debug(LogCategory.AUTH, 'JWKS prewarm succeeded', { jwksUri });
       return true;
     } catch (err) {
@@ -605,6 +610,8 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
     let current = remembered ?? jwksUri;
     if (remembered) {
       this.assertJwksUriAllowed(current);
+      this.resolvedUri.delete(jwksUri);
+      this.resolvedUri.set(jwksUri, remembered);
     }
     for (let hop = 0; hop <= MAX_JWKS_REDIRECTS; hop++) {
       const res = await doFetch(current, {
@@ -635,7 +642,7 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
       }
       // W1.3 - remember where this URI actually resolved to (only when it moved).
       if (current !== jwksUri) {
-        this.resolvedUri.set(jwksUri, current);
+        this.rememberResolvedUri(jwksUri, current);
       }
       // W1.5 - byte cap + key-count cap before the body is trusted.
       const keys = await this.readKeySet(res, policy, jwksUri);
@@ -654,7 +661,7 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
   private getFreshCached(cacheKey: string): unknown {
     const cached = this.cache.get(cacheKey);
     if (!cached) return undefined;
-    if (Date.now() > cached.expiresAt) return undefined;
+    if (Date.now() >= cached.expiresAt) return undefined;
     return cached.keys;
   }
 
@@ -694,6 +701,16 @@ export class ExternalJwksValidatorService implements OnModuleInit, OnModuleDestr
       policy.unknownKidMinIntervalMs,
       policy.staleIfErrorMs,
     ]);
+  }
+
+  private rememberResolvedUri(jwksUri: string, resolved: string): void {
+    this.resolvedUri.delete(jwksUri);
+    while (this.resolvedUri.size >= EGRESS_POLICY_BOUNDS.maxCacheEntries.max) {
+      const oldest = this.resolvedUri.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.resolvedUri.delete(oldest);
+    }
+    this.resolvedUri.set(jwksUri, resolved);
   }
 
   private enforceCacheCapacity(

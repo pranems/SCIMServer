@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
 import { exportJWK, SignJWT, importJWK } from 'jose';
 import { ExternalJwksValidatorService } from './external-jwks-validator.service';
+import { EGRESS_POLICY_BOUNDS } from './egress-policy';
 
 /**
  * Q2 - external JWKS validator unit tests.
@@ -237,9 +238,43 @@ describe('ExternalJwksValidatorService - runtime egress robustness', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('https://login.microsoftonline.com/keys');
   });
 
-  // `getFreshCached` treats an entry as fresh while `elapsed <= maxAge`, so with
-  // maxAge=0 a second call in the SAME millisecond is still a cache hit. These
-  // W1.3 tests need a genuinely cold second fetch, so they let a few ms pass.
+  it('G2: remembered redirect targets stay within the global policy bound', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(redirect('https://login.microsoftonline.com/keys'))
+      .mockResolvedValueOnce(ok(fx.jwks));
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+    const redirects = (svc as unknown as { resolvedUri: Map<string, string> }).resolvedUri;
+    for (let index = 0; index < EGRESS_POLICY_BOUNDS.maxCacheEntries.max; index += 1) {
+      redirects.set(`https://idp.example.com/old-${index}`, 'https://login.microsoftonline.com/keys');
+    }
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+
+    await svc.verify(token, 'https://idp.example.com/new');
+
+    expect(redirects.size).toBeLessThanOrEqual(EGRESS_POLICY_BOUNDS.maxCacheEntries.max);
+  });
+
+  it('W1.2: endpoint-policy prewarm makes the matching first verify a cache hit', async () => {
+    const fx = await makeRsaKey('kid-1');
+    const fetchMock = jest.fn().mockResolvedValue(ok(fx.jwks));
+    const svc = new ExternalJwksValidatorService(makeConfig(), logger, fetchMock as any);
+    const token = await signRs256(fx.privateKey, 'kid-1', { iss: 'a' });
+    const policy = { cacheMaxAgeMs: 60_000 };
+
+    await (svc.prewarm as unknown as (uri: string, overrides: typeof policy) => Promise<boolean>)(
+      'https://idp.example.com/keys',
+      policy,
+    );
+    await svc.verify(token, 'https://idp.example.com/keys', policy);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // These W1.3 tests need a genuinely cold second fetch. Letting time advance
+  // keeps their redirect-memory intent explicit even though zero TTL now
+  // expires immediately, including within the same millisecond.
   const elapse = () => new Promise((r) => setTimeout(r, 5));
 
   it('W1.3: the resolved redirect target is remembered, so a later cold fetch skips the hop', async () => {

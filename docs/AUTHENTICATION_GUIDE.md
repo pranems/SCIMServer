@@ -507,7 +507,7 @@ Content-Type: application/json
 
 `GET /scim/admin/settings/jwks-hosts` returns `seed`, `env`, `persisted` and `effective` so you can see where each host came from.
 
-Fetch behaviour is tuned by the 11 WIF/JWKS egress settings shown in the endpoint Connect panel. Cache, single-flight, stale fallback, refresh, and unknown-kid state are isolated by JWKS URI plus the complete effective endpoint policy. Endpoints may share an IdP URI without a lenient endpoint weakening another endpoint's TTL, response/key cap, retry, refresh, or stale posture. The fetch **fails closed**: an unreachable JWKS rejects with `jwks_unreachable` rather than skipping signature verification.
+Fetch behaviour is tuned by the 11 WIF/JWKS egress settings shown in the endpoint Connect panel. Cache, single-flight, stale fallback, refresh, unknown-kid state, and startup prewarm are isolated by JWKS URI plus the complete effective endpoint policy. Endpoints may share an IdP URI without a lenient endpoint weakening another endpoint's TTL, response/key cap, retry, refresh, or stale posture. Redirect memory is bounded, and a zero cache TTL expires immediately. The fetch **fails closed**: an unreachable JWKS rejects with `jwks_unreachable` rather than skipping signature verification.
 
 ---
 
