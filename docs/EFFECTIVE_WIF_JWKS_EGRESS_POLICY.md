@@ -1,6 +1,6 @@
 # Effective WIF/JWKS egress policy
 
-> **Status:** Consolidated locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.32`
+> **Status:** Verified on dev - **Last verified:** 2026-09-24 - **Product version:** `0.55.32`
 
 ## Purpose
 
@@ -89,4 +89,4 @@ The panel remains within the page at a measured 900 px viewport.
 | Local live | 1,524/1,524; new section T1-T8 passes |
 | Builds | API and web production builds pass |
 
-Full consolidation, PR, merge, and dev deployment remain pending. Canary and customer prod are unchanged.
+PR #175 merged as `566ebd45`; v0.55.32 is verified on dev with live 1,524/1,524 and Playwright 242 passed / 4 intentionally skipped / 0 failed. Canary and customer prod are unchanged.

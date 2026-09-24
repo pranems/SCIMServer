@@ -23,6 +23,7 @@
  *   C8  no PHANTOM settings - a doc must not describe a control that does not
  *       exist in the registry (a reader would set it and nothing would happen)
  *   C9  every route handler has a matching path in COMPLETE_API_REFERENCE
+ *   C13 README's visible version badge matches api/package.json
  *
  * Usage:
  *   node scripts/audit-doc-content.mjs            # audit
@@ -55,6 +56,8 @@ const read = (f) => readFileSync(f, 'utf8');
 // ------------------------------------------------------------ ground truth
 export function groundTruth() {
   const t = {};
+
+  t.productVersion = JSON.parse(read(p('api/package.json'))).version;
 
   const ctrls = walk(p('api/src'), (f) => f.endsWith('.controller.ts') && !f.includes('.spec.'));
   let handlers = 0;
@@ -312,6 +315,17 @@ export function audit(truth) {
   // review. Recorded here so the next person does not rebuild it and rediscover
   // the same noise.
 
+  // C13 - the README header version is covered by the freshness audit, but the
+  // visible shields.io badge is a second independent claim. It stayed on
+  // 0.55.31 after 0.55.32 deployed while both docs gates were green.
+  const readme = p('README.md');
+  if (existsSync(readme)) {
+    const badge = read(readme).match(/shields\.io\/badge\/version-(\d+\.\d+\.\d+)-/i);
+    if (badge && badge[1] !== truth.productVersion) {
+      failures.push(`[C13] README.md: version badge claims ${badge[1]}, product is ${truth.productVersion}`);
+    }
+  }
+
   return { failures, warnings, docs };
 }
 
@@ -333,6 +347,7 @@ if (isMain) {
   console.log(`presets          : ${truth.presetCount} [${truth.presets.join(', ')}]`);
   console.log(`auth reason codes: ${truth.reasonCodes.length}`);
   console.log(`web pages        : ${truth.webPages.length}`);
+  console.log(`product version  : ${truth.productVersion}`);
   console.log('');
 
   const { failures, warnings, docs } = audit(truth);
