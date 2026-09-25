@@ -28,8 +28,10 @@ exports; WIF remains secretless. Public discovery, broad endpoint projections,
 RequestLog, Workbench history, and structured logs do not persist plaintext
 credentials. New `once` writes are rejected; legacy purged values require
 rotation. Evidence is API unit 5,192/5,192, API E2E 1,533/1,533, web
-1,544/1,544, local/dev live 1,532/1,532, all six modes, and final dev
-Playwright 241 passed / 4 skipped / 0 failed. Builds, lint, budgets, migration,
+1,544/1,544, local/dev live 1,532/1,532, and all four executable
+persistence/web lanes. The two Prisma lanes were skipped because `DATABASE_URL`
+was unavailable. Final dev Playwright passed 241 with 4 intentional skips and
+0 failures. Builds, lint, budgets, migration,
 docs, Mermaid, and exact-tip CodeQL are green. PR #177 merged as `6565dc60`;
 dev revision `scimserver-dev--v6565dc60` serves v0.55.33 at 100% with all 60
 endpoint IDs preserved and two active revisions retained. Canary and customer
