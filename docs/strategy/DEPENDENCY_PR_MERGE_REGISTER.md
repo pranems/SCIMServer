@@ -1,6 +1,6 @@
 # Dependency PR Merge Register
 
-**Last reviewed:** 2026-07-30
+**Last reviewed:** 2026-09-25
 **Owner:** @pranems
 
 Why this file exists: on 2026-07-30 three Dependabot PRs looked perfectly
@@ -72,30 +72,23 @@ Merge only when this returns `True` for **every** package the PR bumps.
 | #140 | npm removed from runtime image, `fast-uri` 3.1.4 | 2026-07-30 | Took Trivy 7 findings -> 0 |
 | #139 | log-id 500, audit-batch-loss vector, unreachable fallback | 2026-07-30 | Security |
 | #138 | GitHub Actions bumps (8) | 2026-07-30 | No npm involvement, so the quarantine does not apply. SHA pinning preserved with `# vX.Y.Z` comments |
+| #182 | Hono override pin remediation | 2026-09-25 | Public-runner lockfiles; 12 findings -> 0; both targets older than 7 days |
 
-### Postponed - quarantined versions
+### Current open dependency work
 
-All three are **correct changes blocked by timing, not by defect**. None should
-be closed. Re-check with the snippet above; they become mergeable as each
-version ages past 7 days.
-
-| PR | Ecosystem | Blocking package(s) not served by the proxy |
+| PR | Ecosystem | Status |
 |---|---|---|
-| **#128** | api (dev) | `@types/node` 26.1.2 |
-| **#136** | api | `@prisma/client` / `prisma` / `@prisma/adapter-pg` 7.9.1, `eslint` 10.8.0 |
-| **#137** | web | `@fluentui/react-icons` 2.0.334, `@playwright/test` 1.62.0, `recharts` 3.10.1 |
+| **#154** | web | **Postponed.** `@fluentui/react-components@9.74.8` was only 4.1 days old on 2026-09-25. `@tanstack/react-query@5.103.2` had no verifiable publish-time response through the managed feed, so its status is unknown rather than clean. Re-check both; do not merge on green public CI alone. |
+| **#183** | api | **Postponed.** Eleven proposed targets are at least 7.3 days old, but `@typescript-eslint/eslint-plugin@8.70.1`, `@typescript-eslint/parser@8.70.1`, `typescript-eslint@8.70.1`, `eslint@10.11.0`, and `supertest@7.3.0` had no verifiable publish-time response through the managed feed. Rebase after final master and re-check all five; unknown is not clean. |
+| **#158** | GitHub Actions | Eligible: no npm quarantine applies. Replaced by a current-master branch that keeps every action SHA-pinned and updates the canonical infrastructure doc in the same change. |
 
-Everything else in #136 and #137 is already outside the window (8.5 to 24.6
-days old) and would merge cleanly - the PRs are grouped, so one quarantined
-member holds the whole group.
+### Closed or replaced
 
-#### Additional note on #136
-
-It bumps `@prisma/client` 7.8.0 -> 7.9.1. `fast-uri` is pinned via `overrides`
-to 3.1.4 precisely because it arrives through the Prisma dependency chain. When
-#136 is eventually merged, **re-check whether the override is still needed** -
-if Prisma 7.9.1 already resolves `fast-uri` at or above 3.1.4, the override
-becomes dead weight and should be dropped rather than left to rot.
+| PR | Disposition |
+|---|---|
+| **#128** | Closed. Quarantine elapsed, but Node 26 typings are incompatible with the supported Node 24 runtime line. A future change must align typings to Node 24 instead. |
+| **#136 / #137** | Closed by Dependabot in August; superseded by later grouped updates. |
+| **#152** | Closed by Dependabot as no longer needed after the v0.55.35 security and lockfile refresh. |
 
 ---
 

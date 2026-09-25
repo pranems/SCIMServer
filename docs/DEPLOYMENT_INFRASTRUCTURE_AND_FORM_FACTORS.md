@@ -512,6 +512,14 @@ flowchart LR
 
 **Digest pinning.** [scripts/promote-to-prod.ps1](../scripts/promote-to-prod.ps1) resolves `docker buildx imagetools inspect ghcr.io/pranems/scimserver:<tag>`, parses `^Digest:\s+(sha256:[0-9a-f]+)`, and deploys `ghcr.io/pranems/scimserver@<digest>`. It refuses to promote if the digest cannot be parsed. Both tenant-09 estates are digest-pinned to `sha256:435c6dc2...f1d2` (v0.55.6) as of 2026-08-12.
 
+**Workflow action baseline (2026-09-25).** Every `uses:` reference remains pinned to a complete
+commit SHA with its release tag in a comment. The current image/security toolchain uses
+`actions/checkout` 7.0.1, `docker/login-action` 4.6.0, `docker/setup-buildx-action` 4.4.1,
+`docker/build-push-action` 7.4.0, and `github/codeql-action` 4.38.1. The refresh changes no workflow
+inputs or permissions. Its own pull-request execution is the compatibility gate: checkout and
+Buildx must initialize, both image jobs must build and push, Trivy must scan the resulting digest,
+and CodeQL init/analyze must complete under the new pinned actions.
+
 **Registry inventory at capture.** ACR `acrscimsrv09` (RG `scimserver-prod`) exists with SKU `Basic`, `adminUserEnabled: **false**`, `publicNetworkAccess: Enabled`, and holds the `scimserver` repository with tags `0.55.1`, `0.55.3`, `0.55.5`. **It is not on the serving path.** Both tenant-09 apps pull anonymously from GHCR and carry **no `registries[]` entry at all**, which is the same pattern customer prod has always used.
 
 This was a deliberate simplification made during the 2026-08-12 tenant migration. Wiring ACR back up requires an `AcrPull` role assignment for each app's managed identity, and the deployment service principal is scoped as **Contributor**, which does not include `Microsoft.Authorization/roleAssignments/write`. Rather than widen the deployment principal to Owner or User Access Administrator - a permanent privilege increase to solve a one-time setup problem - the estate uses the public registry that the customer-facing estate already depends on. That also removes the ACR admin-user credential that gap **G6** used to describe, and the misleading `registries[]` mapping that gap **G7** used to describe. The cost is a dependency on GHCR availability and public-image exposure, both of which were already true for calmsand.
