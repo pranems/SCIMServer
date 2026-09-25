@@ -21,9 +21,6 @@ import React from 'react';
 import {
   makeStyles,
   tokens,
-  Combobox,
-  Option,
-  Field,
   Button,
   Card,
   TabList,
@@ -35,7 +32,8 @@ import {
   MessageBarBody,
   MessageBarTitle,
 } from '@fluentui/react-components';
-import { Add24Regular, Person24Regular, People24Regular } from '@fluentui/react-icons';
+import { Add24Regular, Open24Regular, Person24Regular, People24Regular } from '@fluentui/react-icons';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   useCreateGroup,
   useCreateResource,
@@ -45,12 +43,14 @@ import {
   useEndpoints,
 } from '../api/queries';
 import { LoadingSkeleton, ScimErrorMessage, CopyableField, CopyableJsonBlock } from '../components/primitives';
+import { EndpointContextSelector } from '../components/endpoints/EndpointContextSelector';
 import { ProfileResourceBodyEditor } from '../resources/ProfileResourceBodyEditor';
 import {
   buildCreatePayload,
   resolveEffectiveResourceShape,
   type EffectiveResourceShape,
 } from '../resources/profile-resource-shape';
+import type { ManualProvisionSearch } from '../routes/search-schemas';
 
 // ─── Styles ───────────────────────────────────────────────────────────
 
@@ -61,6 +61,9 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: 'minmax(360px, 1fr) minmax(320px, 1fr)',
     gap: '16px',
+    '@media (max-width: 720px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    },
   },
   formCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' },
   resultCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' },
@@ -130,9 +133,10 @@ const ManualResourceForm: React.FC<ManualResourceFormProps> = ({
 
 interface ProvisionResultProps {
   result: { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; error: unknown } | null;
+  onOpenResource?: () => void;
 }
 
-const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
+const ProvisionResult: React.FC<ProvisionResultProps> = ({ result, onOpenResource }) => {
   const classes = useStyles();
   if (!result) {
     return (
@@ -169,6 +173,16 @@ const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
         label="Server response"
         data-testid="provision-result-json"
       />
+      {onOpenResource && (
+        <Button
+          appearance="subtle"
+          icon={<Open24Regular />}
+          onClick={onOpenResource}
+          data-testid="provision-open-resource"
+        >
+          Open in endpoint
+        </Button>
+      )}
     </Card>
   );
 };
@@ -177,23 +191,31 @@ const ProvisionResult: React.FC<ProvisionResultProps> = ({ result }) => {
 
 export const ManualProvisionPage: React.FC = () => {
   const classes = useStyles();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as Partial<ManualProvisionSearch>;
   const { data, isLoading, error } = useEndpoints();
-  const [endpointId, setEndpointId] = React.useState('');
-  const [resourceTypeId, setResourceTypeId] = React.useState('User');
+  const endpointId = search.endpointId ?? '';
+  const endpoints = data?.endpoints ?? [];
+  const selectedEndpoint = endpoints.find((endpoint) => endpoint.id === endpointId);
+  const targetEndpointId = selectedEndpoint?.active ? endpointId : '';
+  const requestedResourceTypeId = search.resourceTypeId ?? '';
   const [result, setResult] = React.useState<
     { kind: 'success'; resource: Record<string, unknown> } | { kind: 'error'; error: unknown } | null
   >(null);
 
   // Mutations - always create the hooks (React rule of hooks); they
   // accept '' but we only invoke mutateAsync when endpointId is set.
-  const createUser = useCreateUser(endpointId);
-  const createGroup = useCreateGroup(endpointId);
-  const schemasQuery = useEndpointSchemas(endpointId);
-  const resourceTypesQuery = useEndpointResourceTypes(endpointId);
+  const createUser = useCreateUser(targetEndpointId);
+  const createGroup = useCreateGroup(targetEndpointId);
+  const schemasQuery = useEndpointSchemas(targetEndpointId);
+  const resourceTypesQuery = useEndpointResourceTypes(targetEndpointId);
   const resourceTypes = resourceTypesQuery.data?.Resources ?? [];
+  const resourceTypeId = resourceTypes.some((resourceType) => resourceType.id === requestedResourceTypeId)
+    ? requestedResourceTypeId
+    : resourceTypes[0]?.id ?? '';
   const activeResourceType = resourceTypes.find((resourceType) =>
     resourceType.id === resourceTypeId || resourceType.name === resourceTypeId);
-  const createResource = useCreateResource(endpointId, activeResourceType?.endpoint ?? '');
+  const createResource = useCreateResource(targetEndpointId, activeResourceType?.endpoint ?? '');
   const shape = React.useMemo(() => {
     if (!activeResourceType || !schemasQuery.data) return undefined;
     try {
@@ -204,11 +226,8 @@ export const ManualProvisionPage: React.FC = () => {
   }, [activeResourceType, schemasQuery.data]);
 
   React.useEffect(() => {
-    if (resourceTypes.length === 0) return;
-    if (!resourceTypes.some((resourceType) => resourceType.id === resourceTypeId)) {
-      setResourceTypeId(resourceTypes[0].id);
-    }
-  }, [resourceTypeId, resourceTypes]);
+    setResult(null);
+  }, [endpointId, resourceTypeId]);
 
   if (isLoading) {
     // G1 - skeleton mirrors the page (header + endpoint picker + tabs +
@@ -230,15 +249,15 @@ export const ManualProvisionPage: React.FC = () => {
     );
   }
 
-  const endpoints = data.endpoints;
-  const selected = endpoints.find((e) => e.id === endpointId);
-
-  function selectEndpoint(_e: unknown, d: { optionValue?: string }) {
-    if (d.optionValue) {
-      setEndpointId(d.optionValue);
-      setResourceTypeId('');
-      setResult(null);
-    }
+  function selectEndpoint(selectedEndpointId: string) {
+    void navigate({
+      to: '/manual-provision',
+      search: (previous) => ({
+        ...previous,
+        endpointId: selectedEndpointId,
+        resourceTypeId: undefined,
+      }),
+    });
   }
 
   async function submitResource(body: Record<string, unknown>) {
@@ -263,35 +282,60 @@ export const ManualProvisionPage: React.FC = () => {
       ? createGroup.isPending
       : createResource.isPending;
 
+    const openCreatedResource = (): void => {
+      if (result?.kind !== 'success' || !targetEndpointId || !activeResourceType) return;
+      const resourceId = typeof result.resource.id === 'string' ? result.resource.id : undefined;
+      if (activeResourceType.name === 'User') {
+        void navigate({
+          to: '/endpoints/$endpointId/users',
+          params: { endpointId: targetEndpointId },
+          search: { page: 1, detail: resourceId },
+        });
+        return;
+      }
+      if (activeResourceType.name === 'Group') {
+        void navigate({
+          to: '/endpoints/$endpointId/groups',
+          params: { endpointId: targetEndpointId },
+          search: { page: 1, detail: resourceId },
+        });
+        return;
+      }
+      void navigate({
+        to: '/endpoints/$endpointId/resources/$resourceTypeId',
+        params: { endpointId: targetEndpointId, resourceTypeId: activeResourceType.id },
+      });
+    };
+
   return (
     <div className={classes.root} data-testid="manual-provision-page">
       <Subtitle1>Manual Provisioning</Subtitle1>
       <Caption1>
-        Create any SCIM resource declared by the selected endpoint profile.
+        Cross-endpoint creation workspace for choosing a target first, then creating any resource
+        declared by its profile. When you are already working inside one endpoint, use that
+        endpoint&apos;s Users, Groups, or custom resource tab instead.
       </Caption1>
 
       <Card className={classes.pickerCard}>
-        <Field label="Target endpoint" required>
-          <Combobox
-            aria-label="Target endpoint"
-            placeholder={endpoints.length === 0 ? 'No endpoints available' : 'Pick an endpoint'}
-            value={selected ? (selected.displayName ?? selected.name) : ''}
-            selectedOptions={endpointId ? [endpointId] : []}
-            onOptionSelect={selectEndpoint}
-            disabled={endpoints.length === 0}
-          >
-            {endpoints.map((ep) => (
-              <Option key={ep.id} value={ep.id} text={ep.displayName ?? ep.name}>
-                {ep.displayName ?? ep.name}
-              </Option>
-            ))}
-          </Combobox>
-        </Field>
+        <EndpointContextSelector
+          endpoints={endpoints}
+          value={endpointId}
+          onChange={selectEndpoint}
+          label="Target endpoint"
+          purpose="The selected endpoint profile controls available resource types and form fields."
+          placeholder="Pick the endpoint that will own the resource"
+          data-testid="manual-endpoint-context"
+        />
         <TabList
           selectedValue={resourceTypeId}
-          onTabSelect={(_, d) => { setResourceTypeId(String(d.value)); setResult(null); }}
+          onTabSelect={(_, d) => {
+            void navigate({
+              to: '/manual-provision',
+              search: (previous) => ({ ...previous, resourceTypeId: String(d.value) }),
+            });
+          }}
         >
-          {resourceTypes.map((resourceType) => (
+          {targetEndpointId && resourceTypes.map((resourceType) => (
             <Tab
               key={resourceType.id}
               value={resourceType.id}
@@ -307,10 +351,18 @@ export const ManualProvisionPage: React.FC = () => {
         </TabList>
       </Card>
 
-      <div className={classes.body}>
-        {shape ? (
+      <div className={classes.body} data-testid="manual-provision-body">
+        {endpointId && !selectedEndpoint ? (
+          <Card className={classes.formCard} data-testid="manual-provision-stale-endpoint">
+            <Text>The selected endpoint is no longer available. Choose an active target.</Text>
+          </Card>
+        ) : selectedEndpoint && !selectedEndpoint.active ? (
+          <Card className={classes.formCard} data-testid="manual-provision-inactive-endpoint">
+            <Text>This endpoint is inactive. Activate it or choose another target before creating resources.</Text>
+          </Card>
+        ) : shape ? (
           <ManualResourceForm
-            endpointId={endpointId}
+            endpointId={targetEndpointId}
             shape={shape}
             isPending={pending}
             onSubmit={(body) => void submitResource(body)}
@@ -324,7 +376,10 @@ export const ManualProvisionPage: React.FC = () => {
             </Text>
           </Card>
         )}
-        <ProvisionResult result={result} />
+        <ProvisionResult
+          result={result}
+          onOpenResource={result?.kind === 'success' ? openCreatedResource : undefined}
+        />
       </div>
     </div>
   );

@@ -36,12 +36,22 @@ import {
   MessageBarBody,
   MessageBarTitle,
 } from '@fluentui/react-components';
-import { Person24Regular, Delete24Regular } from '@fluentui/react-icons';
+import { Person24Regular, Delete24Regular, PlugConnected24Regular, Key24Regular } from '@fluentui/react-icons';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpoints, useMe, usePatchMe, useDeleteMe } from '../api/queries';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
-import { EmptyState, LoadingSkeleton, EditableField } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, EditableField, CopyableField } from '../components/primitives';
+import { EndpointContextSelector } from '../components/endpoints/EndpointContextSelector';
 import { FormDialog } from '../components/primitives/FormDialog';
 import { ScimApiError } from '../api/scim-error';
+import { decodeJwt } from '../utils/jwt-decode';
+import {
+  TOKEN_CHANGED_EVENT,
+  clearStoredToken,
+  getStoredToken,
+  notifyTokenInvalid,
+} from '../auth/token';
+import type { MeSearch } from '../routes/search-schemas';
 
 const useStyles = makeStyles({
   page: {
@@ -51,23 +61,6 @@ const useStyles = makeStyles({
     maxWidth: '900px',
     margin: '0 auto',
     padding: '24px',
-  },
-  pickerCard: {
-    padding: '12px',
-    cursor: 'pointer',
-    border: `1px solid transparent`,
-    ':hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-    },
-  },
-  pickerCardSelected: {
-    borderColor: tokens.colorBrandStroke1,
-    boxShadow: tokens.shadow4Brand,
-  },
-  pickerGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    gap: '12px',
   },
   profileBody: {
     display: 'flex',
@@ -97,10 +90,32 @@ const useStyles = makeStyles({
 
 export const MeProfilePage: React.FC = () => {
   const classes = useStyles();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as Partial<MeSearch>;
 
   const endpoints = useEndpoints();
-  const [pickedEp, setPickedEp] = useState<string>('');
-  const me = useMe(pickedEp);
+  const pickedEp = search.endpointId ?? '';
+  const setPickedEp = (endpointId: string): void => {
+    void navigate({
+      to: '/me',
+      search: (previous) => ({ ...previous, endpointId }),
+    });
+  };
+  const endpointList = endpoints.data?.endpoints ?? [];
+  const selectedEndpoint = endpointList.find((endpoint) => endpoint.id === pickedEp);
+  const endpointScopeIsValid = Boolean(selectedEndpoint?.active);
+  const [token, setToken] = useState(() => getStoredToken());
+  useEffect(() => {
+    const handleTokenChange = () => setToken(getStoredToken());
+    window.addEventListener(TOKEN_CHANGED_EVENT, handleTokenChange);
+    return () => window.removeEventListener(TOKEN_CHANGED_EVENT, handleTokenChange);
+  }, []);
+  const decodedToken = React.useMemo(() => decodeJwt(token), [token]);
+  const tokenSubject = typeof decodedToken.payload?.sub === 'string'
+    ? decodedToken.payload.sub.trim()
+    : '';
+  const canResolveMe = Boolean(endpointScopeIsValid && decodedToken.isJwt && tokenSubject);
+  const me = useMe(canResolveMe ? pickedEp : '');
   const patchMutation = usePatchMe(pickedEp);
   const deleteMutation = useDeleteMe(pickedEp);
 
@@ -120,7 +135,7 @@ export const MeProfilePage: React.FC = () => {
     }
   }, [me.data]);
 
-  const isOAuthRequiredError =
+  const isNoTargetError =
     me.error instanceof ScimApiError &&
     me.error.status === 404 &&
     me.error.scimType === 'noTarget';
@@ -158,22 +173,19 @@ export const MeProfilePage: React.FC = () => {
     }
   };
 
-  const endpointList = endpoints.data?.endpoints ?? [];
-
   return (
     <div className={classes.page} data-testid="me-profile-page">
-      <Subtitle1>My profile (/Me)</Subtitle1>
+      <Subtitle1>Self-service profile (/Me)</Subtitle1>
 
       <Card className={classes.oauthHintCard}>
         <Caption1>
-          /Me requires an OAuth JWT whose `sub` claim matches a SCIM User`s `userName` on the picked
-          endpoint. With the global shared-secret token in TokenGate, every /Me call returns 404.
-          Switch to a per-endpoint OAuth credential to use this page.
+          Self-service view of the SCIM User identified by this OAuth token. The token subject must
+          match that User&apos;s userName on the selected endpoint. This is not the SCIMServer admin
+          operator&apos;s account profile.
         </Caption1>
       </Card>
 
       <div data-testid="me-endpoint-picker">
-        <Subtitle2>Pick an endpoint</Subtitle2>
         {endpoints.isLoading ? (
           <LoadingSkeleton count={2} height="60px" />
         ) : endpointList.length === 0 ? (
@@ -182,27 +194,15 @@ export const MeProfilePage: React.FC = () => {
             body="Create an endpoint first, then come back to view your /Me."
           />
         ) : (
-          <div className={classes.pickerGrid}>
-            {endpointList.map((ep) => {
-              const selected = ep.id === pickedEp;
-              return (
-                <Card
-                  key={ep.id}
-                  className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                  onClick={() => setPickedEp(ep.id)}
-                  role="button"
-                  aria-pressed={selected}
-                  data-testid={`me-endpoint-option-${ep.id}`}
-                >
-                  <Text weight="semibold">{ep.displayName ?? ep.name}</Text>
-                  <br />
-                  <Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>
-                    {ep.name}
-                  </Caption1>
-                </Card>
-              );
-            })}
-          </div>
+          <EndpointContextSelector
+            endpoints={endpointList}
+            value={pickedEp}
+            onChange={setPickedEp}
+            label="Profile endpoint"
+            purpose="The token subject is resolved independently inside the selected endpoint."
+            placeholder="Select the endpoint that issued this user token"
+            data-testid="me-endpoint-picker-control"
+          />
         )}
       </div>
 
@@ -214,29 +214,94 @@ export const MeProfilePage: React.FC = () => {
         />
       )}
 
-      {pickedEp && me.isLoading && (
+      {pickedEp && !endpoints.isLoading && !selectedEndpoint && (
+        <EmptyState
+          data-testid="me-stale-endpoint"
+          title="Selected endpoint is no longer available"
+          body="Choose an active endpoint before resolving this token subject."
+          actionLabel="Clear endpoint"
+          onAction={() => void navigate({
+            to: '/me',
+            search: (previous) => ({ ...previous, endpointId: undefined }),
+          })}
+        />
+      )}
+
+      {selectedEndpoint && !selectedEndpoint.active && (
+        <EmptyState
+          data-testid="me-inactive-endpoint"
+          title="Selected endpoint is inactive"
+          body="Activate the endpoint or choose another active endpoint before resolving /Me."
+        />
+      )}
+
+      {endpointScopeIsValid && !canResolveMe && (
+        <Card data-testid="me-oauth-preflight">
+          <MessageBar intent="warning">
+            <MessageBarBody>
+              <MessageBarTitle>OAuth user token required</MessageBarTitle>
+              The current token has no readable JWT subject, so it cannot identify a SCIM User.
+              Configure an OAuth client credential on this endpoint, mint a user-subject token,
+              then replace the current token.
+            </MessageBarBody>
+          </MessageBar>
+          <div className={classes.buttonRow}>
+            <Button
+              appearance="subtle"
+              icon={<Key24Regular />}
+              onClick={() => { clearStoredToken(); notifyTokenInvalid(); }}
+            >
+              Change token
+            </Button>
+            <Button
+              appearance="primary"
+              icon={<PlugConnected24Regular />}
+              onClick={() => void navigate({
+                to: '/endpoints/$endpointId/connect',
+                params: { endpointId: pickedEp },
+                search: { method: 'oauth_client' },
+              })}
+            >
+              Open OAuth setup
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {canResolveMe && me.isLoading && (
         <LoadingSkeleton count={4} height="40px" data-testid="me-loading" />
       )}
 
-      {pickedEp && me.isError && (
+      {canResolveMe && me.isError && (
         <div className={classes.profileBody}>
-          <ScimErrorMessage error={me.error} />
-          {isOAuthRequiredError && (
-            <Card data-testid="me-oauth-required-hint">
-              <MessageBar intent="info">
+          {isNoTargetError ? (
+            <Card data-testid="me-subject-not-found">
+              <MessageBar intent="warning">
                 <MessageBarBody>
-                  <MessageBarTitle>OAuth required</MessageBarTitle>
-                  Issue a per-endpoint OAuth credential (Credentials tab on the picked endpoint)
-                  and use the JWT it produces here. The shared admin secret cannot identify a SCIM
-                  user, so /Me cannot resolve.
+                  <MessageBarTitle>No User matches this token subject</MessageBarTitle>
+                  The server verified the token, but the selected endpoint has no User whose
+                  userName equals this subject:
                 </MessageBarBody>
               </MessageBar>
+              <CopyableField value={tokenSubject} monospace data-testid="me-token-subject" />
+              <Button
+                appearance="subtle"
+                onClick={() => void navigate({
+                  to: '/endpoints/$endpointId/users',
+                  params: { endpointId: pickedEp },
+                  search: { page: 1, filter: `userName eq "${tokenSubject.replace(/"/g, '\\"')}"` },
+                })}
+              >
+                Open endpoint Users
+              </Button>
             </Card>
+          ) : (
+            <ScimErrorMessage error={me.error} />
           )}
         </div>
       )}
 
-      {pickedEp && me.data && (
+      {canResolveMe && me.data && (
         <Card data-testid="me-profile-card">
           <div className={classes.profileBody}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

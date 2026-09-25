@@ -31,6 +31,7 @@ import {
 } from '@fluentui/react-components';
 import {
   DocumentSearch24Regular,
+  DataUsage24Regular,
   Open24Regular,
   Open16Regular,
 } from '@fluentui/react-icons';
@@ -62,6 +63,11 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '16px',
     flexWrap: 'wrap',
+  },
+  heading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
   },
   // R5: horizontal-scroll wrapper so a narrow window scrolls instead of
   // clipping; the table stays >= minWidth for readability and expands to
@@ -166,7 +172,7 @@ interface LogRow {
   authCredentialId?: string;
 }
 
-export const LogsPage: React.FC = () => {
+export const LogsPage: React.FC<{ routeSince?: string }> = ({ routeSince }) => {
   const classes = useStyles();
   const search = useSearch({ strict: false }) as Partial<GlobalLogsSearch> & { detail?: string };
   const navigate = useNavigate();
@@ -180,7 +186,8 @@ export const LogsPage: React.FC = () => {
   const method = search.method;
   const hasError = search.hasError;
   const minDurationMs = search.minDurationMs;
-  const since = React.useMemo(() => timeRangeToSince(timeRange), [timeRange]);
+  const derivedSince = React.useMemo(() => timeRangeToSince(timeRange), [timeRange]);
+  const since = routeSince ?? derivedSince;
 
   // Endpoint dropdown source. Loads in parallel; harmless if it 404s
   // (just renders an empty Combobox).
@@ -189,7 +196,7 @@ export const LogsPage: React.FC = () => {
   // X6 - endpointId -> name map so a log row can show the endpoint NAME + a
   // quick-open link, not just the opaque id in the URL.
   const endpointNameById = React.useMemo(
-    () => new Map(endpointOptions.map((e) => [e.id, e.name])),
+    () => new Map(endpointOptions.map((e) => [e.id, e.displayName ?? e.name])),
     [endpointOptions],
   );
 
@@ -268,7 +275,16 @@ export const LogsPage: React.FC = () => {
     });
   };
 
-  const hasFilters = Boolean(urlContains || endpointId || status || timeRange || requestId || method || hasError || minDurationMs !== undefined);
+  const hasFilters = Boolean(
+    urlContains ||
+    endpointId ||
+    status ||
+    timeRange ||
+    requestId ||
+    method ||
+    hasError !== undefined ||
+    minDurationMs !== undefined
+  );
 
   if (error) {
     return (
@@ -281,7 +297,21 @@ export const LogsPage: React.FC = () => {
   return (
     <div className={classes.page} data-testid="global-logs-page">
       <div className={classes.header}>
-        <Subtitle1>Request Logs ({data?.total ?? 0})</Subtitle1>
+        <div className={classes.heading}>
+          <Subtitle1>Request Logs ({data?.total ?? 0})</Subtitle1>
+          <Caption1>
+            Recorded request outcomes across endpoints. Logs answers what happened; Operations
+            shows the resources that exist now.
+          </Caption1>
+        </div>
+        <Button
+          appearance="subtle"
+          icon={<DataUsage24Regular />}
+          onClick={() => void navigate({ to: '/operations' })}
+          data-testid="logs-open-operations"
+        >
+          View current resources
+        </Button>
       </div>
 
       {/* U12 - the standalone auth-diagnostics panel is re-scoped to the

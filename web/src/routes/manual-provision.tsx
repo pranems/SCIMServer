@@ -9,6 +9,7 @@ import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
 import { endpointsQueryOptions } from '../api/queries';
+import { manualProvisionSearchSchema } from './search-schemas';
 
 // Phase K1 - lazy-load ManualProvisionPage into its own chunk.
 const ManualProvisionPage = React.lazy(() =>
@@ -18,6 +19,7 @@ const ManualProvisionPage = React.lazy(() =>
 export const manualProvisionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/manual-provision',
+  validateSearch: (search) => manualProvisionSearchSchema.parse(search),
   component: ManualProvisionPage,
   loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
 });

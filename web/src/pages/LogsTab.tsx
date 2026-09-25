@@ -103,8 +103,8 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const navigate = useNavigate();
   const { data, isLoading, error } = useEndpointLogs(endpointId, page, search, pageSize);
 
-  // Clickable log detail (mirrors the SCIMServer-level Logs page).
-  const [detailId, setDetailId] = React.useState<string | undefined>(undefined);
+  // Clickable log detail is URL-owned so global Back/Forward restores the drawer.
+  const detailId = search.detail;
   const detailQuery = useEndpointLog(endpointId, detailId);
 
   // U12 - recent auth decisions for this endpoint, keyed by correlation id, so
@@ -161,6 +161,22 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     });
   };
 
+  const openDetail = (id: string): void => {
+    navigate({
+      to: LOGS_ROUTE_PATH,
+      params: { endpointId },
+      search: (previous) => ({ ...(previous as LogsSearch), detail: id }),
+    });
+  };
+
+  const closeDetail = (): void => {
+    navigate({
+      to: LOGS_ROUTE_PATH,
+      params: { endpointId },
+      search: (previous) => ({ ...(previous as LogsSearch), detail: undefined }),
+    });
+  };
+
   if (isLoading) {
     // G1 - row-shaped skeleton mirrors the final table.
     return (
@@ -188,7 +204,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     search.method ||
     search.status ||
     search.timeRange ||
-    search.hasError ||
+    search.hasError !== undefined ||
     search.minDurationMs !== undefined ||
     search.requestId,
   );
@@ -270,7 +286,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
             <tr
               key={log.id}
               className={classes.tr}
-              {...clickableProps(() => setDetailId(log.id), `Open log ${log.method} ${log.url}`)}
+              {...clickableProps(() => openDetail(log.id), `Open log ${log.method} ${log.url}`)}
               data-testid={`logs-tab-row-${log.id}`}
               style={{ cursor: 'pointer' }}
             >
@@ -338,7 +354,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
 
       <DetailDrawer
         open={Boolean(detailId)}
-        onClose={() => setDetailId(undefined)}
+        onClose={closeDetail}
         title={detailQuery.data ? `${detailQuery.data.method} ${detailQuery.data.url}` : 'Log detail'}
         jsonData={detailQuery.data}
         jsonFilename={detailId ? `log-${detailId}` : 'log-detail'}

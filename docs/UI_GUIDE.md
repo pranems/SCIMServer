@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.33`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.34`
 
-> **Status:** Active | **Last Updated:** 2026-09-24 | **Version:** 0.55.33
+> **Status:** Active | **Last Updated:** 2026-09-24 | **Version:** 0.55.34
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -46,7 +46,7 @@ The Web Admin UI is a React Single-Page Application served by the NestJS backend
 flowchart TB
     subgraph Browser["Browser (SPA)"]
         Shell["AppShell<br/>FluentProvider + TanStack Router + Zustand"]
-        Shell --> Header["AppHeader<br/>Brand + 5 header actions"]
+        Shell --> Header["AppHeader<br/>Global Back/Forward + brand + 5 actions"]
         Shell --> Sidebar["AppSidebar<br/>9 nav links + collapse"]
         Shell --> SSE["SSE log stream<br/>EventSource"]
         Shell --> Pages["9 Route Pages"]
@@ -110,17 +110,19 @@ After authentication the app shell renders: a brand bar, a collapsible sidebar w
 |------|-------|---------|
 | Dashboard | `/` | KPIs, request volume, activity analytics, endpoint grid |
 | Endpoints | `/endpoints` | Endpoint card grid, create, drill into detail |
-| Manual Provision | `/manual-provision` | Create any ResourceType declared by an endpoint profile |
-| My profile | `/me` | SCIM `/Me` self-service (per-endpoint OAuth) |
+| Manual Provision | `/manual-provision` | Choose an endpoint first, then create any ResourceType declared by its profile |
+| Self-service /Me | `/me` | Resolve and manage the SCIM User represented by a per-endpoint OAuth token |
 | Discovery | `/discovery` | Read-only RFC 7644 §4-§5 discovery, side-by-side diff |
-| Operations | `/operations` | Cross-endpoint operator view of all users/groups |
+| Operations | `/operations` | Current cross-endpoint inventory of Users, Groups, and statistics |
 | Workbench | `/workbench` | Free-form SCIM request builder + replay |
-| Logs | `/logs` | Global request-log table with filters |
+| Logs | `/logs` | Recorded request history, outcomes, authentication, and details |
 | Settings | `/settings` | Server info, health, log configuration |
+
+**Header navigation (left side):** global **Back** and **Forward** icons restore exact route and URL-owned workflow state. Direct loads start with both disabled; moving Back enables Forward until a new navigation branch replaces it.
 
 **Header actions (right side):** environment warning indicator, notifications bell, **pulse icon** (live log stream drawer), **key icon** (token dialog), and the **theme toggle** (light/dark).
 
-The sidebar collapses to an icon rail via the chevron at its bottom, persisting the choice across reloads.
+The sidebar collapses to an icon rail via the chevron at its bottom, persisting the choice across reloads. Below 720px it becomes an icon rail automatically so the active workflow remains usable.
 
 ---
 
@@ -244,7 +246,7 @@ Each row shows the type name, its endpoint path and its schema URN. **Create** a
 
 ## 7. Manual Provisioning
 
-Provision any SCIM resource declared by an endpoint profile without an external IdP. Pick a target endpoint, select one of its discovered ResourceType tabs, review or edit the generated working example, and submit. Text, numeric, boolean, canonical-value, complex, and multi-valued attributes receive type-appropriate controls. A dropdown appears only when the schema publishes non-empty `canonicalValues`; an unconstrained string remains a text field. Extension values are nested under their schema URN. The request body is fully editable and synchronized with the controls in both directions; malformed or non-object JSON blocks submission. The created resource is copyable JSON.
+Manual Provision is the cross-endpoint, choose-target-first creation workspace. Use it when you know what to create but still need to choose the owning endpoint or a discovered custom ResourceType. When already working inside one endpoint, its Users, Groups, or custom resource tab is the shorter path. Both paths use the same profile-driven form engine. The created resource is copyable JSON and **Open in endpoint** hands back to its endpoint-local view.
 
 ![Manual Provisioning](screenshots/prod-07-manual-provision.png)
 
@@ -256,13 +258,13 @@ Provision any SCIM resource declared by an endpoint profile without an external 
 
 ---
 
-## 8. My Profile (/Me)
+## 8. Self-service Profile (/Me)
 
-Exercises the SCIM `/Me` self-service endpoint (RFC 7644 §3.11). Pick an endpoint, then the page resolves the caller from the OAuth JWT.
+Exercises the SCIM `/Me` self-service endpoint (RFC 7644 §3.11). This is the profile of the SCIM User represented by the current OAuth token, not the SCIMServer administrator's account. Pick an endpoint, then the page resolves the JWT `sub` to a matching User `userName`.
 
 ![My profile](screenshots/prod-06-my-profile.png)
 
-> `/Me` requires an **OAuth JWT** whose `sub` claim matches a SCIM User's `userName` on the chosen endpoint. With the global shared-secret token in the Token Gate, every `/Me` call returns `404` - switch to a per-endpoint OAuth credential to use this page.
+> `/Me` requires an **OAuth JWT** whose `sub` claim matches a SCIM User's `userName` on the chosen endpoint. A shared-secret session is stopped locally before any `/Me` request and offers **Open OAuth setup** plus **Change token**. A verified JWT with no matching User gets a subject-specific recovery state rather than a generic `noTarget` explanation.
 
 | Action | Endpoint |
 |--------|----------|
@@ -287,7 +289,7 @@ A read-only view of each endpoint's SCIM discovery surfaces (RFC 7644 §4 + §5)
 
 ## 10. Operations
 
-A cross-endpoint operator view of users and groups across **every** endpoint on the server. Three tabs: **All Users**, **All Groups**, **Statistics**. Each row shows the resource, its `active` state, the owning endpoint badge, and the created timestamp. An **Active only** toggle and **Download CSV** export operate on the current page; clicking an endpoint badge jumps to that endpoint's tab pre-filtered.
+A current-state cross-endpoint inventory of Users and Groups across **every** endpoint on the server. Three tabs: **All Users**, **All Groups**, **Statistics**. Each row shows the resource, its `active` state, the owning endpoint display name, and the created timestamp. An **Active only** toggle and **Download CSV** export operate on the current page; clicking an endpoint label jumps to that endpoint's tab. Use **View request history** to pivot to Logs.
 
 ![Operations](screenshots/prod-04-operations.png)
 
@@ -325,7 +327,7 @@ The canonical dev endpoint `PRTest-Auth-Methods-ISV-1` is the post-deployment de
 
 ## 12. Logs
 
-The global request-log table. The header shows the total log count. Filters: **URL contains**, **Endpoint** dropdown, **Status** chips (200, 201, 400, 401, 403, 404, 409, 500), and **Time range** (Last 1 hour / 24 hours / 7 days / 30 days). Each row shows Method, URL (copyable), Status, Duration, and Time.
+The recorded request-history table across endpoints. It answers what requests happened; Operations answers what resources exist now. Filters include **URL contains**, **Endpoint**, **Method**, **Status**, **Time range**, **Minimum duration**, **Request ID**, and **Errors only**. Each row shows Method, URL, endpoint display name, Status, authentication outcome, Duration, and Time. **View current resources** pivots to Operations.
 
 ![Logs](screenshots/prod-08-logs.png)
 
@@ -427,7 +429,7 @@ The twelve `prod-auth-*` images belong to [AUTHENTICATION_GUIDE.md](AUTHENTICATI
 ## 18. Known Limitations
 
 - **Data-grid scalability** - Operations, Discovery, Dashboard, and Endpoints grids lack column sort/filter in several places, and some cards are not click-through. Tracked as a dedicated effort in [strategy/UI_PRESENTATION_BACKLOG.md](strategy/UI_PRESENTATION_BACKLOG.md).
-- **My profile** requires a per-endpoint OAuth JWT; it cannot be exercised with the global shared-secret token.
+- **Self-service /Me** requires a per-endpoint OAuth JWT. The page detects a shared-secret session before issuing `/Me` and directs the operator to OAuth setup.
 - The SPA serves all routes client-side; bookmarking a deep link relies on the server SPA fallback.
 
 ---

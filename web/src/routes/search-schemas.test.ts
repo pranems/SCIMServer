@@ -26,6 +26,8 @@ import {
   connectSearchSchema,
   operationsSearchSchema,
   discoverySearchSchema,
+  meSearchSchema,
+  manualProvisionSearchSchema,
   TIME_RANGE_VALUES,
   type PaginationSearch,
   type LogsSearch,
@@ -102,6 +104,11 @@ describe('logsSearchSchema (per-endpoint)', () => {
     const result = logsSearchSchema.parse({ urlContains: '' });
     expect(result.urlContains).toBeUndefined();
   });
+
+  it('accepts typed boolean values from router navigation for Errors only', () => {
+    expect(logsSearchSchema.parse({ hasError: true }).hasError).toBe(true);
+    expect(logsSearchSchema.parse({ hasError: false }).hasError).toBe(false);
+  });
 });
 
 describe('globalLogsSearchSchema', () => {
@@ -133,6 +140,11 @@ describe('globalLogsSearchSchema', () => {
 
   it('rejects non-numeric status code', () => {
     expect(() => globalLogsSearchSchema.parse({ status: 'OK' })).toThrow();
+  });
+
+  it('accepts typed boolean values from router navigation for Errors only', () => {
+    expect(globalLogsSearchSchema.parse({ hasError: true }).hasError).toBe(true);
+    expect(globalLogsSearchSchema.parse({ hasError: false }).hasError).toBe(false);
   });
 });
 
@@ -187,6 +199,14 @@ describe('restorable workflow search schemas', () => {
     });
     expect(discoverySearchSchema.parse({ compare: true }).compare).toBe(true);
     expect(operationsSearchSchema.parse({ userActiveOnly: false }).userActiveOnly).toBe(false);
+  });
+
+  it('parses Self-service /Me and Manual Provision workflow context', () => {
+    expect(meSearchSchema.parse({ endpointId: 'ep-1' })).toEqual({ endpointId: 'ep-1' });
+    expect(manualProvisionSearchSchema.parse({
+      endpointId: 'ep-1',
+      resourceTypeId: 'Device',
+    })).toEqual({ endpointId: 'ep-1', resourceTypeId: 'Device' });
   });
 });
 

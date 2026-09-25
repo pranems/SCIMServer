@@ -90,6 +90,8 @@ describe('LogsPage', () => {
     // The row id testid is unique; "200" alone collides with the
     // status filter chip. Assert the row exists instead.
     expect(screen.getByTestId('logs-row-l1')).toBeInTheDocument();
+    expect(screen.getByText(/Logs answers what happened; Operations shows the resources that exist now/i)).toBeInTheDocument();
+    expect(screen.getByTestId('logs-open-operations')).toBeInTheDocument();
   });
 
   it('X5/X6: a log row shows the auth-method chip + the endpoint name + a quick-open button', async () => {
@@ -101,7 +103,7 @@ describe('LogsPage', () => {
     expect(chip.textContent).toContain('auth ok');
     expect(chip.textContent).toContain('OAuth JWT');
     // X6 - the endpoint NAME (resolved from endpointId) + a quick-open button.
-    expect(screen.getByTestId('log-row-endpoint-l1').textContent).toContain('production');
+    expect(screen.getByTestId('log-row-endpoint-l1').textContent).toContain('Production');
     expect(screen.getByTestId('log-row-endpoint-open-l1')).toBeInTheDocument();
   });
 
@@ -186,6 +188,14 @@ describe('LogsPage', () => {
       wrap(<LogsPage />);
       await screen.findByTestId('global-logs-page');
       expect(screen.queryByTestId('logs-toolbar-reset')).not.toBeInTheDocument();
+    });
+
+    it('treats Errors only as an active filter with reset recovery', async () => {
+      mockUseGlobalLogs.mockReturnValue({ data: { total: 0, items: [] }, isLoading: false, error: null });
+      wrap(<LogsPage />, '/logs?hasError=true');
+      await screen.findByTestId('logs-empty');
+      expect(screen.getByTestId('logs-toolbar-reset')).toBeInTheDocument();
+      expect(screen.getByTestId('logs-empty-action')).toBeInTheDocument();
     });
   });
 

@@ -13,9 +13,11 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { MeProfilePage } from './MeProfilePage';
+import { setStoredToken } from '../auth/token';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -23,8 +25,35 @@ const mockUseEndpoints = vi.fn();
 const mockUseMe = vi.fn();
 const mockPatchMutateAsync = vi.fn();
 const mockDeleteMutateAsync = vi.fn();
+const routerMock = vi.hoisted(() => ({
+  initialSearch: {} as Record<string, unknown>,
+  setSearch: undefined as React.Dispatch<React.SetStateAction<Record<string, unknown>>> | undefined,
+  navigate: vi.fn(),
+}));
 let patchPending = false;
 let deletePending = false;
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router');
+  const react = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    useSearch: () => {
+      const [search, setSearch] = react.useState(routerMock.initialSearch);
+      routerMock.setSearch = setSearch;
+      return search;
+    },
+    useNavigate: () => (options: {
+      search?: Record<string, unknown> | ((previous: Record<string, unknown>) => Record<string, unknown>);
+    }) => {
+      routerMock.navigate(options);
+      if (!options.search) return;
+      routerMock.setSearch?.((previous) =>
+        typeof options.search === 'function' ? options.search(previous) : options.search ?? previous,
+      );
+    },
+  };
+});
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -62,6 +91,14 @@ const sampleMe = {
   meta: { resourceType: 'User', version: 'W/"v4"' },
 };
 
+function makeJwt(payload: Record<string, unknown>): string {
+  const encode = (value: object) => btoa(JSON.stringify(value))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode(payload)}.signature`;
+}
+
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -73,9 +110,16 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
+async function selectEndpoint(name: string | RegExp = /Production/i): Promise<void> {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('combobox', { name: 'Profile endpoint' }));
+  await user.click(await screen.findByRole('option', { name }));
+}
+
 describe('MeProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerMock.initialSearch = {};
     patchPending = false;
     deletePending = false;
     mockUseEndpoints.mockReturnValue({
@@ -91,13 +135,32 @@ describe('MeProfilePage', () => {
     });
     mockPatchMutateAsync.mockResolvedValue({});
     mockDeleteMutateAsync.mockResolvedValue(undefined);
+    setStoredToken(makeJwt({ sub: 'admin@example.com' }));
   });
 
-  it('renders the endpoint picker with one option per endpoint from useEndpoints', () => {
+  it('explains that My Profile is OAuth self-service for the token subject', () => {
+    renderWithProviders(<MeProfilePage />);
+    expect(screen.getByText(/self-service view of the SCIM User identified by this OAuth token/i)).toBeInTheDocument();
+  });
+
+  it('does not call /Me for a shared-secret session and directs the operator to OAuth setup', async () => {
+    setStoredToken('shared-admin-secret');
+    renderWithProviders(<MeProfilePage />);
+    await selectEndpoint();
+
+    expect(mockUseMe).toHaveBeenLastCalledWith('');
+    expect(screen.getByTestId('me-oauth-preflight')).toBeInTheDocument();
+    expect(screen.queryByTestId('scim-error-message')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open OAuth setup/i })).toBeInTheDocument();
+  });
+
+  it('renders the endpoint picker with one option per endpoint from useEndpoints', async () => {
     renderWithProviders(<MeProfilePage />);
     expect(screen.getByTestId('me-endpoint-picker')).toBeInTheDocument();
-    expect(screen.getByTestId('me-endpoint-option-ep-1')).toBeInTheDocument();
-    expect(screen.getByTestId('me-endpoint-option-ep-2')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('combobox', { name: 'Profile endpoint' }));
+    expect(await screen.findByRole('option', { name: /Production/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Staging/i })).toBeInTheDocument();
   });
 
   it('does not call useMe with a real endpoint until the operator picks one', () => {
@@ -107,7 +170,14 @@ describe('MeProfilePage', () => {
     expect(screen.getByTestId('me-empty')).toBeInTheDocument();
   });
 
-  it('renders the user profile when useMe returns data', () => {
+  it('does not call /Me for a stale endpoint id from a copied URL', () => {
+    routerMock.initialSearch = { endpointId: 'deleted-endpoint' };
+    renderWithProviders(<MeProfilePage />);
+    expect(mockUseMe).toHaveBeenLastCalledWith('');
+    expect(screen.getByTestId('me-stale-endpoint')).toBeInTheDocument();
+  });
+
+  it('renders the user profile when useMe returns data', async () => {
     mockUseMe.mockReturnValue({
       data: sampleMe,
       isLoading: false,
@@ -115,13 +185,13 @@ describe('MeProfilePage', () => {
       error: null,
     });
     renderWithProviders(<MeProfilePage />);
-    fireEvent.click(screen.getByTestId('me-endpoint-option-ep-1'));
+    await selectEndpoint();
     expect(screen.getByTestId('me-profile-card')).toBeInTheDocument();
     expect(screen.getByTestId('me-username')).toHaveTextContent('admin@example.com');
     expect(screen.getByTestId('me-displayname-input')).toBeInTheDocument();
   });
 
-  it('renders the OAuth-required fallback on 404 noTarget error', async () => {
+  it('renders the subject-not-found fallback on 404 noTarget error', async () => {
     const { ScimApiError } = await import('../api/scim-error');
     const noTargetError = new ScimApiError({
       status: 404,
@@ -135,11 +205,9 @@ describe('MeProfilePage', () => {
       error: noTargetError,
     });
     renderWithProviders(<MeProfilePage />);
-    fireEvent.click(screen.getByTestId('me-endpoint-option-ep-1'));
-    // ScimErrorMessage primitive renders with default testid.
-    expect(screen.getByTestId('scim-error-message')).toBeInTheDocument();
-    // Page-level hint pointing at the auth model.
-    expect(screen.getByTestId('me-oauth-required-hint')).toBeInTheDocument();
+    await selectEndpoint();
+    expect(screen.getByTestId('me-subject-not-found')).toBeInTheDocument();
+    expect(screen.queryByTestId('scim-error-message')).not.toBeInTheDocument();
   });
 
   it('Save fires usePatchMe with a SCIM PatchOp envelope when displayName changes', async () => {
@@ -150,7 +218,7 @@ describe('MeProfilePage', () => {
       error: null,
     });
     renderWithProviders(<MeProfilePage />);
-    fireEvent.click(screen.getByTestId('me-endpoint-option-ep-1'));
+    await selectEndpoint();
 
     fireEvent.change(screen.getByTestId('me-displayname-input'), {
       target: { value: 'Site Admin Renamed' },
@@ -166,7 +234,7 @@ describe('MeProfilePage', () => {
     expect(ops.some((op) => op.path === 'displayName' && op.value === 'Site Admin Renamed')).toBe(true);
   });
 
-  it('Delete button opens confirm modal; Delete is disabled until userName matches', () => {
+  it('Delete button opens confirm modal; Delete is disabled until userName matches', async () => {
     mockUseMe.mockReturnValue({
       data: sampleMe,
       isLoading: false,
@@ -174,7 +242,7 @@ describe('MeProfilePage', () => {
       error: null,
     });
     renderWithProviders(<MeProfilePage />);
-    fireEvent.click(screen.getByTestId('me-endpoint-option-ep-1'));
+    await selectEndpoint();
     fireEvent.click(screen.getByTestId('me-delete-button'));
 
     const input = screen.getByTestId('me-delete-confirm-input') as HTMLInputElement;
@@ -196,7 +264,7 @@ describe('MeProfilePage', () => {
       error: null,
     });
     renderWithProviders(<MeProfilePage />);
-    fireEvent.click(screen.getByTestId('me-endpoint-option-ep-1'));
+    await selectEndpoint();
     fireEvent.click(screen.getByTestId('me-delete-button'));
 
     fireEvent.change(screen.getByTestId('me-delete-confirm-input'), {

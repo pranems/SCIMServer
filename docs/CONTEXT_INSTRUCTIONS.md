@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.33
+> **Version**: 0.55.34
 > **Last Updated**: September 24, 2026
 > **Last verified:** 2026-09-24
 
@@ -17,6 +17,20 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The v0.55.34 global-navigation and workflow-context rollback unit is
+consolidated locally on `feat/global-history-workflow-ux-v05534`. Shell-wide
+Back/Forward restores route and typed URL state, including endpoint Logs detail
+drawers, Self-service `/Me` endpoint scope, and Manual Provision endpoint plus
+ResourceType. Errors-only Logs filtering accepts typed booleans and URL text.
+`/Me` preflights shared-secret, stale, and inactive endpoint contexts. Operations
+is current inventory, Logs is request history, and Manual Provision is the
+choose-target-first creation workspace. Intent-based endpoint controls show
+display name, stable name, and active state. Evidence is web 1,566/1,566 across
+118 files with all coverage ratchets, focused review 78/78, Chromium 6/6,
+dev live 1,532/1,532, builds, API lint, route budgets, docs, and 716/716 Mermaid
+renders. PR, merge, and dev deployment remain pending. Canary and customer prod
+are unchanged.
 
 The v0.55.33 API-output-fidelity rollback unit is merged and verified on dev.
 URL and SCIM identifiers are case-insensitive

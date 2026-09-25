@@ -20,6 +20,7 @@ import { useUIStore } from '../store/ui-store';
 import { clearStoredToken, notifyTokenInvalid } from '../auth/token';
 import { HealthRollup } from './HealthRollup';
 import { NotificationsButton } from './NotificationsButton';
+import { GlobalHistoryControls } from './GlobalHistoryControls';
 
 const useStyles = makeStyles({
   header: {
@@ -37,11 +38,21 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    minWidth: 0,
+  },
+  branding: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '8px',
+    '@media (max-width: 480px)': {
+      display: 'none',
+    },
   },
   actions: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
+    flexShrink: 0,
   },
 });
 
@@ -57,16 +68,19 @@ export const AppHeader: React.FC = () => {
   return (
     <header className={classes.header} data-testid="app-header">
       <div className={classes.titleArea}>
-        <Text size={500} weight="semibold" style={{ color: 'inherit' }}>
-          SCIMServer
-        </Text>
-        <Text
-          size={200}
-          style={{ color: 'inherit', opacity: 0.85 }}
-          data-testid="app-version"
-        >
-          v{__APP_VERSION__}
-        </Text>
+        <GlobalHistoryControls />
+        <div className={classes.branding}>
+          <Text size={500} weight="semibold" style={{ color: 'inherit' }}>
+            SCIMServer
+          </Text>
+          <Text
+            size={200}
+            style={{ color: 'inherit', opacity: 0.85 }}
+            data-testid="app-version"
+          >
+            v{__APP_VERSION__}
+          </Text>
+        </div>
       </div>
 
       <div className={classes.actions}>

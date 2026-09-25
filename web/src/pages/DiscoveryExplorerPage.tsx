@@ -63,6 +63,7 @@ import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../c
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
+import { EndpointOptionIdentity } from '../components/endpoints/EndpointContextSelector';
 import type { DiscoverySearch } from '../routes/search-schemas';
 import {
   compareSchemas,
@@ -71,6 +72,7 @@ import {
   type CharacteristicKey,
   type AttributeDiffRow,
 } from '../utils/discovery-diff';
+import { clickableProps } from '../utils/interactive';
 
 type DiscoveryTabKey = 'serviceProviderConfig' | 'resourceTypes' | 'schemas';
 
@@ -307,14 +309,14 @@ export const DiscoveryExplorerPage: React.FC = () => {
                 <Card
                   key={ep.id}
                   className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                  onClick={() => updateSearch({ primaryId: ep.id })}
-                  role="button"
+                  {...clickableProps(
+                    () => updateSearch({ primaryId: ep.id }),
+                    `Select ${ep.displayName ?? ep.name} as primary endpoint`,
+                  )}
                   aria-pressed={selected}
                   data-testid={`discovery-primary-option-${ep.id}`}
                 >
-                  <Text weight="semibold">{ep.displayName ?? ep.name}</Text>
-                  <br />
-                  <span className={classes.schemaIdMono}>{ep.name}</span>
+                  <EndpointOptionIdentity endpoint={ep} />
                 </Card>
               );
             })}
@@ -350,14 +352,14 @@ export const DiscoveryExplorerPage: React.FC = () => {
                   <Card
                     key={ep.id}
                     className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                    onClick={() => updateSearch({ secondaryId: ep.id })}
-                    role="button"
+                    {...clickableProps(
+                      () => updateSearch({ secondaryId: ep.id }),
+                      `Select ${ep.displayName ?? ep.name} as secondary endpoint`,
+                    )}
                     aria-pressed={selected}
                     data-testid={`discovery-secondary-option-${ep.id}`}
                   >
-                    <Text weight="semibold">{ep.displayName ?? ep.name}</Text>
-                    <br />
-                    <span className={classes.schemaIdMono}>{ep.name}</span>
+                    <EndpointOptionIdentity endpoint={ep} />
                   </Card>
                 );
               })}

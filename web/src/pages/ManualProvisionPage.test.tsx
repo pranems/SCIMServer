@@ -21,6 +21,34 @@ import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { ManualProvisionPage } from './ManualProvisionPage';
 import type { EndpointListResponse } from '@scim/types/dashboard.types';
 
+const routerMock = vi.hoisted(() => ({
+  initialSearch: {} as Record<string, unknown>,
+  setSearch: undefined as React.Dispatch<React.SetStateAction<Record<string, unknown>>> | undefined,
+  navigate: vi.fn(),
+}));
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router');
+  const react = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    useSearch: () => {
+      const [search, setSearch] = react.useState(routerMock.initialSearch);
+      routerMock.setSearch = setSearch;
+      return search;
+    },
+    useNavigate: () => (options: {
+      search?: Record<string, unknown> | ((previous: Record<string, unknown>) => Record<string, unknown>);
+    }) => {
+      routerMock.navigate(options);
+      if (!options.search) return;
+      routerMock.setSearch?.((previous) =>
+        typeof options.search === 'function' ? options.search(previous) : options.search ?? previous,
+      );
+    },
+  };
+});
+
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
   return {
@@ -75,6 +103,7 @@ describe('ManualProvisionPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    routerMock.initialSearch = {};
     createUser = vi.fn().mockResolvedValue({ id: 'new-user-id', userName: 'alice@x.com' });
     createGroup = vi.fn().mockResolvedValue({ id: 'new-group-id', displayName: 'Engineering' });
     createResource = vi.fn().mockResolvedValue({ id: 'device-1', serialNumber: 'serial-number-example' });
@@ -164,6 +193,15 @@ describe('ManualProvisionPage', () => {
     expect(screen.getByRole('option', { name: /Staging/i })).toBeInTheDocument();
   });
 
+  it('explains when to use the cross-endpoint workspace instead of endpoint-local Create', () => {
+    (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: ENDPOINTS, isLoading: false, error: null,
+    });
+    wrap(<ManualProvisionPage />);
+    expect(screen.getByText(/Cross-endpoint creation workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/use that endpoint's Users, Groups, or custom resource tab instead/i)).toBeInTheDocument();
+  });
+
   it('disables the form until an endpoint is selected', () => {
     (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
       data: ENDPOINTS, isLoading: false, error: null,
@@ -171,6 +209,36 @@ describe('ManualProvisionPage', () => {
     wrap(<ManualProvisionPage />);
     const submit = screen.getByRole('button', { name: /Create User/i });
     expect((submit as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('fails closed for a stale endpoint id from a copied URL', () => {
+    routerMock.initialSearch = { endpointId: 'deleted-endpoint' };
+    (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: ENDPOINTS, isLoading: false, error: null,
+    });
+    wrap(<ManualProvisionPage />);
+
+    expect(useEndpointSchemas).toHaveBeenLastCalledWith('');
+    expect(useCreateUser).toHaveBeenLastCalledWith('');
+    expect(screen.getByTestId('manual-provision-stale-endpoint')).toBeInTheDocument();
+  });
+
+  it('fails closed for an inactive endpoint id from a copied URL', () => {
+    routerMock.initialSearch = { endpointId: 'ep-1' };
+    (useEndpoints as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        ...ENDPOINTS,
+        endpoints: ENDPOINTS.endpoints.map((endpoint) =>
+          endpoint.id === 'ep-1' ? { ...endpoint, active: false } : endpoint),
+      },
+      isLoading: false,
+      error: null,
+    });
+    wrap(<ManualProvisionPage />);
+
+    expect(useEndpointResourceTypes).toHaveBeenLastCalledWith('');
+    expect(useCreateGroup).toHaveBeenLastCalledWith('');
+    expect(screen.getByTestId('manual-provision-inactive-endpoint')).toBeInTheDocument();
   });
 
   it('submits a User create with the SCIM body shape after picking endpoint + filling userName', async () => {
@@ -301,6 +369,12 @@ describe('ManualProvisionPage', () => {
     });
     // The new id appears both in the success header and in the JSON dump.
     expect(screen.getAllByText(/new-user-id/).length).toBeGreaterThanOrEqual(1);
+    await user.click(screen.getByTestId('provision-open-resource'));
+    expect(routerMock.navigate).toHaveBeenCalledWith({
+      to: '/endpoints/$endpointId/users',
+      params: { endpointId: 'ep-1' },
+      search: { page: 1, detail: 'new-user-id' },
+    });
   });
 
   it('shows error feedback in the result panel when the mutation rejects', async () => {
