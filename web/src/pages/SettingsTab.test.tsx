@@ -25,11 +25,12 @@ vi.mock('../api/queries', async () => {
   return {
     ...actual,
     useEndpointOverview: vi.fn(),
+    useEndpointEgressPolicy: vi.fn(),
     useUpdateEndpointConfig: vi.fn(),
   };
 });
 
-import { useEndpointOverview, useUpdateEndpointConfig } from '../api/queries';
+import { useEndpointEgressPolicy, useEndpointOverview, useUpdateEndpointConfig } from '../api/queries';
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -75,6 +76,32 @@ describe('SettingsTab', () => {
       mutateAsync,
       isPending: false,
       variables: undefined,
+      error: null,
+    });
+    const field = (effective: number, unit: 'ms' | 'bytes' | 'count', min: number, max: number) => ({
+      effective,
+      configured: null,
+      source: 'server-env' as const,
+      unit,
+      min,
+      max,
+      clamped: false,
+    });
+    (useEndpointEgressPolicy as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        timeoutMs: field(4321, 'ms', 100, 60000),
+        retries: field(3, 'count', 0, 10),
+        retryBackoffMs: field(250, 'ms', 0, 10000),
+        cacheMaxAgeMs: field(86400000, 'ms', 0, 86400000),
+        totalDeadlineMs: field(10000, 'ms', 100, 120000),
+        maxResponseBytes: field(1048576, 'bytes', 1024, 10485760),
+        maxKeys: field(100, 'count', 1, 1000),
+        maxCacheEntries: field(50, 'count', 1, 1000),
+        refreshIntervalMs: field(3600000, 'ms', 60000, 86400000),
+        unknownKidMinIntervalMs: field(300000, 'ms', 0, 3600000),
+        staleIfErrorMs: field(172800000, 'ms', 0, 604800000),
+      },
+      isLoading: false,
       error: null,
     });
   });
@@ -331,39 +358,30 @@ describe('SettingsTab', () => {
     expect(sw.disabled).toBe(true);
   });
 
-  // ── WI-7: CredentialSecretVisibility enum control ─────────────────
-  it('renders the CredentialSecretVisibility control defaulting to always', () => {
+  // ── CredentialSecretVisibility always-retain policy ───────────────
+  it('renders the fixed always-retain credential policy', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({}),
       isLoading: false, error: null,
     });
     wrap(<SettingsTab endpointId={EP_ID} />);
     expect(screen.getByTestId('settings-credential-visibility')).toBeInTheDocument();
-    const always = screen.getByTestId('credential-visibility-always') as HTMLInputElement;
-    expect(always.checked).toBe(true);
+    expect(screen.getByTestId('credential-visibility-always')).toHaveTextContent(
+      'always (retain encrypted + display to authenticated admins)',
+    );
+    expect(screen.queryByTestId('credential-visibility-once')).not.toBeInTheDocument();
   });
 
-  it('reflects a stored CredentialSecretVisibility=once', () => {
+  it('marks legacy once-only credentials as rotation-required', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({ CredentialSecretVisibility: 'once' }),
       isLoading: false, error: null,
     });
     wrap(<SettingsTab endpointId={EP_ID} />);
-    const once = screen.getByTestId('credential-visibility-once') as HTMLInputElement;
-    expect(once.checked).toBe(true);
-  });
-
-  it('selecting "once" fires useUpdateEndpointConfig with the enum value', async () => {
-    const user = userEvent.setup();
-    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: overviewWith({ CredentialSecretVisibility: 'always' }),
-      isLoading: false, error: null,
-    });
-    wrap(<SettingsTab endpointId={EP_ID} />);
-    await user.click(screen.getByTestId('credential-visibility-once'));
-    expect(mutateAsync).toHaveBeenCalledWith({
-      profile: { settings: { CredentialSecretVisibility: 'once' } },
-    });
+    expect(screen.getByTestId('settings-credential-visibility')).toHaveTextContent(
+      'Existing credentials created under the retired once-only policy remain unavailable until rotated.',
+    );
+    expect(screen.queryByTestId('credential-visibility-once')).not.toBeInTheDocument();
   });
 
   it('renders PrimaryEnforcement as an editable Dropdown (not a Switch, not read-only)', () => {
@@ -422,31 +440,14 @@ describe('SettingsTab', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('renders the PersistRequestSecrets switch under Logging & privacy (defaults ON)', () => {
+  it('renders fixed request-log redaction instead of a PersistRequestSecrets switch', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: overviewWith({}),
       isLoading: false, error: null,
     });
     wrap(<SettingsTab endpointId={EP_ID} />);
-    const card = screen.getByTestId('settings-category-logging-privacy');
-    expect(card).toBeInTheDocument();
-    const sw = screen.getByRole('switch', { name: /PersistRequestSecrets/i });
-    expect(sw).toBeInTheDocument();
-    // Default (unset) shows ON - the request log keeps the full request for RCA.
-    expect(sw).toBeChecked();
-  });
-
-  it('toggling PersistRequestSecrets OFF fires the config update with false', async () => {
-    const user = userEvent.setup();
-    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: overviewWith({ PersistRequestSecrets: true }),
-      isLoading: false, error: null,
-    });
-    wrap(<SettingsTab endpointId={EP_ID} />);
-    await user.click(screen.getByRole('switch', { name: /PersistRequestSecrets/i }));
-    await waitFor(() => {
-      expect(mutateAsync).toHaveBeenCalledWith({ profile: { settings: { PersistRequestSecrets: false } } });
-    });
+    expect(screen.getByTestId('settings-log-secret-persistence')).toHaveTextContent('always redacted');
+    expect(screen.queryByRole('switch', { name: /PersistRequestSecrets/i })).not.toBeInTheDocument();
   });
 
   it('logLevel renders as an enum Dropdown with the log levels', () => {
@@ -485,7 +486,7 @@ describe('SettingsTab', () => {
       }
     });
 
-    it('reflects the persisted value and leaves unset fields blank (inherit default)', () => {
+    it('shows configured overrides and real inherited effective values with source and units', () => {
       (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
         data: overviewWith({ JwksFetchTimeoutMs: 1500 }),
         isLoading: false, error: null,
@@ -494,7 +495,13 @@ describe('SettingsTab', () => {
       const setInput = screen.getByTestId('settings-number-JwksFetchTimeoutMs-input') as HTMLInputElement;
       expect(setInput.value).toBe('1500');
       const unsetInput = screen.getByTestId('settings-number-JwksFetchRetries-input') as HTMLInputElement;
-      expect(unsetInput.value).toBe('');
+      expect(unsetInput.value).toBe('3');
+      expect(screen.getByTestId('settings-number-JwksFetchRetries-effective')).toHaveTextContent(
+        'Effective: 3 count',
+      );
+      expect(screen.getByTestId('settings-number-JwksFetchRetries-source')).toHaveTextContent(
+        'Server environment',
+      );
     });
 
     it('fires the config update with the new numeric value on blur', async () => {
@@ -506,6 +513,7 @@ describe('SettingsTab', () => {
       wrap(<SettingsTab endpointId={EP_ID} />);
       const input = screen.getByTestId('settings-number-JwksFetchTimeoutMs-input');
       await user.click(input);
+      await user.clear(input);
       await user.type(input, '2500');
       await user.tab(); // blur
       await waitFor(() => {

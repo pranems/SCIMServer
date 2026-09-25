@@ -67,6 +67,14 @@ describe('InMemoryUserRepository', () => {
       expect(found!.scimId).toBe('scim-user-1');
     });
 
+    it('should resolve SCIM IDs case-insensitively', async () => {
+      await repo.create(makeInput({ scimId: 'aabbccdd-1234-abcd-9876-aabbccddeeff' }));
+
+      const found = await repo.findByScimId(endpointId, 'AABBCCDD-1234-ABCD-9876-AABBCCDDEEFF');
+
+      expect(found?.scimId).toBe('aabbccdd-1234-abcd-9876-aabbccddeeff');
+    });
+
     it('should return null when the scimId does not exist', async () => {
       const found = await repo.findByScimId(endpointId, 'nonexistent');
       expect(found).toBeNull();

@@ -36,6 +36,7 @@ import {
   coercePatchOpBooleans,
   scopePatchPayloadToTouched,
   stripNeverReturnedFromPayload,
+  stripInternalResponseFields,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
   handleRepositoryError,
@@ -644,6 +645,7 @@ export class EndpointScimUsersService {
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
     const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
     const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA, ...visibleExtUrns];
+    stripInternalResponseFields(rawPayload);
 
     // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
     // (e.g., a client-supplied "id" in the POST body must never override scimId)

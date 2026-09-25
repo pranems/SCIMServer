@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.32
+> **Version**: 0.55.33
 > **Last Updated**: September 24, 2026
 > **Last verified:** 2026-09-24
 
@@ -17,6 +17,20 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The v0.55.33 API-output-fidelity rollback unit is consolidated locally on
+`fix/api-output-fidelity-v05533`. URL and SCIM identifiers are case-insensitive
+across endpoint names/UUIDs, Bulk, custom ResourceTypes, Schemas, and PATCH
+paths. ServiceProviderConfig reflects effective authentication methods, and
+Endpoint Settings publishes all 11 authoritative egress values. Recoverable
+bearer and OAuth secrets render automatically and populate authenticated admin
+exports; WIF remains secretless. Public discovery, broad endpoint projections,
+RequestLog, Workbench history, and structured logs do not persist plaintext
+credentials. New `once` writes are rejected; legacy purged values require
+rotation. Evidence is API unit 5,192/5,192, API E2E 1,533/1,533, web
+1,544/1,544, local live 1,532/1,532, focused Playwright 5/5, available parity
+lanes 4/4, builds, lint, budgets, and additive migration lint. PR, merge, and
+dev deployment remain pending. Canary and customer prod are unchanged.
 
 The v0.55.32 effective WIF/JWKS egress rollback unit is merged and verified on
 dev. An endpoint admin GET and the Connect WIF panel

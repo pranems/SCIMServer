@@ -29,6 +29,10 @@ export interface ResourceTypeResolution {
   resourceType?: ScimResourceType;
 }
 
+function urlIdentifierEquals(left: string | undefined, right: string | undefined): boolean {
+  return left !== undefined && right !== undefined && left.toLowerCase() === right.toLowerCase();
+}
+
 /**
  * Resolve a resource type from the endpoint profile by name/id OR endpoint path.
  * Returns `{ supported: true }` (fail-open) when no constraint is declared.
@@ -44,8 +48,10 @@ export function resolveResourceType(
 
   const resourceType = resourceTypes.find(
     (r) =>
-      (match.name !== undefined && (r.id === match.name || r.name === match.name)) ||
-      (match.endpointPath !== undefined && r.endpoint === match.endpointPath),
+      (match.name !== undefined && (
+        urlIdentifierEquals(r.id, match.name) || urlIdentifierEquals(r.name, match.name)
+      )) ||
+      (match.endpointPath !== undefined && urlIdentifierEquals(r.endpoint, match.endpointPath)),
   );
 
   return { supported: !!resourceType, resourceType };

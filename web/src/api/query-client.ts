@@ -21,6 +21,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D2 (TanStack Query)
  */
 import { QueryClient } from '@tanstack/react-query';
+import { TOKEN_CHANGED_EVENT } from '../auth/token';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,3 +32,11 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export function clearCredentialRevealCache(): void {
+  queryClient.removeQueries({ queryKey: ['connection-reveal'] });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(TOKEN_CHANGED_EVENT, clearCredentialRevealCache);
+}

@@ -51,6 +51,19 @@ describe('ContextBackButton', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
+  it('uses the fallback when browser history exists only outside the app', () => {
+    // TanStack initializes __TSR_index=0 on an externally loaded document,
+    // regardless of window.history.length, so useCanGoBack() is false here.
+    canGoBack = false;
+    window.history.replaceState({ externalEntryExists: true }, '', '/endpoints/ep-1');
+    renderButton();
+
+    fireEvent.click(screen.getByTestId('context-back'));
+
+    expect(mockFallback).toHaveBeenCalledTimes(1);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('exposes the same behavior as a hook for post-save navigation', () => {
     render(<Harness />);
 

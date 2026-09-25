@@ -180,6 +180,39 @@ describe('LoggingService.getLog - malformed id handling', () => {
       expect(row?.id).toBe(VALID_UUID);
       expect(row?.method).toBe('GET');
     });
+
+    it('redacts legacy plaintext detail fields returned by Prisma', async () => {
+      prisma.requestLog.findUnique.mockResolvedValueOnce({
+        id: VALID_UUID,
+        endpointId: null,
+        method: 'POST',
+        url: '/scim/oauth/token',
+        status: 200,
+        durationMs: 12,
+        createdAt: new Date('2026-07-30T00:00:00.000Z'),
+        requestHeaders: JSON.stringify({ authorization: 'Bearer legacy-token' }),
+        requestBody: JSON.stringify({ client_id: 'public-client', client_secret: 'legacy-value' }),
+        responseHeaders: JSON.stringify({ 'set-cookie': 'legacy-cookie' }),
+        responseBody: JSON.stringify({ access_token: 'legacy-jwt' }),
+        errorMessage: null,
+        requestId: null,
+        authOutcome: null,
+        authMethod: null,
+        authReason: null,
+        authCredentialId: null,
+        authDecision: JSON.stringify({ client_assertion: 'legacy-assertion', outcome: 'accept' }),
+      });
+
+      const row = await service.getLog(VALID_UUID);
+      const serialized = JSON.stringify(row);
+      expect(serialized).not.toContain('legacy-token');
+      expect(serialized).not.toContain('legacy-value');
+      expect(serialized).not.toContain('legacy-cookie');
+      expect(serialized).not.toContain('legacy-jwt');
+      expect(serialized).not.toContain('legacy-assertion');
+      expect(serialized).toContain('[REDACTED]');
+      expect(serialized).toContain('public-client');
+    });
   });
 
   describe('inmemory backend - parity lock', () => {

@@ -23,7 +23,6 @@ import {
   useEndpointEgressPolicy,
   useEndpointOverview,
   useUpdateEndpointConfig,
-  type EgressPolicyFieldName,
 } from '../api/queries';
 import {
   ALL_ENDPOINT_SETTINGS,
@@ -32,6 +31,7 @@ import {
   type EndpointSettingDefinition,
   type NumberSettingDefinition,
 } from './endpoint-settings-definitions';
+import { EGRESS_FIELD_BY_SETTING, EGRESS_SOURCE_LABEL } from './egress-policy-ui';
 
 const useStyles = makeStyles({
   card: {
@@ -89,26 +89,6 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
   },
 });
-
-const EGRESS_FIELD_BY_SETTING: Record<string, EgressPolicyFieldName | undefined> = {
-  JwksFetchTimeoutMs: 'timeoutMs',
-  JwksFetchRetries: 'retries',
-  JwksFetchRetryBackoffMs: 'retryBackoffMs',
-  JwksCacheMaxAgeMs: 'cacheMaxAgeMs',
-  JwksTotalDeadlineMs: 'totalDeadlineMs',
-  JwksMaxResponseBytes: 'maxResponseBytes',
-  JwksMaxKeys: 'maxKeys',
-  JwksMaxCacheEntries: 'maxCacheEntries',
-  JwksRefreshIntervalMs: 'refreshIntervalMs',
-  JwksUnknownKidMinIntervalMs: 'unknownKidMinIntervalMs',
-  JwksStaleIfErrorMs: 'staleIfErrorMs',
-};
-
-const SOURCE_LABEL = {
-  endpoint: 'Endpoint override',
-  'server-env': 'Server environment',
-  default: 'Built-in default',
-} as const;
 
 export interface EndpointRelatedSettingsProps {
   endpointId: string;
@@ -265,6 +245,14 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
           const disabled = update.isPending && pendingKey === definition.key;
           if (definition.kind === 'boolean') {
             const descriptionId = `${testId}-${definition.key}-description`;
+            if (definition.key === 'PersistRequestSecrets') {
+              return (
+                <div key={definition.key} className={classes.control} data-testid={`${testId}-${definition.key}`}>
+                  <Caption1><strong>{definition.displayLabel}: always redacted</strong></Caption1>
+                  <Caption1 id={descriptionId} className={classes.description}>{definition.description}</Caption1>
+                </div>
+              );
+            }
             return (
               <div key={definition.key} className={classes.control}>
                 <Switch
@@ -375,7 +363,7 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
                                 Effective: {field.effective} {field.unit}
                               </Caption1>
                               <Caption1 data-testid={`${testId}-source-${definition.key}`}>
-                                Source: {SOURCE_LABEL[field.source]}
+                                Source: {EGRESS_SOURCE_LABEL[field.source]}
                                 {field.configured !== null ? ` (${field.configured} ${field.unit})` : ''}
                               </Caption1>
                               <Caption1 data-testid={`${testId}-bounds-${definition.key}`}>

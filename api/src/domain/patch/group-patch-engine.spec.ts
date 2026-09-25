@@ -101,6 +101,19 @@ describe('GroupPatchEngine', () => {
       expect(result.members).toEqual([{ value: 'user-5' }]);
     });
 
+    it('should resolve no-path well-known and custom keys case-insensitively', () => {
+      const result = apply(
+        [{
+          op: 'replace',
+          value: { DISPLAYNAME: 'Case Team', EXTERNALID: 'case-ext', CUSTOMFIELD: 'updated' },
+        }],
+        { rawPayload: { customField: 'original' } },
+      );
+      expect(result.displayName).toBe('Case Team');
+      expect(result.externalId).toBe('case-ext');
+      expect(result.payload).toEqual({ customField: 'updated' });
+    });
+
     it('should store extra attributes in rawPayload on no-path replace', () => {
       const result = apply([{
         op: 'replace',

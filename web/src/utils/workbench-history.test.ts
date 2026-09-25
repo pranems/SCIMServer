@@ -68,6 +68,62 @@ describe('Phase M1 - workbench-history (pure localStorage ring buffer)', () => {
     ]);
   });
 
+  it('redacts credential material before persisting history', () => {
+    appendHistory(sample({
+      requestHeaders: [
+        { key: 'Authorization', value: 'Bearer live-token', enabled: true },
+        { key: 'Content-Type', value: 'application/json', enabled: true },
+      ],
+      requestBody: {
+        client_id: 'public-client',
+        client_secret: 'client-secret',
+        nested: { token: 'bearer-secret' },
+      },
+      responseBody: {
+        access_token: 'issued-jwt',
+        clientSecret: 'revealed-secret',
+        retained: true,
+      },
+    }));
+
+    const [stored] = loadHistory();
+    const serialized = JSON.stringify(stored);
+    expect(serialized).not.toContain('live-token');
+    expect(serialized).not.toContain('client-secret');
+    expect(serialized).not.toContain('bearer-secret');
+    expect(serialized).not.toContain('issued-jwt');
+    expect(serialized).not.toContain('revealed-secret');
+    expect(serialized).toContain('[REDACTED]');
+    expect(serialized).toContain('public-client');
+    expect(serialized).toContain('application/json');
+  });
+
+  it('sanitizes and rewrites legacy plaintext history on read', () => {
+    const legacy = sample({
+      requestBody: { client_secret: 'legacy-client-secret' },
+      responseBody: { access_token: 'legacy-access-token' },
+    });
+    localStorage.setItem(WORKBENCH_HISTORY_KEY, JSON.stringify([legacy]));
+
+    const loaded = loadHistory();
+
+    expect(JSON.stringify(loaded)).not.toContain('legacy-client-secret');
+    expect(JSON.stringify(loaded)).not.toContain('legacy-access-token');
+    expect(localStorage.getItem(WORKBENCH_HISTORY_KEY)).toContain('[REDACTED]');
+  });
+
+  it('redacts sensitive query parameters from persisted paths', () => {
+    appendHistory(sample({
+      path: '/scim/oauth/token?client_id=public-client&client_secret=query-secret&scope=read',
+    }));
+
+    const [stored] = loadHistory();
+    expect(stored.path).toBe(
+      '/scim/oauth/token?client_id=public-client&client_secret=[REDACTED]&scope=read',
+    );
+    expect(localStorage.getItem(WORKBENCH_HISTORY_KEY)).not.toContain('query-secret');
+  });
+
   it('newest entry lands at index 0 (newest-first ordering)', () => {
     appendHistory(sample({ id: 'wb-1', timestamp: '2026-05-15T10:00:00.000Z' }));
     appendHistory(sample({ id: 'wb-2', timestamp: '2026-05-15T10:00:01.000Z' }));

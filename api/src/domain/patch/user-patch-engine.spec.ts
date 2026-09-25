@@ -89,6 +89,23 @@ describe('UserPatchEngine', () => {
       const result = apply([{ op: 'replace', path: 'title', value: 'Manager' }]);
       expect(result.payload.title).toBe('Manager');
     });
+
+    it('should preserve canonical casing for arbitrary and nested payload paths', () => {
+      const result = apply(
+        [
+          { op: 'replace', path: 'TITLE', value: 'Director' },
+          { op: 'replace', path: 'Name.FamilyName', value: 'Smith' },
+        ],
+        { rawPayload: { title: 'Manager', name: { givenName: 'Jane', familyName: 'Doe' } } },
+        verboseConfig,
+      );
+      expect(result.payload).toEqual({
+        title: 'Director',
+        name: { givenName: 'Jane', familyName: 'Smith' },
+      });
+      expect(result.payload).not.toHaveProperty('TITLE');
+      expect(result.payload).not.toHaveProperty('Name');
+    });
   });
 
   // ── Add operations ─────────────────────────────────────────────────
@@ -120,6 +137,14 @@ describe('UserPatchEngine', () => {
       }]);
       expect(result.extractedFields.userName).toBe('norm@test.com');
       expect(result.extractedFields.displayName).toBe('Norm');
+    });
+
+    it('should preserve an existing custom key during mixed-case no-path add', () => {
+      const result = apply(
+        [{ op: 'add', value: { CUSTOMFIELD: 'updated' } }],
+        { rawPayload: { customField: 'original' } },
+      );
+      expect(result.payload).toEqual({ customField: 'updated' });
     });
   });
 

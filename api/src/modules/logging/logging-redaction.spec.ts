@@ -77,13 +77,14 @@ describe('LoggingService - RequestLog secret persistence (F1)', () => {
     else process.env.PERSIST_REQUEST_SECRETS = savedPersist;
   });
 
-  it('DEFAULT: stores the complete request/response INCLUDING secrets', async () => {
+  it('DEFAULT: redacts request and response secrets before persistence', async () => {
     const service = await makeService();
     record(service);
     const row = rowsOf(service)[0];
-    expect(row.requestBody).toContain('super-secret');
-    expect(row.requestHeaders).toContain('Basic dXNlcjpzZWNyZXQ=');
-    expect(row.responseBody).toContain('jwt.value.here');
+    expect(row.requestBody).not.toContain('super-secret');
+    expect(row.requestHeaders).not.toContain('Basic dXNlcjpzZWNyZXQ=');
+    expect(row.responseBody).not.toContain('jwt.value.here');
+    expect(row.requestBody).toContain('[REDACTED]');
     await service.onModuleDestroy?.();
   });
 
@@ -117,13 +118,28 @@ describe('LoggingService - RequestLog secret persistence (F1)', () => {
     await service.onModuleDestroy?.();
   });
 
-  it('endpoint PersistRequestSecrets=true OVERRIDES a false server default', async () => {
+  it('endpoint PersistRequestSecrets=true cannot bypass mandatory redaction', async () => {
     process.env.PERSIST_REQUEST_SECRETS = 'false';
     cachedSettings = { PersistRequestSecrets: true };
     const service = await makeService();
     record(service, 'ep-keep');
     const row = rowsOf(service)[0];
-    expect(row.requestBody).toContain('super-secret');
+    expect(row.requestBody).not.toContain('super-secret');
+    expect(row.requestBody).toContain('[REDACTED]');
+    await service.onModuleDestroy?.();
+  });
+
+  it('redacts secret-bearing query parameters before RequestLog persistence', async () => {
+    const service = await makeService();
+    service.recordRequest({
+      method: 'GET',
+      url: '/scim/oauth/token?client_id=public-client&client_secret=query-secret&scope=read',
+      status: 200,
+      requestHeaders: {},
+    });
+    const row = rowsOf(service)[0] as StoredRow & { url: string };
+    expect(row.url).toBe('/scim/oauth/token?client_id=public-client&client_secret=[REDACTED]&scope=read');
+    expect(row.url).not.toContain('query-secret');
     await service.onModuleDestroy?.();
   });
 });

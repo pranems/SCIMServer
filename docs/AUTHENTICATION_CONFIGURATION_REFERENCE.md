@@ -1,7 +1,7 @@
 # Authentication configuration: what exists, where it lives, and how to change it
 
-**Last verified:** 2026-09-21
-**Applies to:** v0.55.24
+**Last verified:** 2026-09-24
+**Applies to:** v0.55.33
 **Source-derived.** Every path and field below was read from source; file references are given so you can check any claim.
 **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines current versus target behavior, profile portability, and effective authentication provenance.
 
@@ -99,8 +99,8 @@ Beyond create/edit through the credential routes, three diagnostic routes exist,
 
 | Verb | Path | Purpose |
 |---|---|---|
-| `GET`/`PUT` | `/scim/admin/settings/security` | Read or set `CredentialSecretVisibility`; reports whether the KEK is still the default |
-| `GET` | `/scim/admin/settings/security/connection-secrets` | Return the global shared secret and OAuth client credentials, **only** when server visibility is `always`. Audit-logged |
+| `GET`/`PUT` | `/scim/admin/settings/security` | Read the fixed `always` retention policy; PUT accepts only `always`; reports whether the KEK is still the default |
+| `GET` | `/scim/admin/settings/security/connection-secrets` | Return the global shared secret and OAuth client credentials to authenticated admins. Audit-logged |
 | `GET`/`POST`/`PUT`/`PATCH`/`DELETE` | `/scim/admin/settings/jwks-hosts` | Manage the JWKS host allowlist. Hot-reloads |
 
 The JWKS allowlist is an **SSRF control**: WIF verification fetches remote URLs, and only allowlisted hosts may be contacted. It is layered (built-in seed + env var + persisted entries), and the effective list is the union.
@@ -121,7 +121,7 @@ The JWKS allowlist is an **SSRF control**: WIF verification fetches remote URLs,
 | `OAuthClientCredentialsAuthEnabled` | Creating and using `oauth_client` credentials |
 | `SharedSecretBearerAuthEnabled` | Whether this endpoint accepts the **global** `SCIM_SHARED_SECRET`. Defaults **true** for backward compatibility |
 | `WifCredentialsEnabled` | WIF trust creation and all three diagnostic routes |
-| `CredentialSecretVisibility` | `always` or `once` - see section 6 |
+| `CredentialSecretVisibility` | `always` only - encrypted retention for authenticated admin display and export |
 
 Resolution order for per-method enablement is explicit: an entry in `profile.authentication.methods[]` wins, then the dedicated setting, then the default.
 
@@ -134,17 +134,17 @@ flowchart LR
   C["POST /credentials"] --> G["generate 32 random bytes"]
   G --> H["bcrypt hash, cost 12"]
   H --> DB["credentialHash column"]
-  G --> V{"CredentialSecretVisibility"}
-  V -->|"once"| D["nothing retained"]
-  V -->|"always"| E["AES-256-GCM encrypt with the DEK"]
+  G --> E["AES-256-GCM encrypt with the DEK"]
   E --> ENV["secretEnvelope column"]
-  G --> R["returned to the caller ONCE"]
+  G --> R["returned to authenticated admin surfaces"]
 ```
 
 - The plaintext is **never** persisted. Verification is a bcrypt compare against `credentialHash`.
 - With retention on, a second **encrypted** copy is kept in `secretEnvelope` (format `v1.<iv>.<ct>.<tag>`, AES-256-GCM). It is decrypted only on the audit-logged `reveal` path, never on the auth hot path.
 - The data-encryption key is stored **wrapped** in `CredentialDek.wrappedDek`; the key that wraps it (`CREDENTIAL_KEK`) lives only in an environment variable.
-- Visibility resolves **most-restrictive-wins**: the server-global setting is a ceiling, the endpoint setting a floor. Flipping the server to `once` **purges retained envelopes**.
+- `CredentialSecretVisibility` is fixed to `always`. New endpoint or server writes using the retired `once` value return `400` and do not purge retained envelopes.
+- Credentials whose envelope was purged before this policy changed remain unrecoverable. The UI and JSON exports mark them rotation-required; rotation creates a new retained value.
+- Public discovery, endpoint overview/list responses, RequestLog persistence, Workbench history, and console/file logs never receive plaintext secrets.
 
 **Read this before trusting the encryption.** `CREDENTIAL_KEK` ships with a public default (`changeme-credential-kek`), and [credential-kek.ts](../api/src/security/credential-kek.ts) exposes `isDefaultKek()` precisely so the API can admit it. While the default is in place the encryption is **cosmetic** - anyone with the database and the open-source repo can unwrap it. `GET /admin/settings/security` reports this honestly as `kek.isDefault`. Set a real KEK before enabling retention on anything you care about.
 

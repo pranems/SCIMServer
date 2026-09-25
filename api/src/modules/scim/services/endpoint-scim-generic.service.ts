@@ -49,6 +49,7 @@ import {
   coercePatchOpBooleans,
   scopePatchPayloadToTouched,
   stripNeverReturnedFromPayload,
+  stripInternalResponseFields,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   assertSchemaUniqueness,
@@ -816,7 +817,9 @@ export class EndpointScimGenericService {
     const visibleExtUrns = stripNeverReturnedFromPayload(payload, neverByParent, coreUrnLower, extSchemaUrns);
     const schemas: string[] = [resourceType.schema, ...visibleExtUrns];
 
-    // Remove schemas from payload - we built it dynamically above (G19 / FP-1)
+    stripInternalResponseFields(payload);
+    delete payload.id;
+    delete payload.meta;
     delete payload.schemas;
 
     return {

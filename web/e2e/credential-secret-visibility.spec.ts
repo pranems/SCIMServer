@@ -23,6 +23,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(
     ({ key, value }) => {
       window.localStorage.setItem(key, value);
+      window.localStorage.setItem('scimserver.onboarding.completedAt', '2026-09-24T00:00:00.000Z');
     },
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
@@ -50,22 +51,14 @@ async function openFirstEndpointSettings(page: Page): Promise<void> {
   await expect(page.getByTestId('settings-tab')).toBeVisible({ timeout: 30_000 });
 }
 
-test.describe('SettingsTab - CredentialSecretVisibility (WI-7)', () => {
-  test('the credential-visibility card renders an always|once radio group', async ({ page }) => {
+test.describe('SettingsTab - credential and request-log secret policy', () => {
+  test('credential retention and request-log redaction are fixed safe policies', async ({ page }) => {
     await openFirstEndpointSettings(page);
     await expect(page.getByTestId('settings-credential-visibility')).toBeVisible();
-    await expect(page.getByTestId('credential-visibility-always')).toBeVisible();
-    await expect(page.getByTestId('credential-visibility-once')).toBeVisible();
-  });
-
-  test('exactly one visibility value is selected (defaults to always)', async ({ page }) => {
-    await openFirstEndpointSettings(page);
-    const always = page.getByTestId('credential-visibility-always');
-    const once = page.getByTestId('credential-visibility-once');
-    const alwaysChecked = await always.isChecked();
-    const onceChecked = await once.isChecked();
-    // Exactly one is checked.
-    expect(alwaysChecked !== onceChecked).toBe(true);
+    await expect(page.getByTestId('credential-visibility-always')).toContainText('retain encrypted');
+    await expect(page.getByTestId('credential-visibility-once')).toHaveCount(0);
+    await expect(page.getByTestId('settings-persist-request-secrets-redacted')).toContainText('always redacted');
+    await expect(page.getByRole('switch', { name: /PersistRequestSecrets/i })).toHaveCount(0);
   });
 
   test('settings are grouped into category cards + enum settings render as Dropdowns', async ({ page }) => {
@@ -81,24 +74,48 @@ test.describe('SettingsTab - CredentialSecretVisibility (WI-7)', () => {
     await expect(page.getByTestId('settings-tab-export-download')).toBeVisible();
   });
 
-  test('the runtime-egress card renders 4 bounded number inputs (WIF JWKS fetch)', async ({ page }) => {
+  test('the runtime-egress card displays all authoritative values, units, sources, and bounds', async ({ page }) => {
     await openFirstEndpointSettings(page);
     await expect(page.getByTestId('settings-number-settings')).toBeVisible();
 
-    // R10 - assert the OUTCOME (each input is present AND carries its bounds
-    // contract), not merely that the card exists.
-    const bounds: Record<string, { min: string; max: string }> = {
-      JwksFetchTimeoutMs: { min: '100', max: '60000' },
-      JwksFetchRetries: { min: '0', max: '10' },
-      JwksFetchRetryBackoffMs: { min: '0', max: '10000' },
-      JwksCacheMaxAgeMs: { min: '0', max: '86400000' },
+    const response = await page.request.get(
+      `/scim/admin/endpoints/${fixtureEndpointId}/egress-policy`,
+      { headers: { Authorization: `Bearer ${TOKEN}` } },
+    );
+    expect(response.ok()).toBe(true);
+    const effective = await response.json() as Record<string, {
+      effective: number;
+      source: 'endpoint' | 'server-env' | 'default';
+      unit: 'ms' | 'bytes' | 'count';
+      min: number;
+      max: number;
+    }>;
+
+    const fields: Record<string, string> = {
+      JwksFetchTimeoutMs: 'timeoutMs',
+      JwksFetchRetries: 'retries',
+      JwksFetchRetryBackoffMs: 'retryBackoffMs',
+      JwksCacheMaxAgeMs: 'cacheMaxAgeMs',
+      JwksTotalDeadlineMs: 'totalDeadlineMs',
+      JwksMaxResponseBytes: 'maxResponseBytes',
+      JwksMaxKeys: 'maxKeys',
+      JwksMaxCacheEntries: 'maxCacheEntries',
+      JwksRefreshIntervalMs: 'refreshIntervalMs',
+      JwksUnknownKidMinIntervalMs: 'unknownKidMinIntervalMs',
+      JwksStaleIfErrorMs: 'staleIfErrorMs',
     };
-    for (const [key, b] of Object.entries(bounds)) {
+    const sourceLabel = { endpoint: 'Endpoint override', 'server-env': 'Server environment', default: 'Built-in default' };
+    for (const [key, fieldName] of Object.entries(fields)) {
+      const field = effective[fieldName];
       const input = page.getByTestId(`settings-number-${key}-input`);
       await expect(input).toBeVisible();
-      await expect(input).toHaveAttribute('type', 'number');
-      await expect(input).toHaveAttribute('min', b.min);
-      await expect(input).toHaveAttribute('max', b.max);
+      await expect(input).toHaveValue(String(field.effective));
+      await expect(input).toHaveAttribute('min', String(field.min));
+      await expect(input).toHaveAttribute('max', String(field.max));
+      await expect(page.getByTestId(`settings-number-${key}-effective`)).toContainText(
+        `Effective: ${field.effective} ${field.unit}`,
+      );
+      await expect(page.getByTestId(`settings-number-${key}-source`)).toContainText(sourceLabel[field.source]);
     }
   });
 });

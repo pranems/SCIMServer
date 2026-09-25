@@ -221,7 +221,18 @@ export class GroupPatchEngine {
         return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
       }
       if (typeof operation.value === 'object' && operation.value !== null) {
-        const obj = operation.value as Record<string, unknown>;
+        const obj = Object.fromEntries(
+          Object.entries(operation.value as Record<string, unknown>).map(([key, value]) => [
+            key.toLowerCase() === 'displayname'
+              ? 'displayName'
+              : key.toLowerCase() === 'externalid'
+                ? 'externalId'
+                : key.toLowerCase() === 'members'
+                  ? 'members'
+                  : key,
+            value,
+          ]),
+        );
         let newDisplayName = currentDisplayName;
         let newExternalId = currentExternalId;
         let newMembers = members;

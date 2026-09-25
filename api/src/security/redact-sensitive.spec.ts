@@ -1,6 +1,18 @@
-import { redactSensitiveDeep, isSensitiveKey, REDACTED } from './redact-sensitive';
+import { redactSensitiveDeep, redactSensitiveUrl, isSensitiveKey, REDACTED } from './redact-sensitive';
 
 describe('redact-sensitive', () => {
+  describe('redactSensitiveUrl', () => {
+    it('redacts sensitive query parameters while preserving routing parameters', () => {
+      expect(redactSensitiveUrl('/scim/oauth/token?client_id=public&client_secret=secret-value&scope=read#result'))
+        .toBe('/scim/oauth/token?client_id=public&client_secret=[REDACTED]&scope=read#result');
+    });
+
+    it('matches encoded and mixed-case sensitive query keys', () => {
+      expect(redactSensitiveUrl('/path?Access_Token=jwt-value&api%5Fkey=key-value'))
+        .toBe('/path?Access_Token=[REDACTED]&api%5Fkey=[REDACTED]');
+    });
+  });
+
   describe('isSensitiveKey', () => {
     it('flags secret-bearing key names (case-insensitive)', () => {
       for (const k of [

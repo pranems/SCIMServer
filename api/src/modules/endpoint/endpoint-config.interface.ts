@@ -992,10 +992,10 @@ export function resolveEndpointEgressOverrides(
  * included); when `false` the persisted + displayed row is redacted.
  */
 export function getEffectivePersistRequestSecrets(
-  config: EndpointConfig | undefined,
-  serverDefault: boolean,
+  _config: EndpointConfig | undefined,
+  _serverDefault: boolean,
 ): boolean {
-  return getOptionalConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS) ?? serverDefault;
+  return false;
 }
 
 /**
@@ -1210,8 +1210,8 @@ export function resolveEndpointAuthEnablementDetails(
 /** The two visibility values. `always` retains + reveals; `once` shows once. */
 export type CredentialSecretVisibility = 'always' | 'once';
 
-/** Valid CredentialSecretVisibility values (case-insensitive). */
-export const VALID_CREDENTIAL_SECRET_VISIBILITY = ['always', 'once'] as const;
+/** New configuration accepts only encrypted retention with authenticated reveal. */
+export const VALID_CREDENTIAL_SECRET_VISIBILITY = ['always'] as const;
 
 /**
  * Normalize an arbitrary stored value to a valid visibility, or undefined when
@@ -1234,15 +1234,10 @@ export function normalizeCredentialSecretVisibility(
  * Missing/invalid values fall back to `always` (the retain-friendly default).
  */
 export function getEffectiveCredentialSecretVisibility(
-  serverValue: unknown,
-  config: EndpointConfig | undefined,
+  _serverValue: unknown,
+  _config: EndpointConfig | undefined,
 ): CredentialSecretVisibility {
-  const server = normalizeCredentialSecretVisibility(serverValue) ?? 'always';
-  if (server === 'once') return 'once'; // server ceiling
-  const endpoint = normalizeCredentialSecretVisibility(
-    config?.[ENDPOINT_CONFIG_FLAGS.CREDENTIAL_SECRET_VISIBILITY],
-  );
-  return endpoint ?? 'always';
+  return 'always';
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -1328,22 +1323,22 @@ function validatePrimaryEnforcementFlag(config: Record<string, any>, flagName: s
 }
 
 /**
- * Validate a `credentialVisibility` config flag value (WI-7). Enum always|once.
+ * Validate the retained-secret policy for authenticated admin display.
  */
 function validateCredentialVisibilityFlag(config: Record<string, any>, flagName: string): void {
   const value = config[flagName];
   if (value === undefined) return;
   if (typeof value === 'string') {
-    if (!VALID_CREDENTIAL_SECRET_VISIBILITY.includes(value.toLowerCase() as CredentialSecretVisibility)) {
+    if (value.toLowerCase() !== 'always') {
       throw new Error(
         `Invalid value "${value}" for config flag "${flagName}". ` +
-        `Allowed values: "always", "once" (case-insensitive).`,
+        `Allowed value: "always" (case-insensitive).`,
       );
     }
   } else {
     throw new Error(
       `Invalid type for config flag "${flagName}". ` +
-      `Expected string ("always"/"once"), got ${typeof value}.`,
+      `Expected string "always", got ${typeof value}.`,
     );
   }
 }

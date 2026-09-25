@@ -1,8 +1,8 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.32`
+> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.33`
 
-> **Version:** 0.55.32 - **Updated:** 2026-09-18
+> **Version:** 0.55.33 - **Updated:** 2026-09-18
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
 > **Source of truth:** [endpoint.controller.ts](../api/src/modules/endpoint/controllers/endpoint.controller.ts) - [built-in-presets.ts](../api/src/modules/scim/endpoint-profile/built-in-presets.ts)
 

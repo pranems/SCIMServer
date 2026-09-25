@@ -343,12 +343,13 @@ describe('SettingsPage security settings (WI-8)', () => {
     (useUpdateSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({ mutate: vi.fn(), isPending: false, error: null });
   });
 
-  it('renders the security settings card with the visibility group + KEK status', () => {
+  it('renders the fixed always-retain security policy + KEK status', () => {
     wrap(<SettingsPage />);
     expect(screen.getByTestId('security-settings-card')).toBeInTheDocument();
-    expect(screen.getByTestId('security-visibility-group')).toBeInTheDocument();
-    const always = screen.getByTestId('security-visibility-always') as HTMLInputElement;
-    expect(always.checked).toBe(true);
+    expect(screen.getByTestId('security-visibility-always')).toHaveTextContent(
+      'always (retain encrypted + display to authenticated admins)',
+    );
+    expect(screen.queryByTestId('security-visibility-once')).not.toBeInTheDocument();
     expect(screen.getByTestId('security-kek-status').textContent).toContain('default');
   });
 
@@ -359,22 +360,14 @@ describe('SettingsPage security settings (WI-8)', () => {
     expect(screen.getByTestId('security-settings-export-download')).toBeInTheDocument();
   });
 
-  it('reflects a server value of once', () => {
+  it('does not restore a selectable once control for legacy server data', () => {
     (useSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({
       data: { credentialSecretVisibility: 'once', kek: { configured: true, isDefault: false } },
       isLoading: false,
     });
     wrap(<SettingsPage />);
-    const once = screen.getByTestId('security-visibility-once') as HTMLInputElement;
-    expect(once.checked).toBe(true);
+    expect(screen.queryByTestId('security-visibility-once')).not.toBeInTheDocument();
+    expect(screen.getByTestId('security-visibility-always')).toBeInTheDocument();
     expect(screen.getByTestId('security-kek-status').textContent).toContain('configured');
-  });
-
-  it('selecting once fires the update mutation with the enum value', () => {
-    const mutate = vi.fn();
-    (useUpdateSecuritySettings as ReturnType<typeof vi.fn>).mockReturnValue({ mutate, isPending: false, error: null });
-    wrap(<SettingsPage />);
-    screen.getByTestId('security-visibility-once').click();
-    expect(mutate).toHaveBeenCalledWith({ credentialSecretVisibility: 'once' });
   });
 });

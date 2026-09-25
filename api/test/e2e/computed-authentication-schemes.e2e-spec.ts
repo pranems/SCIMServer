@@ -50,6 +50,29 @@ describe('Computed authenticationSchemes (A2)', () => {
     expect(res.body.authenticationSchemes[0].primary).toBe(true);
   });
 
+  it('dedicated endpoint auth settings contribute every effective scheme', async () => {
+    await request(app.getHttpServer())
+      .patch(`/scim/admin/endpoints/${endpointId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        profile: {
+          settings: {
+            SecretTokenBearerAuthEnabled: true,
+            OAuthClientCredentialsAuthEnabled: true,
+            WifCredentialsEnabled: true,
+          },
+        },
+      })
+      .expect(200);
+
+    const res = await spc().expect(200);
+    const names = res.body.authenticationSchemes.map((scheme: { name: string }) => scheme.name);
+    expect(names).toContain('OAuth Bearer Token');
+    expect(names).toContain('OAuth 2.0 Client Credentials');
+    expect(names).toContain('Workload Identity Federation');
+    expect(res.body.authenticationSchemes.filter((scheme: { primary?: boolean }) => scheme.primary)).toHaveLength(1);
+  });
+
   it('an enabled method adds its scheme alongside the baseline', async () => {
     await addMethod({ type: 'wif-7523', displayName: 'WIF', specUri: 'https://www.rfc-editor.org/rfc/rfc7523' }).expect(201);
 

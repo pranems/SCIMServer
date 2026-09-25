@@ -50,8 +50,9 @@ export class InMemoryGroupRepository implements IGroupRepository {
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null> {
+    const normalizedScimId = scimId.toLowerCase();
     for (const group of this.groups.values()) {
-      if (group.endpointId === endpointId && group.scimId === scimId) {
+      if (group.endpointId === endpointId && group.scimId.toLowerCase() === normalizedScimId) {
         return { ...group };
       }
     }

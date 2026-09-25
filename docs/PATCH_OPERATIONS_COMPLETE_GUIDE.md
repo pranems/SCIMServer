@@ -1,6 +1,6 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.32`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.33`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
@@ -191,6 +191,8 @@ flowchart TD
 ```
 
 **Critical default behavior (form 2 on Users/Groups):** with `VerbosePatchSupported = false` (the default), a core dot-path such as `name.givenName` is **not** an error - it is stored as a literal flat top-level key `"name.givenName"`, and the real nested `name.givenName` is left unchanged. Microsoft Entra sends dot-notation by default in its "verbose" PATCH, so endpoints serving Entra core sub-attribute updates should set this flag `true`. See [§6.1](#61-verbosepatchsupported) for the full treatment. Note that no-path object merges (form 5) resolve dotted keys regardless of the flag via `resolveNoPathValue`.
+
+**Case and key safety:** SCIM attribute names are case-insensitive. The PATCH engines resolve each incoming segment to the casing already present in the resource, so `Status`, `status`, and mixed-case value-path segments update one canonical property rather than creating duplicates. Resolved updates and removals rebuild objects from validated entry lists instead of assigning or deleting an arbitrary property name. `__proto__`, `constructor`, and `prototype` are rejected before reconstruction. This immutable shape removes the remote-property-injection sink while preserving canonical casing.
 
 ---
 

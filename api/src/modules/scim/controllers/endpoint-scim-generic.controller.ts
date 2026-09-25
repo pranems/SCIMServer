@@ -48,6 +48,7 @@ import { applyAttributeProjection, applyAttributeProjectionToList } from '../com
 import { EndpointScimGenericService } from '../services/endpoint-scim-generic.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
+import { resolveResourceType } from '../common/resource-type-resolver';
 import { buildBaseUrl } from '../common/base-url.util';
 
 @Controller('endpoints/:endpointId')
@@ -101,11 +102,9 @@ export class EndpointScimGenericController {
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
     // Derive custom resource type availability from profile.resourceTypes (D9)
-    const rt = endpoint.profile?.resourceTypes?.find(
-      r => r.endpoint === `/${resourceTypePath}` && r.name !== 'User' && r.name !== 'Group',
-    );
+    const rt = resolveResourceType(profile, { endpointPath: `/${resourceTypePath}` }).resourceType;
 
-    if (!rt) {
+    if (!rt || ['user', 'group'].includes(rt.name.toLowerCase())) {
       throw new NotFoundException(
         `No custom resource type registered at "/${resourceTypePath}" for this endpoint.`,
       );

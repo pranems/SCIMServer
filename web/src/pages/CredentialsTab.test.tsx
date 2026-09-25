@@ -16,7 +16,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
-import { CredentialsTab } from './CredentialsTab';
+import {
+  CredentialsTab,
+  buildEndpointConnectBundle,
+  buildMethodConnectBundle,
+  projectCredentialAdmin,
+} from './CredentialsTab';
 import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
 import type { EndpointOverviewResponse } from '@scim/types/dashboard.types';
 
@@ -43,6 +48,7 @@ const routerMock = vi.hoisted(() => ({
 }));
 const mockNavigate = routerMock.navigate;
 let mockRetainedSecrets: Record<string, string> = {};
+let mockCredentialRevealResults: Record<string, unknown> = {};
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router');
   const react = await vi.importActual<typeof import('react')>('react');
@@ -108,6 +114,7 @@ vi.mock('../api/queries', async () => {
     // P5 - the unified Connect tab embeds ConnectionPanel + AuthDiagnosticsPanel;
     // stub their hooks so these tests need no live network.
     useConnectionRetainedSecrets: () => mockRetainedSecrets,
+    useCredentialRevealResults: () => mockCredentialRevealResults,
     useUpdateEndpointConfig: () => ({ mutate: mockUpdateConfigMutate, isPending: false }),
     useAuthDecisions: () => ({ data: { count: 0, records: [] }, isLoading: false, error: null }),
   };
@@ -165,6 +172,8 @@ describe('CredentialsTab', () => {
     mockUseConnectionInfo.mockReturnValue({ data: undefined, isLoading: false, error: null });
     createMutationState = { isPending: false };
     deleteMutationState = { isPending: false };
+    mockRetainedSecrets = {};
+    mockCredentialRevealResults = {};
   });
 
   // ─── Loading / error / empty states ────────────────────────────────
@@ -818,6 +827,9 @@ describe('CredentialsTab', () => {
         },
       ],
     };
+    mockCredentialRevealResults = {
+      'oc-1': { id: 'oc-1', credentialType: 'oauth_client', retained: true, clientSecret: 'oauth-secret' },
+    };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
     // P7 - the panel is rendered up front; the Connect toggle button is gone.
@@ -835,9 +847,8 @@ describe('CredentialsTab', () => {
     expect(screen.getByTestId('credential-connect-appurl-info-oc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-connect-tokenurl-info-oc-1')).toBeInTheDocument();
     expect(screen.getByTestId('credential-connect-clientid-info-oc-1')).toBeInTheDocument();
-    // The secret still costs one deliberate click rather than rendering by default.
-    expect(screen.getByTestId('credential-connect-secret-reveal-oc-1')).toBeInTheDocument();
-    expect(screen.queryByTestId('credential-connect-secret-oc-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('credential-connect-secret-reveal-oc-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('credential-connect-secret-oc-1')).toHaveTextContent('oauth-secret');
   });
 
   function wifTrustOverview(id: string): EndpointOverviewResponse {
@@ -1020,10 +1031,6 @@ describe('CredentialsTab', () => {
   });
 
   it('V4: the oauth_client Connect panel shows the secret inline when retained', () => {
-    mockRevealMutate.mockClear();
-    mockRevealMutate.mockImplementation((_id: string, opts?: { onSuccess?: (r: unknown) => void }) =>
-      opts?.onSuccess?.({ retained: true, clientSecret: 'super-secret-value' }),
-    );
     const overview: EndpointOverviewResponse = {
       ...baseOverview,
       configFlags: { OAuthClientCredentialsAuthEnabled: true },
@@ -1031,22 +1038,20 @@ describe('CredentialsTab', () => {
         { id: 'oc-v4', credentialType: 'oauth_client', label: 'ISV', active: true, createdAt: '2026-05-01T00:00:00Z', expiresAt: null, oauthClientId: 'client-id-ep-1' },
       ],
     };
+    mockCredentialRevealResults = {
+      'oc-v4': { id: 'oc-v4', credentialType: 'oauth_client', retained: true, clientSecret: 'super-secret-value' },
+    };
     mockUseEndpointOverview.mockReturnValue({ data: overview, isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    fireEvent.click(screen.getByTestId('credential-connect-secret-reveal-oc-v4'));
     expect(screen.getByTestId('credential-connect-secret-oc-v4').textContent).toContain('super-secret-value');
   });
 
   it('X2: the bearer Connect panel shows the retained secret token inline (reveal returns `token`, not `clientSecret`)', () => {
-    mockRevealMutate.mockClear();
-    // A bearer credential's retained secret is returned in the `token` field
-    // (oauth_client uses `clientSecret`). The Connect subpanel must show it.
-    mockRevealMutate.mockImplementation((_id: string, opts?: { onSuccess?: (r: unknown) => void }) =>
-      opts?.onSuccess?.({ retained: true, token: 'bearer-token-value' }),
-    );
+    mockCredentialRevealResults = {
+      'bc-1': { id: 'bc-1', credentialType: 'bearer', retained: true, token: 'bearer-token-value' },
+    };
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ active: true }), isLoading: false, error: null });
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    fireEvent.click(screen.getByTestId('credential-connect-secret-reveal-bc-1'));
     expect(screen.getByTestId('credential-connect-secret-bc-1').textContent).toContain('bearer-token-value');
   });
 
@@ -1740,6 +1745,46 @@ describe('CredentialsTab', () => {
   });
 });
 
+describe('authenticated admin credential exports', () => {
+  const credentials = [
+    { id: 'bearer-1', credentialType: 'bearer', label: 'Bearer', active: true, createdAt: '2026-01-01T00:00:00Z' },
+    { id: 'oauth-1', credentialType: 'oauth_client', label: 'OAuth', active: true, createdAt: '2026-01-01T00:00:00Z', oauthClientId: 'client-1' },
+    { id: 'wif-1', credentialType: 'wif', label: 'WIF', active: true, createdAt: '2026-01-01T00:00:00Z', wif: { issuer: 'https://issuer.example' } },
+  ] as any;
+  const secrets = {
+    'bearer-1': { id: 'bearer-1', credentialType: 'bearer', retained: true, token: 'bearer-secret' },
+    'oauth-1': { id: 'oauth-1', credentialType: 'oauth_client', retained: true, clientSecret: 'oauth-secret' },
+  } as any;
+
+  it('includes each recoverable secret in its credential JSON projection', () => {
+    expect(projectCredentialAdmin(credentials[0], secrets)).toMatchObject({ token: 'bearer-secret' });
+    expect(projectCredentialAdmin(credentials[1], secrets)).toMatchObject({ clientSecret: 'oauth-secret' });
+    expect(projectCredentialAdmin(credentials[2], secrets)).not.toHaveProperty('token');
+    expect(projectCredentialAdmin(credentials[2], secrets)).not.toHaveProperty('clientSecret');
+  });
+
+  it('includes credential secrets in whole-endpoint and per-method JSON bundles', () => {
+    const endpointBundle = buildEndpointConnectBundle('ep-1', baseOverview.connectionInfo, credentials, {}, secrets);
+    expect(endpointBundle).toEqual(expect.objectContaining({
+      credentials: expect.arrayContaining([
+        expect.objectContaining({ id: 'bearer-1', token: 'bearer-secret' }),
+        expect.objectContaining({ id: 'oauth-1', clientSecret: 'oauth-secret' }),
+      ]),
+    }));
+
+    const methodBundle = buildMethodConnectBundle(
+      'ep-1',
+      'oauth_client',
+      baseOverview.connectionInfo,
+      [credentials[1]],
+      secrets,
+    );
+    expect(methodBundle).toEqual(expect.objectContaining({
+      credentials: [expect.objectContaining({ id: 'oauth-1', clientSecret: 'oauth-secret' })],
+    }));
+  });
+});
+
 // ─── R6: per-method credential sub-tabs ────────────────────────────────
 
 describe('CredentialsTab - per-method sub-tabs (R6)', () => {
@@ -2107,17 +2152,10 @@ describe('CredentialsTab - unified Connect surface (P5)', () => {
 
   it('W8: shows the retained bearer secret inline in the per-card Connect subpanel when visibility is Always', () => {
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview(true), isLoading: false, error: null });
-    // The reveal returns the retained bearer secret in `token` (oauth_client uses
-    // `clientSecret`) so the per-card subpanel renders it (X2).
-    mockRevealMutate.mockImplementation(
-      (_id: string, opts: { onSuccess: (r: { retained: boolean; token: string }) => void }) => {
-        opts.onSuccess({ retained: true, token: 'super-secret-token-value' });
-      },
-    );
+    mockCredentialRevealResults = {
+      'cred-b1': { id: 'cred-b1', credentialType: 'bearer', retained: true, token: 'super-secret-token-value' },
+    };
     renderWithProviders(<CredentialsTab endpointId="ep-1" />);
-    // Default tab = bearer; the panel is already open, so only the secret needs a click.
-    fireEvent.click(screen.getByTestId('credential-connect-secret-reveal-cred-b1'));
-    // The retained secret is rendered inline (re-viewable) rather than hidden.
     expect(screen.getByTestId('credential-connect-secret-cred-b1').textContent).toContain('super-secret-token-value');
   });
 

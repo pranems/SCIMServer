@@ -44,25 +44,25 @@ describe('AdminSecuritySettingsController (WI-8)', () => {
     });
   });
 
-  it('PUT sets a valid visibility and echoes it back', async () => {
+  it('PUT sets always and echoes it back', async () => {
     const { controller, credentialSecurity } = makeController();
-    const res = await controller.update({ credentialSecretVisibility: 'once' });
-    expect(credentialSecurity.setServerVisibility).toHaveBeenCalledWith('once');
-    expect(res.credentialSecretVisibility).toBe('once');
+    const res = await controller.update({ credentialSecretVisibility: 'always' });
+    expect(credentialSecurity.setServerVisibility).toHaveBeenCalledWith('always');
+    expect(res.credentialSecretVisibility).toBe('always');
   });
 
-  it('PUT to "once" purges every retained secret (server ceiling)', async () => {
+  it('PUT rejects the retired once policy without purging retained secrets', async () => {
     const { controller, credentialSecurity } = makeController();
-    await controller.update({ credentialSecretVisibility: 'once' });
-    expect(credentialSecurity.purgeAllRetainedSecrets).toHaveBeenCalledTimes(1);
+    await expect(controller.update({ credentialSecretVisibility: 'once' })).rejects.toBeInstanceOf(BadRequestException);
+    expect(credentialSecurity.purgeAllRetainedSecrets).not.toHaveBeenCalled();
   });
 
   it('PUT emits a security-settings event for cross-tab cache invalidation', async () => {
     const { controller, eventEmitter } = makeController();
-    await controller.update({ credentialSecretVisibility: 'once' });
+    await controller.update({ credentialSecretVisibility: 'always' });
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'scim.security.updated',
-      { credentialSecretVisibility: 'once' },
+      { credentialSecretVisibility: 'always' },
     );
   });
 
@@ -81,9 +81,9 @@ describe('AdminSecuritySettingsController (WI-8)', () => {
 
   it('PUT is case-insensitive on the enum', async () => {
     const { controller, credentialSecurity } = makeController();
-    const res = await controller.update({ credentialSecretVisibility: 'ONCE' });
-    expect(credentialSecurity.setServerVisibility).toHaveBeenCalledWith('once');
-    expect(res.credentialSecretVisibility).toBe('once');
+    const res = await controller.update({ credentialSecretVisibility: 'ALWAYS' });
+    expect(credentialSecurity.setServerVisibility).toHaveBeenCalledWith('always');
+    expect(res.credentialSecretVisibility).toBe('always');
   });
 
   describe('GET /connection-secrets (server-level global secrets)', () => {

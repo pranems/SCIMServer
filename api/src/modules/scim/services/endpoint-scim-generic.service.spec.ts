@@ -630,6 +630,35 @@ describe('EndpointScimGenericService', () => {
 
       expect(result.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:Device');
     });
+
+    it('should not emit server-owned or internal payload fields', async () => {
+      mockGenericRepo.findByScimId.mockResolvedValue({
+        ...mockGenericRecord,
+        rawPayload: JSON.stringify({
+          displayName: 'Safe Device',
+          id: 'client-controlled-id',
+          meta: { resourceType: 'Injected' },
+          endpointId: 'internal-endpoint',
+          scimId: 'internal-scim-id',
+          rawPayload: 'internal-raw-payload',
+          _version: 99,
+          _schemaCaches: { leaked: true },
+        }),
+      });
+
+      const result = await service.getResource(
+        'scim-dev-001',
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(result.id).toBe('scim-dev-001');
+      expect((result.meta as any).resourceType).not.toBe('Injected');
+      for (const key of ['endpointId', 'scimId', 'rawPayload', '_version', '_schemaCaches']) {
+        expect(result).not.toHaveProperty(key);
+      }
+    });
   });
 
   // ─── If-Match validation ──────────────────────────────────────────────

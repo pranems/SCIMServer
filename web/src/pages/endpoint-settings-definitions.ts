@@ -191,8 +191,8 @@ export const BOOLEAN_FLAGS: ReadonlyArray<BooleanSettingDefinition> = [
     key: 'PersistRequestSecrets',
     label: 'PersistRequestSecrets',
     displayLabel: 'Persist request secrets',
-    description: 'Store complete request/response headers and bodies for this endpoint; turn off to redact secret-bearing values.',
-    defaultValue: true,
+    description: 'Retired compatibility setting. Secret-bearing values are always redacted before durable request-log storage.',
+    defaultValue: false,
     category: 'Logging & privacy',
   },
   {

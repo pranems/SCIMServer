@@ -1,4 +1,4 @@
-import { Module, type NestModule, type MiddlewareConsumer, type OnModuleInit } from '@nestjs/common';
+import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 
 import { LoggingModule } from '../logging/logging.module';
@@ -128,18 +128,11 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     }
   ]
 })
-export class ScimModule implements NestModule, OnModuleInit {
+export class ScimModule implements NestModule {
   constructor(
     private readonly endpointContext: EndpointContextStorage,
     private readonly endpointService: EndpointService,
-    private readonly credentialSecurity: CredentialSecurityService,
   ) {}
-
-  onModuleInit(): void {
-    this.endpointService.setCredentialSecretPurgeListener((endpointId) =>
-      this.credentialSecurity.purgeRetainedSecrets(endpointId),
-    );
-  }
 
   /**
    * Register middleware on ALL routes:

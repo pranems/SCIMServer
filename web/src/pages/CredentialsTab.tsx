@@ -82,6 +82,8 @@ import {
   useDebugWifAssertion,
   type WifDebugAssertionResponse,
   useConnectionRetainedSecrets,
+  useCredentialRevealResults,
+  type CredentialRevealResults,
   useUpdateEndpointConfig,
 } from '../api/queries';
 import { AUTH_METHOD_FLAGS, effectiveAuthFlag } from './endpoint-auth-flags';
@@ -1929,6 +1931,31 @@ function projectCredentialPublic(cred: EndpointOverviewCredential): Record<strin
   };
 }
 
+export function projectCredentialAdmin(
+  cred: EndpointOverviewCredential,
+  revealResults: CredentialRevealResults,
+): Record<string, unknown> {
+  const projected = projectCredentialPublic(cred);
+  const reveal = revealResults[cred.id];
+  if (cred.credentialType === 'oauth_client') {
+    return {
+      ...projected,
+      clientSecret: reveal?.clientSecret ?? null,
+      secretStatus: reveal?.retained ? 'retained' : 'rotation-required',
+      ...(reveal?.reason ? { secretUnavailableReason: reveal.reason } : {}),
+    };
+  }
+  if (cred.credentialType === 'bearer') {
+    return {
+      ...projected,
+      token: reveal?.token ?? null,
+      secretStatus: reveal?.retained ? 'retained' : 'rotation-required',
+      ...(reveal?.reason ? { secretUnavailableReason: reveal.reason } : {}),
+    };
+  }
+  return projected;
+}
+
 /**
  * W3 - assemble the whole-endpoint Connect bundle: every enabled auth method +
  * the connection info (URLs + Entra field mappings, no secrets) + every
@@ -1936,18 +1963,19 @@ function projectCredentialPublic(cred: EndpointOverviewCredential): Record<strin
  * the one object an operator can copy / download to reproduce or audit the
  * endpoint's complete auth + connection posture.
  */
-function buildEndpointConnectBundle(
+export function buildEndpointConnectBundle(
   endpointId: string,
   connectionInfo: ConnectionInfo | undefined,
   credentials: EndpointOverviewCredential[],
   configFlags: Record<string, unknown>,
+  revealResults: CredentialRevealResults,
 ): Record<string, unknown> {
   return {
     endpointId,
     displayName: connectionInfo?.displayName ?? null,
     authConfigFlags: pickAuthConfigFlags(configFlags),
     connectionInfo: connectionInfo ?? null,
-    credentials: credentials.map(projectCredentialPublic),
+    credentials: credentials.map((credential) => projectCredentialAdmin(credential, revealResults)),
   };
 }
 
@@ -1956,11 +1984,12 @@ function buildEndpointConnectBundle(
  * connection info + the credentials/trusts backing that method (public
  * projection). `method` is the active sub-tab's credential axis.
  */
-function buildMethodConnectBundle(
+export function buildMethodConnectBundle(
   endpointId: string,
   method: ConnectionMethod,
   connectionInfo: ConnectionInfo | undefined,
   credentials: EndpointOverviewCredential[],
+  revealResults: CredentialRevealResults,
 ): Record<string, unknown> {
   const enabledMethod = connectionInfo?.enabledMethods.find((m) => m.method === method) ?? null;
   return {
@@ -1969,7 +1998,7 @@ function buildMethodConnectBundle(
     displayName: connectionInfo?.displayName ?? null,
     urls: connectionInfo?.urls ?? null,
     enabledMethod,
-    credentials: credentials.map(projectCredentialPublic),
+    credentials: credentials.map((credential) => projectCredentialAdmin(credential, revealResults)),
   };
 }
 
@@ -2003,6 +2032,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const rotateMutation = useRotateCredential(endpointId);
   const configMutation = useUpdateEndpointConfig(endpointId);
   const routeSearch = useSearch({ strict: false }) as Partial<ConnectSearch>;
+  const credentialRevealResults = useCredentialRevealResults(endpointId, data?.credentials ?? []);
 
   // V3 - which credential's label is being edited inline, + its draft value.
   const [editLabelId, setEditLabelId] = React.useState<string | null>(null);
@@ -2031,13 +2061,6 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [purgeTarget, setPurgeTarget] = React.useState<EndpointOverviewCredential | null>(null);
 
-  // U2 - which oauth_client credential's Connect-to-Entra params are expanded.
-  const [connectCredId, setConnectCredId] = React.useState<string | null>(null);
-  // V4 - the retained secret for the credential whose Connect panel is open
-  // (auto-revealed when visibility is Always), shown inline with the params. A
-  // bearer credential's secret comes back in `token`; oauth_client's in
-  // `clientSecret` (X2), so both are carried and the type-appropriate one shown.
-  const [connectSecret, setConnectSecret] = React.useState<{ id: string; retained: boolean; clientSecret?: string; token?: string } | null>(null);
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const connectScimUrl = `${origin}/scim/v2/endpoints/${endpointId}`;
   const connectTokenUrl = `${origin}/scim/endpoints/${endpointId}/oauth/token`;
@@ -2202,7 +2225,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
               auth-related config flags (no secret values). */}
           {connectionInfo && (
             <SettingsJsonExport
-              value={buildEndpointConnectBundle(endpointId, connectionInfo, credentials, configFlags)}
+              value={buildEndpointConnectBundle(endpointId, connectionInfo, credentials, configFlags, credentialRevealResults)}
               filename={`endpoint-${endpointId}-connect.json`}
               copyLabel="Copy all as JSON"
               data-testid="connect-endpoint-export"
@@ -2359,7 +2382,13 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
       {!noMethods && connectionInfo && (
         <div className={classes.headerActions} data-testid={`connect-method-export-row-${activeTab}`}>
           <SettingsJsonExport
-            value={buildMethodConnectBundle(endpointId, activeTab as ConnectionMethod, connectionInfo, listCredentials)}
+            value={buildMethodConnectBundle(
+              endpointId,
+              activeTab as ConnectionMethod,
+              connectionInfo,
+              listCredentials,
+              credentialRevealResults,
+            )}
             filename={`endpoint-${endpointId}-${activeTab}-connect.json`}
             copyLabel="Copy this method as JSON"
             data-testid={`connect-method-export-${activeTab}`}
@@ -2585,7 +2614,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                   <div className={classes.exportRow}>
                     <Caption1><strong>Credential JSON</strong></Caption1>
                     <SettingsJsonExport
-                      value={projectCredentialPublic(cred)}
+                      value={projectCredentialAdmin(cred, credentialRevealResults)}
                       filename={`credential-${cred.id}.json`}
                       copyLabel="Copy credential JSON"
                       data-testid={`credential-export-${cred.id}`}
@@ -2601,8 +2630,14 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                               applicationApiUrl: connectScimUrl,
                               oauthTokenEndpoint: connectTokenUrl,
                               clientIdentifier: cred.oauthClientId ?? null,
+                              clientSecret: credentialRevealResults[cred.id]?.clientSecret ?? null,
+                              secretStatus: credentialRevealResults[cred.id]?.retained ? 'retained' : 'rotation-required',
                             }
-                          : { applicationApiUrl: connectScimUrl }
+                          : {
+                              applicationApiUrl: connectScimUrl,
+                              secretToken: credentialRevealResults[cred.id]?.token ?? null,
+                              secretStatus: credentialRevealResults[cred.id]?.retained ? 'retained' : 'rotation-required',
+                            }
                       }
                       filename={`credential-${cred.id}-connection.json`}
                       copyLabel="Copy connection JSON"
@@ -2635,11 +2670,12 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                       Secret Token (reveal `token`); for oauth_client the client
                       secret (reveal `clientSecret`). */}
                   {(() => {
+                    const reveal = credentialRevealResults[cred.id];
                     const secretValue =
                       cred.credentialType === 'oauth_client'
-                        ? connectSecret?.clientSecret
-                        : connectSecret?.token;
-                    if (connectSecret?.id === cred.id && connectSecret.retained && secretValue) {
+                        ? reveal?.clientSecret
+                        : reveal?.token;
+                    if (reveal?.retained && secretValue) {
                       return (
                         <div className={classes.connectRow}>
                           <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
@@ -2654,42 +2690,16 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                         </div>
                       );
                     }
-                    if (connectSecret?.id === cred.id && !connectSecret.retained) {
+                    if (reveal && !reveal.retained) {
                       return (
                         <Caption1 data-testid={`credential-connect-secret-note-${cred.id}`}>
-                          This endpoint does not retain secrets
-                          (CredentialSecretVisibility=once), so the{' '}
+                          {reveal.reason ?? 'This credential has no recoverable retained secret.'} The{' '}
                           {cred.credentialType === 'oauth_client' ? 'client secret' : 'bearer token'} cannot
                           be shown again. Rotate to get a fresh one.
                         </Caption1>
                       );
                     }
-                    return (
-                      <div className={classes.connectRow}>
-                        <InfoLabel info={CONNECT_PARAM_HELP.clientSecret} data-testid={`credential-connect-secret-info-${cred.id}`}>
-                          {cred.credentialType === 'oauth_client' ? 'Client secret' : 'Secret token (bearer)'}
-                        </InfoLabel>
-                        <Button
-                          appearance="secondary"
-                          size="small"
-                          icon={<Eye24Regular />}
-                          disabled={!cred.active || revealMutation.isPending}
-                          onClick={() =>
-                            {
-                              setActionError(null);
-                              revealMutation.mutate(cred.id, {
-                                onSuccess: (r) =>
-                                  setConnectSecret({ id: cred.id, retained: r.retained, clientSecret: r.clientSecret, token: r.token }),
-                                onError: (error) => setActionError(actionErrorText(error)),
-                              });
-                            }
-                          }
-                          data-testid={`credential-connect-secret-reveal-${cred.id}`}
-                        >
-                          Reveal
-                        </Button>
-                      </div>
-                    );
+                    return <Caption1 data-testid={`credential-connect-secret-loading-${cred.id}`}>Loading secret...</Caption1>;
                   })()}
                 </div>
               )}

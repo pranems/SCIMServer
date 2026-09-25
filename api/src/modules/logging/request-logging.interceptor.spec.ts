@@ -137,6 +137,25 @@ describe('RequestLoggingInterceptor', () => {
     });
   });
 
+  it('should redact secret query parameters from structured messages and persistence', (done) => {
+    const url = '/scim/oauth/token?client_id=public&client_secret=query-secret&scope=read';
+    const safeUrl = '/scim/oauth/token?client_id=public&client_secret=[REDACTED]&scope=read';
+    const { context } = createMockContext({ method: 'GET', url });
+    const handler: CallHandler = { handle: () => of({ result: 'ok' }) };
+
+    interceptor.intercept(context, handler).subscribe({
+      complete: () => {
+        const messages = mockScimLogger.debug.mock.calls.map((call: unknown[]) => String(call[1]));
+        expect(messages.join('\n')).toContain(safeUrl);
+        expect(messages.join('\n')).not.toContain('query-secret');
+        expect(mockLoggingService.recordRequest).toHaveBeenCalledWith(
+          expect.objectContaining({ url: safeUrl }),
+        );
+        done();
+      },
+    });
+  });
+
   // ── Step 1: endpointId persisted to RequestLog ──────────────────────
 
   it('should pass endpointId to recordRequest on success', (done) => {

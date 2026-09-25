@@ -18,6 +18,30 @@ import type { WorkbenchHeader } from './workbench-export';
 
 export const WORKBENCH_HISTORY_KEY = 'scimserver.workbench.history.v1';
 export const MAX_HISTORY = 50;
+const REDACTED = '[REDACTED]';
+const SENSITIVE_KEY_PATTERN =
+  /secret|password|passwd|pwd|token|authorization|bearer|jwt|assertion|cookie|credential|api[-_]?key|passphrase/i;
+
+function redactSensitivePath(path: string): string {
+  const queryStart = path.indexOf('?');
+  if (queryStart < 0) return path;
+  const hashStart = path.indexOf('#', queryStart);
+  const base = path.slice(0, queryStart);
+  const query = path.slice(queryStart + 1, hashStart < 0 ? undefined : hashStart);
+  const hash = hashStart < 0 ? '' : path.slice(hashStart);
+  const redacted = query.split('&').map((part) => {
+    const equals = part.indexOf('=');
+    const encodedKey = equals < 0 ? part : part.slice(0, equals);
+    let decodedKey = encodedKey;
+    try {
+      decodedKey = decodeURIComponent(encodedKey.replace(/\+/g, ' '));
+    } catch {
+      // Preserve malformed query keys while still applying the raw-key check.
+    }
+    return SENSITIVE_KEY_PATTERN.test(decodedKey) ? `${encodedKey}=${REDACTED}` : part;
+  }).join('&');
+  return `${base}?${redacted}${hash}`;
+}
 
 export interface WorkbenchHistoryEntry {
   /** Stable per-entry id (uuid or timestamp-based). */
@@ -47,7 +71,7 @@ function safeRead(): WorkbenchHistoryEntry[] {
     if (!Array.isArray(parsed)) return [];
     // Defensive shape check: only accept entries that at least have
     // the four scalar fields so a bad write cannot pollute the UI.
-    return parsed.filter(
+    const valid = parsed.filter(
       (e) =>
         e !== null &&
         typeof e === 'object' &&
@@ -56,6 +80,9 @@ function safeRead(): WorkbenchHistoryEntry[] {
         typeof e.path === 'string' &&
         typeof e.timestamp === 'string',
     ) as WorkbenchHistoryEntry[];
+    const sanitized = valid.map(sanitizeEntry);
+    if (JSON.stringify(sanitized) !== JSON.stringify(valid)) safeWrite(sanitized);
+    return sanitized;
   } catch {
     // Corrupt storage - return empty so the next append silently
     // overwrites the bad payload.
@@ -73,6 +100,30 @@ function safeWrite(entries: WorkbenchHistoryEntry[]): void {
   }
 }
 
+function redactSensitiveDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSensitiveDeep);
+  if (value === null || typeof value !== 'object') return value;
+
+  const out: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = SENSITIVE_KEY_PATTERN.test(key) ? REDACTED : redactSensitiveDeep(nested);
+  }
+  return out;
+}
+
+function sanitizeEntry(entry: WorkbenchHistoryEntry): WorkbenchHistoryEntry {
+  return {
+    ...entry,
+    path: redactSensitivePath(entry.path),
+    requestBody: redactSensitiveDeep(entry.requestBody),
+    responseBody: redactSensitiveDeep(entry.responseBody),
+    requestHeaders: entry.requestHeaders?.map((header) => ({
+      ...header,
+      value: SENSITIVE_KEY_PATTERN.test(header.key) ? REDACTED : header.value,
+    })),
+  };
+}
+
 export function loadHistory(): WorkbenchHistoryEntry[] {
   return safeRead();
 }
@@ -83,7 +134,7 @@ export function loadHistory(): WorkbenchHistoryEntry[] {
  */
 export function appendHistory(entry: WorkbenchHistoryEntry): void {
   const current = safeRead();
-  const next = [entry, ...current].slice(0, MAX_HISTORY);
+  const next = [sanitizeEntry(entry), ...current].slice(0, MAX_HISTORY);
   safeWrite(next);
 }
 

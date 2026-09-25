@@ -73,6 +73,14 @@ describe('InMemoryGroupRepository', () => {
       expect(found!.scimId).toBe('scim-grp-1');
     });
 
+    it('should resolve SCIM IDs case-insensitively', async () => {
+      await repo.create(makeGroupInput({ scimId: 'aabbccdd-1234-abcd-9876-aabbccddeeff' }));
+
+      const found = await repo.findByScimId(endpointId, 'AABBCCDD-1234-ABCD-9876-AABBCCDDEEFF');
+
+      expect(found?.scimId).toBe('aabbccdd-1234-abcd-9876-aabbccddeeff');
+    });
+
     it('should return null when not found', async () => {
       expect(await repo.findByScimId(endpointId, 'nonexistent')).toBeNull();
     });

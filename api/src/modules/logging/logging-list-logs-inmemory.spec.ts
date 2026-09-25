@@ -263,6 +263,32 @@ describe('LoggingService.listLogs - in-memory filter parity (Phase D4)', () => {
       expect(detail?.requestId).toBe('cccccccc-0000-0000-0000-000000000003');
     });
 
+    it('getLog redacts legacy plaintext rows on read', async () => {
+      const rows = (service as unknown as { inMemoryLogRows: Array<Record<string, unknown>> }).inMemoryLogRows;
+      rows.push({
+        id: 'legacy-row-1',
+        method: 'POST',
+        url: '/scim/oauth/token',
+        status: 200,
+        createdAt: new Date(),
+        requestHeaders: JSON.stringify({ authorization: 'Bearer legacy-token' }),
+        requestBody: JSON.stringify({ client_id: 'public-client', client_secret: 'legacy-secret' }),
+        responseHeaders: JSON.stringify({ 'set-cookie': 'legacy-cookie' }),
+        responseBody: JSON.stringify({ access_token: 'legacy-jwt' }),
+        authDecision: JSON.stringify({ client_assertion: 'legacy-assertion', outcome: 'accept' }),
+      });
+
+      const detail = await service.getLog('legacy-row-1');
+      const serialized = JSON.stringify(detail);
+      expect(serialized).not.toContain('legacy-token');
+      expect(serialized).not.toContain('legacy-secret');
+      expect(serialized).not.toContain('legacy-cookie');
+      expect(serialized).not.toContain('legacy-jwt');
+      expect(serialized).not.toContain('legacy-assertion');
+      expect(serialized).toContain('[REDACTED]');
+      expect(serialized).toContain('public-client');
+    });
+
     it('getLog detail carries the endpointId correlation (parity with the list row)', async () => {
       service.recordRequest({
         method: 'POST',

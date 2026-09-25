@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.32`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.33`
 
-> **Version:** 0.55.32 - **Updated:** 2026-09-24
+> **Version:** 0.55.33 - **Updated:** 2026-09-24
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -80,6 +80,8 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [CUSTOM_RESOURCE_OBSERVABILITY_EXECUTION_RCA.md](CUSTOM_RESOURCE_OBSERVABILITY_EXECUTION_RCA.md) | **v0.55.29 execution RCA** - User/Group-only query boundaries, missing update events, duplicated filters, and exact-branch proxy routing. |
 | [CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md](CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md) | **v0.55.30 credential lifecycle** - atomic rotation, explicit reversible deactivate/activate, inactive-only permanent purge, and Connect UI parity for bearer, OAuth, and WIF. |
 | [auth/CREDENTIAL_LIFECYCLE_EXECUTION_RCA.md](auth/CREDENTIAL_LIFECYCLE_EXECUTION_RCA.md) | **v0.55.30 execution RCA** - split-write rotation, false-success purge, worktree harness friction, and prevention. |
+| [API_OUTPUT_FIDELITY_AND_SECRET_SURFACE_CONTRACT.md](API_OUTPUT_FIDELITY_AND_SECRET_SURFACE_CONTRACT.md) | **v0.55.33 API fidelity contract** - case-insensitive URL/SCIM identifiers, effective discovery and egress output, internal-field filtering, authenticated admin secret exports, and public/durable secret boundaries. |
+| [API_OUTPUT_FIDELITY_EXECUTION_RCA.md](API_OUTPUT_FIDELITY_EXECUTION_RCA.md) | **v0.55.33 execution RCA** - routing, backend parity, output, secret policy, durable disclosure, stale worktree/server, migration-design, and test-correctness findings. |
 | [CONTEXT_PRESERVING_NAVIGATION.md](CONTEXT_PRESERVING_NAVIGATION.md) | **v0.55.31 navigation contract** - history-first Back, direct-link fallbacks, and URL-owned workflow state. |
 | [CONTEXT_PRESERVING_NAVIGATION_EXECUTION_RCA.md](CONTEXT_PRESERVING_NAVIGATION_EXECUTION_RCA.md) | **v0.55.31 execution RCA** - modal locality, SPA history, router value types, canonical URLs, and test-harness prevention. |
 | [EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md](EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md) | **v0.55.32 effective egress** - runtime values, provenance, units, bounds, clamping, and transactional endpoint overrides. |
