@@ -18,6 +18,10 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
+The current deployed baseline is v0.55.35 on dev and the proudbush canary. The shared digest is
+`sha256:ad8594e2e2b7263e88dc4ae813436a20797cbea30b78457340fdb35dfe7eedfc`.
+Customer production remains on v0.55.20 and must not be promoted without explicit operator approval.
+
 The v0.55.34 global-navigation and workflow-context rollback unit is merged and
 fully verified on dev. Shell-wide
 Back/Forward restores route and typed URL state, including endpoint Logs detail
