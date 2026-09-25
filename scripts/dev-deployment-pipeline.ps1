@@ -471,14 +471,31 @@ if (-not $SkipDeploy) {
     # pointing at a tag that was never pushed. If the local build did not produce
     # an image, skip with a reason rather than reporting a FAIL for a step that
     # no longer gates anything.
-    $localImagePresent = $null -ne (docker image inspect scimserver-api --format '{{.Id}}' 2>$null)
+    $composeImageId = docker compose images -q api 2>$null | Select-Object -First 1
+    $localImagePresent = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($composeImageId)
+    $localImageId = if ($localImagePresent) {
+        (docker image inspect $composeImageId --format '{{.Id}}' 2>$null).Trim()
+    } else { $null }
+    $localImagePresent = $localImagePresent -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($localImageId)
     if ($localImagePresent) {
         Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') } | Out-Null
         Invoke-Gate '4.2b' "Mirror local image -> $RegistryAcr/scimserver:$ImageTag" {
-            docker tag scimserver-api "$RegistryAcr/scimserver:$ImageTag"
-            docker tag scimserver-api "$RegistryAcr/scimserver:latest"
-            docker push "$RegistryAcr/scimserver:$ImageTag"
-            docker push "$RegistryAcr/scimserver:latest"
+            $targets = @(
+                "$RegistryAcr/scimserver:$ImageTag",
+                "$RegistryAcr/scimserver:latest"
+            )
+            foreach ($target in $targets) {
+                docker tag $localImageId $target
+                if ($LASTEXITCODE -ne 0) { throw "docker tag failed for image $localImageId -> $target" }
+                $taggedImageId = (docker image inspect $target --format '{{.Id}}' 2>$null).Trim()
+                if ($LASTEXITCODE -ne 0 -or $taggedImageId -ne $localImageId) {
+                    throw "Local mirror tag identity mismatch for $target (expected $localImageId, got $taggedImageId)"
+                }
+            }
+            foreach ($target in $targets) {
+                docker push $target
+                if ($LASTEXITCODE -ne 0) { throw "docker push failed for $target" }
+            }
         } | Out-Null
     } else {
         Add-Result -Stage '4.2a' -Gate "ACR login ($RegistryAcr)"                          -Status 'SKIPPED' -Detail 'no local image (Docker build did not run or failed); deploy uses the GHCR import path'

@@ -66,10 +66,25 @@ foreach ($required in @(
 if ($pipeline.Contains("--limit 1 --json databaseId --jq '.[0].databaseId'")) {
     throw 'Deployment pipeline still selects the newest run without matching the expected SHA.'
 }
+foreach ($required in @(
+    'docker compose images -q api',
+    'docker image inspect $composeImageId',
+    'docker tag $localImageId $target',
+    'docker image inspect $target',
+    'docker tag failed for image',
+    'docker push failed for'
+)) {
+    if (-not $pipeline.Contains($required)) {
+        throw "Deployment pipeline is missing local-image mirror guard: $required"
+    }
+}
+if ($pipeline.Contains('docker tag scimserver-api')) {
+    throw 'Deployment pipeline still treats the Compose container name as an image tag.'
+}
 
 $prePush = Get-Content $prePushPath -Raw
 if (-not $prePush.Contains('select-github-workflow-run.contract.ps1')) {
     throw 'The default pre-push gate does not execute the workflow-run selector contract.'
 }
 
-Write-Output 'select-github-workflow-run contract: 10/10 passed'
+Write-Output 'select-github-workflow-run contract: 17/17 passed'

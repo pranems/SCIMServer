@@ -69,8 +69,21 @@ test.describe('Connect tab - migration surface (P7)', () => {
     const wif = page.getByTestId('connect-auth-flag-WifCredentialsEnabled');
     const before = await wif.isChecked();
     await wif.click();
-    // Re-read from the server rather than trusting the control's own state:
-    // an optimistic switch that never persisted looks identical in the DOM.
+    // Wait for SERVER truth before reloading. Reloading immediately after the
+    // click can abort the in-flight PATCH and make this persistence test cause
+    // the very failure it is intended to detect.
+    await expect.poll(async () => {
+      const response = await page.request.get(`/scim/admin/endpoints/${fixtureEndpointId}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      if (!response.ok()) return before;
+      const body = await response.json();
+      const stored = body.profile?.settings?.WifCredentialsEnabled;
+      return stored === true || String(stored).toLowerCase() === 'true';
+    }, { timeout: 20_000 }).toBe(!before);
+
+    // Re-read through the UI after a reload rather than trusting the
+    // optimistic control state.
     await page.reload();
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
     await page.getByTestId('connect-auth-methods').getByRole('button').click();

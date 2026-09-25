@@ -82,6 +82,19 @@ describe('Phase M1 - filter-builder (pure RFC 7644 §3.4.2.2 emitter)', () => {
     expect(buildFilterString(c)).toBe('userName eq "domain\\\\\\"alice\\""');
   });
 
+  it('round-trips a string containing backslashes and quotes', () => {
+    const value = 'domain\\"alice"';
+    const built = buildFilterString({
+      kind: 'atom',
+      atom: { attribute: 'userName', operator: 'eq', value },
+    });
+    const parsed = parseSimpleFilter(built);
+    expect(parsed).toEqual({
+      kind: 'atom',
+      atom: { attribute: 'userName', operator: 'eq', value },
+    });
+  });
+
   it('emits AND with multiple atoms wrapped in parentheses', () => {
     const c: FilterClause = {
       kind: 'compound',

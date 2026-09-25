@@ -152,7 +152,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
     expect(body2).not.toContain('Cannot GET');
 
     // Navigate to Settings
-    await page.getByTestId('app-sidebar').getByText('Settings').click();
+    await page.getByTestId('nav-settings').click();
     await page.waitForTimeout(3000);
     await screenshot(page, '10-settings-page');
     const body3 = await page.textContent('body');
@@ -303,7 +303,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
 
     await screenshot(page, '26-mobile-dashboard');
 
-    await page.getByTestId('app-sidebar').getByText('Settings').click();
+    await page.getByTestId('nav-settings').click();
     await page.waitForTimeout(3000);
     await screenshot(page, '27-mobile-settings');
   });
