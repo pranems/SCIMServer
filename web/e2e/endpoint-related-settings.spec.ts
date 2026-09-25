@@ -59,14 +59,22 @@ test.describe('Endpoint contextual settings', () => {
         await disclosure.click();
       }
       const renderedLabels = await panel.locator('label').allTextContents();
+      const editableLabels = settingLabels.filter((label) => label !== 'Persist request secrets');
       expect(renderedLabels.map((label) => label.trim()).filter(Boolean).sort()).toEqual(
-        [...settingLabels].sort(),
+        [...editableLabels].sort(),
       );
       if (route === 'users') {
         await expect(panel.getByRole('switch')).toHaveCount(2);
       }
       if (route === 'groups') {
         await expect(panel.getByRole('switch')).toHaveCount(3);
+      }
+      if (route === 'logs') {
+        await expect(panel.getByTestId('logs-related-settings-PersistRequestSecrets')).toContainText(
+          'always redacted',
+        );
+        await expect(panel.getByRole('switch')).toHaveCount(1);
+        await expect(panel.getByRole('combobox')).toHaveCount(1);
       }
     }
   });

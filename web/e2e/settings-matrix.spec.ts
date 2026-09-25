@@ -9,8 +9,8 @@
  *   (CredentialSecretVisibility) had a spec whose own comment concedes it is
  *   "READ-ONLY ... It does NOT click a different radio" - i.e. a presence-only
  *   assertion, which rule R10 says is not correctness. The remaining 25 flags,
- *   both enum dropdowns and all four numeric inputs, were never driven by a
- *   browser at all.
+ *   both enum dropdowns and the numeric settings surface, were never driven by
+ *   a browser at all.
  *
  *   That is the dangerous shape: every one of those controls renders, so a
  *   human glance and a presence assertion both pass, while a control wired to
@@ -48,7 +48,7 @@ const CORE_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const CORE_GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 
 /** Lower bound on the rendered control count. Fails loudly if the surface shrinks. */
-const MIN_EXPECTED_FLAGS = 20;
+const MIN_EXPECTED_FLAGS = 19;
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(
@@ -249,6 +249,8 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
       );
 
       expect(keys.length, 'the Settings tab should render the full flag surface').toBeGreaterThanOrEqual(MIN_EXPECTED_FLAGS);
+      await expect(page.getByTestId('settings-persist-request-secrets-redacted')).toContainText('always redacted');
+      await expect(page.getByRole('switch', { name: /PersistRequestSecrets/i })).toHaveCount(0);
 
       const failures: string[] = [];
       const covered: string[] = [];
@@ -374,7 +376,7 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
     }
   });
 
-  test('all four numeric JWKS inputs persist a typed value', async ({ page }) => {
+  test('all numeric endpoint settings persist a changed typed value', async ({ page }) => {
     test.setTimeout(10 * 60_000);
     let id: string | null = null;
     try {
@@ -417,7 +419,7 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
         JwksMaxResponseBytes: '524288',       // 1024 - 10485760
         JwksMaxKeys: '50',                    // 1 - 1000
         JwksMaxCacheEntries: '100',           // 1 - 1000
-        JwksRefreshIntervalMs: '3600000',     // 60000 - 86400000
+        JwksRefreshIntervalMs: '7200000',     // 60000 - 86400000; differs from inherited 3600000
         JwksUnknownKidMinIntervalMs: '60000', // 0 - 3600000
         JwksStaleIfErrorMs: '86400000',       // 0 - 604800000
         MaxActiveBearerCredentials: '7',      // 1 - 25
