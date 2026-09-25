@@ -52,6 +52,7 @@ import {
   notifyTokenInvalid,
 } from '../auth/token';
 import type { MeSearch } from '../routes/search-schemas';
+import { buildFilterString } from '../utils/filter-builder';
 
 const useStyles = makeStyles({
   page: {
@@ -289,7 +290,13 @@ export const MeProfilePage: React.FC = () => {
                 onClick={() => void navigate({
                   to: '/endpoints/$endpointId/users',
                   params: { endpointId: pickedEp },
-                  search: { page: 1, filter: `userName eq "${tokenSubject.replace(/"/g, '\\"')}"` },
+                  search: {
+                    page: 1,
+                    filter: buildFilterString({
+                      kind: 'atom',
+                      atom: { attribute: 'userName', operator: 'eq', value: tokenSubject },
+                    }),
+                  },
                 })}
               >
                 Open endpoint Users

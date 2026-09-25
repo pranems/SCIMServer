@@ -60,7 +60,7 @@ A page opened in a fresh tab has no valid in-app return entry. Back commands the
 |---|---|
 | Search-schema unit | 26/26 typed URL parsing tests, including typed booleans and action-target workflow state |
 | Page/component unit | 78 focused review-closure tests plus existing navigation coverage |
-| Web coverage | 1,566/1,566 across 118 files |
+| Web coverage | 1,567/1,567 across 118 files |
 | Playwright | 3/3 self-cleaning context-restoration journeys plus 6/6 global workflow regressions |
 | Live SCIM | 1,516/1,516 against dev |
 | Static/docs | Web build and route budgets; zero touched-file diagnostics; docs; 716 Mermaid renders |

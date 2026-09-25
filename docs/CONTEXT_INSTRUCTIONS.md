@@ -26,11 +26,14 @@ ResourceType. Errors-only Logs filtering accepts typed booleans and URL text.
 `/Me` preflights shared-secret, stale, and inactive endpoint contexts. Operations
 is current inventory, Logs is request history, and Manual Provision is the
 choose-target-first creation workspace. Intent-based endpoint controls show
-display name, stable name, and active state. Evidence is web 1,566/1,566 across
-118 files with all coverage ratchets, focused review 78/78, Chromium 6/6,
+display name, stable name, and active state. Evidence is web 1,567/1,567 across
+118 files with all coverage ratchets, focused review 78/78 plus filter-security
+29/29, Chromium 6/6,
 dev live 1,532/1,532, builds, API lint, route budgets, docs, and 716/716 Mermaid
 renders. PR, merge, and dev deployment remain pending. Canary and customer prod
-are unchanged.
+are unchanged. Exact-tip CodeQL found and closed incomplete subject-filter
+escaping through the structured RFC 7644 filter builder; fresh CodeQL remains
+required before merge.
 
 The v0.55.33 API-output-fidelity rollback unit is merged and verified on dev.
 URL and SCIM identifiers are case-insensitive

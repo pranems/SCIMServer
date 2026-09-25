@@ -8,7 +8,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![Tests](https://img.shields.io/badge/tests-9%2C829%20pass-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-9%2C830%20pass-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---
@@ -64,7 +64,7 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 | **Observability** | Structured JSON logging, SSE live stream, ring buffer, per-endpoint log isolation, file rotation, auto-prune |
 | **Deployment** | Docker Compose (1 command), Azure Container Apps (1 script), local dev, pre-built GHCR image |
 | **Web UI** | React + Vite admin console - dashboard, endpoint CRUD, Workbench, Bulk UI, custom resource types, discovery diff, operations, logs, settings |
-| **Testing** | 5,192 API unit + 1,533 API E2E + 1,566 web Vitest + 1,532 live SCIM + 6 focused Playwright = **9,829 checks**, measured on 2026-09-24 against v0.55.34 code and the v0.55.33 dev API |
+| **Testing** | 5,192 API unit + 1,533 API E2E + 1,567 web Vitest + 1,532 live SCIM + 6 focused Playwright = **9,830 checks**, measured on 2026-09-24 against v0.55.34 code and the v0.55.33 dev API |
 
 ---
 
