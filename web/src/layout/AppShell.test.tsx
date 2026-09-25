@@ -8,7 +8,15 @@
  */
 import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, render, waitFor } from '@testing-library/react';
+import {
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router';
 import { AppShell } from './AppShell';
 import { useUIStore } from '../store/ui-store';
 import { setStoredToken } from '../auth/token';
@@ -29,6 +37,35 @@ async function renderShell(child?: React.ReactNode) {
   // RouterProvider resolves the initial route asynchronously.
   await screen.findByTestId('app-shell');
   return result;
+}
+
+async function renderPersistentShell() {
+  const rootRoute = createRootRoute({
+    component: () => <AppShell><Outlet /></AppShell>,
+  });
+  const dashboardRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/',
+    component: () => <div data-testid="history-dashboard">Dashboard</div>,
+  });
+  const endpointsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/endpoints',
+    component: () => <div data-testid="history-endpoints">Endpoints</div>,
+  });
+  const settingsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/settings',
+    component: () => <div data-testid="history-settings">Settings</div>,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([dashboardRoute, endpointsRoute, settingsRoute]),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
+
+  const result = render(<RouterProvider router={router} />);
+  await screen.findByTestId('app-shell');
+  return { ...result, router };
 }
 
 describe('AppShell', () => {
@@ -101,6 +138,49 @@ describe('AppHeader', () => {
 
     fireEvent.click(themeBtn);
     await waitFor(() => expect(useUIStore.getState().colorScheme).toBe('dark'));
+  });
+
+  it('provides global Back and Forward across route transitions', async () => {
+    const { router } = await renderPersistentShell();
+
+    expect(screen.getByTestId('global-history-back')).toBeDisabled();
+    expect(screen.getByTestId('global-history-forward')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('nav-endpoints'));
+    await waitFor(() => {
+      expect(router.history.location.pathname).toBe('/endpoints');
+      expect(screen.getByTestId('global-history-back')).not.toBeDisabled();
+    });
+    expect(screen.getByTestId('global-history-forward')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('global-history-back'));
+    await waitFor(() => {
+      expect(router.history.location.pathname).toBe('/');
+      expect(screen.getByTestId('global-history-forward')).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByTestId('global-history-forward'));
+    await waitFor(() => {
+      expect(router.history.location.pathname).toBe('/endpoints');
+      expect(screen.getByTestId('global-history-forward')).toBeDisabled();
+    });
+  });
+
+  it('discards the stale Forward branch after Back followed by a new PUSH', async () => {
+    const { router } = await renderPersistentShell();
+
+    fireEvent.click(screen.getByTestId('nav-endpoints'));
+    await waitFor(() => expect(router.history.location.pathname).toBe('/endpoints'));
+    fireEvent.click(screen.getByTestId('global-history-back'));
+    await waitFor(() => expect(router.history.location.pathname).toBe('/'));
+    expect(screen.getByTestId('global-history-forward')).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await waitFor(() => expect(router.history.location.pathname).toBe('/settings'));
+    expect(screen.getByTestId('global-history-forward')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('global-history-forward'));
+    expect(router.history.location.pathname).toBe('/settings');
   });
 });
 

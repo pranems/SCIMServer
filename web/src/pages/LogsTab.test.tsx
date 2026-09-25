@@ -84,6 +84,16 @@ describe('LogsTab', () => {
     expect(screen.getByTestId('logs-tab-filters')).toBeInTheDocument();
   });
 
+  it('treats hasError=false as an active filter with reset recovery', async () => {
+    mockUseQuery.mockReturnValue({
+      data: { total: 0, items: [] },
+      isLoading: false, error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />, '/endpoints/ep-1/logs?hasError=false');
+    expect(await screen.findByTestId('logs-tab-empty-filtered')).toBeInTheDocument();
+    expect(screen.getByTestId('logs-tab-filters-reset')).toBeInTheDocument();
+  });
+
   it('reads urlContains and page from URL search params', async () => {
     mockUseQuery.mockReturnValue({
       data: { total: 0, items: [] },
@@ -141,6 +151,26 @@ describe('LogsTab', () => {
     expect(await screen.findByTestId('logs-tab-detail-drawer')).toBeInTheDocument();
     expect(screen.getByTestId('logs-tab-detail-request-body')).toBeInTheDocument();
     expect(screen.getByTestId('logs-tab-detail-response-body')).toBeInTheDocument();
+  });
+
+  it('opens the detail drawer from URL state for Back/Forward restoration', async () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        total: 1,
+        items: [{ id: 'l1', method: 'GET', url: '/Users', status: 200, durationMs: 8, createdAt: '2026-05-01T09:00:00Z' }],
+        method: 'GET',
+        url: '/Users',
+        status: 200,
+        requestHeaders: {},
+        requestBody: {},
+        responseHeaders: {},
+        responseBody: {},
+      },
+      isLoading: false,
+      error: null,
+    });
+    wrap(<LogsTab endpointId="ep-1" />, '/endpoints/ep-1/logs?detail=l1');
+    expect(await screen.findByTestId('logs-tab-detail-drawer')).toBeInTheDocument();
   });
 
   it('CSV export invokes triggerCsvDownload with flattened log rows', async () => {

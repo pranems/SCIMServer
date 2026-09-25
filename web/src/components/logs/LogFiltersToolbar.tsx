@@ -16,6 +16,7 @@ import {
   TIME_RANGE_VALUES,
   type TimeRange,
 } from '../../routes/search-schemas';
+import { EndpointOptionIdentity } from '../endpoints/EndpointContextSelector';
 
 export const LOG_METHOD_VALUES = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 export const LOG_STATUS_VALUES = [200, 201, 204, 400, 401, 403, 404, 409, 412, 429, 500] as const;
@@ -63,6 +64,7 @@ export interface LogEndpointOption {
   id: string;
   name: string;
   displayName?: string;
+  active: boolean;
 }
 
 export function timeRangeToSince(range: TimeRange | undefined): string | undefined {
@@ -125,7 +127,7 @@ export const LogFiltersToolbar: React.FC<{
           >
             {endpoints.map((option) => (
               <Option key={option.id} value={option.id} text={option.displayName ?? option.name}>
-                {option.displayName ?? option.name}
+                <EndpointOptionIdentity endpoint={option} />
               </Option>
             ))}
           </Combobox>

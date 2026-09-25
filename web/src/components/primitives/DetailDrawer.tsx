@@ -2,9 +2,9 @@
  * DetailDrawer - right-side overlay drawer used by tabs that need a
  * contextual detail panel (Activity drawer, Credential drawer, etc.).
  *
- * Wraps Fluent UI's `OverlayDrawer` so callers don't have to wire up
- * `position`, `type`, `onOpenChange`, ESC handling or backdrop clicks
- * - the drawer Just Closes when the user expects it to.
+ * Wraps Fluent UI's non-modal `OverlayDrawer` so callers don't have to wire up
+ * `position`, `type`, `onOpenChange`, ESC handling, or the close action. It is
+ * deliberately non-modal so the global Back/Forward controls remain usable.
  *
  * Slot conventions:
  *   - `title`: short string for the sticky header (also drives aria-label)
@@ -105,6 +105,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         if (!data.open) onClose();
       }}
       position="end"
+      modalType="non-modal"
       style={{ width }}
       data-testid={testId}
       aria-label={title}

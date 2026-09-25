@@ -44,6 +44,7 @@ import {
 } from '@fluentui/react-components';
 import {
   DataUsage24Regular,
+  DocumentSearch24Regular,
   ArrowDownload24Regular,
   People24Regular,
   Group24Regular,
@@ -54,6 +55,7 @@ import {
   useDatabaseUsers,
   useDatabaseGroups,
   useDatabaseStatistics,
+  useEndpoints,
   type DatabaseUserRow,
   type DatabaseGroupRow,
 } from '../api/queries';
@@ -88,6 +90,19 @@ const useStyles = makeStyles({
     maxWidth: '1200px',
     margin: '0 auto',
     padding: '24px',
+  },
+  pageHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '16px',
+    flexWrap: 'wrap',
+  },
+  pageHeading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    maxWidth: '760px',
   },
   toolbar: {
     display: 'flex',
@@ -205,15 +220,34 @@ export const OperationsPage: React.FC = () => {
   });
 
   const stats = useDatabaseStatistics();
+  const endpoints = useEndpoints();
+  const endpointIdentityById = useMemo(
+    () => new Map((endpoints.data?.endpoints ?? []).map((endpoint) => [endpoint.id, {
+      label: endpoint.displayName ?? endpoint.name,
+      name: endpoint.name,
+    }])),
+    [endpoints.data],
+  );
 
   return (
     <div className={classes.page} data-testid="operations-page">
-      <Subtitle1>Operations</Subtitle1>
-      <Caption1>
-        Cross-endpoint operator view of users and groups across every endpoint registered on
-        this server. Click an endpoint badge on a row to jump to that endpoint`s tab pre-filtered
-        by the user or group. Use Download CSV to export the currently visible page.
-      </Caption1>
+      <div className={classes.pageHeader}>
+        <div className={classes.pageHeading}>
+          <Subtitle1>Operations - current resources</Subtitle1>
+          <Caption1>
+            Current cross-endpoint inventory of Users and Groups, plus aggregate statistics.
+            Operations answers what exists now; Logs answers what requests happened.
+          </Caption1>
+        </div>
+        <Button
+          appearance="subtle"
+          icon={<DocumentSearch24Regular />}
+          onClick={() => void navigate({ to: '/logs' })}
+          data-testid="operations-open-logs"
+        >
+          View request history
+        </Button>
+      </div>
 
       <TabList
         selectedValue={activeTab}
@@ -239,6 +273,7 @@ export const OperationsPage: React.FC = () => {
           search={userSearch}
           activeOnly={userActiveOnly}
           page={userPage}
+          endpointIdentityById={endpointIdentityById}
           onSearch={(v) => {
             updateSearch({ userSearch: v || undefined, userPage: 1 });
           }}
@@ -256,6 +291,7 @@ export const OperationsPage: React.FC = () => {
           error={groups.error}
           search={groupSearch}
           page={groupPage}
+          endpointIdentityById={endpointIdentityById}
           onSearch={(v) => {
             updateSearch({ groupSearch: v || undefined, groupPage: 1 });
           }}
@@ -298,10 +334,11 @@ const UsersSection: React.FC<{
   search: string;
   activeOnly: boolean;
   page: number;
+  endpointIdentityById: ReadonlyMap<string, { label: string; name: string }>;
   onSearch: (v: string) => void;
   onActiveOnly: (v: boolean) => void;
   onPage: (p: number) => void;
-}> = ({ data, isLoading, error, search, activeOnly, page, onSearch, onActiveOnly, onPage }) => {
+}> = ({ data, isLoading, error, search, activeOnly, page, endpointIdentityById, onSearch, onActiveOnly, onPage }) => {
   const classes = useStyles();
   // X7 - drag-to-resize the 4 columns (userName|active|endpoint|created).
   const cols = useResizableColumns('operations-users', 4, 'operations-users-col');
@@ -401,6 +438,7 @@ const UsersSection: React.FC<{
                     {u.endpointId ? (
                       <EndpointBadgeLink
                         endpointId={u.endpointId}
+                        identity={endpointIdentityById.get(u.endpointId)}
                         section="users"
                         testId={`operations-user-row-${u.id}-endpoint-${u.endpointId}`}
                       />
@@ -468,9 +506,10 @@ const GroupsSection: React.FC<{
   error: unknown;
   search: string;
   page: number;
+  endpointIdentityById: ReadonlyMap<string, { label: string; name: string }>;
   onSearch: (v: string) => void;
   onPage: (p: number) => void;
-}> = ({ data, isLoading, error, search, page, onSearch, onPage }) => {
+}> = ({ data, isLoading, error, search, page, endpointIdentityById, onSearch, onPage }) => {
   const classes = useStyles();
   // X7 - drag-to-resize the 4 columns (displayName|members|endpoint|created).
   const cols = useResizableColumns('operations-groups', 4, 'operations-groups-col');
@@ -561,6 +600,7 @@ const GroupsSection: React.FC<{
                     {g.endpointId ? (
                       <EndpointBadgeLink
                         endpointId={g.endpointId}
+                        identity={endpointIdentityById.get(g.endpointId)}
                         section="groups"
                         testId={`operations-group-row-${g.id}-endpoint-${g.endpointId}`}
                       />
@@ -617,9 +657,10 @@ const GroupsSection: React.FC<{
 
 const EndpointBadgeLink: React.FC<{
   endpointId: string;
+  identity?: { label: string; name: string };
   section: 'users' | 'groups';
   testId: string;
-}> = ({ endpointId, section, testId }) => {
+}> = ({ endpointId, identity, section, testId }) => {
   const navigate = useNavigate();
   const href = `/endpoints/${endpointId}/${section}`;
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>): void => {
@@ -636,10 +677,11 @@ const EndpointBadgeLink: React.FC<{
       href={href}
       onClick={handleClick}
       data-testid={testId}
+      title={`${identity?.label ?? endpointId} (${identity?.name ?? endpointId}, ${endpointId})`}
       style={{ textDecoration: 'none' }}
     >
       <Badge appearance="outline" size="small">
-        {endpointId.slice(0, 8)}
+        {identity?.label ?? endpointId.slice(0, 8)}
       </Badge>
     </a>
   );

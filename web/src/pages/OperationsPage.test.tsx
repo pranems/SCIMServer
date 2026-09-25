@@ -24,6 +24,7 @@ import { OperationsPage } from './OperationsPage';
 const mockUseDatabaseUsers = vi.fn();
 const mockUseDatabaseGroups = vi.fn();
 const mockUseDatabaseStatistics = vi.fn();
+const mockUseEndpoints = vi.fn();
 const mockTriggerCsvDownload = vi.fn();
 const routerMock = vi.hoisted(() => ({
   initialSearch: {} as Record<string, unknown>,
@@ -38,6 +39,7 @@ vi.mock('../api/queries', async () => {
     useDatabaseUsers: (params: unknown) => mockUseDatabaseUsers(params),
     useDatabaseGroups: (params: unknown) => mockUseDatabaseGroups(params),
     useDatabaseStatistics: () => mockUseDatabaseStatistics(),
+    useEndpoints: () => mockUseEndpoints(),
   };
 });
 
@@ -140,6 +142,13 @@ describe('OperationsPage (Phase L6)', () => {
     mockUseDatabaseUsers.mockReturnValue(defaultHookReturn(sampleUsers));
     mockUseDatabaseGroups.mockReturnValue(defaultHookReturn(sampleGroups));
     mockUseDatabaseStatistics.mockReturnValue(defaultHookReturn(sampleStats));
+    mockUseEndpoints.mockReturnValue(defaultHookReturn({
+      endpoints: [
+        { id: 'ep-1', name: 'prod', displayName: 'Production', active: true },
+        { id: 'ep-2', name: 'staging', displayName: 'Staging', active: true },
+      ],
+      totalResults: 2,
+    }));
   });
 
   // ─── 1. Sub-tabs render ────────────────────────────────────────────
@@ -147,6 +156,8 @@ describe('OperationsPage (Phase L6)', () => {
   it('renders the page with 3 sub-tabs (All Users | All Groups | Statistics)', () => {
     renderWithProviders(<OperationsPage />);
     expect(screen.getByTestId('operations-page')).toBeInTheDocument();
+    expect(screen.getByText(/Operations answers what exists now; Logs answers what requests happened/i)).toBeInTheDocument();
+    expect(screen.getByTestId('operations-open-logs')).toBeInTheDocument();
     expect(screen.getByTestId('operations-tab-users')).toBeInTheDocument();
     expect(screen.getByTestId('operations-tab-groups')).toBeInTheDocument();
     expect(screen.getByTestId('operations-tab-statistics')).toBeInTheDocument();
@@ -162,6 +173,7 @@ describe('OperationsPage (Phase L6)', () => {
     // Endpoint badge on each row.
     expect(screen.getByTestId('operations-user-row-u1-endpoint-ep-1')).toBeInTheDocument();
     expect(screen.getByTestId('operations-user-row-u2-endpoint-ep-2')).toBeInTheDocument();
+    expect(screen.getByTestId('operations-user-row-u1-endpoint-ep-1')).toHaveTextContent('Production');
   });
 
   it('endpoint Badge on a user row links to that endpoint`s Users tab', () => {

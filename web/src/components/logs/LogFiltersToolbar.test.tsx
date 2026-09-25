@@ -13,7 +13,7 @@ describe('LogFiltersToolbar', () => {
       <FluentProvider theme={webLightTheme}>
         <LogFiltersToolbar
           values={{ urlContains: 'Devices', method: 'PATCH' }}
-          endpoints={[{ id: 'ep-1', name: 'Endpoint one' }]}
+          endpoints={[{ id: 'ep-1', name: 'endpoint-one', displayName: 'Endpoint one', active: true }]}
           onChange={onChange}
           onReset={onReset}
           data-testid="filters"
@@ -56,5 +56,21 @@ describe('LogFiltersToolbar', () => {
     );
 
     expect(screen.queryByTestId('filters-reset')).not.toBeInTheDocument();
+  });
+
+  it('treats explicit hasError=false as active filter state', () => {
+    render(
+      <FluentProvider theme={webLightTheme}>
+        <LogFiltersToolbar
+          values={{ hasError: false }}
+          onChange={vi.fn()}
+          onReset={vi.fn()}
+          data-testid="filters"
+        />
+      </FluentProvider>,
+    );
+
+    expect(screen.getByTestId('filters-reset')).toBeInTheDocument();
+    expect(screen.getByTestId('filters-errors')).toHaveAttribute('aria-pressed', 'false');
   });
 });

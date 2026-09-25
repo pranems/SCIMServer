@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.33`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.34`
 
-> **Version:** 0.55.33 - **Updated:** 2026-09-24
+> **Version:** 0.55.34 - **Updated:** 2026-09-24
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -15,6 +15,7 @@
 | Trace custom ResourceTypes through Activity and shared Logs filters | [CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md](CUSTOM_RESOURCE_OBSERVABILITY_AND_SHARED_LOGS.md) |
 | Operate bearer, OAuth, and WIF credential lifecycle safely | [CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md](CREDENTIAL_AND_WIF_TRUST_LIFECYCLE.md) |
 | Preserve page, tab, filter, pagination, comparison, and drawer state through Back | [CONTEXT_PRESERVING_NAVIGATION.md](CONTEXT_PRESERVING_NAVIGATION.md) |
+| Use global Back/Forward and understand Operations, Logs, `/Me`, Manual Provision, and endpoint context | [GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md](GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md) |
 | Inspect and edit effective WIF/JWKS runtime egress values | [EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md](EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md) |
 | Run ready-to-use server, admin, endpoint, and profile-aware SCIM requests | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) |
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
@@ -83,6 +84,8 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [API_OUTPUT_FIDELITY_AND_SECRET_SURFACE_CONTRACT.md](API_OUTPUT_FIDELITY_AND_SECRET_SURFACE_CONTRACT.md) | **v0.55.33 API fidelity contract** - case-insensitive URL/SCIM identifiers, effective discovery and egress output, internal-field filtering, authenticated admin secret exports, and public/durable secret boundaries. |
 | [API_OUTPUT_FIDELITY_EXECUTION_RCA.md](API_OUTPUT_FIDELITY_EXECUTION_RCA.md) | **v0.55.33 execution RCA** - routing, backend parity, output, secret policy, durable disclosure, stale worktree/server, migration-design, and test-correctness findings. |
 | [CONTEXT_PRESERVING_NAVIGATION.md](CONTEXT_PRESERVING_NAVIGATION.md) | **v0.55.31 navigation contract** - history-first Back, direct-link fallbacks, and URL-owned workflow state. |
+| [GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md](GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md) | **v0.55.34 global workflow contract** - shell-wide Back/Forward, intent-based endpoint context, `/Me` OAuth preflight, Operations vs Logs, Manual Provision boundaries, and narrow-layout measurements. |
+| [UX_NAVIGATION_AND_WORKFLOW_EXECUTION_RCA.md](UX_NAVIGATION_AND_WORKFLOW_EXECUTION_RCA.md) | **v0.55.34 execution RCA** - typed router booleans, forward-boundary tracking, `/Me` preflight, workflow ambiguity, endpoint context, and responsive-layout findings. |
 | [CONTEXT_PRESERVING_NAVIGATION_EXECUTION_RCA.md](CONTEXT_PRESERVING_NAVIGATION_EXECUTION_RCA.md) | **v0.55.31 execution RCA** - modal locality, SPA history, router value types, canonical URLs, and test-harness prevention. |
 | [EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md](EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md) | **v0.55.32 effective egress** - runtime values, provenance, units, bounds, clamping, and transactional endpoint overrides. |
 | [EFFECTIVE_WIF_JWKS_EGRESS_EXECUTION_RCA.md](EFFECTIVE_WIF_JWKS_EGRESS_EXECUTION_RCA.md) | **v0.55.32 execution RCA** - discarded provenance, missing reset semantics, query-harness update, and design correction. |

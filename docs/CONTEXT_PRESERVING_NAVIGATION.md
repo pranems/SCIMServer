@@ -1,10 +1,12 @@
 # Context-preserving navigation
 
-> **Status:** Consolidated locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.31`
+> **Status:** Extended with global controls - **Last verified:** 2026-09-24 - **Product version:** `0.55.34`
 
 ## Purpose
 
 Back navigation restores the workflow the operator was using, not a generic destination. Endpoint-list filters, endpoint tabs, Connect methods, Operations filters/pages, Discovery comparison state, and open resource drawers are URL state and therefore survive browser Back, Forward, refresh, and shared links.
+
+Back and Forward are also global icon controls in the application header. They remain visible across every route. Forward is enabled only after moving below the highest reachable TanStack history index; a new PUSH truncates that forward branch. See [GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md](GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md).
 
 ## Navigation contract
 
@@ -25,15 +27,26 @@ flowchart LR
 - Endpoint detail falls back to `/endpoints`.
 - Endpoint edit falls back to the endpoint overview.
 
+`GlobalHistoryControls` owns the shell-wide pair:
+
+- Back is available when TanStack `canGoBack()` is true.
+- Forward is available when the current `__TSR_index` is below the highest reachable in-app index.
+- A new route/search PUSH moves the highest reachable index to the new entry and discards the old forward branch.
+- Browser history length is never used because it includes entries outside SCIMServer.
+
 ## URL-owned workflow state
 
 | Surface | Restored state |
 |---|---|
 | Endpoints | `q` list filter |
 | Endpoint Users/Groups/Logs | page, page size, filters, and `detail` drawer id |
+| Global Logs | endpoint, method, status, time, error, duration, request id, and `detail` drawer id |
+| Activity | type, severity, and search filters |
 | Connect | selected authentication method |
 | Operations | selected subtab, Users search/active/page, Groups search/page |
 | Discovery | primary endpoint, compare mode, secondary endpoint, selected discovery subtab |
+| Self-service `/Me` | selected endpoint |
+| Manual Provision | selected endpoint and ResourceType |
 
 Boolean search values accept actual booleans and the URL strings `true`/`false` explicitly. Truthy coercion is not used.
 
@@ -45,11 +58,11 @@ A page opened in a fresh tab has no valid in-app return entry. Back commands the
 
 | Layer | Evidence |
 |---|---|
-| Search-schema unit | 23/23 typed URL parsing tests |
-| Page/component unit | 155 focused Back and URL-state tests |
-| Web coverage | 1,534/1,534 across 115 files |
-| Playwright | 3/3 self-cleaning context-restoration journeys |
+| Search-schema unit | 26/26 typed URL parsing tests, including typed booleans and action-target workflow state |
+| Page/component unit | 78 focused review-closure tests plus existing navigation coverage |
+| Web coverage | 1,567/1,567 across 118 files |
+| Playwright | 3/3 self-cleaning context-restoration journeys plus 6/6 global workflow regressions |
 | Live SCIM | 1,516/1,516 against dev |
-| Static/docs | Web build and route budgets; zero touched-file diagnostics; docs; 713 Mermaid renders |
+| Static/docs | Web build and route budgets; zero touched-file diagnostics; docs; 716 Mermaid renders |
 
-Full consolidation, PR, merge, and dev deployment remain pending. Canary and customer prod are unchanged.
+The v0.55.31 context-preserving Back implementation is merged and deployed. The v0.55.34 global controls are locally validated; PR, merge, and dev deployment remain pending. Canary and customer prod are unchanged.

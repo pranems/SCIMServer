@@ -10,6 +10,7 @@ import React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
 import { endpointsQueryOptions } from '../api/queries';
+import { meSearchSchema } from './search-schemas';
 
 // Phase K1 - lazy-load MeProfilePage into its own chunk.
 const MeProfilePage = React.lazy(() =>
@@ -19,6 +20,7 @@ const MeProfilePage = React.lazy(() =>
 export const meRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/me',
+  validateSearch: (search) => meSearchSchema.parse(search),
   component: MeProfilePage,
   loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
 });

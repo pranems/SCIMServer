@@ -76,7 +76,7 @@ export const logsSearchSchema = paginationSchema.extend({
   method: z.preprocess(emptyToUndef, z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional()),
   status: z.preprocess(emptyToUndef, z.coerce.number().int().min(100).max(599).optional()),
   timeRange: z.preprocess(emptyToUndef, z.enum(TIME_RANGE_VALUES).optional()),
-  hasError: z.preprocess(emptyToUndef, z.enum(['true', 'false']).transform((value) => value === 'true').optional()),
+  hasError: z.preprocess(emptyToUndef, explicitBoolean.optional()),
   minDurationMs: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()),
   requestId: z.preprocess(emptyToUndef, z.string().optional()),
   detail: z.preprocess(emptyToUndef, z.string().optional()),
@@ -109,7 +109,7 @@ export const globalLogsSearchSchema = paginationSchema.extend({
    */
   requestId: z.preprocess(emptyToUndef, z.string().optional()),
   method: z.preprocess(emptyToUndef, z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional()),
-  hasError: z.preprocess(emptyToUndef, z.enum(['true', 'false']).transform((value) => value === 'true').optional()),
+  hasError: z.preprocess(emptyToUndef, explicitBoolean.optional()),
   minDurationMs: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()),
 });
 export type GlobalLogsSearch = z.infer<typeof globalLogsSearchSchema>;
@@ -123,6 +123,19 @@ export const endpointsSearchSchema = z.object({
   q: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export type EndpointsSearch = z.infer<typeof endpointsSearchSchema>;
+
+/** Self-service /Me endpoint scope. */
+export const meSearchSchema = z.object({
+  endpointId: z.preprocess(emptyToUndef, z.string().optional()),
+});
+export type MeSearch = z.infer<typeof meSearchSchema>;
+
+/** Cross-endpoint Manual Provision target and resource type. */
+export const manualProvisionSearchSchema = z.object({
+  endpointId: z.preprocess(emptyToUndef, z.string().optional()),
+  resourceTypeId: z.preprocess(emptyToUndef, z.string().optional()),
+});
+export type ManualProvisionSearch = z.infer<typeof manualProvisionSearchSchema>;
 
 /** Per-endpoint Connect method sub-tab. */
 export const CONNECT_METHOD_VALUES = ['shared_secret', 'bearer', 'oauth_client', 'wif'] as const;

@@ -53,7 +53,7 @@ import { operationsRoute } from './routes/operations';
 import { workbenchRoute } from './routes/workbench';
 import { queryClient } from './api/query-client';
 
-/** Endpoint detail layout with its 10 nested tab routes (overview + 9 explicit). */
+/** Endpoint detail layout with its 13 nested routes (overview + 12 explicit). */
 const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
   overviewTabRoute,
   usersTabRoute,

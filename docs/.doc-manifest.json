@@ -91,6 +91,17 @@
       "maxAgeDays": 90
     },
     {
+      "path": "docs/GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md",
+      "title": "Global navigation and workflow context",
+      "sources": [
+        "web/src/layout/",
+        "web/src/pages/",
+        "web/src/components/endpoints/",
+        "web/src/routes/search-schemas.ts"
+      ],
+      "maxAgeDays": 90
+    },
+    {
       "path": "docs/COMPLETE_API_REFERENCE.md",
       "title": "REST API reference",
       "sources": ["api/src/modules/scim/controllers/", "api/src/oauth/oauth.controller.ts"],

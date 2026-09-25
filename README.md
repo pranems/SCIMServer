@@ -1,14 +1,14 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.33`
+> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.34`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
-[![Version](https://img.shields.io/badge/version-0.55.33-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.34-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![Tests](https://img.shields.io/badge/tests-7%2C846%20pass-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-9%2C830%20pass-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---
@@ -64,7 +64,7 @@ SCIMServer is a fully RFC-compliant SCIM 2.0 server built with NestJS and Postgr
 | **Observability** | Structured JSON logging, SSE live stream, ring buffer, per-endpoint log isolation, file rotation, auto-prune |
 | **Deployment** | Docker Compose (1 command), Azure Container Apps (1 script), local dev, pre-built GHCR image |
 | **Web UI** | React + Vite admin console - dashboard, endpoint CRUD, Workbench, Bulk UI, custom resource types, discovery diff, operations, logs, settings |
-| **Testing** | 4,673 API unit + 1,440 API E2E + 1,274 web vitest + 1,373 live SCIM + 213 Playwright = **8,973 checks**, all measured on 2026-07-31 against v0.55.1 |
+| **Testing** | 5,192 API unit + 1,533 API E2E + 1,567 web Vitest + 1,532 live SCIM + 6 focused Playwright = **9,830 checks**, measured on 2026-09-24 against v0.55.34 code and the v0.55.33 dev API |
 
 ---
 

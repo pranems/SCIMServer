@@ -44,7 +44,12 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     flexShrink: 0,
   },
-  expanded: { width: SIDEBAR_WIDTH_EXPANDED },
+  expanded: {
+    width: SIDEBAR_WIDTH_EXPANDED,
+    '@media (max-width: 720px)': {
+      width: SIDEBAR_WIDTH_COLLAPSED,
+    },
+  },
   collapsed: { width: SIDEBAR_WIDTH_COLLAPSED },
   nav: {
     display: 'flex',
@@ -67,6 +72,16 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground1Hover,
       color: tokens.colorNeutralForeground1,
     },
+    '@media (max-width: 720px)': {
+      justifyContent: 'center',
+      paddingLeft: '8px',
+      paddingRight: '8px',
+    },
+  },
+  navLabel: {
+    '@media (max-width: 720px)': {
+      display: 'none',
+    },
   },
   navItemActive: {
     backgroundColor: tokens.colorNeutralBackground1Selected,
@@ -75,6 +90,9 @@ const useStyles = makeStyles({
   collapseBtn: {
     margin: '8px',
     alignSelf: 'flex-end',
+    '@media (max-width: 720px)': {
+      display: 'none',
+    },
   },
 });
 
@@ -90,7 +108,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'endpoints', label: 'Endpoints', icon: <Server24Regular />, href: '/endpoints' },
   { key: 'manual-provision', label: 'Manual Provision', icon: <PersonAdd24Regular />, href: '/manual-provision' },
   // Phase L2 - per-endpoint /Me self-service
-  { key: 'me', label: 'My profile', icon: <Person24Regular />, href: '/me' },
+  { key: 'me', label: 'Self-service /Me', icon: <Person24Regular />, href: '/me' },
   // Phase L5 - Discovery Explorer + two-endpoint diff
   { key: 'discovery', label: 'Discovery', icon: <Search24Regular />, href: '/discovery' },
   // Phase L6 - Cross-endpoint Operations view
@@ -130,7 +148,7 @@ export const AppSidebar: React.FC = () => {
               data-testid={`nav-${item.key}`}
             >
               {item.icon}
-              {!collapsed && <Text size={300}>{item.label}</Text>}
+              {!collapsed && <Text size={300} className={classes.navLabel}>{item.label}</Text>}
             </Link>
           );
 
