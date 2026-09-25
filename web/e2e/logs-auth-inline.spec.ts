@@ -298,10 +298,10 @@ test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
     await expect(mintChip).toContainText('OAuth client');
   });
 
-  test('X6: a log row shows the endpoint NAME + a quick-open button', async ({ page }) => {
+  test('X6: a log row shows the endpoint display name + a quick-open button', async ({ page }) => {
     await page.goto('/logs');
     await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('log-row-endpoint-log-x5-crud')).toContainText('x5-endpoint');
+    await expect(page.getByTestId('log-row-endpoint-log-x5-crud')).toContainText('X5 Endpoint');
     await expect(page.getByTestId('log-row-endpoint-open-log-x5-crud')).toBeVisible();
   });
 

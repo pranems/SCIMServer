@@ -18,8 +18,8 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The v0.55.34 global-navigation and workflow-context rollback unit is
-consolidated locally on `feat/global-history-workflow-ux-v05534`. Shell-wide
+The v0.55.34 global-navigation and workflow-context rollback unit is merged and
+fully verified on dev. Shell-wide
 Back/Forward restores route and typed URL state, including endpoint Logs detail
 drawers, Self-service `/Me` endpoint scope, and Manual Provision endpoint plus
 ResourceType. Errors-only Logs filtering accepts typed booleans and URL text.
@@ -28,12 +28,13 @@ is current inventory, Logs is request history, and Manual Provision is the
 choose-target-first creation workspace. Intent-based endpoint controls show
 display name, stable name, and active state. Evidence is web 1,567/1,567 across
 118 files with all coverage ratchets, focused review 78/78 plus filter-security
-29/29, Chromium 6/6,
-dev live 1,532/1,532, builds, API lint, route budgets, docs, and 716/716 Mermaid
-renders. PR, merge, and dev deployment remain pending. Canary and customer prod
-are unchanged. Exact-tip CodeQL found and closed incomplete subject-filter
-escaping through the structured RFC 7644 filter builder; fresh CodeQL remains
-required before merge.
+29/29, final dev Playwright 246 passed / 5 skipped / 0 failed, dev live
+1,532/1,532, all six modes, builds, API lint, route budgets, docs, and 716/716
+Mermaid renders. PR #179 merged as `b58af31d`; dev revision
+`scimserver-dev--vb58af31d` serves v0.55.34 at 100% with all 60 endpoint IDs
+preserved and two active revisions retained. Exact-tip CodeQL found and closed
+incomplete subject-filter escaping through the structured RFC 7644 filter
+builder. Canary and customer prod are unchanged.
 
 The v0.55.33 API-output-fidelity rollback unit is merged and verified on dev.
 URL and SCIM identifiers are case-insensitive
