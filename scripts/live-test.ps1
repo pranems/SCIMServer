@@ -4506,7 +4506,7 @@ $bulkPostBody = @{
     Operations = @(
         @{
             method = "POST"
-            path = "/Users"
+            path = "/uSeRs"
             bulkId = "user1"
             data = @{
                 schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -4612,7 +4612,7 @@ $bulkGroupBody = @{
     Operations = @(
         @{
             method = "POST"
-            path = "/Groups"
+            path = "/gRoUpS"
             bulkId = "group1"
             data = @{
                 schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -4787,7 +4787,7 @@ try {
     $groupOp = $mixedResult.Operations[1]
     $mixedUserId = $userOp.location -replace '.*/', ''
     $mixedGroupId = $groupOp.location -replace '.*/', ''
-    Test-Result -Success ($userOp.status -eq "201" -and $groupOp.status -eq "201") -Message "9n.13 Mixed ops: User=$($userOp.status), Group=$($groupOp.status)"
+    Test-Result -Success ($userOp.status -eq "201" -and $groupOp.status -eq "201") -Message "9n.13 Mixed-case Bulk paths: User=$($userOp.status), Group=$($groupOp.status)"
     # Clean up
     if ($mixedUserId) { try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Users/$mixedUserId" -Method DELETE -Headers $headers } catch {} }
     if ($mixedGroupId) { try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Groups/$mixedGroupId" -Method DELETE -Headers $headers } catch {} }
@@ -10535,6 +10535,13 @@ try {
         Test-Result -Success $false -Message "9z-AI.4: GET /Devices wildcard endpoint failed: $($_.Exception.Message)"
     }
 
+    $aiCaseVariants = @("devices", "DEVICES", "DeViCeS")
+    foreach ($aiCaseVariant in $aiCaseVariants) {
+        $aiCaseList = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($aiEp.id)/$aiCaseVariant" -Headers $headers
+        $aiCaseOk = $aiCaseList.schemas[0] -eq "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+        Test-Result -Success $aiCaseOk -Message "9z-AI.4.$aiCaseVariant`: custom ResourceType URL casing resolves"
+    }
+
     # 9z-AI.5: PATCH with filtered resourceTypes[] removes Device
     # (this is what the M3 Delete-confirm dialog Submit handler does).
     $aiDeleteBody = @{
@@ -12208,6 +12215,10 @@ try {
     $at9Get = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id" -Method GET -Headers $headers
     Test-Result -Success ($at9Get.profile.settings.CredentialSecretVisibility -eq "always") -Message "9z-AT9.T1: endpoint accepts CredentialSecretVisibility=always"
 
+    $at9UpperId = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at9Id.ToUpper())" -Method GET -Headers $headers
+    $at9UpperName = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($at9Ep.name.ToUpper())" -Method GET -Headers $headers
+    Test-Result -Success (($at9UpperId.id -eq $at9Id) -and ($at9UpperName.id -eq $at9Id)) -Message "9z-AT9.T1b: endpoint UUID and name URL identifiers are case-insensitive"
+
     # T2: an invalid visibility value is rejected -> 400.
     $at9BadVis = $false
     try {
@@ -12216,6 +12227,14 @@ try {
         } | ConvertTo-Json -Depth 6) | Out-Null
     } catch { $at9BadVis = ($_.Exception.Response.StatusCode.value__ -eq 400) }
     Test-Result -Success $at9BadVis -Message "9z-AT9.T2: invalid CredentialSecretVisibility value rejected -> 400"
+
+    $at9OnceRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ CredentialSecretVisibility = "once" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    } catch { $at9OnceRejected = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at9OnceRejected -Message "9z-AT9.T2b: retired once-only endpoint policy is rejected -> 400"
 
     # T3: creating an oauth_client under always returns the one-time secret and NEVER leaks the stored envelope.
     $at9Cred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at9Id/credentials" -Method POST -Headers $headers -Body (@{
@@ -12250,7 +12269,7 @@ try {
     # T1: GET /admin/settings/security returns the server visibility + KEK status (no KEK value).
     $at10Sec = Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/security" -Method GET -Headers $headers
     $at10SecJson = $at10Sec | ConvertTo-Json -Depth 6
-    $at10SecOk = ($at10Sec.credentialSecretVisibility -in @("always", "once")) -and `
+    $at10SecOk = ($at10Sec.credentialSecretVisibility -eq "always") -and `
         ($null -ne $at10Sec.kek) -and ($at10Sec.kek.configured -eq $true) -and `
         (-not ($at10SecJson -match "changeme-credential-kek"))
     Test-Result -Success $at10SecOk -Message "9z-AT10.T1: GET security settings returns visibility + KEK status (no KEK value leaked)"
@@ -12268,6 +12287,14 @@ try {
         } | ConvertTo-Json) | Out-Null
     } catch { $at10BadPut = ($_.Exception.Response.StatusCode.value__ -eq 400) }
     Test-Result -Success $at10BadPut -Message "9z-AT10.T2: PUT security settings rejects an invalid enum -> 400"
+
+    $at10OnceRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/settings/security" -Method PUT -Headers $headers -Body (@{
+            credentialSecretVisibility = "once"
+        } | ConvertTo-Json) | Out-Null
+    } catch { $at10OnceRejected = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    Test-Result -Success $at10OnceRejected -Message "9z-AT10.T2b: retired once-only server policy is rejected -> 400"
 
     # T3: reveal a retained oauth_client secret under always -> matches the one-time create secret.
     $at10Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
@@ -12287,23 +12314,24 @@ try {
     $at10RevealJson = $at10Reveal | ConvertTo-Json -Depth 6
     Test-Result -Success (-not ($at10RevealJson -match '"secretEnvelope"')) -Message "9z-AT10.T4: reveal response never exposes secretEnvelope"
 
-    # T5: an endpoint set to once returns retained:false (rotate to view).
-    $at10Ep2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
-        name = "live-test-wi8b-$(Get-Random)"; profilePreset = "rfc-standard"
-    } | ConvertTo-Json)
-    $at10Id2 = $at10Ep2.id
-    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2" -Method PATCH -Headers $headers -Body (@{
-        profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True"; CredentialSecretVisibility = "once" } }
-    } | ConvertTo-Json -Depth 6) | Out-Null
-    $at10Cred2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2/credentials" -Method POST -Headers $headers -Body (@{
-        credentialType = "oauth_client"; label = "wi8-once-live"
-    } | ConvertTo-Json)
-    $at10Reveal2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2/credentials/$($at10Cred2.id)/reveal" -Method POST -Headers $headers
-    Test-Result -Success (($at10Reveal2.retained -eq $false) -and ($null -eq $at10Reveal2.clientSecret)) -Message "9z-AT10.T5: reveal under once returns retained:false with no secret"
+    # T5: authenticated admin connection-info includes the retained secret.
+    $at10Info = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id/connection-info" -Method GET -Headers $headers
+    $at10Oauth = $at10Info.enabledMethods | Where-Object { $_.method -eq "oauth_client" } | Select-Object -First 1
+    Test-Result -Success (($at10Oauth.entraFields.clientSecret -eq $at10Cred.clientSecret) -and ($at10Oauth.secretRevealed -eq $true)) -Message "9z-AT10.T5: authenticated connection-info includes retained oauth secret"
+
+    # T6: SPC reflects effective auth methods, but public discovery never contains a secret.
+    $at10Spc = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at10Id/ServiceProviderConfig" -Method GET -Headers $headers
+    $at10OauthScheme = $at10Spc.authenticationSchemes | Where-Object { $_.name -eq "OAuth 2.0 Client Credentials" }
+    Test-Result -Success ($null -ne $at10OauthScheme) -Message "9z-AT10.T6: SPC advertises effective OAuth client credentials"
+    $at10DiscoveryJson = @(
+        $at10Spc,
+        (Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at10Id/Schemas" -Method GET -Headers $headers),
+        (Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$at10Id/ResourceTypes" -Method GET -Headers $headers)
+    ) | ConvertTo-Json -Depth 20
+    Test-Result -Success (-not ($at10DiscoveryJson.Contains($at10Cred.clientSecret))) -Message "9z-AT10.T7: public discovery outputs exclude retained credential secrets"
 
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id" -Method DELETE -Headers $headers | Out-Null } catch {}
-    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$at10Id2" -Method DELETE -Headers $headers | Out-Null } catch {}
 } catch {
     Test-Result -Success $false -Message "9z-AT10: WI-8 reveal + security settings section threw: $($_.Exception.Message)"
 }
@@ -12685,13 +12713,16 @@ try {
     $awReveal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/credentials/$awCredId/reveal" -Method POST -Headers $headers
     Test-Result -Success ($awReveal.retained -eq $true -and $null -ne $awReveal.clientSecret) -Message "9z-AW.T5: reveal returns retained:true + the clientSecret for the Connect tab always-show"
 
-    # T6 (secret-show feature): flipping the endpoint to `once` WITHHOLDS the inline secret again.
-    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId" -Method PATCH -Headers $headers -Body (@{
-        profile = @{ settings = @{ CredentialSecretVisibility = "once" } }
-    } | ConvertTo-Json -Depth 6) | Out-Null
-    $awInfoOnce = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/connection-info" -Method GET -Headers $headers
-    $awOauthOnce = $awInfoOnce.enabledMethods | Where-Object { $_.method -eq "oauth_client" }
-    Test-Result -Success ($awOauthOnce.secretRevealed -ne $true -and $null -eq $awOauthOnce.entraFields.clientSecret) -Message "9z-AW.T6: flipping the endpoint to once WITHHOLDS the inline secret"
+    # T6: the retired once-only policy is rejected and cannot purge the retained secret.
+    $awOnceRejected = $false
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId" -Method PATCH -Headers $headers -Body (@{
+            profile = @{ settings = @{ CredentialSecretVisibility = "once" } }
+        } | ConvertTo-Json -Depth 6) | Out-Null
+    } catch { $awOnceRejected = ($_.Exception.Response.StatusCode.value__ -eq 400) }
+    $awInfoAfterReject = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$awId/connection-info" -Method GET -Headers $headers
+    $awOauthAfterReject = $awInfoAfterReject.enabledMethods | Where-Object { $_.method -eq "oauth_client" }
+    Test-Result -Success ($awOnceRejected -and $awOauthAfterReject.entraFields.clientSecret -eq $awCred.clientSecret) -Message "9z-AW.T6: once-only policy is rejected and retained secret remains available"
 
     # T7 (secret-show feature): server-level connection-secrets returns the global
     # shared secret + oauth client id/secret when the server visibility is always.
@@ -13776,7 +13807,7 @@ try {
         $d = Get-LogDetailByUrlStatus "endpoints/$bnId/Users" 400
         $bnHas = ($null -ne $d -and $d.requestBody._bodyNotCaptured -eq $true)
         Test-Result -Success ($bnHas -and $d.requestBody.reason -eq "unparseable") -Message "9z-BN.T2: malformed row stored with an 'unparseable' marker"
-        Test-Result -Success ($bnHas -and ("$($d.requestBody._rawPreview)" -match "bn-broken")) -Message "9z-BN.T3: unparseable marker carries the raw bytes"
+        Test-Result -Success ($bnHas -and $d.requestBody._rawPreview -eq "[REDACTED]") -Message "9z-BN.T3: unparseable raw bytes are redacted before durable storage"
     } else {
         Test-Result -Success $false -Message "9z-BN.T2-T3: malformed request was not rejected with 400"
     }

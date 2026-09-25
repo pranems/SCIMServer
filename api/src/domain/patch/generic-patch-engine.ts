@@ -29,7 +29,7 @@ import {
   pruneEmptyExtensions,
   findInvalidMultiValuedElement,
   mergeComplexAttribute,
-  safePropertyKey,
+  resolvePropertyKey,
 } from '../../modules/scim/utils/scim-patch-path';
 
 // ─── Prototype pollution guard ──────────────────────────────────────────────
@@ -118,7 +118,7 @@ export class GenericPatchEngine {
       if (typeof op.value === 'object' && op.value !== null && !Array.isArray(op.value)) {
         for (const [key, val] of Object.entries(op.value)) {
           if (!DANGEROUS_KEYS.has(key)) {
-            this.payload[key] = val;
+            this.payload[resolvePropertyKey(this.payload, key)] = val;
           }
         }
       } else {
@@ -140,7 +140,7 @@ export class GenericPatchEngine {
       if (typeof op.value === 'object' && op.value !== null && !Array.isArray(op.value)) {
         for (const [key, val] of Object.entries(op.value)) {
           if (!DANGEROUS_KEYS.has(key)) {
-            this.payload[key] = val;
+            this.payload[resolvePropertyKey(this.payload, key)] = val;
           }
         }
       } else {
@@ -234,15 +234,16 @@ export class GenericPatchEngine {
 
     const segments = path.split('.');
     if (segments.length === 1) {
-      if (merge && Array.isArray(this.payload[path]) && Array.isArray(value)) {
-        (this.payload[safePropertyKey(path)] as unknown[]).push(...(value as unknown[]));
+      const propertyKey = resolvePropertyKey(this.payload, path);
+      if (merge && Array.isArray(this.payload[propertyKey]) && Array.isArray(value)) {
+        (this.payload[propertyKey] as unknown[]).push(...(value as unknown[]));
       } else if (!merge) {
         // F1: when replacing a complex parent, merge with null-as-unset so a
         // partial object preserves siblings (RFC 7644 S3.5.2.3 Entra/Okta).
         // Arrays / primitives still whole-replace via mergeComplexAttribute's fallback.
-        this.payload[safePropertyKey(path)] = mergeComplexAttribute(this.payload[path], value);
+        this.payload[propertyKey] = mergeComplexAttribute(this.payload[propertyKey], value);
       } else {
-        this.payload[safePropertyKey(path)] = value;
+        this.payload[propertyKey] = value;
       }
     } else {
       this.setNested(this.payload, segments, value, merge);
@@ -257,7 +258,7 @@ export class GenericPatchEngine {
   ): void {
     let current = obj;
     for (let i = 0; i < segments.length - 1; i++) {
-      const seg = segments[i];
+      const seg = resolvePropertyKey(current, segments[i]);
       // CWE-1321 defense-in-depth: callers pre-validate the path via
       // guardPrototypePollution, but never write a prototype-polluting segment.
       if (DANGEROUS_KEYS.has(seg)) return;
@@ -266,7 +267,7 @@ export class GenericPatchEngine {
       }
       current = current[seg] as Record<string, unknown>;
     }
-    const last = segments[segments.length - 1];
+    const last = resolvePropertyKey(current, segments[segments.length - 1]);
     if (DANGEROUS_KEYS.has(last)) return; // CWE-1321 defense-in-depth
     if (merge && Array.isArray(current[last]) && Array.isArray(value)) {
       (current[last] as unknown[]).push(...(value as unknown[]));
@@ -317,7 +318,7 @@ export class GenericPatchEngine {
 
     const segments = path.split('.');
     if (segments.length === 1) {
-      delete this.payload[path];
+      delete this.payload[resolvePropertyKey(this.payload, path)];
     } else {
       this.removeNested(this.payload, segments);
     }
@@ -326,12 +327,12 @@ export class GenericPatchEngine {
   private removeNested(obj: Record<string, unknown>, segments: string[]): void {
     let current = obj;
     for (let i = 0; i < segments.length - 1; i++) {
-      const seg = segments[i];
+      const seg = resolvePropertyKey(current, segments[i]);
       if (typeof current[seg] !== 'object' || current[seg] === null) {
         return; // Path doesn't exist - no-op
       }
       current = current[seg] as Record<string, unknown>;
     }
-    delete current[segments[segments.length - 1]];
+    delete current[resolvePropertyKey(current, segments[segments.length - 1])];
   }
 }

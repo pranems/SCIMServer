@@ -52,6 +52,18 @@ describe('InMemoryGenericResourceRepository', () => {
       expect(found!.scimId).toBe('scim-001');
     });
 
+    it('should resolve SCIM IDs case-insensitively', async () => {
+      await repo.create({ ...sampleInput, scimId: 'aabbccdd-1234-abcd-9876-aabbccddeeff' });
+
+      const found = await repo.findByScimId(
+        endpointId,
+        resourceType,
+        'AABBCCDD-1234-ABCD-9876-AABBCCDDEEFF',
+      );
+
+      expect(found?.scimId).toBe('aabbccdd-1234-abcd-9876-aabbccddeeff');
+    });
+
     it('should return null for wrong resourceType', async () => {
       await repo.create(sampleInput);
       const found = await repo.findByScimId(endpointId, 'WrongType', 'scim-001');

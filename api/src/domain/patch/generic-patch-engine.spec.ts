@@ -35,6 +35,23 @@ describe('GenericPatchEngine', () => {
       expect(engine.getResult().displayName).toBe('New Name');
     });
 
+    it('should resolve top-level and nested attribute paths case-insensitively', () => {
+      const engine = new GenericPatchEngine({
+        status: 'offline',
+        name: { model: 'Old Model' },
+      });
+
+      engine.apply({ op: 'replace', path: 'Status', value: 'online' });
+      engine.apply({ op: 'replace', path: 'Name.Model', value: 'New Model' });
+
+      expect(engine.getResult()).toEqual({
+        status: 'online',
+        name: { model: 'New Model' },
+      });
+      expect(engine.getResult()).not.toHaveProperty('Status');
+      expect(engine.getResult()).not.toHaveProperty('Name');
+    });
+
     it('should replace a nested attribute (dot notation)', () => {
       const engine = new GenericPatchEngine(makePayload());
       engine.apply({ op: 'replace', path: 'name.model', value: 'Gadget' });

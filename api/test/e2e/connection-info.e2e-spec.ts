@@ -163,34 +163,14 @@ describe('Connection-info API (E2E)', () => {
     expect(oc.entraFields.clientSecret).toBeNull();
   });
 
-  it('WITHHOLDS the secret when CredentialSecretVisibility is once (shown once at create only)', async () => {
-    const endpointId = await createEndpointWithConfig(app, token, {
-      OAuthClientCredentialsAuthEnabled: true,
-      CredentialSecretVisibility: 'once',
-    });
-
-    // Create an oauth_client credential (the secret is shown once here, not in connection-info).
-    const created = await request(app.getHttpServer())
-      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+  it('rejects once-only configuration before it can suppress connection-info secrets', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {});
+    await request(app.getHttpServer())
+      .patch(`/scim/admin/endpoints/${endpointId}`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ credentialType: 'oauth_client', label: 'wi2-e2e' })
-      .expect(201);
-    expect(created.body.clientSecret).toBeDefined();
-
-    const res = await request(app.getHttpServer())
-      .get(`/scim/admin/endpoints/${endpointId}/connection-info`)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-
-    const oc = res.body.enabledMethods.find((m: { method: string }) => m.method === 'oauth_client');
-    expect(oc.clientSecretState).toBe('set-shown-once');
-    expect(oc.entraFields.clientIdentifier).toBe(`client-id-${endpointId}`); // first oauth_client defaults to client-id-<endpointId>
-    // visibility=once -> the secret is NOT inlined.
-    expect(oc.entraFields.clientSecret).toBeNull();
-    expect(oc.secretRevealed).toBe(false);
-    // The whole response must not carry the plaintext secret anywhere.
-    expect(JSON.stringify(res.body)).not.toContain(created.body.clientSecret);
+      .send({ profile: { settings: { CredentialSecretVisibility: 'once' } } })
+      .expect(400);
   });
 
   it('INLINES the secret + sets secretRevealed when CredentialSecretVisibility is always (Entra one-stop)', async () => {

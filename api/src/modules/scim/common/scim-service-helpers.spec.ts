@@ -1776,6 +1776,22 @@ describe('stripNeverReturnedFromPayload', () => {
     expect(visible).toEqual([EXT_URN]);
   });
 
+  it('should match and canonicalize extension URN keys case-insensitively', () => {
+    const mixedCaseUrn = EXT_URN.toUpperCase();
+    const neverByParent = new Map<string, Set<string>>([
+      [EXT_URN.toLowerCase(), new Set(['badge'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      [mixedCaseUrn]: { department: 'Engineering', badge: 'secret-badge' },
+    };
+
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+
+    expect(payload[mixedCaseUrn]).toBeUndefined();
+    expect(payload[EXT_URN]).toEqual({ department: 'Engineering' });
+    expect(visible).toEqual([EXT_URN]);
+  });
+
   it('should strip extension sub-attrs when top-level never entry also exists', () => {
     const extUrn = 'urn:test:ext:neversub';
     const neverByParent = new Map<string, Set<string>>([

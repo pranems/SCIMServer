@@ -1883,7 +1883,7 @@ export function useConnectionInfo(endpointId: string) {
 
 /** WI-8 - the server-scope security settings (visibility + KEK status). */
 export interface SecuritySettings {
-  credentialSecretVisibility: 'always' | 'once';
+  credentialSecretVisibility: 'always';
   kek: { configured: boolean; isDefault: boolean };
 }
 
@@ -1901,7 +1901,7 @@ export function useSecuritySettings() {
 export function useUpdateSecuritySettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { credentialSecretVisibility: 'always' | 'once' }) =>
+    mutationFn: (body: { credentialSecretVisibility: 'always' }) =>
       fetchWithAuth<SecuritySettings>('/scim/admin/settings/security', {
         method: 'PUT',
         body: JSON.stringify(body),
@@ -1969,6 +1969,7 @@ export function useConnectionRetainedSecrets(
           { method: 'POST' },
         ),
       staleTime: 30_000,
+      gcTime: 0,
     })),
   });
   const out: Record<string, string> = {};
@@ -1978,6 +1979,36 @@ export function useConnectionRetainedSecrets(
       const secret = r.clientSecret ?? r.token;
       if (secret) out[m.method] = secret;
     }
+  });
+  return out;
+}
+
+export type CredentialRevealResults = Record<string, RevealResult | undefined>;
+
+export function useCredentialRevealResults(
+  endpointId: string,
+  credentials: ReadonlyArray<{ id: string; credentialType: string }>,
+): CredentialRevealResults {
+  const revealable = credentials.filter(
+    (credential) => credential.credentialType === 'bearer' || credential.credentialType === 'oauth_client',
+  );
+  const results = useQueries({
+    queries: revealable.map((credential) => ({
+      queryKey: [...queryKeys.endpoints.connectionReveals(endpointId), credential.id] as const,
+      queryFn: () =>
+        fetchWithAuth<RevealResult>(
+          `/scim/admin/endpoints/${endpointId}/credentials/${credential.id}/reveal`,
+          { method: 'POST' },
+        ),
+      enabled: endpointId.length > 0,
+      staleTime: 30_000,
+      gcTime: 0,
+    })),
+  });
+
+  const out: CredentialRevealResults = {};
+  revealable.forEach((credential, index) => {
+    out[credential.id] = results[index]?.data;
   });
   return out;
 }
@@ -2595,7 +2626,7 @@ export const useAuthDecisions = (params: AuthDecisionsParams = {}, options?: { e
  */
 export interface ServerConnectionSecrets {
   revealed: boolean;
-  visibility: 'always' | 'once';
+  visibility: 'always';
   sharedSecret: string | null;
   oauthClientId: string | null;
   oauthClientSecret: string | null;

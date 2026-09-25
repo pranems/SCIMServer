@@ -176,6 +176,17 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(res.body).toHaveProperty('Resources');
     });
 
+    it('GET list - accepts custom ResourceType URL casing variants', async () => {
+      for (const path of ['devices', 'DEVICES', 'DeViCeS']) {
+        const res = await request(app.getHttpServer())
+          .get(`${basePath}/${path}?startIndex=1&count=10`)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        expect(res.body.Resources.some((resource: { id?: string }) => resource.id === resourceId)).toBe(true);
+      }
+    });
+
     it('POST /.search - should search', async () => {
       const res = await request(app.getHttpServer())
         .post(`${basePath}/${CUSTOM_RESOURCE_TYPE}/.search`)

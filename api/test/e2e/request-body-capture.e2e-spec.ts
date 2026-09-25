@@ -12,7 +12,7 @@ import { createEndpoint, scimBasePath } from './helpers/request.helper';
  * persists a RequestLog row (the exception filters run), and its stored
  * `requestBody` is now never silently empty:
  *   - malformed JSON -> a `_bodyNotCaptured` marker with reason `unparseable`
- *     plus the raw bytes (captured by the parser `verify` hook);
+ *     with a redacted raw preview (captured by the parser `verify` hook);
  *   - wrong content-type (415) -> a `_bodyNotCaptured` marker with reason
  *     `content-type-rejected` naming the content-type + length.
  */
@@ -46,7 +46,7 @@ describe('Request body capture on pre-parse failures (E2E)', () => {
     return detail.body as Record<string, unknown>;
   }
 
-  it('malformed JSON -> row stored with an unparseable marker carrying the raw bytes', async () => {
+  it('malformed JSON -> row stored with an unparseable marker and redacted preview', async () => {
     const res = await request(app.getHttpServer())
       .post(`${basePath}/Users`)
       .set('Authorization', `Bearer ${token}`)
@@ -61,7 +61,7 @@ describe('Request body capture on pre-parse failures (E2E)', () => {
     const body = detail!.requestBody as Record<string, unknown>;
     expect(body._bodyNotCaptured).toBe(true);
     expect(body.reason).toBe('unparseable');
-    expect(String(body._rawPreview)).toContain('broken-body-marker');
+    expect(body._rawPreview).toBe('[REDACTED]');
   });
 
   it('wrong content-type (415) -> row stored with a content-type-rejected marker', async () => {

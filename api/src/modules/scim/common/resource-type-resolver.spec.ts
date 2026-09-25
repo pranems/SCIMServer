@@ -101,5 +101,13 @@ describe('resolveResourceType', () => {
       const result = resolveResourceType(profileWith([GROUP_RT]), { name: 'Nope', endpointPath: '/Groups' });
       expect(result.supported).toBe(true);
     });
+
+    it('matches resource type names, ids, and endpoint paths case-insensitively', () => {
+      const custom = rt('Device', '/Devices', 'urn:example:Device');
+
+      expect(resolveResourceType(profileWith([custom]), { name: 'device' }).resourceType).toBe(custom);
+      expect(resolveResourceType(profileWith([custom]), { endpointPath: '/devices' }).resourceType).toBe(custom);
+      expect(resolveResourceType(profileWith([custom]), { endpointPath: '/DEVICES' }).resourceType).toBe(custom);
+    });
   });
 });

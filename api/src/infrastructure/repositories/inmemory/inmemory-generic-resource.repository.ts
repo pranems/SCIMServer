@@ -48,8 +48,13 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
     resourceType: string,
     scimId: string,
   ): Promise<GenericResourceRecord | null> {
+    const normalizedScimId = scimId.toLowerCase();
     for (const r of this.resources.values()) {
-      if (r.endpointId === endpointId && r.resourceType === resourceType && r.scimId === scimId) {
+      if (
+        r.endpointId === endpointId
+        && r.resourceType === resourceType
+        && r.scimId.toLowerCase() === normalizedScimId
+      ) {
         return { ...r };
       }
     }

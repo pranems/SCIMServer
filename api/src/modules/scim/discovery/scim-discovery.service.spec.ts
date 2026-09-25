@@ -10,6 +10,7 @@ import {
   SCIM_SP_CONFIG_SCHEMA,
   KNOWN_EXTENSION_URNS,
 } from '../common/scim-constants';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 const mockScimLogger = {
   trace: jest.fn(),
@@ -33,6 +34,35 @@ describe('ScimDiscoveryService', () => {
     registry = new ScimSchemaRegistry(mockScimLogger);
     await registry.onModuleInit();
     service = new ScimDiscoveryService(registry);
+  });
+
+  describe('case-insensitive discovery identifiers', () => {
+    const customProfile = {
+      schemas: [{ id: 'urn:example:params:scim:schemas:custom:2.0:Device', name: 'Device', attributes: [] }],
+      resourceTypes: [{
+        id: 'Device',
+        name: 'Device',
+        endpoint: '/Devices',
+        description: 'Device',
+        schema: 'urn:example:params:scim:schemas:custom:2.0:Device',
+        schemaExtensions: [],
+      }],
+      settings: {},
+    } as unknown as EndpointProfile;
+
+    it('resolves a profile Schema URN without regard to URL casing', () => {
+      const result = service.getSchemaByUrnFromProfile(
+        'URN:EXAMPLE:PARAMS:SCIM:SCHEMAS:CUSTOM:2.0:DEVICE',
+        customProfile,
+      );
+
+      expect(result.id).toBe('urn:example:params:scim:schemas:custom:2.0:Device');
+    });
+
+    it('resolves a profile ResourceType id or name without regard to URL casing', () => {
+      expect(service.getResourceTypeByIdFromProfile('device', customProfile).id).toBe('Device');
+      expect(service.getResourceTypeByIdFromProfile('DEVICE', customProfile).name).toBe('Device');
+    });
   });
 
   // ─── getSchemas ─────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-17 - **Product version at capture:** `0.55.24`
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-24 - **Product version at capture:** `0.55.33`
 > **Every value in this document was measured against a running server**, not transcribed from source. The preset matrix in [Section 3](#3-preset-matrix-measured) was produced by creating one endpoint per preset on the live dev estate, reading back what the server actually published, and deleting them. The request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) are verbatim wire captures.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
@@ -10,14 +10,14 @@
 
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 
-The Settings tab renders **all 38 server-registered endpoint settings**:
+The Settings tab renders **all 37 server-registered endpoint settings**:
 
 | Kind | Count | Examples |
 |---|---|---|
-| Boolean switches | **21** | `StrictSchemaValidation`, `RequireIfMatch`, `UserHardDeleteEnabled` |
+| Boolean switches | **19** | `StrictSchemaValidation`, `RequireIfMatch`, `UserHardDeleteEnabled` |
 | Enum dropdowns | **2** | `PrimaryEnforcement`, `logLevel` |
 | Numeric inputs | **14** | JWKS egress/safety/refresh knobs and per-method credential caps |
-| Radio group | **1** | `CredentialSecretVisibility` |
+| Fixed policy statuses | **2** | encrypted admin secret retention; durable request-log redaction |
 
 Settings remains the complete, structured inventory. Operational tabs also show a collapsed **Related settings** disclosure containing only controls unique to that workflow. Both presentations consume `web/src/pages/endpoint-settings-definitions.ts`, so changing a value in either place writes the same endpoint profile and the other surface reflects it.
 
@@ -29,7 +29,7 @@ The ownership rule is deliberate:
 | Groups | `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `PatchOpAllowRemoveAllMembers` | Common validation, boolean coercion, primary enforcement, general PATCH semantics and ETags |
 | Schemas | Discovery and schema-validation controls | Unrelated lifecycle, auth and logging controls |
 | Resource types | Discovery and resource-type enforcement | Unrelated lifecycle, auth and logging controls |
-| Logs | Request persistence, file output and endpoint log level | Unrelated resource and auth controls |
+| Logs | Redacted persistence status, file output and endpoint log level | Unrelated resource and auth controls |
 | Connect method | The selected method's credential cap or WIF/JWKS policy | Other methods and unrelated endpoint behavior |
 
 This avoids presenting the same common setting in both Users and Groups, where an operator could reasonably mistake it for two independent values. The collapsed header always shows the pane title and setting count; expand it only when changing that workflow's behavior.
@@ -108,6 +108,7 @@ When `profile.authentication.methods[]` declares one of these methods, that entr
 | `WifCredentialsEnabled` | Accept federated-identity (WIF, RFC 7523 `jwt-bearer`) credentials and advertise the WIF authentication scheme. |
 | `SharedSecretBearerAuthEnabled` | Whether this endpoint accepts the **global** SCIM shared secret. Turn OFF to make the endpoint accept only its own credentials. Defaults to on. |
 | `SecretTokenBearerAuthEnabled` | Accept a per-endpoint bcrypt bearer token (Entra's "Secret Token" field). |
+| `CredentialSecretVisibility` | Fixed to `always`: new and rotated bearer/OAuth secrets are retained encrypted for authenticated admin display and export. The retired `once` value is rejected. |
 
 An explicit `profile.authentication.methods[]` entry is authoritative over the flat setting. Connection info reports `enablementSource` (`authentication-method`, `dedicated-setting`, or `default`). Connect disables a flat switch managed by an authentication-method entry instead of allowing a change that would look successful but have no effect.
 
@@ -119,11 +120,11 @@ An explicit `profile.authentication.methods[]` entry is authoritative over the f
 |---|---|
 | `logLevel` | Per-endpoint log verbosity override. Falls back to the server global level when unset. Values: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `OFF`. |
 | `logFileEnabled` | ON (default): this endpoint's entries are also written to the rotating log **file**, not only to the in-memory ring buffer and the database. Turn OFF for a high-volume endpoint whose traffic you do not want on disk. Independent of `logLevel` - the level decides *what* is logged, this decides *where* it goes. |
-| `PersistRequestSecrets` | ON (default): the request log stores and displays the **complete** request/response for this endpoint - headers and body, secrets included - for fast RCA. Turn OFF to redact secret-bearing values (`Authorization`, `client_secret`, `access_token`) before they are persisted or shown. Console and file logs always redact regardless. |
+| `PersistRequestSecrets` | Retired compatibility value. RequestLog always preserves non-secret diagnostics and redacts secret-bearing values (`Authorization`, `client_secret`, `access_token`) before durable storage. The Settings tab displays this as a fixed policy, not a switch. |
 
 ### 2.8 Runtime egress (WIF JWKS fetch)
 
-Fourteen numeric controls cover how the server fetches and caches signing keys plus the active-credential limits for each authentication method. The Connect WIF panel shows the effective runtime value, configured endpoint override, source, unit, inclusive bounds, and any clamping. Use Edit to open a draft, Save to persist changed overrides, Cancel to discard the draft, and Reset to inherit to remove a stored endpoint override on Save.
+Fourteen numeric controls cover how the server fetches and caches signing keys plus the active-credential limits for each authentication method. Both Endpoint Settings and the Connect WIF panel show authoritative effective runtime values. The 11 WIF/JWKS fields include configured endpoint override, source, unit, inclusive bounds, and any clamping. Connect provides transactional Edit, Save, Cancel, and Reset to inherit controls; Settings exports the effective values rather than blank placeholders.
 
 | Setting | Bounds | Server default |
 |---|---|---|

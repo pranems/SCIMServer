@@ -157,7 +157,13 @@ export class BulkProcessorService {
     const resolvedPath = this.resolveBulkIdInString(op.path, bulkIdMap);
     const resolvedData = op.data ? this.resolveBulkIdInData(op.data, bulkIdMap) : undefined;
 
-    const { resourceType, resourceId } = parseBulkPath(resolvedPath);
+    const parsedPath = parseBulkPath(resolvedPath);
+    const resourceType = parsedPath.resourceType.toLowerCase() === 'users'
+      ? 'Users'
+      : parsedPath.resourceType.toLowerCase() === 'groups'
+        ? 'Groups'
+        : parsedPath.resourceType;
+    const { resourceId } = parsedPath;
     const method = op.method.toUpperCase();
 
     // Validate method + path consistency

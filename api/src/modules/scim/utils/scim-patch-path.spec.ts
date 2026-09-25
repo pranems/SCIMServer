@@ -332,6 +332,20 @@ describe('scim-patch-path utilities', () => {
       expect((result.emails as Record<string, unknown>[])[1].value).toBe('home@example.com');
     });
 
+    it('should resolve valuePath attribute and sub-attribute keys case-insensitively', () => {
+      const payload: Record<string, unknown> = {
+        emails: [{ type: 'work', value: 'old@example.com' }],
+      };
+      const parsed = parseValuePath('Emails[Type eq "work"].Value')!;
+
+      const { matched, payload: result } = applyValuePathUpdate(payload, parsed, 'new@example.com');
+
+      expect(matched).toBe(true);
+      expect(result).toEqual({
+        emails: [{ type: 'work', value: 'new@example.com' }],
+      });
+    });
+
     it('should report matched=false when attribute array is missing (RFC 7644 §3.5.2.2 noTarget signal)', () => {
       const payload: Record<string, unknown> = { displayName: 'Test' };
       const parsed = parseValuePath('emails[type eq "work"].value')!;

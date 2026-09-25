@@ -36,25 +36,32 @@ describe('CredentialSecurityService (WI-7)', () => {
     expect(await svc.getServerVisibility()).toBe('always');
   });
 
-  it('persists a server visibility change under the canonical key', async () => {
+  it('treats legacy once-mode settings as always-retain going forward', async () => {
     const settings = new FakeServerSettings();
+    settings.store.set('credentialSecretVisibility', 'once');
     const svc = new CredentialSecurityService(settings, fakeCredRepo() as any);
-    await svc.setServerVisibility('once');
-    expect(settings.store.get(SERVER_VISIBILITY_KEY)).toBe('once');
-    expect(await svc.getServerVisibility()).toBe('once');
+
+    expect(await svc.getServerVisibility()).toBe('always');
+    expect(await svc.getEffectiveVisibility({ CredentialSecretVisibility: 'once' })).toBe('always');
   });
 
-  it('computes effective visibility with the server as the ceiling', async () => {
+  it('coerces retired once-mode server updates to always', async () => {
+    const settings = new FakeServerSettings();
+    const svc = new CredentialSecurityService(settings, fakeCredRepo() as any);
+    await svc.setServerVisibility('once');
+    expect(settings.store.get(SERVER_VISIBILITY_KEY)).toBe('always');
+    expect(await svc.getServerVisibility()).toBe('always');
+  });
+
+  it('always retains secrets regardless of legacy stored values', async () => {
     const settings = new FakeServerSettings();
     const svc = new CredentialSecurityService(settings, fakeCredRepo() as any);
 
-    // server=always -> endpoint choice honored.
-    expect(await svc.getEffectiveVisibility({ CredentialSecretVisibility: 'once' })).toBe('once');
+    expect(await svc.getEffectiveVisibility({ CredentialSecretVisibility: 'once' })).toBe('always');
     expect(await svc.getEffectiveVisibility({})).toBe('always');
 
-    // server=once -> forced once regardless of the endpoint.
     await svc.setServerVisibility('once');
-    expect(await svc.getEffectiveVisibility({ CredentialSecretVisibility: 'always' })).toBe('once');
+    expect(await svc.getEffectiveVisibility({ CredentialSecretVisibility: 'always' })).toBe('always');
   });
 
   it('purges retained secrets via the credential repo', async () => {

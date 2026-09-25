@@ -8,12 +8,11 @@
  *   `credentialSecretVisibility` (seeded to `always` by the migration / the
  *   inmemory backend). Read/written via this service.
  * - Endpoint scope: rides `profile.settings.CredentialSecretVisibility`.
- * - Effective value: most-restrictive-wins with the SERVER as the ceiling
- *   (`getEffectiveCredentialSecretVisibility`).
+ * - Effective value: always retain encrypted copies for authenticated admin
+ *   display and export. Legacy `once` values are read but resolve to `always`.
  *
- * Retention: when the effective value is `always`, a freshly-created secret is
- * encrypted (via CredentialEncryptionService) and its envelope stored on the
- * credential. When it flips to `once`, retained envelopes are purged.
+ * A freshly-created or rotated secret is encrypted via CredentialEncryptionService
+ * and its envelope is stored on the credential.
  */
 import { Inject, Injectable } from '@nestjs/common';
 import { SERVER_SETTING_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY } from '../domain/repositories/repository.tokens';
@@ -41,12 +40,13 @@ export class CredentialSecurityService {
   /** The server-scope visibility (defaults to `always` when unset/invalid). */
   async getServerVisibility(): Promise<CredentialSecretVisibility> {
     const raw = await this.serverSettings.get(SERVER_VISIBILITY_KEY);
-    return normalizeCredentialSecretVisibility(raw) ?? 'always';
+    normalizeCredentialSecretVisibility(raw);
+    return 'always';
   }
 
   /** Set the server-scope visibility (validated by the caller). */
   async setServerVisibility(value: CredentialSecretVisibility): Promise<void> {
-    await this.serverSettings.set(SERVER_VISIBILITY_KEY, value);
+    await this.serverSettings.set(SERVER_VISIBILITY_KEY, value === 'always' ? value : 'always');
   }
 
   /**
@@ -59,16 +59,16 @@ export class CredentialSecurityService {
   }
 
   /**
-   * Purge retained secret envelopes for an endpoint (used when its effective
-   * visibility becomes `once`). Returns the number of rows cleared.
+  * Administrative compatibility helper for explicitly purging retained
+  * envelopes on an endpoint. Current visibility policy never calls it.
    */
   async purgeRetainedSecrets(endpointId: string): Promise<number> {
     return this.credentialRepo.clearSecretEnvelopesForEndpoint(endpointId);
   }
 
   /**
-   * Purge EVERY retained secret envelope (used when the server-scope visibility
-   * flips to `once`, the global ceiling). Returns the number of rows cleared.
+  * Administrative compatibility helper for explicitly purging every retained
+  * envelope. Current visibility policy never calls it.
    */
   async purgeAllRetainedSecrets(): Promise<number> {
     return this.credentialRepo.clearAllSecretEnvelopes();

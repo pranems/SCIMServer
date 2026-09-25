@@ -35,6 +35,7 @@ describe('EndpointService', () => {
           useValue: {
             endpoint: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               findMany: jest.fn(),
               create: jest.fn(),
               update: jest.fn(),
@@ -141,7 +142,7 @@ describe('EndpointService', () => {
     const p4MinSchema = { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' as const };
     const p4MinRT = { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] };
 
-    it('purges retained secrets when endpoint visibility changes to once', async () => {
+    it('rejects the retired once policy without purging retained secrets', async () => {
       const before = {
         ...mockEndpoint,
         profile: {
@@ -152,17 +153,16 @@ describe('EndpointService', () => {
         },
       };
       const purge = jest.fn().mockResolvedValue(2);
-      service.setCredentialSecretPurgeListener(purge);
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(before);
       (prisma.endpoint.update as jest.Mock).mockImplementation((args: { data: { profile: unknown } }) =>
         Promise.resolve({ ...before, profile: args.data.profile }),
       );
 
-      await service.updateEndpoint('test-endpoint-id', {
+      await expect(service.updateEndpoint('test-endpoint-id', {
         profile: { settings: { CredentialSecretVisibility: 'once' } },
-      });
+      })).rejects.toThrow(BadRequestException);
 
-      expect(purge).toHaveBeenCalledWith('test-endpoint-id');
+      expect(purge).not.toHaveBeenCalled();
     });
 
     it('persists normalized dedicated auth settings during a Prisma profile update', async () => {
@@ -350,11 +350,20 @@ describe('EndpointService', () => {
     });
 
     it('should reject duplicate endpoint name', async () => {
-      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(mockEndpoint);
 
       await expect(
         service.createEndpoint({ name: 'test-endpoint' })
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should map a concurrent database name conflict to the duplicate-name response', async () => {
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockRejectedValue({ code: 'P2002' });
+
+      await expect(service.createEndpoint({ name: 'CaseName' })).rejects.toThrow(
+        new BadRequestException('Endpoint with name "CaseName" already exists'),
+      );
     });
   });
 
@@ -366,6 +375,15 @@ describe('EndpointService', () => {
 
       expect(result.id).toBe('test-endpoint-id');
       expect(result.name).toBe('test-endpoint');
+    });
+
+    it('should resolve cached endpoint names case-insensitively', async () => {
+      (service as any).cacheSet(mockEndpoint);
+
+      const result = await service.getEndpoint('TEST-ENDPOINT');
+
+      expect(result.name).toBe('test-endpoint');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException for non-existent endpoint', async () => {
@@ -473,15 +491,24 @@ describe('EndpointService', () => {
 
   describe('getEndpointByName', () => {
     it('should return endpoint by name', async () => {
-      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(mockEndpoint);
 
       const result = await service.getEndpointByName('test-endpoint');
 
       expect(result.name).toBe('test-endpoint');
     });
 
+    it('should resolve cached endpoint names case-insensitively', async () => {
+      (service as any).cacheSet(mockEndpoint);
+
+      const result = await service.getEndpointByName('TEST-ENDPOINT');
+
+      expect(result.name).toBe('test-endpoint');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException for non-existent endpoint', async () => {
-      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.getEndpointByName('non-existent')
@@ -1412,6 +1439,27 @@ describe('EndpointService', () => {
 
       const summary = EndpointService.buildProfileSummary(profile);
       expect(summary.activeSettings).toEqual({ VerbosePatchSupported: 'True' });
+    });
+
+    it('should exclude every false-like string while preserving numeric zero', () => {
+      const profile = {
+        schemas: [],
+        resourceTypes: [],
+        serviceProviderConfig: {},
+        settings: {
+          lower: 'false',
+          upper: 'FALSE',
+          title: 'False',
+          zeroString: '0',
+          falseBoolean: false,
+          logLevel: 0,
+          enabled: 'True',
+        },
+      } as any;
+
+      const summary = EndpointService.buildProfileSummary(profile);
+
+      expect(summary.activeSettings).toEqual({ logLevel: 0, enabled: 'True' });
     });
 
     it('should handle schema with no attributes (extension schema)', () => {

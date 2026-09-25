@@ -166,6 +166,14 @@ When working on development projects:
 - NEVER expose internal work-item, wave, or implementation-phase labels such as `WI-11`, `W2.5`, or `Phase E2` in user-facing UI copy, API messages, exported examples, or operator documentation. Describe the capability in product language instead. Internal labels may remain in code comments, test names, and historical engineering records.
 - `web/src/test/user-facing-copy.test.ts` and `api/src/security/user-facing-copy.spec.ts` enforce this rule for production UI/API string literals. Extend the gates when another user-facing surface is added.
 
+## URL and SCIM Identifier Case Rule (CRITICAL - added 2026-09-24)
+
+Every URL-carried identifier and every SCIM attribute identifier is matched case-insensitively. This includes endpoint UUID/name segments, built-in and custom ResourceType paths, ResourceType ids/names/endpoints, Schema URNs, Bulk operation paths, and PATCH attribute/valuePath segments. Preserve configured canonical casing in responses and locations. Do not fix one controller with a local lowercase comparison: use the owning shared resolver or property-key helper. Every new identifier surface requires lowercase, uppercase, and mixed-case positive tests at the nearest unit boundary plus an HTTP or live contract. Endpoint names additionally require database-enforced case-insensitive uniqueness so concurrent case-only creates cannot race past application checks.
+
+## Credential Secret Surface Rule (CRITICAL - added 2026-09-24)
+
+Recoverable bearer and OAuth client secrets are retained encrypted and displayed automatically on authenticated admin surfaces. They MUST be included in the corresponding credential, method, endpoint, clipboard, and download JSON exports. WIF trusts carry no shared secret. The retired `once` policy is rejected for new writes; a legacy credential whose encrypted copy was already purged is marked rotation-required and is never reconstructed. Plaintext credentials MUST NOT enter public SCIM discovery, unauthenticated metadata, endpoint overview/list projections, durable RequestLog rows, Workbench history, or console/file logs. Every secret-bearing admin change needs both a positive admin sentinel assertion and negative public/durable sentinel assertions.
+
 ## Doc Code-Block Formatting Rule (CRITICAL - added 2026-06-23)
 
 Origin: 2026-06-23. The first cut of [docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md](docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md) shipped SCIM payload examples collapsed onto 1-2 lines (`{ "schemas": [...], "Operations": [ { "op": ... } ] }`). That is technically valid JSON but unreadable - a reader cannot scan the envelope, the op, the path, or the value at a glance, and copy-paste into a client produces a wall of text. Standing rules for EVERY fenced code block in ANY `.md` under the repo:

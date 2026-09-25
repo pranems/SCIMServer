@@ -23,6 +23,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(
     ({ key, value }) => {
       window.localStorage.setItem(key, value);
+      window.localStorage.setItem('scimserver.onboarding.completedAt', '2026-09-24T00:00:00.000Z');
     },
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
@@ -197,16 +198,16 @@ test.describe('Connect tab - retained secret reveal (R3)', () => {
 
     await page.goto(`/endpoints/${ID}/connect`);
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
-    // W8/W12 - the retained secret now shows in the per-card Connect subpanel
-    // (the endpoint ConnectionPanel is shared-secret-only). The oauth_client tab
-    // is the default (first per-endpoint method); open the card's Connect
-    // subpanel - the auto-reveal returns the retained secret.
-    await page.getByTestId('credential-connect-secret-reveal-cred-r3').click();
+    // Retained secrets are loaded automatically on this authenticated admin surface.
+    await expect(page.getByTestId('credential-connect-secret-reveal-cred-r3')).toHaveCount(0);
     await expect(page.getByTestId('credential-connect-secret-cred-r3')).toContainText('retained-secret-r3');
     // W9/W10 - the subpanel header names the IdP (Entra as the example) and each
     // parameter carries an InfoLabel help affordance.
     await expect(page.getByTestId('credential-connect-panel-cred-r3')).toContainText(/Entra/i);
     await expect(page.getByTestId('credential-connect-clientid-info-cred-r3')).toBeVisible();
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByTestId('connect-endpoint-export-copy').click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('retained-secret-r3');
   });
 });
 
@@ -285,9 +286,7 @@ test.describe('Connect tab - retained bearer secret (X2)', () => {
 
     await page.goto(`/endpoints/${ID}/connect`);
     await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
-    // The bearer tab is the default (first per-endpoint method); open the card's
-    // Connect subpanel - the auto-reveal returns the retained Secret Token.
-    await page.getByTestId('credential-connect-secret-reveal-cred-x2').click();
+    await expect(page.getByTestId('credential-connect-secret-reveal-cred-x2')).toHaveCount(0);
     await expect(page.getByTestId('credential-connect-secret-cred-x2')).toContainText('retained-bearer-token-x2');
     // The secret is labelled as the bearer Secret Token, not a client secret.
     await expect(page.getByTestId('credential-connect-secret-info-cred-x2')).toContainText(/Secret token/i);

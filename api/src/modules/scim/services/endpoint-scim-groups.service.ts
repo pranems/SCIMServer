@@ -41,6 +41,7 @@ import {
   coercePatchOpBooleans,
   scopePatchPayloadToTouched,
   stripNeverReturnedFromPayload,
+  stripInternalResponseFields,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
   handleRepositoryError,
@@ -699,6 +700,7 @@ export class EndpointScimGroupsService {
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
     const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
     const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA, ...visibleExtUrns];
+    stripInternalResponseFields(rawPayload);
 
     return {
       schemas,

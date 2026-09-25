@@ -48,8 +48,9 @@ export class InMemoryUserRepository implements IUserRepository {
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null> {
+    const normalizedScimId = scimId.toLowerCase();
     for (const user of this.users.values()) {
-      if (user.endpointId === endpointId && user.scimId === scimId) {
+      if (user.endpointId === endpointId && user.scimId.toLowerCase() === normalizedScimId) {
         return { ...user };
       }
     }
@@ -137,10 +138,10 @@ export class InMemoryUserRepository implements IUserRepository {
     scimIds: string[],
   ): Promise<Array<Pick<UserRecord, 'id' | 'scimId'>>> {
     if (scimIds.length === 0) return [];
-    const idSet = new Set(scimIds);
+    const idSet = new Set(scimIds.map((id) => id.toLowerCase()));
     const results: Array<Pick<UserRecord, 'id' | 'scimId'>> = [];
     for (const user of this.users.values()) {
-      if (user.endpointId === endpointId && idSet.has(user.scimId)) {
+      if (user.endpointId === endpointId && idSet.has(user.scimId.toLowerCase())) {
         results.push({ id: user.id, scimId: user.scimId });
       }
     }

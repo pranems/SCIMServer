@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.32`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.33`
 
 Global and endpoint Logs share filters for URL, HTTP method, status, time range,
 errors-only, minimum duration, and request ID. Custom ResourceType URLs remain

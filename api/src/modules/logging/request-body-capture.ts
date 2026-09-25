@@ -15,7 +15,7 @@
  * flows through the existing redaction + storage path unchanged. The
  * `_rawPreview` free-text (which can contain secrets from an unparseable blob)
  * is redacted by the caller (`LoggingService.recordRequest`) when the effective
- * `PersistRequestSecrets` flag is OFF.
+ * durable RequestLog row is written.
  */
 import type { Request } from 'express';
 import type { RequestLoggingMeta } from './request-logging.interceptor';

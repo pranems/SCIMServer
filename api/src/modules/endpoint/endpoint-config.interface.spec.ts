@@ -1450,16 +1450,16 @@ describe('endpoint-config.interface', () => {
         expect(getEffectiveCredentialSecretVisibility(undefined, {})).toBe('always');
       });
 
-      it('server "once" forces "once" even when the endpoint says "always"', () => {
+      it('ignores retired server once values', () => {
         expect(
           getEffectiveCredentialSecretVisibility('once', { CredentialSecretVisibility: 'always' }),
-        ).toBe('once');
+        ).toBe('always');
       });
 
-      it('server "always" lets the endpoint opt into "once"', () => {
+      it('ignores retired endpoint once values', () => {
         expect(
           getEffectiveCredentialSecretVisibility('always', { CredentialSecretVisibility: 'once' }),
-        ).toBe('once');
+        ).toBe('always');
       });
 
       it('server "always" + endpoint "always" -> "always"', () => {
@@ -1468,8 +1468,8 @@ describe('endpoint-config.interface', () => {
         ).toBe('always');
       });
 
-      it('is case-insensitive and falls back to "always" on invalid values', () => {
-        expect(getEffectiveCredentialSecretVisibility('ONCE', {})).toBe('once');
+      it('always resolves to retained authenticated visibility', () => {
+        expect(getEffectiveCredentialSecretVisibility('ONCE', {})).toBe('always');
         expect(getEffectiveCredentialSecretVisibility('bogus', { CredentialSecretVisibility: 'nope' })).toBe('always');
       });
     });
@@ -1484,14 +1484,17 @@ describe('endpoint-config.interface', () => {
     });
 
     describe('validateEndpointConfig - CredentialSecretVisibility', () => {
-      it('accepts always/once (case-insensitive)', () => {
+      it('accepts always case-insensitively and rejects retired once', () => {
         expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'always' })).not.toThrow();
-        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'ONCE' })).not.toThrow();
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'ALWAYS' })).not.toThrow();
+        expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'ONCE' })).toThrow(
+          /Allowed value: "always"/,
+        );
       });
 
       it('rejects an invalid enum value', () => {
         expect(() => validateEndpointConfig({ CredentialSecretVisibility: 'sometimes' })).toThrow(
-          /Allowed values: "always", "once"/,
+          /Allowed value: "always"/,
         );
       });
 
@@ -1570,20 +1573,14 @@ describe('endpoint-config.interface', () => {
     });
 
     describe('getEffectivePersistRequestSecrets', () => {
-      it('inherits the server default when the endpoint leaves it unset', () => {
-        expect(getEffectivePersistRequestSecrets(undefined, true)).toBe(true);
-        expect(getEffectivePersistRequestSecrets({}, true)).toBe(true);
+      it('always redacts durable request logs regardless of legacy values', () => {
+        expect(getEffectivePersistRequestSecrets(undefined, true)).toBe(false);
+        expect(getEffectivePersistRequestSecrets({}, true)).toBe(false);
         expect(getEffectivePersistRequestSecrets({}, false)).toBe(false);
-      });
-
-      it('endpoint value OVERRIDES the server default (both directions)', () => {
         expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: false }, true)).toBe(false);
-        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: true }, false)).toBe(true);
-      });
-
-      it('accepts string boolean values (Entra-style)', () => {
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: true }, false)).toBe(false);
         expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'False' }, true)).toBe(false);
-        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'True' }, false)).toBe(true);
+        expect(getEffectivePersistRequestSecrets({ PersistRequestSecrets: 'True' }, false)).toBe(false);
       });
 
       it('is NOT baked into DEFAULT_ENDPOINT_CONFIG (stays inheritable)', () => {

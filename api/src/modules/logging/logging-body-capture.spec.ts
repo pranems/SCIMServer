@@ -41,7 +41,7 @@ describe('LoggingService.recordRequest - body-capture safety', () => {
     else process.env.PERSIST_REQUEST_SECRETS = savedSecrets;
   });
 
-  it('keeps the raw preview when secrets ARE persisted (default)', async () => {
+  it('redacts the raw preview under the mandatory persistence boundary', async () => {
     process.env.PERSIST_REQUEST_SECRETS = 'true';
     service = await build();
     service.recordRequest({
@@ -53,7 +53,7 @@ describe('LoggingService.recordRequest - body-capture safety', () => {
     const { items } = await service.listLogs({});
     const detail = await service.getLog(items[0].id);
     const body = detail?.requestBody as Record<string, unknown>;
-    expect(body._rawPreview).toBe('client_secret=abc Bearer xyz');
+    expect(body._rawPreview).toBe('[REDACTED]');
   });
 
   it('redacts the raw preview when secrets are NOT persisted', async () => {

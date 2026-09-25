@@ -87,6 +87,14 @@ const WIF_SCHEME: SpcAuthenticationScheme = {
   specUri: 'https://www.rfc-editor.org/rfc/rfc7523',
 };
 
+const OAUTH_CLIENT_SCHEME: SpcAuthenticationScheme = {
+  type: 'oauth2',
+  name: 'OAuth 2.0 Client Credentials',
+  description:
+    'OAuth 2.0 client_credentials grant at the per-endpoint token endpoint using the configured client id and secret.',
+  specUri: 'https://www.rfc-editor.org/rfc/rfc6749#section-4.4',
+};
+
 function methodToScheme(method: AuthenticationMethod): SpcAuthenticationScheme {
   const schemeType = METHOD_TYPE_TO_SCHEME_TYPE[method.type] ?? 'oauth2';
   const scheme: SpcAuthenticationScheme = {
@@ -112,7 +120,7 @@ function methodToScheme(method: AuthenticationMethod): SpcAuthenticationScheme {
 export function computeAuthenticationSchemes(
   baseline: readonly SpcAuthenticationScheme[],
   authentication?: ProfileAuthentication,
-  options?: { wifCredentialsEnabled?: boolean },
+  options?: { wifCredentialsEnabled?: boolean; oauthClientCredentialsEnabled?: boolean },
 ): SpcAuthenticationScheme[] {
   // Always start from a clone of the baseline; reset primary flags - we set
   // exactly one primary below.
@@ -128,11 +136,14 @@ export function computeAuthenticationSchemes(
   // Q6.6 - whether an enabled method already contributes a WIF scheme.
   const hasWifMethod = enabled.some((m) => m.type === 'wif-7523' || m.type === 'wif-8693');
   const appendWif = options?.wifCredentialsEnabled === true && !hasWifMethod;
+  const hasOauthClientMethod = enabled.some((m) => m.type === 'oauth-client');
+  const appendOauthClient = options?.oauthClientCredentialsEnabled === true && !hasOauthClientMethod;
 
   if (enabled.length === 0) {
     // Disabled / no methods: baseline only, baseline is primary. Q6.6 may still
     // append the WIF scheme when the flag is on.
     if (baselineClones.length > 0) baselineClones[0].primary = true;
+    if (appendOauthClient) baselineClones.push({ ...OAUTH_CLIENT_SCHEME, primary: false });
     if (appendWif) baselineClones.push({ ...WIF_SCHEME, primary: false });
     return baselineClones;
   }
@@ -144,6 +155,8 @@ export function computeAuthenticationSchemes(
     schemes.push(scheme);
     schemeByMethodId.set(method.id, scheme);
   }
+  if (appendOauthClient) schemes.push({ ...OAUTH_CLIENT_SCHEME, primary: false });
+  if (appendWif) schemes.push({ ...WIF_SCHEME, primary: false });
 
   // primary:true on the defaultMethodId scheme; else the baseline stays primary.
   const defaultScheme = authentication?.defaultMethodId

@@ -121,7 +121,8 @@ export class ScimSchemaRegistry implements OnModuleInit {
   }
 
   getSchema(schemaUrn: string): ScimSchemaDefinition | undefined {
-    return this.defaultSchemas.find(s => s.id === schemaUrn);
+    const requestedUrn = schemaUrn.toLowerCase();
+    return this.defaultSchemas.find(s => s.id.toLowerCase() === requestedUrn);
   }
 
   getAllResourceTypes(): ScimResourceType[] {
@@ -129,7 +130,10 @@ export class ScimSchemaRegistry implements OnModuleInit {
   }
 
   getResourceType(resourceTypeId: string): ScimResourceType | undefined {
-    return this.defaultResourceTypes.find(r => r.id === resourceTypeId || r.name === resourceTypeId);
+    const requestedId = resourceTypeId.toLowerCase();
+    return this.defaultResourceTypes.find(
+      r => r.id.toLowerCase() === requestedId || r.name.toLowerCase() === requestedId,
+    );
   }
 
   getServiceProviderConfig() {

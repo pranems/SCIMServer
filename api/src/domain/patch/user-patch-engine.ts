@@ -32,7 +32,7 @@ import {
   mergeComplexAttribute,
   pruneEmptyExtensions,
   findInvalidMultiValuedElement,
-  safePropertyKey,
+  resolvePropertyKey,
 } from '../../modules/scim/utils/scim-patch-path';
 
 import type {
@@ -318,9 +318,10 @@ export class UserPatchEngine {
       // incoming value is also a non-array object, merge with null-as-unset
       // semantics (Entra/Okta de-facto interpretation of RFC 7644 S3.5.2.3).
       // Arrays and primitives whole-replace.
-      const existing = rawPayload[originalPath];
+      const propertyKey = resolvePropertyKey(rawPayload, originalPath);
+      const existing = rawPayload[propertyKey];
       const merged = mergeComplexAttribute(existing, value);
-      rawPayload = { ...rawPayload, [safePropertyKey(originalPath)]: merged };
+      rawPayload = { ...rawPayload, [propertyKey]: merged };
       return { userName, displayName, externalId, active, rawPayload };
     }
 
@@ -452,12 +453,11 @@ export class UserPatchEngine {
     const dotIndex = originalPath.indexOf('.');
     const parentAttr = originalPath.substring(0, dotIndex);
     const childAttr = originalPath.substring(dotIndex + 1);
-    const parentKey = Object.keys(rawPayload).find(
-      k => k.toLowerCase() === parentAttr.toLowerCase(),
-    ) ?? parentAttr;
+    const parentKey = resolvePropertyKey(rawPayload, parentAttr);
     const existing = rawPayload[parentKey];
     if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-      (existing as Record<string, unknown>)[childAttr] = value;
+      const childKey = resolvePropertyKey(existing as Record<string, unknown>, childAttr);
+      (existing as Record<string, unknown>)[childKey] = value;
     } else {
       rawPayload[parentKey] = { [childAttr]: value };
     }
@@ -471,12 +471,12 @@ export class UserPatchEngine {
     const dotIndex = originalPath.indexOf('.');
     const parentAttr = originalPath.substring(0, dotIndex);
     const childAttr = originalPath.substring(dotIndex + 1);
-    const parentKey = Object.keys(rawPayload).find(
-      k => k.toLowerCase() === parentAttr.toLowerCase(),
-    ) ?? parentAttr;
+    const parentKey = resolvePropertyKey(rawPayload, parentAttr);
     const existing = rawPayload[parentKey];
     if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-      delete (existing as Record<string, unknown>)[childAttr];
+      delete (existing as Record<string, unknown>)[
+        resolvePropertyKey(existing as Record<string, unknown>, childAttr)
+      ];
     }
     return rawPayload;
   }

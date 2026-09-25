@@ -92,13 +92,19 @@ describe('Admin Endpoints Create (Phase L1, E2E)', () => {
       .expect(204);
   });
 
-  it('POST /admin/endpoints with a duplicate name is rejected with 400 (or 409 if a future tightening lands)', async () => {
+  it('treats endpoint UUIDs and names as case-insensitive URL identifiers', async () => {
     const name = `l1-dup-${Date.now()}`;
     const first = await request(app.getHttpServer())
       .post('/scim/admin/endpoints')
       .set('Authorization', `Bearer ${token}`)
       .send({ name, profilePreset: 'minimal' })
       .expect(201);
+
+    const getByUppercaseId = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${String(first.body.id).toUpperCase()}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(getByUppercaseId.body.id).toBe(first.body.id);
 
     // Second create with the same name. Per current backend semantics
     // this is 400 (BadRequest from service layer); a future
@@ -108,7 +114,7 @@ describe('Admin Endpoints Create (Phase L1, E2E)', () => {
     const res = await request(app.getHttpServer())
       .post('/scim/admin/endpoints')
       .set('Authorization', `Bearer ${token}`)
-      .send({ name, profilePreset: 'rfc-standard' });
+      .send({ name: name.toUpperCase(), profilePreset: 'rfc-standard' });
 
     expect([400, 409]).toContain(res.status);
 

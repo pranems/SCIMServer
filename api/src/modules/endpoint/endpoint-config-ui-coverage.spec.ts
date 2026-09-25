@@ -150,10 +150,10 @@ describe('endpoint config flag UI coverage', () => {
     expect(new Set([...declarative, ...settingsBespoke]).size).toBe(registered.length);
 
     // Owning a definition is not enough: Settings must render every registry
-    // family plus its one purpose-built radio control.
+    // family plus its one purpose-built fixed-policy control.
     expect(settingsSource).toMatch(/BOOLEAN_FLAGS\.filter/);
     expect(settingsSource).toMatch(/ENUM_SETTINGS\.map/);
     expect(settingsSource).toMatch(/NUMBER_SETTINGS\.map/);
-    expect(settingsSource).toMatch(/aria-label="CredentialSecretVisibility"/);
+    expect(settingsSource).toMatch(/data-testid="credential-visibility-always"/);
   });
 });

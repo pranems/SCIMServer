@@ -36,7 +36,7 @@ describe('Credential reveal + security settings (E2E)', () => {
       .get('/scim/admin/settings/security')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(['always', 'once']).toContain(res.body.credentialSecretVisibility);
+    expect(res.body.credentialSecretVisibility).toBe('always');
     expect(res.body.kek).toEqual({ configured: true, isDefault: expect.any(Boolean) });
     // Key-allowlist: no secret KEK value ever leaks.
     expect(JSON.stringify(res.body)).not.toContain('changeme-credential-kek');
@@ -85,29 +85,17 @@ describe('Credential reveal + security settings (E2E)', () => {
     expect(revealed.body.secretEnvelope).toBeUndefined();
   });
 
-  it('returns retained:false for an endpoint whose effective visibility is once', async () => {
-    const endpointId = await createEndpointWithConfig(app, token, {
-      OAuthClientCredentialsAuthEnabled: true,
-      CredentialSecretVisibility: 'once',
-    });
-    const created = await request(app.getHttpServer())
-      .post(`/scim/admin/endpoints/${endpointId}/credentials`)
+  it('rejects the retired endpoint once-only policy', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {});
+    await request(app.getHttpServer())
+      .patch(`/scim/admin/endpoints/${endpointId}`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ credentialType: 'oauth_client', label: 'wi8-once' })
-      .expect(201);
-
-    const revealed = await request(app.getHttpServer())
-      .post(`/scim/admin/endpoints/${endpointId}/credentials/${created.body.id}/reveal`)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-
-    expect(revealed.body.retained).toBe(false);
-    expect(revealed.body.reason).toMatch(/rotate the credential/i);
-    expect(revealed.body.clientSecret).toBeUndefined();
+      .send({ profile: { settings: { CredentialSecretVisibility: 'once' } } })
+      .expect(400);
   });
 
-  it('server flip to once forces reveal to retained:false even when the endpoint says always (server ceiling + purge)', async () => {
+  it('rejecting server once does not purge an existing retained secret', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       OAuthClientCredentialsAuthEnabled: true,
       CredentialSecretVisibility: 'always',
@@ -119,27 +107,19 @@ describe('Credential reveal + security settings (E2E)', () => {
       .send({ credentialType: 'oauth_client', label: 'wi8-ceiling' })
       .expect(201);
 
-    // Flip the SERVER setting to once - the ceiling forces once everywhere + purges.
     await request(app.getHttpServer())
       .put('/scim/admin/settings/security')
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
       .send({ credentialSecretVisibility: 'once' })
-      .expect(200);
+      .expect(400);
 
     const revealed = await request(app.getHttpServer())
       .post(`/scim/admin/endpoints/${endpointId}/credentials/${created.body.id}/reveal`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(revealed.body.retained).toBe(false);
-
-    // Restore for other tests.
-    await request(app.getHttpServer())
-      .put('/scim/admin/settings/security')
-      .set('Authorization', `Bearer ${token}`)
-      .set('Content-Type', 'application/json')
-      .send({ credentialSecretVisibility: 'always' })
-      .expect(200);
+    expect(revealed.body.retained).toBe(true);
+    expect(revealed.body.clientSecret).toBe(created.body.clientSecret);
   });
 
   it('returns 404 revealing a credential that does not belong to the endpoint', async () => {
@@ -172,32 +152,21 @@ describe('Credential reveal + security settings (E2E)', () => {
       expect(res.body).toHaveProperty('oauthClientSecret');
     });
 
-    it('withholds the global secrets (revealed:false, all null) when server visibility is once', async () => {
+    it('rejects the retired server once-only policy and keeps global secrets available', async () => {
       await request(app.getHttpServer())
         .put('/scim/admin/settings/security')
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
         .send({ credentialSecretVisibility: 'once' })
-        .expect(200);
+        .expect(400);
 
       const res = await request(app.getHttpServer())
         .get('/scim/admin/settings/security/connection-secrets')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.revealed).toBe(false);
-      expect(res.body.visibility).toBe('once');
-      expect(res.body.sharedSecret).toBeNull();
-      expect(res.body.oauthClientId).toBeNull();
-      expect(res.body.oauthClientSecret).toBeNull();
-
-      // Restore always so other suites are unaffected.
-      await request(app.getHttpServer())
-        .put('/scim/admin/settings/security')
-        .set('Authorization', `Bearer ${token}`)
-        .set('Content-Type', 'application/json')
-        .send({ credentialSecretVisibility: 'always' })
-        .expect(200);
+      expect(res.body.revealed).toBe(true);
+      expect(res.body.visibility).toBe('always');
     });
 
     it('requires admin auth (401 without a bearer)', async () => {

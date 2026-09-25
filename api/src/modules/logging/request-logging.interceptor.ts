@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { LoggingService } from './logging.service';
 import { ScimLogger } from './scim-logger.service';
 import { LogCategory } from './log-levels';
+import { redactSensitiveUrl } from '../../security/redact-sensitive';
 
 /**
  * Metadata stashed on the request object by the interceptor so that
@@ -99,8 +100,9 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     endpointId: string | undefined,
     next: CallHandler,
   ): Observable<unknown> {
+    const requestUrl = redactSensitiveUrl(request.originalUrl ?? request.url);
     // Log incoming request (DEBUG - operational detail, not business event)
-    this.scimLogger.debug(LogCategory.HTTP, `→ ${request.method} ${request.originalUrl ?? request.url}`, {
+    this.scimLogger.debug(LogCategory.HTTP, `→ ${request.method} ${requestUrl}`, {
       userAgent: request.headers['user-agent'] as string,
       contentType: request.headers['content-type'] as string,
       ip: request.ip || request.socket?.remoteAddress,
@@ -118,7 +120,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
         const durationMs = Date.now() - startedAt;
 
         // Structured response log (DEBUG - operational detail)
-        this.scimLogger.debug(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${request.originalUrl ?? request.url}`, {
+        this.scimLogger.debug(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${requestUrl}`, {
           status: response.statusCode,
           durationMs,
         });
@@ -141,7 +143,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
         // Persist to database (existing behavior)
         void this.loggingService.recordRequest({
           method: request.method,
-          url: request.originalUrl ?? request.url,
+          url: requestUrl,
           status: response.statusCode,
           durationMs,
           requestHeaders: { ...request.headers },

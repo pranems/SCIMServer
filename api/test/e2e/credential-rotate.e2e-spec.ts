@@ -94,24 +94,24 @@ describe('Credential rotate (E2E)', () => {
     expect(revealed.body.clientSecret).toBe(rotated.body.clientSecret);
   });
 
-  it('rotate under once returns the one-time secret but does not retain it', async () => {
+  it('rotate under always returns and retains the replacement secret', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       OAuthClientCredentialsAuthEnabled: true,
-      CredentialSecretVisibility: 'once',
+      CredentialSecretVisibility: 'always',
     });
-    const created = await createOauthCred(endpointId, 'rotate-once');
+    const created = await createOauthCred(endpointId, 'rotate-retained');
     const rotated = await request(app.getHttpServer())
       .post(`/scim/admin/endpoints/${endpointId}/credentials/${created.body.id}/rotate`)
       .set('Authorization', `Bearer ${token}`)
       .expect(201);
     expect(rotated.body.clientSecret).toBeDefined();
 
-    // Reveal on the rotated credential reports not-retained (once).
     const revealed = await request(app.getHttpServer())
       .post(`/scim/admin/endpoints/${endpointId}/credentials/${rotated.body.id}/reveal`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(revealed.body.retained).toBe(false);
+    expect(revealed.body.retained).toBe(true);
+    expect(revealed.body.clientSecret).toBe(rotated.body.clientSecret);
   });
 
   it('rejects inactive rotation and atomically switches OAuth authentication to the replacement', async () => {

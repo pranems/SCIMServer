@@ -10,9 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger, getCorrelationContext } from './scim-logger.service';
 import { capStoredBodyString } from './request-body-capture';
 import { LogCategory } from './log-levels';
-import { redactSensitiveDeep, REDACTED } from '../../security/redact-sensitive';
-import { EndpointService } from '../endpoint/services/endpoint.service';
-import { getEffectivePersistRequestSecrets } from '../endpoint/endpoint-config.interface';
+import { redactSensitiveDeep, redactSensitiveUrl, REDACTED } from '../../security/redact-sensitive';
 
 export interface CreateRequestLogOptions {
   method: string;
@@ -122,38 +120,6 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     this.flushMaxBuffer = log.flushMaxBuffer.effective as number;
   }
 
-  /**
-   * The server-level default for PersistRequestSecrets (env, default true). When
-   * true the RequestLog keeps the complete request/response (secrets included);
-   * an endpoint may override it per-endpoint via the `PersistRequestSecrets`
-   * config flag.
-   */
-  private readonly persistRequestSecretsServerDefault =
-    (process.env.PERSIST_REQUEST_SECRETS ?? 'true').toLowerCase() !== 'false';
-
-  /** Lazily-resolved EndpointService (cycle-safe via ModuleRef; cached). */
-  private endpointServiceRef?: EndpointService | null;
-
-  /**
-   * Resolve the EFFECTIVE PersistRequestSecrets for a request: the endpoint's
-   * explicit config flag OVERRIDES the server-level default; an endpoint that
-   * leaves it unset (or a global/unknown route) inherits the server default.
-   * Cache-only endpoint read (no async/DB) so this stays cheap on the log path;
-   * a cache miss falls back to the server default.
-   */
-  private resolvePersistSecrets(endpointId?: string): boolean {
-    if (!endpointId) return this.persistRequestSecretsServerDefault;
-    if (this.endpointServiceRef === undefined) {
-      try {
-        this.endpointServiceRef = this.moduleRef.get(EndpointService, { strict: false });
-      } catch {
-        this.endpointServiceRef = null;
-      }
-    }
-    const settings = this.endpointServiceRef?.getCachedProfileSettings(endpointId);
-    return getEffectivePersistRequestSecrets(settings, this.persistRequestSecretsServerDefault);
-  }
-
   // ── Auto-prune lifecycle ──
 
   // eslint-disable-next-line @typescript-eslint/require-await -- NestJS OnModuleInit signature requires Promise<void>
@@ -253,22 +219,16 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       return;
     }
 
-    // F1 - request-log privacy. By DEFAULT the RequestLog keeps the complete
-    // request/response (headers + body, secrets included) for fast RCA. When the
-    // effective PersistRequestSecrets flag is OFF (server env or per-endpoint
-    // override), secret-bearing header/body values are redacted BEFORE the row is
-    // persisted, so they never reach the DB or the API/UI. Identifier derivation
-    // still runs on the raw payload (userName/displayName/externalId are not
-    // secrets). Console/file structured logs are always redacted separately.
-    const persistSecrets = this.resolvePersistSecrets(endpointId);
-    const storedRequestHeaders = persistSecrets ? requestHeaders : redactSensitiveDeep(requestHeaders);
-    let storedRequestBody = persistSecrets ? requestBody : redactSensitiveDeep(requestBody);
-    const storedResponseHeaders = persistSecrets ? responseHeaders : redactSensitiveDeep(responseHeaders);
-    const storedResponseBody = persistSecrets ? responseBody : redactSensitiveDeep(responseBody);
-    // When secrets are not persisted, mask the free-text raw preview of an
-    // unparseable body - key-based redaction cannot reach a blob's contents.
+    const storedUrl = redactSensitiveUrl(url);
+
+    // RequestLog is a durable secondary store, so credential material is always
+    // redacted before persistence. Admin reveal/copy/download surfaces remain
+    // unchanged; the retired PersistRequestSecrets flag cannot bypass this boundary.
+    const storedRequestHeaders = redactSensitiveDeep(requestHeaders);
+    let storedRequestBody = redactSensitiveDeep(requestBody);
+    const storedResponseHeaders = redactSensitiveDeep(responseHeaders);
+    const storedResponseBody = redactSensitiveDeep(responseBody);
     if (
-      !persistSecrets &&
       storedRequestBody &&
       typeof storedRequestBody === 'object' &&
       (storedRequestBody as Record<string, unknown>)._rawPreview !== undefined
@@ -294,20 +254,20 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       const errorStack = this.extractErrorStack(error);
       let identifier: string | undefined;
       try {
-        const idCandidate = this.deriveReportableIdentifier(url, requestBody, responseBody) ||
-          (/\/scim\/Groups/i.test(url) ? this.deriveGroupDisplayName(
+        const idCandidate = this.deriveReportableIdentifier(storedUrl, requestBody, responseBody) ||
+          (/\/scim\/Groups/i.test(storedUrl) ? this.deriveGroupDisplayName(
             this.normalizeObject(requestBody) ?? null,
             this.normalizeObject(responseBody) ?? null
-          ) : undefined) || this.deriveIdentifierFromUrl(url);
+          ) : undefined) || this.deriveIdentifierFromUrl(storedUrl);
         if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
       } catch (e) {
-        this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed (inmemory)', { url, error: (e as Error).message });
+        this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed (inmemory)', { url: storedUrl, error: (e as Error).message });
       }
 
       this.inMemoryLogRows.push({
         id: randomUUID(),
         method,
-        url,
+        url: storedUrl,
         endpointId: toStorableEndpointId(endpointId),
         status: status ?? null,
         durationMs: durationMs ?? null,
@@ -334,19 +294,19 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     // Compute identifier once (cheap vs later bulk parsing). Works for Users (userName/email/externalId) & Groups (displayName)
     let identifier: string | undefined;
     try {
-      const idCandidate = this.deriveReportableIdentifier(url, requestBody, responseBody) ||
-        (/\/scim\/Groups/i.test(url) ? this.deriveGroupDisplayName(
+      const idCandidate = this.deriveReportableIdentifier(storedUrl, requestBody, responseBody) ||
+        (/\/scim\/Groups/i.test(storedUrl) ? this.deriveGroupDisplayName(
           this.normalizeObject(requestBody) ?? null,
           this.normalizeObject(responseBody) ?? null
-        ) : undefined) || this.deriveIdentifierFromUrl(url);
+        ) : undefined) || this.deriveIdentifierFromUrl(storedUrl);
       if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
     } catch (e) {
-      this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
+      this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url: storedUrl, error: (e as Error).message });
     }
 
     const data: Prisma.RequestLogCreateManyInput = {
       method,
-      url,
+      url: storedUrl,
       status: status ?? null,
       durationMs: durationMs ?? null,
       requestHeaders: this.stringifyValue(storedRequestHeaders) ?? '{}',
@@ -997,10 +957,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         status: row.status ?? undefined,
         durationMs: row.durationMs ?? undefined,
         createdAt: row.createdAt,
-        requestHeaders: this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null),
-        requestBody: parsedRequest,
-        responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
-        responseBody: parsedResponse,
+        requestHeaders: redactSensitiveDeep(this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null)),
+        requestBody: redactSensitiveDeep(parsedRequest),
+        responseHeaders: redactSensitiveDeep(this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null)),
+        responseBody: redactSensitiveDeep(parsedResponse),
         errorMessage: row.errorMessage ?? undefined,
         reportableIdentifier: rid,
         requestId: row.requestId ?? undefined,
@@ -1008,7 +968,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         authMethod: row.authMethod ?? undefined,
         authReason: row.authReason ?? undefined,
         authCredentialId: row.authCredentialId ?? undefined,
-        authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
+        authDecision: row.authDecision ? redactSensitiveDeep(this.safeParse(String(row.authDecision))) : undefined,
       };
     }
 
@@ -1043,10 +1003,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       status: row.status ?? undefined,
       durationMs: row.durationMs ?? undefined,
       createdAt: row.createdAt,
-      requestHeaders: this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null),
-      requestBody: parsedRequest,
-      responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
-      responseBody: parsedResponse,
+      requestHeaders: redactSensitiveDeep(this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null)),
+      requestBody: redactSensitiveDeep(parsedRequest),
+      responseHeaders: redactSensitiveDeep(this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null)),
+      responseBody: redactSensitiveDeep(parsedResponse),
       errorMessage: row.errorMessage ?? undefined,
       reportableIdentifier: rid,
       requestId: row.requestId ?? undefined,
@@ -1054,7 +1014,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       authMethod: row.authMethod ?? undefined,
       authReason: row.authReason ?? undefined,
       authCredentialId: row.authCredentialId ?? undefined,
-      authDecision: row.authDecision ? this.safeParse(String(row.authDecision)) : undefined,
+      authDecision: row.authDecision ? redactSensitiveDeep(this.safeParse(String(row.authDecision))) : undefined,
     };
   }
 

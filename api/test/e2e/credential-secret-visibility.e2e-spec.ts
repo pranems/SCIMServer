@@ -39,15 +39,14 @@ describe('CredentialSecretVisibility endpoint flag (E2E)', () => {
     expect(res.body.profile.settings.CredentialSecretVisibility).toBe('always');
   });
 
-  it('accepts CredentialSecretVisibility=once', async () => {
-    const endpointId = await createEndpointWithConfig(app, token, {
-      CredentialSecretVisibility: 'once',
-    });
-    const res = await request(app.getHttpServer())
-      .get(`/scim/admin/endpoints/${endpointId}`)
+  it('rejects the retired CredentialSecretVisibility=once policy', async () => {
+    const endpointId = await createEndpointWithConfig(app, token, {});
+    await request(app.getHttpServer())
+      .patch(`/scim/admin/endpoints/${endpointId}`)
       .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-    expect(res.body.profile.settings.CredentialSecretVisibility).toBe('once');
+      .set('Content-Type', 'application/json')
+      .send({ profile: { settings: { CredentialSecretVisibility: 'once' } } })
+      .expect(400);
   });
 
   it('rejects an invalid CredentialSecretVisibility value', async () => {

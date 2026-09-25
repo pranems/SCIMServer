@@ -103,7 +103,8 @@ export class ScimDiscoveryService {
 
   /** Find a single schema by URN from the endpoint's profile */
   getSchemaByUrnFromProfile(schemaUrn: string, profile?: EndpointProfile) {
-    const schema = profile?.schemas?.find(s => s.id === schemaUrn);
+    const requestedUrn = schemaUrn.toLowerCase();
+    const schema = profile?.schemas?.find(s => s.id.toLowerCase() === requestedUrn);
     if (!schema) {
       throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
@@ -133,7 +134,10 @@ export class ScimDiscoveryService {
 
   /** Find a single resource type by id from the endpoint's profile */
   getResourceTypeByIdFromProfile(resourceTypeId: string, profile?: EndpointProfile) {
-    const rt = profile?.resourceTypes?.find(r => r.id === resourceTypeId || r.name === resourceTypeId);
+    const requestedId = resourceTypeId.toLowerCase();
+    const rt = profile?.resourceTypes?.find(
+      r => r.id.toLowerCase() === requestedId || r.name.toLowerCase() === requestedId,
+    );
     if (!rt) {
       throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
@@ -151,14 +155,17 @@ export class ScimDiscoveryService {
     // each enabled method adds its scheme; primary on defaultMethodId).
     // Q6.6 - when the endpoint's WifCredentialsEnabled flag is on, a WIF scheme
     // is also advertised so discovery reflects the federated-identity token path.
-    const wifCredentialsEnabled = resolveEndpointAuthEnablement(
+    const effectiveAuth = resolveEndpointAuthEnablement(
       profile?.settings,
       profile?.authentication?.methods,
-    ).workloadIdentityFederation;
+    );
     const authenticationSchemes = computeAuthenticationSchemes(
       SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
       profile?.authentication,
-      { wifCredentialsEnabled },
+      {
+        wifCredentialsEnabled: effectiveAuth.workloadIdentityFederation,
+        oauthClientCredentialsEnabled: effectiveAuth.oauthClientCredentials,
+      },
     );
     if (profile?.serviceProviderConfig) {
       return {

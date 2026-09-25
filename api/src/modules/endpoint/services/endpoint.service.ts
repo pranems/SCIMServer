@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
-import { ENDPOINT_CONFIG_FLAGS, normalizeCredentialSecretVisibility, parseBooleanValue, validateEndpointConfig } from '../endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, parseBooleanValue, validateEndpointConfig } from '../endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
@@ -24,7 +24,6 @@ import {
 
 /** Callback type for profile change notifications (registry hydration) */
 export type ProfileChangeListener = (endpointId: string, profile: EndpointProfile | null) => void;
-export type CredentialSecretPurgeListener = (endpointId: string) => Promise<number>;
 
 // ─── Profile Summary Types ────────────────────────────────────────────────
 
@@ -153,7 +152,6 @@ export class EndpointService implements OnModuleInit {
 
   /** Callback for registry hydration on profile changes */
   private profileChangeListener?: ProfileChangeListener;
-  private credentialSecretPurgeListener?: CredentialSecretPurgeListener;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -189,28 +187,6 @@ export class EndpointService implements OnModuleInit {
    */
   setProfileChangeListener(listener: ProfileChangeListener): void {
     this.profileChangeListener = listener;
-  }
-
-  setCredentialSecretPurgeListener(listener: CredentialSecretPurgeListener): void {
-    this.credentialSecretPurgeListener = listener;
-  }
-
-  private async purgeRetainedSecretsIfRequested(
-    endpointId: string,
-    settings: Record<string, unknown> | undefined,
-  ): Promise<void> {
-    if (
-      normalizeCredentialSecretVisibility(settings?.CredentialSecretVisibility) !== 'once' ||
-      !this.credentialSecretPurgeListener
-    ) {
-      return;
-    }
-    const cleared = await this.credentialSecretPurgeListener(endpointId);
-    this.scimLogger.info(
-      LogCategory.AUTH,
-      `Purged ${cleared} retained credential secret(s) after endpoint flip to "once".`,
-      { endpointId },
-    );
   }
 
   /**
@@ -262,12 +238,12 @@ export class EndpointService implements OnModuleInit {
 
   private cacheSet(ep: CachedEndpoint): void {
     this.cacheById.set(ep.id, ep);
-    this.cacheByName.set(ep.name, ep);
+    this.cacheByName.set(ep.name.toLowerCase(), ep);
   }
 
   private cacheDelete(ep: CachedEndpoint): void {
     this.cacheById.delete(ep.id);
-    this.cacheByName.delete(ep.name);
+    this.cacheByName.delete(ep.name.toLowerCase());
   }
 
   // ─── Profile Summary Builder ────────────────────────────────────────
@@ -303,7 +279,14 @@ export class EndpointService implements OnModuleInit {
     const activeSettings: Record<string, unknown> = {};
     if (profile.settings) {
       for (const [key, value] of Object.entries(profile.settings)) {
-        if (value !== undefined && value !== null && value !== '' && value !== false && value !== 'False') {
+        const normalized = typeof value === 'string' ? value.trim().toLowerCase() : undefined;
+        const inactive = value === undefined
+          || value === null
+          || value === false
+          || normalized === ''
+          || normalized === 'false'
+          || normalized === '0';
+        if (!inactive) {
           activeSettings[key] = value;
         }
       }
@@ -442,7 +425,7 @@ export class EndpointService implements OnModuleInit {
       // PERSISTENCE_BACKEND. Cache lookup is sufficient because inmemory
       // backend is single-process and the name->endpoint Map is the source of
       // truth (no DB to race against). See crossBackendParityAudit prompt.
-      if (this.cacheByName.has(dto.name)) {
+      if (this.cacheByName.has(dto.name.toLowerCase())) {
         throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
       }
 
@@ -476,23 +459,31 @@ export class EndpointService implements OnModuleInit {
       return this.toFullResponse(cached);
     }
 
-    const existing = await this.prisma.endpoint.findUnique({
-      where: { name: dto.name }
+    const existing = await this.prisma.endpoint.findFirst({
+      where: { name: { equals: dto.name, mode: 'insensitive' } }
     });
 
     if (existing) {
       throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
     }
 
-    const endpoint = await this.prisma.endpoint.create({
-      data: {
-        name: dto.name,
-        displayName: dto.displayName,
-        description: dto.description,
-        profile: resolvedProfile as any,
-        active: true
+    let endpoint: Endpoint;
+    try {
+      endpoint = await this.prisma.endpoint.create({
+        data: {
+          name: dto.name,
+          displayName: dto.displayName,
+          description: dto.description,
+          profile: resolvedProfile as any,
+          active: true
+        }
+      });
+    } catch (error) {
+      if ((error as { code?: unknown }).code === 'P2002') {
+        throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
       }
-    });
+      throw error;
+    }
 
     const cached = this.toCached(endpoint);
     this.cacheSet(cached);
@@ -512,7 +503,7 @@ export class EndpointService implements OnModuleInit {
 
   async getEndpoint(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
     // Try cache by ID first, then by name
-    const cached = this.cacheById.get(endpointId) ?? this.cacheByName.get(endpointId);
+    const cached = this.cacheById.get(endpointId.toLowerCase()) ?? this.cacheByName.get(endpointId.toLowerCase());
     if (cached) return this.toResponse(cached, view);
 
     // Cache miss - try DB (Prisma only; InMemory is always in cache)
@@ -535,8 +526,8 @@ export class EndpointService implements OnModuleInit {
     // Fallback: try by name (allows using endpoint name in SCIM URLs)
     if (!endpoint) {
       try {
-        endpoint = await this.prisma.endpoint.findUnique({
-          where: { name: endpointId }
+        endpoint = await this.prisma.endpoint.findFirst({
+          where: { name: { equals: endpointId, mode: 'insensitive' } }
         });
       } catch (e) {
         // Name lookup also failed
@@ -554,15 +545,15 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpointByName(name: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
-    const cached = this.cacheByName.get(name);
+    const cached = this.cacheByName.get(name.toLowerCase());
     if (cached) return this.toResponse(cached, view);
 
     if (this.isInMemoryBackend) {
       throw new NotFoundException(`Endpoint with name "${name}" not found`);
     }
 
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { name }
+    const endpoint = await this.prisma.endpoint.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } }
     });
 
     if (!endpoint) {
@@ -636,7 +627,7 @@ export class EndpointService implements OnModuleInit {
       };
 
       // Update cache (delete old name entry if name changed)
-      if (current.name !== updated.name) this.cacheByName.delete(current.name);
+      if (current.name !== updated.name) this.cacheByName.delete(current.name.toLowerCase());
       this.cacheSet(updated);
       if (dto.profile?.settings) {
         this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
@@ -648,10 +639,6 @@ export class EndpointService implements OnModuleInit {
           updated.profile?.settings,
         );
       }
-      await this.purgeRetainedSecretsIfRequested(
-        endpointId,
-        dto.profile?.settings as Record<string, unknown> | undefined,
-      );
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
         endpointId, name: updated.name,
@@ -701,7 +688,7 @@ export class EndpointService implements OnModuleInit {
 
     const cached = this.toCached(dbUpdated);
     // Update cache (delete old name entry if name changed)
-    if (current && current.name !== cached.name) this.cacheByName.delete(current.name);
+    if (current && current.name !== cached.name) this.cacheByName.delete(current.name.toLowerCase());
     this.cacheSet(cached);
 
     if (dto.profile?.settings) {
@@ -714,10 +701,6 @@ export class EndpointService implements OnModuleInit {
         cached.profile?.settings,
       );
     }
-    await this.purgeRetainedSecretsIfRequested(
-      endpointId,
-      dto.profile?.settings as Record<string, unknown> | undefined,
-    );
     this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {

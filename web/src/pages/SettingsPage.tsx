@@ -18,8 +18,7 @@ import {
   Dropdown,
   Option,
   Switch,
-  Radio,
-  RadioGroup,
+  Badge,
   Input,
   Field,
   Divider,
@@ -27,7 +26,7 @@ import {
   Link,
 } from '@fluentui/react-components';
 import { useNavigate } from '@tanstack/react-router';
-import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useUpdateSecuritySettings, useServerConnectionSecrets } from '../api/queries';
+import { useVersion, useHealth, useLogConfig, useUpdateLogConfig, useJwksHostAllowlist, useAddJwksHost, useRemoveJwksHost, useUpdateJwksHost, usePatchJwksHosts, useSecuritySettings, useServerConnectionSecrets } from '../api/queries';
 import type { LogConfigResponse } from '../api/queries';
 import { LoadingSkeleton, CopyableField, CopyJsonButton, CopyableJsonBlock, SettingsJsonExport } from '../components/primitives';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
@@ -239,8 +238,8 @@ const ServerConnectionInfoCard: React.FC = () => {
         endpoint also has its own per-endpoint values on its Connect tab. Labels follow Microsoft
         Entra ID; other IdPs (Okta, OneLogin, Ping, custom clients) use the equivalent field.
         {revealed
-          ? ' Secrets are shown because CredentialSecretVisibility is "always".'
-          : ' Secrets are hidden (CredentialSecretVisibility is "once"); set it to "always" below to show them.'}
+          ? ' Secrets are shown to authenticated admins and included in this export.'
+          : ' A configured global secret is currently unavailable.'}
       </Caption1>
 
       <div className={classes.row}>
@@ -512,14 +511,6 @@ const JwksHostAllowlistSection: React.FC = () => {
 const SecuritySettingsSection: React.FC = () => {
   const classes = useStyles();
   const { data, isLoading } = useSecuritySettings();
-  const update = useUpdateSecuritySettings();
-
-  const visibility = data?.credentialSecretVisibility ?? 'always';
-
-  const onChange = (next: 'always' | 'once'): void => {
-    if (next === visibility) return;
-    update.mutate({ credentialSecretVisibility: next });
-  };
 
   return (
     <Card className={classes.logConfigCard} data-testid="security-settings-card">
@@ -535,26 +526,18 @@ const SecuritySettingsSection: React.FC = () => {
         )}
       </div>
       <Caption1>
-        Server-scope ceiling for whether per-endpoint credential secrets are retained
-        (encrypted at rest) and re-viewable by an admin. Setting this to &quot;once&quot; forces
-        every endpoint to &quot;once&quot; and purges any retained secret copies, regardless of the
-        per-endpoint setting.
+        Credential secrets are retained encrypted at rest and shown only on authenticated
+        admin surfaces. Existing credentials created under the retired once-only policy
+        require rotation before their secret can be shown again.
       </Caption1>
 
       {isLoading && <Caption1>Loading...</Caption1>}
       {data && (
         <>
-          <Field label="CredentialSecretVisibility (server ceiling)">
-            <RadioGroup
-              layout="horizontal"
-              value={visibility}
-              disabled={update.isPending}
-              onChange={(_e, d) => onChange(d.value as 'always' | 'once')}
-              data-testid="security-visibility-group"
-            >
-              <Radio value="always" label="always (retain + reveal)" data-testid="security-visibility-always" />
-              <Radio value="once" label="once (show at create only)" data-testid="security-visibility-once" />
-            </RadioGroup>
+          <Field label="CredentialSecretVisibility">
+            <Badge appearance="filled" color="success" data-testid="security-visibility-always">
+              always (retain encrypted + display to authenticated admins)
+            </Badge>
           </Field>
 
           <div className={classes.row}>
@@ -568,7 +551,6 @@ const SecuritySettingsSection: React.FC = () => {
         </>
       )}
 
-      <ScimErrorMessage error={update.error} />
     </Card>
   );
 };

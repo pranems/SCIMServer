@@ -103,6 +103,23 @@ describe('Bulk Operations (Phase 9) E2E', () => {
       expect(res.body.Operations).toHaveLength(1);
       expect(res.body.Operations[0].status).toBe('201');
     });
+
+    it.each(['/users', '/uSeRs'])('should resolve mixed-case Bulk collection path %s', async (path) => {
+      const res = await request(app.getHttpServer())
+        .post(`${scimBasePath(endpointId)}/Bulk`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [BULK_REQUEST_SCHEMA],
+          Operations: [
+            { method: 'POST', path, bulkId: 'case-user', data: { schemas: [USER_SCHEMA], userName: `bulk-case-${Date.now()}-${path}@example.com` } },
+          ],
+        })
+        .expect(200);
+
+      expect(res.body.Operations[0].status).toBe('201');
+      expect(res.body.Operations[0].location).toContain('/Users/');
+    });
   });
 
   // ─── User CRUD via Bulk ──────────────────────────────────────────────

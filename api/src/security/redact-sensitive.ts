@@ -2,11 +2,9 @@
  * redact-sensitive.ts - a single, shared, recursive secret redactor.
  *
  * Used by BOTH the structured console/file logger (`ScimLogger.sanitizeData`)
- * and the persisted RequestLog path (`LoggingService.recordRequest`, when the
- * effective `PersistRequestSecrets` flag is OFF) so the two never drift on what
- * counts as a secret. The RequestLog is a deliberate full-fidelity RCA store
- * that keeps everything (headers + body, secrets included) BY DEFAULT; turning
- * the flag OFF routes the same request/response through this redactor first.
+ * and the persisted RequestLog path (`LoggingService.recordRequest`) so the two
+ * never drift on what counts as a secret. Durable RequestLog rows always pass
+ * through this redactor; legacy `PersistRequestSecrets` values cannot bypass it.
  *
  * The redactor deep-clones its input and replaces the VALUE of any key whose
  * name looks secret (at any nesting depth, and inside arrays) with the
@@ -30,6 +28,30 @@ export const SENSITIVE_KEY_PATTERN =
 /** Whether a key name should have its value redacted. */
 export function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_PATTERN.test(key);
+}
+
+export function redactSensitiveUrl(url: string): string {
+  const queryStart = url.indexOf('?');
+  if (queryStart < 0) return url;
+
+  const hashStart = url.indexOf('#', queryStart);
+  const path = url.slice(0, queryStart);
+  const query = url.slice(queryStart + 1, hashStart < 0 ? undefined : hashStart);
+  const hash = hashStart < 0 ? '' : url.slice(hashStart);
+  const redactedQuery = query.split('&').map((part) => {
+    const equals = part.indexOf('=');
+    const encodedKey = equals < 0 ? part : part.slice(0, equals);
+    let decodedKey = encodedKey;
+    try {
+      decodedKey = decodeURIComponent(encodedKey.replace(/\+/g, ' '));
+    } catch {
+      // Preserve malformed query keys while still applying the raw-key check.
+    }
+    return isSensitiveKey(decodedKey)
+      ? `${encodedKey}=${REDACTED}`
+      : part;
+  }).join('&');
+  return `${path}?${redactedQuery}${hash}`;
 }
 
 /**

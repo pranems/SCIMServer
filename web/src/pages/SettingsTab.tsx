@@ -33,8 +33,6 @@ import {
   tokens,
   Card,
   Switch,
-  Radio,
-  RadioGroup,
   Dropdown,
   Option,
   Input,
@@ -49,6 +47,7 @@ import {
   MessageBarTitle,
 } from '@fluentui/react-components';
 import {
+  useEndpointEgressPolicy,
   useEndpointOverview,
   useUpdateEndpointConfig,
 } from '../api/queries';
@@ -66,6 +65,11 @@ import {
   type NumberSettingDefinition as NumberSetting,
 } from './endpoint-settings-definitions';
 import { AUTH_METHOD_FLAGS } from './endpoint-auth-flags';
+import {
+  EGRESS_FIELD_BY_SETTING,
+  EGRESS_SOURCE_LABEL,
+  formatEgressValue,
+} from './egress-policy-ui';
 
 /*
  * Setting definitions live in endpoint-settings-definitions.ts. Settings is
@@ -144,6 +148,7 @@ interface Feedback {
 export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
   const { data, isLoading, error } = useEndpointOverview(endpointId);
+  const egressPolicy = useEndpointEgressPolicy(endpointId);
   const updateMutation = useUpdateEndpointConfig(endpointId);
   const [feedback, setFeedback] = React.useState<Feedback | null>(null);
 
@@ -154,7 +159,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     return () => clearTimeout(t);
   }, [feedback]);
 
-  if (isLoading) {
+  if (isLoading || egressPolicy.isLoading) {
     // G1 - settings is a stack of form rows; mirror with several
     // shorter skeleton bands instead of an indeterminate Spinner.
     return (
@@ -168,7 +173,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     );
   }
 
-  if (error || !data) {
+  if (error || egressPolicy.error || !data || !egressPolicy.data) {
     return (
       <div className={classes.center} data-testid="settings-error">
         <Text>Failed to load settings.</Text>
@@ -177,6 +182,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   }
 
   const overview: EndpointOverviewResponse = data;
+  const effectiveEgressPolicy = egressPolicy.data;
   const flags = overview.configFlags ?? {};
   const pendingKey = pendingFlagKey(updateMutation.variables);
   const isPending = updateMutation.isPending;
@@ -186,22 +192,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
   // or diffed against an earlier capture.
   const effectiveSettings: Record<string, boolean | string | number> = {};
   for (const flag of BOOLEAN_FLAGS) {
-    effectiveSettings[flag.key] = coerceFlag(flags[flag.key], flag.defaultValue);
+    effectiveSettings[flag.key] = flag.key === 'PersistRequestSecrets'
+      ? false
+      : coerceFlag(flags[flag.key], flag.defaultValue);
   }
-  effectiveSettings.CredentialSecretVisibility =
-    typeof flags.CredentialSecretVisibility === 'string' &&
-    flags.CredentialSecretVisibility.toLowerCase() === 'once'
-      ? 'once'
-      : 'always';
+  effectiveSettings.CredentialSecretVisibility = 'always';
   for (const s of ENUM_SETTINGS) {
     const v = flags[s.key];
     effectiveSettings[s.key] = typeof v === 'string' && v !== '' ? v : s.defaultValue;
   }
-  // Number settings are OPTIONAL overrides - include only the ones explicitly
-  // set so the exported PATCH body reflects "unset = inherit server default".
   for (const s of NUMBER_SETTINGS) {
-    const v = getNumberFlag(flags[s.key]);
-    if (v !== undefined) effectiveSettings[s.key] = v;
+    const fieldName = EGRESS_FIELD_BY_SETTING[s.key];
+    const field = fieldName ? effectiveEgressPolicy[fieldName] : undefined;
+    if (field) effectiveSettings[s.key] = field.effective;
   }
   const settingsExport = { profile: { settings: effectiveSettings } };
 
@@ -221,27 +224,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
         type: 'error',
         message: `Failed to update ${flag.label}: ${msg}`,
       });
-    }
-  }
-
-  // WI-7: CredentialSecretVisibility is an enum (always|once), not a boolean.
-  const visibilityRaw = typeof flags.CredentialSecretVisibility === 'string'
-    ? flags.CredentialSecretVisibility.toLowerCase()
-    : 'always';
-  const visibility = visibilityRaw === 'once' ? 'once' : 'always';
-  const visibilityPending = isPending && pendingKey === 'CredentialSecretVisibility';
-
-  async function handleVisibilityChange(next: 'always' | 'once') {
-    if (next === visibility) return;
-    setFeedback(null);
-    try {
-      await updateMutation.mutateAsync({
-        profile: { settings: { CredentialSecretVisibility: next } },
-      });
-      setFeedback({ type: 'success', message: `CredentialSecretVisibility set to ${next}.` });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update failed.';
-      setFeedback({ type: 'error', message: `Failed to update CredentialSecretVisibility: ${msg}` });
     }
   }
 
@@ -276,7 +258,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
       });
       return;
     }
-    if (getNumberFlag(flags[setting.key]) === n) return;
+    const fieldName = EGRESS_FIELD_BY_SETTING[setting.key];
+    const effectiveValue = fieldName ? effectiveEgressPolicy[fieldName]?.effective : undefined;
+    if ((getNumberFlag(flags[setting.key]) ?? effectiveValue) === n) return;
     setFeedback(null);
     try {
       await updateMutation.mutateAsync({
@@ -345,7 +329,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
 
         {/* ── Boolean toggles grouped by category ──────────────── */}
         {CATEGORY_ORDER.map((category) => {
-          const flagsInCategory = BOOLEAN_FLAGS.filter((f) => f.category === category);
+          const flagsInCategory = BOOLEAN_FLAGS.filter(
+            (f) => f.category === category && f.key !== 'PersistRequestSecrets',
+          );
           if (flagsInCategory.length === 0) return null;
           const catTestId = `settings-category-${category.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
           return (
@@ -401,25 +387,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
           );
         })}
 
-        {/* ── WI-7: CredentialSecretVisibility (enum) ──────────── */}
+        <Card className={classes.card} data-testid="settings-log-secret-persistence">
+          <Caption1>Request log credential persistence</Caption1>
+          <Badge appearance="filled" color="success" data-testid="settings-persist-request-secrets-redacted">
+            always redacted
+          </Badge>
+          <Caption1 className={classes.flagDescription}>
+            Request and response diagnostics are preserved, but secret-bearing values are
+            redacted before durable storage. The retired PersistRequestSecrets value cannot
+            bypass this boundary.
+          </Caption1>
+        </Card>
+
+        {/* Authenticated admin credential secrets are retained encrypted and always displayed. */}
         <Card className={classes.card} data-testid="settings-credential-visibility">
           <Caption1>Credential secret visibility</Caption1>
           <div className={classes.flagRow}>
-            <RadioGroup
-              layout="horizontal"
-              value={visibility}
-              disabled={visibilityPending}
-              onChange={(_, d) => { void handleVisibilityChange(d.value as 'always' | 'once'); }}
-              aria-label="CredentialSecretVisibility"
-            >
-              <Radio value="always" label="always (retain + reveal)" data-testid="credential-visibility-always" />
-              <Radio value="once" label="once (show at create only)" data-testid="credential-visibility-once" />
-            </RadioGroup>
+            <Badge appearance="filled" color="success" data-testid="credential-visibility-always">
+              always (retain encrypted + display to authenticated admins)
+            </Badge>
             <Caption1 className={classes.flagDescription}>
-              Choose whether a per-endpoint credential secret is retained (encrypted at rest) and
-              re-viewable by an admin, or shown exactly once at creation. The server setting is the
-              ceiling - if the server is set to &quot;once&quot; this endpoint is forced to &quot;once&quot;
-              regardless of the value here.
+              Existing credentials created under the retired once-only policy remain unavailable
+              until rotated. New and rotated secrets are retained encrypted and included in
+              authenticated admin displays and exports.
             </Caption1>
           </div>
         </Card>
@@ -464,21 +454,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
           <Caption1>Runtime egress (WIF JWKS fetch)</Caption1>
           {NUMBER_SETTINGS.map((setting) => {
             const current = getNumberFlag(flags[setting.key]);
-            const currentDisplay = current !== undefined ? String(current) : '';
+            const fieldName = EGRESS_FIELD_BY_SETTING[setting.key];
+            const field = fieldName ? effectiveEgressPolicy[fieldName] : undefined;
+            const currentDisplay = String(current ?? field?.effective ?? setting.serverDefault);
             const disabled = isPending && pendingKey === setting.key;
             return (
               <div key={setting.key} className={classes.flagRow} data-testid={`settings-number-${setting.key}`}>
                 <div className={classes.flagHeader}>
                   <Text className={classes.monospace}>{setting.label}</Text>
                   <Input
-                    // Re-mount when the persisted value changes so the field
-                    // reflects the latest server state (blank = inherit default).
                     key={`${setting.key}-${currentDisplay}`}
                     type="number"
                     defaultValue={currentDisplay}
-                    placeholder={`server default: ${setting.serverDefault}`}
-                    min={setting.min}
-                    max={setting.max}
+                    min={field?.min ?? setting.min}
+                    max={field?.max ?? setting.max}
                     disabled={disabled}
                     aria-label={setting.label}
                     onBlur={(e) => { void handleNumberChange(setting, e.target.value); }}
@@ -486,6 +475,32 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                   />
                 </div>
                 <Caption1 className={classes.flagDescription}>{setting.description}</Caption1>
+                {field && (
+                  <>
+                    <Caption1
+                      className={classes.flagDescription}
+                      data-testid={`settings-number-${setting.key}-effective`}
+                    >
+                      Effective: {formatEgressValue(field)}
+                    </Caption1>
+                    <Caption1
+                      className={classes.flagDescription}
+                      data-testid={`settings-number-${setting.key}-configured`}
+                    >
+                      Configured: {field.configured === null ? 'inherit' : `${field.configured} ${field.unit}`}
+                    </Caption1>
+                    <Caption1
+                      className={classes.flagDescription}
+                      data-testid={`settings-number-${setting.key}-source`}
+                    >
+                      Source: {EGRESS_SOURCE_LABEL[field.source]}
+                    </Caption1>
+                    <Caption1 className={classes.flagDescription}>
+                      Allowed: {field.min}-{field.max} {field.unit}
+                      {field.clamped ? `; requested ${field.requested} was clamped` : ''}
+                    </Caption1>
+                  </>
+                )}
               </div>
             );
           })}

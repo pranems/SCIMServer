@@ -455,6 +455,35 @@ function coerceScalarPatchValue(
  * @param extensionUrns  Extension URNs to check (original-case)
  * @returns Array of extension URNs that have visible (non-empty) attributes in the payload
  */
+const INTERNAL_RESPONSE_KEYS = new Set([
+  '_schemacaches',
+  '_rawpayload',
+  '_prismametadata',
+  '_version',
+  'endpointid',
+  'scimid',
+  'rawpayload',
+  'stacktrace',
+  'stack',
+]);
+
+export function stripInternalResponseFields(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) stripInternalResponseFields(item);
+    return;
+  }
+  if (typeof value !== 'object' || value === null) return;
+
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (key.startsWith('_') || INTERNAL_RESPONSE_KEYS.has(key.toLowerCase())) {
+      delete record[key];
+      continue;
+    }
+    stripInternalResponseFields(record[key]);
+  }
+}
+
 export function stripNeverReturnedFromPayload(
   payload: Record<string, unknown>,
   neverByParent: Map<string, Set<string>>,
@@ -480,10 +509,22 @@ export function stripNeverReturnedFromPayload(
   // ─── Extension stripping + visible URN collection ───
   const visibleExtUrns: string[] = [];
   for (const urn of extensionUrns) {
-    if (!(urn in payload)) continue;
     const urnLower = urn.toLowerCase();
+    const matchingKeys = Object.keys(payload).filter((key) => key.toLowerCase() === urnLower);
+    if (matchingKeys.length === 0) continue;
+
+    const extensionObjects = matchingKeys
+      .map((key) => payload[key])
+      .filter((value): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null && !Array.isArray(value),
+      );
+    const extObj: unknown = extensionObjects.length > 0
+      ? Object.assign({}, ...extensionObjects)
+      : payload[matchingKeys[0]];
+    for (const key of matchingKeys) delete payload[key];
+    payload[urn] = extObj;
+
     const extNever = neverByParent.get(urnLower);
-    const extObj = payload[urn];
     if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
       for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
         if (extNever.has(extKey.toLowerCase())) {

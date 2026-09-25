@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.32`
+> **Status:** Living reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.33`
 >
 > **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -239,7 +239,7 @@ Content-Type: application/json
 }
 ```
 
-> **The `token` is returned once.** It is stored as a bcrypt hash, so the server cannot show it to you again. `CredentialSecretVisibility` controls whether the UI keeps it on screen (`always`) or hides it after first reveal (`once`).
+> **The `token` is returned at creation and retained encrypted for authenticated admin display and export.** Verification uses the keyed credential hash, not the encrypted copy. If an older credential was created while the retired once-only policy was active, its plaintext cannot be reconstructed; rotate it to create a newly retained secret.
 
 > **Token format (v0.55.16).** A bearer credential is now issued as
 > `scim_<lookupKey>_<secret>`. The `lookupKey` half is a **public identifier** -
@@ -880,11 +880,11 @@ one.
 | `SecretTokenBearerAuthEnabled` | off | per-endpoint bearer tokens |
 | `OAuthClientCredentialsAuthEnabled` | off | `oauth_client` credentials |
 | `WifCredentialsEnabled` | off | federated assertions and WIF scheme advertisement |
-| `CredentialSecretVisibility` | `once` | whether the UI keeps a secret on screen |
-| `PersistRequestSecrets` | on | whether request logs retain secret-bearing values |
+| `CredentialSecretVisibility` | `always` | fixed encrypted retention for authenticated admin display and export; `once` writes are rejected |
+| `PersistRequestSecrets` | off | retired compatibility setting; durable request logs always redact secret-bearing values |
 | `JwksFetchTimeoutMs` / `JwksFetchRetries` / `JwksFetchRetryBackoffMs` / `JwksCacheMaxAgeMs` | see settings guide | JWKS fetch behaviour |
 
-The broad endpoint overview response used by Users, Groups, Logs, Settings, and other tabs never carries plaintext credentials. The Connect tab separately requests `connection-info`; under `CredentialSecretVisibility=always`, that dedicated admin route may return retained values and emits an AUTH disclosure audit event.
+The broad endpoint overview response used by Users, Groups, Logs, Settings, and other tabs never carries plaintext credentials. Connect separately requests authenticated admin connection and reveal resources; retained values appear automatically and are included in credential, method, and endpoint JSON exports. Public discovery and durable logs remain secret-free.
 
 ### Source
 

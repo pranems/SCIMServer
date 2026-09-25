@@ -94,9 +94,9 @@ export class AdminSecuritySettingsController {
   @Put()
   async update(@Body() body: UpdateSecuritySettingsDto): Promise<SecuritySettingsResponse> {
     const next = normalizeCredentialSecretVisibility(body?.credentialSecretVisibility);
-    if (!next) {
+    if (next !== 'always') {
       throw new BadRequestException(
-        'credentialSecretVisibility must be "always" or "once".',
+        'credentialSecretVisibility must be "always". Secrets are retained encrypted for authenticated admin display and export.',
       );
     }
     await this.credentialSecurity.setServerVisibility(next);
@@ -104,14 +104,6 @@ export class AdminSecuritySettingsController {
       LogCategory.AUTH,
       `Server CredentialSecretVisibility set to "${next}".`,
     );
-    // Server-scope `once` is the ceiling; purge retained ciphertext everywhere.
-    if (next === 'once') {
-      const cleared = await this.credentialSecurity.purgeAllRetainedSecrets();
-      this.logger.info(
-        LogCategory.AUTH,
-        `Purged ${cleared} retained credential secret(s) after server flip to "once".`,
-      );
-    }
     this.eventEmitter.emit(SCIM_EVENTS.SECURITY_SETTINGS_UPDATED, {
       credentialSecretVisibility: next,
     });
