@@ -4,10 +4,11 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
-**`docs/DELIVERY_PLAN.md` is the canonical execution plan** for the current `ci/validate-before-push` branch and the 6-week production-hardening + UI-redesign sequence. All upcoming commits should:
-- Reference a named defect ID from [DELIVERY_PLAN.md §3](docs/DELIVERY_PLAN.md#3-named-defect-inventory)
-- Follow the TDD process from [DELIVERY_PLAN.md §7](docs/DELIVERY_PLAN.md#7-tdd-process-rules)
-- Update the [Progress Log in §11](docs/DELIVERY_PLAN.md#11-progress-log) on commit
+The current shipped baseline is `master` v0.55.34. Use
+[AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](docs/strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
+for the operating process and [REMAINING_WORK_REGISTER.md](docs/auth/REMAINING_WORK_REGISTER.md)
+for the dated authentication backlog. The old [DELIVERY_PLAN.md](docs/DELIVERY_PLAN.md) is a
+historical execution record, not the current branch or priority authority.
 
 ### Workspace Tenant Isolation (CRITICAL - read before any `az` command)
 
@@ -15,36 +16,35 @@ This dev box hosts TWO projects targeting TWO different Azure tenants. Cross-ten
 
 | Project | Tooling | Tenant | Tenant ID | Subscription |
 | --- | --- | --- | --- | --- |
-| **SCIMServer** (this VS Code window) | VS Code + integrated `pwsh` + `az` CLI | Provisioning IAM Team 07 (`proviamtest07.onmicrosoft.com`) | `79e329e6-1ece-4499-8381-53a6e43eea5c` | scimserver-rg (prod) / scimserver-rg-dev (dev) |
+| **SCIMServer** (this VS Code window) | VS Code + integrated `pwsh` + `az` CLI | Provisioning IAM Team 09 (`proviamtest09.onmicrosoft.com`) | `9751e42f-78f3-42f4-8b8a-6e73845aceae` | `ProvIAM_Subscription` (`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`) |
 | **Sync Fabric** (separate window) | Visual Studio + its own MSAL cache | TME Organization (AzureCloud) | `70a036f6-8e4d-4615-bad6-149c02e7720d` | AADSF TME Test Subscription |
 
-Isolation is enforced by per-workspace `AZURE_CONFIG_DIR` so each project gets its own `az` CLI token cache, default subscription, and login state. The setting is committed at [.vscode/settings.json](.vscode/settings.json) and applies automatically to every integrated terminal opened from this workspace - no manual `az account set` per shell needed.
+Tenant identity and estate roles are owned by [scim-estates.json](scripts/scim-estates.json).
+CLI isolation is provided by [az-tenant.ps1](scripts/az-tenant.ps1), which assigns a dedicated
+`AZURE_CONFIG_DIR` to each tenant. Never copy tenant IDs or FQDNs into a new script.
 
-**One-time bootstrap in any new integrated terminal opened from this workspace:**
+**Bootstrap in any new integrated terminal used for dev or canary operations:**
 
 ```powershell
-# Verify the workspace setting took effect (should print a path ending in .azure-scimserver)
-$env:AZURE_CONFIG_DIR
-$env:AZURE_TENANT_ID  # should be 79e329e6-1ece-4499-8381-53a6e43eea5c
-
-# First-time login into the SCIMServer tenant only (won't touch the sync fabric tenant)
-az login --tenant 79e329e6-1ece-4499-8381-53a6e43eea5c
-az account set --subscription "<scimserver-subscription-id>"
-
-# Sanity check before any deploy / live-test run
+. .\scripts\az-tenant.ps1
+Use-ProvIAM09
 az account show --query '{name:name, tenantId:tenantId, subId:id}' -o table
 ```
 
-**Why this matters:** without `AZURE_CONFIG_DIR`, `az login` writes to the global `~/.azure` directory shared with Visual Studio's `az` invocations, sync fabric's `DefaultAzureCredential`, and any other shell. The last `az account set` wins globally - which is exactly how prod gets deployed to the wrong tenant. The Visual Studio sync fabric project keeps its own MSAL cache and is unaffected by this isolation.
+The expected tenant is `9751e42f-78f3-42f4-8b8a-6e73845aceae`; the expected subscription is
+`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`. `Use-ProvIAM09` reuses the isolated cache or the deployment
+service principal and selects the subscription by ID, avoiding the ambiguous
+`ProvIAM_Subscription` name shared with the retired Tenant 08.
 
 **Pitfalls to avoid:**
-- NEVER run `az login` without first confirming `$env:AZURE_CONFIG_DIR` is set to the SCIMServer-scoped path.
+- NEVER deploy before dot-sourcing `az-tenant.ps1`, calling `Use-ProvIAM09`, and checking `az account show`.
 - NEVER pass `--tenant 70a036f6-...` (TME) from this workspace - that's the sync fabric tenant.
-- If [scripts/deploy-dev.ps1](scripts/deploy-dev.ps1) or [scripts/live-test.ps1](scripts/live-test.ps1) ever appears to target the wrong subscription, run `az account show` first - the fix is almost always a missing `AZURE_CONFIG_DIR` in the parent shell, not a script bug.
+- NEVER target Tenant 08 or Tenant 07 for dev/canary work; they are retired historical estates.
+- If an ARM lookup returns empty, verify tenant and subscription before debugging the caller.
 
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
-| 2026-09-24 (latest) | nav+ux **v0.55.34 global history and workflow context is merged and fully verified on dev.** Shell-wide Back/Forward restores routes, tabs, subtabs, filters, action-target selections, and global/endpoint Logs drawers; a new PUSH discards stale Forward history. Logs Errors-only no longer throws `hasError` `invalid_value`. Self-service `/Me` and Manual Provision fail closed for shared-secret, stale, and inactive endpoint contexts. Operations, Logs, and Manual Provision state distinct purposes, share intent-based endpoint identity, and hand off between aggregate and endpoint-local workflows. The sidebar and Manual Provision stack without overflow at 320px/390px. Exact-tip CodeQL found and closed incomplete subject-filter escaping through the structured filter builder. GREEN: web **1,567/1,567** across 118 files with all coverage ratchets, focused review **78/78** plus filter-security **29/29**, final dev Playwright **246 passed / 5 skipped / 0 failed**, dev live **1,532/1,532**, all six modes, builds, API lint, route budgets, docs, Mermaid **716/716**, and CodeQL. PR #179 merged as `b58af31d`; dev revision `scimserver-dev--vb58af31d` serves v0.55.34 at 100%, endpoint integrity is **60 -> 60**, and revision hygiene retains two revisions. Canary and customer prod are unchanged. |
+| 2026-09-24 (latest) | nav+ux **v0.55.34 global history and workflow context is merged and fully verified on dev.** Shell-wide Back/Forward restores routes, tabs, subtabs, filters, action-target selections, and global/endpoint Logs drawers; a new PUSH discards stale Forward history. Logs Errors-only no longer throws `hasError` `invalid_value`. Self-service `/Me` and Manual Provision fail closed for shared-secret, stale, and inactive endpoint contexts. Operations, Logs, and Manual Provision state distinct purposes, share intent-based endpoint identity, and hand off between aggregate and endpoint-local workflows. The sidebar and Manual Provision stack without overflow at 320px/390px. Exact-tip CodeQL found and closed incomplete subject-filter escaping through the structured filter builder. GREEN: web **1,567/1,567** across 118 files with all coverage ratchets, focused review **78/78** plus filter-security **29/29**, final dev Playwright **246 passed / 5 skipped / 0 failed**, dev live **1,532/1,532**, all six modes, builds, API lint, route budgets, docs, Mermaid **716/716**, and CodeQL. PR #179 merged as `b58af31d`; dev revision `scimserver-dev--vb58af31d` serves v0.55.34 at 100%, endpoint integrity is **60 -> 60**, and revision hygiene retains two revisions. Operator quick visual verification was received on 2026-09-25 for the global history, Logs, `/Me`, Operations, Manual Provision, and responsive surfaces. Canary and customer prod are unchanged. |
 | 2026-09-24 (latest) | api+auth+ux **v0.55.33 output fidelity is merged and fully verified on dev.** URL and SCIM identifiers are case-insensitive across endpoint names/UUIDs, Bulk, custom ResourceTypes, Schemas, and PATCH paths; SPC uses effective auth enablement; Settings displays all 11 authoritative egress fields; SCIM serializers suppress mixed-case `returned:never` values and internal fields. Recoverable bearer/OAuth secrets render automatically and populate every authenticated admin JSON export, while public discovery, Workbench history, RequestLog, structured logs, and secret-bearing query strings stay secret-free. Retired `once` writes are rejected and legacy purged values require rotation. GREEN: API unit **5,192/5,192**, API E2E **1,533/1,533**, web **1,544/1,544**, local/dev live **1,532/1,532**, four executable persistence/web lanes **4/4** with two Prisma lanes skipped because `DATABASE_URL` was unavailable, final dev Playwright **241 passed / 4 skipped / 0 failed**, builds, lint, budgets, docs, Mermaid, and exact-tip CodeQL. PR #177 merged as `6565dc60`; dev revision `scimserver-dev--v6565dc60` serves v0.55.33 at 100% with all **60 -> 60** endpoint IDs preserved and two active revisions retained. Canary and customer prod are unchanged. |
 | 2026-09-24 (latest) | auth+ux **v0.55.32 effective WIF/JWKS egress values are merged and fully verified on dev.** The API and Connect WIF panel expose all 11 runtime values with configured override, source, units, bounds, and clamping. Edit/Save/Cancel/Reset-to-inherit use one PATCH contract with null-as-unset while preserving siblings. Shared JWKS cache/prewarm state is partitioned by URI plus effective policy; redirect memory is bounded and zero TTL is exact. GREEN: API unit **5,170/5,170**, API E2E **1,529/1,529**, web **1,538/1,538**, focused API **160/160** plus JWKS/provider/wiring **90/90**, focused web **99/99**, dev live **1,524/1,524**, final dev Playwright **242 passed / 4 skipped / 0 failed**, and all six modes. PR #175 merged as `566ebd45`; dev revision `scimserver-dev--v566ebd45` serves v0.55.32 at 100%, endpoint integrity is **60 -> 60**, and revision hygiene retains two revisions. Canary and customer prod are unchanged. |
 | 2026-09-24 (latest) | nav+ux **v0.55.31 context-preserving Back navigation is merged and fully verified on dev.** A shared history-first primitive restores exact in-app URLs with safe direct-link fallbacks. Connect method, Operations subtab/filters/pages, and Discovery endpoint comparison/tab state live in typed URL search. GREEN: web coverage **1,534/1,534** across 115 files, focused Vitest **155/155**, search schemas **23/23**, live **1,516/1,516**, and final dev Playwright **241 passed / 4 skipped / 0 failed**. The inspected Users baseline now uses semantic live-data masks plus explicit detail/Users readiness locks, rejecting the shell-only negative control by 29%. PR #173 merged as `574d9135`; dev revision `scimserver-dev--v574d9135` serves v0.55.31 at 100%, endpoint integrity is **60 -> 60**, and revision hygiene retains two revisions. Canary and customer prod are unchanged. |

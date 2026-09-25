@@ -3,6 +3,10 @@
 **Last verified:** 2026-08-19 against `feat/wif` (api + web **0.55.9**), SyncFabric `origin/master`
 `38c429b511`, canonical WIF guide revision 7 (6,503 lines, mirror byte-identical).
 
+**Operational sequence corrected:** 2026-09-25 against `master` v0.55.34. W3.5 shipped in
+v0.55.23 and is live on dev plus canary. Section 4 now starts from the current security and release
+state; the detailed item inventory remains the dated snapshot described below.
+
 > **Historical status snapshot:** Do not use this document as the current v0.55.24 authority without re-verifying each row. Use [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](../PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for the current endpoint/profile/authentication synthesis and this register for the dated backlog evidence.
 
 **How to read this.** Section 1 answers *"which authentication methods actually work?"*. Section 2 is
@@ -368,21 +372,26 @@ satisfied but never tracked; E and F open. All three X15 findings closed via W1.
 
 ## 4. Do next, in order
 
-Sequenced by value per unit of effort.
+Sequenced by current risk, release dependency, then capability value.
 
 ```mermaid
 flowchart TD
-  C35["Consolidate W3.5<br/>commit, PR, merged-master image"] --> DEV["Deploy and validate dev"]
-  DEV --> CANARY["Promote same artifact to canary"]
+  VISUAL["v0.55.34 operator visual check<br/>complete 2026-09-25"] --> PIN["Resolve issue 144<br/>vulnerable override pins"]
+  PIN --> DEPS["Refresh dependency PRs<br/>against current master"]
+  DEPS --> DEV["Deploy and validate<br/>security-fixed merged master"]
+  DEV --> CANARY["Promote the same digest<br/>to canary"]
   CANARY --> W41["Wave 4 RFC 8693<br/>carries N7: no client_id"]
   W41 --> W42["Truthful metadata when active"]
   W42 --> W43["Real SyncFabric RFC 8693 proof"]
 ```
 
-**Why this order.** W3.5 is locally complete but not yet a reviewable commit or deployed artifact.
-Mixing Wave 4 into the same diff would erase the rollback and review boundary between a cache/index
-change and a new OAuth protocol handler. Consolidate W3.5 first, prove the migration and runtime on
-dev/canary, then start W4.1 in a new branch and fresh session.
+**Why this order.** W3.5 was merged in PR #155 and deployed as v0.55.23. Dev now serves v0.55.34,
+while canary serves v0.55.23 and customer production serves v0.55.20. Before promoting another
+artifact, issue #144 must move the pinned `hono` and `@hono/node-server` overrides off vulnerable
+versions through the approved public-runner lockfile workflow. Dependency PRs are already green but
+behind master, so they need current-tip validation before merge. Only after one security-fixed digest
+passes dev and canary should W4.1 begin as its own protocol and rollback unit. Customer production
+still requires explicit operator approval and is not part of this automatic sequence.
 
 **Two constraints to carry into Wave 4:** **N7** - RFC 8693 omits `client_id` by design, so A4's
 "require `client_id`" must **not** be generalized to the 8693 handler or the integration breaks
