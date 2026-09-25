@@ -33,6 +33,7 @@ import {
   pruneEmptyExtensions,
   findInvalidMultiValuedElement,
   resolvePropertyKey,
+  safePropertyKey,
 } from '../../modules/scim/utils/scim-patch-path';
 
 import type {
@@ -321,7 +322,7 @@ export class UserPatchEngine {
       const propertyKey = resolvePropertyKey(rawPayload, originalPath);
       const existing = rawPayload[propertyKey];
       const merged = mergeComplexAttribute(existing, value);
-      rawPayload = { ...rawPayload, [propertyKey]: merged };
+      rawPayload = { ...rawPayload, [safePropertyKey(propertyKey)]: merged };
       return { userName, displayName, externalId, active, rawPayload };
     }
 
@@ -457,9 +458,9 @@ export class UserPatchEngine {
     const existing = rawPayload[parentKey];
     if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
       const childKey = resolvePropertyKey(existing as Record<string, unknown>, childAttr);
-      (existing as Record<string, unknown>)[childKey] = value;
+      (existing as Record<string, unknown>)[safePropertyKey(childKey)] = value;
     } else {
-      rawPayload[parentKey] = { [childAttr]: value };
+      rawPayload[safePropertyKey(parentKey)] = { [safePropertyKey(childAttr)]: value };
     }
     return rawPayload;
   }
@@ -474,9 +475,9 @@ export class UserPatchEngine {
     const parentKey = resolvePropertyKey(rawPayload, parentAttr);
     const existing = rawPayload[parentKey];
     if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-      delete (existing as Record<string, unknown>)[
-        resolvePropertyKey(existing as Record<string, unknown>, childAttr)
-      ];
+      delete (existing as Record<string, unknown>)[safePropertyKey(
+        resolvePropertyKey(existing as Record<string, unknown>, childAttr),
+      )];
     }
     return rawPayload;
   }

@@ -334,11 +334,11 @@ export function applyValuePathUpdate(
   if (parsed.subAttribute) {
     const entry = arr[matchIdx] as Record<string, unknown>;
     const subAttributeKey = resolvePropertyKey(entry, parsed.subAttribute);
-    entry[subAttributeKey] = value;
+    entry[safePropertyKey(subAttributeKey)] = value;
   } else {
     arr[matchIdx] = value;
   }
-  rawPayload[attributeKey] = [...arr];
+  rawPayload[safePropertyKey(attributeKey)] = [...arr];
 
   return { matched: true, payload: rawPayload };
 }
@@ -379,9 +379,9 @@ export function removeValuePathEntry(
       return { matched: false, payload: rawPayload };
     }
     const entry = { ...(arr[matchIdx] as Record<string, unknown>) };
-    delete entry[resolvePropertyKey(entry, parsed.subAttribute)];
+    delete entry[safePropertyKey(resolvePropertyKey(entry, parsed.subAttribute))];
     arr[matchIdx] = entry;
-    rawPayload[attributeKey] = [...arr];
+    rawPayload[safePropertyKey(attributeKey)] = [...arr];
     return { matched: true, payload: rawPayload };
   }
 
@@ -396,7 +396,7 @@ export function removeValuePathEntry(
       caseExact,
     );
   });
-  rawPayload[attributeKey] = filtered;
+  rawPayload[safePropertyKey(attributeKey)] = filtered;
   return { matched: filtered.length < beforeLen, payload: rawPayload };
 }
 
@@ -441,7 +441,7 @@ export function addValuePathEntry(
     // Update existing matching element
     if (parsed.subAttribute) {
       const entry = arr[matchIdx] as Record<string, unknown>;
-      entry[resolvePropertyKey(entry, parsed.subAttribute)] = value;
+      entry[safePropertyKey(resolvePropertyKey(entry, parsed.subAttribute))] = value;
     } else {
       arr[matchIdx] = value;
     }
@@ -456,7 +456,7 @@ export function addValuePathEntry(
     arr.push(newEntry);
   }
 
-  rawPayload[attributeKey] = [...arr];
+  rawPayload[safePropertyKey(attributeKey)] = [...arr];
   return rawPayload;
 }
 
@@ -742,9 +742,12 @@ export function resolveNoPathValue(
       const existing = rawPayload[parentKey];
       if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
         const childKey = resolvePropertyKey(existing as Record<string, unknown>, childAttr);
-        rawPayload[parentKey] = { ...(existing as Record<string, unknown>), [childKey]: value };
+        rawPayload[safePropertyKey(parentKey)] = {
+          ...(existing as Record<string, unknown>),
+          [safePropertyKey(childKey)]: value,
+        };
       } else {
-        rawPayload[parentKey] = { [safePropertyKey(childAttr)]: value };
+        rawPayload[safePropertyKey(parentKey)] = { [safePropertyKey(childAttr)]: value };
       }
     } else {
       // F1: plain key. If both existing and incoming are non-array objects,
@@ -754,7 +757,7 @@ export function resolveNoPathValue(
       // Matches the Entra/Okta de-facto interpretation of RFC 7644 §3.5.2.3.
       // Arrays (multi-valued) still whole-replace.
       const propertyKey = resolvePropertyKey(rawPayload, key);
-      rawPayload[propertyKey] = mergeComplexAttribute(rawPayload[propertyKey], value);
+      rawPayload[safePropertyKey(propertyKey)] = mergeComplexAttribute(rawPayload[propertyKey], value);
     }
   }
   return rawPayload;

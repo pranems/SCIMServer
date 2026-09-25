@@ -34,6 +34,7 @@ This change began with case-sensitive custom ResourceType URLs and expanded afte
 | F22 | PATCH parity | High | User/Group custom and no-path fields still accepted caller casing as a new key | Generic engine used the shared resolver first; older engines retained local sinks | Reuse the property resolver in explicit, nested, and no-path paths; User/Group parity tests |
 | F23 | Migration packaging | High | Renaming a migration left an empty discoverable directory | File deletion did not remove its parent directory | Remove the empty directory and run migration lint against filesystem discovery |
 | F24 | Durable disclosure | High | Secret-bearing query parameters could persist in URL fields | Header/body redactors did not inspect query keys | Shared query-key URL sanitizer for structured logs and RequestLog plus Workbench path sanitization and sentinel tests |
+| F25 | Security gate | High | PR CodeQL reported 16 high-severity remote-property-injection alerts at PATCH sinks | Case-insensitive key canonicalization passed through `resolvePropertyKey`, so CodeQL no longer recognized the earlier prototype guard as a barrier at the final assignment/delete | Wrap every resolved key with `safePropertyKey` at the actual sink; PATCH/prototype tests 330/330, lint 0 errors, build green; exact-tip CodeQL rerun required before merge |
 
 ## Escape Analysis
 

@@ -30,6 +30,7 @@ import {
   findInvalidMultiValuedElement,
   mergeComplexAttribute,
   resolvePropertyKey,
+  safePropertyKey,
 } from '../../modules/scim/utils/scim-patch-path';
 
 // ─── Prototype pollution guard ──────────────────────────────────────────────
@@ -118,7 +119,7 @@ export class GenericPatchEngine {
       if (typeof op.value === 'object' && op.value !== null && !Array.isArray(op.value)) {
         for (const [key, val] of Object.entries(op.value)) {
           if (!DANGEROUS_KEYS.has(key)) {
-            this.payload[resolvePropertyKey(this.payload, key)] = val;
+            this.payload[safePropertyKey(resolvePropertyKey(this.payload, key))] = val;
           }
         }
       } else {
@@ -140,7 +141,7 @@ export class GenericPatchEngine {
       if (typeof op.value === 'object' && op.value !== null && !Array.isArray(op.value)) {
         for (const [key, val] of Object.entries(op.value)) {
           if (!DANGEROUS_KEYS.has(key)) {
-            this.payload[resolvePropertyKey(this.payload, key)] = val;
+            this.payload[safePropertyKey(resolvePropertyKey(this.payload, key))] = val;
           }
         }
       } else {
@@ -211,10 +212,10 @@ export class GenericPatchEngine {
       // CWE-1321 defense-in-depth: `urn` matches ^urn: so it is never a
       // prototype key, but guard the dynamic write at the sink regardless.
       if (DANGEROUS_KEYS.has(urn)) return;
-      let ext = this.payload[urn] as Record<string, unknown> | undefined;
+      let ext = this.payload[safePropertyKey(urn)] as Record<string, unknown> | undefined;
       if (!ext || typeof ext !== 'object') {
         ext = {};
-        this.payload[urn] = ext;
+        this.payload[safePropertyKey(urn)] = ext;
       }
       this.setNested(ext, subPath.split('.'), value, merge);
       return;
@@ -236,14 +237,14 @@ export class GenericPatchEngine {
     if (segments.length === 1) {
       const propertyKey = resolvePropertyKey(this.payload, path);
       if (merge && Array.isArray(this.payload[propertyKey]) && Array.isArray(value)) {
-        (this.payload[propertyKey] as unknown[]).push(...(value as unknown[]));
+        (this.payload[safePropertyKey(propertyKey)] as unknown[]).push(...(value as unknown[]));
       } else if (!merge) {
         // F1: when replacing a complex parent, merge with null-as-unset so a
         // partial object preserves siblings (RFC 7644 S3.5.2.3 Entra/Okta).
         // Arrays / primitives still whole-replace via mergeComplexAttribute's fallback.
-        this.payload[propertyKey] = mergeComplexAttribute(this.payload[propertyKey], value);
+        this.payload[safePropertyKey(propertyKey)] = mergeComplexAttribute(this.payload[propertyKey], value);
       } else {
-        this.payload[propertyKey] = value;
+        this.payload[safePropertyKey(propertyKey)] = value;
       }
     } else {
       this.setNested(this.payload, segments, value, merge);
@@ -262,17 +263,17 @@ export class GenericPatchEngine {
       // CWE-1321 defense-in-depth: callers pre-validate the path via
       // guardPrototypePollution, but never write a prototype-polluting segment.
       if (DANGEROUS_KEYS.has(seg)) return;
-      if (typeof current[seg] !== 'object' || current[seg] === null) {
-        current[seg] = {};
+      if (typeof current[safePropertyKey(seg)] !== 'object' || current[safePropertyKey(seg)] === null) {
+        current[safePropertyKey(seg)] = {};
       }
-      current = current[seg] as Record<string, unknown>;
+      current = current[safePropertyKey(seg)] as Record<string, unknown>;
     }
     const last = resolvePropertyKey(current, segments[segments.length - 1]);
     if (DANGEROUS_KEYS.has(last)) return; // CWE-1321 defense-in-depth
-    if (merge && Array.isArray(current[last]) && Array.isArray(value)) {
-      (current[last] as unknown[]).push(...(value as unknown[]));
+    if (merge && Array.isArray(current[safePropertyKey(last)]) && Array.isArray(value)) {
+      (current[safePropertyKey(last)] as unknown[]).push(...(value as unknown[]));
     } else {
-      current[last] = value;
+      current[safePropertyKey(last)] = value;
     }
   }
 
@@ -318,7 +319,7 @@ export class GenericPatchEngine {
 
     const segments = path.split('.');
     if (segments.length === 1) {
-      delete this.payload[resolvePropertyKey(this.payload, path)];
+      delete this.payload[safePropertyKey(resolvePropertyKey(this.payload, path))];
     } else {
       this.removeNested(this.payload, segments);
     }
@@ -328,11 +329,11 @@ export class GenericPatchEngine {
     let current = obj;
     for (let i = 0; i < segments.length - 1; i++) {
       const seg = resolvePropertyKey(current, segments[i]);
-      if (typeof current[seg] !== 'object' || current[seg] === null) {
+      if (typeof current[safePropertyKey(seg)] !== 'object' || current[safePropertyKey(seg)] === null) {
         return; // Path doesn't exist - no-op
       }
-      current = current[seg] as Record<string, unknown>;
+      current = current[safePropertyKey(seg)] as Record<string, unknown>;
     }
-    delete current[resolvePropertyKey(current, segments[segments.length - 1])];
+    delete current[safePropertyKey(resolvePropertyKey(current, segments[segments.length - 1]))];
   }
 }
