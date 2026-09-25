@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.34`
+> **Status:** Implemented locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.35`
 
 ## Purpose
 

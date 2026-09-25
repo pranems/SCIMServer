@@ -415,6 +415,25 @@ The version pinned as the *fix* for one advisory therefore becomes the *vulnerab
 
 It has **no semver dependency on purpose**: `semver` is present only transitively with no types, so importing it would be a phantom dependency and adding it would require a lockfile regeneration, which is the very thing this policy says not to do locally. GHSA ranges are a tiny grammar, so the comparator is hand-written and unit-tested, including the cases a lexical compare gets wrong (`3.1.10` vs `3.1.9`, `10.0.0` vs `9.0.0`).
 
+### 2026-09-25 follow-up: issue #144
+
+The scheduled check later found the same mechanism had recurred: the 11-pin override map froze
+`hono@4.12.25` and `@hono/node-server@1.19.10` inside 12 medium/low advisory ranges. v0.55.35 moves
+them to `hono@4.13.5` and `@hono/node-server@1.19.15`. Both targets were outside the seven-day
+quarantine at adoption: 30.7 and 63.7 days old. Public-runner regeneration changed exactly those two
+API packages plus the API/web root versions; both lockfiles contain only `registry.npmjs.org`
+resolved hosts and SHA-512 integrity values. The pin gate moved from **12 findings / exit 1** to
+**0 findings / exit 0**, with zero unchecked packages.
+
+These dependencies remain runtime-image relevant even though they are under `prisma -> @prisma/dev`:
+the container executes `prisma migrate deploy` at startup. Classifying them as harmless dev-only
+packages would therefore be incorrect.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / prevention |
+|---|---|---|---|---|
+| SP-1 | Security / Medium | Frozen overrides became vulnerable again; Dependabot cannot update them. | Move both pins to aged versions above every affected range and regenerate on the public runner. The installed graph now resolves only the patched versions. | Scheduled pin review caught it before deployment. `check:pins` is the focused RED/GREEN gate and the scheduled issue remains the recurrence control. |
+| SP-2 | Tooling / Low | Local `npm ci` failed with `EPERM` while stale Jest and API processes from other worktrees held shared native DLLs. | Identify holders by exact loaded-module path, stop only confirmed stale processes, then rerun `npm ci`. This releases Windows file handles without disturbing active Vite or unrelated services. | Caught during local consolidation, the earliest stage that replaces `node_modules`. Future retries must inspect exact holders first; blind process termination is forbidden. |
+
 ### Day-to-day effect
 
 Nothing changes for ordinary work. `npm ci` is unaffected, and neither check blocks a push - both open an Issue, because both need the network and a flaky blocking gate is worse than a reliable nagging one. What changes is that a suppression now has to say **which kind** it is, a timing hold cannot quietly become a quarter, and a rotting pin gets noticed by a scheduled job instead of by a failed required status check after an image build.
