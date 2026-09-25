@@ -32,11 +32,14 @@ function assert(name, condition, detail) {
   }
 }
 
-function scratch(docs, manifestDocs) {
+function scratch(docs, manifestDocs, rootDocs = {}) {
   const root = mkdtempSync(join(tmpdir(), 'doccontent-'));
   mkdirSync(join(root, 'docs'), { recursive: true });
   for (const [name, body] of Object.entries(docs)) {
     writeFileSync(name === 'README.md' ? join(root, name) : join(root, 'docs', name), body, 'utf8');
+  }
+  for (const [name, body] of Object.entries(rootDocs)) {
+    writeFileSync(join(root, name), body, 'utf8');
   }
   writeFileSync(
     join(root, 'docs', '.doc-manifest.json'),
@@ -81,6 +84,18 @@ async function run(label, docs, manifestDocs, truth, expectId, shouldFail = true
   } else {
     assert(`${label} does NOT fire ${expectId}`, !all.includes(expectId), all);
   }
+}
+
+async function runOperational(label, sessionStarter, truth, shouldFail = true) {
+  const root = scratch({}, [], { 'Session_starter.md': sessionStarter });
+  roots.push(root);
+  const { failures, warnings } = await runAudit(root, { ...BASE_TRUTH, ...truth });
+  const all = [...failures, ...warnings].join(' | ');
+  assert(
+    `${label} ${shouldFail ? 'fires' : 'does NOT fire'} [C14]`,
+    shouldFail ? all.includes('[C14]') : !all.includes('[C14]'),
+    all || '(no findings)',
+  );
 }
 
 console.log('=== negative controls: each check must FIRE ===');
@@ -175,6 +190,18 @@ await run(
   '[C13]',
 );
 
+await runOperational(
+  'C14 retired tenant in active bootstrap',
+  '### Workspace Tenant Isolation\n\n| **SCIMServer** | proviamtest07.onmicrosoft.com | old-tenant | old-subscription |\n\n### Recent Key Achievements\n',
+  {
+    activeTenant: {
+      tenantDomain: 'proviamtest09.onmicrosoft.com',
+      tenantId: 'active-tenant-id',
+      subscriptionId: 'active-subscription-id',
+    },
+  },
+);
+
 console.log('\n=== positive controls: each check must NOT fire ===');
 
 await run(
@@ -237,6 +264,19 @@ await run(
   ['COMPLETE_API_REFERENCE.md'],
   { routes: [{ verb: 'POST', path: '/scim/admin/settings/jwks-hosts', file: 'x.ts' }] },
   '[C9]',
+  false,
+);
+
+await runOperational(
+  'C14 matching active tenant bootstrap',
+  '### Workspace Tenant Isolation\n\n| **SCIMServer** | proviamtest09.onmicrosoft.com | active-tenant-id | active-subscription-id |\n\n### Recent Key Achievements\n',
+  {
+    activeTenant: {
+      tenantDomain: 'proviamtest09.onmicrosoft.com',
+      tenantId: 'active-tenant-id',
+      subscriptionId: 'active-subscription-id',
+    },
+  },
   false,
 );
 

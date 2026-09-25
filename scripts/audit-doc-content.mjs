@@ -24,6 +24,7 @@
  *       exist in the registry (a reader would set it and nothing would happen)
  *   C9  every route handler has a matching path in COMPLETE_API_REFERENCE
  *   C13 README's visible version badge matches api/package.json
+ *   C14 Session_starter's active Azure bootstrap matches scim-estates.json
  *
  * Usage:
  *   node scripts/audit-doc-content.mjs            # audit
@@ -58,6 +59,18 @@ export function groundTruth() {
   const t = {};
 
   t.productVersion = JSON.parse(read(p('api/package.json'))).version;
+
+  const estateRegistry = p('scripts/scim-estates.json');
+  if (existsSync(estateRegistry)) {
+    const activeTenant = JSON.parse(read(estateRegistry)).tenants.find((tenant) => tenant.role === 'active');
+    if (activeTenant) {
+      t.activeTenant = {
+        tenantDomain: activeTenant.tenantDomain,
+        tenantId: activeTenant.tenantId,
+        subscriptionId: activeTenant.subscriptionId,
+      };
+    }
+  }
 
   const ctrls = walk(p('api/src'), (f) => f.endsWith('.controller.ts') && !f.includes('.spec.'));
   let handlers = 0;
@@ -327,6 +340,21 @@ export function audit(truth) {
       failures.push(`[C13] README.md: version badge is malformed: ${badges[0][1]}`);
     } else if (badges[0][1] !== truth.productVersion) {
       failures.push(`[C13] README.md: version badge claims ${badges[0][1]}, product is ${truth.productVersion}`);
+    }
+  }
+
+  // C14 - Session_starter is the first file operators and agents read. Its
+  // active Azure bootstrap must follow the estate registry, not preserve a
+  // tenant identity copied during an earlier rollover. Scope the check to the
+  // active isolation section so historical log entries may still name retired
+  // tenants honestly.
+  const sessionStarter = p('Session_starter.md');
+  if (existsSync(sessionStarter) && truth.activeTenant) {
+    const text = read(sessionStarter);
+    const activeSection = text.match(/### Workspace Tenant Isolation[\s\S]*?(?=\n### )/)?.[0] ?? '';
+    const missing = Object.values(truth.activeTenant).filter((value) => !activeSection.includes(value));
+    if (missing.length) {
+      failures.push(`[C14] Session_starter.md: active tenant bootstrap does not match scripts/scim-estates.json; missing ${missing.join(', ')}`);
     }
   }
 
