@@ -124,9 +124,10 @@ test.describe('WI-8 - credential reveal + server security settings', () => {
     await page.goto('/settings');
     await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('security-settings-card')).toBeVisible({ timeout: 30_000 });
-    // The server visibility radio group + KEK status line render.
-    await expect(page.getByTestId('security-visibility-always')).toBeVisible();
-    await expect(page.getByTestId('security-visibility-once')).toBeVisible();
+    // The fixed always-retain policy + KEK status line render. The retired
+    // once-only control must not return.
+    await expect(page.getByTestId('security-visibility-always')).toContainText('retain encrypted');
+    await expect(page.getByTestId('security-visibility-once')).toHaveCount(0);
     await expect(page.getByTestId('security-kek-status')).toBeVisible();
     // Settings JSON export affordances (Copy + Download).
     await expect(page.getByTestId('security-settings-export-copy')).toBeVisible();

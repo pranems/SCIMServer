@@ -9,8 +9,8 @@
  *   (CredentialSecretVisibility) had a spec whose own comment concedes it is
  *   "READ-ONLY ... It does NOT click a different radio" - i.e. a presence-only
  *   assertion, which rule R10 says is not correctness. The remaining 25 flags,
- *   both enum dropdowns and all four numeric inputs, were never driven by a
- *   browser at all.
+ *   both enum dropdowns and the numeric settings surface, were never driven by
+ *   a browser at all.
  *
  *   That is the dangerous shape: every one of those controls renders, so a
  *   human glance and a presence assertion both pass, while a control wired to
@@ -30,25 +30,26 @@
  *        because presets ARE flag combinations and differ from each other.
  *
  * DESIGN NOTES
- *   - The control list is derived at runtime from what the page actually
- *     renders (`settings-flag-*` testids), not from a hardcoded list. A
- *     hardcoded list silently stops covering a flag the day someone adds one;
- *     this way a new flag is covered the moment it appears, and the count
- *     assertion below fails loudly if the surface shrinks unexpectedly.
+ *   - The rendered control list is compared to the authoritative Settings
+ *     definitions by key and option label. A missing, duplicated, or renamed
+ *     control therefore fails instead of disappearing from a DOM-only baseline.
  *   - Every test creates its own throwaway endpoint and deletes it in a
  *     finally block, so this is safe against the shared dev estate.
  *
  * Runs against local dev (:4000), Docker compose (:8080) and Azure dev.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { BOOLEAN_FLAGS, ENUM_SETTINGS } from '../src/pages/endpoint-settings-definitions';
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
 const CORE_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const CORE_GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 
-/** Lower bound on the rendered control count. Fails loudly if the surface shrinks. */
-const MIN_EXPECTED_FLAGS = 20;
+const EXPECTED_EDITABLE_FLAGS = BOOLEAN_FLAGS
+  .filter(({ key }) => key !== 'PersistRequestSecrets')
+  .map(({ key }) => key)
+  .sort();
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(
@@ -63,7 +64,7 @@ test.beforeEach(async ({ page }) => {
 // helpers
 // ---------------------------------------------------------------------------
 
-async function createEndpoint(page: Page, preset = 'rfc-standard', tag = 'matrix'): Promise<string | null> {
+async function createEndpoint(page: Page, preset = 'rfc-standard', tag = 'matrix'): Promise<string> {
   await page.goto('/endpoints');
   await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
   return page.evaluate(
@@ -76,8 +77,12 @@ async function createEndpoint(page: Page, preset = 'rfc-standard', tag = 'matrix
           profilePreset: preset,
         }),
       });
-      if (!res.ok) return null;
-      return (await res.json()).id as string;
+      if (!res.ok) {
+        throw new Error(`Fixture endpoint creation failed (${res.status}): ${await res.text()}`);
+      }
+      const body = (await res.json()) as { id?: string };
+      if (!body.id) throw new Error('Fixture endpoint creation returned no id.');
+      return body.id;
     },
     { token: TOKEN, preset, tag },
   );
@@ -232,12 +237,8 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'flagmatrix');
-      test.skip(!id, 'Could not create the fixture endpoint.');
       await openSettings(page, id!);
 
-      // Derive the control list from the DOM, so a newly added flag is covered
-      // automatically instead of silently escaping a hardcoded list.
-      //
       // The `!includes('-')` filter is load-bearing: the row and description
       // wrappers (`settings-flag-row-X`, `settings-flag-desc-X`) share the same
       // testid prefix as the Switch, and a flag key never contains a hyphen.
@@ -248,7 +249,12 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           .filter((k) => k && !k.includes('-')),
       );
 
-      expect(keys.length, 'the Settings tab should render the full flag surface').toBeGreaterThanOrEqual(MIN_EXPECTED_FLAGS);
+      expect(
+        [...keys].sort(),
+        'the Settings tab should render every authoritative editable flag exactly once',
+      ).toEqual(EXPECTED_EDITABLE_FLAGS);
+      await expect(page.getByTestId('settings-persist-request-secrets-redacted')).toContainText('always redacted');
+      await expect(page.getByRole('switch', { name: /PersistRequestSecrets/i })).toHaveCount(0);
 
       const failures: string[] = [];
       const covered: string[] = [];
@@ -306,7 +312,6 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'enummatrix');
-      test.skip(!id, 'Could not create the fixture endpoint.');
       await openSettings(page, id!);
 
       // `settings-enum-{key}` is only the ROW wrapper; the Dropdown carries
@@ -317,7 +322,10 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           .map((el) => (el.getAttribute('data-testid') || '').replace('settings-enum-', '').replace(/-dropdown$/, ''))
           .filter(Boolean),
       );
-      expect(enums.length, 'expected PrimaryEnforcement and logLevel dropdowns').toBeGreaterThanOrEqual(2);
+      expect(
+        [...enums].sort(),
+        'the Settings tab should render every authoritative enum exactly once',
+      ).toEqual(ENUM_SETTINGS.map(({ key }) => key).sort());
 
       const failures: string[] = [];
       for (const key of enums) {
@@ -329,7 +337,11 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
         await dd.click();
         const options = (await page.getByRole('option').allTextContents()).map((o) => o.trim()).filter(Boolean);
         await page.keyboard.press('Escape');
-        expect(options.length, `${key} should offer selectable options`).toBeGreaterThan(0);
+        const definition = ENUM_SETTINGS.find((setting) => setting.key === key);
+        expect(definition, `${key} should have an authoritative definition`).toBeDefined();
+        expect(options, `${key} should offer every authoritative option exactly once`).toEqual(
+          definition!.options.map(({ label }) => label),
+        );
 
         // The dropdown DISPLAYS a human label ("passthrough (accept as-is)")
         // but PERSISTS a keyword ("passthrough"), so comparing the two
@@ -341,7 +353,7 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           await openSettings(page, id!);
           await page.getByTestId(`settings-enum-${key}-dropdown`).click();
           const item = page.getByRole('option', { name: opt, exact: true });
-          if ((await item.count()) === 0) continue;
+          await expect(item, `${key} option "${opt}" should remain selectable`).toHaveCount(1);
           await item.click();
           await expect(page.getByTestId('settings-feedback-success')).toBeVisible({ timeout: 20_000 });
 
@@ -363,6 +375,7 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           }
         }
 
+        expect(persistedValues, `${key} should persist every rendered option`).toHaveLength(options.length);
         const distinct = new Set(persistedValues);
         if (distinct.size !== persistedValues.length) {
           failures.push(`${key}: options collapsed onto duplicate values [${persistedValues.join(', ')}]`);
@@ -374,12 +387,11 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
     }
   });
 
-  test('all four numeric JWKS inputs persist a typed value', async ({ page }) => {
+  test('all numeric endpoint settings persist a changed typed value', async ({ page }) => {
     test.setTimeout(10 * 60_000);
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'nummatrix');
-      test.skip(!id, 'Could not create the fixture endpoint.');
       await openSettings(page, id!);
 
       // As with the enums, `settings-number-{key}` is the row wrapper and the
@@ -417,7 +429,7 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
         JwksMaxResponseBytes: '524288',       // 1024 - 10485760
         JwksMaxKeys: '50',                    // 1 - 1000
         JwksMaxCacheEntries: '100',           // 1 - 1000
-        JwksRefreshIntervalMs: '3600000',     // 60000 - 86400000
+        JwksRefreshIntervalMs: '7200000',     // 60000 - 86400000; differs from inherited 3600000
         JwksUnknownKidMinIntervalMs: '60000', // 0 - 3600000
         JwksStaleIfErrorMs: '86400000',       // 0 - 604800000
         MaxActiveBearerCredentials: '7',      // 1 - 25
@@ -464,7 +476,6 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'discovery');
-      test.skip(!id, 'Could not create the fixture endpoint.');
 
       const on = await scim(page, id!, 'GET', '/Schemas');
       expect(on.status, 'discovery ON should serve /Schemas').toBe(200);
@@ -484,7 +495,6 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'ifmatch');
-      test.skip(!id, 'Could not create the fixture endpoint.');
 
       const un = `ifmatch.${Date.now()}@example.com`;
       const created = await scim(page, id!, 'POST', '/Users', { schemas: [CORE_USER], userName: un, active: true });
@@ -509,7 +519,6 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'strict');
-      test.skip(!id, 'Could not create the fixture endpoint.');
 
       const payload = (u: string) => ({ schemas: [CORE_USER], userName: u, active: true, totallyUndeclared: 'x' });
 
@@ -531,28 +540,26 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'coerce');
-      test.skip(!id, 'Could not create the fixture endpoint.');
-
-      // rfc-standard ships coercion OFF, so the string form is a type error.
-      const off = await scim(page, id!, 'POST', '/Users', {
-        schemas: [CORE_USER], userName: `coerce.off.${Date.now()}@example.com`, active: 'True',
-      });
 
       await openSettings(page, id!);
-      await toggleFlag(page, 'AllowAndCoerceBooleanStrings');
-
-      const on = await scim(page, id!, 'POST', '/Users', {
-        schemas: [CORE_USER], userName: `coerce.on.${Date.now()}@example.com`, active: 'True',
+      const beforeEnabled = await switchChecked(page, 'AllowAndCoerceBooleanStrings');
+      const before = await scim(page, id!, 'POST', '/Users', {
+        schemas: [CORE_USER], userName: `coerce.before.${Date.now()}@example.com`, active: 'True',
       });
 
-      // Assert the DIFFERENCE the flag makes, and that ON yields a real boolean.
-      expect(
-        { off: off.status, on: on.status },
-        'flipping the flag should change the accept/reject decision for active:"True"',
-      ).not.toEqual({ off: on.status, on: on.status });
-      if (on.status === 201) {
-        expect(on.body.active, 'the coerced value should be a native boolean true').toBe(true);
-      }
+      await toggleFlag(page, 'AllowAndCoerceBooleanStrings');
+
+      const afterEnabled = asBool((await readSettings(page, id!))['AllowAndCoerceBooleanStrings']);
+      const after = await scim(page, id!, 'POST', '/Users', {
+        schemas: [CORE_USER], userName: `coerce.after.${Date.now()}@example.com`, active: 'True',
+      });
+
+      expect(afterEnabled, 'the Switch should invert the effective setting').toBe(!beforeEnabled);
+      const accepted = beforeEnabled ? before : after;
+      const rejected = beforeEnabled ? after : before;
+      expect(accepted.status, 'coercion ON should accept active:"True"').toBe(201);
+      expect(accepted.body.active, 'the coerced value should be a native boolean true').toBe(true);
+      expect(rejected.status, 'coercion OFF should reject active:"True"').toBe(400);
     } finally {
       await deleteEndpoint(page, id);
     }
@@ -563,7 +570,6 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'harddel');
-      test.skip(!id, 'Could not create the fixture endpoint.');
 
       const mk = async (tag: string) => {
         const r = await scim(page, id!, 'POST', '/Users', {
@@ -593,7 +599,6 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'grpdel');
-      test.skip(!id, 'Could not create the fixture endpoint.');
 
       const mk = async (tag: string) => {
         const r = await scim(page, id!, 'POST', '/Groups', {
@@ -624,7 +629,6 @@ test.describe('Settings matrix - flags change real SCIM behaviour', () => {
     let id: string | null = null;
     try {
       id = await createEndpoint(page, 'rfc-standard', 'sharedsec');
-      test.skip(!id, 'Could not create the fixture endpoint.');
 
       const probe = () =>
         page.evaluate(
@@ -695,7 +699,6 @@ test.describe('Settings matrix - every preset produces a distinct, working contr
       let id: string | null = null;
       try {
         id = await createEndpoint(page, preset, `preset-${preset}`);
-        test.skip(!id, `Could not create an endpoint with preset ${preset}.`);
 
         // The Settings tab must render for every preset - a preset that breaks
         // the settings UI would be invisible to an API-only test.

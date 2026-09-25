@@ -18,8 +18,8 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The v0.55.33 API-output-fidelity rollback unit is consolidated locally on
-`fix/api-output-fidelity-v05533`. URL and SCIM identifiers are case-insensitive
+The v0.55.33 API-output-fidelity rollback unit is merged and verified on dev.
+URL and SCIM identifiers are case-insensitive
 across endpoint names/UUIDs, Bulk, custom ResourceTypes, Schemas, and PATCH
 paths. ServiceProviderConfig reflects effective authentication methods, and
 Endpoint Settings publishes all 11 authoritative egress values. Recoverable
@@ -28,9 +28,14 @@ exports; WIF remains secretless. Public discovery, broad endpoint projections,
 RequestLog, Workbench history, and structured logs do not persist plaintext
 credentials. New `once` writes are rejected; legacy purged values require
 rotation. Evidence is API unit 5,192/5,192, API E2E 1,533/1,533, web
-1,544/1,544, local live 1,532/1,532, focused Playwright 5/5, available parity
-lanes 4/4, builds, lint, budgets, and additive migration lint. PR, merge, and
-dev deployment remain pending. Canary and customer prod are unchanged.
+1,544/1,544, local/dev live 1,532/1,532, and all four executable
+persistence/web lanes. The two Prisma lanes were skipped because `DATABASE_URL`
+was unavailable. Final dev Playwright passed 241 with 4 intentional skips and
+0 failures. Builds, lint, budgets, migration,
+docs, Mermaid, and exact-tip CodeQL are green. PR #177 merged as `6565dc60`;
+dev revision `scimserver-dev--v6565dc60` serves v0.55.33 at 100% with all 60
+endpoint IDs preserved and two active revisions retained. Canary and customer
+prod are unchanged.
 
 The v0.55.32 effective WIF/JWKS egress rollback unit is merged and verified on
 dev. An endpoint admin GET and the Connect WIF panel
