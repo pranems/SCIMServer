@@ -50,6 +50,34 @@ export function resolvePropertyKey(
   return Object.keys(record).find((key) => key.toLowerCase() === requestedLower) ?? requestedKey;
 }
 
+export function readResolvedProperty(
+  record: Record<string, unknown>,
+  requestedKey: string,
+): unknown {
+  const resolvedKey = safePropertyKey(resolvePropertyKey(record, requestedKey));
+  return Object.entries(record).find(([key]) => key === resolvedKey)?.[1];
+}
+
+export function withResolvedProperty(
+  record: Record<string, unknown>,
+  requestedKey: string,
+  value: unknown,
+): Record<string, unknown> {
+  const resolvedKey = safePropertyKey(resolvePropertyKey(record, requestedKey));
+  return Object.fromEntries([
+    ...Object.entries(record).filter(([key]) => key !== resolvedKey),
+    [resolvedKey, value],
+  ]);
+}
+
+export function withoutResolvedProperty(
+  record: Record<string, unknown>,
+  requestedKey: string,
+): Record<string, unknown> {
+  const resolvedKey = safePropertyKey(resolvePropertyKey(record, requestedKey));
+  return Object.fromEntries(Object.entries(record).filter(([key]) => key !== resolvedKey));
+}
+
 /** Result of parsing a valuePath expression like `emails[type eq "work"].value` */
 export interface ValuePathExpression {
   /** The multi-valued attribute name, e.g. "emails" */
@@ -309,8 +337,7 @@ export function applyValuePathUpdate(
   // to Object.prototype instead of undefined and silently mask the attack).
   safePropertyKey(parsed.attribute);
   if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
-  const attributeKey = resolvePropertyKey(rawPayload, parsed.attribute);
-  const arr = rawPayload[attributeKey];
+  const arr = readResolvedProperty(rawPayload, parsed.attribute);
 
   if (!Array.isArray(arr)) {
     return { matched: false, payload: rawPayload };
@@ -331,16 +358,14 @@ export function applyValuePathUpdate(
     return { matched: false, payload: rawPayload };
   }
 
-  if (parsed.subAttribute) {
-    const entry = arr[matchIdx] as Record<string, unknown>;
-    const subAttributeKey = resolvePropertyKey(entry, parsed.subAttribute);
-    entry[safePropertyKey(subAttributeKey)] = value;
-  } else {
-    arr[matchIdx] = value;
-  }
-  rawPayload[safePropertyKey(attributeKey)] = [...arr];
+  const updated = arr.map((item, index) => {
+    if (index !== matchIdx) return item;
+    return parsed.subAttribute
+      ? withResolvedProperty(item as Record<string, unknown>, parsed.subAttribute, value)
+      : value;
+  });
 
-  return { matched: true, payload: rawPayload };
+  return { matched: true, payload: withResolvedProperty(rawPayload, parsed.attribute, updated) };
 }
 
 /**
@@ -358,8 +383,7 @@ export function removeValuePathEntry(
   // See applyValuePathUpdate: entry-validate to throw before any read.
   safePropertyKey(parsed.attribute);
   if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
-  const attributeKey = resolvePropertyKey(rawPayload, parsed.attribute);
-  const arr = rawPayload[attributeKey];
+  const arr = readResolvedProperty(rawPayload, parsed.attribute);
   if (!Array.isArray(arr)) {
     return { matched: false, payload: rawPayload };
   }
@@ -378,11 +402,10 @@ export function removeValuePathEntry(
     if (matchIdx < 0) {
       return { matched: false, payload: rawPayload };
     }
-    const entry = { ...(arr[matchIdx] as Record<string, unknown>) };
-    delete entry[safePropertyKey(resolvePropertyKey(entry, parsed.subAttribute))];
-    arr[matchIdx] = entry;
-    rawPayload[safePropertyKey(attributeKey)] = [...arr];
-    return { matched: true, payload: rawPayload };
+    const updated = arr.map((item, index) => index === matchIdx
+      ? withoutResolvedProperty(item as Record<string, unknown>, parsed.subAttribute!)
+      : item);
+    return { matched: true, payload: withResolvedProperty(rawPayload, parsed.attribute, updated) };
   }
 
   const beforeLen = arr.length;
@@ -396,8 +419,10 @@ export function removeValuePathEntry(
       caseExact,
     );
   });
-  rawPayload[safePropertyKey(attributeKey)] = filtered;
-  return { matched: filtered.length < beforeLen, payload: rawPayload };
+  return {
+    matched: filtered.length < beforeLen,
+    payload: withResolvedProperty(rawPayload, parsed.attribute, filtered),
+  };
 }
 
 /**
@@ -419,8 +444,7 @@ export function addValuePathEntry(
   safePropertyKey(parsed.attribute);
   safePropertyKey(parsed.filterAttribute);
   if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
-  const attributeKey = resolvePropertyKey(rawPayload, parsed.attribute);
-  let arr = rawPayload[attributeKey] as unknown[] | undefined;
+  let arr = readResolvedProperty(rawPayload, parsed.attribute) as unknown[] | undefined;
 
   if (!Array.isArray(arr)) {
     arr = [];
@@ -438,26 +462,20 @@ export function addValuePathEntry(
   });
 
   if (matchIdx >= 0) {
-    // Update existing matching element
-    if (parsed.subAttribute) {
-      const entry = arr[matchIdx] as Record<string, unknown>;
-      entry[safePropertyKey(resolvePropertyKey(entry, parsed.subAttribute))] = value;
-    } else {
-      arr[matchIdx] = value;
-    }
+    arr = arr.map((item, index) => {
+      if (index !== matchIdx) return item;
+      return parsed.subAttribute
+        ? withResolvedProperty(item as Record<string, unknown>, parsed.subAttribute, value)
+        : value;
+    });
   } else {
     // Create new element with filter criteria and the value
-    const newEntry: Record<string, unknown> = {
-      [safePropertyKey(parsed.filterAttribute)]: parsed.filterValue,
-    };
-    if (parsed.subAttribute) {
-      newEntry[safePropertyKey(parsed.subAttribute)] = value;
-    }
+    let newEntry = withResolvedProperty({}, parsed.filterAttribute, parsed.filterValue);
+    if (parsed.subAttribute) newEntry = withResolvedProperty(newEntry, parsed.subAttribute, value);
     arr.push(newEntry);
   }
 
-  rawPayload[safePropertyKey(attributeKey)] = [...arr];
-  return rawPayload;
+  return withResolvedProperty(rawPayload, parsed.attribute, [...arr]);
 }
 
 /**

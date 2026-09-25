@@ -32,8 +32,9 @@ import {
   mergeComplexAttribute,
   pruneEmptyExtensions,
   findInvalidMultiValuedElement,
-  resolvePropertyKey,
-  safePropertyKey,
+  readResolvedProperty,
+  withResolvedProperty,
+  withoutResolvedProperty,
 } from '../../modules/scim/utils/scim-patch-path';
 
 import type {
@@ -319,10 +320,9 @@ export class UserPatchEngine {
       // incoming value is also a non-array object, merge with null-as-unset
       // semantics (Entra/Okta de-facto interpretation of RFC 7644 S3.5.2.3).
       // Arrays and primitives whole-replace.
-      const propertyKey = resolvePropertyKey(rawPayload, originalPath);
-      const existing = rawPayload[propertyKey];
+      const existing = readResolvedProperty(rawPayload, originalPath);
       const merged = mergeComplexAttribute(existing, value);
-      rawPayload = { ...rawPayload, [safePropertyKey(propertyKey)]: merged };
+      rawPayload = withResolvedProperty(rawPayload, originalPath, merged);
       return { userName, displayName, externalId, active, rawPayload };
     }
 
@@ -454,13 +454,19 @@ export class UserPatchEngine {
     const dotIndex = originalPath.indexOf('.');
     const parentAttr = originalPath.substring(0, dotIndex);
     const childAttr = originalPath.substring(dotIndex + 1);
-    const parentKey = resolvePropertyKey(rawPayload, parentAttr);
-    const existing = rawPayload[parentKey];
+    const existing = readResolvedProperty(rawPayload, parentAttr);
     if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-      const childKey = resolvePropertyKey(existing as Record<string, unknown>, childAttr);
-      (existing as Record<string, unknown>)[safePropertyKey(childKey)] = value;
+      rawPayload = withResolvedProperty(
+        rawPayload,
+        parentAttr,
+        withResolvedProperty(existing as Record<string, unknown>, childAttr, value),
+      );
     } else {
-      rawPayload[safePropertyKey(parentKey)] = { [safePropertyKey(childAttr)]: value };
+      rawPayload = withResolvedProperty(
+        rawPayload,
+        parentAttr,
+        withResolvedProperty({}, childAttr, value),
+      );
     }
     return rawPayload;
   }
@@ -472,12 +478,13 @@ export class UserPatchEngine {
     const dotIndex = originalPath.indexOf('.');
     const parentAttr = originalPath.substring(0, dotIndex);
     const childAttr = originalPath.substring(dotIndex + 1);
-    const parentKey = resolvePropertyKey(rawPayload, parentAttr);
-    const existing = rawPayload[parentKey];
+    const existing = readResolvedProperty(rawPayload, parentAttr);
     if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-      delete (existing as Record<string, unknown>)[safePropertyKey(
-        resolvePropertyKey(existing as Record<string, unknown>, childAttr),
-      )];
+      rawPayload = withResolvedProperty(
+        rawPayload,
+        parentAttr,
+        withoutResolvedProperty(existing as Record<string, unknown>, childAttr),
+      );
     }
     return rawPayload;
   }
