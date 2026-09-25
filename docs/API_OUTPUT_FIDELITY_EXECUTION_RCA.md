@@ -35,6 +35,7 @@ This change began with case-sensitive custom ResourceType URLs and expanded afte
 | F23 | Migration packaging | High | Renaming a migration left an empty discoverable directory | File deletion did not remove its parent directory | Remove the empty directory and run migration lint against filesystem discovery |
 | F24 | Durable disclosure | High | Secret-bearing query parameters could persist in URL fields | Header/body redactors did not inspect query keys | Shared query-key URL sanitizer for structured logs and RequestLog plus Workbench path sanitization and sentinel tests |
 | F25 | Security gate | High | PR CodeQL reported 16 high-severity remote-property-injection alerts at PATCH sinks | Case-insensitive key canonicalization passed through `resolvePropertyKey`, so CodeQL no longer recognized the earlier prototype guard as a barrier at the final assignment/delete | Wrap every resolved key with `safePropertyKey` at the actual sink; PATCH/prototype tests 330/330, lint 0 errors, build green; exact-tip CodeQL rerun required before merge |
+| F26 | Documentation gate | Low | Pre-push rejected the CodeQL follow-up because PATCH source changed without its coupled guide | Security behavior changed at the source boundary but the operator guide had no sink-level explanation | Added the case-insensitive canonicalization and final-sink prototype barrier contract to the PATCH guide; doc freshness/content rerun required |
 
 ## Escape Analysis
 
