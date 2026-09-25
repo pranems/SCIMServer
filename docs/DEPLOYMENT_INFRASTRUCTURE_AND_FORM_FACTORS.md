@@ -643,6 +643,12 @@ Without `-BlueGreen` the script falls back to a legacy auto-flip: update the ima
 | 5 | 5.3 Playwright against the dev FQDN with `E2E_TOKEN=changeme-scim` |
 | 6 | Post-deploy state diff vs the before-snapshot; fails on endpoint count delta or any missing ID |
 | 6.5 | Auto-canary to the `purplecliff` canary prod, blocked by any FAIL, any SKIPPED, the freeze file `scripts/.deploy-freeze`, or `SCIMSERVER_AUTOCANARY_DISABLE` |
+
+Stage 6.5 resolves `canary-prod` through [scim-estates.json](../scripts/scim-estates.json) and passes
+the tenant's immutable subscription ID to `promote-to-prod.ps1`. The promotion script uses the same
+registry-derived ID when `-Subscription` is omitted. Never default either path to the duplicate
+`ProvIAM_Subscription` display name: Tenant 08 and Tenant 09 share it, and the tenant helper correctly
+rejects it as ambiguous.
 | 7 | Writes `test-results/dev-deploy-<timestamp>.md` including the exact cross-tenant calmsand promote commands |
 
 `--ref` pinning on the workflow dispatch (stage 4.3) exists because an unpinned dispatch once published from `master` instead of the working branch.

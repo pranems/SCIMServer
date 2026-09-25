@@ -140,6 +140,7 @@ $ErrorActionPreference = 'Continue'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 . (Join-Path $PSScriptRoot 'github-workflow-run.ps1')
+. (Join-Path $PSScriptRoot 'scim-estates.ps1')
 
 if ([string]::IsNullOrWhiteSpace($ReportDir)) {
     $ReportDir = Join-Path $repoRoot 'test-results'
@@ -721,7 +722,6 @@ if (-not $SkipDeploy) {
     # literal here, so this stage cannot drift away from promote-to-prod.ps1.
     if (-not $DryRun) {
         try {
-            . (Join-Path $PSScriptRoot 'scim-estates.ps1')
             $devKeep = Get-ScimEstateRevisionKeep -AppName $DevAppName -ResourceGroup $DevResourceGroup
             & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep $devKeep
             Add-Result -Stage '6.2' -Gate "Revision hygiene (keep newest $devKeep active)" -Status 'PASS' -Detail 'stale revisions deactivated'
@@ -782,19 +782,21 @@ if ($AutoCanary -and -not $SkipDeploy) {
         # data/ID before-after diff). promote-to-prod.ps1 handles the 0% green
         # soak, the verify-on-green, the flip, and auto-rollback on any failure.
         $promoteScript = Join-Path $repoRoot 'scripts/promote-to-prod.ps1'
-        Write-Host "  Auto blue/green promote proudbush ($CanaryAppName/$CanaryResourceGroup) @ $ImageTag..." -ForegroundColor Yellow
+        $canaryEstate = Get-ScimEstate -Purpose 'canary-prod'
+        Write-Host "  Auto blue/green promote proudbush ($CanaryAppName/$CanaryResourceGroup) @ $version..." -ForegroundColor Yellow
 
         # promote-to-prod.ps1 prompts for 'yes'; feed it non-interactively.
         $promoteOut = 'yes' | & pwsh -NoProfile -File $promoteScript `
             -ProdResourceGroup $CanaryResourceGroup `
             -ProdAppName $CanaryAppName `
-            -ImageTag $ImageTag `
+            -ImageTag $version `
+            -Subscription $canaryEstate.Tenant.subscriptionId `
             -BlueGreen -RunVerification -VerifyPlaywright 2>&1
         $promoteExit = $LASTEXITCODE
         $promoteOut | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
 
         if ($promoteExit -eq 0) {
-            Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush (verified)' -Status 'PASS' -Detail "$CanaryAppName @ $ImageTag flipped + verified"
+            Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush (verified)' -Status 'PASS' -Detail "$CanaryAppName @ $version flipped + verified"
         } else {
             Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush' -Status 'FAIL' -Detail "promote-to-prod exit=$promoteExit (green rolled back; customers stayed on blue)"
         }
@@ -864,15 +866,15 @@ if ($failCount -eq 0 -and -not $SkipDeploy) {
         $reportLines += '> ```'
         $reportLines += '> az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950'
         $reportLines += '> az account set --subscription AnandSa-Test-150'
-        $reportLines += '> pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag ' + $ImageTag + ' -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright'
+        $reportLines += '> pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag ' + $version + ' -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright'
         $reportLines += '> ```'
     } else {
         $reportLines += '> Dev is green. Parallel prod (proudbush) blue/green promote (image swap; prod DB / endpoints / IDs preserved):'
-        $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag ' + $ImageTag + ' -BlueGreen -RunVerification -VerifyPlaywright`'
+        $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver -ImageTag ' + $version + ' -BlueGreen -RunVerification -VerifyPlaywright`'
         $reportLines += ''
         $reportLines += '> Then, with explicit operator go-ahead, promote calmsand (separate AnandSa tenant):'
         $reportLines += '> `az login --tenant 9de357c6-4488-4a8d-bd2f-14696f1af950; az account set --subscription AnandSa-Test-150`'
-        $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag ' + $ImageTag + ' -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright`'
+        $reportLines += '> `pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod -ImageTag ' + $version + ' -Subscription AnandSa-Test-150 -BlueGreen -RunVerification -VerifyPlaywright`'
     }
     $reportLines += ""
     $reportLines += 'After every promote: verify-deployment.ps1 runs live + Playwright + data/ID diff automatically.'
