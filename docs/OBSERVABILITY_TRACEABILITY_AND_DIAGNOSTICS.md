@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.34`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.35`
 
 Custom ResourceType operations are first-class Activity entries with
 `resourceType`, `resourceEndpoint`, and `resourceIdentifier`. Create, update,

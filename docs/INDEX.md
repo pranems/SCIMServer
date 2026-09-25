@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.34`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.35`
 
-> **Version:** 0.55.34 - **Updated:** 2026-09-24
+> **Version:** 0.55.35 - **Updated:** 2026-09-24
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
