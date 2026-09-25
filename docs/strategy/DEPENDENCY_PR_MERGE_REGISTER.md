@@ -79,6 +79,7 @@ Merge only when this returns `True` for **every** package the PR bumps.
 | PR | Ecosystem | Status |
 |---|---|---|
 | **#154** | web | **Postponed.** `@fluentui/react-components@9.74.8` was only 4.1 days old on 2026-09-25. `@tanstack/react-query@5.103.2` had no verifiable publish-time response through the managed feed, so its status is unknown rather than clean. Re-check both; do not merge on green public CI alone. |
+| **#183** | api | **Postponed.** Eleven proposed targets are at least 7.3 days old, but `@typescript-eslint/eslint-plugin@8.70.1`, `@typescript-eslint/parser@8.70.1`, `typescript-eslint@8.70.1`, `eslint@10.11.0`, and `supertest@7.3.0` had no verifiable publish-time response through the managed feed. Rebase after final master and re-check all five; unknown is not clean. |
 | **#158** | GitHub Actions | Eligible: no npm quarantine applies. Replaced by a current-master branch that keeps every action SHA-pinned and updates the canonical infrastructure doc in the same change. |
 
 ### Closed or replaced
