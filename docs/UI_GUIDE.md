@@ -266,6 +266,8 @@ Exercises the SCIM `/Me` self-service endpoint (RFC 7644 §3.11). This is the pr
 
 > `/Me` requires an **OAuth JWT** whose `sub` claim matches a SCIM User's `userName` on the chosen endpoint. A shared-secret session is stopped locally before any `/Me` request and offers **Open OAuth setup** plus **Change token**. A verified JWT with no matching User gets a subject-specific recovery state rather than a generic `noTarget` explanation.
 
+The recovery action uses the shared structured SCIM filter builder to search Users by token subject, including correct quote and backslash escaping.
+
 | Action | Endpoint |
 |--------|----------|
 | Read self | `GET /scim/endpoints/{id}/Me` |

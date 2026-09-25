@@ -66,6 +66,8 @@ The browser decodes the JWT only to avoid a request that cannot succeed. The ser
 
 A shared admin secret now stops at a local preflight and offers **Open OAuth setup** and **Change token**. It sends no `/Me` request and does not render the generic SCIM `noTarget` explanation. A stale or inactive endpoint URL also stops before `/Me`. If the server verifies a JWT but no User matches its subject, the page shows the subject and links to the selected endpoint's Users tab.
 
+That recovery link builds its `userName eq <subject>` expression through the shared structured RFC 7644 filter builder. The UI does not interpolate token claims into filter text; backslashes and quotes are escaped by the same serializer used by Workbench filters.
+
 ## Operations and Logs
 
 Operations and Logs are complementary, not duplicate:
