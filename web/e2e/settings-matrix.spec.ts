@@ -30,25 +30,26 @@
  *        because presets ARE flag combinations and differ from each other.
  *
  * DESIGN NOTES
- *   - The control list is derived at runtime from what the page actually
- *     renders (`settings-flag-*` testids), not from a hardcoded list. A
- *     hardcoded list silently stops covering a flag the day someone adds one;
- *     this way a new flag is covered the moment it appears, and the count
- *     assertion below fails loudly if the surface shrinks unexpectedly.
+ *   - The rendered control list is compared to the authoritative Settings
+ *     definitions by key and option label. A missing, duplicated, or renamed
+ *     control therefore fails instead of disappearing from a DOM-only baseline.
  *   - Every test creates its own throwaway endpoint and deletes it in a
  *     finally block, so this is safe against the shared dev estate.
  *
  * Runs against local dev (:4000), Docker compose (:8080) and Azure dev.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { BOOLEAN_FLAGS, ENUM_SETTINGS } from '../src/pages/endpoint-settings-definitions';
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
 const CORE_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const CORE_GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 
-/** Exact editable-flag count. PersistRequestSecrets is a fixed status surface. */
-const EXPECTED_EDITABLE_FLAGS = 19;
+const EXPECTED_EDITABLE_FLAGS = BOOLEAN_FLAGS
+  .filter(({ key }) => key !== 'PersistRequestSecrets')
+  .map(({ key }) => key)
+  .sort();
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(
@@ -238,9 +239,6 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
       id = await createEndpoint(page, 'rfc-standard', 'flagmatrix');
       await openSettings(page, id!);
 
-      // Derive the control list from the DOM, so a newly added flag is covered
-      // automatically instead of silently escaping a hardcoded list.
-      //
       // The `!includes('-')` filter is load-bearing: the row and description
       // wrappers (`settings-flag-row-X`, `settings-flag-desc-X`) share the same
       // testid prefix as the Switch, and a flag key never contains a hyphen.
@@ -251,7 +249,10 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           .filter((k) => k && !k.includes('-')),
       );
 
-      expect(keys, 'the Settings tab should render the exact editable flag surface').toHaveLength(EXPECTED_EDITABLE_FLAGS);
+      expect(
+        [...keys].sort(),
+        'the Settings tab should render every authoritative editable flag exactly once',
+      ).toEqual(EXPECTED_EDITABLE_FLAGS);
       await expect(page.getByTestId('settings-persist-request-secrets-redacted')).toContainText('always redacted');
       await expect(page.getByRole('switch', { name: /PersistRequestSecrets/i })).toHaveCount(0);
 
@@ -321,7 +322,10 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           .map((el) => (el.getAttribute('data-testid') || '').replace('settings-enum-', '').replace(/-dropdown$/, ''))
           .filter(Boolean),
       );
-      expect(enums.length, 'expected PrimaryEnforcement and logLevel dropdowns').toBeGreaterThanOrEqual(2);
+      expect(
+        [...enums].sort(),
+        'the Settings tab should render every authoritative enum exactly once',
+      ).toEqual(ENUM_SETTINGS.map(({ key }) => key).sort());
 
       const failures: string[] = [];
       for (const key of enums) {
@@ -333,7 +337,11 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
         await dd.click();
         const options = (await page.getByRole('option').allTextContents()).map((o) => o.trim()).filter(Boolean);
         await page.keyboard.press('Escape');
-        expect(options.length, `${key} should offer selectable options`).toBeGreaterThan(0);
+        const definition = ENUM_SETTINGS.find((setting) => setting.key === key);
+        expect(definition, `${key} should have an authoritative definition`).toBeDefined();
+        expect(options, `${key} should offer every authoritative option exactly once`).toEqual(
+          definition!.options.map(({ label }) => label),
+        );
 
         // The dropdown DISPLAYS a human label ("passthrough (accept as-is)")
         // but PERSISTS a keyword ("passthrough"), so comparing the two
