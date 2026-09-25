@@ -11,7 +11,8 @@
 3. [Issue 2: SQLite Multi-Replica Split Brain (404 after 201)](#issue-2-sqlite-multi-replica-split-brain)
 4. [Issue 3: HTTPS → HTTP Location Header Redirect (Protocol Downgrade)](#issue-3-https--http-location-header-redirect)
 5. [Unit Test Mock Object Failures (28 tests)](#unit-test-mock-object-failures)
-6. [Design Principles & Best Practices](#design-principles--best-practices)
+6. [Issue 4: Auto-canary target resolution](#issue-4-auto-canary-target-resolution)
+7. [Design Principles & Best Practices](#design-principles--best-practices)
 
 ---
 
@@ -581,6 +582,63 @@ const mockRequest = {
 ### Design Principle: Mock Objects Must Reflect Real Interfaces
 
 > When refactoring production code to use different properties of a dependency, **test mocks must be updated to cover those new property accesses**. This is a sign that mock objects should ideally be generated from interface definitions or use shared factories.
+
+---
+
+## Issue 4: Auto-canary target resolution
+
+**Date:** 2026-09-25
+
+**Type:** deployment targeting / artifact identity
+
+**Severity:** High - blocked the canary and could have selected the wrong tenant if ambiguity had
+been resolved permissively rather than rejected.
+
+### Symptom
+
+The v0.55.35 pipeline passed 33 executable gates, deployed and verified dev, preserved all 60
+endpoint IDs, and then failed before creating a canary revision:
+
+```text
+ERROR: subscription name 'ProvIAM_Subscription' is ambiguous across 2 tenants
+ERROR: unknown SCIM tenant 'ProvIAM_Subscription'.
+```
+
+After correcting the subscription input, a dry run exposed a second failure that the first had
+masked:
+
+```text
+ghcr.io/pranems/scimserver:bca4f6b4: not found
+```
+
+### Root cause
+
+1. `promote-to-prod.ps1` defaulted to the display name `ProvIAM_Subscription`. Active Tenant 09 and
+      retired Tenant 08 intentionally share that name. `Connect-ScimTenant` correctly rejects an
+      ambiguous display name, but the caller omitted `-Subscription` and therefore selected the broken
+      default.
+2. `dev-deployment-pipeline.ps1` used `$ImageTag`, the local short commit tag, for canary promotion.
+      The GHCR publish stage creates the semver tag (`0.55.35`) and `latest`, not the short SHA tag.
+      Subscription resolution failed first, so the missing GHCR tag stayed hidden until the first fix
+      reached digest resolution.
+
+### Fix and why it works
+
+- Both scripts resolve `canary-prod` from `scim-estates.json` and pass the tenant's immutable
+     `subscriptionId`. This makes tenant selection unique across rollover generations.
+- Stage 6.5 promotes `$version`, the same semver tag dispatched to `publish-ghcr.yml`, while retaining
+     the short SHA only for local/ACR traceability.
+- A real `-DryRun` authenticated to Tenant 09, resolved the v0.55.35 digest, read the current blue
+     revision, and produced the complete blue/green plan without mutation.
+
+### Detection-stage escape analysis and prevention
+
+| Finding | Caught by | Earliest possible gate | Escape | Prevention |
+|---|---|---|---|---|
+| Ambiguous subscription name | Stage 6.5 live canary handoff | Static deployment contract | Reached post-dev deployment | Contract requires `Get-ScimEstate -Purpose 'canary-prod'` and explicit `-Subscription $canaryEstate.Tenant.subscriptionId`; promotion default must derive the same ID. |
+| Unpublished short-SHA GHCR tag | Corrected promotion dry run | Static deployment contract | Masked by the subscription failure | Contract requires `-ImageTag $version`; dry run proves the semver tag resolves to an immutable digest before mutation. |
+
+The contract moved from 17 assertions before the v0.55.34 mirror fix to 22/22 after these checks.
 
 ---
 

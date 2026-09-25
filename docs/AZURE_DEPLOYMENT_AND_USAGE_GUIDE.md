@@ -364,15 +364,24 @@ flowchart LR
 ```powershell
 # 1. canary first (same tenant as dev)
 pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-prod -ProdAppName scimserver `
-  -ImageTag <version> -BlueGreen -RunVerification
+  -ImageTag <version> -Subscription <active-subscription-id> -BlueGreen -RunVerification
 
 # 2. only after that is green, and only on an explicit go-ahead:
 #    the customer-facing estate is in a DIFFERENT Azure AD tenant, so re-auth first
 az login --tenant <customer-tenant-id>
 az account set --subscription <customer-subscription>
 pwsh scripts/promote-to-prod.ps1 -ProdResourceGroup scimserver-rg-prod -ProdAppName scimserver-prod `
-  -ImageTag <version> -Subscription <customer-subscription>
+  -ImageTag <version> -Subscription <customer-subscription-id>
 ```
+
+Use the immutable subscription ID, not a subscription display name. The active and retiring
+ephemeral tenants both use the name `ProvIAM_Subscription`; the promotion helper deliberately
+rejects that ambiguous input. When `-Subscription` is omitted for the canary, the script derives the
+active canary subscription ID from `scripts/scim-estates.json`.
+
+`-ImageTag` is the published product version such as `0.55.35`, not the local short commit tag. The
+publish workflow creates GHCR tags for the version and `latest`; the short SHA is used only for
+local/ACR traceability and cannot be promoted from GHCR.
 
 **What `-BlueGreen` does.** It pins the current revision (blue) at 100%, creates the new revision (green) at 0%, soaks and verifies green on its own `--green` label FQDN, and only then flips traffic. Any failure rolls back automatically. Customers stay on blue throughout, so a bad image never serves traffic.
 

@@ -150,13 +150,17 @@ Write-Host ""
 # The helper is optional - if it is absent we fall back to the legacy az-account check.
 $azHelper = Join-Path $PSScriptRoot 'az-tenant.ps1'
 if (Test-Path $azHelper) { . $azHelper }
+$estateHelper = Join-Path $PSScriptRoot 'scim-estates.ps1'
+if (Test-Path $estateHelper) { . $estateHelper }
 
 if ($AzureConfigDir) { $env:AZURE_CONFIG_DIR = $AzureConfigDir }
 
 if (Get-Command Connect-ScimTenant -ErrorAction SilentlyContinue) {
-    # Default to ProvIAM (dev + proudbush) when no -Subscription is given; calmsand
-    # promotion always passes -Subscription AnandSa-Test-150.
-    $targetSub = if ($Subscription) { $Subscription } else { 'ProvIAM_Subscription' }
+    # Default to the active canary tenant's immutable subscription ID. Tenant 08
+    # and Tenant 09 share the display name ProvIAM_Subscription, so using the
+    # name here is ambiguous and fails closed in Connect-ScimTenant.
+    $defaultEstate = if ($Subscription) { $null } else { Get-ScimEstate -Purpose 'canary-prod' }
+    $targetSub = if ($Subscription) { $Subscription } else { $defaultEstate.Tenant.subscriptionId }
     $account = Connect-ScimTenant -Subscription $targetSub -DeviceCode:$DeviceCode
     if (-not $account) {
         Write-Host "❌ Could not authenticate to '$targetSub'." -ForegroundColor Red

@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $helperPath = Join-Path $repoRoot 'scripts/github-workflow-run.ps1'
 $pipelinePath = Join-Path $repoRoot 'scripts/dev-deployment-pipeline.ps1'
+$promotePath = Join-Path $repoRoot 'scripts/promote-to-prod.ps1'
 $prePushPath = Join-Path $repoRoot 'scripts/pre-push-checks.ps1'
 if (-not (Test-Path $helperPath)) {
     throw "Missing workflow-run selector: $helperPath"
@@ -82,9 +83,32 @@ if ($pipeline.Contains('docker tag scimserver-api')) {
     throw 'Deployment pipeline still treats the Compose container name as an image tag.'
 }
 
+foreach ($required in @(
+    "Get-ScimEstate -Purpose 'canary-prod'",
+    '-Subscription $canaryEstate.Tenant.subscriptionId',
+    '-ImageTag $version'
+)) {
+    if (-not $pipeline.Contains($required)) {
+        throw "Deployment pipeline is missing registry-resolved auto-canary subscription guard: $required"
+    }
+}
+
+$promote = Get-Content $promotePath -Raw
+if ($promote.Contains("else { 'ProvIAM_Subscription' }")) {
+    throw 'Promotion still defaults to the ambiguous ProvIAM_Subscription display name.'
+}
+foreach ($required in @(
+    "Get-ScimEstate -Purpose 'canary-prod'",
+    '$defaultEstate.Tenant.subscriptionId'
+)) {
+    if (-not $promote.Contains($required)) {
+        throw "Promotion is missing registry-resolved default subscription guard: $required"
+    }
+}
+
 $prePush = Get-Content $prePushPath -Raw
 if (-not $prePush.Contains('select-github-workflow-run.contract.ps1')) {
     throw 'The default pre-push gate does not execute the workflow-run selector contract.'
 }
 
-Write-Output 'select-github-workflow-run contract: 17/17 passed'
+Write-Output 'select-github-workflow-run contract: 22/22 passed'
