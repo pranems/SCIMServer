@@ -29,7 +29,7 @@ import type {
   ValidationResult,
 } from './validation-types';
 import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
-import { COMMON_EXTERNAL_ID, effectiveCommonAttribute } from './common-attributes';
+import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, validateCommonAttributeValues } from './common-attributes';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -672,11 +672,7 @@ export class SchemaValidator {
   ): void {
     // Common externalId remains typed even when strict schema checks are off or
     // an old/custom core omitted its declaration. Namespaced fields are independent.
-    for (const [key, value] of Object.entries(payload)) {
-      if (key.toLowerCase() === 'externalid' && value != null && typeof value !== 'string') {
-        errors.push({ path: key, message: 'Common externalId must be a single string (RFC 7643 3.1).', scimType: 'invalidValue' });
-      }
-    }
+    errors.push(...validateCommonAttributeValues(payload));
     const collect = (obj: Record<string, unknown>, attrs: Iterable<SchemaAttributeDefinition>, prefix: string): void => {
       for (const attr of attrs) {
         if (attr.mutability === 'readOnly') continue;
@@ -1202,6 +1198,11 @@ export class SchemaValidator {
         }
       }
     }
+
+    const externalIdDefinition = coreAttributes.get('externalid');
+    coreAttributes = new Map(coreAttributes);
+    coreAttributes.set('externalid', externalIdDefinition
+      ? effectiveCommonAttribute(externalIdDefinition, true) : COMMON_EXTERNAL_ID);
 
     const opLower = op.toLowerCase();
 

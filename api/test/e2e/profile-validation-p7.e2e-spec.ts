@@ -5,12 +5,13 @@ import { getAuthToken } from './helpers/auth.helper';
 import { randomUUID } from 'crypto';
 import type { Server } from 'node:http';
 import { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } from './helpers/profile-p7-readonly.fixture';
-import { effectiveCharacteristic } from './helpers/schema-characteristics.helper';
+import { effectiveCharacteristic, type SchemaAttribute } from './helpers/schema-characteristics.helper';
 
 const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
 const EXT = 'urn:example:params:scim:schemas:extension:p7:2.0:Test';
 interface WireBody extends Record<string, unknown> {
   id: string;
+  Resources: { id: string; attributes: SchemaAttribute[] }[];
   profile: {
     schemas: { id: string; attributes: Record<string, unknown>[] }[];
     settings: Record<string, unknown>;
@@ -161,8 +162,8 @@ describe('P7 declaration and POST/PUT contracts', () => {
           expect(changed.body.externalId).toBe('Client-aBc');
           expect(changed.body[EXT].externalId).toEqual([7, 9]);
           const schemas = await scim('get', `/scim/endpoints/${endpointId}/Schemas`).expect(200);
-          const published = schemas.body.Resources.find((s: { id: string }) => s.id === core).attributes
-            .find((a: { name: string }) => a.name.toLowerCase() === 'externalid');
+          const published = schemas.body.Resources.find(schema => schema.id === core)?.attributes
+            .find(attribute => attribute.name?.toLowerCase() === 'externalid');
           expect(published).toBeDefined();
           expect(effectiveCharacteristic(published, 'type')).toBe('string');
           expect(effectiveCharacteristic(published, 'multiValued')).toBe(false);
@@ -174,8 +175,9 @@ describe('P7 declaration and POST/PUT contracts', () => {
           const before = (await admin('get', `/${endpointId}`).expect(200)).body;
           for (const override of [{ type: 'integer' }, { multiValued: true }, { caseExact: false }, { mutability: 'readOnly' }]) {
             const profile = structuredClone(before.profile);
-            const declaration = profile.schemas.find((s: { id: string }) => s.id === core).attributes
-              .find((a: { name: string }) => a.name.toLowerCase() === 'externalid');
+            const declaration = profile.schemas.find(schema => schema.id === core)?.attributes
+              .find(attribute => typeof attribute.name === 'string' && attribute.name.toLowerCase() === 'externalid');
+            if (!declaration) throw new Error('Expected common externalId in the published core schema.');
             Object.assign(declaration, override);
             await admin('patch', `/${endpointId}`).send({ profile }).expect(400);
             const after = (await admin('get', `/${endpointId}`).expect(200)).body;

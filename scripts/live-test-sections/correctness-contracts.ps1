@@ -113,7 +113,7 @@ function Invoke-ScimCorrectnessContractTests {
             $result = & node (Join-Path $PSScriptRoot 'profile-validation.cjs')
             if ($LASTEXITCODE -ne 0) { throw 'Profile validation contract process failed.' }
             $receipt = $result | ConvertFrom-Json -ErrorAction Stop
-            Test-Result -Success ($receipt.assertions -eq 228) -Message '9z-CV: 228 declaration, scalar, POST/PUT, projection and cleanup assertions'
+            Test-Result -Success ($receipt.assertions -eq 426) -Message '9z-CV: 426 declaration, scalar, POST/PUT, projection and cleanup assertions'
         } catch {
             Test-Result -Success $false -Message "9z-CV: profile validation failed: $($_.Exception.Message)"
         } finally {
@@ -223,6 +223,24 @@ function Invoke-ScimCorrectnessContractTests {
 
             . "$PSScriptRoot\atomic-uniqueness.ps1"
             Invoke-ScimAtomicUniquenessTests -BaseUrl $base -Headers $Headers
+
+            $script:currentSection = '9z-DC: Common externalId PATCH'
+            $oldBase = $env:SCIM_LIVE_BASE_URL
+            $oldToken = $env:SCIM_LIVE_TOKEN
+            try {
+                $env:SCIM_LIVE_BASE_URL = $base
+                $env:SCIM_LIVE_TOKEN = $token
+                $result = & node (Join-Path $PSScriptRoot 'common-externalid-patch.cjs')
+                if ($LASTEXITCODE -ne 0) { throw 'Common externalId PATCH contract process failed.' }
+                $receipt = $result | ConvertFrom-Json -ErrorAction Stop
+                Test-Result -Success ($receipt.cases -eq 66 -and $receipt.assertions -eq 718) `
+                    -Message '9z-DC: 66 common externalId PATCH cases / 718 type, namespace and rollback assertions'
+            } catch {
+                Test-Result -Success $false -Message "9z-DC: common externalId PATCH failed: $($_.Exception.Message)"
+            } finally {
+                $env:SCIM_LIVE_BASE_URL = $oldBase
+                $env:SCIM_LIVE_TOKEN = $oldToken
+            }
         }
     }
 }

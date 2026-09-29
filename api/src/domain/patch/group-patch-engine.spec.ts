@@ -64,9 +64,13 @@ describe('GroupPatchEngine', () => {
       expect(result.externalId).toBe('ext-999');
     });
 
-    it('should set externalId to null for non-string value', () => {
-      const result = apply([{ op: 'replace', path: 'externalId', value: 123 }]);
-      expect(result.externalId).toBeNull();
+    it('rejects non-string externalId instead of silently clearing it', () => {
+      const state = makeState();
+      const before = structuredClone(state);
+      expect(() => GroupPatchEngine.apply(
+        [{ op: 'replace', path: 'externalId', value: 123 }], state, defaultConfig,
+      )).toThrow(PatchError);
+      expect(state).toEqual(before);
     });
 
     it('should replace members array completely', () => {

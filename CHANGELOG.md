@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed - common externalId PATCH integration, not released
+- Reject invalid original common externalId PATCH values before resource hooks
+  can erase their type, and validate the completed candidate in both strict
+  modes through one shared common-value-only seam. Preserve extension homonyms,
+  valid custom shapes, old-definition precedence, null/remove behavior and the
+  separation from complete POST/PUT required checks. RED: 13 domain / 25 HTTP
+  failures. GREEN: 973 focused units, 392 HTTP/backend, 66 new built-live
+  cases / 718 assertions plus 426 P7 assertions/backend; actual owned
+  PostgreSQL 17.8 with all 22 migrations and exact cleanup. No release-version,
+  lockfile, deployment or data repair change.
+  [Combined proof](docs/SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate).
+
 ### Fixed - retained-entry PUT preservation, integration only
 - PUT no longer assigns one duplicate complex entry's server-owned data to
   multiple entries. PUT preparation, immutable validation and PATCH retention

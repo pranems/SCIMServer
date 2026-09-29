@@ -895,6 +895,16 @@ Examples of standing rules that originated from real failures:
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**
 
+## Original-value and completed-candidate validation (2026-09-29)
+
+For typed common attributes, preserve and validate original client value
+types before DTO/resource adapters can coerce or clear them, and validate the
+completed common state before persistence. A successful normalized value is
+not proof that the original assignment was valid. PATCH checks must remain
+value-scoped; never reuse complete POST/PUT required-extension checks on
+touched partial PATCH views. Include late-operation rollback and unrelated
+required-field controls.
+
 ## Retained-entry cross-operation regression rule (2026-09-29)
 
 Changes to preservation/matching of multi-valued complex entries MUST cover

@@ -1,0 +1,62 @@
+{
+  "scope": "Integrated common externalId PATCH value/rollback proof, not final C0",
+  "importedSource": "8e8aa72e2a92d3389ea6fd4d72cf8c129c849e69",
+  "baseHead": "e8a6e48751bd5d055c2b8bfe012625718b0848a5",
+  "testedWorkingTreeSha256": "762c7f70e705d2fda41b37221bce2c245d47d6765fb287887b106ed1668cc1bf",
+  "sourceHashScope": "Sorted git ls-files -co --exclude-standard for api/src, api/test and scripts; path plus bytes",
+  "sourceFileCount": 716,
+  "builtRuntimeSha256": "a741a20408eb52dc9897a4a17be4b5d224dec96419a55b048e08d9f12cade257",
+  "buildHashScope": "Sorted relative .js paths and bytes under api/dist; measured after the focused run",
+  "buildFileCount": 250,
+  "red": {
+    "domainFailed": 13,
+    "domainPositiveControls": 2,
+    "httpFailed": 25,
+    "httpPositiveControls": 41,
+    "staleP7LiveCountFailed": 1,
+    "newLiveRouteFailed": 2
+  },
+  "green": {
+    "focusedUnitSuites": 20,
+    "focusedUnitPassed": 973,
+    "newDomainTests": 17,
+    "newHttpCasesPerBackend": 66,
+    "focusedHttpSuitesPerBackend": 5,
+    "focusedHttpCasesPerBackend": 392,
+    "newBuiltLiveCasesPerBackend": 66,
+    "newBuiltLiveAssertionsPerBackend": 718,
+    "p7BuiltLiveAssertionsPerBackend": 426,
+    "inmemoryCombinedLiveReportedChecks": 137,
+    "apiBuild": "passed",
+    "lintFiles": 17,
+    "lintErrors": 0,
+    "lintWarnings": 14
+  },
+  "postgresql": {
+    "versionNumber": 170008,
+    "version": "17.8",
+    "migrations": 22,
+    "run": "c6da7a3314e614b2",
+    "containerId": "9e7d8467adea8548a5f1388d5500f49e68c55ab9ad9de2a2d23d43f0ff2013e3",
+    "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+    "exactOwnedContainerRemoved": true,
+    "builtRuntimePid": 60716,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true,
+    "rawReceipt": "test-results/scim-integration-common-externalid/postgres-c6da7a3314e614b2/receipt.json"
+  },
+  "inmemory": {
+    "database": "explicit inert URL; no database connected",
+    "builtRuntimePid": 20784,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true
+  },
+  "limits": [
+    "No complete POST/PUT required checks run against partial PATCH views",
+    "No uniqueness enforcement or custom displayName/active admission restriction added",
+    "Common-attribute query and P3b representation issues remain separate acceptance work",
+    "No old stored data repair, deployment or final authoritative matrix",
+    "Eight previously confirmed P7 expectation mismatches remain separately tracked",
+    "The original 82-case/backend ledger is not closed by aggregate counts"
+  ]
+}

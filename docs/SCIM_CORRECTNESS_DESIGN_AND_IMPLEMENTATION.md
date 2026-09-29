@@ -415,7 +415,7 @@ combined checkpoint has its own counts in section 11.1.
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | Common externalId source integrated; combined PATCH validation pending | [Common contract](SCIM_P7_COMMON_EXTERNAL_ID.md) from `8e8aa72e`, prior POST/PUT/readonly and neutral retention fix retained. Completed-candidate strict-OFF PATCH seam, eight baseline expectation mismatches and final case-level acceptance remain open |
+| P7 | Common externalId POST/PUT/PATCH focused parity verified; other acceptance items open | [Common contract](SCIM_P7_COMMON_EXTERNAL_ID.md) from `8e8aa72e` plus integration original-value/completed-candidate checks; neutral PUT matching retained. 973 units, 392 HTTP/backend and built-live proof in 11.19. Eight baseline expectations, query/uniqueness boundaries and final case-level acceptance remain open |
 | P8 | P8a/P8b/P8c integrated; concurrent-error follow-up active | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) proves cleanup/retained audit behavior. Its original worker owns exact missing-parent error normalization for raced User/Group/custom/applicable credential routes on both backends; genuine DB faults and P3 conditional 412 remain distinct |
 | P9 | Integrated with owned-bootstrap hardening; current corpus/policy statuses preserved | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Follow-up `8679e90f` pins the guarded database target. I02 remains default-running (18 cases); I03 remains the parent-reviewed safety/policy hold, not a frozen-core claim; active coercion remains open |
 | C0 | Incremental assembly verified only | Checkpoints through 11.15; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. I02 is default-verified locally; no full matrix until the deliberate I03 safety/policy disposition, active coercion, P7/common attributes/test reconciliation, P3b/compatibility and concurrent FK-error normalization close |
@@ -1490,6 +1490,68 @@ is checked before choosing equality semantics, with both rejection and
 legitimate-no-constraint controls.
 **Design disposition: accepted.** Remove unsupported comparison branches;
 retain the existing typed policy and repository transaction seams.
+
+### 11.19 Common externalId POST/PUT and PATCH integration
+
+Source `8e8aa72e2a92d3389ea6fd4d72cf8c129c849e69` was appended as
+`e8a6e487`. Source-package counts remain 1,687 focused units, 104 HTTP and
+426 live assertions per backend; they are not relabeled as the new combined
+proof. Public deepEqual, neutral retained-entry matching, explicit core versus
+extension metadata and P3/P4/P8 persistence safeguards were retained.
+
+The requested cross-package check then proved a missing seam: **13 domain
+and 25 HTTP failures**. Lenient generic PATCH accepted non-string common
+externalId. Group's resource hook could clear such input to null, including
+strict pathless requests, so a final-state check alone would not recover the
+original type. A strict fallback map could also still treat an old externalId
+declaration as readOnly despite common precedence.
+
+The integration correction extracts `validateCommonAttributeValues` from the
+existing P7 create/replace check and reuses it before common-target hooks and
+after PATCH normalization. It only validates common values; it does not invoke
+the complete required/required-extension pass or alter its PATCH early return.
+PATCH target/fallback maps use common metadata precedence without mutating a
+supplied cache. Null/unassignment, value-insensitive remove, extension integer
+arrays and arbitrary valid custom displayName/active shapes have controls.
+The old Group unit expectation that invalid input silently clears externalId
+was replaced with rejection and unchanged input-state proof.
+
+| Focused combined check | Result |
+|---|---|
+| RED before integration production changes | 13 domain failures / 2 positive controls; 25 HTTP failures / 41 positive controls; stale P7 receipt-count check also RED |
+| Final unit/profile/service checks | 20 suites / 973 passed, including 17 new domain controls |
+| New HTTP matrix | 66 cases, all three resource families, both strict modes, explicit/pathless invalid values, late-op rollback, case preservation and namespace/custom-shape controls |
+| InMemory HTTP | 392 cases passed across five focused suites |
+| PostgreSQL HTTP | Same 392 cases passed on actual 17.8 after 22 migrations |
+| Built-local live per backend | New `9z-DC`: 66 cases / 718 assertions; P7 `9z-CV`: 426 assertions |
+| Combined InMemory main section | 137 reported checks passed; this bounded run still excludes unresolved I03 |
+| API build / lint | Build passes; 0 errors / 14 existing warnings across 17 files |
+| Cleanup | Exact newly owned PostgreSQL container removed, both APIs stopped, pre-existing endpoint collections unchanged |
+
+The shared HTTP/live fixture prevents scenario drift. Persistent HTTP checks
+compare repository records as well as GET responses and versions. The
+guarded integration PostgreSQL runner uses a new random task identity, rejects
+inherited targets/markers, checks port/database/user/cluster/system identity,
+pins the verified URL at bootstrap, and cleans only its own container.
+No earlier source/database guard or frozen failure evidence was edited.
+
+See [the portable integrated receipt](evidence/scim-common-patch-20260929/validation.json);
+full logs are in `test-results/scim-integration-common-externalid/`.
+The original P7 source receipt remains separate. This focused parity run is
+not the final authoritative matrix or final release-artifact gate. No already
+stored invalid resource was automatically repaired.
+
+**Remaining boundaries:** generic query/pushdown and uniqueness candidate
+representation, unsupported-promise admission, exact concurrent-deletion
+errors, eight previously established P7 expectation mismatches, authorized
+I03/active-coercion follow-up and all case-level C0 dispositions remain
+independent. Do not infer their closure from this value-validation proof.
+
+**Assurance improvement: applied.** Validate original semantic type before
+lossy adapters and validate completed common state without confusing it with
+full-resource requiredness. **Design disposition: applied.** One pure
+common-value checker serves POST/PUT and PATCH; resource adapters remain
+small, required-check boundaries and protocol defaults stay unchanged.
 
 ## 12. Architecture and self-improvement decisions
 

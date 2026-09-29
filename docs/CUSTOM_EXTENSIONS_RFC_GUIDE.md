@@ -30,6 +30,12 @@
 
 ### Pending release: typed extension PATCH paths
 
+The integrated [common externalId PATCH check](SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate)
+also runs with strict validation OFF. It applies to the common top-level
+String only, not to a namespaced extension externalId integer array or a
+custom-core displayName/active shape. Rejected values leave the stored
+resource and version unchanged.
+
 **PUT retained-state correction, integrated but not deployed:** when an
 extension contains repeated complex values, preserving readOnly/omitted
 immutable children must not copy one old entry's server data to several

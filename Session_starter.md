@@ -10,6 +10,14 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
+**Common externalId source and PATCH seam verified:** `8e8aa72e` -> `e8a6e487`.
+New cross-package RED: 13 domain / 25 HTTP failures. Original-value pre-hook
+and completed-candidate checks now pass 973 units, 392 HTTP cases/backend,
+66 new built-live cases / 718 assertions and 426 P7 assertions/backend.
+Actual owned PostgreSQL 17.8 replayed 22 migrations and was removed; APIs
+stopped with unchanged endpoint inventories. [Separate proof](docs/evidence/scim-common-patch-20260929/validation.json).
+This is not full C0 or generic query/uniqueness representation closure.
+
 **P9 harness hardening integrated:** `8679e90f` -> `2c5067a4`. P9 now pins the
 verified URL through bootstrap; the shared runner clears inherited URLs and
 uses TCP readiness. Eight focused isolation/discovery units and 23 selected
@@ -92,9 +100,9 @@ verification/correction of actual admission/runtime gaps. Custom-core
 displayName/active and extension-namespaced homonyms still follow their resolved
 schemas, not convenience columns. The [corrected contract](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1113-standards-correction-common-externalid-is-not-a-custom-core-field)
 supersedes the earlier unrestricted custom-core externalId assumption.
-The pending P7 implementation is POST/PUT-only at this seam. Integration must
-separately prove completed PATCH candidates respect common externalId in
-strict OFF, without applying POST/PUT required checks to partial PATCH views.
+The P7 source package was POST/PUT-only at this seam; the separate integrated
+PATCH correction now has focused dual-backend proof. It checks common values
+without applying POST/PUT required checks to partial PATCH views.
 
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
@@ -108,6 +116,7 @@ strict OFF, without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: Separate PUT retention correction shares P2's matcher through a neutral domain seam, with `9z-DA` live coverage.
 - [x] ✅ COMPLETED: P3b core assembled with P3/P4/P8 guards intact; `9z-DB` runs the original 21 string-MV uniqueness assertions plus endpoint cleanup.
 - [x] ✅ COMPLETED: P3b RFC follow-up `cefb540b` integrated as `1f0a024a`; supported types/references corrected without claiming generic representation closure.
+- [x] ✅ COMPLETED: P7 common externalId source plus original-value/completed-PATCH integration; `9z-CV` has 426 assertions and new `9z-DC` has 66 cases / 718 assertions.
 - [ ] Close P3b's documented unsupported-type/generic-authority acceptance hold before claiming promised uniqueness complete.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.

@@ -5,6 +5,12 @@
 **Status:** Local follow-up to `892b74ba`. Not merged, pushed or deployed.
 P7 remains open until final P2 integration. Atomic uniqueness is P3b-owned.
 
+**Integration update:** source `8e8aa72e` is assembled as `e8a6e487`.
+The separate completed-PATCH correction below is locally validated on both
+backends, not merged to master or deployed. PUT one-to-one retention was
+already fixed and independently verified in `b21e44cb`; it is not reopened
+by this common-attribute source-package handoff.
+
 ## 1. The standard, not the storage column, decides the contract
 
 [RFC 7643 3.1](https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1)
@@ -157,6 +163,45 @@ common externalId type check in addition to required-state checks. It still
 returns immediately for PATCH, preserving P2's touched-partial-view boundary.
 That is why combined PATCH common-attribute validation remains an explicit
 integration item, not an implied pass from these POST/PUT tests.
+
+### Integrated PATCH boundary: original value and completed candidate
+
+The combined P2/P7 check proved **13 domain failures and 25 HTTP failures**
+before the integration correction. Lenient generic PATCH could retain an
+invalid common value. Group's promoted-field hook could instead convert that
+invalid input to null before final validation, including a pathless strict
+request. An outcome check only after that lossy conversion would miss the
+original error.
+
+`validateCommonAttributeValues` now supplies one common-value-only check to
+both create/replace validation and the ordered PATCH executor. The executor
+checks a common externalId target's original value before resource hooks,
+then checks the completed candidate after normalization. PATCH fallback
+metadata honors the same common precedence as cached metadata without mutating
+the supplied map. Null/unassignment and value-insensitive remove retain their
+established behavior. Extension externalId remains independent.
+
+This does **not** invoke the complete POST/PUT required/required-extension
+pass on a partial PATCH view. A negative control has unrelated required data
+absent and still permits a valid externalId PATCH. The common check neither
+restricts custom-core displayName/active shapes nor invents uniqueness.
+Previously stored invalid common data is not migrated or silently repaired;
+an invalid completed candidate is rejected rather than persisted again.
+
+| Integrated proof | Result |
+|---|---|
+| New domain controls | 17 passed, including cached-map immutability, old conflicting definitions, hook output, and remove behavior |
+| New HTTP matrix | 66 cases per backend: all families, strict ON/OFF, explicit/pathless invalid values, late-op full rollback, case preservation, extension integer arrays and valid custom shapes |
+| Focused domain/service/profile units | 973 passed across 20 suites |
+| Focused combined HTTP | 392 passed per backend |
+| New built-runtime live section | 66 cases / 718 assertions per backend, plus P7's 426 assertions |
+| Actual database | PostgreSQL 17.8, all 22 migrations, task-owned identities and exact container cleanup |
+
+See the [separate integrated receipt](evidence/scim-common-patch-20260929/validation.json)
+and [implementation tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1119-common-externalid-postput-and-patch-integration).
+Original P7 counts above are preserved as source-package evidence, not
+overwritten with this later combined result. Query/pushdown, uniqueness
+representation, other open P7 expectations and final C0 remain separate.
 
 **Design gate: applied.** One domain definition supplies core precedence;
 extension names never inherit common-field policy. **Self-improvement:

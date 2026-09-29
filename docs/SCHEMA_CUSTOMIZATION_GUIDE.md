@@ -21,6 +21,11 @@
 
 ### Pending release: PATCH validation uses typed paths
 
+The [common externalId integration](SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate)
+checks original PATCH values before adapters and the completed candidate in
+both strict modes. It does not reuse POST/PUT required-field checks on partial
+PATCH views or restrict an independent extension externalId to String.
+
 **PUT retention is separately verified:** repeated complex entries can carry
 different server-owned values even when their `value` fields match. The
 integrated [one-to-one retention fix](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries)

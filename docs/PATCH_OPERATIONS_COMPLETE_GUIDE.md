@@ -35,6 +35,15 @@ once; anonymous occurrences retain their order. This extraction preserves
 PATCH behavior and fixes PUT copying one server-owned value into several
 entries. See [the retained-entry proof](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries).
 
+**Common externalId value boundary:** the assembled follow-up checks original
+top-level externalId values before resource hooks and the completed candidate
+after normalization, even with strict validation OFF. Numeric/Boolean/array/
+object common values are rejected without saving earlier operations, rather
+than being silently cleared by a promoted-field adapter. This does not run
+complete POST/PUT required checks on partial PATCH views, and extension
+externalId fields retain their own declared types. See
+[the common-value proof](SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate).
+
 **RFC references:**
 - [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
 - [RFC 7644 §3.5.2.1 - Add](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.1) / [§3.5.2.2 - Remove](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.2) / [§3.5.2.3 - Replace](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.3)

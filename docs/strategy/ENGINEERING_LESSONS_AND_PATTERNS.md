@@ -30,6 +30,15 @@ See [P9 evidence](../SCIM_ENTRA_COMPATIBILITY.md).
 
 ### P7a: semantic presence and ownership survive framework transformations
 
+**Common-value recurrence, 2026-09-29:** preserving a DTO's original externalId
+type was not enough for PATCH. A Group resource hook converted invalid values
+to null before the completed candidate was inspected. Validate the assigned
+common target before a lossy adapter, then validate the resulting common state
+after normalization. Do not replace that narrow invariant with a complete
+POST/PUT required-resource check on a PATCH partial view. The combined
+[RED/GREEN and real-backend proof](../evidence/scim-common-patch-20260929/validation.json)
+covers both boundaries and a control for unrelated required fields.
+
 The [P7a review](../SCIM_P7_EXECUTION_RCA.md) reproduced two defects from the
 same false premise: an optional DTO field with value `undefined` was treated
 as client input. This discarded omitted immutable values and implicitly

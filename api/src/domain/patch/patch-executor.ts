@@ -1,5 +1,6 @@
 import { SchemaValidator } from '../validation/schema-validator';
 import type { SchemaDefinition, SchemaAttributeDefinition as Attribute } from '../validation/validation-types';
+import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, validateCommonAttributeValues } from '../validation/common-attributes';
 import { parsePatchPath, matchesPatchSelection, type ParsedPatchPath } from './patch-path';
 import { PatchError } from './patch-error';
 import type { PatchOperation } from './patch-types';
@@ -72,6 +73,7 @@ export class PatchExecutor {
         }
       }
       this.options.normalize?.(candidate, operation);
+      this.checkCommonValues(candidate);
       this.checkRequired(candidate, before, operation);
       this.payload = candidate;
     } catch (error) {
@@ -92,9 +94,15 @@ export class PatchExecutor {
 
   private definitions(path: ParsedPatchPath): readonly Attribute[] | undefined {
     const schemas = this.options.schemaDefinitions;
-    return path.schemaUrn
-      ? schemas?.find(s => s.id.toLowerCase() === path.schemaUrn?.toLowerCase())?.attributes
-      : schemas?.filter(s => s.isCoreSchema ?? s.id.startsWith('urn:ietf:params:scim:schemas:core:')).flatMap(s => [...s.attributes]);
+    if (path.schemaUrn) return schemas?.find(s => s.id.toLowerCase() === path.schemaUrn?.toLowerCase())?.attributes;
+    const core = schemas?.filter(s => s.isCoreSchema ?? s.id.startsWith('urn:ietf:params:scim:schemas:core:'))
+      .flatMap(s => s.attributes.map(attr => effectiveCommonAttribute(attr, true)));
+    return core?.some(attr => attr.name.toLowerCase() === 'externalid') ? core : [...(core ?? []), COMMON_EXTERNAL_ID];
+  }
+
+  private checkCommonValues(payload: Record<string, unknown>): void {
+    const errors = validateCommonAttributeValues(payload);
+    if (errors.length) throw new PatchError(400, errors.map(error => error.message).join('; '), errors[0].scimType);
   }
 
   private parse(path: string): ParsedPatchPath {
@@ -105,6 +113,11 @@ export class PatchExecutor {
 
   private atPath(payload: Record<string, unknown>, operation: PatchOperation): Record<string, unknown> {
     const parsed = this.parse(operation.path!);
+    // Validate before an adapter can replace invalid input with a nullable column value.
+    if (!parsed.schemaUrn && !parsed.subAttribute && parsed.kind !== 'selection' &&
+        parsed.attribute.toLowerCase() === 'externalid' && operation.op !== 'remove') {
+      this.checkCommonValues({ externalId: operation.value });
+    }
     if (this.hooks.normalizeValue) {
       operation = { ...operation, value: this.hooks.normalizeValue(parsed, operation.value, operation.op) };
     }

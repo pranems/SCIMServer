@@ -31,6 +31,7 @@ describe('integrated correctness live coverage', () => {
       'ordered-patch.cjs',
       'retained-entry-put.cjs',
       'Invoke-ScimAtomicUniquenessTests -BaseUrl',
+      'common-externalid-patch.cjs',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
@@ -47,12 +48,12 @@ describe('integrated correctness live coverage', () => {
     const sections = [...`${main}\n${source}\n${search}\n${atomic}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-(?:C[O-Z]|D[A-Z])):/g)]
       .map((match) => match[1]);
     expect(new Set(sections).size).toBe(sections.length);
-    expect(sections.length).toBeGreaterThanOrEqual(14);
+    expect(sections.length).toBeGreaterThanOrEqual(15);
   });
 
   it('requires the expanded recursive readOnly live contract', () => {
     const source = read(section);
-    expect(source.includes('$receipt.assertions -eq 228')).toBe(true);
-    expect(source.includes('228 declaration, scalar, POST/PUT, projection and cleanup assertions')).toBe(true);
+    expect(source.includes('$receipt.assertions -eq 426')).toBe(true);
+    expect(source.includes('426 declaration, scalar, POST/PUT, projection and cleanup assertions')).toBe(true);
   });
 });
