@@ -2,12 +2,19 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.35
-> **Last Updated**: September 28, 2026
-> **Last verified:** 2026-09-28
+> **Last Updated**: September 29, 2026
+> **Last verified:** 2026-09-29
 
 ---
 
 ## Active Delivery Process
+
+The local initial assembly now includes P1, P3/P4, P5, P6a/P6b, P7a, P8a and
+P8c. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#115-p4-incremental-assembly-2026-09-29)
+owns current combined results; the records below are source-package evidence,
+not deployment claims. P4's raw repository-error gap was closed separately
+with value/content regressions, not assumed fixed by P5's scalar formatting.
+P2/P8b, final P7 PATCH and P3b/compatibility dispositions still block C0.
 
 P7a is implemented locally in its own P1-based worktree. The
 [P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,

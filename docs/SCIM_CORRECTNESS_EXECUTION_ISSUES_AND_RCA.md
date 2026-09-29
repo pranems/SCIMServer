@@ -1,6 +1,6 @@
 # SCIM correctness implementation: issues and lessons
 
-> **Last verified:** 2026-09-28
+> **Last verified:** 2026-09-29
 >
 > **Status:** Implementation ledger, updated when an issue is confirmed
 >
@@ -99,6 +99,8 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I07 | Integration / Medium | P6b's generic If-Match edits conflicted with P3; P7a moved PUT snapshot reads ahead of replacement preparation | The independent packages changed different responsibilities in the same methods | Keep P6b's profile-aware checks and P7a's earlier single snapshot, but bind the returned expected version there and pass it to P3's repository mutation. Remove the obsolete second read. The 229 HTTP cases include real-repository conditional-write barriers alongside typed PATCH, query and P7a contracts; all pass | Merge review / merge review and focused HTTP | Preserve the persistence condition when moving validation order; do not restore an unconditional save or validate replacement from a different snapshot |
 | C0-I08 | Integration / Low | P6b reused `9z-CP`; P7a had no main-runner invocation | Package-local smoke helpers do not reserve globally unique sections or prove main-runner reachability | Two wiring assertions failed before edits. Route P6b through `9z-CU` and P7a through `9z-CV`; share P7a's explicit-target HTTP assertions while preserving its original source/database/loopback guards. All three wiring tests pass within 1,044 focused units | Existing wiring regression / same | Applied: eight-package inventory and cross-main/helper identifier checks; no ownership guard is bypassed |
 | C0-I09 | Error contract / Medium | P4's deferred raw-error issue was still present after P5: both a private injected message and internal repository context reached HTTP clients | P5 normalizes scalar shape but deliberately preserves an already-SCIM envelope. The shared repository bridge interpolated `RepositoryError.message`, which includes Prisma mapper context/cause text, into server-error detail | Two unit and two HTTP assertions proved RED on the assembled code. Mask mapped 500/503 detail to the operation only; retain status, diagnostics, client-error behavior and logged original cause. Build, 185 helper/filter units and the two HTTP cases pass. Restore raw-marker assertions in the full P4 HTTP contract | P4 error-contract RED / P4 integration closure | Applied: actual Prisma error translation feeds permanent unit and HTTP seam tests; a scalar string is not necessarily safe content. No historical P4 or P5 evidence is rewritten |
+| C0-I10 | Integration / Low | P4's standalone helper was not reachable from the main live runner | The helper expected a pre-created owned loopback endpoint; the main runner had neither invocation nor fixture setup | Two wiring assertions failed. Add `9z-CW`, create a dedicated endpoint, share the unchanged 69 HTTP assertions through a callable function, and retain the original guarded script. Three wiring tests and all 121 combined live checks pass; endpoint state is identical after cleanup | Existing wiring regression / same | Applied: nine-package inventory, unique sections and main-runner cleanup proof. An initial insertion matched an earlier repeated finally block; source review moved it after `9z-CV` before execution |
+| C0-I11 | Documentation/tooling / Low | Both independent pattern additions had total 31; renderer initially skipped for missing web/root tooling | P4 added PA-10 while the assembled branch already included PC-4; fresh worktree dependency trees were absent | Combine A=10 and C=4 with total 32. After actual missing-tool results, reuse owned read-only web/root links. Both diagrams in the changed ledger render in both strict themes; version discovery still reports the pre-existing 0.0.0 sentinel | Merge review/render gate / same | Preserve both patterns and recompute totals, never choose one side. SKIP is not render proof; no version pin or dependency was changed |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -149,6 +151,15 @@ validation/projection, and atomic persistence retain their existing seams.
 The merge does not add a universal repository or a shared mutable snapshot.
 Eight real live consumers justify the existing small orchestrator; final
 PATCH semantics and P8b cleanup are not silently pulled into this increment.
+
+P4 incremental confirmation: **121 combined live checks** pass, including
+all 69 new aggregate assertions and dedicated endpoint cleanup. Endpoint state
+is identical, the owned API is stopped, and the standalone guard still rejects
+unowned targets. New logs use `test-results/scim-integration-p4/`; previous
+receipts remain unchanged. **Design disposition: accepted.** Aggregate
+transaction mechanics stay in the Group repository ports; safe server-error
+formatting stays in the existing SCIM boundary. The two corrections are
+separate rollback units, and no universal transaction framework is introduced.
 
 ## P8a issues
 

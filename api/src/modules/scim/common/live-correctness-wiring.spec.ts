@@ -25,6 +25,7 @@ describe('integrated correctness live coverage', () => {
       'live-endpoint-conditional.cjs',
       'test-scim-query-semantics.ps1',
       'profile-validation.cjs',
+      'Invoke-ScimGroupAggregateContract -EndpointUrl',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
@@ -39,6 +40,6 @@ describe('integrated correctness live coverage', () => {
     const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-C[O-Z]):/g)]
       .map((match) => match[1]);
     expect(new Set(sections).size).toBe(sections.length);
-    expect(sections.length).toBeGreaterThanOrEqual(8);
+    expect(sections.length).toBeGreaterThanOrEqual(9);
   });
 });

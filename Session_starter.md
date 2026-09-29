@@ -1,33 +1,36 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
 ### Active Execution Reference
 
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
-assembles P1, P3 (including its cleanup follow-up), P5, P6a/P6b, P7a, P8a and P8c on D0.
+assembles P1, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a and P8c on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
-The latest P6b/P7a increment passes build, 1,044 focused units, 229 HTTP cases
-and 119 combined live checks, including all 156 P7a assertions. Endpoint state
-is unchanged after cleanup.
+The latest P4 increment passes build, 390 focused unit tests plus three wiring
+checks, 112 HTTP cases (one PostgreSQL-only FK control skipped) and 121 combined
+live checks, including all 69 P4 assertions. Endpoint state is unchanged after
+cleanup. The raw-error issue remained after P5 and was fixed separately in
+`9991ff50` with two unit and two HTTP RED/GREEN regressions.
 No package is deployed by this assembly. Product/version/lock metadata stays
-unchanged. P2, P4 and P8b remain separate work. Final P7 PATCH integration
+unchanged. P2 and P8b remain separate work. Final P7 PATCH integration
 depends on P2; P3b and compatibility dispositions must close before C0.
 
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
 - [x] ✅ COMPLETED: P8c `8eb2f162` integrated as `2c0536ef`; conditional endpoint writes use `9z-CT`.
 - [x] ✅ COMPLETED: P6b `cc3ccdbc` -> `5075a82c` and P7a `8e42f15f` -> `0a6b9c5d`; live sections `9z-CU`/`9z-CV`.
+- [x] ✅ COMPLETED: P4 `212a6b92` -> `c95d0fb6` and `66a7229f` -> `de14fc5b`; aggregate checks use `9z-CW`.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close P2/P4/P8b, P7 PATCH integration and P3b/compatibility dispositions before the final C0 matrix.
+- [ ] Close P2/P8b, P7 PATCH integration and P3b/compatibility dispositions before the final C0 matrix.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 
 | Date | Summary |
 | --- | --- |
-| 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. Full P4 integration validation and live wiring are still in progress. |
+| 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
 | 2026-09-28 | P7a declaration, scalar/cardinality and POST/PUT correctness implemented on `fix/scim-profile-validation-20260928`, based on P1 `3ecaba55`. Focused units: 1,507. Owned PostgreSQL/InMemory HTTP and local-live evidence, boundaries and remaining PATCH integration are in [P7a](docs/SCIM_P7A_PROFILE_VALIDATION.md). No versions, locks, push or deployment changed. |
 | 2026-09-28 | P1 typed PATCH paths implemented in isolated `fix/scim-correctness-p1-20260928`; focused 1,476 unit and 65 HTTP tests pass, plus owned PostgreSQL/InMemory and local-live proof. See [P1 implementation](docs/SCIM_P1_IMPLEMENTATION.md). No merge/deploy; central release metadata remains pending. |
 

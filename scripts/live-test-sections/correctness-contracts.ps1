@@ -120,5 +120,40 @@ function Invoke-ScimCorrectnessContractTests {
             $env:SCIM_LIVE_BASE_URL = $oldBase
             $env:SCIM_LIVE_TOKEN = $oldToken
         }
+
+        $script:currentSection = '9z-CW: Group Aggregate Transactions'
+        $groupEndpointId = $null
+        try {
+            $profile = @{
+                schemas = @(
+                    @{ id = 'urn:ietf:params:scim:schemas:core:2.0:User'; name = 'User'; attributes = 'all' }
+                    @{ id = 'urn:ietf:params:scim:schemas:core:2.0:Group'; name = 'Group'; attributes = 'all' }
+                )
+                resourceTypes = @('User', 'Group') | ForEach-Object {
+                    @{ id = $_; name = $_; endpoint = "/$($_)s"; schema = "urn:ietf:params:scim:schemas:core:2.0:$_"; schemaExtensions = @() }
+                }
+                settings = @{ StrictSchemaValidation = $true; logFileEnabled = $false }
+                serviceProviderConfig = @{ patch = @{ supported = $true }; etag = @{ supported = $true } }
+            }
+            $created = Invoke-RestMethod -Uri "$base/scim/admin/endpoints" -Method Post -Headers $Headers `
+                -ContentType 'application/json' -ErrorAction Stop `
+                -Body (@{ name = "live-aggregate-$([guid]::NewGuid().ToString('N'))"; profile = $profile } | ConvertTo-Json -Depth 20)
+            $groupEndpointId = $created.id
+            if (-not $groupEndpointId) { throw 'Group aggregate endpoint creation returned no id.' }
+            . "$PSScriptRoot\group-aggregate.ps1"
+            $count = Invoke-ScimGroupAggregateContract -EndpointUrl "$base/scim/v2/endpoints/$groupEndpointId" -Headers $Headers
+            Test-Result -Success ($count -eq 69) -Message '9z-CW: 69 Group aggregate, version, error and cleanup assertions'
+        } catch {
+            Test-Result -Success $false -Message "9z-CW: Group aggregate contract failed: $($_.Exception.Message)"
+        } finally {
+            if ($groupEndpointId) {
+                try {
+                    $null = Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$groupEndpointId" -Method Delete -Headers $Headers -ErrorAction Stop
+                    Test-Result -Success $true -Message '9z-CW: removed dedicated Group aggregate endpoint'
+                } catch {
+                    Test-Result -Success $false -Message '9z-CW: failed to remove dedicated Group aggregate endpoint'
+                }
+            }
+        }
     }
 }

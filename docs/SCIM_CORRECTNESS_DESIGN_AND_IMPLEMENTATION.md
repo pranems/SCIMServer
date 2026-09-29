@@ -2,7 +2,7 @@
 
 > **Status:** Implementation authorized; work packages are tracked below
 >
-> **Last verified:** 2026-09-28
+> **Last verified:** 2026-09-29
 >
 > **Starting source:** `ccde1d5d6b5129dd943c6e848989c668a0d00d7a`, version `0.55.35`
 >
@@ -405,16 +405,16 @@ combined checkpoint has its own counts in section 11.1.
 | P2 | In progress separately | Await parent-supplied commit; pending diffs are not part of this assembly |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Awaiting explicit disposition | Schema-driven, Group and custom-name atomic uniqueness need a separate design or accepted scope decision; P3 does not claim these guarantees and C0 is not unblocked |
-| P4 | Integrated; combined validation pending | `212a6b92` aggregate writes: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md); raw-error integration check remains required |
+| P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | P7a integrated; focused combined validation passed | [Declaration, scalar/cardinality and POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md). Ordered PATCH integration still waits for P2; unsupported server uniqueness/reference/deep-compatibility promises remain explicit follow-up work |
 | P8 | Partly integrated | P8a authoritative reads/fingerprints from `39841319`: [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8c conditional admin PATCH from `8eb2f162`: [CAS and single-snapshot token evidence](ENDPOINT_WRITE_CONCURRENCY.md), 172 units, 32 HTTP and 8 live checks per backend. P8b repository cleanup remains separate |
 | P9 | Awaiting compatibility disposition | Follow changed behavior; preserve legitimate compatibility and close the disposition before C0 |
-| C0 | Incremental assembly verified only | Checkpoints 11.1-11.4; no full matrix until P2/P4/P8b, P7 PATCH integration and P3b/compatibility dispositions close |
+| C0 | Incremental assembly verified only | Checkpoints 11.1-11.5; no full matrix until P2/P8b, P7 PATCH integration and P3b/compatibility dispositions close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
+P1, P3/P4, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
 and integrated here. The initial checkpoint and focused incremental integration
 validation passed. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
@@ -589,6 +589,52 @@ Logs are in `test-results/scim-integration-p6b-p7a/`.
 **Final P7 PATCH integration still depends on P2.** Do not run the full
 authoritative matrix until P2, P4, P8b and the P3b/compatibility dispositions
 are closed. No version/lock regeneration, publication or deployment occurred.
+
+### 11.5 P4 incremental assembly, 2026-09-29
+
+| Source / correction | Integration commit |
+|---|---|
+| P4 `212a6b929683c3d853e23ec84f56310536941c3a` | `c95d0fb6` |
+| P4 handoff `66a7229fe8646b15e620514c8bf82f7b1f72343c` | `de14fc5b` |
+| Public repository server-error correction | `9991ff50` |
+
+The original trailer-format issue stays documented; neither source history nor
+the cherry-picked message was amended. Production aggregate changes applied
+without conflicts. P4's staged InMemory writes and PostgreSQL Group-plus-member
+transaction retain P3 conditions, P7a validation and P6b internal query behavior.
+Documentation preserves all packages; the combined pattern chart now counts
+both PA-10 and PC-4 rather than dropping either addition.
+
+**The raw-error issue was not already fixed by P5.** P5 guarantees scalar
+detail, not safe content. Two unit and two HTTP regressions proved that the
+mapped Prisma error still exposed internal context/cause text. The separate
+`9991ff50` rollback unit masks mapped 500/503 detail while preserving status,
+diagnostics, client errors and the logged original cause. The full P4 HTTP
+contract again rejects its original injected-error markers.
+
+P4 now joins the main runner at `9z-CW`. A dedicated endpoint wraps the original
+69 assertions; the standalone script retains its loopback/path/credential
+guard. Two wiring assertions proved the missing route before the correction.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| Group aggregate, Prisma/InMemory repository, service and error units | 7 suites / 390 tests passed |
+| Wiring regression | 3 tests passed after 2 initial failures |
+| Group aggregate/lifecycle/parity and P3 conditional HTTP | 5 suites / 112 cases passed; one PostgreSQL-only FK control explicitly skipped on InMemory |
+| Public server-error regression | 2 unit and 2 HTTP REDs turned GREEN; original raw-marker checks restored |
+| Combined main live section | 121 reported checks pass, including 69 P4 assertions plus dedicated endpoint cleanup |
+| Cleanup and guard | Endpoint collection identical before/after; owned API stopped; original Group helper rejects unowned targets before HTTP |
+| Focused merged-source lint | 0 errors / 66 existing warnings across 11 files; separate HTTP/error-boundary lint and wiring lint pass |
+| Documentation | Content/coupling audits pass; 41 literal JSON blocks parse |
+| Edited pattern-ledger diagrams | 2 diagrams render in both strict themes; existing renderer metadata sentinel 0.0.0 is recorded, not adopted as a version |
+
+Logs are in `test-results/scim-integration-p4/`. The new error HTTP tests use
+the actual Prisma error translator at the repository seam without accessing
+PostgreSQL; this is not a new integration database matrix. Original P4 database
+and 22-migration evidence remains unchanged. P3b uniqueness remains open.
+No full authoritative matrix, publication, deployment or release-metadata
+update is authorized by this checkpoint.
 
 ## 12. Architecture and self-improvement decisions
 
