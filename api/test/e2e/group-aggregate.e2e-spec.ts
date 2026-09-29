@@ -91,7 +91,7 @@ describe('Group aggregate HTTP and persistence contract', () => {
 
   it.each([
     ['injected private member failure', 500],
-    ['connect refused at private database host', 503],
+    ['ECONNREFUSED at private database host', 503],
   ] as const)('sanitizes the mapped repository failure: %s', async (message, status) => {
     jest.spyOn(groups, 'create').mockRejectedValueOnce(
       wrapPrismaError(new Error(message), 'Group.create(private-row-id)'),

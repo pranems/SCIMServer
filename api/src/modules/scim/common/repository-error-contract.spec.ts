@@ -8,7 +8,7 @@ import { handleRepositoryError } from './scim-service-helpers';
 describe('repository server-failure response contract', () => {
   it.each([
     ['injected private member failure', 'UNKNOWN', 500],
-    ['connect refused at private database host', 'CONNECTION', 503],
+    ['ECONNREFUSED at private database host', 'CONNECTION', 503],
   ] as const)('does not return %s to the client', (message, code, status) => {
     const cause = new Error(message);
     const failure = wrapPrismaError(cause, 'Group.create(private-row-id)');

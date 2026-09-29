@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Verified - exact interrupted-create errors in the integration assembly
+- P8b follow-up `d8441f46` integrates with P3/P3b/P4/P8c as `6a52ae32`.
+  Six interrupted resource/credential creates return sanitized 404 while
+  conditional 412, member validation, genuine outages and trigger failures
+  retain their separate contracts. The race helper now forwards all member/
+  policy arguments after a failing fidelity regression. Proof: 247 units,
+  131 InMemory HTTP plus four native-only skips, 135 PostgreSQL 17.8 HTTP after
+  22 migrations, and 16 built-local deletion checks per backend. No broad
+  lifecycle/C0 or deployment claim; no version or dependency changes.
+  [Integrated receipt](docs/evidence/scim-endpoint-errors-20260929/validation.json).
+
 ### Fixed - common externalId PATCH integration, not released
 - Reject invalid original common externalId PATCH values before resource hooks
   can erase their type, and validate the completed candidate in both strict

@@ -927,6 +927,11 @@ and forbidden output keys, not only HTTP success.
 
 ## Atomic Invariant Representation Rule (P3b, 2026-09-28)
 
+Race barriers and repository spies MUST forward the complete typed argument
+tuple, including expected versions, initial members and uniqueness policy.
+Prove forwarding with a negative control; pausing a call while dropping its
+policy is not evidence about the original operation.
+
 For a persistence uniqueness/invariant change, tests MUST force two DIFFERENT
 owners to compete, not only two writes to the same version. Assert one losing
 conflict, one stored owner and unchanged loser state on both backends.

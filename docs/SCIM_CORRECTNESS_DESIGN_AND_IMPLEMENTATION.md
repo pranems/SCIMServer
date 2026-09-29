@@ -416,9 +416,9 @@ combined checkpoint has its own counts in section 11.1.
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | Common externalId POST/PUT/PATCH focused parity verified; other acceptance items open | [Common contract](SCIM_P7_COMMON_EXTERNAL_ID.md) from `8e8aa72e` plus integration original-value/completed-candidate checks; neutral PUT matching retained. 973 units, 392 HTTP/backend and built-live proof in 11.19. Eight baseline expectations, query/uniqueness boundaries and final case-level acceptance remain open |
-| P8 | Exact-error follow-up integrated; P3/P4/P8c revalidation pending | `d8441f46` adds narrow interrupted-create missing-parent classification and sanitized 404 envelopes. Source evidence preserves 412, member failures, outages and trigger errors. [Contract](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md#6-exact-concurrent-deletion-http-contract); combined transaction/lifecycle validation remains required |
+| P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | Integrated with owned-bootstrap hardening; current corpus/policy statuses preserved | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Follow-up `8679e90f` pins the guarded database target. I02 remains default-running (18 cases); I03 remains the parent-reviewed safety/policy hold, not a frozen-core claim; active coercion remains open |
-| C0 | Incremental assembly verified only | Checkpoints through 11.15; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. I02 is default-verified locally; no full matrix until the deliberate I03 safety/policy disposition, active coercion, P7/common attributes/test reconciliation, P3b/compatibility and concurrent FK-error normalization close |
+| C0 | Incremental assembly verified only | Checkpoints through 11.20; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. Scoped exact-create error proof now exists; all original case dispositions, remaining I03/active, P7/context/test, P3b/representation/admission and performance/artifact acceptance still require closure |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -858,7 +858,7 @@ similarly named suite:
 | Attribute characteristics | Core/extension namespace, scalar/MV/complex-child, required/readOnly/immutable/returned/caseExact/uniqueness boundaries, defaults when omitted, provider restrictions and compatibility consequences | B: P3b/P7/P9 and characteristic reconciliation pending |
 | Controlled races and Group rollback | Deterministic same-condition races at real mutation boundaries on both backends; complete scalar/payload/member/version/timestamp rollback and no partial create or success event | B: reconcile P3/P4/P8c with final tip |
 | Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b focused proof exists; exact-case/final-tip reconciliation remains pending |
-| Concurrent deletion/FK error contract | Prove each raced User/Group/custom/applicable credential operation's exact status, SCIM envelope, diagnostics and sanitized detail separately from no-orphan/rollback checks; retain genuine DB faults, P3 conditional 412 and P4 atomicity | B: original P8b worker's follow-up is active; awaiting committed dual-backend proof |
+| Concurrent deletion/FK error contract | Prove each raced User/Group/custom/applicable credential operation's exact status, SCIM envelope, diagnostics and sanitized detail separately from no-orphan/rollback checks; retain genuine DB faults, P3 conditional 412 and P4 atomicity | B: focused six-create dual-backend proof exists in 11.20; map exact cases/route boundaries to final source before closing the C0 overlay |
 | Built-runtime proof | Source SHA, build/artifact identity, actual launched command/runtime and backend, live wire outcomes and fixture cleanup. In-process test listeners and local spot checks are separate claims | B: final exact-artifact live gate pending |
 | P6b resource cost | Measure residual candidate materialization, selectivity, latency, memory and database work on stated datasets; document trade-offs without inferring unchanged cost from functional GREEN | B: final performance assessment pending |
 
@@ -1581,6 +1581,64 @@ read or changed here. These controls remain open before C0.
 negative controls rather than inferring correctness from a schema name.
 **Design disposition: accepted:** reuse explicit schema-role metadata, not a
 second parser or endpoint-global common-attribute mutation.
+
+### 11.20 Exact interrupted-create errors with assembled transactions
+
+Follow-up `d8441f4660b11e076dab47155c9aa1e48328fe7f` was appended as
+`6a52ae32`; preceding P8b cleanup commits were not repeated. The narrow
+create-error translator handles only failed endpoint-owned INSERTs with
+relevant Prisma relation/missing-row errors and confirms endpoint absence
+before creating the safe EndpointNotFoundError. It does not relabel every FK
+failure, failed lookup, arbitrary driver message or conditional write as 404.
+
+**Merge decisions:** retain `wrapPrismaError(..., expectedVersion)` and its
+conditional P2025 -> PRECONDITION_FAILED path. Keep P3b withUniqueWrite and
+P4 Group/member transactions, placing the new create-only catch outside their
+completed rollback. Preserve INVALID_VALUE mapping and the prior sanitized
+500/503 public detail. Typed endpoint absence reuses existing plane-aware
+SCIM error handling and diagnostics; unrelated faults retain their own path.
+
+One integration test defect was closed first: `pauseCreate` forwarded only
+the first argument, losing initial members and uniqueness policy. A permanent
+negative control failed, then the helper was changed to forward the complete
+tuple. The interrupted Group case includes an initial real member and native
+pool-timeout controls now pass their policy/precondition arguments too.
+The required append policy is supplied explicitly in the native member-FK
+fixture. Two older fake outage messages were corrected to genuine ECONNREFUSED
+shapes rather than weakening the new classifier back to bare connect matching.
+
+| Focused combined check | Result |
+|---|---|
+| API build | PASS |
+| Error translation, global/SCIM boundary, lifecycle, CAS and Group units | 9 suites / 247 passed |
+| InMemory HTTP | 131 passed, four explicitly native-DB-only controls skipped |
+| PostgreSQL HTTP | 135 passed on actual 17.8 after all 22 migrations |
+| Interrupted creates | User, Group with initial member, custom Device, bearer, OAuth-client and WIF creation return exact sanitized 404 envelopes with ENDPOINT_NOT_FOUND diagnostics |
+| Independent negative controls | Stale resource conditions remain 412; typed member errors remain 400; unrelated create/trigger faults remain 500; actual User pool-acquisition timeouts remain sanitized 503; native member-FK error with existing endpoint is not EndpointNotFound |
+| Built-local live checks | 16 deletion checks per backend; InMemory combined main section reports 143 |
+| Lint | 0 errors / 38 existing warnings across 16 files |
+| Cleanup | Before/after endpoint collections identical; APIs stopped; exact new owned PostgreSQL container removed |
+
+The PostgreSQL run used real guarded triggers, a held one-connection pool,
+independent uniqueness writers and current repository argument tuples.
+Controlled races execute through owned Nest HTTP listeners in Jest. The
+separate `node api/dist/main.js` smoke verifies already-deleted route envelopes
+and cleanup; it is not described as a synthetic storage barrier in a packaged
+deployment. Both evidence layers are retained separately in the
+[portable integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json).
+Full artifacts are under `test-results/scim-integration-p8-errors/`.
+
+This focused integrated proof closes the named six-create/error boundary,
+not every possible lifecycle operation or the 82-case C0 ledger. Other
+packages' policy/representation holds, final source reconciliation, performance,
+the authoritative artifact matrix, release metadata and approvals remain open.
+No deployment, shared database mutation or historical data repair occurred.
+
+**Assurance improvement: applied.** Delay the exact original persistence call
+in race tests; never silently drop transaction inputs or policy arguments.
+**Design disposition: accepted.** Missing-parent classification remains in a
+small create-only helper and typed error, not a broad global FK rewrite; the
+existing transaction, exception and conditional-write boundaries are preserved.
 
 ## 12. Architecture and self-improvement decisions
 

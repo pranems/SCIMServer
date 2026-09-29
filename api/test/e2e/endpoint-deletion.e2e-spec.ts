@@ -23,16 +23,16 @@ const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 const DEVICE_SCHEMA = 'urn:example:params:scim:schemas:custom:2.0:Device';
 
-function pauseCreate<Input, Result>(repository: { create(input: Input): Promise<Result> }) {
+function pauseCreate<Args extends unknown[], Result>(repository: { create(...args: Args): Promise<Result> }) {
   const create = repository.create.bind(repository);
   let resume!: () => void;
   const paused = new Promise<void>(resolve => { resume = resolve; });
   let entered!: () => void;
   const reached = new Promise<void>(resolve => { entered = resolve; });
-  jest.spyOn(repository, 'create').mockImplementationOnce(async input => {
+  jest.spyOn(repository, 'create').mockImplementationOnce(async (...args: Args) => {
     entered();
     await paused;
-    return create(input);
+    return create(...args);
   });
   return { reached, resume };
 }
@@ -121,6 +121,18 @@ describe('Endpoint deletion storage and HTTP contract', () => {
     }
   });
   afterAll(async () => { await app?.close(); });
+
+  it('the interrupted-create barrier preserves member and uniqueness arguments', async () => {
+    const repository = { create: (...args: unknown[]) => Promise.resolve(args) };
+    const input = { candidate: true };
+    const members = [{ value: 'synthetic-member' }];
+    const uniqueness = [{ path: 'synthetic-policy' }];
+    const pause = pauseCreate(repository);
+    const pending = repository.create(input, members, uniqueness);
+    await pause.reached;
+    pause.resume();
+    expect(await pending).toEqual([input, members, uniqueness]);
+  });
 
   it('deletes every owned row, invalidates derived state and retains old and late audit records', async () => {
     expect(await deletionCounts(app, owned)).toEqual(SEEDED_COUNTS);
@@ -213,7 +225,7 @@ describe('Endpoint deletion storage and HTTP contract', () => {
     const path = credential ? `/scim/admin/endpoints/${owned.endpointId}/credentials`
       : `/scim/endpoints/${owned.endpointId}/${kind === 'Device' ? 'Devices' : `${kind}s`}`;
     const body = kind === 'User' ? { schemas: [USER_SCHEMA], userName: 'late-http-user' }
-      : kind === 'Group' ? { schemas: [GROUP_SCHEMA], displayName: 'late-http-group' }
+      : kind === 'Group' ? { schemas: [GROUP_SCHEMA], displayName: 'late-http-group', members: [{ value: owned.user.scimId }] }
       : kind === 'Device' ? { schemas: [DEVICE_SCHEMA], displayName: 'late-http-device' }
       : {
         credentialType: kind,
@@ -331,7 +343,7 @@ describe('Endpoint deletion storage and HTTP contract', () => {
     const { groups } = deletionRepositories(app);
     const result = await groups.addMembers(owned.parent.id, [
       { userId: randomUUID(), value: randomUUID(), type: 'User', display: null },
-    ]).catch((error: unknown) => error);
+    ], []).catch((error: unknown) => error);
     expect(result).toBeInstanceOf(RepositoryError);
     expect(result).not.toBeInstanceOf(EndpointNotFoundError);
     await scimGet(app, `/scim/admin/endpoints/${owned.endpointId}`, token).expect(200);
@@ -347,13 +359,13 @@ describe('Endpoint deletion storage and HTTP contract', () => {
     const timedOut = new PrismaUserRepository(client as unknown as PrismaService);
     const { users } = deletionRepositories(app);
     try {
-      jest.spyOn(users, 'create').mockImplementationOnce(input => timedOut.create(input));
+      jest.spyOn(users, 'create').mockImplementationOnce((...args: Parameters<typeof users.create>) => timedOut.create(...args));
       const create = await scimPost(app, `/scim/endpoints/${owned.endpointId}/Users`, token, {
         schemas: [USER_SCHEMA], userName: 'timeout-user',
       });
       expectSafeError(create, 503);
       expect(JSON.stringify(create.body)).not.toMatch(/timeout exceeded|trying to connect/i);
-      jest.spyOn(users, 'update').mockImplementationOnce((id, data) => timedOut.update(id, data));
+      jest.spyOn(users, 'update').mockImplementationOnce((...args: Parameters<typeof users.update>) => timedOut.update(...args));
       const update = await scimPatch(app, `/scim/endpoints/${owned.endpointId}/Users/${owned.user.scimId}`, token, {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         Operations: [{ op: 'replace', path: 'active', value: false }],

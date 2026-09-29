@@ -10,6 +10,14 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
+**Precise interrupted-create errors integrated and verified:** `d8441f46` ->
+`6a52ae32`. P3 conditional writes, P3b transactions, P4 aggregates and P8c
+remain intact. New barrier-forwarding RED/GREEN prevents dropped policy/member
+arguments. Proof: 247 units, 131 InMemory HTTP plus four native-only skips,
+135 actual PostgreSQL 17.8 HTTP after 22 migrations, and 16 built-live checks
+per backend with exact cleanup. [Separate integrated receipt](docs/evidence/scim-endpoint-errors-20260929/validation.json).
+This closes the scoped six-create/error controls, not every lifecycle/C0 row.
+
 **Common externalId source and PATCH seam verified:** `8e8aa72e` -> `e8a6e487`.
 New cross-package RED: 13 domain / 25 HTTP failures. Original-value pre-hook
 and completed-candidate checks now pass 973 units, 392 HTTP cases/backend,
@@ -73,9 +81,9 @@ item pending that authorized correction, not a new frozen-P2 regression.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
-unchanged. P8b cleanup is integrated, but its original worker now owns an active
-follow-up for exact concurrent-deletion errors on both backends. Genuine DB
-faults and P3 conditional 412 semantics must remain distinct. Final P7 PATCH integration depends
+unchanged. P8b cleanup and its precise interrupted-create follow-up now have
+focused combined-backend proof; genuine DB faults and conditional 412 remain
+distinct. Final P7 PATCH integration depends
 on remaining follow-ups; the P2/P7 selected-value/cardinality and POST/PUT
 overlap checks pass. P7 common-attribute verification and P3b remain active;
 I03 and active-coercion semantics are not declared closed.
@@ -121,6 +129,7 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P3b core assembled with P3/P4/P8 guards intact; `9z-DB` runs the original 21 string-MV uniqueness assertions plus endpoint cleanup.
 - [x] ✅ COMPLETED: P3b RFC follow-up `cefb540b` integrated as `1f0a024a`; supported types/references corrected without claiming generic representation closure.
 - [x] ✅ COMPLETED: P7 common externalId source plus original-value/completed-PATCH integration; `9z-CV` has 426 assertions and new `9z-DC` has 66 cases / 718 assertions.
+- [x] ✅ COMPLETED: P8b exact six-route interrupted-create errors integrated with current transactions; `9z-CX` now supplies 16 checks.
 - [ ] Close P3b's documented unsupported-type/generic-authority acceptance hold before claiming promised uniqueness complete.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.

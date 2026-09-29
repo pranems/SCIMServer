@@ -10,6 +10,25 @@
 > [P8a freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md),
 > [execution issues](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
 
+**Combined integration proof:** follow-up `d8441f46` is assembled as
+`6a52ae32` with P3 conditional writes, P3b uniqueness transactions, P4 Group
+aggregates and P8c admin CAS retained. Exact six-route 404 contracts and
+negative error controls pass in the integrated InMemory/PostgreSQL runs.
+The [separate integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json)
+records 247 units, 131 InMemory HTTP cases plus four native-only skips,
+135 PostgreSQL HTTP cases, 22 migrations and 16 built-live checks per backend.
+This is focused proof, not final C0 or a deployment.
+
+The controlled-create pause forwards the complete repository argument tuple,
+including initial Group members and the compiled uniqueness policy. A failing
+negative control exposed the old one-argument test wrapper before correction.
+Otherwise a test could silently skip the very transaction path it claims to
+exercise. Group's interrupted-create case now includes an actual initial
+member; the pool-timeout callbacks also preserve policy/precondition arguments.
+The six controlled races run through owned Nest HTTP listeners; the separate
+built-runtime smoke verifies deleted-route envelopes and cleanup, not an
+injected persistence barrier in production.
+
 ## 1. What changes for an operator
 
 Deleting an endpoint removes its provisioning data, not its audit history.

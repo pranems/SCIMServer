@@ -138,6 +138,14 @@ pie showData
 
 ### Category A - Test-harness and gate integrity (the false-green family)
 
+**Repository-barrier fidelity, 2026-09-29:** an interrupted-create test
+forwarded only the first repository argument, silently dropping P4 initial
+members and P3b uniqueness policy. A barrier can pause a real operation while
+still changing its semantics. Forward the complete typed tuple and add a
+negative control proving the original callback receives every argument.
+The [integrated exact-error proof](../evidence/scim-endpoint-errors-20260929/validation.json)
+then exercises actual Group/uniqueness transactions, not a weaker substitute.
+
 The most dangerous class: a gate that is GREEN but proves nothing. Every pattern here is a way a test can lie.
 
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
