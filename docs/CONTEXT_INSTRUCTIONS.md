@@ -84,9 +84,11 @@ close that hold.
 See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
 P7 common externalId and P3b uniqueness policies have separate owners.
 The RFC follow-up limits unique types to string/integer/decimal/reference;
-references are intrinsically exact. Latest focused evidence: 640 units,
-144 PostgreSQL HTTP and 142 InMemory plus two database-only N/A in the
-source package; combined-tip validation is separate.
+references are intrinsically exact. The final adapter follow-up rejects only
+unrepresented builtin Group member leaves, not same-named extensions.
+Latest focused evidence: 646 units, 147 PostgreSQL HTTP and 145 InMemory
+plus two database-only N/A in the source package. This does not close the
+separate generic promoted-column and admission holds above.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory

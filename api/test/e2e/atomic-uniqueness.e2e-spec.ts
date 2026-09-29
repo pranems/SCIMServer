@@ -58,6 +58,9 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
             { name: 'codes', type: 'complex', multiValued: true, subAttributes: [
               { name: 'value', type: 'string', uniqueness: 'server' },
             ] },
+            { name: 'members', type: 'complex', multiValued: true, subAttributes: [
+              { name: '$ref', type: 'reference', uniqueness: 'server', referenceTypes: ['external'] },
+            ] },
             { name: 'displayName', type: 'string', uniqueness: 'server' },
             { name: 'free', type: 'string', uniqueness: 'none' },
             { name: 'defaultFree', type: 'string' },
@@ -188,6 +191,15 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
       }
     });
   for (const route of routes) {
+    it(`${route}: extension members.$ref is represented and is not a builtin Group exclusion`, async () => {
+      const ep = await endpoint();
+      const extension = { members: [{ $ref: 'https://example.com/member' }] };
+      const first = await http('post', base(ep, route), body(route, extension));
+      expect(first.status).toBe(201);
+      expect(first.body[EXT]).toMatchObject(extension);
+      conflict(await http('post', base(ep, route), body(route, extension)));
+      expect(await rows(ep, route)).toHaveLength(1);
+    });
     it.each([
       { value: 'free', VALUE: 'taken' },
       { VALUE: 'taken', value: 'free' },

@@ -21,6 +21,8 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
   const result: UniqueAttribute[] = [];
   for (const schema of schemas) {
     const core = schema.isCoreSchema ?? schema.id.toLowerCase().startsWith('urn:ietf:params:scim:schemas:core:');
+    const builtinUser = core && schema.id.toLowerCase() === 'urn:ietf:params:scim:schemas:core:2.0:user';
+    const builtinGroup = core && schema.id.toLowerCase() === 'urn:ietf:params:scim:schemas:core:2.0:group';
     const walk = (attrs: readonly SchemaAttributeDefinition[], parent: UniqueAttribute['path']): void => {
       for (const attr of attrs) {
         const path = [...parent, { name: attr.name, multiValued: attr.multiValued ?? false }];
@@ -33,11 +35,14 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
           const root = path[0].name.toLowerCase();
           const promotedType = ['id', 'externalid', 'displayname'].includes(root) ? 'string'
             : root === 'active' ? 'boolean'
-              : schema.id.toLowerCase().endsWith(':core:2.0:user') && root === 'username' ? 'string' : undefined;
+              : builtinUser && root === 'username' ? 'string' : undefined;
           const computed = root === 'meta' || root === 'schemas' ||
-            (schema.id.toLowerCase().endsWith(':core:2.0:user') && root === 'groups') ||
-            (schema.id.toLowerCase().endsWith(':core:2.0:group') && root === 'members' && path.some((p) => p.name === '$ref'));
-          if (core && (computed || (promotedType &&
+            (builtinUser && root === 'groups');
+          const unrepresentedMember = builtinGroup && root === 'members' &&
+            (path.length !== 2 || !path[0].multiValued || path[1].multiValued ||
+              !['value', 'type', 'display'].includes(path[1].name.toLowerCase()) ||
+              !['string', 'reference'].includes(type));
+          if (core && (computed || unrepresentedMember || (promotedType &&
               (path.length !== 1 || path[0].multiValued || (attr.type ?? 'string') !== promotedType)))) {
             throw new RepositoryError('INVALID_VALUE', 'Unsupported uniqueness declaration on a computed or incompatible promoted core attribute.');
           }

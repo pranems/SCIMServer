@@ -12,6 +12,31 @@ function policy(attr: Partial<SchemaAttributeDefinition> = {}, core = false) {
 }
 
 describe('typed uniqueness policy', () => {
+  it.each(['$ref', 'customCode', 'userId'])('rejects unrepresented builtin Group member leaf %s', (name) => {
+    expect(() => compileUniquenessPolicy([{
+      id: 'urn:ietf:params:scim:schemas:core:2.0:Group', isCoreSchema: true, attributes: [{
+        name: 'members', type: 'complex', required: false, multiValued: true, subAttributes: [{
+          name, type: 'string', required: false, multiValued: false, uniqueness: 'server',
+        }],
+      }],
+    }])).toThrow('Unsupported uniqueness declaration');
+  });
+  it('does not apply builtin User exclusions to a custom core URN suffix', () => {
+    const unique = compileUniquenessPolicy([{
+      id: 'urn:example:core:2.0:User', isCoreSchema: true, attributes: [{
+        name: 'groups', type: 'string', required: false, multiValued: false, uniqueness: 'server',
+      }],
+    }]);
+    expect(() => assertUnique(unique, { groups: 'x' }, [{ groups: 'x' }])).toThrow('already owned');
+  });
+  it.each([false, true])('preserves representable extension/custom-core member children (core=%s)', (core) => {
+    const unique = policy({ name: 'members', type: 'complex', uniqueness: 'none', multiValued: true,
+      subAttributes: [{ name: '$ref', type: 'reference', required: false, multiValued: false, uniqueness: 'server' }],
+    }, core);
+    const payload = { members: [{ $ref: 'https://example.com/x' }] };
+    const candidate = core ? payload : { [urn]: payload };
+    expect(() => assertUnique(unique, candidate, [candidate])).toThrow('already owned');
+  });
   it('does not infer an extension to be core from a substring in its URN', () => {
     const extension = 'urn:example:core:DeviceExtension';
     const unique = compileUniquenessPolicy([{ id: extension, attributes: [

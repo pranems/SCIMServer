@@ -19,6 +19,7 @@
 | U11 | Repository boundary / medium | Independent review / repository unit | Retained `addMembers` did not take a policy. Its required policy argument now drives the same aggregate check and database lock; direct append failure leaves members untouched. |
 | U12 | Compatibility / low | Neighbor repository units / neighbor repository units | Two sorting fixtures deliberately omit payloads. Eager uniqueness parsing ran even for an empty policy. Empty-policy InMemory calls now skip the new parser/scanner, matching Prisma and preserving unrelated behavior. |
 | U13 | Standards interpretation / high | P7 sibling feedback after local commit / RFC type-table design review | Initial P3b implemented boolean/dateTime/binary equality despite RFC 7643 sections 2.3.2/5/6 saying these types have no uniqueness, and treated reference as default case-insensitive despite section 2.3.7. Five RED unit controls now require fail-closed inconsistent declarations and intrinsic exact reference equality. Correct in a normal follow-up commit; P7 owns admission rejection. |
+| U14 | Representation completeness / medium | P7 adapter inventory / initial adapter inventory | Builtin Group members discard all additional child fields, not only `$ref`; treating other declared leaves as absent silently ignored a promise. Three RED controls exposed extra child skips and an overbroad builtin-URN suffix check. Require the exact represented Group relation leaves and full builtin URN identity; preserve extension/custom-core member paths. |
 
 ## Why the fix works
 
@@ -52,6 +53,14 @@ narrow review has no significant finding. [RFC follow-up receipt](evidence/scim-
 The fix removes invalid promises rather than inventing behavior contrary to
 the scalar type definitions. Prevention: include type-specific characteristic
 applicability in the policy design table before writing equality tests.
+
+U14 confirmed fix: `postgres-2321df0d53ff0f52`, 646 units, PostgreSQL 147
+HTTP and InMemory 145 plus two N/A. All live assertions and 22 migrations
+pass, build and changed-policy lint pass, narrow independent review reports
+no significant issue. [Adapter follow-up receipt](evidence/scim-uniqueness-members-20260929.json).
+The fix is path/namespace-specific, not a blanket rejection of readOnly or
+same-named extension attributes. Prevention: enumerate the actual adapter's
+round-tripped leaf allowlist, not only one known dropped field.
 
 The issue list was reconciled against the available execution outputs and
 review reports for this worktree, separating missing-tool/setup/registration

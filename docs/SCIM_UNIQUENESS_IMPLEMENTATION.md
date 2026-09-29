@@ -93,7 +93,8 @@ whether an operator may relax the Group baseline; P3b does not change it.
 |---|---|
 | Uniqueness on an entire complex object | Unsupported: tuple/object equality is not defined by this implementation. Declare supported scalar child constraints instead. |
 | Uniqueness on boolean, dateTime or binary | Inconsistent with their RFC type definitions, not an invitation to add bespoke equality. Remove the characteristic; repeated values are legitimate. |
-| Computed core `meta`, `schemas`, User `groups`, Group `members.$ref` | Unsupported: these values are synthesized, not owned by the resource writer. |
+| Core `meta`, `schemas`, builtin User `groups` | Unsupported: these structural, computed or inverse-membership values are not authoritatively owned by this resource writer. |
+| Builtin Group `members` children other than `value`, `type`, `display` | Unsupported: the relation adapter does not store `$ref` or arbitrary additional children. Those three supported leaves must be single-valued strings/references under multi-valued `members`. |
 | Core promoted string fields declared numeric, complex or MV; uniqueness on `active` | Unsupported: the existing column/response model cannot preserve an incompatible shape, and boolean has no uniqueness. The same names in extensions remain supported when their declared type supports uniqueness. |
 | Unknown scalar type | Unsupported. Do not publish a constraint whose equality cannot be evaluated. |
 | Malformed value in a unique field with strict validation off | Rejected with 400 / invalidValue. Disabling general strict validation does not disable a promised uniqueness invariant. |
@@ -103,6 +104,13 @@ this package alone may still admit an unsupported profile, but its affected
 resource writes fail with 400 rather than silently succeeding without the
 promise. Existing unsupported profiles must be corrected explicitly. No profile
 or resource is silently rewritten.
+
+Exclusions use exact builtin schema identity, not a name or URN suffix. An
+extension or custom-core `members.$ref` remains a normal represented leaf.
+Arbitrary readOnly attributes are not rejected merely for being readOnly:
+storage representation, not mutability/returned characteristics, determines
+whether the uniqueness policy can be evaluated. Intrinsic core `id` is read
+from authoritative `scimId`, never from `rawPayload.id`.
 
 Pre-existing duplicate or malformed unique values are not repaired automatically.
 A write that retains a conflicting value fails; an operator can remove/change
@@ -175,9 +183,9 @@ data analysis and replay evidence, not an unreviewed optimization here.
 
 ## Evidence and reproduction
 
-Final RFC-corrected run: **`postgres-85aea7a5dee16b2d`**. [Sanitized durable receipt](evidence/scim-uniqueness-rfc-20260929.json)
+Final RFC/adapter-corrected run: **`postgres-2321df0d53ff0f52`**. [Sanitized durable receipt](evidence/scim-uniqueness-members-20260929.json)
 records the exact API/scripts hash and cleanup identity. Focused unit:
-**640 passed / 10 suites**. HTTP: **144 PostgreSQL passed**, **142 InMemory
+**646 passed / 10 suites**. HTTP: **147 PostgreSQL passed**, **145 InMemory
 passed plus two N/A** (native foreign key and independent database pools).
 Each backend also runs **21 new uniqueness live assertions**, plus the existing
 33 conditional and 69 Group aggregate live assertions.
@@ -190,6 +198,8 @@ parent-owned, not implied by this focused evidence.
 
 The RFC follow-up changed policy files independently lint at **0 errors / 0
 warnings**, and its narrow independent review reports no significant issues.
+The final adapter follow-up repeats these results and adds HTTP preservation
+checks for extension `members.$ref` on all three families.
 The [initial receipt](evidence/scim-uniqueness-20260928.json) remains preserved
 for audit history rather than rewritten as if it tested the corrected policy.
 
