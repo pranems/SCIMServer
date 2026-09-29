@@ -76,6 +76,23 @@ columns with the completed payload, including removal and case-insensitive
 keys. Otherwise a GET can omit an attribute while its old query-column value
 survives. This is an adapter correction, not a query or repository redesign.
 
+**Common-attribute boundary, clarified for integration on 2026-09-29:**
+[RFC 7643 Sections 3 and 3.1](https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1)
+apply common attributes to all extended resource types. Top-level `externalId`
+is a single-valued string with `caseExact:true` and `mutability:readWrite`,
+scoped to the provisioning client; conflicting older schema definitions do
+not override the common characteristics. Raw-payload authority is therefore
+not permission to redefine common `externalId` as numeric or multi-valued.
+Custom-core `displayName` and `active` may have other valid declared types,
+and an extension-namespaced `externalId` is independent. Their types must not
+be constrained merely to fit optional query columns.
+
+P7 owns common-attribute admission/runtime gap closure. Integrated tests must
+separate invalid top-level externalId redefinitions from valid typed custom
+attributes and extension homonyms. The P2 externalId persistence test uses a
+string and does not assert numeric/MV common externalId support. Provisioning-
+client scope is not a promise of global or server-wide externalId uniqueness.
+
 The legacy `patch-selection.ts` export is retained for historical consumers
 and the pinned P1 negative control. None of the resource engines uses it.
 
