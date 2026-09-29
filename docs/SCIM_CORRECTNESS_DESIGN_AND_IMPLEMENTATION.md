@@ -409,12 +409,12 @@ combined checkpoint has its own counts in section 11.1.
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | P7a/readOnly follow-up integrated; focused revalidation passed | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Recursive readOnly commit `892b74ba` preserves the existing map interface and POST/PUT-only scope. Final ordered PATCH integration still waits for P2; uniqueness and compatibility closure remain separately owned |
-| P8 | P8a/P8b/P8c integrated; cleanup revalidation pending | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) adds lifecycle port, synchronous reversible InMemory cleanup, write barriers and retained audit history. Concurrent FK-error normalization remains a distinct parent-reviewed boundary |
+| P8 | P8a/P8b/P8c integrated; focused cleanup revalidation passed | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) adds lifecycle port, synchronous reversible InMemory cleanup, write barriers and retained audit history. Concurrent FK-error normalization remains a distinct parent-reviewed boundary |
 | P9 | Active parent-assigned worker | Compatibility corpus and accurate guidance are in progress; no commit supplied for assembly and no compatibility closure claimed |
-| C0 | Incremental assembly verified only | Checkpoints 11.1-11.7; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. No full matrix until P2/P8b, final P7 PATCH integration and P3b/P9 work close |
+| C0 | Incremental assembly verified only | Checkpoints 11.1-11.9; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. No full matrix until P2, final P7 PATCH, P3b/P9 and concurrent FK-error normalization close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3/P4, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
+P1, P3/P4, P5, P6a/P6b, P7a and P8a/P8b/P8c are implemented and locally validated in their source worktrees,
 and integrated here. The initial checkpoint and focused incremental integration
 validation passed. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
@@ -846,9 +846,11 @@ similarly named suite:
 | Exact four-operation incident, strict ON and OFF | Round-trip all four intended values, persisted readback, no literal bracket/dotted corruption, and a late-operation failure proving the whole stored resource/version is unchanged | B: reconcile exact integrated cases |
 | Supported direct, Bulk, `/Me` and custom CRUD paths | Explicit operation/resource/route inventory, real response values and stored outcomes, capability-enabled/disabled behavior, documented unsupported combinations | B: P2/P7/P9 and route reconciliation remain open |
 | All registered settings | Derive the registry inventory from the integrated source; map each key's documented policy, relevant enforcement tests and untested interactions. Do not infer coverage from registration or UI presence | B: registry-to-evidence reconciliation pending |
+| Generic custom fields sharing promoted names | For schema-valid numeric/MV custom-core displayName/externalId and extension homonyms, verify POST -> GET -> PUT/PATCH -> GET plus filtering/typed sorting against rawPayload authority. Distinguish builtin User/Group constraints; pushdown is valid only when its column faithfully represents the resolved schema | B: P3b owns tightly coupled reconstruction; integration owns cross-package probes; no name-only admission restriction authorized |
 | Attribute characteristics | Core/extension namespace, scalar/MV/complex-child, required/readOnly/immutable/returned/caseExact/uniqueness boundaries, defaults when omitted, provider restrictions and compatibility consequences | B: P3b/P7/P9 and characteristic reconciliation pending |
 | Controlled races and Group rollback | Deterministic same-condition races at real mutation boundaries on both backends; complete scalar/payload/member/version/timestamp rollback and no partial create or success event | B: reconcile P3/P4/P8c with final tip |
-| Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b and integrated freshness reconciliation pending |
+| Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b focused proof exists; exact-case/final-tip reconciliation remains pending |
+| Concurrent deletion/FK error contract | Prove each raced resource/credential operation's exact status, SCIM envelope, diagnostics and sanitized detail separately from no-orphan/rollback checks; retain P3 preconditions and P4 atomicity | B: precise parent-reviewed error-normalization boundary remains open |
 | Built-runtime proof | Source SHA, build/artifact identity, actual launched command/runtime and backend, live wire outcomes and fixture cleanup. In-process test listeners and local spot checks are separate claims | B: final exact-artifact live gate pending |
 | P6b resource cost | Measure residual candidate materialization, selectivity, latency, memory and database work on stated datasets; document trade-offs without inferring unchanged cost from functional GREEN | B: final performance assessment pending |
 
@@ -863,6 +865,59 @@ prevents green-but-blind suite totals from closing the known defect inventory.
 **Design disposition: accepted.** Reuse permanent tests and owned harness seams;
 no weakened historical guard, universal testing framework or speculative
 production behavior is introduced.
+
+### 11.9 P8b cleanup integration, 2026-09-29
+
+| Source commit | Integration commit |
+|---|---|
+| `88b96c74388481d36632bf0fa787ecc86160a0c7` | `39a58c9a` |
+| `2db239a9f6ebaffbde8a7ecb019c4ba93f21aa16` | `9178d60c` |
+
+The lifecycle repository port and adapters are retained. Repository conflicts
+preserve P3's expected-version checks and P4's staged Group-plus-member
+creation/update, uniqueness checks and synchronous aggregate reads. Deleted
+endpoint barriers execute before publishing staged creates/member additions;
+the merge does not restore P8b's older per-member publication loop or P4's
+obsolete await-between-scalar-and-members sequence.
+
+Two integrated test assumptions needed correction. P8c's isolated module
+requires a lifecycle provider after P8b. P8b's old Group race paused the scalar
+`update` method, which P4 no longer calls during an aggregate update, so it
+timed out instead of exercising a race. The test now pauses the caller before
+the real atomic aggregate method and verifies deletion wins without restoring
+rows, for both unconditioned NOT_FOUND and conditioned PRECONDITION_FAILED.
+Late Group creation also supplies initial members to cover the P4/P8b seam.
+
+P8b's source reservations are historical: the assembled map already uses
+`9z-CS` for P8a and `9z-CT` for P8c. A failing route/uniqueness regression
+preceded assigning P8b `9z-CX`. The existing deletion helper, its ten checks
+and dedicated-fixture cleanup remain unchanged.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| Lifecycle, repository, P3/P4/P8c and wiring units | 14 suites / 305 tests passed |
+| Deletion/freshness/admin CAS/profile/Group aggregate/resource CAS HTTP | 6 suites / 69 cases passed on explicit InMemory; one PostgreSQL-only FK control skipped |
+| Focused production and test lint | 0 errors / 32 existing warnings across 23 files |
+| Combined built-local main live section | 131 reported checks passed, including all 10 deletion checks |
+| Cleanup | Endpoint collection identical before/after; owned API process stopped |
+| Script syntax | Main runner, shared section and deletion helper parsed |
+| Concurrent FK-error normalization | NOT CLOSED: cleanup success and broad non-success assertions do not establish the exact public error contract |
+
+Logs are in `test-results/scim-integration-p8b/`. Original P8b PostgreSQL 17.8,
+22-migration and source-package evidence remains distinct. No new integrated
+PostgreSQL matrix or final built-artifact release proof is claimed.
+The parent is checking the precise concurrent FK-error boundary. Neither
+P4's mapped-server-error masking nor P8b's no-orphan assertions should be
+misrepresented as having closed every raced endpoint/resource/credential error.
+P2/P7 PATCH, P3b/P9, the generic-field authority probes, and all case-level C0
+dispositions remain open. No publication, deployment or release metadata changed.
+
+**Assurance improvement: applied.** Match controlled interleaving tests to
+the actual current commit boundary instead of reintroducing an obsolete await
+to satisfy a spy. **Design disposition: accepted.** Keep lifecycle cleanup,
+resource CAS and aggregate staging in their existing narrow repository seams;
+test-module wiring is explicit and required, not optional silent fallback.
 
 ## 12. Architecture and self-improvement decisions
 

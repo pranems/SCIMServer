@@ -123,6 +123,9 @@ describe('Endpoint deletion ownership', () => {
     for (const write of [
       () => users.create({ ...owned.userInput, scimId: randomUUID() }),
       () => groups.create({ ...owned.groupInput, scimId: randomUUID() }),
+      () => groups.create({ ...owned.groupInput, scimId: randomUUID() }, [
+        { userId: null, value: 'late-initial-member', type: null, display: null },
+      ]),
       () => resources.create({ ...owned.customInput, scimId: randomUUID() }),
       () => credentials.create({ ...owned.credentialInput, lookupKey: randomUUID() }),
       () => groups.addMembers(owned.parent.id, [{ userId: null, value: 'late', type: null, display: null }]),
@@ -140,23 +143,24 @@ describe('Endpoint deletion ownership', () => {
     expect(await deletionCounts(module, other)).toEqual(SEEDED_COUNTS);
   });
 
-  it('cannot add members when endpoint deletion interrupts an in-flight Group update', async () => {
+  it.each([undefined, 1] as const)('cannot publish a late Group aggregate after deletion, expectedVersion=%s', async expectedVersion => {
     const { groups } = deletionRepositories(module);
-    const update = groups.update.bind(groups);
+    const update = groups.updateGroupWithMembers.bind(groups);
     let resume!: () => void;
     const paused = new Promise<void>(resolve => { resume = resolve; });
     let entered!: () => void;
     const reached = new Promise<void>(resolve => { entered = resolve; });
-    jest.spyOn(groups, 'update').mockImplementationOnce(async (id, data) => {
-      const row = await update(id, data);
+    jest.spyOn(groups, 'updateGroupWithMembers').mockImplementationOnce(async (...args: Parameters<typeof groups.updateGroupWithMembers>) => {
       entered();
       await paused;
-      return row;
+      return update(...args);
     });
     const pending = groups.updateGroupWithMembers(owned.parent.id, { displayName: 'in-flight' }, [
       { userId: null, value: 'late-member', type: null, display: null },
-    ]);
-    const rejection = expect(pending).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    ], expectedVersion);
+    const rejection = expect(pending).rejects.toMatchObject({
+      code: expectedVersion === undefined ? 'NOT_FOUND' : 'PRECONDITION_FAILED',
+    });
     await reached;
     await service.deleteEndpoint(owned.endpointId);
     resume();

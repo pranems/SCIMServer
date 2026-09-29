@@ -4,6 +4,7 @@ import { EndpointService } from './endpoint.service';
 import { endpointETag } from '../common/endpoint-etag';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 
 describe('Persistent conditional endpoint writes', () => {
   const priorBackend = process.env.PERSISTENCE_BACKEND;
@@ -46,6 +47,7 @@ describe('Persistent conditional endpoint writes', () => {
         EndpointService,
         { provide: PrismaService, useValue: prisma },
         { provide: ScimLogger, useValue: logger },
+        { provide: ENDPOINT_LIFECYCLE_REPOSITORY, useValue: { deleteEndpoint: jest.fn() } },
       ],
     }).compile();
     service = module.get(EndpointService);

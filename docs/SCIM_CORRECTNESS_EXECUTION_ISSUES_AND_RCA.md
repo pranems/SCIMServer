@@ -103,6 +103,8 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I11 | Documentation/tooling / Low | Both independent pattern additions had total 31; renderer initially skipped for missing web/root tooling | P4 added PA-10 while the assembled branch already included PC-4; fresh worktree dependency trees were absent | Combine A=10 and C=4 with total 32. After actual missing-tool results, reuse owned read-only web/root links. Both diagrams in the changed ledger render in both strict themes; version discovery still reports the pre-existing 0.0.0 sentinel | Merge review/render gate / same | Preserve both patterns and recompute totals, never choose one side. SKIP is not render proof; no version pin or dependency was changed |
 | C0-I12 | Integration / Low | The shared live runner still required the original 156 P7 assertions after importing the 228-assertion recursive readOnly contract | The source helper gained tests independently of its integration receipt check | A new wiring assertion failed before the expected count/message was updated. All four wiring tests now pass, and the real combined live section reports 121 successful checks including the complete 228-assertion P7 contract | Wiring regression / same | Applied: retained guard-first standalone wrapper; loaded the new fixture inside the explicit-target shared contract; original checkpoint counts remain historical |
 | C0-I13 | Test typing / Low | Explicit lint including the expanded P7 E2E spec found 124 unsafe-value diagnostics despite zero production-file lint errors | Supertest request/result boundaries and Object.fromEntries had implicit any types; existing and new test cases reused them | Add local typed wire/request interfaces, a typed HTTP server boundary, unknown-valued payload fields and tuple-typed entries. Keep runtime value/key assertions and add a missing-fixture guard. After two residual diagnostic passes, all six selected files have zero errors / 14 existing warnings and all 67 P7 HTTP cases pass | Explicit E2E lint / integration | Applied: lint the touched HTTP spec, not only src; no lint-disable comments, rule relaxations or changed protocol expectations |
+| C0-I14 | Harness/integration / Low | P8c unit setup failed eight cases for the new required lifecycle provider; P8b's Group race test timed out | The older P8c test module did not register the new port. P8b paused `groups.update`, but P4 intentionally removed that non-atomic inner call | Register the required test provider. Move the controlled pause before the real aggregate commit, then prove both unconditioned NOT_FOUND and conditioned PRECONDITION_FAILED rejection after endpoint deletion, with zero rows restored. All 305 focused units pass, including unchanged P4 atomic-stage/torn-read tests | Focused integrated unit setup / same | Setup failures are not product RED. Do not reintroduce an await inside P4 to satisfy an obsolete spy; preserve the atomic boundary and test a genuinely suspended caller |
+| C0-I15 | Integration / Low | P8b source reserved `9z-CT`, already used by integrated P8c, and lacked a shared-runner route | Source-branch section allocations differed from the assembled map | Two wiring assertions failed before moving P8b to `9z-CX`. Preserve P8a `9z-CS`, P8c `9z-CT`, original standalone deletion helper and fixture cleanup. All four wiring tests pass | Existing cross-runner regression / same | Applied: ten-package invocation/unique-section inventory; source-package reservations remain historical notes rather than overriding assembled identifiers |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -175,6 +177,18 @@ map interface and separation between metadata collection, input stripping and
 protocol execution. The test-only response types describe exercised wire
 shapes without adding a production abstraction. PATCH execution/flags/defaults
 are not changed by this increment.
+
+P8b integration confirmation: **305 focused units**, **69 HTTP cases** plus
+one explicitly skipped PostgreSQL-only FK control, and **131 combined live
+checks** pass. The live run preserves the existing endpoint collection and
+stops its owned API. Logs use `test-results/scim-integration-p8b/`.
+**Open boundary, not a resolved issue:** parent review still owns exact
+concurrent FK-error normalization. The imported late-User HTTP test accepts
+a broad 4xx/5xx non-success range; its no-orphan assertion is not exact error
+contract proof. No mapper change or new database claim is hidden in this
+cleanup integration. **Design disposition: accepted.** Preserve P3 CAS,
+P4 staged aggregates and P8b lifecycle barriers without introducing shared
+mutable storage or a generalized transaction framework.
 
 ## P8a issues
 

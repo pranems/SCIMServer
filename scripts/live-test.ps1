@@ -16134,18 +16134,6 @@ Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -Foregrou
 Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 
 # ============================================
-# TEST SECTION 9z-CT: ENDPOINT DELETION OWNERSHIP
-$script:currentSection = "9z-CT: Endpoint deletion ownership"
-# ============================================
-$deletionToken = ([string]$headers.Authorization) -replace '^Bearer\s+', ''
-try {
-    & "$PSScriptRoot\test-scim-endpoint-deletion.ps1" -BaseUrl $baseUrl -Token $deletionToken |
-        ForEach-Object { Test-Result -Success $_.Success -Message "9z-CT: $($_.Message)" }
-} catch {
-    Test-Result -Success $false -Message "9z-CT: $($_.Exception.Message)"
-}
-
-# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

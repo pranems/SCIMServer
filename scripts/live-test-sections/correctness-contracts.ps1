@@ -154,6 +154,14 @@ function Invoke-ScimCorrectnessContractTests {
                     Test-Result -Success $false -Message '9z-CW: failed to remove dedicated Group aggregate endpoint'
                 }
             }
+
+            $script:currentSection = '9z-CX: Endpoint Deletion Ownership'
+            try {
+                & (Join-Path $PSScriptRoot '..\test-scim-endpoint-deletion.ps1') -BaseUrl $base -Token $token |
+                    ForEach-Object { Test-Result -Success $_.Success -Message "9z-CX: $($_.Message)" }
+            } catch {
+                Test-Result -Success $false -Message "9z-CX: endpoint deletion failed: $($_.Exception.Message)"
+            }
         }
     }
 }

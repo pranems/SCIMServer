@@ -9,12 +9,13 @@
 
 ## Active Delivery Process
 
-The local initial assembly now includes P1, P3/P4, P5, P6a/P6b, P7a, P8a and
-P8c. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#115-p4-incremental-assembly-2026-09-29)
+The local initial assembly now includes P1, P3/P4, P5, P6a/P6b, P7a and
+P8a/P8b/P8c. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#119-p8b-cleanup-integration-2026-09-29)
 owns current combined results; the records below are source-package evidence,
 not deployment claims. P4's raw repository-error gap was closed separately
 with value/content regressions, not assumed fixed by P5's scalar formatting.
-P2/P8b, final P7 PATCH and P3b/compatibility dispositions still block C0.
+P2, final P7 PATCH, P3b/compatibility dispositions and concurrent FK-error
+normalization still block C0. Cleanup/no-orphan checks are not error-contract proof.
 
 P7a is implemented locally in its own P1-based worktree. The
 [P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,
