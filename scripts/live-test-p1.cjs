@@ -1,5 +1,5 @@
-// Focused live sibling to live-test.ps1. Only the ownership-verifying P1
-// orchestrator supplies a loopback URL and random runtime credential.
+// The standalone P1 entry point is ownership-guarded. The main live runner
+// reuses only runP1Contract with an explicitly authorized target.
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -11,6 +11,15 @@ async function runLiveP1(baseUrl, secret) {
   assert.equal(base.hostname, "127.0.0.1");
   assert.equal(base.protocol, "http:");
   assert.ok(secret && secret.length >= 32);
+  return runP1Contract(baseUrl, secret);
+}
+
+// Explicit live-runner targets need no database access. The owned P1 entry point
+// above retains every source, database and loopback guard.
+async function runP1Contract(baseUrl, secret) {
+  const base = new URL(baseUrl);
+  assert.ok(["http:", "https:"].includes(base.protocol));
+  assert.ok(secret);
   const Module = require("node:module");
   const ts = require(path.join(API, "node_modules", "typescript"));
   const file = path.join(API, "test", "e2e", "helpers", "typed-patch-fixtures.ts");
@@ -69,7 +78,7 @@ async function runLiveP1(baseUrl, secret) {
   }
   return { assertions, strictModes: [true, false], families: ["Users", "Groups", "Devices"] };
 }
-module.exports = { runLiveP1 };
+module.exports = { runLiveP1, runP1Contract };
 if (require.main === module) {
   runLiveP1(process.env.P1_BASE_URL, process.env.P1_SHARED_SECRET)
     .then(result => console.log(JSON.stringify(result, null, 2)))

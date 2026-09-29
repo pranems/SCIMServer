@@ -386,30 +386,81 @@ retain the task-owned database guards.
 ## 11. Progress tracker
 
 Statuses mean: **pending**, **in progress**, **implemented**, **validated**,
-**committed**, or **blocked with a named reason**. The final two states do not
-mean merged or deployed.
+**committed**, **integrated**, or **blocked with a named reason**. Integrated
+means assembled on the local integration branch, not merged to master or deployed.
+Package validation counts below describe the original package evidence; the
+combined checkpoint has its own counts in section 11.1.
 
 | Package | Status | Evidence / next action |
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
-| P1 | Validated locally | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | Pending | Depends on stable typed path contract |
-| P3 | Validated locally | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
+| P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
+| P2 | In progress separately | Await parent-supplied commit; pending diffs are not part of this assembly |
+| P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Deferred with explicit scope | Schema-driven, Group and custom-name atomic uniqueness need a separate design; P3 does not claim these guarantees |
-| P4 | Pending | Native and injected member failures already reproduce |
-| P5 | Locally validated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and independent consolidation remain pending |
-| P6 | In progress | P6a capability boundary validated: 69 HTTP tests on each backend, 346 unit tests, 7 local live checks and independent review; query/projection/sort/limit work remains |
-| P7 | Pending | Verify each current schema promise before changing enforcement |
-| P8 | Pending | Cleanup plus cache-freshness implementation requires explicit contracts |
+| P4 | In progress separately | Await parent-supplied commit; native and injected member failures remain acceptance checks |
+| P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
+| P6 | Partly integrated | P6a capability boundary integrated: 69 HTTP tests on each backend, 346 unit tests, 7 local live checks and independent review; P6b query/projection/sort/limit work remains separate |
+| P7 | In progress separately | Await P7a commit and remaining schema promises |
+| P8 | In progress separately | Parent owns P8a source; cleanup/cache contracts are not claimed integrated |
 | P9 | Pending | Follow changed behavior; preserve legitimate compatibility |
-| C0 | Pending | Do not mark complete while a package or applicable gate is unresolved |
+| C0 | Initial assembly verified | Section 11.1 only; final matrix/release readiness waits for remaining packages |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3, P5, and P6a are implemented and locally validated in their source worktrees,
-and integrated here. Combined validation, release metadata, PR, and deployment
-remain pending. Other package statuses are owned by their independent
+and integrated here. Focused initial validation passed; final combined matrix,
+release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
+### 11.1 Initial integration checkpoint, 2026-09-28
+
+Branch: `integrate/scim-correctness-20260928`; base: D0 `cb2e1bcb`
+on master `ccde1d5d`. Five source commits were cherry-picked in the supplied
+order, without squash, amend, publication or deployment.
+
+| Package | Source commit | Integration commit |
+|---|---|---|
+| P1 typed PATCH paths | `3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51` | `9676fb94` |
+| P3 conditional persistence and User uniqueness | `0aae30775a2888ff4bc6e67636d51ab234e717a5` | `c980e1fe` |
+| P3 handoff cleanup | `41c5b8c52ece0d8b48042c754cbdefa68624248f` | `8cbf6349` |
+| P5 JSON search/error contract | `e3da254a5ec4cdeac4a2985b8fe4a8817141126f` | `10e3305f` |
+| P6a capability boundary | `a801935866e06c2c3907bc6fad92683f6b4f98e3` | `a5751028` |
+
+**Merge decisions.** Keep P1 parsing and indexed diagnostics before mutation,
+P3 expected-version conditions at each repository write, P5 validated projection
+normalization at all search controllers, and P6a capability checks at the
+appropriate client/application boundary. `/Me` internal identity lookup retains
+its exception to client-filter capability checks. All production overlaps
+auto-merged and were reviewed; conflicts were shared documentation and the live
+runner. Documentation retains all package rows and evidence, not one side's
+claim that the other work is still pending.
+
+**Live wiring correction.** P1/P3 helpers existed but had no main-runner route,
+and both P5/P6a claimed section `9z-CO`. Three permanent regressions failed
+before wiring changed. The main runner now invokes one shared section before
+cleanup: P5 `9z-CO`, P6a `9z-CP`, P1 `9z-CQ`, P3 `9z-CR`. Explicit-target HTTP
+functions share the original assertions while original standalone ownership
+guards remain intact. Every fixture is dedicated and cleaned in `finally`.
+
+| Initial integration gate | Evidence |
+|---|---|
+| API build | PASS, after restoring missing tooling through an owned read-only dependency junction and generating only the local Prisma client |
+| Focused source lint | PASS, 0 errors / 195 warnings across 50 merged source/test files; no gate or warning ceiling changed |
+| Merge-sensitive units | PASS, 20 suites / 1,011 tests, including 3 new wiring regressions |
+| Four package HTTP suites | PASS, 4 suites / 91 cases, explicit InMemory plus inert database URL |
+| Combined live main section | PASS, 71 reported checks containing 58 P1 + 33 P3 assertions, 61 P5 + 7 P6a checks, and extra P3 endpoint cleanup |
+| Resource cleanup | PASS, endpoint collection identical before/after; owned API stopped |
+| Standalone harness isolation | PASS, P1/P3 reject unowned input before network/database access |
+| Script syntax | PASS, four PowerShell files and two Node helpers |
+| Documentation | Content audit passes; 15 literal JSON blocks in edited docs parse. Two F4-bound operator guides now explain P1. Final committed-range coupling verification runs after the integration wiring commit |
+| Historical evidence and release metadata | Frozen; no prior analysis, version, manifest or lockfile changes |
+| Full authoritative matrix / new PostgreSQL proof / publication / deployment | Not run or claimed at this initial assembly checkpoint |
+
+Full logs stay in ignored `test-results/scim-integration-initial/`. Package-local
+PostgreSQL receipts remain independent evidence, not relabeled as an
+integration-branch database run. Other packages are still being authored; do
+not start final C0 or release from this checkpoint.
 
 ## 12. Architecture and self-improvement decisions
 

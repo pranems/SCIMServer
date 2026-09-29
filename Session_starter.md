@@ -6,6 +6,18 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
+**Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
+assembles P1, P3 (including its cleanup follow-up), P5 and P6a on D0.
+[Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
+record the exact source-to-integration mapping. API build, 1,011 focused unit
+tests, four package HTTP suites (91 cases), and the combined live section pass.
+No package is deployed by this assembly. Product/version/lock metadata stays
+unchanged. P2, P4, P6b, P7a and parent-owned P8a remain separate active work.
+
+- [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
+- [ ] Continue assembly only after the parent supplies follow-up package SHAs.
+- [ ] Final C0 matrix, release metadata on the approved runner, review/PR and deployment.
+
 | Date | Summary |
 | --- | --- |
 | 2026-09-28 | P1 typed PATCH paths implemented in isolated `fix/scim-correctness-p1-20260928`; focused 1,476 unit and 65 HTTP tests pass, plus owned PostgreSQL/InMemory and local-live proof. See [P1 implementation](docs/SCIM_P1_IMPLEMENTATION.md). No merge/deploy; central release metadata remains pending. |

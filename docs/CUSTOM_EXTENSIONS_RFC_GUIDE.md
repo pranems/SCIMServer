@@ -1,6 +1,6 @@
 # Custom Resource Extensions - RFC-Compliant Authoring Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026
@@ -15,6 +15,22 @@
 > - RFC 7644 (Protocol): §3.1 schemas array semantics, §3.5.1 POST, §3.5.2 PATCH path resolution, §3.4.2 query parameters, §4 discovery endpoints
 >
 > Custom schema and ResourceType definitions are portable profile data. Stored resources, credential bindings, generated locations, server ceilings, and effective authentication state are not copied with them.
+
+### Pending release: typed extension PATCH paths
+
+The [P1 implementation](SCIM_P1_IMPLEMENTATION.md) is locally integrated, not
+deployed. It interprets an extension path such as
+`urn:contoso:scim:schemas:extension:contacts:2.0:User:contacts[primary eq true].value`
+as a typed selector. A native Boolean, number, or compound predicate is not a
+literal property name. Register the extension and ResourceType binding before
+using it; each predicate leaf uses the `caseExact` policy of its own schema
+attribute. Root read-only checks resolve through the same parsed path.
+
+Malformed brackets, repeated selectors, and unsupported selector tails return
+`invalidPath` without saving any operation, even when `StrictSchemaValidation`
+is off. Turning strict validation off is not permission to store invalid path
+syntax. Broader per-operation required/immutable/primary semantics remain
+separate work; see the [integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md).
 
 ---
 

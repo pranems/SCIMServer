@@ -1,10 +1,28 @@
 # Schema Customization Guide - Operator Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
+
+### Pending release: PATCH validation uses typed paths
+
+The [P1 path repair](SCIM_P1_IMPLEMENTATION.md) is locally integrated and
+validated, but this checkpoint does not deploy it. User, Group and custom
+resource PATCH now share syntax interpretation with schema validation.
+Selectors such as `contacts[primary eq true].value` preserve Boolean types,
+resolve names case-insensitively, and apply each attribute's own `caseExact`
+policy. Extension URNs are resolved as namespaces, not split at version dots
+or colons inside quoted predicate values.
+
+Malformed syntax fails as `invalidPath` before persistence, with a zero-based
+operation index, regardless of `StrictSchemaValidation`. Valid extension
+attributes are validated once rather than emitting duplicate diagnostics.
+This is not a redesign of profile merge rules or a claim that all
+required/immutable/primary transitions are fixed. Follow the
+[package tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) for those
+separate changes and the eventual release status.
 
 ---
 

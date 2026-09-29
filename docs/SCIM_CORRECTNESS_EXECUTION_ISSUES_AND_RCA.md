@@ -86,6 +86,37 @@ remains a consolidation gate, not a claimed completed check.
 | P6-I06 | Design/test correctness / Medium | The first shared read guard blocked `/Me` when client filtering was disabled | `/Me` uses the User service's filtered lookup internally; an internal lookup is not a client query capability | Added a failing `/Me` regression, retained User/Group query guards at their existing HTTP boundary, and kept custom list plus all PATCH checks at their service boundary; 69 HTTP and 346 unit tests pass | Cross-flow design review / focused review before commit | Every capability move must identify internal callers and include an unaffected-caller control |
 | P6-I07 | Test tooling / Low | Two PostgreSQL attempts stopped before migration/tests | First guard compared different IP/CIDR forms; the next inline script shadowed the global URL constructor used by pg | Final runner reuses the existing ownership/database guards, normalizes CIDR for address comparison, and uses `databaseUrl`; 22 migrations and 69 PostgreSQL HTTP tests pass, exact container removed | Runner initialization / same | Do not weaken ownership checks; preserve failed setup separately from behavior evidence; avoid globals named URL |
 
+## Initial integration, 2026-09-28
+
+| ID | Type / severity | Symptom | Root cause | Resolution and why it works | Earliest possible / actual detection | Prevention / status |
+|---|---|---|---|---|---|---|
+| C0-I01 | Integration / High | P1 and P3 live helpers were not reachable from the main runner; P5 and P6a both used `9z-CO` | Independently valid package runners do not prove their combined entry-point wiring | Three permanent wiring regressions failed, then passed after one shared section invokes all four packages under `9z-CO` through `9z-CR`. P1/P3 retain their guarded standalone entry points and share only explicit-target HTTP assertions | Entry-point contract / initial assembly | `live-correctness-wiring.spec.ts` locks reachability, pre-cleanup ordering, and distinct sections. Live execution/cleanup proof is recorded below when confirmed |
+| C0-I02 | Merge/process / Low | Shared progress, INDEX and RCA edits conflicted | Each package correctly updated the same baseline independently | Retained every package link and issue row, combined progress as integrated rather than deployed, and retained all source commits via ordered cherry-picks | Cherry-pick / same | No blanket ours/theirs, no overwritten historical analysis, and combined overlap suites before handoff |
+| C0-I03 | Environment/tooling / Low | Initial build could not find `tsc`; next build could not find generated Prisma client; editor Problems provider failed | Fresh integration worktree has no dependency tree, generated client or usable editor provider | After observed failures, reuse one owned API dependency junction without modifying its target; generate Prisma only into the integration worktree and validate through CLI with an explicit inert URL | Build intake / same | No package install, version/lock rewrite, inherited database, or shared generated-client mutation |
+| C0-I04 | Documentation / Medium | F4 source coupling rejected Custom Extensions and Schema Customization guides | P1 changed `schema-validator.ts`, but these two source-bound guides had no corresponding package update | Add operator-facing typed-selector, strict-off syntax, namespace/caseExact and diagnostic notes with explicit not-deployed status. Fifteen literal JSON blocks in edited docs parse; content audit passes. The coupled gate's explicit BaseRef mode compares committed HEAD, so final-range verification follows this commit rather than pretending uncommitted changes are visible | Package source-coupling audit / initial integration | Keep the existing F4 gate unchanged; a feature-specific implementation report does not replace each bound operator guide |
+
+**Test/gate improvement: applied.** Package-local live success is now paired
+with a main-runner reachability/section regression. A helper existing on disk
+does not establish deployment-runner coverage.
+
+**Design/architecture disposition: accepted.** One small live orchestrator
+coordinates four actual package contracts. Production services are unchanged
+by the wiring fix; guarded source/database harnesses remain distinct from
+explicit-target HTTP helpers. No universal protocol executor or new runner
+framework is introduced.
+
+**Initial integration provenance:** source commits, their package receipts,
+this worktree's complete command results, and ignored
+`test-results/scim-integration-initial/` logs are the evidence for this assembly.
+This is not a full parent-transcript reconciliation or final C0/release gate.
+
+Live confirmation: the combined section passed **71 reported checks** on an
+owned InMemory API. Those checks include all **58 P1** and **33 P3** assertions,
+**61 P5** and **7 P6a** checks, and the extra P3 endpoint cleanup check. The
+endpoint collection was byte-for-byte equal before and after the run, and the
+owned API process was stopped. Both original P1/P3 standalone entry points
+still reject unowned inputs before network/database access.
+
 ## Entry checklist
 
 For each new issue record:
