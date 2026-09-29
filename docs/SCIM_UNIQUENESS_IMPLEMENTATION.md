@@ -25,6 +25,13 @@ admission checks. Source-package RED/GREEN evidence is linked below; final
 integrated acceptance and the custom-core displayName/active authority hold
 remain separate.
 
+**Registration is a separate open guarantee.** Runtime rejection does not
+prove the endpoint profile/discovery rejects unsupported uniqueness promises.
+P7 owns type- and namespace-qualified admission checks for genuinely
+unsupported declarations. The current generic promoted-column restriction
+must not become a blanket admission rule for otherwise valid custom-core
+displayName/active or extension homonyms.
+
 ## Client-visible outcome
 
 Two different resources cannot acquire the same declared unique value by

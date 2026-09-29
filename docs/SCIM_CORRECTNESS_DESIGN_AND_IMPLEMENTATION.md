@@ -1418,6 +1418,23 @@ custom-core displayName/active column restrictions and candidate overlays
 are untouched by this RFC commit and remain separately assigned to P3b.
 No broad uniqueness/C0, deployment or data-repair closure is implied.
 
+**Admission TODO remains explicit:** resource writes returning 400 for an
+unsupported promise do not prove that registration/discovery cannot publish
+that promise as supported. P7 must verify and close declaration rejection for
+whole-complex/Boolean/dateTime/binary server uniqueness and genuinely
+unenforceable computed paths, using exact resource-type/schema/path identity.
+Extensions sharing core names must not be rejected by spelling alone.
+Legitimate `none`/omitted uniqueness remains accepted.
+
+Do not interpret P3b's existing "incompatible promoted core" error as an
+approved general admission category. Real builtin/common constraints need
+their standards-backed identity, while valid custom-core displayName/active
+must not be banned because older columns cannot represent them. P3b owns
+that candidate-authority correction; P7 must not paper over it by adding
+broader schema restrictions. The P7 status document and uniqueness-inventory
+JSON remain historical pre-P3b evidence, not proof that every listed collector
+gap is still present or that all gaps are now closed.
+
 **Assurance improvement: applied.** Type-specific characteristic applicability
 is checked before choosing equality semantics, with both rejection and
 legitimate-no-constraint controls.

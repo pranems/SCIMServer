@@ -26,6 +26,9 @@ the 21-assertion built-local smoke pass.
 **Acceptance remains blocked:** the three generic promoted-column
 restriction/candidate-authority probes remain unresolved with P3b, separately
 from P7's common-externalId work. Prior receipts remain historical.
+P7 admission must also stop publishing genuinely unsupported uniqueness
+promises; P3b's runtime 400 is not registration proof. Do not convert a
+convenience-column mismatch into a blanket custom-schema admission ban.
 
 **Latest integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
