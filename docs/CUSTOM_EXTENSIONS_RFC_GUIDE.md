@@ -22,6 +22,11 @@
 > the correct retained occurrence. Core and extension arrays share the matcher
 > with PATCH, without importing PATCH append intent into PUT. Ambiguous equal
 > entries use documented occurrence order; required/immutable rejection is atomic.
+> Parent source89810f0c keeps `domain/retained-entries.ts` and its original
+> consumers canonical: exact assigned types reserve capacity before fallback,
+> and restoration/null guards keep the chosen occurrence order stable.
+> [Integrated84-case/1764-assertion proof](evidence/scim-parent-reservation-integration-20260929.json)
+> is separate from prior source snapshots; no new matching implementation exists.
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026

@@ -147,6 +147,11 @@ unstaged edits. The second pre-commit check therefore correctly still saw
 the old committed range. Working-tree freshness passed after the prose fix;
 the authoritative committed-range F4 check runs after the final doc commit.
 No failed committed-range result is relabeled as a pre-commit PASS.
+The later parent canonical-path reconciliation likewise required review of
+the bound Custom Extensions guide when schema-validator's matcher import
+changed. That committed-range check failed, the existing guide was updated
+with the authoritative helper/fixture contract, and the range was rechecked
+without changing the F4 binding.
 
 **Flag/default-corpus checkpoint provenance:** C0-I33/I34/I35 were reconciled
 against this increment's saved RED/GREEN, HTTP, built-live, lint and cleanup
