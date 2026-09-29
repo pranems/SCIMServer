@@ -6,6 +6,8 @@ const assert = require("node:assert/strict");
 const { ROOT, API, OWNER, IS_P2, IS_P7, IS_P9, docker, sourceGuard, containerGuard, databaseGuard } = require("./safety.cjs");
 
 const source = sourceGuard();
+// Provision only a fresh owned target; never carry an inherited database into setup.
+delete process.env.DATABASE_URL;
 const { Client } = require(path.join(API, "node_modules", "pg"));
 const run = crypto.randomBytes(8).toString("hex");
 const password = crypto.randomBytes(36).toString("base64url");
@@ -106,7 +108,7 @@ async function main() {
   save();
   let ready = false;
   for (let i = 0; i < 60; i++) {
-    const result = cp.spawnSync("docker", ["exec", containerId, "pg_isready", "-U", "p1_runner", "-d", `scim_p1_${run}`], { windowsHide: true });
+    const result = cp.spawnSync("docker", ["exec", containerId, "pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "p1_runner", "-d", `scim_p1_${run}`], { windowsHide: true });
     if (result.status === 0) { ready = true; break; }
     assert.ok([1, 2].includes(result.status), "Unexpected database readiness failure");
     await new Promise(resolve => setTimeout(resolve, 500));

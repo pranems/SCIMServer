@@ -1,11 +1,13 @@
 {
   "package": "P9 compatibility guidance and corpus",
   "base": "8e42f15f54a955fd6b93d58e9471c393329f4d3a",
-  "testedSourceSha256": "ca51398f105646183891f0593029def15aa4780c84292e337084f5131ec60068",
-  "sourceFileCount": 555,
+  "testedSourceSha256": "35990a1e082ce71ef0c7876c4f4ce1178cbaf11254ceaabf255dbca9f162c4d4",
+  "sourceFileCount": 556,
   "sourceHashScope": "Guarded API source/tests/Prisma and P1/P7/P9 harness files; documentation excluded",
-  "completedAt": "2026-09-29T05:56:33.452Z",
-  "rawReceipt": "test-results/p9/backends-be0f8ff8b02077b3/run.json",
+  "completedAt": "2026-09-29T06:39:53.340Z",
+  "rawReceipt": "test-results/p9/backends-255b25a57fc13ed9/run.json",
+  "previousReceipt": "test-results/p9/backends-be0f8ff8b02077b3/run.json",
+  "previousSourceSha256": "ca51398f105646183891f0593029def15aa4780c84292e337084f5131ec60068",
   "postgresVersion": "17.8",
   "completedMigrations": 22,
   "backends": [
@@ -15,7 +17,7 @@
       "integrationTodo": 2,
       "liveCasesPassed": 17,
       "liveAssertions": 1104,
-      "runtimePid": 2480,
+      "runtimePid": 56776,
       "runtimeStopped": true
     },
     {
@@ -24,12 +26,12 @@
       "integrationTodo": 2,
       "liveCasesPassed": 17,
       "liveAssertions": 1104,
-      "runtimePid": 61688,
+      "runtimePid": 58424,
       "runtimeStopped": true
     }
   ],
   "cleanup": {
-    "containerId": "50a8d8217d06235ad77c3764a95c3c506593c886939c7248cebe90194a417dd9",
+    "containerId": "f24a57d2c5948cf5dd7b530fb641368b74452b21622cfee6cdfc57fb18320d81",
     "removed": true,
     "externalDatabaseUsed": false
   },
@@ -41,6 +43,13 @@
     "registryGuidanceRedThenGreen": true,
     "inventoryNegativeControlPassed": true
   },
+  "harnessFollowup": {
+    "databaseUrlResolutionTestsPassed": 5,
+    "lateMarkerRedThenGreen": true,
+    "inheritedUrlClearedBeforeProvisioning": true,
+    "tcpReadiness": true,
+    "verifiedBootstrapUrlPinned": true
+  },
   "integrationOnly": [
     {
       "id": "I02",
@@ -50,7 +59,8 @@
     {
       "id": "I03",
       "resultOnBase": "failed",
-      "requirement": "Verbose-disabled dotted User PATCH must not save a literal dotted property"
+      "requirement": "Proposed safety policy: verbose-disabled dotted User PATCH should not save a literal dotted property",
+      "disposition": "Open policy proposal; P2 intentionally preserves this historical compatibility mode"
     }
   ],
   "scopeLimits": [

@@ -23,7 +23,9 @@ corpus, including the proven modern pathless shape.
 Both owned PostgreSQL 17.8 (22 migrations) and InMemory pass.
 The original P9 run had two open P2 checks. After core P2 integration I02
 passes and runs by default; I03 still fails explicitly, and active-coercion
-policy still awaits its owning follow-up.
+policy still awaits its owning follow-up. Owned P9 bootstrap now pins the
+verified URL against later marker changes; inherited URLs are cleared before
+provisioning and readiness checks target TCP.
 See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
 [37-setting reconciliation](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 No version/lockfile, UI code, push or deployment changes.

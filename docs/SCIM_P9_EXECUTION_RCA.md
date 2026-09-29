@@ -1,6 +1,6 @@
 # P9 compatibility execution issues
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
 Companion: [compatibility](SCIM_ENTRA_COMPATIBILITY.md) and
 [setting evidence](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
@@ -16,13 +16,19 @@ Companion: [compatibility](SCIM_ENTRA_COMPATIBILITY.md) and
 | Counting/settings drift / documentation / Medium | Reference said 38 keys, omitted three cap rows, and claimed secrets could be logged and once visibility supported | Reconciled all 37 keys, separated fixed controls from UI toggles, marked config-only versus behavioral coverage | Source/evidence review / documentation inventory sentinel |
 | Negative control / test correctness / Low | Row-removal fixture did not remove a CRLF-terminated row, so negative control unexpectedly passed the checker | Made deletion regex accept CRLF and LF; five guidance/inventory tests now pass, including the deliberately missing row | Negative control / same |
 | Renderer discovery / tooling / Low | Existing doctor claimed editor Mermaid 0.0.0 while 11.15.0 rendered successfully | Recorded parity as unverified; no nonsensical dependency downgrade. Diagram renders in both themes | Render gate / existing documented environment limitation |
+| Verified-target pinning / harness / High | Parent review identified a gap between checking marker absence and ordinary app bootstrap reading a marker that could appear later | RED showed a later competing URL won; GREEN adds optional pinned URL with owned helper, matching committed P5 design. P9 clears inherited URL and uses TCP readiness. Both owned HTTP/live backends rerun green | Parent harness review / bootstrap negative control |
+| Integration ownership / process / Medium | Initial I03 label implied P2 would remove historical literal-key mode | Frozen P2 owner explicitly preserves it. Reclassified I03 as an open compatibility-policy proposal; no speculative default/semantics change | Cross-worker handoff / acceptance-boundary agreement |
+| Receipt parsing / tooling / Low | Loading a JSON-formatted `.log` using `require` treated it as JavaScript and raised SyntaxError | Used `JSON.parse(readFileSync(...))`; no artifact or database change | Summary extraction / same |
 
 The first confirmed guidance fix was captured after its RED/GREEN run.
 The fixture errors are harness errors, not product regressions. I03 is open
 until integration and is never included in the supported passing count.
 The initially tentative pathless modern case actually passed and was promoted
 to supported E17. I02 primary handoff and I03 literal-key safety were both
-executed and failed on the base; they remain integration checks.
+executed and failed on the base; I02 remains a P2 integration check and I03
+is an open policy proposal, not a P2 promise. The source already enforced
+PostgreSQL >=17.8 within major 17; the initial follow-up message describing
+that guard as major-only was incorrect and required no code change.
 
 ## Provenance and completeness
 
@@ -30,7 +36,8 @@ This ledger covers the P9 worker's complete visible tool/message history from
 the assigned base, not the parent's or siblings' work. Signals reconciled:
 missing jest, missing generated Prisma, tool failures, initial corpus
 failures, exact contract mismatches, GREEN guidance and both backend/live
-results. No full transcript file was available through the worktree; this is
+results, parent safety handoff, pinned-URL RED/GREEN and hardened rerun.
+No full transcript file was available through the worktree; this is
 **not a claim of full JSONL transcript reconciliation**. Parent consolidation
 must reconcile the parent transcript before declaring the entire build ledger
 complete. Verified non-issues: ephemeral local signing-key warning is expected;

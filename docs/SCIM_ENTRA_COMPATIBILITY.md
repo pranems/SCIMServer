@@ -186,6 +186,11 @@ an unrelated base, a pre-existing test database marker and arbitrary DB URLs.
 It creates a uniquely labeled, loopback-only PostgreSQL container, checks
 container/database/cluster/system identity, replays migrations and removes
 only that exact owned container. No normal destructive E2E teardown is used.
+The September 29 hardening clears inherited `DATABASE_URL` before provisioning,
+waits for TCP readiness rather than PostgreSQL's temporary startup socket,
+and pins the verified URL into application bootstrap so a later marker file
+cannot redirect it. The pre-existing version guard requires PostgreSQL 17.8
+or later in major 17; the executed image below is exactly 17.8.
 
 ```powershell
 Set-Location .\api
@@ -195,7 +200,7 @@ node .\scripts\p1-validation\check-safety.cjs
 node .\scripts\p1-validation\run.cjs
 ```
 
-Recorded run: `test-results/p9/backends-be0f8ff8b02077b3/run.json`;
+Recorded hardened run: `test-results/p9/backends-255b25a57fc13ed9/run.json`;
 [sanitized permanent receipt](evidence/scim-p9/validation.json).
 The following counts describe the original P9 source-package checkpoint,
 not the later 18-case integrated corpus:
@@ -203,7 +208,7 @@ Actual PostgreSQL **17.8**, all **22 migrations**, **17 HTTP cases passed per
 backend**, **2 integration TODOs per backend**. Each built local runtime
 passed **17 live cases / 1,104 assertions**, including cleanup assertions.
 Both owned runtime PIDs stopped; exact container
-`50a8d8217d06235ad77c3764a95c3c506593c886939c7248cebe90194a417dd9`
+`f24a57d2c5948cf5dd7b530fb641368b74452b21622cfee6cdfc57fb18320d81`
 was removed. No shared database or deployment was touched.
 
 Startup/registry guidance: RED against the original emitted message and
@@ -211,6 +216,9 @@ descriptions, then GREEN. Across targeted runs, **411 distinct tests / 7
 suites** passed, including registry helpers, the negative-controlled
 37-row documentation sentinel, JWKS policy/cache outcomes and mandatory
 redaction. No full test suite was run.
+The harness follow-up also passed five database-URL resolution tests,
+including a RED/GREEN late-marker negative control and unchanged ordinary
+marker behavior. This is test-harness protection, not a product behavior change.
 Build passed; scoped ESLint: **0 errors, 6 existing warnings**.
 The new diagram rendered in both strict-security themes. The existing doctor
 reported the editor renderer version as `0.0.0`; renderer-version parity is

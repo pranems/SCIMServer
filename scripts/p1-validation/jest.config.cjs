@@ -14,6 +14,12 @@ loaded._compile(ts.transpileModule(fs.readFileSync(file, "utf8"), {
 const { globalTeardown, ...original } = loaded.exports.default;
 module.exports = {
   ...original, rootDir: API,
+  moduleNameMapper: {
+    ...original.moduleNameMapper,
+    ...(IS_P9 ? {
+      '^\\./helpers/app\\.helper$': '<rootDir>/test/e2e/helpers/owned-compatibility-app.helper.ts',
+    } : {}),
+  },
   ...(IS_P2 && process.env.P2_BASELINE === "1" ? {
     transform: { '^.+\\.(t|j)s$': [path.join(__dirname, "baseline-transform.cjs"), { tsconfig: { allowJs: true } }] },
   } : {}),
