@@ -30,7 +30,7 @@ import type {
 } from './validation-types';
 import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
 import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, effectiveCommonAttributes, validateCommonAttributeValues } from './common-attributes';
-import { retainedEntries } from '../attribute-values';
+import { retainedEntries } from '../retained-entries';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.

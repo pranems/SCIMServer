@@ -74,6 +74,34 @@ Self-review checked that core precedence never becomes an extension-name
 blacklist and that string preservation/duplicate acceptance are asserted
 under ordinary client-scoped profiles. The unrelated confirmed PUT
 one-to-one retention blocker remains open with integration.
+### Type-reservation follow-up and ownership reconciliation
+
+| Issue | Type / severity | Confirmed resolution | Earliest / actual detection |
+|---|---|---|---|
+| An earlier untyped entry stole a later explicit type match | Correctness / high | Reserve exact assigned-type capacity before occurrence fallback in the existing shared helper. Six unit and 24 HTTP regressions went RED, then GREEN, including stored core and extension values across all three resource families | Matcher invariant test / focused independent comparison and domain/HTTP tests |
+| A simple reservation fix could change matching after protected type restoration | Regression risk / medium | Stable distribution of selected equal-type occurrences, plus treating null and absent types as unassigned for matching. Enumerated short combinations prove the correspondence stays stable | Unit design / independent comparison plus permanent invariant test |
+| A delayed ownership message caused a duplicate PUT implementation | Process / medium | The separately launched worker completed `414e14e8` before the queued stop arrived. Its branch is preserved, not blindly merged. A focused comparison identified the one residual greedy-matching defect in accepted `b21e44cb`; only the needed matcher/test delta is applied under the existing filename and API | Ownership check before delegation / delayed notification |
+| Fresh tooling and an invalid test selector interrupted setup | Environment/tooling / low | Restored the owned dependency link only after missing Jest, generated the local Prisma client after its missing-module error, and replaced nonexistent `patch-values.spec.ts` with discovered existing engine suites | File discovery/setup / test command |
+
+The duplicate worker's two restoration findings were hazards in its proposed
+reservation implementation, not two separately reproduced defects in the
+already accepted greedy matcher. This distinction was checked by an independent
+read-only comparison and is retained rather than inflating the bug count.
+
+The shared live fixture adds the omitted-type and changed-type cases. Its
+main-runner expectation now requires 84 cases and 1,764 assertions. Both
+InMemory and actual PostgreSQL built runtimes met that threshold; owned
+endpoints were removed and the PostgreSQL runtime/container were stopped.
+
+**Process improvement: applied to this run.** Freeze completed workers, avoid
+peer acknowledgment loops, and check the active owner's current scope before
+forking a new fix. A queued stop is not an interrupt; it cannot be relied on
+to prevent work in the current turn. The separate branch stays available for
+audit, while only one matcher is integrated.
+**Design disposition: applied.** Keep the neutral helper, its public signature,
+re-export and consumers. Do not introduce a second matcher or import PATCH
+mutation logic into replacement validation.
+
 ### Combined-suite expectation reconciliation
 
 The combined P2/P7 run exposed eight older expectations in

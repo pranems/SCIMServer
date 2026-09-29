@@ -1,0 +1,58 @@
+{
+  "scope": "Retained-entry type reservation follow-up, not final C0 validation",
+  "baseCommit": "df3ca95773eae65938e07d136c1f199b28746863",
+  "priorMatcherCommit": "b21e44cb1dd3ee2d92b00d04846b90e68fe1a7dd",
+  "sourceSha256": "b32fccf41e4aebde219f804f78bf5789f2a775a2d3bb05d478519a9e26700763",
+  "sourceHashScope": "Git-listed api/src, api/test and scripts paths plus file bytes; includes the uncommitted fix at validation time",
+  "red": {
+    "unitFailed": 6,
+    "unitPassedControls": 17,
+    "httpFailed": 24,
+    "httpPassedControls": 60
+  },
+  "green": {
+    "unitSuites": 8,
+    "unitTests": 491,
+    "httpTestsPerBackend": 313,
+    "httpSuitesPerBackend": 4,
+    "builtLiveCasesPerBackend": 84,
+    "builtLiveAssertionsPerBackend": 1764
+  },
+  "postgres": {
+    "version": "17.8",
+    "migrations": 22,
+    "loopbackOnly": true,
+    "ephemeralStorageOnly": true,
+    "ownershipVerifiedBeforeMigration": true,
+    "identityVerifiedAtBootstrap": true,
+    "exactOwnedContainerRemoved": true,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true
+  },
+  "inmemory": {
+    "builtRuntimeStopped": true,
+    "ownedEndpointsRemoved": true
+  },
+  "static": {
+    "build": "passed",
+    "focusedLintErrors": 0,
+    "focusedLintWarnings": 0,
+    "documentationContent": "passed",
+    "documentationFreshness": "passed",
+    "liveScriptParse": "passed",
+    "diagramsRendered": 5,
+    "strictThemes": 2
+  },
+  "review": {
+    "method": "Independent read-only comparison of accepted C0 and preserved duplicate-worker implementations",
+    "confirmedResidualIssue": "Earlier omitted or changed types greedily consume later explicit type matches",
+    "guardedFixHazards": [
+      "Protected type restoration must not reorder equal typed occurrences",
+      "Null and absent types must not acquire different exact-match priority"
+    ],
+    "separateWorkerCommitPreserved": "414e14e8f3e1b42e4d39621b244700695da18c34",
+    "blindCherryPickPerformed": false
+  },
+  "runtimeLogs": "test-results/type-reservation",
+  "deployment": "none"
+}

@@ -9,6 +9,27 @@ export interface RetainedEntryCase {
 
 export const retainedEntryCases: RetainedEntryCase[] = [
   {
+    name: 'omitted type reserves a later explicit type match',
+    before: [
+      { value: 'same', type: 'work', server: 'work-owned' },
+      { value: 'same', type: 'home', server: 'home-owned' },
+    ],
+    after: [{ value: 'same' }, { value: 'same', type: 'work' }],
+    expected: [{ value: 'same', server: 'home-owned' }, { value: 'same', type: 'work', server: 'work-owned' }],
+  },
+  {
+    name: 'changed type reserves a later explicit type match',
+    before: [
+      { value: 'same', type: 'work', server: 'work-owned' },
+      { value: 'same', type: 'home', server: 'home-owned' },
+    ],
+    after: [{ value: 'same', type: 'other' }, { value: 'same', type: 'work' }],
+    expected: [
+      { value: 'same', type: 'other', server: 'home-owned' },
+      { value: 'same', type: 'work', server: 'work-owned' },
+    ],
+  },
+  {
     name: 'duplicate values reordered by type',
     before: [
       { value: 'same', type: 'work', server: 'work-owned' },

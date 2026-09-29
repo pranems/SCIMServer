@@ -35,7 +35,7 @@ describe('one-to-one retained multi-valued entries', () => {
   }
 
   it('immutable comparison matches each duplicate occurrence rather than the last value', () => {
-    const scenario = retainedEntryCases[0];
+    const scenario = retainedEntryCases.find(entry => entry.name === 'duplicate values reordered by type')!;
     const schemas: SchemaDefinition[] = [{ id: core, isCoreSchema: true, attributes: [retainedRecordsAttribute('immutable')] }];
     expect(SchemaValidator.checkImmutable(
       { records: scenario.before }, { records: scenario.expected }, schemas, undefined, 'replace',
@@ -45,5 +45,28 @@ describe('one-to-one retained multi-valued entries', () => {
     expect(SchemaValidator.checkImmutable(
       { records: scenario.before }, { records: changed }, schemas, undefined, 'replace',
     )).toMatchObject({ valid: false, errors: [{ path: 'records[0].server', scimType: 'mutability' }] });
+  });
+
+  it('keeps correspondence stable when protected type values are restored', () => {
+    const combinations: (string | null | undefined)[][] = [[]];
+    let layer: (string | null | undefined)[][] = [[]];
+    for (let length = 1; length <= 3; length++) {
+      layer = layer.flatMap(types => [undefined, null, 'work', 'home'].map(type => [...types, type]));
+      combinations.push(...layer);
+    }
+    for (const beforeTypes of combinations) {
+      for (const afterTypes of combinations) {
+        const before = beforeTypes.map((type, index) => ({ value: 'same', type, server: `server-${index}` }));
+        const after = afterTypes.map(type => ({ value: 'same', type }));
+        const paired = retainedEntries(before, after);
+        for (const readOnly of [false, true]) {
+          if (!readOnly && paired.some((entry, index) =>
+            entry?.type != null && after[index].type !== undefined && after[index].type !== entry.type)) continue;
+          const restored = after.map((entry, index) => paired[index] && (readOnly || entry.type === undefined)
+            ? { ...entry, type: paired[index]?.type } : entry);
+          expect(retainedEntries(before, restored)).toEqual(paired);
+        }
+      }
+    }
   });
 });

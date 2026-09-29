@@ -113,6 +113,38 @@ local runtimes and retains exact endpoint cleanup. See the
 [integration reconciliation](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1115-retained-entry-put-preservation-fix)
 for evidence boundaries and unrelated still-blocking checks.
 
+#### Follow-up: reserve a later explicit type match
+
+The first shared matcher was still greedy when an earlier incoming entry had
+an omitted or changed type. For stored entries `same/work` and `same/home`,
+an incoming untyped entry followed by `same/work` consumed the work entry
+too early. It could copy the wrong readOnly state or reject unchanged
+immutable data.
+
+| Stored entries | Incoming entries | Protected values that must follow them |
+|---|---|---|
+| `same/work: A`, `same/home: B` | `same` without type, then `same/work` | `B`, then `A` |
+| `same/work: A`, `same/home: B` | `same/other`, then `same/work` | `B`, then `A` |
+| `same/work: A`, `same/work: B` | first type omitted, then `same/work` | `A`, then `B`, even after the omitted type is restored |
+
+The matcher now reserves assigned exact-type capacity before falling back
+to occurrence order. Selected entries with equal types are then distributed
+in stable order. Null and absent types are both unassigned for matching, so
+restoring a protected null type cannot suddenly change its priority. Stored
+payload values are not rewritten by this helper.
+
+This is the provider's deterministic retention policy, not a claim that SCIM
+defines a unique identity for otherwise indistinguishable array entries.
+There is still only one dependency-free helper for PATCH and PUT.
+
+The added regressions first failed **6 unit and 24 HTTP cases**, while the
+previous controls passed. The expanded HTTP matrix passes **313 tests per
+backend**, and the built-runtime live helper now runs **84 cases / 1,764
+assertions per backend**. PostgreSQL 17.8 and 22 migrations were verified again
+on an owned disposable database. The additional stability test enumerates
+short assigned, omitted and null type combinations before and after protected
+type restoration. Historical receipts above remain unchanged.
+
 | Type | Value validation |
 | --- | --- |
 | string | JSON string; canonical suggestions do not change or reject its case |
