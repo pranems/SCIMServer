@@ -411,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Core/RFC correction integrated and focused checks passed; generic representation hold OPEN | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`. Supported unique scalar types/references are corrected. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Three no-write generic promoted-column restrictions/reconstruction probes remain unresolved, distinct from P7 common externalId |
+| P3b | Core/RFC correction integrated; representation/admission dispositions OPEN | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`. Supported unique types/references corrected. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Three generic representation probes still reproduce. Worker reports no further edits; parent must assign/resolve remaining work. Registration/discovery admission is not claimed fixed by P7 |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
@@ -1420,7 +1420,8 @@ No broad uniqueness/C0, deployment or data-repair closure is implied.
 
 **Admission TODO remains explicit:** resource writes returning 400 for an
 unsupported promise do not prove that registration/discovery cannot publish
-that promise as supported. P7 must verify and close declaration rejection for
+that promise as supported. Final acceptance must verify or deliberately
+dispose of declaration rejection for
 whole-complex/Boolean/dateTime/binary server uniqueness and genuinely
 unenforceable computed paths, using exact resource-type/schema/path identity.
 Extensions sharing core names must not be rejected by spelling alone.
@@ -1434,6 +1435,18 @@ that candidate-authority correction; P7 must not paper over it by adding
 broader schema restrictions. The P7 status document and uniqueness-inventory
 JSON remain historical pre-P3b evidence, not proof that every listed collector
 gap is still present or that all gaps are now closed.
+
+**Latest owner status:** P3b reports no further source edits underway after
+`cefb540b`. Its namespace test demonstrates isolation by endpoint **and**
+resource type, including one shared extension across families; it does not
+promise whole-endpoint/global uniqueness. The registration/discovery gap has
+not been closed by a committed P7 change and must not be attributed as fixed.
+Parent assignment or explicit reviewed disposition is still needed.
+Separately, the compiled generic-field probes remain valid: `promotedType`
+still constrains generic core names and `uniquenessPayload` still overlays
+their raw values. No pending fix is presumed merely because the concern was
+previously routed to P3b. Parent decisions are required before C0, not inferred
+from the absence of further worker edits.
 
 **Assurance improvement: applied.** Type-specific characteristic applicability
 is checked before choosing equality semantics, with both rejection and

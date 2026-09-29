@@ -31,6 +31,10 @@ P7 owns type- and namespace-qualified admission checks for genuinely
 unsupported declarations. The current generic promoted-column restriction
 must not become a blanket admission rule for otherwise valid custom-core
 displayName/active or extension homonyms.
+No committed P7 admission closure is established here. The P3b worker reports
+no additional edits underway; remaining admission and candidate-authority
+items therefore require explicit parent ownership/disposition rather than an
+assumption that either worker has completed them.
 
 ## Client-visible outcome
 

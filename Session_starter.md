@@ -24,10 +24,11 @@ unique types and compares references exactly. Build, 211 focused units,
 167 InMemory HTTP cases (one native-DB skip), seven no-write controls and
 the 21-assertion built-local smoke pass.
 **Acceptance remains blocked:** the three generic promoted-column
-restriction/candidate-authority probes remain unresolved with P3b, separately
-from P7's common-externalId work. Prior receipts remain historical.
-P7 admission must also stop publishing genuinely unsupported uniqueness
-promises; P3b's runtime 400 is not registration proof. Do not convert a
+restriction/candidate-authority probes remain unresolved in P3b's committed
+code. The P3b worker reports no further edits underway; these need explicit
+follow-up ownership or parent disposition, separately from P7 common externalId.
+Prior receipts remain historical. Uniqueness admission is also unclosed;
+do not assume P7 fixed it. P3b's runtime 400 is not registration proof. Do not convert a
 convenience-column mismatch into a blanket custom-schema admission ban.
 
 **Latest integration fix:** shared one-to-one matching closes the confirmed
