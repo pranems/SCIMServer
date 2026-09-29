@@ -1311,6 +1311,7 @@ the compiled source are retained in
 | Boolean, dateTime and binary server uniqueness compile and normalize values | OPEN: these types have no uniqueness characteristic under the reviewed RFC clauses; do not invent normalized uniqueness as a requirement. P3b must explicitly handle unsupported/inconsistent promises |
 | Generic core decimal or MV displayName server uniqueness is rejected because the promoted column is String | OPEN: valid custom-core displayName/active shapes are not restricted by convenience-column representation |
 | Generic candidate reconstruction overwrites raw displayName/active with promoted column values | OPEN: P3b's extractor must use the resource-family/schema-authoritative representation, coordinated with P2/P7 rather than solved by new admission restrictions |
+| Owner confirms references are folded by the String comparison default | OPEN: RFC 7643 section 2.3.7 requires reference case exactness; test distinct case-sensitive reference values and identical-value conflicts without silently borrowing String defaults |
 
 Top-level externalId remains the separate RFC common String/single-value
 contract owned by P7; extension homonyms are independent. The source package's

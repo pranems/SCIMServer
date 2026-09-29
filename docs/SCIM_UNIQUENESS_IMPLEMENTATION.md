@@ -16,6 +16,15 @@ release metadata, exact-tip CI and deployment remain parent-owned.
 > package counts as acceptance of those policies. See
 > [integration disposition](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open).
 
+**Owner-confirmed additional correction:** reference values are inherently
+case-exact under [RFC 7643 section 2.3.7](https://www.rfc-editor.org/rfc/rfc7643.html#section-2.3.7).
+The current shared String/reference lowercase default is therefore another
+open P3b policy defect. The owner is preparing a new RED/GREEN follow-up for
+reference exactness and rejection of inconsistent server uniqueness on
+Boolean/dateTime/binary/whole-complex attributes. P7 owns matching admission
+checks. No corrected behavior is claimed until the new commit is integrated;
+the custom-core displayName/active authority hold also remains open.
+
 ## Client-visible outcome
 
 Two different resources cannot acquire the same declared unique value by

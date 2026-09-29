@@ -16,6 +16,9 @@ cases (two native-DB skips) and 136 bounded built-live checks pass.
 **Acceptance remains blocked:** six no-write probes expose unsupported-type
 and generic promoted-column policy/reconstruction discrepancies; P3b owns
 the correction, not P7's common-externalId work.
+P3b also confirmed reference values must compare case-exactly (RFC 7643
+2.3.7). A new owner follow-up will correct that and unsupported uniqueness
+types; no acceptance is claimed before its SHA and proof arrive.
 
 **Latest integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
