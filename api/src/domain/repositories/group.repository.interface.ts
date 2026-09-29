@@ -8,6 +8,7 @@
  * Phase 3: displayNameLower parameter renamed to displayName - CITEXT/InMemory
  * handles case-insensitive comparison without a pre-computed lowercase column.
  */
+import type { ExpectedVersion } from './write-precondition';
 import type {
   GroupRecord,
   GroupWithMembers,
@@ -40,10 +41,10 @@ export interface IGroupRepository {
   ): Promise<GroupWithMembers[]>;
 
   /** Update a group by its internal storage ID. */
-  update(id: string, data: GroupUpdateInput): Promise<GroupRecord>;
+  update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion): Promise<GroupRecord>;
 
   /** Delete a group by its internal storage ID. */
-  delete(id: string): Promise<void>;
+  delete(id: string, expectedVersion?: ExpectedVersion): Promise<void>;
 
   /**
    * Check for displayName uniqueness within an endpoint (case-insensitive).
@@ -76,5 +77,6 @@ export interface IGroupRepository {
     groupId: string,
     data: GroupUpdateInput,
     members: MemberCreateInput[],
+    expectedVersion?: ExpectedVersion,
   ): Promise<void>;
 }

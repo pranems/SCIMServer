@@ -18,6 +18,7 @@ import type {
 import type { Prisma } from '../../../generated/prisma/client';
 import { isValidUuid } from './uuid-guard';
 import { wrapPrismaError } from './prisma-error.util';
+import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
@@ -103,7 +104,7 @@ export class PrismaUserRepository implements IUserRepository {
     }
   }
 
-  async update(id: string, data: UserUpdateInput): Promise<UserRecord> {
+  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion): Promise<UserRecord> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
@@ -114,20 +115,22 @@ export class PrismaUserRepository implements IUserRepository {
     prismaData.version = { increment: 1 };
     try {
       const updated = await this.prisma.scimResource.update({
-        where: { id },
+        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
       });
       return toUserRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
-      throw wrapPrismaError(error, `User update(${id})`);
+      throw wrapPrismaError(error, `User update(${id})`, expectedVersion);
     }
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
     try {
-      await this.prisma.scimResource.delete({ where: { id } });
+      await this.prisma.scimResource.delete({
+        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+      });
     } catch (error) {
-      throw wrapPrismaError(error, `User delete(${id})`);
+      throw wrapPrismaError(error, `User delete(${id})`, expectedVersion);
     }
   }
 

@@ -30,6 +30,7 @@ import { parsePatchPath, patchAttributePath, type ParsedPatchPath } from '../../
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
+import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
 
@@ -57,6 +58,15 @@ export function handleRepositoryError(
   context: Record<string, unknown> = {},
 ): never {
   if (error instanceof RepositoryError) {
+    if (error.code === 'PRECONDITION_FAILED') {
+      logger.debug(logCategory, 'Conditional write rejected', { operation, errorCode: error.code, ...context });
+      throw createScimError({
+        status: 412,
+        scimType: 'versionMismatch',
+        detail: 'Resource no longer satisfies If-Match. Read the current resource before retrying.',
+        diagnostics: { errorCode: 'PRECONDITION_VERSION_MISMATCH' },
+      });
+    }
     logger.error(logCategory, `Repository failure: ${operation}`, error.cause ?? error, {
       operation,
       errorCode: error.code,
@@ -141,6 +151,7 @@ export function ensureSchema(schemas: string[] | undefined, requiredSchema: stri
  *
  * When the client sends an If-Match header, the resource's current version-based
  * ETag must match - otherwise 412 Precondition Failed is thrown BEFORE the write.
+ * Return the condition for the repository to enforce again atomically at mutation.
  * When RequireIfMatch is enabled, a missing If-Match header → 428 Precondition Required.
  */
 export function enforceIfMatch(
@@ -148,7 +159,7 @@ export function enforceIfMatch(
   ifMatch?: string,
   config?: EndpointConfig,
   profile?: EndpointProfile,
-): void {
+): ExpectedVersion | undefined {
   // Gap 10: ETag/If-Match is meaningful only when etag.supported is on. When an
   // endpoint explicitly sets serviceProviderConfig.etag.supported = false,
   // versioning is inert: RequireIfMatch does not apply (no 428) and a supplied
@@ -175,6 +186,7 @@ export function enforceIfMatch(
 
   const currentETag = `W/"v${currentVersion}"`;
   assertIfMatch(currentETag, ifMatch);
+  return ifMatch === '*' ? '*' : currentVersion;
 }
 
 /**

@@ -241,6 +241,14 @@ resource scope. InMemory checks and replaces/deletes the map entry in one
 synchronous operation. A mismatch becomes the same typed repository conflict
 on either backend and is mapped to HTTP 412.
 
+**P3 implementation:** [conditional writes and User uniqueness](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md).
+The condition is a numeric version or wildcard existence requirement. The
+initial endpoint/resource-type lookup resolves the unique internal storage id;
+the atomic write predicates combine that id with the numeric version. A target
+removed after the read fails the supplied precondition with 412; an initially
+missing target retains 404. Existing unsupported ETag lists still fail rather
+than being silently reduced to one version.
+
 Without a client condition, preserve the documented existing write policy.
 Do not add hidden retries that reinterpret a client's intended selection.
 If a retry is required by a later design, re-read and reapply deliberately.
@@ -305,7 +313,8 @@ flowchart LR
 | D0 | Commit reviewed design, independent analysis and sanitized evidence | None | Docs, JSON/CSV, links, rendered diagrams, safety guard syntax |
 | P1 | Safe, typed PATCH path interpretation on all resource families | D0 | `INC-*`, native/quoted/compound/number selectors, invalid-path no-write cases |
 | P2 | Correct shared operation semantics and ordered transitions | P1 | Multi-value add, all matches, required/immutable/primary, selected-object shape |
-| P3 | Atomic version and uniqueness enforcement | D0 | Same-version barriers, sequential If-Match, duplicate create/update on both backends |
+| P3 | Atomic conditional writes and endpoint-scoped User name uniqueness parity | D0 | Same-version barriers, sequential If-Match, duplicate create/update on both backends |
+| P3b | Design atomic schema-driven and Group/custom-name uniqueness | Separate design after P3 | Storage constraints, scope/equality policy and concurrent creates/renames for every promised characteristic |
 | P4 | Atomic Group create/update plus members | P3 contract if shared | Native constraints and injected failure rollback, no partial create |
 | P5 | JSON search arrays and well-formed errors | D0 | User/Group/custom `.search`, genuine invalid DTO with scalar error detail |
 | P6 | Consistent query limits, sorting and capability checks | P1 query seam, P5 | `READ-FILTER-*`, typed sort, hidden fields, direct/Bulk/Me capability checks |
@@ -385,7 +394,8 @@ mean merged or deployed.
 | D0 | Validated; committing | 53 new docs/evidence/reproducer files reviewed; 22 JSON artifacts parse; 140 relative links resolve; 10 diagrams render in both themes; content/freshness and safety controls pass |
 | P1 | Validated locally | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Pending | Depends on stable typed path contract |
-| P3 | Pending | Actual database barriers are already available as baseline evidence |
+| P3 | Validated locally | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
+| P3b | Deferred with explicit scope | Schema-driven, Group and custom-name atomic uniqueness need a separate design; P3 does not claim these guarantees |
 | P4 | Pending | Native and injected member failures already reproduce |
 | P5 | Pending | Valid search arrays and invalid error detail already reproduce |
 | P6 | Pending | Custom/Bulk capability controls already reproduce |
@@ -395,7 +405,10 @@ mean merged or deployed.
 | C0 | Pending | Do not mark complete while a package or applicable gate is unresolved |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1 implemented and locally validated; P2-P9 remain pending. This section is updated at package boundaries. Detailed
+P1 and P3 are implemented and locally validated in their source worktrees,
+and integrated here. Combined validation, release metadata, PR, and deployment
+remain pending. Other package statuses are owned by their independent
+implementation contexts. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
 
 ## 12. Architecture and self-improvement decisions

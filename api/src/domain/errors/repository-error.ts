@@ -13,7 +13,7 @@
  *
  * @see Phase A Step 2 - LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md §7
  */
-export type RepositoryErrorCode = 'NOT_FOUND' | 'CONFLICT' | 'CONNECTION' | 'UNKNOWN';
+export type RepositoryErrorCode = 'NOT_FOUND' | 'CONFLICT' | 'PRECONDITION_FAILED' | 'CONNECTION' | 'UNKNOWN';
 
 export class RepositoryError extends Error {
   /** Discriminator for instanceof checks across module boundaries */
@@ -44,6 +44,7 @@ export function repositoryErrorToHttpStatus(code: RepositoryErrorCode): number {
   switch (code) {
     case 'NOT_FOUND':  return 404;
     case 'CONFLICT':   return 409;
+    case 'PRECONDITION_FAILED': return 412;
     case 'CONNECTION': return 503;
     case 'UNKNOWN':    return 500;
   }

@@ -2,6 +2,15 @@ import { wrapPrismaError } from './prisma-error.util';
 import { RepositoryError } from '../../../domain/errors/repository-error';
 
 describe('wrapPrismaError', () => {
+  it.each([1, '*'] as const)('maps a conditional miss (%s), including deletion, to PRECONDITION_FAILED', (expected) => {
+    const error = Object.assign(new Error('Record not found'), { code: 'P2025' });
+    expect(wrapPrismaError(error, 'conditional write', expected)).toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('preserves an already typed repository error', () => {
+    const error = new RepositoryError('PRECONDITION_FAILED', 'condition failed');
+    expect(wrapPrismaError(error, 'aggregate')).toBe(error);
+  });
   it('should map P2025 to NOT_FOUND', () => {
     const prismaError = Object.assign(new Error('Record not found'), { code: 'P2025' });
     const result = wrapPrismaError(prismaError, 'User update(abc)');

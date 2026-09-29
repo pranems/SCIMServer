@@ -20,6 +20,21 @@ for the operating process and [REMAINING_WORK_REGISTER.md](docs/auth/REMAINING_W
 for the dated authentication backlog. The old [DELIVERY_PLAN.md](docs/DELIVERY_PLAN.md) is a
 historical execution record, not the current branch or priority authority.
 
+### SCIM correctness P3 local implementation
+
+| Date | Summary |
+|---|---|
+| 2026-09-28 | P3 implements atomic conditional User/Group/custom writes plus InMemory User name uniqueness. Real PostgreSQL 17.8 and InMemory each pass 55 HTTP tests and 33 live assertions; targeted units pass 692. [Implementation and exact evidence](docs/SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md). |
+
+- [x] ✅ COMPLETED P3 local implementation and focused dual-backend validation.
+- [ ] Parent consolidation: release metadata, independent review and full applicable matrix.
+- [ ] P3b: separately design schema-driven and Group/custom-name atomic uniqueness.
+- [ ] P4 remains separately assigned; no Group-create rollback guarantee is claimed here.
+
+Assistant memory: an initial If-Match read is not a persistence condition.
+Pass the validated condition to the real write, preserve wildcard existence,
+and assert stored versions and winner values under deterministic barriers.
+
 ### Workspace Tenant Isolation (CRITICAL - read before any `az` command)
 
 This dev box hosts TWO projects targeting TWO different Azure tenants. Cross-tenant accidents (deploying to the wrong subscription, leaking secrets, running tests against the wrong identity) are the #1 risk and have a one-line preventative fix.

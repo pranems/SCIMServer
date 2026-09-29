@@ -280,7 +280,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -433,7 +433,7 @@ export class EndpointScimGroupsService {
           ...parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
           lastModified: new Date().toISOString()
         })
-      }, memberInputs);
+      }, memberInputs, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, 'patch group (transaction)', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -495,7 +495,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
 
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
@@ -531,7 +531,7 @@ export class EndpointScimGroupsService {
           ...meta,
           lastModified: now.toISOString()
         })
-      }, replaceMemberInputs);
+      }, replaceMemberInputs, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, 'replace group (transaction)', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
@@ -560,7 +560,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Settings v7: Gate hard delete behind GroupHardDeleteEnabled (default: true)
     const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED);
@@ -574,7 +574,7 @@ export class EndpointScimGroupsService {
     }
 
     try {
-      await this.groupRepo.delete(group.id);
+      await this.groupRepo.delete(group.id, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }

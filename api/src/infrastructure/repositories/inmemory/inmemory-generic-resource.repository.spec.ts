@@ -149,7 +149,7 @@ describe('InMemoryGenericResourceRepository', () => {
     });
 
     it('should throw RepositoryError when deleting non-existent id', async () => {
-      await expect(repo.delete('non-existent')).rejects.toThrow('GenericResource with id "non-existent" not found.');
+      await expect(repo.delete('non-existent')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 

@@ -17,7 +17,7 @@ import type {
   GenericResourceUpdateInput,
 } from '../../../domain/models/generic-resource.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
-import { RepositoryError } from '../../../domain/errors/repository-error';
+import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
 @Injectable()
 export class InMemoryGenericResourceRepository implements IGenericResourceRepository {
@@ -80,11 +80,9 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       .map((r) => ({ ...r }));
   }
 
-  async update(id: string, data: GenericResourceUpdateInput): Promise<GenericResourceRecord> {
+  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion): Promise<GenericResourceRecord> {
     const existing = this.resources.get(id);
-    if (!existing) {
-      throw new RepositoryError('NOT_FOUND', `GenericResource with id "${id}" not found.`);
-    }
+    assertWritePrecondition(existing, expectedVersion);
 
     const updated: GenericResourceRecord = {
       ...existing,
@@ -97,10 +95,8 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
     return { ...updated };
   }
 
-  async delete(id: string): Promise<void> {
-    if (!this.resources.has(id)) {
-      throw new RepositoryError('NOT_FOUND', `GenericResource with id "${id}" not found.`);
-    }
+  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
+    assertWritePrecondition(this.resources.get(id), expectedVersion);
     this.resources.delete(id);
   }
 

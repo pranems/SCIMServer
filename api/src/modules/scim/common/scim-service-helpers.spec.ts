@@ -172,6 +172,12 @@ describe('enforceIfMatch', () => {
     const profile = { serviceProviderConfig: { etag: { supported: true } } } as any;
     expect(() => enforceIfMatch(3, undefined, config, profile)).toThrow();
   });
+
+  it('returns the validated persistence condition, preserving wildcard existence', () => {
+    expect(enforceIfMatch(3, 'W/"v3"')).toBe(3);
+    expect(enforceIfMatch(3, '*')).toBe('*');
+    expect(enforceIfMatch(3)).toBeUndefined();
+  });
 });
 
 // ─── ScimSchemaHelpers ──────────────────────────────────────────────────────

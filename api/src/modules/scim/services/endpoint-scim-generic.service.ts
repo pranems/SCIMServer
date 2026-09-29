@@ -406,7 +406,7 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    enforceIfMatch(existing.version, ifMatch, config);
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // GEN-02: Immutable attribute enforcement - compare existing with incoming
     this.checkImmutableAttributes(existing, body, resourceType, endpointId, config);
@@ -462,7 +462,7 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(payload),
         meta: JSON.stringify(metaObj),
-      });
+      }, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -511,7 +511,7 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    enforceIfMatch(existing.version, ifMatch, config);
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // AUDIT-4: ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
     // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → reject 400
@@ -704,7 +704,7 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(patchedPayload),
         meta: JSON.stringify(metaObj),
-      });
+      }, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -749,7 +749,7 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard (double-delete → 404)
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    enforceIfMatch(existing.version, ifMatch, config);
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Settings v7: Gate hard delete behind USER_HARD_DELETE_ENABLED (default: true)
     const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED);
@@ -763,7 +763,7 @@ export class EndpointScimGenericService {
     }
 
     try {
-      await this.genericRepo.delete(existing.id);
+      await this.genericRepo.delete(existing.id, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }

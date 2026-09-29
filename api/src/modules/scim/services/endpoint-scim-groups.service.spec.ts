@@ -323,7 +323,7 @@ describe('EndpointScimGroupsService', () => {
       expect(mockGroupRepo.findWithMembers).toHaveBeenCalledWith(mockEndpoint.id, mockGroup.scimId);
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
         displayName: 'Updated Group Name',
-      }), expect.any(Array));
+      }), expect.any(Array), undefined);
     });
 
     it('should return updated group resource with 200 OK (RFC 7644 §3.5.2)', async () => {
@@ -826,7 +826,7 @@ describe('EndpointScimGroupsService', () => {
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'New Display Name',
-        }), expect.any(Array));
+        }), expect.any(Array), undefined);
       });
 
       it('should persist externalId as first-class column from no-path replace object', async () => {
@@ -849,7 +849,7 @@ describe('EndpointScimGroupsService', () => {
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           externalId: 'new-ext-id',
-        }), expect.any(Array));
+        }), expect.any(Array), undefined);
       });
 
       it('should handle combined displayName + externalId in no-path replace', async () => {
@@ -876,7 +876,7 @@ describe('EndpointScimGroupsService', () => {
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'Combined',
           externalId: 'ext-combined',
-        }), expect.any(Array));
+        }), expect.any(Array), undefined);
       });
 
       it('should handle externalId path in replace operation', async () => {
@@ -900,7 +900,7 @@ describe('EndpointScimGroupsService', () => {
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           externalId: 'pathed-ext-id',
-        }), expect.any(Array));
+        }), expect.any(Array), undefined);
       });
 
       it('should accept no-path replace with string value as displayName', async () => {
@@ -926,7 +926,7 @@ describe('EndpointScimGroupsService', () => {
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'Direct String Name',
-        }), expect.any(Array));
+        }), expect.any(Array), undefined);
       });
 
       it('should handle no-path replace with members array in object value', async () => {
@@ -956,7 +956,7 @@ describe('EndpointScimGroupsService', () => {
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'Group With Members',
-        }), expect.any(Array));
+        }), expect.any(Array), undefined);
       });
 
       it('should throw error for no-path replace with invalid value type', async () => {
@@ -1077,7 +1077,7 @@ describe('EndpointScimGroupsService', () => {
       await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id);
 
       expect(mockGroupRepo.findByScimId).toHaveBeenCalledWith(mockEndpoint.id, mockGroup.scimId);
-      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
     });
 
     it('should throw 404 if group not found in endpoint', async () => {
@@ -1098,7 +1098,7 @@ describe('EndpointScimGroupsService', () => {
         const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
 
-        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
 
@@ -1109,7 +1109,7 @@ describe('EndpointScimGroupsService', () => {
         const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
 
-        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
 
@@ -1119,7 +1119,7 @@ describe('EndpointScimGroupsService', () => {
 
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined);
 
-        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
 
@@ -1130,7 +1130,7 @@ describe('EndpointScimGroupsService', () => {
         const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
 
-        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
 
@@ -1411,7 +1411,7 @@ describe('EndpointScimGroupsService', () => {
 
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
         externalId: 'ext-updated',
-      }), expect.any(Array));
+      }), expect.any(Array), undefined);
     });
 
     it('should update externalId via no-path PATCH replace object', async () => {
@@ -1432,7 +1432,7 @@ describe('EndpointScimGroupsService', () => {
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
         displayName: 'Renamed',
         externalId: 'ext-via-nopath',
-      }), expect.any(Array));
+      }), expect.any(Array), undefined);
     });
   });
 
@@ -1681,7 +1681,7 @@ describe('EndpointScimGroupsService', () => {
       mockGroupRepo.delete.mockResolvedValue(mockGroup);
 
       await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, hardDeleteConfig);
-      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
 
       // GET after hard-delete: not found
       mockGroupRepo.findWithMembers.mockResolvedValue(null);
@@ -1730,7 +1730,7 @@ describe('EndpointScimGroupsService', () => {
       };
 
       await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
-      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, undefined);
       expect(mockGroupRepo.update).not.toHaveBeenCalled();
     });
 
@@ -1841,7 +1841,7 @@ describe('EndpointScimGroupsService', () => {
 
       it('should succeed when If-Match matches current ETag', async () => {
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined, 'W/"v1"');
-        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id, 1);
       });
 
       it('should throw 412 when If-Match does not match current ETag', async () => {

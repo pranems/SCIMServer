@@ -23,7 +23,7 @@ import type {
   MemberRecord,
 } from '../../../domain/models/group.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
-import { RepositoryError } from '../../../domain/errors/repository-error';
+import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
@@ -101,11 +101,9 @@ export class InMemoryGroupRepository implements IGroupRepository {
     }));
   }
 
-  async update(id: string, data: GroupUpdateInput): Promise<GroupRecord> {
+  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion): Promise<GroupRecord> {
     const existing = this.groups.get(id);
-    if (!existing) {
-      throw new RepositoryError('NOT_FOUND', `Group with id ${id} not found`);
-    }
+    assertWritePrecondition(existing, expectedVersion);
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: GroupRecord = {
       ...existing,
@@ -117,10 +115,8 @@ export class InMemoryGroupRepository implements IGroupRepository {
     return { ...updated };
   }
 
-  async delete(id: string): Promise<void> {
-    if (!this.groups.has(id)) {
-      throw new RepositoryError('NOT_FOUND', `Group with id ${id} not found`);
-    }
+  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
+    assertWritePrecondition(this.groups.get(id), expectedVersion);
     this.groups.delete(id);
     // Cascade: remove associated members
     for (const [memberId, member] of this.members) {
@@ -181,16 +177,28 @@ export class InMemoryGroupRepository implements IGroupRepository {
     groupId: string,
     data: GroupUpdateInput,
     members: MemberCreateInput[],
+    expectedVersion?: ExpectedVersion,
   ): Promise<void> {
-    await this.update(groupId, data);
+    const existing = this.groups.get(groupId);
+    assertWritePrecondition(existing, expectedVersion);
+    // Stage the entire aggregate before committing either map. No await can
+    // interleave a second conditional writer between the check and mutation.
+    const now = new Date();
+    const updated: GroupRecord = {
+      ...existing, ...data, version: existing.version + 1, updatedAt: now,
+    };
+    const replacement = members.map((m): MemberRecord => ({
+      ...m, id: randomUUID(), groupId, createdAt: now,
+    }));
 
+    this.groups.set(groupId, updated);
     for (const [memberId, member] of this.members) {
       if (member.groupId === groupId) {
         this.members.delete(memberId);
       }
     }
 
-    await this.addMembers(groupId, members);
+    for (const member of replacement) this.members.set(member.id, member);
   }
 
   /** Clear all data - useful in test teardowns. */

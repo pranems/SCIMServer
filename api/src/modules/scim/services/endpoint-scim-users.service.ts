@@ -259,13 +259,13 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId, config);
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, updatedData);
+      updatedUser = await this.userRepo.update(user.id, updatedData, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, 'patch user', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -322,7 +322,7 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
@@ -354,7 +354,7 @@ export class EndpointScimUsersService {
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, data);
+      updatedUser = await this.userRepo.update(user.id, data, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, 'replace user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
@@ -393,10 +393,10 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     try {
-      await this.userRepo.delete(user.id);
+      await this.userRepo.delete(user.id, expectedVersion);
     } catch (error) {
       handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }

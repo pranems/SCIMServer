@@ -80,6 +80,17 @@ All requests (except public routes) are evaluated against 3 tiers in order:
 | `If-Match` | Conditional | `W/"{version}"` or `*` | ETag for PUT/PATCH/DELETE. Required if `RequireIfMatch: true` |
 | `If-None-Match` | Optional | `W/"{version}"` | Conditional GET - returns 304 if match |
 
+**Conditional resource writes (P3, locally validated; release integration pending):**
+User, Group and custom-resource PUT/PATCH/DELETE enforce a numeric If-Match
+at persistence, not only at the initial read. A concurrent modification returns
+412 without changing fields, members or version. Wildcard `*` means existence,
+not a specific version; unsupported comma-separated tag lists remain rejected.
+ETag-disabled profiles ignore the header. An initially missing scoped resource
+returns 404; disappearance after a successful read returns 412 for a conditional
+write. InMemory User name create/rename now enforces the existing endpoint-scoped,
+case-insensitive PostgreSQL uniqueness policy atomically. See
+[implementation and remaining uniqueness limitations](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md).
+
 ### Response Headers
 
 | Header | Value | Notes |
@@ -1176,7 +1187,9 @@ Authorization: Bearer changeme-scim
 ```
 
 ```json
-{ "pruned": 1250 }
+{
+  "pruned": 1250
+}
 ```
 
 ---
@@ -1238,7 +1251,10 @@ Authorization: Bearer changeme-scim
 ```
 
 ```json
-{ "message": "Global log level set to DEBUG", "globalLevel": "DEBUG" }
+{
+  "message": "Global log level set to DEBUG",
+  "globalLevel": "DEBUG"
+}
 ```
 
 ---

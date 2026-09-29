@@ -19,6 +19,7 @@ import type {
 } from '../../../domain/models/group.model';
 import type { Prisma } from '../../../generated/prisma/client';
 import { wrapPrismaError } from './prisma-error.util';
+import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { isValidUuid } from './uuid-guard';
 
 /** Maps a ScimResource row (with JSONB payload) to the GroupRecord domain type. */
@@ -138,7 +139,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     }
   }
 
-  async update(id: string, data: GroupUpdateInput): Promise<GroupRecord> {
+  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion): Promise<GroupRecord> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
@@ -149,20 +150,22 @@ export class PrismaGroupRepository implements IGroupRepository {
     prismaData.version = { increment: 1 };
     try {
       const updated = await this.prisma.scimResource.update({
-        where: { id },
+        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
       });
       return toGroupRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
-      throw wrapPrismaError(error, `Group update(${id})`);
+      throw wrapPrismaError(error, `Group update(${id})`, expectedVersion);
     }
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
     try {
-      await this.prisma.scimResource.delete({ where: { id } });
+      await this.prisma.scimResource.delete({
+        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+      });
     } catch (error) {
-      throw wrapPrismaError(error, `Group delete(${id})`);
+      throw wrapPrismaError(error, `Group delete(${id})`, expectedVersion);
     }
   }
 
@@ -236,6 +239,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     groupId: string,
     data: GroupUpdateInput,
     members: MemberCreateInput[],
+    expectedVersion?: ExpectedVersion,
   ): Promise<void> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
@@ -248,7 +252,7 @@ export class PrismaGroupRepository implements IGroupRepository {
       async (tx: Prisma.TransactionClient) => {
         // Phase 7: Include version increment in the transaction
         await tx.scimResource.update({
-          where: { id: groupId },
+          where: { id: groupId, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
           data: {
             ...prismaData,
             version: { increment: 1 },
@@ -272,7 +276,7 @@ export class PrismaGroupRepository implements IGroupRepository {
       },
       { maxWait: 10000, timeout: 30000 },
     ).catch((error) => {
-      throw wrapPrismaError(error, `Group updateGroupWithMembers(${groupId})`);
+      throw wrapPrismaError(error, `Group updateGroupWithMembers(${groupId})`, expectedVersion);
     });
   }
 }

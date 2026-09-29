@@ -472,7 +472,7 @@ describe('EndpointScimUsersService', () => {
       expect(result.userName).toBe('nopath@example.com');
       expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
         userName: 'nopath@example.com',
-      }));
+      }), undefined);
     });
 
     it('should update externalId and active via no-path replace', async () => {
@@ -978,7 +978,7 @@ describe('EndpointScimUsersService', () => {
       expect(result.externalId).toBe('pathed-ext-id');
       expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
         externalId: 'pathed-ext-id',
-      }));
+      }), undefined);
     });
 
     it('should remove simple attribute via path', async () => {
@@ -1339,7 +1339,7 @@ describe('EndpointScimUsersService', () => {
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
 
       expect(mockUserRepo.findByScimId).toHaveBeenCalledWith(mockEndpoint.id, mockUser.scimId);
-      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, undefined);
     });
 
     it('should hard-delete user when config is undefined (default true)', async () => {
@@ -1348,7 +1348,7 @@ describe('EndpointScimUsersService', () => {
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, undefined);
 
-      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, undefined);
     });
 
     it('should throw 404 if user not found in endpoint', async () => {
@@ -1410,7 +1410,7 @@ describe('EndpointScimUsersService', () => {
         };
         await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
 
-        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, undefined);
       });
     });
   });
@@ -1798,7 +1798,7 @@ describe('EndpointScimUsersService', () => {
         expect(result.userName).toBe('normalized@example.com');
         expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
           userName: 'normalized@example.com',
-        }));
+        }), undefined);
       });
 
       it('should normalize DISPLAYNAME to displayName in no-path replace', async () => {
@@ -2407,7 +2407,8 @@ describe('EndpointScimUsersService', () => {
       expect(result.active).toBe(true);
       expect(mockUserRepo.update).toHaveBeenCalledWith(
         deactivatedUser.id,
-        expect.objectContaining({ active: true })
+        expect.objectContaining({ active: true }),
+        undefined,
       );
     });
 
@@ -2439,7 +2440,7 @@ describe('EndpointScimUsersService', () => {
       mockUserRepo.delete.mockResolvedValue(mockUser);
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id);
-      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, undefined);
 
       // Now GET returns null (not found)
       mockUserRepo.findByScimId.mockResolvedValue(null);
@@ -2454,7 +2455,7 @@ describe('EndpointScimUsersService', () => {
       mockUserRepo.delete.mockResolvedValue(mockUser);
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
-      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, undefined);
 
       // Now GET returns null (not found)
       mockUserRepo.findByScimId.mockResolvedValue(null);
@@ -2493,7 +2494,7 @@ describe('EndpointScimUsersService', () => {
       };
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
-      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, undefined);
     });
 
     it('should enforce strict schema on PATCH when UserSoftDeleteEnabled + StrictSchemaValidation', async () => {
@@ -2678,7 +2679,7 @@ describe('EndpointScimUsersService', () => {
 
       it('should succeed when If-Match matches current ETag', async () => {
         await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, undefined, 'W/"v1"');
-        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id, 1);
       });
 
       it('should throw 412 when If-Match does not match current ETag', async () => {

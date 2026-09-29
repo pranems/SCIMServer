@@ -15,6 +15,7 @@ import type {
 import type { Prisma } from '../../../generated/prisma/client';
 import { isValidUuid } from './uuid-guard';
 import { wrapPrismaError } from './prisma-error.util';
+import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
 /** Maps a ScimResource row to the GenericResourceRecord domain type. */
 function toGenericRecord(resource: Record<string, unknown>): GenericResourceRecord {
@@ -97,7 +98,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     }
   }
 
-  async update(id: string, data: GenericResourceUpdateInput): Promise<GenericResourceRecord> {
+  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion): Promise<GenericResourceRecord> {
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
       prismaData.payload = JSON.parse(data.rawPayload);
@@ -106,20 +107,22 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     prismaData.version = { increment: 1 };
     try {
       const updated = await this.prisma.scimResource.update({
-        where: { id },
+        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
       });
       return toGenericRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
-      throw wrapPrismaError(error, `GenericResource update(${id})`);
+      throw wrapPrismaError(error, `GenericResource update(${id})`, expectedVersion);
     }
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
     try {
-      await this.prisma.scimResource.delete({ where: { id } });
+      await this.prisma.scimResource.delete({
+        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+      });
     } catch (error) {
-      throw wrapPrismaError(error, `GenericResource delete(${id})`);
+      throw wrapPrismaError(error, `GenericResource delete(${id})`, expectedVersion);
     }
   }
 

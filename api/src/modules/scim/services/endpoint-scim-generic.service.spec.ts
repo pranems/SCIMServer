@@ -440,7 +440,7 @@ describe('EndpointScimGenericService', () => {
         deviceResourceType,
       );
 
-      expect(mockGenericRepo.delete).toHaveBeenCalledWith(mockGenericRecord.id);
+      expect(mockGenericRepo.delete).toHaveBeenCalledWith(mockGenericRecord.id, undefined);
     });
 
     it('should error when UserHardDeleteEnabled is false (settings v7)', async () => {

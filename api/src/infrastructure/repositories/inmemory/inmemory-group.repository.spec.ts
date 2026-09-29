@@ -244,7 +244,7 @@ describe('InMemoryGroupRepository', () => {
     it('should throw when group does not exist', async () => {
       await expect(
         repo.update('nonexistent-id', { displayName: 'X' }),
-      ).rejects.toThrow('Group with id nonexistent-id not found');
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
@@ -273,7 +273,7 @@ describe('InMemoryGroupRepository', () => {
     });
 
     it('should throw RepositoryError when deleting nonexistent id', async () => {
-      await expect(repo.delete('nonexistent')).rejects.toThrow('Group with id nonexistent not found');
+      await expect(repo.delete('nonexistent')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
