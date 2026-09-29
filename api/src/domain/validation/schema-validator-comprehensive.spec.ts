@@ -118,15 +118,15 @@ describe('SchemaValidator - Comprehensive', () => {
       });
     });
 
-    describe('readOnly attribute rejected on create/replace but not patch', () => {
+    describe('readOnly input ignored on create/replace; PATCH checks are separate', () => {
       const schemaWithReadOnly = makeCoreUserSchema([
         makeAttr({ name: 'userName', type: 'string', required: true }),
         makeAttr({ name: 'groups', type: 'complex', multiValued: true, mutability: 'readOnly' }),
       ]);
 
       it.each([
-        { mode: 'create'  as const, shouldFail: true },
-        { mode: 'replace' as const, shouldFail: true },
+        { mode: 'create'  as const, shouldFail: false },
+        { mode: 'replace' as const, shouldFail: false },
         { mode: 'patch'   as const, shouldFail: false },
       ])('readOnly attr set on $mode → fail=$shouldFail', ({ mode, shouldFail }) => {
         const opts: ValidationOptions = { strictMode: false, mode };
@@ -231,6 +231,7 @@ describe('SchemaValidator - Comprehensive', () => {
       '2025-01-15T10:30:00Z',
       '2025-01-15T10:30:00.000Z',
       '2025-01-15T10:30:00+05:30',
+      '2025-01-15T10:30:00',
     ])('should accept valid dateTime: %s', (dt) => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], ts: dt };
       expect(SchemaValidator.validate(payload, [schema], opts).valid).toBe(true);
@@ -242,7 +243,6 @@ describe('SchemaValidator - Comprehensive', () => {
       'yesterday',
       '',  // empty string
       '2025-01-15',  // date-only (no time) - RFC 7643 §2.3.5 requires xsd:dateTime
-      '2025-01-15T10:30:00',  // no timezone - xsd:dateTime requires Z or ±HH:MM
       'Tue, 15 Jan 2025 10:30:00 GMT',  // RFC 2822 - not xsd:dateTime
     ])('should reject invalid dateTime: "%s"', (dt) => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], ts: dt };
@@ -310,12 +310,10 @@ describe('SchemaValidator - Comprehensive', () => {
       makeAttr({ name: 'readOnlyField', mutability: 'readOnly', type: 'string' }),
     ]);
 
-    it('readOnly error takes precedence - no type error reported', () => {
+    it('readOnly input is ignored before type validation', () => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], userName: 'a', readOnlyField: 42 };
       const result = SchemaValidator.validate(payload, [schema], { strictMode: false, mode: 'create' });
-      expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]!.scimType).toBe('mutability');
+      expect(result).toEqual({ valid: true, errors: [] });
     });
   });
 
@@ -622,25 +620,24 @@ describe('SchemaValidator - Comprehensive', () => {
         makeAttr({ name: 'editableExt', type: 'string' }),
       ]);
 
-      it('should reject readOnly extension attr on create', () => {
+      it('should ignore readOnly extension attr on create', () => {
         const payload = {
           schemas: [CORE_USER_SCHEMA_ID],
           userName: 'a',
           [ENTERPRISE_EXT_ID]: { readOnlyExt: 'val' },
         };
         const result = SchemaValidator.validate(payload, [coreSchema, extSchema], { strictMode: false, mode: 'create' });
-        expect(result.valid).toBe(false);
-        expect(result.errors[0]!.scimType).toBe('mutability');
+        expect(result).toEqual({ valid: true, errors: [] });
       });
 
-      it('should reject readOnly extension attr on replace', () => {
+      it('should ignore readOnly extension attr on replace', () => {
         const payload = {
           schemas: [CORE_USER_SCHEMA_ID],
           userName: 'a',
           [ENTERPRISE_EXT_ID]: { readOnlyExt: 'val' },
         };
         const result = SchemaValidator.validate(payload, [coreSchema, extSchema], { strictMode: true, mode: 'replace' });
-        expect(result.valid).toBe(false);
+        expect(result).toEqual({ valid: true, errors: [] });
       });
 
       it('should allow editable extension attr', () => {
@@ -1168,26 +1165,24 @@ describe('SchemaValidator - Comprehensive', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should handle extension block as array gracefully', () => {
+    it('should reject an extension block array', () => {
       const payload = {
         schemas: [CORE_USER_SCHEMA_ID],
         userName: 'a',
         [ENTERPRISE_EXT_ID]: ['not', 'an', 'object'],
       };
-      // Array fails the !Array.isArray check, so it skips → valid (no error for malformed block)
       const result = SchemaValidator.validate(payload, [coreSchema, extSchema], { strictMode: true, mode: 'create' });
-      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([expect.objectContaining({ path: ENTERPRISE_EXT_ID, scimType: 'invalidValue' })]);
     });
 
-    it('should handle extension block as string gracefully', () => {
+    it('should reject an extension block string', () => {
       const payload = {
         schemas: [CORE_USER_SCHEMA_ID],
         userName: 'a',
         [ENTERPRISE_EXT_ID]: 'not-an-object',
       };
-      // String fails typeof === 'object' check, so it skips → valid
       const result = SchemaValidator.validate(payload, [coreSchema, extSchema], { strictMode: true, mode: 'create' });
-      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([expect.objectContaining({ path: ENTERPRISE_EXT_ID, scimType: 'invalidValue' })]);
     });
   });
 
@@ -1574,11 +1569,8 @@ describe('SchemaValidator - Comprehensive', () => {
     it('should handle NaN as invalid decimal', () => {
       const schema = makeCoreUserSchema([makeAttr({ name: 'score', type: 'decimal' })]);
       const payload = { schemas: [CORE_USER_SCHEMA_ID], score: NaN };
-      // NaN is typeof 'number', so depending on implementation it may pass or fail
-      // The validator accepts any typeof number for decimal, so NaN passes type check
       const result = SchemaValidator.validate(payload, [schema], { strictMode: false, mode: 'create' });
-      // NaN is technically typeof 'number', so current implementation accepts it
-      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([expect.objectContaining({ path: 'score', scimType: 'invalidValue' })]);
     });
 
     it('should handle very deeply nested unknown attr in complex (strict)', () => {

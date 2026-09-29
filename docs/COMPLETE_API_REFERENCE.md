@@ -13,6 +13,14 @@
 
 ## Table of Contents
 
+**Local P7a update, not yet merged/deployed:** no routes were added.
+Admin profile writes reject malformed declarations before saving. User,
+Group and custom-resource POST/PUT ignore readOnly input; PUT preserves
+omitted non-required immutable values and rejects explicit immutable changes.
+Required extension bindings apply in both strict modes. Supplied
+`returned:request` values appear in POST/PUT responses unless explicit
+projection excludes them. See [contracts and evidence](SCIM_P7A_PROFILE_VALIDATION.md).
+
 - [Authentication](#authentication)
 - [Common Headers](#common-headers)
 - [Health & Version](#health--version)

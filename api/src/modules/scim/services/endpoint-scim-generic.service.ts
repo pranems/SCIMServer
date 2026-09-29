@@ -136,10 +136,11 @@ export class EndpointScimGenericService {
         schemas.push({
           id: profileExt.id,
           attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+          required: ext.required,
         });
       } else {
         const extDef = this.schemaRegistry.getSchema(ext.schema);
-        if (extDef) schemas.push(extDef as SchemaDefinition);
+        if (extDef) schemas.push({ ...extDef, required: ext.required } as SchemaDefinition);
       }
     }
 
@@ -163,6 +164,9 @@ export class EndpointScimGenericService {
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
+    const readOnlyCache = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings ("True"/"False") → native booleans before validation
@@ -175,9 +179,6 @@ export class EndpointScimGenericService {
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'create');
 
     // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
-    const readOnlyCache = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
     if (strippedAttrs.length > 0) {
       this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly attributes from POST payload', {
         method: 'POST', path: resourceType.endpoint, stripped: strippedAttrs, endpointId,
@@ -328,6 +329,17 @@ export class EndpointScimGenericService {
     // GEN-11: Validate schemas array includes the core schema
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected);
+    const existing = await this.genericRepo.findByScimId(endpointId, resourceType.name, scimId);
+    if (!existing) {
+      throw createScimError({
+        status: 404, scimType: 'noTarget', detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
+      });
+    }
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
+
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
@@ -338,36 +350,13 @@ export class EndpointScimGenericService {
     this.enforcePrimaryConstraint(body, resourceType, endpointId, config);
 
     // GEN-01: Attribute-level payload validation
+    SchemaValidator.prepareReplacement(this.buildExistingPayload(existing, resourceType), body, schemaDefs);
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'replace');
 
-    const existing = await this.genericRepo.findByScimId(
-      endpointId,
-      resourceType.name,
-      scimId,
-    );
-
-    if (!existing) {
-      this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Replace target ${resourceType.name} not found`, { scimId, endpointId });
-      throw createScimError({
-        status: 404,
-        scimType: 'noTarget',
-        detail: `${resourceType.name} "${scimId}" not found.`,
-        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
-      });
-    }
-
-    // GEN-12: Config-aware soft-delete guard
-    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
-
-    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
-
     // GEN-02: Immutable attribute enforcement - compare existing with incoming
-    this.checkImmutableAttributes(existing, body, resourceType, endpointId, config);
+    this.checkImmutableAttributes(existing, body, resourceType, endpointId, config, 'replace');
 
     // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
-    const readOnlyCachePut = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCachePut);
     if (strippedAttrs.length > 0) {
       this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly attributes from PUT payload', {
         method: 'PUT', path: `${resourceType.endpoint}/${scimId}`, stripped: strippedAttrs, endpointId,
@@ -862,7 +851,7 @@ export class EndpointScimGenericService {
     endpointId: string,
     isStrict: boolean,
   ): void {
-    const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+    const schemas = this.getSchemaDefinitions(resourceType, endpointId);
     if (schemas.length === 0) return;
 
     const nesting = SchemaValidator.validateSubAttributeNesting(
@@ -919,7 +908,7 @@ export class EndpointScimGenericService {
     if (!isStrict) {
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       if (mode === 'patch') return;
-      const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+      const schemas = this.getSchemaDefinitions(resourceType, endpointId);
       if (schemas.length === 0) return;
       const result = SchemaValidator.validateRequired(dto, schemas, mode,
         this.getAttrMapsForRT(resourceType, endpointId));
@@ -940,7 +929,7 @@ export class EndpointScimGenericService {
       return;
     }
 
-    const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+    const schemas = mode === 'patch' ? this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId) : this.getSchemaDefinitions(resourceType, endpointId);
     if (schemas.length === 0) return;
 
     const result = SchemaValidator.validate(dto, schemas, {
@@ -1134,12 +1123,13 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     endpointId: string,
     _config?: EndpointConfig,
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
     // Previously gated by StrictSchemaValidation - removed per P4 analysis
 
     const existingPayload = this.buildExistingPayload(existing, resourceType);
-    const schemas = this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);
+    const schemas = mode === 'replace' ? this.getSchemaDefinitions(resourceType, endpointId) : this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);
     if (schemas.length === 0) return;
 
     // Use precomputed maps from cache when available
@@ -1148,8 +1138,8 @@ export class EndpointScimGenericService {
       ? SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
           coreAttrMap: cache.coreAttrMap,
           extensionSchemaMap: cache.extensionSchemaMap,
-        })
-      : SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+        }, mode)
+      : SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, undefined, mode);
 
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');

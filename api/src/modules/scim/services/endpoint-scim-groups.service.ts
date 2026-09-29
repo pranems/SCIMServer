@@ -88,6 +88,7 @@ export class EndpointScimGroupsService {
     // Resolve config: use passed config or fall back to endpoint context
     const endpointConfig = config ?? this.endpointContext.getConfig();
 
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
@@ -99,7 +100,6 @@ export class EndpointScimGroupsService {
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'create');
 
     // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from POST payload', {
         attributes: strippedAttrs,
@@ -436,6 +436,12 @@ export class EndpointScimGroupsService {
     // Resolve config: use passed config or fall back to endpoint context
     const endpointConfig = config ?? this.endpointContext.getConfig();
 
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
+    if (!group) {
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
+    }
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
@@ -444,10 +450,10 @@ export class EndpointScimGroupsService {
     // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
     this.schemaHelpers.enforcePrimaryConstraint(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
+    SchemaValidator.prepareReplacement(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, this.schemaHelpers.getSchemaDefinitions(endpointId));
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
     // Strip readOnly attributes from PUT payload (RFC 7643 §2.2)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from PUT payload', {
         attributes: strippedAttrs,
@@ -459,17 +465,8 @@ export class EndpointScimGroupsService {
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
-    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
-    if (!group) {
-      this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found for PUT', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
-    }
-
-    // Phase 7: Pre-write If-Match enforcement
-    const expectedVersion = enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
-
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
-    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
     // G8f: Uniqueness enforcement on PUT - only displayName must remain unique
     // externalId is NOT checked - saved as received per RFC 7643.
@@ -482,7 +479,7 @@ export class EndpointScimGroupsService {
     const uniqueAttrsPut = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrsPut.length > 0) {
       const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
+      assertSchemaUniqueness(endpointId, dto, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
     }
 
     const now = new Date();

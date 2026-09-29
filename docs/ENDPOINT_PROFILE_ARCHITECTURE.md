@@ -26,6 +26,14 @@
 
 ## Overview
 
+**P7a implementation note (local, not deployed):** the existing profile
+pipeline validates raw declarations before expansion, then expanded
+declarations before tighten-only/structural checks. This prevents malformed
+containers or unknown types from becoming accepted profiles. ResourceType
+extension requiredness is carried into schema validation caches. Global
+uniqueness is rejected as unsupported rather than ranked as a locally
+enforceable promise. See [P7a](SCIM_P7A_PROFILE_VALIDATION.md) for exact boundaries.
+
 Every endpoint has a **profile** that fully defines its SCIM behavior. A profile is the single source of truth for:
 
 1. **What schemas** are available (attributes, types, characteristics)

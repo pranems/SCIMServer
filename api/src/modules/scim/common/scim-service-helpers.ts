@@ -930,11 +930,13 @@ export class ScimSchemaHelpers {
     // Build the set of schema URNs relevant to this resource type:
     // core + extensions declared on RTs that use this core schema.
     const relevantUrns = new Set<string>([this.coreSchemaUrn]);
+    const requiredUrns = new Set<string>();
     if (profile.resourceTypes) {
       for (const rt of profile.resourceTypes) {
         if (rt.schema === this.coreSchemaUrn) {
           for (const ext of rt.schemaExtensions) {
             relevantUrns.add(ext.schema);
+            if (ext.required) requiredUrns.add(ext.schema);
           }
         }
       }
@@ -957,6 +959,7 @@ export class ScimSchemaHelpers {
           id: ps.id,
           attributes: ps.attributes as unknown as SchemaAttributeDefinition[],
           isCoreSchema: ps.id === this.coreSchemaUrn,
+          required: requiredUrns.has(ps.id),
         });
       }
     }
@@ -965,7 +968,7 @@ export class ScimSchemaHelpers {
     const globalSchemas = this.getGlobalSchemaDefinitions();
     for (const gs of globalSchemas) {
       if (!seenIds.has(gs.id) && relevantUrns.has(gs.id)) {
-        schemas.push(gs);
+        schemas.push({ ...gs, required: requiredUrns.has(gs.id) });
       }
     }
 
@@ -1093,7 +1096,7 @@ export class ScimSchemaHelpers {
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       // Type/unknown/canonical validation remains strict-gated
       if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
-      const schemas = this.buildSchemaDefinitions(dto, endpointId);
+      const schemas = this.getSchemaDefinitions(endpointId);
       if (schemas.length === 0) return;
       const cache = this.getSchemaCache(endpointId);
       const result = SchemaValidator.validateRequired(dto, schemas, mode,
@@ -1115,7 +1118,7 @@ export class ScimSchemaHelpers {
       return;
     }
 
-    const schemas = this.buildSchemaDefinitions(dto, endpointId);
+    const schemas = mode === 'patch' ? this.buildSchemaDefinitions(dto, endpointId) : this.getSchemaDefinitions(endpointId);
     if (schemas.length === 0) return;
 
     const cache = this.getSchemaCache(endpointId);
@@ -1607,6 +1610,7 @@ export class ScimSchemaHelpers {
     incomingDto: Record<string, unknown>,
     endpointId: string,
     _config?: EndpointConfig,
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
     // Previously gated by StrictSchemaValidation - removed per P4 analysis
@@ -1616,15 +1620,15 @@ export class ScimSchemaHelpers {
 
     if (cache) {
       // Use precomputed maps from cache - skip per-call map building
-      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      const schemas = mode === 'replace' ? this.getSchemaDefinitions(endpointId) : this.buildSchemaDefinitions(incomingDto, endpointId);
       result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
         coreAttrMap: cache.coreAttrMap,
         extensionSchemaMap: cache.extensionSchemaMap,
-      });
+      }, mode);
     } else {
-      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      const schemas = mode === 'replace' ? this.getSchemaDefinitions(endpointId) : this.buildSchemaDefinitions(incomingDto, endpointId);
       if (schemas.length === 0) return;
-      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, undefined, mode);
     }
 
     if (!result.valid) {

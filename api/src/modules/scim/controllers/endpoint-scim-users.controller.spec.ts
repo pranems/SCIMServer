@@ -499,6 +499,18 @@ describe('EndpointScimUsersController', () => {
   // ───────────── G8e: returned characteristic filtering ─────────────
 
   describe('G8e - returned:request attribute filtering', () => {
+    it('P7 returns a request-only attribute explicitly supplied on POST and PUT', async () => {
+      const dto = { schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: 'p7', secretQuestion: 'Pet?' };
+      const resource = { ...dto, id: 'p7', meta: { resourceType: 'User' } };
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.createUserForEndpoint.mockResolvedValue(resource);
+      mockUsersService.replaceUserForEndpoint.mockResolvedValue(resource);
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([
+        ['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])],
+      ]));
+      expect((await controller.createUser('endpoint-1', dto, mockRequest)).secretQuestion).toBe('Pet?');
+      expect((await controller.replaceUser('endpoint-1', 'p7', dto, mockRequest)).secretQuestion).toBe('Pet?');
+    });
     it('POST createUser should strip returned:request attributes from response', async () => {
       const createDto: CreateUserDto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],

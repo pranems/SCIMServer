@@ -5,7 +5,8 @@ const assert = require("node:assert/strict");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const API = path.join(ROOT, "api");
-const BASE = "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e";
+const IS_P7 = path.basename(ROOT).toLowerCase() === "scimserver-scim-profile-validation";
+const BASE = IS_P7 ? "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51" : "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e";
 const OWNER = "bf8209ca-96fe-46aa-8cab-1641c725a077";
 const docker = (...args) =>
   cp
@@ -14,8 +15,8 @@ const docker = (...args) =>
 
 function sourceGuard() {
   const git = (...args) => cp.execFileSync("git", ["-C", ROOT, ...args], { encoding: "utf8" }).trim();
-  assert.equal(path.basename(ROOT).toLowerCase(), "scimserver-scim-implementation");
-  assert.equal(git("branch", "--show-current"), "fix/scim-correctness-p1-20260928");
+  assert.equal(path.basename(ROOT).toLowerCase(), IS_P7 ? "scimserver-scim-profile-validation" : "scimserver-scim-implementation");
+  assert.equal(git("branch", "--show-current"), IS_P7 ? "fix/scim-profile-validation-20260928" : "fix/scim-correctness-p1-20260928");
   git("merge-base", "--is-ancestor", BASE, "HEAD");
   assert.equal(
     fs.existsSync(path.join(API, "test", "e2e", ".test-db-path")),
@@ -24,7 +25,7 @@ function sourceGuard() {
   );
   const hash = require("node:crypto").createHash("sha256");
   const files = git("ls-files", "-co", "--exclude-standard", "--",
-    "api/src", "api/test", "api/prisma", "scripts/p1-validation", "scripts/live-test-p1.cjs",
+    "api/src", "api/test", "api/prisma", "scripts/p1-validation", "scripts/live-test-p1.cjs", "scripts/live-test-p7.cjs",
   ).split("\n").filter(Boolean).sort();
   for (const file of files) {
     hash.update(file);
@@ -91,6 +92,7 @@ async function databaseGuard({ marker = true } = {}) {
       await client.query(`
       SELECT current_database() AS database, current_user AS username,
         current_setting('cluster_name') AS cluster_name, version() AS version,
+        current_setting('server_version_num')::int AS server_version_num,
         inet_server_addr()::text AS server_address, inet_server_port() AS server_port,
         system_identifier::text FROM pg_control_system()
     `)
@@ -99,6 +101,7 @@ async function databaseGuard({ marker = true } = {}) {
     assert.equal(identity.username, "p1_runner");
     assert.equal(identity.cluster_name, `scim-p1-${container.run}`);
     assert.equal(identity.server_port, 5432);
+    assert.ok(identity.server_version_num >= 170008 && identity.server_version_num < 180000, "PostgreSQL 17.8+ required");
     if (process.env.PG_ANALYSIS_SYSTEM_ID)
       assert.equal(
         identity.system_identifier,
@@ -140,6 +143,7 @@ module.exports = {
   ROOT,
   API,
   BASE,
+  IS_P7,
   OWNER,
   docker,
   sourceGuard,

@@ -1,12 +1,20 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-24 - **Product version at capture:** `0.55.33`
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-28 - **Product version at capture:** `0.55.33`
 > **Every value in this document was measured against a running server**, not transcribed from source. The preset matrix in [Section 3](#3-preset-matrix-measured) was produced by creating one endpoint per preset on the live dev estate, reading back what the server actually published, and deleting them. The request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) are verbatim wire captures.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
 ---
 
 ## 1. What this document is
+
+**Local source update (P7a), not a deployment:** malformed schema declarations
+are rejected independently of `StrictSchemaValidation`. Strict mode gates
+resource type/format/cardinality checks; required fields, required extension
+bindings and immutable rules still apply with it off. Canonical values are
+suggestions, not an implicit closed enum. POST/PUT ignore readOnly input.
+See [the implementation and verification scope](SCIM_P7A_PROFILE_VALIDATION.md).
+The historical measured preset tables below have not been re-captured.
 
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 

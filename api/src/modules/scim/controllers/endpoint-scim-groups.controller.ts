@@ -146,11 +146,12 @@ export class EndpointScimGroupsController {
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const writePayload = structuredClone(dto) as Record<string, unknown>;
     const result = await this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
     const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 
@@ -317,11 +318,12 @@ export class EndpointScimGroupsController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const writePayload = structuredClone(dto) as Record<string, unknown>;
     const result = await this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
     const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 

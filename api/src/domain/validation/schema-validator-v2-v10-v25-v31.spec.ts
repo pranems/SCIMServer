@@ -237,21 +237,19 @@ describe('V10 - canonical value enforcement', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('should reject a non-canonical value in strict mode', () => {
+  it('should accept a non-canonical recommendation in strict mode', () => {
     const payload = { schemas: [CORE_SCHEMA_ID], locale: 'xx-INVALID' };
     const result = SchemaValidator.validate(payload, [schema], createOpts);
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/canonical/i);
+    expect(result).toEqual({ valid: true, errors: [] });
   });
 
-  it('should reject non-canonical sub-attribute value in complex type', () => {
+  it('should accept a non-canonical sub-attribute recommendation', () => {
     const payload = {
       schemas: [CORE_SCHEMA_ID],
       emails: [{ value: 'a@b.com', type: 'personal' }],
     };
     const result = SchemaValidator.validate(payload, [schema], createOpts);
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/canonical/i);
+    expect(result).toEqual({ valid: true, errors: [] });
   });
 
   it('should pass for valid canonical sub-attribute value', () => {
@@ -329,11 +327,10 @@ describe('V31 - strict xsd:dateTime format validation', () => {
     expect(result.errors[0].message).toMatch(/xsd:dateTime/);
   });
 
-  it('should reject dateTime without timezone', () => {
+  it('should accept xsd:dateTime with an omitted optional timezone', () => {
     const payload = { schemas: [CORE_SCHEMA_ID], lastLogin: '2024-01-15T10:30:00' };
     const result = SchemaValidator.validate(payload, [schema], createOpts);
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/xsd:dateTime/);
+    expect(result).toEqual({ valid: true, errors: [] });
   });
 
   it('should reject non-string dateTime', () => {
@@ -632,12 +629,11 @@ describe('V10 - canonical via validatePatchOperationValue', () => {
     ]),
   ];
 
-  it('should reject non-canonical value via PATCH pre-validation', () => {
+  it('should accept non-canonical recommendation via shared PATCH value validation', () => {
     const result = SchemaValidator.validatePatchOperationValue(
       'replace', 'locale', 'xx-INVALID', schemas,
     );
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/canonical/i);
+    expect(result).toEqual({ valid: true, errors: [] });
   });
 
   it('should accept canonical value via PATCH pre-validation', () => {
@@ -755,13 +751,10 @@ describe('V31 - dateTime additional edge cases', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('should accept dateTime with out-of-range month (regex is format-only)', () => {
-    // XSD_DATETIME_RE validates format (\d{4}-\d{2}-\d{2}T...) not
-    // semantic ranges. Months like 13 pass the regex. Semantic
-    // validation is DB/application layer responsibility.
+  it('should reject dateTime with out-of-range month', () => {
     const payload = { schemas: [CORE_SCHEMA_ID], lastLogin: '2024-13-15T10:30:00Z' };
     const result = SchemaValidator.validate(payload, [schema], createOpts);
-    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([expect.objectContaining({ path: 'lastLogin', scimType: 'invalidValue' })]);
   });
 
   it('should reject dateTime with space instead of T separator', () => {

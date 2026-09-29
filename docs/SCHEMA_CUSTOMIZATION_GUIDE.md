@@ -2,6 +2,10 @@
 
 > **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
+> **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
+> documents the source changes below, with owned PostgreSQL/InMemory evidence.
+> They are not yet merged or deployed. Omitted RFC defaults remain supported.
+
 > **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
@@ -809,7 +813,7 @@ flowchart TD
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `StrictSchemaValidation` | `true` (entra-id preset) | Full validation: types, required, unknowns, schemas[] array, canonical values |
+| `StrictSchemaValidation` | `true` (entra-id preset) | Types/formats, cardinality, unknowns and schemas[] array; required checks also run when disabled |
 | *(flag off)* | - | Required-only validation: just checks required attributes exist |
 
 ### What Strict Validation Checks
@@ -820,10 +824,10 @@ flowchart TD
 | Extension URN keys present in `schemas[]` | §3.1 | `Extension URN ... not declared in schemas[]` |
 | Required attributes present | §2.2 | `Missing required attribute: ...` |
 | Attribute types match schema | §2.3 | `Attribute ... expected type ... got ...` |
-| readOnly attributes rejected on create | §2.2 | `Attribute ... is readOnly` |
+| readOnly input ignored on POST/PUT | §2.2; RFC 7644 §3.3/3.5.1 | Not a validation error, even when the ignored input has the wrong type |
 | Unknown attributes rejected | §2.1 | `Unknown attribute: ...` |
 | dateTime format valid | §2.3.5 | `Invalid dateTime format` |
-| Canonical values enforced | §7 | `Value ... not in canonicalValues` |
+| Canonical values are suggestions | §7 | Out-of-list values are not rejected merely because canonicalValues is present |
 | Multi-valued must be array | §2.4 | `Expected array for multi-valued attribute ...` |
 | Sub-attribute validation | §2.4 | Per-sub-attribute type/required checks |
 
@@ -840,7 +844,7 @@ flowchart TD
 - **Required-only validation:** Checks that required attributes exist
 - **Unknown attributes:** Accepted and stored as-is in JSONB
 - **Extension URNs:** Not validated against registered schemas
-- **Type/canonical checks:** Skipped
+- **Type/format checks:** Skipped; canonical suggestions are not a closed-enum policy
 
 ---
 
@@ -936,7 +940,7 @@ The server enforces **all** attribute characteristics on extension attributes id
 - **`mutability: "immutable"`** → enforced via `checkImmutable()` on PUT/PATCH (H-2)
 - **`uniqueness: "server"`** → enforced via `assertSchemaUniqueness()` using `caseExact` from schema
 - **`caseExact: true`** → exact-match comparison in uniqueness checks
-- **`canonicalValues`** → validated in strict mode (V10)
+- **`canonicalValues`** → an array of string suggestions; not implicit closed-enum validation
 
 ---
 
@@ -975,6 +979,11 @@ When operators override attributes on RFC schemas, changes must be same-or-tight
 | `uniqueness` | `none → server → global` | Any loosening |
 | `caseExact` | `false → true` | `true → false` |
 | `returned` | Cannot change `never` | Loosening `never` |
+
+The table describes the historical tighten-only ordering, not supported
+storage scope. P7a rejects `global` declarations: a local server scan cannot
+guarantee global uniqueness. Required ResourceType extensions and required
+writable attributes are enforced on POST/PUT in either strict mode.
 
 > **Custom schemas (non-RFC URNs)** have no baseline - tighten-only validation is skipped; attributes are used as-is.
 

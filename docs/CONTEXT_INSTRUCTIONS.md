@@ -9,6 +9,13 @@
 
 ## Active Delivery Process
 
+P7a is implemented locally in its own P1-based worktree. The
+[P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,
+scalar/cardinality checks and POST/PUT contracts with 1,507 focused unit
+passes and owned backend/live evidence. It does not close P7 ordered-PATCH
+integration or remaining uniqueness/reference/deep-compatibility questions.
+No product version, lockfile, push or deployment changed.
+
 P1 correctness work is implemented locally on the isolated implementation
 branch, not on a deployment. [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md)
 records the typed-path contract, 1,476 focused unit / 65 HTTP passes and owned

@@ -135,11 +135,12 @@ export class EndpointScimGenericController {
       resourceTypePath,
       req,
     );
+    const writePayload = structuredClone(body);
     const result = await this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
     const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 
@@ -316,6 +317,7 @@ export class EndpointScimGenericController {
       req,
     );
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const writePayload = structuredClone(body);
     const result = await this.genericService.replaceResource(
       id,
       body,
@@ -328,7 +330,7 @@ export class EndpointScimGenericController {
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
     const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 

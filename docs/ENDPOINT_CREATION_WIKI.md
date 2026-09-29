@@ -1,6 +1,6 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Version:** 0.55.35 - **Updated:** 2026-09-18
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
@@ -13,6 +13,12 @@ This is the "start here" page. For deeper reference see:
 [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) (every route).
 
 An endpoint profile is portable configuration, not a complete running endpoint export. It includes schemas, ResourceTypes, capability inputs, endpoint settings, and non-secret authentication method declarations. Credentials, secrets, resources, logs, and server policy are configured separately. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
+
+**P7a local source update, not deployed:** when creating/updating an inline
+profile, use Boolean characteristic values, valid SCIM type/mutability/returned
+keywords and arrays of attribute definitions. Omitted RFC defaults remain
+valid. Unsupported `global` uniqueness is rejected before saving. See
+[the declaration checklist and HTTP proof](SCIM_P7A_PROFILE_VALIDATION.md).
 
 ---
 

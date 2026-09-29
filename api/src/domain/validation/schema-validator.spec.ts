@@ -265,37 +265,35 @@ describe('SchemaValidator', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should skip validation for unknown types (forward-compatible)', () => {
+    it('should reject unsupported persisted schema types', () => {
       const schema = makeCoreSchema([makeAttr({ name: 'custom', type: 'futureType' as string })]);
       const payload = { schemas: [CORE_USER_SCHEMA_ID], custom: 'anything' };
       const result = SchemaValidator.validate(payload, [schema], defaultOptions);
-      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([expect.objectContaining({ path: 'custom', scimType: 'invalidValue' })]);
     });
   });
 
   // ── Mutability ────────────────────────────────────────────────────────
 
   describe('mutability constraints', () => {
-    it('should reject readOnly attribute on create', () => {
+    it('should ignore readOnly attribute on create', () => {
       const schema = makeCoreSchema([
         makeAttr({ name: 'userName', required: true }),
         makeAttr({ name: 'groups', mutability: 'readOnly' }),
       ]);
       const payload = { schemas: [CORE_USER_SCHEMA_ID], userName: 'alice', groups: [] };
       const result = SchemaValidator.validate(payload, [schema], defaultOptions);
-      expect(result.valid).toBe(false);
-      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result).toEqual({ valid: true, errors: [] });
     });
 
-    it('should reject readOnly attribute on replace', () => {
+    it('should ignore readOnly attribute on replace', () => {
       const schema = makeCoreSchema([
         makeAttr({ name: 'userName', required: true }),
         makeAttr({ name: 'groups', mutability: 'readOnly' }),
       ]);
       const payload = { schemas: [CORE_USER_SCHEMA_ID], userName: 'alice', groups: [] };
       const result = SchemaValidator.validate(payload, [schema], replaceOptions);
-      expect(result.valid).toBe(false);
-      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result).toEqual({ valid: true, errors: [] });
     });
 
     it('should allow readWrite attribute on create', () => {

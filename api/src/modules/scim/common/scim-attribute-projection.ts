@@ -92,6 +92,7 @@ export function applyAttributeProjection(
   excludedAttributes?: string,
   alwaysReturnedByParent?: Map<string, Set<string>>,
   requestReturnedByParent?: Map<string, Set<string>>,
+  writePayload?: Record<string, unknown>,
 ): Record<string, unknown> {
   let result = resource;
 
@@ -105,7 +106,7 @@ export function applyAttributeProjection(
   // Strip returned:'request' attributes (unless explicitly named in `attributes`)
   if (requestReturnedByParent && requestReturnedByParent.size > 0) {
     const requestedSet = attributes ? parseAttrList(attributes) : new Set<string>();
-    result = stripRequestOnlyAttrs(result, requestReturnedByParent, requestedSet);
+    result = stripRequestOnlyAttrs(result, requestReturnedByParent, requestedSet, attributes ? undefined : writePayload);
   }
 
   return result;
@@ -231,118 +232,37 @@ function stripRequestOnlyAttrs(
   resource: Record<string, unknown>,
   requestByParent: Map<string, Set<string>>,
   requestedAttrs: Set<string>,
+  writePayload?: Record<string, unknown>,
 ): Record<string, unknown> {
-  const result = { ...resource };
-
-  // Collect all top-level request-only attrs from bare-URN keys
-  const topLevelRequest = new Set<string>();
-  for (const [parent, children] of requestByParent) {
-    if (!isSubAttrKey(parent)) {
-      for (const child of children) topLevelRequest.add(child);
+  const roots = [...requestByParent.keys()].filter(key => !isSubAttrKey(key));
+  const urns = Array.isArray(resource.schemas) ? resource.schemas.filter((s): s is string => typeof s === 'string') : [];
+  const core = (urns.find(urn => findKey(resource, urn) === undefined &&
+    [...requestByParent.keys()].some(parent => parent === urn.toLowerCase() || parent.startsWith(`${urn.toLowerCase()}.`))) ??
+    roots.find(urn => findKey(resource, urn) === undefined) ?? '').toLowerCase();
+  const explicitlyRequested = (path: string): boolean => [...requestedAttrs].some(requested =>
+    path === requested || path.startsWith(`${requested}.`) || path.startsWith(`${requested}:`));
+  const walk = (value: unknown, parent: string, path: string, supplied: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map((item, index) => walk(item, parent, path, Array.isArray(supplied) ? supplied[index] : undefined));
     }
-  }
-
-  // Build a sub-attr request map keyed by last segment (attr name) for O(1) lookup
-  const subReqByAttrName = new Map<string, Set<string>>();
-  for (const [parent, children] of requestByParent) {
-    if (isSubAttrKey(parent)) {
-      const dotIdx = parent.lastIndexOf('.');
-      const attrName = parent.substring(dotIdx + 1);
-      let existing = subReqByAttrName.get(attrName);
-      if (!existing) { existing = new Set(); subReqByAttrName.set(attrName, existing); }
-      for (const c of children) existing.add(c);
+    if (!value || typeof value !== 'object') return value;
+    const out: Record<string, unknown> = {};
+    const requestOnly = requestByParent.get(parent);
+    const input = supplied && typeof supplied === 'object' && !Array.isArray(supplied)
+      ? supplied as Record<string, unknown> : undefined;
+    for (const [key, child] of Object.entries(value)) {
+      const lower = key.toLowerCase();
+      const extension = !path && lower.startsWith('urn:');
+      const childPath = extension ? lower : path ? `${path}${path.startsWith('urn:') && path === parent ? ':' : '.'}${lower}` : lower;
+      const suppliedKey = input ? findKey(input, key) : undefined;
+      const wasSupplied = suppliedKey !== undefined && input![suppliedKey] !== undefined;
+      if (requestOnly?.has(lower) && !explicitlyRequested(childPath) && !wasSupplied) continue;
+      out[key] = walk(child, extension ? lower : `${parent}.${lower}`, childPath,
+        suppliedKey !== undefined ? input![suppliedKey] : undefined);
     }
-  }
-
-  for (const key of Object.keys(result)) {
-    const keyLower = key.toLowerCase();
-
-    // Top-level: strip if in request-only set AND not explicitly requested
-    if (topLevelRequest.has(keyLower) && !requestedAttrs.has(keyLower)) {
-      delete result[key];
-      continue;
-    }
-
-    const value = result[key];
-
-    // Extension URN objects: check extension-keyed + sub-attr entries
-    if (typeof key === 'string' && key.startsWith('urn:') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      const urnLower = key.toLowerCase();
-      const extCopy = { ...(value as Record<string, unknown>) };
-      let changed = false;
-      for (const extKey of Object.keys(extCopy)) {
-        const extKeyLower = extKey.toLowerCase();
-        const fqn = `${urnLower}:${extKeyLower}`;
-        // Top-level extension attr with returned:request
-        if (topLevelRequest.has(extKeyLower) && !requestedAttrs.has(extKeyLower) && !requestedAttrs.has(fqn)) {
-          delete extCopy[extKey];
-          changed = true;
-          continue;
-        }
-        // Sub-attrs within extension complex parents
-        const extSubReq = subReqByAttrName.get(extKeyLower);
-        if (extSubReq && extSubReq.size > 0) {
-          const extVal = extCopy[extKey];
-          if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
-            const subCopy = { ...(extVal as Record<string, unknown>) };
-            let subChanged = false;
-            for (const subKey of Object.keys(subCopy)) {
-              if (extSubReq.has(subKey.toLowerCase()) && !requestedAttrs.has(`${extKeyLower}.${subKey.toLowerCase()}`)) {
-                delete subCopy[subKey];
-                subChanged = true;
-              }
-            }
-            if (subChanged) { extCopy[extKey] = subCopy; changed = true; }
-          } else if (Array.isArray(extVal)) {
-            extCopy[extKey] = extVal.map(item => {
-              if (typeof item !== 'object' || item === null) return item;
-              const itemCopy = { ...(item as Record<string, unknown>) };
-              for (const subKey of Object.keys(itemCopy)) {
-                if (extSubReq.has(subKey.toLowerCase()) && !requestedAttrs.has(`${extKeyLower}.${subKey.toLowerCase()}`)) {
-                  delete itemCopy[subKey];
-                }
-              }
-              return itemCopy;
-            });
-            changed = true;
-          }
-        }
-      }
-      if (changed) result[key] = extCopy;
-      continue;
-    }
-
-    // Core sub-attrs within complex/multi-valued parents
-    if (value !== null && value !== undefined) {
-      const subReq = subReqByAttrName.get(keyLower);
-      if (subReq && subReq.size > 0) {
-        if (typeof value === 'object' && !Array.isArray(value)) {
-          const subCopy = { ...(value as Record<string, unknown>) };
-          let subChanged = false;
-          for (const subKey of Object.keys(subCopy)) {
-            if (subReq.has(subKey.toLowerCase()) && !requestedAttrs.has(subKey.toLowerCase()) && !requestedAttrs.has(`${keyLower}.${subKey.toLowerCase()}`)) {
-              delete subCopy[subKey];
-              subChanged = true;
-            }
-          }
-          if (subChanged) result[key] = subCopy;
-        } else if (Array.isArray(value)) {
-          result[key] = value.map(item => {
-            if (typeof item !== 'object' || item === null) return item;
-            const itemCopy = { ...(item as Record<string, unknown>) };
-            for (const subKey of Object.keys(itemCopy)) {
-              if (subReq.has(subKey.toLowerCase()) && !requestedAttrs.has(subKey.toLowerCase()) && !requestedAttrs.has(`${keyLower}.${subKey.toLowerCase()}`)) {
-                delete itemCopy[subKey];
-              }
-            }
-            return itemCopy;
-          });
-        }
-      }
-    }
-  }
-
-  return result;
+    return out;
+  };
+  return walk(resource, core, '', writePayload) as Record<string, unknown>;
 }
 
 function parseAttrList(raw: string): Set<string> {

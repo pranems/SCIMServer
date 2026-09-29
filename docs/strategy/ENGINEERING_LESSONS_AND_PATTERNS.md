@@ -16,6 +16,20 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### P7a: semantic presence and ownership survive framework transformations
+
+The [P7a review](../SCIM_P7_EXECUTION_RCA.md) reproduced two defects from the
+same false premise: an optional DTO field with value `undefined` was treated
+as client input. This discarded omitted immutable values and implicitly
+requested request-only response attributes. At a JSON/DTO boundary, test
+defined value presence, not only object-key presence; retain actual `false`,
+`0`, and empty-string inputs. Permanent P7 tests exercise all four cases.
+
+Also normalize only client-writable input before restoring server-owned
+state. A profile changing an existing field to readOnly must not let an
+unrelated PUT normalize or reject that stored value. The P7 combination
+matrix checks both normalize and reject policies on every resource family.
+
 ```mermaid
 flowchart LR
     EXEC[Execution: a fix is confirmed to resolve an issue] -->|capture AT fix-confirmation time| RCA[Per-build EXECUTION_ISSUES_AND_RCA.md]

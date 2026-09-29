@@ -2,6 +2,11 @@
 
 > **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
+> **Local P7a update, not deployed:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
+> adds declaration/type/cardinality checks, required extension enforcement,
+> readonly POST/PUT ignoring, and immutable PUT preservation. `global`
+> uniqueness is rejected as an unsupported provider promise.
+
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026
 > **Related:**
@@ -534,13 +539,13 @@ Run through every box. A "no" is a fix-before-publish.
 |---|---|---|
 | URN namespace squatting on `urn:ietf:params:scim:schemas:extension:` | Accepts at registration but is non-conformant; flagged in audit | RFC 7643 §10 |
 | Sibling block present, URN missing from `schemas[]` | Currently SILENTLY back-fills the URN into response `schemas[]` - known gap per [OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md](OPENTEXT_ISV3_SCHEMA_SOURCE_VS_LIVE.md) audit follow-up | RFC 7644 §3.1 expects `400 invalidSyntax` |
-| URN in `schemas[]`, sibling block absent, no required attrs | Accepts (no required-attr violation to enforce) | RFC 7643 §7 |
+| Optional extension URN in `schemas[]`, sibling block absent, no required attrs | Accepts; a ResourceType-required extension must have its body block | RFC 7643 §6-7 |
 | URN in `schemas[]`, sibling block absent, extension has required attr | `400 invalidValue` with `attributePaths` naming the missing attr | RFC 7643 §7 + §2.2 |
 | Extension attrs flattened to top level | Treated as unknown core attrs; under StrictSchemaValidation: `400 invalidSyntax`; under loose: silently dropped | RFC 7643 §3.3 |
 | Unknown sub-attribute inside extension block | `400 invalidSyntax` under StrictSchemaValidation | RFC 7643 §7 |
 | `mutability: readOnly` attr sent on POST | `400 mutability` | RFC 7643 §2.2 |
 | Duplicate value for `uniqueness: server` attr | `409 uniqueness` | RFC 7643 §2.2 |
-| `canonicalValues` violation | `400 invalidValue` | RFC 7643 §2.2 |
+| Value outside `canonicalValues` suggestions | Accepted if its type/format is valid | RFC 7643 §7: suggestions are not automatically a closed enum |
 | Multi-valued: more than one entry with `primary: true` | `400 invalidValue` | RFC 7643 §2.4 |
 
 ---
@@ -675,7 +680,7 @@ The response MUST include the extension sibling object AND the URN in its `schem
 3. **Schema name like `MailboxExtensionResource`** - RFC convention is short PascalCase (`Mailbox`)
 4. **Nested complex (`subAttributes[*].type == "complex"`)** - RFC 7643 §2.3 forbids this; flatten or split
 5. **Forgetting the `schemaExtensions[]` binding** - schema is discoverable but POST sees an unregistered URN
-6. **`canonicalValues` for a string-encoded prefix** - `canonicalValues` validates the whole attribute value, not a prefix substring; document the prefix convention in `description` instead
+6. **`canonicalValues` for a string-encoded prefix** - suggestions describe whole values, not a prefix grammar; document the prefix convention in `description` instead
 7. **Omitting `required` field on `schemaExtensions[*]`** - RFC 7643 §6 makes it REQUIRED even when its value is `false`
 8. **Hardcoded test assertion `expect(attr.uniqueness).toBe('none')`** - violates the Schema-Characteristic Test Rule; use `expectCharacteristicIn()`
 9. **Same extension URN attached to two different resource types** - pick distinct URNs ending in each respective resource type

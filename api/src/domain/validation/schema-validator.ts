@@ -7,11 +7,11 @@
  * Validations performed:
  *  1. Required attributes (on create/replace only, not patch)
  *  2. Attribute type checking (string, boolean, integer, decimal, complex, dateTime, reference, binary)
- *  3. Mutability constraints (readOnly attributes rejected on create/replace AND on PATCH operations)
+ *  3. Mutability constraints (POST/PUT readOnly input ignored; PATCH validated separately)
  *  4. Unknown attribute detection (strict mode only)
  *  5. Multi-valued / single-valued enforcement
  *  6. Sub-attribute validation for complex types
- *  7. Canonical value enforcement (V10)
+ *  7. Canonical values remain recommendations, not an implicit closed enum
  *  8. Required sub-attribute enforcement (V9)
  *  9. Strict ISO 8601 dateTime format validation (V31)
  * 10. schemas array validation (V25)
@@ -28,6 +28,7 @@ import type {
   ValidationOptions,
   ValidationResult,
 } from './validation-types';
+import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -54,14 +55,6 @@ function isCoreSchema(schema: SchemaDefinition): boolean {
   if (schema.isCoreSchema !== undefined) return schema.isCoreSchema;
   return schema.id.startsWith('urn:ietf:params:scim:schemas:core:');
 }
-
-/**
- * xsd:dateTime regex (RFC 7643 §2.3.5).
- * Validates ISO 8601 / xsd:dateTime format:
- *   YYYY-MM-DDTHH:MM:SSZ  or  YYYY-MM-DDTHH:MM:SS.sss±HH:MM
- * Not anchored to allow timezone offset variants.
- */
-const XSD_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 export class SchemaValidator {
   /**
@@ -146,6 +139,8 @@ export class SchemaValidator {
     }
 
     for (const [key, value] of Object.entries(payload)) {
+      // class-transformer materializes optional DTO fields with undefined values.
+      if (value === undefined) continue;
       // Skip reserved SCIM keys
       if (RESERVED_KEYS.has(key)) continue;
 
@@ -181,6 +176,8 @@ export class SchemaValidator {
       const extPayload = payload[urn] as Record<string, unknown> | undefined;
       if (extPayload && typeof extPayload === 'object' && !Array.isArray(extPayload)) {
         this.validateAttributes(extPayload, schema.attributes, urn, options, errors);
+      } else if (extPayload !== undefined && extPayload !== null) {
+        errors.push({ path: urn, message: `Extension '${urn}' must be a complex object.`, scimType: 'invalidValue' });
       }
     }
 
@@ -376,12 +373,7 @@ export class SchemaValidator {
 
     // ── Mutability check ──
     if (attrDef.mutability === 'readOnly' && (options.mode === 'create' || options.mode === 'replace')) {
-      errors.push({
-        path,
-        message: `Attribute '${attrDef.name}' is readOnly and cannot be set by the client.`,
-        scimType: 'mutability',
-      });
-      return; // Don't further validate readOnly attributes set by client
+      return; // POST/PUT ignore client readOnly values, including malformed ones.
     }
 
     // ── Multi-valued check ──
@@ -426,7 +418,7 @@ export class SchemaValidator {
   ): void {
     if (value === null || value === undefined) return;
 
-    switch (attrDef.type) {
+    switch (attrDef.type ?? 'string') {
       case 'string':
       case 'reference':
       case 'binary':
@@ -436,6 +428,11 @@ export class SchemaValidator {
             message: `Attribute '${attrDef.name}' must be a string, got ${typeof value}.`,
             scimType: 'invalidValue',
           });
+        } else if (
+          (attrDef.type === 'binary' && !isScimBinary(value)) ||
+          (attrDef.type === 'reference' && !isScimReference(value))
+        ) {
+          errors.push({ path, message: `Attribute '${attrDef.name}' is not a valid ${attrDef.type} value.`, scimType: 'invalidValue' });
         }
         break;
 
@@ -460,7 +457,7 @@ export class SchemaValidator {
         break;
 
       case 'decimal':
-        if (typeof value !== 'number') {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
           errors.push({
             path,
             message: `Attribute '${attrDef.name}' must be a number, got ${typeof value}.`,
@@ -476,7 +473,7 @@ export class SchemaValidator {
             message: `Attribute '${attrDef.name}' must be a dateTime string, got ${typeof value}.`,
             scimType: 'invalidValue',
           });
-        } else if (!XSD_DATETIME_RE.test(value)) {
+        } else if (!isScimDateTime(value)) {
           // V31: Strict xsd:dateTime format (RFC 7643 §2.3.5)
           errors.push({
             path,
@@ -529,27 +526,8 @@ export class SchemaValidator {
         break;
 
       default:
-        // Unknown type - skip validation (forward-compatible)
+        errors.push({ path, message: `Attribute '${attrDef.name}' has an unsupported schema type.`, scimType: 'invalidValue' });
         break;
-    }
-
-    // ── V10: Canonical values enforcement ────────────────────────────
-    // If the attribute defines canonicalValues and the value is a string,
-    // verify the value is one of the allowed canonical values (case-insensitive).
-    if (
-      attrDef.canonicalValues &&
-      attrDef.canonicalValues.length > 0 &&
-      typeof value === 'string'
-    ) {
-      const lower = value.toLowerCase();
-      const allowed = attrDef.canonicalValues.map(cv => cv.toLowerCase());
-      if (!allowed.includes(lower)) {
-        errors.push({
-          path,
-          message: `Attribute '${attrDef.name}' value '${value}' is not one of the canonical values: [${attrDef.canonicalValues.join(', ')}].`,
-          scimType: 'invalidValue',
-        });
-      }
     }
   }
 
@@ -566,19 +544,6 @@ export class SchemaValidator {
     const subMap = new Map<string, SchemaAttributeDefinition>();
     for (const sa of subAttrDefs) {
       subMap.set(sa.name.toLowerCase(), sa);
-    }
-
-    // V9: Required sub-attribute enforcement (create/replace only)
-    if (options.mode !== 'patch') {
-      for (const sa of subAttrDefs) {
-        if (sa.required && !this.findKeyIgnoreCase(obj, sa.name)) {
-          errors.push({
-            path: `${parentPath}.${sa.name}`,
-            message: `Required sub-attribute '${sa.name}' is missing in '${parentPath}'.`,
-            scimType: 'invalidValue',
-          });
-        }
-      }
     }
 
     for (const [key, value] of Object.entries(obj)) {
@@ -625,24 +590,7 @@ export class SchemaValidator {
       //
       // Only when the value really is an array: null/undefined keep falling
       // through so RFC 7643 §2.5 unassigned-value handling is untouched.
-      if (subDef.multiValued === true && Array.isArray(value)) {
-        const elementDef: SchemaAttributeDefinition = { ...subDef, multiValued: false };
-        value.forEach((element, index) => {
-          this.validateSingleValue(
-            `${parentPath}.${key}[${index}]`,
-            element,
-            elementDef,
-            options,
-            errors,
-          );
-        });
-        continue;
-      }
-
-      // Reached only for a sub-attribute the schema declares SINGULAR, so an
-      // array here is a genuine cardinality violation and validateSingleValue
-      // is right to reject it.
-      this.validateSingleValue(`${parentPath}.${key}`, value, subDef, options, errors);
+      this.validateAttribute(`${parentPath}.${key}`, value, subDef, options, errors);
     }
   }
 
@@ -716,28 +664,92 @@ export class SchemaValidator {
     extensionSchemas: Map<string, SchemaDefinition>,
     errors: ValidationError[],
   ): void {
-    for (const attr of coreAttributes.values()) {
-      if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(payload, attr.name))) {
-        errors.push({
-          path: attr.name,
-          message: `Required attribute '${attr.name}' is missing.`,
-          scimType: 'invalidValue',
-        });
+    const collect = (obj: Record<string, unknown>, attrs: Iterable<SchemaAttributeDefinition>, prefix: string): void => {
+      for (const attr of attrs) {
+        if (attr.mutability === 'readOnly') continue;
+        const value = this.getValueIgnoreCase(obj, attr.name);
+        const path = prefix ? `${prefix}.${attr.name}` : attr.name;
+        if (attr.required && (value == null || value === '' || (Array.isArray(value) && value.length === 0))) {
+          errors.push({ path, message: `Required attribute '${attr.name}' is missing or unassigned.`, scimType: 'invalidValue' });
+        }
+        if (attr.type === 'complex' && attr.subAttributes) {
+          const elements = Array.isArray(value) ? value : [value];
+          elements.forEach((element, index) => {
+            if (element && typeof element === 'object' && !Array.isArray(element)) {
+              collect(element as Record<string, unknown>, attr.subAttributes!, Array.isArray(value) ? `${path}[${index}]` : path);
+            }
+          });
+        }
       }
-    }
+    };
+    collect(payload, coreAttributes.values(), '');
 
     // Check required extension attributes
     for (const [urn, schema] of extensionSchemas) {
       const extPayload = payload[urn] as Record<string, unknown> | undefined;
-      if (extPayload && typeof extPayload === 'object') {
-        for (const attr of schema.attributes) {
-          if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(extPayload, attr.name))) {
-            errors.push({
-              path: `${urn}.${attr.name}`,
-              message: `Required attribute '${attr.name}' is missing in extension '${urn}'.`,
-              scimType: 'invalidValue',
-            });
-          }
+      if (schema.required && (!extPayload || typeof extPayload !== 'object' || Array.isArray(extPayload) ||
+        !Array.isArray(payload.schemas) || !payload.schemas.includes(urn))) {
+        errors.push({ path: urn, message: `Required extension '${urn}' must be present in schemas and the resource body.`, scimType: 'invalidValue' });
+        continue;
+      }
+      if (extPayload && typeof extPayload === 'object' && !Array.isArray(extPayload)) collect(extPayload, schema.attributes, urn);
+    }
+  }
+
+  /**
+   * Build a PUT candidate without discarding server-owned or omitted immutable
+   * data. Required writable attributes must still be supplied by the client.
+   * Explicit immutable changes remain visible to checkImmutable.
+   */
+  static prepareReplacement(
+    existing: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+    schemas: readonly SchemaDefinition[],
+  ): void {
+    const preserve = (old: Record<string, unknown>, next: Record<string, unknown>,
+      attrs: readonly SchemaAttributeDefinition[]): void => {
+      for (const attr of attrs) {
+        const oldKey = Object.keys(old).find(key => key.toLowerCase() === attr.name.toLowerCase());
+        const nextKey = Object.keys(next).find(key => key.toLowerCase() === attr.name.toLowerCase());
+        const oldValue = oldKey ? old[oldKey] : undefined;
+        const supplied = nextKey !== undefined && next[nextKey] !== undefined;
+        if (attr.mutability === 'readOnly' || (attr.mutability === 'immutable' && !supplied && !attr.required)) {
+          if (nextKey) delete next[nextKey];
+          if (oldKey && oldValue !== undefined) next[oldKey] = structuredClone(oldValue);
+          continue;
+        }
+        if (attr.type !== 'complex' || !attr.subAttributes || !oldValue || typeof oldValue !== 'object') continue;
+        if (Array.isArray(oldValue)) {
+          const nextValue = nextKey ? next[nextKey] : undefined;
+          if (!Array.isArray(nextValue)) continue; // Removing an entry is not changing its immutable children.
+          nextValue.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+            const identity = this.getValueIgnoreCase(entry, 'value');
+            const oldEntry = identity === undefined ? oldValue[index] : oldValue.find(item =>
+              item && typeof item === 'object' && this.deepEqual(this.getValueIgnoreCase(item, 'value'), identity));
+            if (oldEntry && typeof oldEntry === 'object' && !Array.isArray(oldEntry)) preserve(oldEntry, entry, attr.subAttributes!);
+          });
+        } else {
+          const nextValue = nextKey ? next[nextKey] : undefined;
+          if (nextValue !== undefined && (!nextValue || typeof nextValue !== 'object' || Array.isArray(nextValue))) continue;
+          const target = (nextValue ?? {}) as Record<string, unknown>;
+          preserve(oldValue as Record<string, unknown>, target, attr.subAttributes);
+          if (Object.keys(target).length) next[nextKey ?? attr.name] = target;
+        }
+      }
+    };
+    for (const schema of schemas) {
+      if (isCoreSchema(schema)) preserve(existing, incoming, schema.attributes);
+      else {
+        const old = existing[schema.id];
+        const next = incoming[schema.id];
+        if (!old || typeof old !== 'object' || Array.isArray(old)) continue;
+        if (next !== undefined && (!next || typeof next !== 'object' || Array.isArray(next))) continue;
+        const target = (next ?? {}) as Record<string, unknown>;
+        preserve(old as Record<string, unknown>, target, schema.attributes);
+        if (Object.keys(target).length) {
+          incoming[schema.id] = target;
+          if (Array.isArray(incoming.schemas) && !incoming.schemas.includes(schema.id)) incoming.schemas.push(schema.id);
         }
       }
     }
@@ -758,6 +770,7 @@ export class SchemaValidator {
     incoming: Record<string, unknown>,
     schemas: readonly SchemaDefinition[],
     preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
+    mode: 'patch' | 'replace' = 'patch',
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
@@ -790,6 +803,7 @@ export class SchemaValidator {
         incoming,
         attrDef,
         errors,
+        mode,
       );
     }
 
@@ -806,6 +820,7 @@ export class SchemaValidator {
           incomingExt ?? {},
           attrDef,
           errors,
+          mode,
         );
       }
     }
@@ -822,12 +837,13 @@ export class SchemaValidator {
     incoming: Record<string, unknown>,
     attrDef: SchemaAttributeDefinition,
     errors: ValidationError[],
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     if (attrDef.mutability !== 'immutable') {
       // For complex attributes with sub-attributes, check sub-attribute immutability
       if (attrDef.type === 'complex' && attrDef.subAttributes) {
         const hasImmutableSubs = attrDef.subAttributes.some(sa => sa.mutability === 'immutable');
-        if (!hasImmutableSubs) return;
+        if (!hasImmutableSubs && mode !== 'replace') return;
 
         const existingVal = this.getValueIgnoreCase(existing, attrDef.name);
         const incomingVal = this.getValueIgnoreCase(incoming, attrDef.name);
@@ -835,17 +851,18 @@ export class SchemaValidator {
         if (attrDef.multiValued) {
           // Multi-valued complex: compare each matched element's immutable sub-attrs
           this.checkImmutableMultiValuedComplex(
-            path, existingVal, incomingVal, attrDef.subAttributes, errors,
+            path, existingVal, incomingVal, attrDef.subAttributes, errors, mode,
           );
-        } else if (existingVal && incomingVal &&
-                   typeof existingVal === 'object' && typeof incomingVal === 'object') {
+        } else if (existingVal && typeof existingVal === 'object' &&
+                   ((incomingVal && typeof incomingVal === 'object') || mode === 'replace')) {
           for (const subDef of attrDef.subAttributes) {
             this.checkImmutableAttribute(
               `${path}.${subDef.name}`,
               existingVal as Record<string, unknown>,
-              incomingVal as Record<string, unknown>,
+              (incomingVal ?? {}) as Record<string, unknown>,
               subDef,
               errors,
+              mode,
             );
           }
         }
@@ -861,7 +878,7 @@ export class SchemaValidator {
     if (existingVal === null || existingVal === undefined) return;
 
     // Not present in incoming → allow (attribute not being modified)
-    if (incomingVal === undefined) return;
+    if (incomingVal === undefined && mode !== 'replace') return;
 
     // Compare values
     if (!this.deepEqual(existingVal, incomingVal)) {
@@ -883,6 +900,7 @@ export class SchemaValidator {
     incomingVal: unknown,
     subAttributes: readonly SchemaAttributeDefinition[],
     errors: ValidationError[],
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     if (!Array.isArray(existingVal) || !Array.isArray(incomingVal)) return;
 
@@ -913,6 +931,7 @@ export class SchemaValidator {
               incomingObj,
               subDef,
               errors,
+              mode,
             );
           }
         }

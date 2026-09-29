@@ -25,9 +25,12 @@ admin PATCH guarantees; P8b repository cleanup is not claimed integrated.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-28 | P7a declaration, scalar/cardinality and POST/PUT correctness implemented on `fix/scim-profile-validation-20260928`, based on P1 `3ecaba55`. Focused units: 1,507. Owned PostgreSQL/InMemory HTTP and local-live evidence, boundaries and remaining PATCH integration are in [P7a](docs/SCIM_P7A_PROFILE_VALIDATION.md). No versions, locks, push or deployment changed. |
 | 2026-09-28 | P1 typed PATCH paths implemented in isolated `fix/scim-correctness-p1-20260928`; focused 1,476 unit and 65 HTTP tests pass, plus owned PostgreSQL/InMemory and local-live proof. See [P1 implementation](docs/SCIM_P1_IMPLEMENTATION.md). No merge/deploy; central release metadata remains pending. |
 
 - [x] ✅ COMPLETED: P1 native Boolean selector and malformed-path repair, with permanent regression tests.
+- [x] ✅ COMPLETED: P7a bounded declaration/scalar/POST/PUT implementation and owned runtime proof; P7 as a whole remains open.
+- [ ] P7b: integrate ordered PATCH after P2 and resolve remaining supported uniqueness/reference/deep-compatibility promises.
 - [ ] P2: operation transitions, append/all-match behavior, primary/required/immutable policies.
 - [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.
 

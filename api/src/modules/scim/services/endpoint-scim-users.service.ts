@@ -77,6 +77,7 @@ export class EndpointScimUsersService {
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation.
@@ -89,7 +90,6 @@ export class EndpointScimUsersService {
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'create');
 
     // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly attributes from POST payload', {
         method: 'POST', path: '/Users', stripped: strippedAttrs, endpointId,
@@ -265,6 +265,12 @@ export class EndpointScimUsersService {
   ): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
+    const user = await this.userRepo.findByScimId(endpointId, scimId);
+    if (!user) {
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
+    }
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
@@ -273,10 +279,10 @@ export class EndpointScimUsersService {
     // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
     this.schemaHelpers.enforcePrimaryConstraint(dto as Record<string, unknown>, endpointId, config);
 
+    SchemaValidator.prepareReplacement(this.buildExistingPayload(user), dto, this.schemaHelpers.getSchemaDefinitions(endpointId));
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'replace');
 
     // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly attributes from PUT payload', {
         method: 'PUT', path: `/Users/${scimId}`, stripped: strippedAttrs, endpointId,
@@ -286,18 +292,8 @@ export class EndpointScimUsersService {
 
     this.logger.info(LogCategory.SCIM_USER, 'Replace user (PUT)', { scimId, userName: dto.userName, endpointId });
 
-    const user = await this.userRepo.findByScimId(endpointId, scimId);
-    
-    if (!user) {
-      this.logger.debug(LogCategory.SCIM_USER, 'Replace target not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
-    }
-
-    // Phase 7: Pre-write If-Match enforcement
-    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
-
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
-    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config, 'replace');
 
     await this.assertUniqueUserNameForEndpoint(dto.userName, endpointId, scimId);
 

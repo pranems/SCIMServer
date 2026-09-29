@@ -18,6 +18,7 @@ import type { EndpointProfile, ShorthandProfileInput, ServiceProviderConfig } fr
 import { expandProfile } from './auto-expand.service';
 import { validateAttributeTightenOnly } from './tighten-only-validator';
 import { RFC_SCHEMA_ATTRIBUTE_MAPS } from './rfc-baseline';
+import { validateSchemaDeclarations } from './schema-declaration-validator';
 
 // ─── Validation Result ──────────────────────────────────────────────────
 
@@ -173,6 +174,8 @@ function validateStructure(profile: EndpointProfile): ProfileValidationError[] {
  * Returns the expanded profile if valid, or errors if not.
  */
 export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileValidationResult {
+  const declarationErrors = validateSchemaDeclarations(input);
+  if (declarationErrors.length) return { valid: false, errors: declarationErrors };
   // Step 1+2: Auto-expand + auto-inject
   let profile: EndpointProfile;
   try {
@@ -185,6 +188,7 @@ export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileV
   }
 
   const allErrors: ProfileValidationError[] = [];
+  allErrors.push(...validateSchemaDeclarations(profile));
 
   // Step 3: Tighten-only validation
   allErrors.push(...runTightenOnlyValidation(profile));
