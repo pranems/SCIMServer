@@ -74,6 +74,37 @@ Self-review checked that core precedence never becomes an extension-name
 blacklist and that string preservation/duplicate acceptance are asserted
 under ordinary client-scoped profiles. The unrelated confirmed PUT
 one-to-one retention blocker remains open with integration.
+### Combined-suite expectation reconciliation
+
+The combined P2/P7 run exposed eight older expectations in
+[extension-flags-validation.spec.ts](../api/src/domain/validation/extension-flags-validation.spec.ts).
+They also failed against the earlier combined validator, so they were not
+introduced by the one-to-one PUT preservation fix.
+
+| Old expectation | Accepted P7 contract | Updated proof |
+|---|---|---|
+| Three tests required canonical suggestions to act as a closed enum | RFC 7643 section 7 describes suggested values; this provider does not impose an additional closed-enum policy | Valid non-canonical strings pass; a numeric value still fails with the exact type error |
+| Three tests required malformed extension containers to be silently skipped | A supplied extension value must be a complex object | Array, string and number each produce one exact `invalidValue` error at the extension URN |
+| Two tests required client readOnly values to be rejected on POST/PUT | RFC 7644 sections 3.3 and 3.5.1 ignore client readOnly input | Valid and malformed client values do not fail validation; PUT restores the server value, leaves the caller fixture unchanged, and explicit readOnly PATCH still fails |
+
+The unchanged suite first reproduced **8 failed / 68 passed**. The reconciled
+suite and its P7/preservation neighbors pass **142 tests in three suites**.
+No test was skipped, removed or reduced to a status-only assertion. Four
+additional controls guard scalar type checking, malformed readOnly input in
+both write modes, and PATCH mutability. There is no production-code change.
+
+Two execution frictions were caught before GREEN: the fresh worktree lacked
+Jest, so only an owned link to installed tooling was restored; the first new
+PUT assertion treated the in-place `prepareReplacement` helper as a return
+value, which TypeScript rejected. The test now clones its input and checks
+the mutated candidate plus the untouched original fixture.
+
+**Test/gate disposition: applied.** Standards-backed expectation changes carry
+opposing controls rather than weakening assertions or accepting old defects.
+**Design disposition: accepted.** This is test-only reconciliation of the
+existing validator/helper contract, with no new abstraction or behavior.
+No PostgreSQL or live suite was rerun for unchanged production code; final
+integrated backend evidence remains owned by consolidation.
 
 ### Recursive readOnly follow-up to 8e42f15f
 

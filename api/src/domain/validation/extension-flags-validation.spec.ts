@@ -2,7 +2,7 @@
  * Extension Schema Validation - Flag Combinations & Flow Tests
  *
  * Covers gaps in SchemaValidator for:
- *  - Extension schema with canonical value enforcement (V10 gap)
+ *  - Extension schema with canonical value suggestions
  *  - Extension block as array (should reject)
  *  - Immutable extension attributes across modes
  *  - Extension schema + core error accumulation across flag combos
@@ -78,7 +78,7 @@ const ALL_OPTS: { label: string; opts: ValidationOptions }[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 1. Extension Canonical Value Enforcement (V10 gap)
+// 1. Extension Canonical Value Suggestions
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Extension schema - canonical values (V10)', () => {
@@ -104,15 +104,15 @@ describe('Extension schema - canonical values (V10)', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('should reject non-canonical value in extension attribute (strict)', () => {
+  it('accepts a valid string outside the suggested canonical values in strict mode', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'alice',
       [ENTERPRISE_ID]: { department: 'InvalidDept' },
     };
     const result = SchemaValidator.validate(payload, [core, ext], STRICT_CREATE);
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/canonical/i);
+    expect(result).toEqual({ valid: true, errors: [] });
+    expect(payload[ENTERPRISE_ID].department).toBe('InvalidDept');
   });
 
   it('should accept canonical value case-insensitively', () => {
@@ -125,15 +125,14 @@ describe('Extension schema - canonical values (V10)', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('should reject non-canonical in extension via PATCH pre-validation', () => {
+  it('accepts a valid non-canonical string in PATCH pre-validation', () => {
     const result = SchemaValidator.validatePatchOperationValue(
       'replace',
       `${ENTERPRISE_ID}:department`,
       'InvalidDept',
       [core, ext],
     );
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/canonical/i);
+    expect(result).toEqual({ valid: true, errors: [] });
   });
 
   it('should accept canonical in extension via PATCH pre-validation', () => {
@@ -146,15 +145,29 @@ describe('Extension schema - canonical values (V10)', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('should reject invalid employeeType in extension', () => {
+  it('does not turn suggested employee types into a closed enum', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'alice',
       [ENTERPRISE_ID]: { employeeType: 'intern' },
     };
     const result = SchemaValidator.validate(payload, [core, ext], STRICT_CREATE);
+    expect(result).toEqual({ valid: true, errors: [] });
+    expect(payload[ENTERPRISE_ID].employeeType).toBe('intern');
+  });
+
+  it('still rejects an invalid scalar type when canonical suggestions are present', () => {
+    const result = SchemaValidator.validate({
+      schemas: [CORE_USER_ID],
+      userName: 'alice',
+      [ENTERPRISE_ID]: { department: 42 },
+    }, [core, ext], STRICT_CREATE);
     expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/canonical/i);
+    expect(result.errors).toEqual([{
+      path: `${ENTERPRISE_ID}.department`,
+      scimType: 'invalidValue',
+      message: "Attribute 'department' must be a string, got number.",
+    }]);
   });
 });
 
@@ -168,37 +181,55 @@ describe('Extension block validation - non-object shapes', () => {
     makeAttr({ name: 'department' }),
   ]);
 
-  // The current validator does NOT validate the extension block shape -
-  // non-object values are silently skipped. These tests document actual behavior.
-  it('should silently skip extension block as an array (no crash)', () => {
+  it('rejects an extension block supplied as an array', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'alice',
       [ENTERPRISE_ID]: [{ department: 'Eng' }],
     };
-    const result = SchemaValidator.validate(payload as any, [core, ext], STRICT_CREATE);
-    // Not rejected - validator skips non-object extension blocks
-    expect(result.valid).toBe(true);
+    const result = SchemaValidator.validate(payload, [core, ext], STRICT_CREATE);
+    expect(result).toEqual({
+      valid: false,
+      errors: [{
+        path: ENTERPRISE_ID,
+        scimType: 'invalidValue',
+        message: `Extension '${ENTERPRISE_ID}' must be a complex object.`,
+      }],
+    });
   });
 
-  it('should silently skip extension block as a string (no crash)', () => {
+  it('rejects an extension block supplied as a string', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'alice',
       [ENTERPRISE_ID]: 'invalid-block',
     };
-    const result = SchemaValidator.validate(payload as any, [core, ext], STRICT_CREATE);
-    expect(result.valid).toBe(true);
+    const result = SchemaValidator.validate(payload, [core, ext], STRICT_CREATE);
+    expect(result).toEqual({
+      valid: false,
+      errors: [{
+        path: ENTERPRISE_ID,
+        scimType: 'invalidValue',
+        message: `Extension '${ENTERPRISE_ID}' must be a complex object.`,
+      }],
+    });
   });
 
-  it('should silently skip extension block as a number (no crash)', () => {
+  it('rejects an extension block supplied as a number', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'alice',
       [ENTERPRISE_ID]: 42,
     };
-    const result = SchemaValidator.validate(payload as any, [core, ext], STRICT_CREATE);
-    expect(result.valid).toBe(true);
+    const result = SchemaValidator.validate(payload, [core, ext], STRICT_CREATE);
+    expect(result).toEqual({
+      valid: false,
+      errors: [{
+        path: ENTERPRISE_ID,
+        scimType: 'invalidValue',
+        message: `Extension '${ENTERPRISE_ID}' must be a complex object.`,
+      }],
+    });
   });
 
   it('should accept extension block as empty object', () => {
@@ -749,25 +780,50 @@ describe('Extension mutability flags across modes', () => {
     makeAttr({ name: 'readWriteField' }),
   ]);
 
-  it('should reject readOnly extension attr on create', () => {
+  it('does not reject ignored readOnly client input on create', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'a',
       [ENTERPRISE_ID]: { readOnlyField: 'x' },
     };
     const result = SchemaValidator.validate(payload, [core, ext], STRICT_CREATE);
-    expect(result.valid).toBe(false);
-    expect(result.errors[0].message).toMatch(/readOnly/i);
+    expect(result).toEqual({ valid: true, errors: [] });
   });
 
-  it('should reject readOnly extension attr on replace', () => {
+  it('ignores client readOnly values and preserves server state during replacement', () => {
     const payload = {
       schemas: [CORE_USER_ID],
       userName: 'a',
       [ENTERPRISE_ID]: { readOnlyField: 'x' },
     };
     const result = SchemaValidator.validate(payload, [core, ext], STRICT_REPLACE);
+    expect(result).toEqual({ valid: true, errors: [] });
+    const existing = { ...payload, [ENTERPRISE_ID]: { readOnlyField: 'server-owned' } };
+    const candidate = structuredClone(payload);
+    SchemaValidator.prepareReplacement(existing, candidate, [core, ext]);
+    expect(candidate[ENTERPRISE_ID]).toEqual({ readOnlyField: 'server-owned' });
+    expect(payload[ENTERPRISE_ID].readOnlyField).toBe('x');
+  });
+
+  it.each([STRICT_CREATE, STRICT_REPLACE])('ignores malformed readOnly input in $mode', options => {
+    const result = SchemaValidator.validate({
+      schemas: [CORE_USER_ID],
+      userName: 'a',
+      [ENTERPRISE_ID]: { readOnlyField: { invalid: 'client value' } },
+    }, [core, ext], options);
+    expect(result).toEqual({ valid: true, errors: [] });
+  });
+
+  it('still rejects an explicit readOnly PATCH target in operation pre-validation', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace', `${ENTERPRISE_ID}:readOnlyField`, 'client edit', [core, ext],
+    );
     expect(result.valid).toBe(false);
+    expect(result.errors).toEqual([{
+      path: `${ENTERPRISE_ID}:readOnlyField`,
+      scimType: 'mutability',
+      message: "Attribute 'readOnlyField' is readOnly and cannot be modified via PATCH.",
+    }]);
   });
 
   it('should accept readOnly extension attr on patch', () => {
