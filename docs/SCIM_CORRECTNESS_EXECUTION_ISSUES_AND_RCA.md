@@ -232,6 +232,17 @@ are not changed by this increment.
 Evidence is in ignored `test-results/p8b/` logs. No shared database, deployment,
 product version or dependency manifest was changed.
 
+### P8b integration coordination
+
+| ID | Type / severity | Symptom and cause | Resolution | Earliest / actual detection | Prevention |
+|---|---|---|---|---|---|
+| P8b-I11 | Coordination / Low | P8b and sibling P8c independently reserved live section `9z-CS` from the same base. | Move P8b to `9z-CT`, including result prefixes and its feature guide. The focused section-ID assertion was RED at zero CT sections and GREEN at exactly one; the main script parses. | Shared integration planning / parent coordination | Validate shared section identifiers during integration; keep sibling source/signature merges with the parent. |
+
+**Test/gate improvement: applied.** The section-ID check proves uniqueness
+without rerunning unchanged backend behavior. **Design/architecture
+disposition: accepted.** This is integration metadata only; no lifecycle port,
+Group aggregate operation or conditional-update signature changes.
+
 For each new issue record:
 
 1. Type and severity.

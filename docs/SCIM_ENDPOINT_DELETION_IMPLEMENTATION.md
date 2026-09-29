@@ -1,6 +1,6 @@
 # Endpoint deletion: owned data, audit history and late writes
 
-> **Last verified:** 2026-09-28
+> **Last verified:** 2026-09-29
 >
 > **Status:** P8b implemented and validated locally; not deployed.
 >
@@ -117,6 +117,11 @@ complete emulator of all PostgreSQL foreign keys: standalone repository
 fixtures can still use previously unseen endpoint IDs. Production creates
 resolve the endpoint before entering these repositories.
 
+In particular, these cleanup tests do **not** prove shared-storage User-FK
+semantics. The native PostgreSQL User-FK control is not applicable to the
+independent InMemory User and Group repositories. Parent Group existence and
+endpoint deletion barriers are the specific InMemory guarantees tested here.
+
 Already-returned snapshots and in-flight authorization work are not cancelled.
 The guarantee is that a write after deletion cannot repopulate owned storage.
 The paused HTTP probe verifies rejection and exact counts, not a universal
@@ -151,7 +156,8 @@ Permanent evidence:
 * [Shared exact-count fixture](../api/test/helpers/endpoint-deletion.fixture.ts).
 * [HTTP tests](../api/test/e2e/endpoint-deletion.e2e-spec.ts).
 * [Live helper](../scripts/test-scim-endpoint-deletion.ps1), integrated into
-  [live-test.ps1](../scripts/live-test.ps1) as `9z-CS`. P8a keeps `9z-CR`.
+  [live-test.ps1](../scripts/live-test.ps1) as `9z-CT`. P8a keeps `9z-CR`;
+  sibling P8c reserves `9z-CS`.
 
 The live helper creates and cleans up only its own UUID-named endpoints.
 It proves public behavior; it does **not** claim that HTTP 404 proves physical
@@ -194,3 +200,8 @@ transaction abstraction or all-store migration would add unnecessary scope.
 P8c conditional endpoint-admin writes, P3 integration, full consolidation
 gates and release/deployment remain separate. P8a's authoritative PostgreSQL
 reads and fingerprint-based cache hydration remain intact.
+
+Integration coordination: P4 Group aggregate commits `212a6b92` and
+`66a7229f`, and P8c conditional endpoint-update commit `8eb2f162`, are merged
+by the parent integration task, not this worktree. P8b does not import their
+pending changes or change its delete scope to implement their write contracts.
