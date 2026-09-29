@@ -116,6 +116,15 @@ PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
 failures; GREEN: all 16 new units, 289 targeted HTTP cases per backend and
 60 built-live cases / 1,260 assertions per backend on owned InMemory and
 PostgreSQL 17.8 (22 migrations). [Receipt](docs/evidence/scim-retained-put-20260929/validation.json).
+**Residual retention stability integrated:** committed parallel source
+`414e14e8` is retained as`d8c9a79a`, without replacing the later common/query
+work or parent test reconciliation. A current-tree assertion reproduced
+fallback stealing a later exact type. One matcher in attribute-values now
+reserves type capacity, remains stable after restoration and checks nested
+immutable descendants; retained-entries is a compatibility export only.
+491 units,509 InMemory/511 PostgreSQL HTTP and164 main live checks/backend
+pass, including the new6-case/5474-assertion contract at9z-DD.
+[Integrated residual proof](docs/evidence/scim-retention-stability-integration-20260929/validation.json).
 The eight neighboring P7 expectations were reproduced on the unchanged
 baseline, then reconciled in parent source`df3ca957` -> `bd82e681`.
 The exact assertions and four opposing controls pass142 tests/three suites
@@ -199,6 +208,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | Residual source414e14e8 integrated asd8c9a79a with one canonical matcher and compatibility exports. Reproduced omitted/changed-type stealing on the old helper before import;491 units,509IM/511PG HTTP and164main live checks/backend pass. New9z-DD executes6cases/5474assertions while oldretention/common/query contracts remain. No full-C0 or deployment claim. |
 | 2026-09-29 | Corrected P6c pair integrated09b59b43/8f3510a8. Query/write/schema probe improves43/45->45/45 per backend; explicit-false role regression fixed after2unit/2HTTP REDs.273 scoped units+6 wiring/cleanup units,398IM/399PG HTTP and163main live checks/backend pass. Query helper now52 outcomes; CP capability/CU query mapping retained. Remaining C0 acceptance is separate. |
 | 2026-09-29 | Preserved superseded4ba9373c/corrective2d2da4e1 consecutively asd93d1a0d/43b01c4e. Only corrected final state tested:176units,367InMemory/369PostgreSQL HTTP,143shared live checks/backend. All-core common externalId String/SV/exact semantics and defaultnone retained; namespaced homonyms independent. Prior hold and bad receipt remain historical, not standalone acceptance. |
 | 2026-09-29 | Held `4ba9373c` without cherry-picking: its numeric/MV custom-core externalId permission contradicts the current RFC common-attribute contract. Source GREEN is not contract acceptance. No runtime/tests/defaults changed; all accepted package sequences remain assembled, with the conflicting source explicitly excluded pending parent reconciliation. |

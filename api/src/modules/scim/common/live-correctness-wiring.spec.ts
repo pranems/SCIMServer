@@ -101,4 +101,11 @@ foreach ($failedIds in @(@('role-owned'), @('main-owned'), @('role-owned', 'main
     expect(source.includes('$receipt.assertions -eq 1228')).toBe(true);
     expect(source.includes('$receipt.assertions -eq 188')).toBe(true);
   });
+
+  it('routes the additional retention stability corpus through a distinct owned live section', () => {
+    const source = read(section);
+    expect(source.includes('put-preservation.cjs')).toBe(true);
+    expect(source.includes('$receipt.cases -eq 6 -and $receipt.assertions -eq 5474')).toBe(true);
+    expect(source.includes('9z-DD')).toBe(true);
+  });
 });

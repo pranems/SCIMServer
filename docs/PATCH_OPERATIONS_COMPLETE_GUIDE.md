@@ -31,9 +31,15 @@ policy. See the P2 guide for the explicitly retained compatibility boundaries.
 **Shared retention identity:** the integrated PUT follow-up now uses the same
 operation-neutral one-to-one entry matcher as PATCH preservation and immutable
 transitions. Duplicate `value` fields are disambiguated by `type` and consumed
-once; anonymous occurrences retain their order. This extraction preserves
-PATCH behavior and fixes PUT copying one server-owned value into several
-entries. See [the retained-entry proof](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries).
+once. The residual correction reserves later exact-type capacity before
+occurrence fallback and remains stable when server-owned types are restored.
+Null and absent types are both unassigned; null and absent value identities
+remain distinct. Anonymous/indistinguishable entries use the documented
+occurrence policy, not an invented identity. The single implementation is
+`domain/attribute-values.ts`; the older neutral path is a compatibility
+export. PATCH append intent remains PATCH-only. See the
+[original proof](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries)
+and [additional restoration/nested coverage](SCIM_PUT_ENTRY_PRESERVATION.md).
 
 **Common externalId value boundary:** the assembled follow-up checks original
 top-level externalId values before resource hooks and the completed candidate

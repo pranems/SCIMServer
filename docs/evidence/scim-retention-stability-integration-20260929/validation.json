@@ -1,0 +1,113 @@
+{
+  "scope": "Residual retained-entry reservation/restoration and nested immutable traversal on the current assembly, not final C0",
+  "verifiedAt": "2026-09-29",
+  "sourceCommit": "414e14e8f3e1b42e4d39621b244700695da18c34",
+  "sourceBase": "5581e6b73d8ba9fd206ddf92fa303c96c90ba610",
+  "integrationCommit": "d8c9a79a57236d368f2f1b828d83555abc43bec7",
+  "priorIntegrationFix": "b21e44cb1dd3ee2d92b00d04846b90e68fe1a7dd",
+  "sourceSha256": "a39c8ebe99d6955d2dabe2a9990bd6b4516100fe5f351373c8219b332c3c7a3f",
+  "fingerprintMethod": "Sorted tracked/nonignored api/src, api/test and scripts path plus bytes, including subsequently committed live wiring",
+  "newlyVerifiedGap": "The old matcher let an omitted/changed type consume a stored work entry before a later explicit work entry could claim it",
+  "currentTreeRed": {
+    "actual": [
+      "work-owned",
+      "home-owned"
+    ],
+    "expected": [
+      "home-owned",
+      "work-owned"
+    ],
+    "failingAssertionRecordedBeforeProductionChange": true
+  },
+  "implementation": {
+    "singleImplementation": "api/src/domain/attribute-values.ts",
+    "compatibilityExports": [
+      "api/src/domain/retained-entries.ts",
+      "api/src/domain/patch/patch-values.ts"
+    ],
+    "inputArraysRemainReadonlyCompatible": true,
+    "rules": [
+      "Reserve exact-type capacity before occurrence fallback",
+      "Preserve occurrence stability among indistinguishable selected types after restoration",
+      "Treat null/absent types as unassigned without merging null/missing value identities",
+      "Traverse nested complex children during immutable comparison",
+      "Do not import PATCH append intent into PUT replacement"
+    ]
+  },
+  "build": "passed",
+  "unit": {
+    "suites": 10,
+    "passed": 491,
+    "failed": 0,
+    "newSourceContractCasesIncluded": 107,
+    "oldRetentionAndParentReconciliationRetained": true
+  },
+  "lint": {
+    "files": 8,
+    "errors": 0,
+    "warnings": 2,
+    "rulesRelaxed": false
+  },
+  "configurationChecks": {
+    "passed": 10,
+    "scope": "Selection/transform/bootstrap mapping for P1/P2/P7/P9/PUT; source guard stubbed only during configuration evaluation",
+    "putAndP9BootstrapPinned": true,
+    "allOriginalPackageSelectorsAndMinimumsPreserved": true
+  },
+  "http": {
+    "suites": 9,
+    "inmemory": {
+      "passed": 509,
+      "failed": 0,
+      "nativeOnlySkipped": 2
+    },
+    "postgresql": {
+      "passed": 511,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    },
+    "transport": "Jest/Nest listeners, distinct from built runtime"
+  },
+  "builtLive": {
+    "artifact": "Local npm build output, node api/dist/main.js; not an immutable published image",
+    "mainSharedChecksPerBackend": 164,
+    "failed": 0,
+    "newRetentionCasesPerBackend": 6,
+    "newRetentionAssertionsPerBackend": 5474,
+    "section": "9z-DD",
+    "old9zDAContractRetained": "60 cases/1260 assertions",
+    "ownedRuntimesStopped": true,
+    "endpointInventoriesUnchanged": true
+  },
+  "ownership": {
+    "postgresRun": "208d47983e2048d0",
+    "freshLoopbackTmpfsIdentityVerified": true,
+    "pinnedBootstrap": true,
+    "inheritedDatabaseUrlUsed": false,
+    "exactOwnedContainerRemoved": true
+  },
+  "sourceReceiptUnchanged": "../scim-put-preservation-20260929/validation.json",
+  "documentation": {
+    "contentAndWorkingTreeFreshnessDocsPassed": 26,
+    "committedRangeCoupling": "Run after final documentation commit; final handoff records its result",
+    "literalJsonBlocksParsed": 36,
+    "newDiagramRendered": 1,
+    "themes": 2,
+    "mermaidVersion": "11.15.0",
+    "securityLevel": "strict",
+    "editorVersionParity": "Unverified: existing discovery reports0.0.0; no repinning"
+  },
+  "limits": [
+    "No arbitrary identity is inferred for indistinguishable entries; stable occurrence fallback remains the explicit policy",
+    "Nested-complex tests exercise existing compatibility support, not a new RFC nesting promise",
+    "Common-PATCH validation, context views, public deepEqual/fifth mode and query/uniqueness corrections are preserved",
+    "The parent's eight-expectation reconciliation is retained; the source's older baseline failure is historical",
+    "No final82-case/characteristic/admission/coordination/performance/artifact acceptance claim"
+  ],
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

@@ -6,6 +6,21 @@
 `5581e6b73d8ba9fd206ddf92fa303c96c90ba610`. Not pushed, merged or deployed.
 Product and lockfile versions are unchanged.
 
+**Current integration:** source`414e14e8` is preserved as`d8c9a79a`.
+The earlier assembly fix`b21e44cb` already covered its exact work/home and
+anonymous cases. This source contributes additional type-capacity reservation,
+stable restored-discriminator pairing and nested immutable traversal.
+A direct assertion against the current old helper first reproduced
+omitted/changed type stealing the later explicit work match.
+
+[New integration receipt](evidence/scim-retention-stability-integration-20260929/validation.json)
+records491 units,509 InMemory/511 PostgreSQL HTTP and164 main built-live
+checks/backend, including this6-case/5474-assertion corpus. The original
+retained-entry path is now a compatibility export to attribute-values;
+there is only one implementation. Both old and new test/live contracts
+remain, as do the later common-attribute, query and parent-owned expectation
+corrections. Source counts below remain historical, not final C0 proof.
+
 ## The defect and the fix
 
 A PUT that reordered two `records` entries with the same `value`, but different

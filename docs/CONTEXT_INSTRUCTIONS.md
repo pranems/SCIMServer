@@ -25,8 +25,11 @@ The bounded [PUT retained-entry correction](SCIM_PUT_ENTRY_PRESERVATION.md)
 is a parallel source snapshot on `5581e6b7`. Its additional type-capacity,
 restoration stability and nested immutable controls extend the already
 integrated b21e44cb fix; the old neutral path remains a re-export, never a
-second matcher. Source evidence is107 contract checks within1771 tests;
-merged proof is still pending. The eight base expectations were subsequently
+second matcher. Source evidence is107 contract checks within1771 tests.
+Integration414e14e8 -> d8c9a79a now separately passes491 units,
+509 InMemory/511 PostgreSQL HTTP and164 shared live checks/backend,
+including6 new corpus cases/5474 assertions. [Merged residual proof](evidence/scim-retention-stability-integration-20260929/validation.json).
+The eight base expectations were subsequently
 reconciled by parentdf3ca957/bd82e681 and are not reopened.
 
 The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,

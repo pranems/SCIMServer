@@ -8,6 +8,12 @@ async function runLivePutPreservation(baseUrl, secret) {
   assert.equal(base.hostname, "127.0.0.1");
   assert.equal(base.protocol, "http:");
   assert.ok(secret.length >= 32);
+  return runPutPreservationContract(baseUrl, secret);
+}
+
+async function runPutPreservationContract(baseUrl, secret) {
+  assert.ok(["http:", "https:"].includes(new URL(baseUrl).protocol));
+  assert.ok(secret);
   const results = [];
   for (const test of cases) {
     results.push(await runCase(test, async (method, path, body) => {
@@ -22,4 +28,4 @@ async function runLivePutPreservation(baseUrl, secret) {
   }
   return { cases: results.length, assertions: results.reduce((sum, result) => sum + result.assertions, 0), results };
 }
-module.exports = { runLivePutPreservation };
+module.exports = { runLivePutPreservation, runPutPreservationContract };

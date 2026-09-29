@@ -2033,6 +2033,57 @@ controls and exact errors/state assertions, not deletion or weakening.
 **Design/architecture disposition: accepted.** Test-only alignment of
 existing behavior; no new runtime responsibility or abstraction.
 
+### 11.29 Additional reservation/restoration proof, 2026-09-29
+
+Parallel source `414e14e8f3e1b42e4d39621b244700695da18c34` was based on
+the same5581e6b7 predecessor as the already-integrated b21e44cb fix.
+Only committed content was inspected. It was not treated as a wholesale
+replacement for the newer assembly: parent expectation reconciliation,
+common-PATCH/context, P3b, query and lifecycle work remain.
+
+The net review found genuine residual behavior beyond the first fix:
+an omitted or changed type could consume the entry a later exact type
+identified; restored discriminators could change subsequent pairing; and
+immutable traversal skipped descendants under non-immutable complex parents.
+A current-helper assertion reproduced work-owned/home-owned where the
+omitted-type-before-work input required home-owned/work-owned.
+
+Source is retained as `d8c9a79a`. The single implementation is
+`domain/attribute-values.ts`; the original neutral path and PATCH export
+forward to it rather than retaining a second algorithm. Readonly input
+array compatibility, public deepEqual, the fifth immutable mode and both
+common helpers remain. Reservations choose type capacity; stable occurrence
+redistribution preserves valid restoration. Null/missing types are unassigned
+without merging null/missing value identities. PATCH append intent is not
+introduced into PUT.
+
+| Scoped integrated check | Result |
+|---|---|
+| Build / lint | Build passed; eight touched files, zero errors/two warnings |
+| New/old/common/PATCH/parent-expectation units |10 suites,491 passed, including all107 new source contract cases and old retention cases |
+| Harness selection |10 configuration-only checks preserve P1/P2/P7/P9/PUT selectors, scoped baselines and pinned P9/PUT bootstrap; no ownership claim from stubbed selection probes |
+| HTTP |9 suites:509 InMemory plus two native-only skips;511 PostgreSQL17.8, zero pending/TODO, all22 migrations |
+| Built-live |164 main shared checks/backend; new9z-DD executes6 cases/5474 assertions, alongside existing9z-DA60/1260 and current common/query contracts |
+| Cleanup |Owned endpoints unchanged afterward, runtimes stopped and exact PostgreSQL container removed |
+| Receipt |[Integrated residual retention](evidence/scim-retention-stability-integration-20260929/validation.json); both source and prior b21 receipts retained |
+
+The source's standalone guard remains, while an explicit-target contract
+feeds the normal main runner. A permanent wiring RED precedes the new route.
+All source-worktree selectors/minimums and inherited-URL clearing remain;
+PUT bootstrap is pinned like P9 rather than reintroducing marker redirection.
+Ambiguous identical entries still use the stated occurrence policy, not an
+invented identifier. Nested-complex coverage remains existing compatibility
+behavior, not a new RFC requirement.
+
+**Test/gate improvement: applied.** The first bounded GREEN did not establish
+discriminator-restoration stability; additional properties and real wire
+outcomes now cover it without deleting the original regressions.
+**Design/architecture disposition: accepted.** One matcher, compatibility
+exports only, existing recursive validator path, no new mutation engine.
+Admission/common-policy bridges, whole-namespace strict PATCH, broader
+characteristics, coordination/performance and exact82-case artifact
+acceptance remain separate.
+
 ## 12. Architecture and self-improvement decisions
 
 | Decision | Disposition and reason |
