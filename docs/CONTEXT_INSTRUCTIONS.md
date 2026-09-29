@@ -63,8 +63,11 @@ Integration `8d5915ba` -> `e80da689` separately passes754 units,
 22 migrations, and143 shared live checks/backend including472 P7 assertions.
 [Combined receipt](evidence/scim-common-context-integration-20260929/validation.json).
 Existing common-PATCH and PUT retention fixes are preserved, not reopened.
-Namespace-only strict validation, broader characteristic/query consumers and
-the old test-expectation reconciliation remain distinct P7b work.
+Namespace-only strict validation and broader characteristic/query/policy
+consumers remain distinct P7b work. The parent-owned eight-expectation
+reconciliation is integrated as`df3ca957` -> `bd82e681`:142 tests in three
+suites pass with exact assertions and four opposing controls; no production
+change, skipped case or database rerun was introduced.
 
 P7's [common externalId follow-up](SCIM_P7_COMMON_EXTERNAL_ID.md) corrects
 admission/runtime behavior for all resource cores using RFC 7643 3.1, not

@@ -103,8 +103,11 @@ PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
 failures; GREEN: all 16 new units, 289 targeted HTTP cases per backend and
 60 built-live cases / 1,260 assertions per backend on owned InMemory and
 PostgreSQL 17.8 (22 migrations). [Receipt](docs/evidence/scim-retained-put-20260929/validation.json).
-Eight broader neighboring P7 expectations fail identically on untouched
-committed source and remain explicit test-reconciliation blockers.
+The eight neighboring P7 expectations were reproduced on the unchanged
+baseline, then reconciled in parent source`df3ca957` -> `bd82e681`.
+The exact assertions and four opposing controls pass142 tests/three suites
+on the current assembly, with zero lint errors/two warnings. No production
+change or PostgreSQL rerun was needed; this named blocker is closed.
 
 Historical P2 core checkpoint: build and 1,229 combined units passed; a new
 default-discovery test adds one distinct pass (1,230 total). Initial combined
@@ -125,7 +128,7 @@ focused combined-backend proof; genuine DB faults and conditional 412 remain
 distinct. Final P7 PATCH integration depends
 on remaining follow-ups; the P2/P7 selected-value/cardinality and POST/PUT
 overlap checks pass. P7 schema-role/id/meta and namespace-only prevalidation,
-P3b generic authority/admission/query, eight old P7 expectations and the
+remaining shared-policy admission/coordination and the
 case-level/performance/artifact matrix remain open before C0.
 
 **Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
@@ -173,9 +176,9 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P3b fourth source `704d701f` -> `7001d194`; generic write authority verified with current P3/P4/P7/P8 seams on both backends.
 - [x] ✅ COMPLETED: Measured numeric/MV displayName equality failures and explicit extension-role query regression, with real query/write/schema parity proof.
 - [ ] Close remaining characteristic/query coverage, uniqueness admission and profile-revision coordination before C0.
-- [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
+- [x] ✅ COMPLETED: Parent test-only reconciliationdf3ca957 -> bd82e681 closes the eight legacy expectations with exact assertions, four opposing controls and142 merged unit passes, without skips.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close remaining P7b namespace-only/characteristic-query boundaries and old expectations, plus profile-revision coordination before C0.
+- [ ] Close remaining P7b namespace-only/characteristic/runtime-policy bridges plus profile-revision coordination before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.

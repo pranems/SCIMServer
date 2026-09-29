@@ -415,7 +415,7 @@ combined checkpoint has its own counts in section 11.1.
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | Four source commits assembled; focused context overlaps verified | `8d5915ba` -> `e80da689`; binding-local common views and authoritative timestamps preserve existing PATCH/retention fixes.754 units,537 InMemory/538 PostgreSQL HTTP and143 live checks/backend including472 P7 assertions pass. Namespace-only, prior eight expectations and broader query/admission acceptance remain open; section11.24 |
+| P7 | Context source verified; legacy expectations reconciled | `8d5915ba` -> `e80da689` preserves PATCH/retention fixes with scoped proof in11.24. Parent test-only`df3ca957` -> `bd82e681` now closes the eight old expectations:142 merged units, exact outcomes, no skips. Namespace/common-view/compiler/admission and broader acceptance remain open |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
 | C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.27; measured numeric-displayName and explicit-role query failures now closed. Original82-case/backend ledger, broader P7b/characteristic/admission/coordination/performance/artifact acceptance remain open |
@@ -1985,6 +1985,41 @@ the existing planner and reuse the existing representation guard. Broader
 characteristic combinations, whole-namespace strict PATCH, prior expectation
 reconciliation, admission/profile coordination, performance and exact
 packaged-artifact/82-case acceptance remain independent.
+
+### 11.28 Parent-owned expectation reconciliation, 2026-09-29
+
+Parent source `df3ca95773eae65938e07d136c1f199b28746863`, based on the
+committed retention fix `b21e44cb`, is preserved as `bd82e681`.
+Its ownership was confined to `extension-flags-validation.spec.ts` and
+two continuity documents. No pending sibling diff was read or competing
+production/common/PATCH/admission change authored.
+
+The source first reproduced8 failed/68 passed. Three canonical-value tests
+now verify valid non-canonical strings without disabling type checks;
+three malformed extension-container tests require exact invalidValue
+errors; two POST/PUT readOnly tests require ignored input rather than
+rejection. Four added controls retain invalid-scalar rejection, malformed
+readOnly handling in both write modes and explicit PATCH mutability.
+PUT server-owned preservation and an unchanged caller fixture are asserted.
+
+On the current assembly, the reconciled suite plus schema-validator-p7 and
+retained-entry-preservation pass **142 tests in three suites**. The changed
+file lints at zero errors/two warnings. There are no skips or deletions of
+the contested outcomes, and the source file is retained unchanged.
+[Integrated receipt](evidence/scim-p7-expectation-integration-20260929.json).
+Documentation merge conflicts keep both the later common-context ledger
+and this reconciliation. Production TypeScript, HTTP specs and scripts
+are unchanged, so no PostgreSQL/live/build repetition was performed.
+
+The eight-test blocker is closed; the earlier RED and untouched-baseline
+comparison remain historical evidence. This does not claim a full unit
+matrix or close common-policy/admission, namespace-only PATCH, broader
+characteristics, coordination, performance or exact-artifact acceptance.
+
+**Test/gate improvement: applied.** Contract changes receive opposing
+controls and exact errors/state assertions, not deletion or weakening.
+**Design/architecture disposition: accepted.** Test-only alignment of
+existing behavior; no new runtime responsibility or abstraction.
 
 ## 12. Architecture and self-improvement decisions
 
