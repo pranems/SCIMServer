@@ -1,29 +1,29 @@
 # Atomic schema-driven uniqueness
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
 **Status:** P3b local implementation on P4 tip `66a7229f`. Integration,
 release metadata, exact-tip CI and deployment remain parent-owned.
 
-> **Integration acceptance hold (2026-09-29):** the atomic-write core is
-> assembled, but the as-committed policies below are not all approved.
+> **Integration acceptance boundary (2026-09-29):** all four P3b source
+> commits are assembled through `704d701f` -> `7001d194`.
 > The original six no-write probes remain historical evidence. Follow-up
 > `cefb540b` corrects unsupported-type uniqueness and reference exactness.
-> Valid numeric/MV custom-core displayName server promises are still rejected
-> by convenience-column assumptions, and generic candidate fields are still
-> overwritten by promoted columns. These remaining custom-schema discrepancies
-> belong to P3b; P7 separately
-> owns common top-level externalId. Do not deploy or interpret the passing
-> package counts as acceptance of those policies. See
-> [integration disposition](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open).
+> The fourth correction removes the numeric/MV custom-core restrictions and
+> generic candidate overlays. Combined write/transaction checks pass, but
+> independent numeric displayName equality filters still fail through an
+> unsafe convenience-column hint. Admission/profile coordination also remain
+> separate; do not treat writer GREEN as full resource acceptance. See the
+> [current integrated evidence](evidence/scim-custom-authority-integration-20260929/validation.json)
+> and [checkpoint11.23](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1123-fourth-p3b-correction-and-separate-read-probes-2026-09-29).
 
 **Integrated RFC correction, not a full acceptance claim:** reference values are inherently
 case-exact under [RFC 7643 section 2.3.7](https://www.rfc-editor.org/rfc/rfc7643.html#section-2.3.7).
 Follow-up `cefb540b` removes reference folding and rejects inconsistent server
-uniqueness on Boolean/dateTime/binary/whole-complex attributes. P7 owns matching
-admission checks. Source-package RED/GREEN evidence is linked below; final
-integrated acceptance and the custom-core displayName/active authority hold
-remain separate.
+uniqueness on Boolean/dateTime/binary/whole-complex attributes. Matching
+admission policy remains parent-owned, not proved by runtime rejection.
+Source-package RED/GREEN evidence is linked below; the custom-core writer
+authority correction is verified separately from query and final acceptance.
 
 **Registration is a separate open guarantee.** Runtime rejection does not
 prove the endpoint profile/discovery rejects unsupported uniqueness promises.

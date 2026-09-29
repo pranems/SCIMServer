@@ -1,0 +1,153 @@
+{
+  "scope": "Fourth P3b integration and targeted cross-package checks, not final C0",
+  "verifiedAt": "2026-09-29",
+  "sourceCommit": "704d701f4a99363fd5840aa2e7a0113e65a71e6b",
+  "integrationCommit": "7001d19419b0d3db44983adce6db7bb4b191f0e7",
+  "sourceSha256": "d5e89ecfee18c4fc7977ed2a673d9f01b3a7e954797f138714a232ec4ba7a52f",
+  "fingerprintMethod": "Sorted git ls-files -co --exclude-standard api/src, api/test and scripts; path plus bytes",
+  "writeTransactionScope": "passed",
+  "genericEqualityScope": "blocked",
+  "build": "passed",
+  "unit": {
+    "suites": 7,
+    "passed": 245,
+    "failed": 0
+  },
+  "lint": {
+    "files": 8,
+    "errors": 0,
+    "warnings": 23,
+    "rulesRelaxed": false
+  },
+  "http": {
+    "suites": [
+      "atomic-uniqueness",
+      "conditional-writes",
+      "group-aggregate",
+      "endpoint-deletion",
+      "endpoint-conditional-write",
+      "common-externalid-patch",
+      "retained-entry-put",
+      "query-semantics"
+    ],
+    "transport": "Nest test listener under Jest, separate from built-runtime validation",
+    "inmemory": {
+      "passed": 304,
+      "failed": 0,
+      "nativeOnlySkipped": 4
+    },
+    "postgresql": {
+      "passed": 308,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    }
+  },
+  "builtRuntime": {
+    "artifact": "node api/dist/main.js, locally built output; not an immutable published image",
+    "inmemoryMainSharedChecks": {
+      "passed": 143,
+      "failed": 0
+    },
+    "postgresqlMainSharedChecks": {
+      "passed": 143,
+      "failed": 0
+    },
+    "newGenericProbePerBackend": {
+      "scenarios": 5,
+      "outcomes": 45,
+      "passed": 43,
+      "failed": 2,
+      "writeReadbackAndUniquenessPassed": 30,
+      "sortingAndPaginationPassed": 10,
+      "equalityFiltersPassed": 3,
+      "equalityFiltersFailed": 2
+    },
+    "scenarios": [
+      "displayName string scalar",
+      "displayName integer scalar",
+      "displayName integer multi-valued",
+      "active integer scalar",
+      "userName integer scalar"
+    ],
+    "cleanup": "All owned Node processes stopped; endpoint inventories unchanged; both exact PostgreSQL containers removed"
+  },
+  "queryBlockers": [
+    {
+      "declaration": "displayName: integer, single-valued, uniqueness server",
+      "storedValueAfterPatch": 50,
+      "filter": "displayName eq 50",
+      "expected": "200 with exactly the matching resource",
+      "inmemory": {
+        "status": 200,
+        "totalResults": 0
+      },
+      "postgresql": {
+        "status": 500,
+        "detail": "Internal server error"
+      }
+    },
+    {
+      "declaration": "displayName: integer, multi-valued, uniqueness server",
+      "storedValueAfterPatch": [
+        50,
+        51
+      ],
+      "filter": "displayName eq 51",
+      "expected": "200 with exactly the matching resource",
+      "inmemory": {
+        "status": 200,
+        "totalResults": 0
+      },
+      "postgresql": {
+        "status": 500,
+        "detail": "Internal server error"
+      }
+    }
+  ],
+  "queryRootCause": "GENERIC_DB_COLUMNS still maps displayName to the String/CITEXT convenience column. Valid numeric/MV raw payloads have no equivalent scalar column; InMemory drops candidates and PostgreSQL rejects the numeric String filter. Residual evaluation cannot recover rows removed by an unsafe hint.",
+  "queryDisposition": "Open parent C0 query correction. Preserve valid schema shapes; do not restore the removed admission restriction.",
+  "probeSetup": {
+    "initialOutcome": "Five scenarios failed before resource assertions because the fixture omitted resourceTypes[].schemaExtensions",
+    "fixtureCorrection": "Explicit schemaExtensions:[] matches the existing source fixture contract",
+    "rerun": "Only the corrected extra probe was repeated; unchanged 308 HTTP and 143 live checks were not repeated",
+    "separateAdmissionObservation": "The omitted array currently reaches an unguarded iteration and returns500. Parent P7b must decide normalization to[] versus structured400; this is not a uniqueness/query result."
+  },
+  "ownedPostgresqlRuns": [
+    {
+      "run": "1add5700c5dba845",
+      "scope": "Eight HTTP suites and complete shared live entry; initial extra probe had fixture setup failures",
+      "migrations": 22,
+      "exactContainerRemoved": true
+    },
+    {
+      "run": "ea602260a4357a05",
+      "scope": "Corrected additional generic probe only",
+      "migrations": 22,
+      "exactContainerRemoved": true
+    }
+  ],
+  "preservedSeams": [
+    "P3 expected-version conditional writes",
+    "P4 atomic Group creation and member transactions",
+    "P8 create-only endpoint-absence classification after rollback",
+    "P7 common externalId original-value and completed-candidate checks",
+    "Shared one-to-one PUT/PATCH retained-entry matcher",
+    "Default-running P9 I02 and I03"
+  ],
+  "noAdditionalIntegrationProductionFix": true,
+  "documentation": {
+    "contentAndFreshnessCouplingDocsPassed": 26,
+    "newRelativeLinksResolved": 8,
+    "diagramEdits": 0,
+    "originalCaseIdsPreserved": 82,
+    "backendDispositionsUnchanged": 164
+  },
+  "sourceReceiptUnchanged": "../scim-uniqueness-custom-20260929.json",
+  "finalMatrix": false,
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

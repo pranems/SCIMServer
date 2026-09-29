@@ -411,14 +411,14 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Authorized flags integrated and focused dual-backend proof passed | `29b3b2c6` -> `8d2110d1`; 356 HTTP cases/backend preserve ordered/common/P7 overlaps. Quoted active and explicit dotted User controls pass both strict modes; P2 built-live188/backend. Namespace-only strict prevalidation and final C0 remain separate; section 11.22 |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Fourth correction assembled; focused combined validation pending | Existing three source rollback units preserved; `704d701f` corrects generic raw-payload uniqueness and immutable reconstruction. Source proof: 648 units, PostgreSQL158 HTTP and InMemory156 plus two native N/A. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Admission/query/profile coordination and final acceptance remain separate |
+| P3b | Four source commits integrated; write/transaction checks pass, query hold measured | `704d701f` -> `7001d194`; 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared live checks/backend pass. Extra probe43/45: numeric/MV displayName filters fail differently by backend. Source proof remains648/158/156 plus two native N/A. Section11.23 distinguishes writer closure from query/admission/profile coordination |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | Common externalId POST/PUT/PATCH focused parity verified; other acceptance items open | [Common contract](SCIM_P7_COMMON_EXTERNAL_ID.md) from `8e8aa72e` plus integration original-value/completed-candidate checks; neutral PUT matching retained. 973 units, 392 HTTP/backend and built-live proof in 11.19. Eight baseline expectations, query/uniqueness boundaries and final case-level acceptance remain open |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Incremental assembly verified only | Checkpoints through 11.22; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. P2 flag/I03 and precise-create scopes now have proof; original case dispositions, P7/context/test/namespace, P3b/representation/admission/query and performance/artifact acceptance still require closure |
+| C0 | Incremental assembly only; explicit read/admission blockers remain | Checkpoints through11.23; original82-case/backend ledger unchanged. P3b writes now have combined proof; numeric/MV displayName filtering, malformed profile omission, P7/context/test/namespace, uniqueness admission/profile coordination and performance/artifact acceptance remain open |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -1758,6 +1758,60 @@ operator descriptions now have discriminating semantic regressions.
 owns its flag policy; integration removes obsolete harness branching and
 uses the existing type-only HTTP boundary. No speculative strategy or
 framework was added. No release metadata, publication or deployment occurred.
+
+### 11.23 Fourth P3b correction and separate read probes, 2026-09-29
+
+Source `704d701f4a99363fd5840aa2e7a0113e65a71e6b` is preserved as
+`7001d19419b0d3db44983adce6db7bb4b191f0e7`, after the three earlier P3b
+rollback units. Documentation conflicts retained current P2/P7/P8/P9 state
+and imported the new P3b evidence without regressing other packages to the
+source branch's older global tracker.
+
+The generic repositories now compare raw payload plus authoritative scimId;
+builtin User/Group column authority is unchanged. Generic immutable
+reconstruction matches its response. Typed transaction options preserve Group
+atomicity and the create-only endpoint-absence classifier after rollback.
+Common externalId checks and neutral retained-entry matching remain intact.
+
+| Applicable focused check | Measured result |
+|---|---|
+| API build / touched lint | Build passes; eight touched TypeScript files: zero errors,23 warnings, no rule suppression |
+| Policy, repository, generic service and retained-entry units | Seven suites,245 passed |
+| Combined HTTP: uniqueness/CAS/Group/deletion/admin-CAS/common/retention/query | InMemory304 plus four native-only skips; actual PostgreSQL17.8:308 passed, zero pending/TODO |
+| Built main shared live entry |143 reported checks pass on each separately started Node runtime; endpoint inventories unchanged |
+| Additional generic representation probe | Five shapes,45 outcome checks/backend:30 CRUD/readback/uniqueness plus10 sorting checks pass; equality passes3 and fails2 |
+| Ownership | Each PostgreSQL run verifies fresh loopback/tmpfs identity and all22 migrations. APIs stopped and exact containers removed |
+| Receipt | [New integrated evidence](evidence/scim-custom-authority-integration-20260929/validation.json); original source receipts unchanged |
+
+**Newly measured C0 query hold, not a writer regression claim:** create,
+GET, self-PUT and PATCH preserve integer displayName `50` or `[50,51]`, and
+duplicate writes reject correctly. `displayName eq 50` or `displayName eq 51`
+should retrieve the resource, but returns200/zero results on InMemory and
+500 on PostgreSQL. `GENERIC_DB_COLUMNS` still maps this schema-defined
+attribute to a String/CITEXT convenience column. InMemory removes the
+candidate; PostgreSQL rejects the numeric String predicate. A later residual
+filter cannot recover discarded rows. Correct or avoid the unsafe query
+hint; do not reintroduce a ban on valid numeric/MV attributes. Sorting and
+pagination passed for these five shapes, not every possible query.
+
+**Separate fixture/admission observation:** the first extra probe omitted
+`resourceTypes[].schemaExtensions`, so all five scenarios failed at profile
+creation with an unguarded-iteration500, before any resource assertion.
+Supplying the explicit empty array used by the source fixture reached the
+intended45 outcomes. Only that corrected extra probe was rerun; the unchanged
+308 HTTP and143 shared live checks were not repeated. Whether omission
+normalizes to `[]` or receives a documented400 is a P7b policy/validation
+decision; returning500 remains unclosed. It is not a uniqueness failure.
+
+**Test/gate improvement: applied to this acceptance pass.** Name-collision
+probes verify actual returned values, exact query matches and sort order,
+not merely successful writes or200 status. Promote their desired outcomes
+to ordinary regression coverage with the eventual query fix.
+**Design/architecture disposition: scheduled with the parent C0 query pass,
+before release.** Reuse the existing representation/filter seams; no schema
+restriction, new policy DSL or speculative abstraction was added here.
+P7 common-context source is still pending; final82-case/backend reconciliation,
+performance, exact packaged-artifact proof and publication remain separate.
 
 ## 12. Architecture and self-improvement decisions
 

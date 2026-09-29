@@ -92,9 +92,15 @@ including scalar multi-values and complex children. Database-owned namespace
 locks coordinate PostgreSQL writers; InMemory commits synchronously.
 See [contract, compatibility limits and evidence](SCIM_UNIQUENESS_IMPLEMENTATION.md).
 P7 admission and P8 profile-revision coordination remain separate packages.
-Source follow-up `704d701f` corrects generic promoted-column assumptions
-against the approved custom-field contract. Focused combined validation,
-query/sort, admission and profile coordination remain separate evidence.
+Source follow-up `704d701f`, integrated as `7001d194`, corrects generic
+promoted-column assumptions. Focused combined write/transaction checks pass:
+245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared live checks per
+backend. The independent five-shape probe passes43/45 outcomes: CRUD,
+uniqueness and sorting pass, but numeric scalar/MV displayName equality
+returns empty200 on InMemory and500 on PostgreSQL. Its String-column
+pushdown is not a faithful representation. [Integrated evidence and
+boundaries](evidence/scim-custom-authority-integration-20260929/validation.json).
+Admission and profile coordination remain separate acceptance items.
 See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
 P7 common externalId and P3b uniqueness policies have separate owners.
 The RFC follow-up limits unique types to string/integer/decimal/reference;
@@ -104,7 +110,7 @@ Generic resources use public rawPayload authority, preserving custom numeric/MV
 displayName and other same-named custom fields instead of imposing builtin types.
 Latest source-package evidence: 648 units, 158 PostgreSQL HTTP and 156 InMemory
 plus two database-only N/A. Earlier 646/147/145 counts remain historical;
-this is not yet a claim of combined integration or admission closure.
+these source counts are not the combined counts above or admission closure.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory

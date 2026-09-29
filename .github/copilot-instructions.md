@@ -957,5 +957,3 @@ prove that a same-named custom attribute is restricted to the column's type:
 generic SCIM resources emit rawPayload. Compare and persist the representation
 clients observe, retaining server-owned id semantics, and test numeric/MV
 custom attributes whose names collide with builtin convenience fields.
-
-**This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**

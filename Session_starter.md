@@ -54,20 +54,27 @@ cases (two native-DB skips) and 136 bounded built-live checks pass.
 unique types and compares references exactly. Build, 211 focused units,
 167 InMemory HTTP cases (one native-DB skip), seven no-write controls and
 the 21-assertion built-local smoke pass.
-**Acceptance remains blocked:** the three generic promoted-column
-restriction/candidate-authority probes remain unresolved in P3b's committed
-code. The P3b worker has now accepted the concrete response-authority mismatch
-and resumed a RED-first follow-up for generic raw payload extraction and
-immutable reconstruction, separately from P7 common externalId.
-Prior receipts remain historical. Uniqueness admission is also unclosed;
-do not assume P7 fixed it. P3b's runtime 400 is not registration proof. Do not convert a
-convenience-column mismatch into a blanket custom-schema admission ban.
 P3b's narrow Group-adapter follow-up is integrated: `6dc2bc63` -> `3766e9f4`.
 Build, 144 units, 102 InMemory HTTP cases (four native-only skips), 14
 no-write identity/shape controls and the 21-assertion built-local smoke pass.
-Generic candidate authority and admission remain separate open holds.
-The new generic-authority follow-up is pending; no generic-all-shapes or
-filter/sort closure is inferred from the preceding Group adapter proof.
+**Fourth correction integrated:** `704d701f` -> `7001d194` removes the
+generic promoted-column restriction/overlay. Raw payload plus authoritative
+id now controls generic uniqueness and immutable reconstruction; builtin
+User/Group columns stay authoritative. Combined proof: 245 units, 304
+InMemory HTTP plus four native-only skips, 308 PostgreSQL17.8 HTTP after
+22 migrations, and 143 main shared built-live checks per backend.
+[Separate integrated evidence](docs/evidence/scim-custom-authority-integration-20260929/validation.json).
+
+**Acceptance remains blocked:** the additional generic read probe passes
+43/45 outcomes per backend, including CRUD, uniqueness and sorting, but
+numeric scalar/MV displayName equality still uses an incompatible
+convenience-column hint. InMemory returns200/empty; PostgreSQL returns500.
+Do not turn valid schema shapes into an admission ban to hide this.
+Uniqueness admission/profile coordination and P7 context remain separate
+holds. A malformed profile omitting schemaExtensions also returns500;
+its normalize-versus-400 policy belongs to the remaining P7b validation.
+P3b's owner has no further source edits pending. Earlier receipts remain
+historical; the new runtime write proof is not complete generic acceptance.
 
 **Earlier integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
@@ -141,7 +148,8 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P3b RFC follow-up `cefb540b` integrated as `1f0a024a`; supported types/references corrected without claiming generic representation closure.
 - [x] ✅ COMPLETED: P7 common externalId source plus original-value/completed-PATCH integration; `9z-CV` has 426 assertions and new `9z-DC` has 66 cases / 718 assertions.
 - [x] ✅ COMPLETED: P8b exact six-route interrupted-create errors integrated with current transactions; `9z-CX` now supplies 16 checks.
-- [ ] Close remaining P3b generic-authority, admission and query holds before claiming promised uniqueness complete.
+- [x] ✅ COMPLETED: P3b fourth source `704d701f` -> `7001d194`; generic write authority verified with current P3/P4/P7/P8 seams on both backends.
+- [ ] Close numeric/MV displayName query failures, uniqueness admission and profile-revision coordination before C0.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
 - [ ] Close remaining P7 schema-role/id/meta and namespace-only boundaries plus profile-revision coordination before C0.
@@ -152,6 +160,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | P3b custom authority integrated as `7001d194`: 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared built-live checks/backend pass. Separate five-shape probe records43/45 outcomes per backend; numeric/MV displayName equality remains a C0 query blocker (InMemory empty200, PostgreSQL500). Profile omission500 recorded separately. No final matrix or deployment claim. |
 | 2026-09-29 | Authorized P2 flags integrated as `8d2110d1`; unchanged I02/I03 verified, then optional dispatch removed. Both backends: 356 HTTP, P9 built-live19/1228 and P2 built-live188. PostgreSQL17.8/22 migrations and exact cleanup. Added default-discovery/count/guidance RED/GREEN controls; 26-doc content/freshness/coupling gates pass. Historical receipts and release metadata unchanged. |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
 | 2026-09-29 | P7 common externalId correction applies RFC 7643 3.1 to every resource core: String/SV/caseExact/readWrite, original JSON type validation in both strict modes, with independent extension names and custom displayName/active controls. [Evidence and remaining integration boundaries](docs/SCIM_P7_COMMON_EXTERNAL_ID.md). No versions, locks, push or deployment. |
