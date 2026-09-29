@@ -19,6 +19,7 @@ Companion: [compatibility](SCIM_ENTRA_COMPATIBILITY.md) and
 | Verified-target pinning / harness / High | Parent review identified a gap between checking marker absence and ordinary app bootstrap reading a marker that could appear later | RED showed a later competing URL won; GREEN adds optional pinned URL with owned helper, matching committed P5 design. P9 clears inherited URL and uses TCP readiness. Both owned HTTP/live backends rerun green | Parent harness review / bootstrap negative control |
 | Integration ownership / process / Medium | Initial I03 label implied P2 would remove historical literal-key mode | Frozen P2 owner explicitly preserves it. Reclassified I03 as an open compatibility-policy proposal; no speculative default/semantics change | Cross-worker handoff / acceptance-boundary agreement |
 | Receipt parsing / tooling / Low | Loading a JSON-formatted `.log` using `require` treated it as JavaScript and raised SyntaxError | Used `JSON.parse(readFileSync(...))`; no artifact or database change | Summary extraction / same |
+| Policy scope / documentation / Medium | P2/P7 handoffs clarified strict-OFF adapter conversion and whole-profile revalidation of legacy global uniqueness, neither closed by a green P9 strict-ON corpus | Explicitly scoped the corpus to strict ON, assigned active conversion to unresolved parent/P7b policy, documented unrelated profile edits blocked by global without relabeling the RFC keyword invalid. Confirmed merged validation in this worktree source | Cross-worker handoff / source-policy compatibility review |
 
 The first confirmed guidance fix was captured after its RED/GREEN run.
 The fixture errors are harness errors, not product regressions. I03 is open
@@ -47,4 +48,6 @@ two TODO cases are explicit integration work, not skipped passing tests.
 HTTP/live use one corpus with GET readback, value/key checks and cleanup.
 **Design disposition accepted:** shared test data and thin adapters avoid
 duplicated scenario drift without introducing production abstractions.
+The final policy clarification is documentation-only; existing semantics and
+stored profiles stay untouched, and no speculative migration is introduced.
 No protocol default, schema validator, UI, version or lockfile changed.

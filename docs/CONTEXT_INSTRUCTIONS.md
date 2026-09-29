@@ -29,6 +29,10 @@ provisioning and readiness checks target TCP.
 See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
 [37-setting reconciliation](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 No version/lockfile, UI code, push or deployment changes.
+P9 corpus evidence is strict-ON only. Strict-OFF legacy active conversion
+remains an unresolved parent/P7b policy, not a P2 fix. Legacy global uniqueness
+can block unrelated profile-subblock edits because merged profiles are fully
+revalidated; do not silently downgrade the declaration or call it RFC-invalid.
 
 P7a is implemented locally in its own P1-based worktree. The
 [P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,

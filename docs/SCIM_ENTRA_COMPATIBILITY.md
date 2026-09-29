@@ -153,6 +153,9 @@ output and distinguish promoted active from other schema-aware Boolean paths.
 Final policy ownership/disposition remains with the parent and its designated
 P7b/follow-up owner; no new runtime assignment, default change or speculative
 rejection is made by this documentation correction.
+The additional strict-OFF branches are source-reviewed boundaries, not
+executed P9 corpus cases; output Boolean sanitization may differ from stored
+`emails[].primary` JSON.
 No zero-match-remove, filtered-add or optional-protocol default was changed.
 
 ## Attributes and characteristics: supported is not universal
@@ -174,6 +177,24 @@ See [P7a](SCIM_P7A_PROFILE_VALIDATION.md) for scalar formats and limitations.
 Use published characteristic values when present; otherwise use RFC defaults.
 Never hardcode `Group.displayName.uniqueness:none` against an endpoint that
 publishes/enforces server uniqueness.
+
+### Existing profiles containing global uniqueness
+
+`global` is a valid RFC keyword, but this provider rejects that unsupported
+promise. There is an important compatibility consequence: editing **any
+profile subblock** revalidates the entire merged stored profile. An old
+profile with `uniqueness:global` can therefore reject even a settings-only,
+authentication-only or capability-only profile edit.
+
+This follows from [the merged-profile validation path](../api/src/modules/endpoint/services/endpoint.service.ts)
+and P7a's declaration policy; P9 did not inject an old global profile into
+a database to replay it. The failed edit must not silently rewrite the old
+schema or downgrade its uniqueness promise. Read and export the profile,
+identify the unsupported declaration, then make an explicit owner-approved
+schema/capability decision. Turning `StrictSchemaValidation` off cannot
+bypass admin profile validation. P7a GREEN is not evidence that every
+`server` uniqueness placement is enforced atomically; that remains P3b's
+separate contract.
 
 ## Reproduce the bounded proof
 

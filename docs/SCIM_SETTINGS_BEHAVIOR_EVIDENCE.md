@@ -1,6 +1,6 @@
 # All 37 endpoint settings: behavior and evidence
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
 This reconciles the [frozen independent inventory](evidence/scim-fresh-20260925/settings-inventory.json)
 with P7a/P1 and the [P9 corpus](SCIM_ENTRA_COMPATIBILITY.md).
@@ -18,6 +18,8 @@ No default or stored endpoint setting changes in P9.
   configuration-only check. **L** means a built/live outcome assertion.
 * `P9 E...` means executed on **both PostgreSQL and InMemory**, through both
   Supertest and a separately started built local runtime.
+  All supported cases explicitly use **StrictSchemaValidation=true**.
+  Coercion-off rejection in those cases must not be generalized to strict OFF.
 * Other named suites are existing evidence whose relevant assertions/source
   were reviewed, **not rerun as part of the 17-case P9 wire corpus**.
   The four JWKS resolver/validator/cache and logging-redaction unit suites
@@ -32,6 +34,13 @@ declarations in `profile.authentication.methods` take precedence over the
 older enablement flags. JWKS settings use endpoint, then server environment,
 then bounded hard fallback. Credential caps use endpoint then owner fallback.
 Preset-supplied values can differ from registry defaults.
+
+Editing any profile subblock revalidates the **whole merged profile**. A
+previously stored `uniqueness:global` declaration can block an unrelated
+settings edit under P7a's provider-capability policy. It is not an invalid
+RFC keyword, and changing strict mode cannot bypass this admin validation.
+No stored profile is repaired or downgraded automatically; see
+[the compatibility impact](SCIM_ENTRA_COMPATIBILITY.md#existing-profiles-containing-global-uniqueness).
 
 ## Reconciled matrix
 

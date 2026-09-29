@@ -67,6 +67,13 @@ not establish a global guarantee. See the
 [capability matrix and stored-profile edit implications](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy)
 and [compatibility/policy summary](SCIM_ENTRA_COMPATIBILITY.md).
 
+Compatibility impact: any profile-subblock edit validates the entire merged
+stored profile. A legacy `global` declaration may therefore block an unrelated
+settings, authentication or capability edit. This is a provider capability
+restriction, not proof that the RFC keyword is invalid. Do not silently
+replace `global` with `server`, rewrite stored profiles, or disable strict
+validation as a workaround; the owner must approve any change of promise.
+
 ## Value rules
 
 ### Integrated PUT preservation of repeated complex entries
